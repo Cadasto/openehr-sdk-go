@@ -18,13 +18,11 @@ Plus building-block use cases that import a single sub-package (RM modeling, cod
 ## Quickstart
 
 ```bash
-make help        # discover targets
+make help        # grouped targets (toolchain, test, lint, CI, …)
 make doctor      # check host Go vs Docker fallback
-make fmt         # gofmt -w -s on the tree
-make vet         # go vet ./...
-make test        # go test ./... -count=1
 make ci          # full PR gate (see docs/ci.md)
-make build       # compile every package
+make test        # unit tests (+ codegen drift check)
+make fmt         # gofmt -w -s on the tree
 ```
 
 Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docker dev image once (`make image-dev`) and the Makefile transparently routes `fmt / vet / test / build` through it. See [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml).

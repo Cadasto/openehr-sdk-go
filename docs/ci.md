@@ -36,14 +36,18 @@ make ci        # full PR gate (fmt, mod tidy, vet, test, lint, build)
 make test-race # optional; matches main-branch Race job
 ```
 
-| Target | What it does |
-|---|---|
-| `make fmt-check` | Fail if `gofmt -s` would change any file |
-| `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
-| `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
-| `make spec-check` | `specs/traceability.yaml` paths and probes match the tree |
-| `make lint` / `make lint-ci` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
-| `make ci` | All of the above except `test-race` |
+Run `make help` for the full grouped list. Common targets:
+
+| Group | Target | What it does |
+|---|---|---|
+| CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, build) |
+| Test | `make test` | Unit tests; depends on `codegen-verify` |
+| Test | `make test-race` | `-race` detector (main-branch job only) |
+| Format | `make fmt-check` | Fail if `gofmt -s` would change any file |
+| Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
+| Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
+| Specs | `make spec-check` | `specs/traceability.yaml` paths and probes match the tree |
+| Lint | `make lint` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
 
 **Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).
 
