@@ -19,8 +19,9 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `errors/` | openEHR REST error envelopes (REQ-093) | `transport/` error-mapping tests; PROBE-068 |
 | `discovery/` | SMART configuration document + JWKS | `smart/discovery/` tests; PROBE-001, PROBE-002, PROBE-040, PROBE-041 |
 | `system/` | openEHR REST System API responses | `openehr/client/system/` tests |
+| `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 
-Resource-level cassettes (Composition POST/GET/PUT/DELETE, EHR_STATUS, Directory, AQL, Templates) are **deferred** until the corresponding leaf clients in `openehr/client/{ehr/*,query,definition}/` land in Phases 3–6 of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md). Each later phase adds its cassette directory under `its_rest/` with its own provenance subsection.
+Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../canonical_json/`](../canonical_json/) — those carry full COMPOSITION shapes and are reused here without duplication. Write paths (Phase 4) and the remaining resource cassettes (AQL, Templates) are **deferred** until their leaf clients land in Phases 4–6 of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md).
 
 ## Provenance
 
@@ -47,6 +48,16 @@ Hand-crafted capabilities response matching the openEHR REST 1.1.0-development S
 | File | Notes |
 |---|---|
 | `capabilities.json` | Reference capabilities advertising `restapi_specs_version: 1.1.0-development` and a representative endpoint set. |
+
+### `ehr/`
+
+Hand-crafted EHR-API read-path responses matching the openEHR RM JSON shape (REQ-052 canonical JSON). Each file decodes via `transport.Decode[T]` into the corresponding RM type.
+
+| File | Decodes to | Notes |
+|---|---|---|
+| `ehr.json` | `rm.EHR` | EHR root with ehr_id, system_id, time_created, ehr_status/ehr_access ObjectRef. |
+| `ehr_status.json` | `rm.EHRStatus` | Queryable + modifiable EHR_STATUS with PartySelf subject and PARTY_REF external_ref. |
+| `folder.json` | `rm.Folder` | Directory root with two child folders (no items). |
 
 ### `discovery/`
 

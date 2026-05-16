@@ -1,0 +1,35 @@
+{
+  "_type": "EHR_STATUS",
+  "name": {
+    "_type": "DV_TEXT",
+    "value": "EHR Status"
+  },
+  "archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+  "archetype_details": {
+    "_type": "ARCHETYPED",
+    "archetype_id": {
+      "_type": "ARCHETYPE_ID",
+      "value": "openEHR-EHR-EHR_STATUS.generic.v1"
+    },
+    "rm_version": "1.1.0"
+  },
+  "uid": {
+    "_type": "HIER_OBJECT_ID",
+    "value": "f1e2d3c4-b5a6-4978-89ab-cdef01234567"
+  },
+  "is_modifiable": true,
+  "is_queryable": true,
+  "subject": {
+    "_type": "PARTY_SELF",
+    "external_ref": {
+      "_type": "PARTY_REF",
+      "id": {
+        "_type": "GENERIC_ID",
+        "value": "patient-123",
+        "scheme": "MRN"
+      },
+      "namespace": "demographic",
+      "type": "PERSON"
+    }
+  }
+}

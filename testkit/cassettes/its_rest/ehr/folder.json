@@ -1,0 +1,31 @@
+{
+  "_type": "FOLDER",
+  "name": {
+    "_type": "DV_TEXT",
+    "value": "Root Directory"
+  },
+  "archetype_node_id": "openEHR-EHR-FOLDER.generic.v1",
+  "uid": {
+    "_type": "HIER_OBJECT_ID",
+    "value": "0a1b2c3d-4e5f-6789-abcd-ef0123456789"
+  },
+  "folders": [
+    {
+      "_type": "FOLDER",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Episodes"
+      },
+      "archetype_node_id": "at0002"
+    },
+    {
+      "_type": "FOLDER",
+      "name": {
+        "_type": "DV_TEXT",
+        "value": "Care plans"
+      },
+      "archetype_node_id": "at0003"
+    }
+  ],
+  "items": []
+}
