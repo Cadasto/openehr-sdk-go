@@ -1,0 +1,11 @@
+# Architecture Decision Records
+
+Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markdown file with the standard headings (Status, Context, Decision, Consequences). Status reaches **Accepted** before the ADR is considered closed.
+
+Open decisions (those that would be ADRs once resolved) currently live as research strands in the **Cadasto SDK Specification proposal** (private). When a strand is resolved, an ADR lands here.
+
+| # | Title | Status |
+|---|---|---|
+| [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
+
+See [docs/architecture.md § Open research strands](../architecture.md#open-research-strands) for the strand-to-ADR mapping.

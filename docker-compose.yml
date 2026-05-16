@@ -1,0 +1,30 @@
+# docker-compose.yml — developer toolchain for openehr-sdk-go.
+#
+# Single service, gated behind the `dev` profile so a default
+# `docker compose up` does nothing (this is a library — no runtime
+# service to start). The Makefile shells Go calls through the service
+# via `docker compose run --rm go …` when host Go 1.25.x is missing.
+
+services:
+  go:
+    profiles: ["dev"]
+    build:
+      context: .
+      target: dev
+      args:
+        # Match the host UID/GID so files written to the bind mount land
+        # with correct ownership.
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-1000}
+    image: openehr-sdk-go-dev:local
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/home/dev/.cache/go-build
+    environment:
+      CGO_ENABLED: "0"
+
+volumes:
+  go-mod-cache:
+  go-build-cache:

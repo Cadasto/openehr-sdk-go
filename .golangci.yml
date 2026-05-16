@@ -1,0 +1,40 @@
+# golangci-lint v2 — keep in sync with LINT_IMAGE in the Makefile (v2.11.4).
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - copyloopvar
+    - misspell
+    - unconvert
+  disable:
+    - depguard # no third-party deps yet; enable when the module grows
+
+issues:
+  exclude-rules:
+    - path: '_gen\.go$'
+      linters:
+        - dupl
+        - gocyclo
+        - funlen
+        - revive
+    - path: '_jsonmar_gen\.go$'
+      linters:
+        - dupl
+        - gocyclo
+        - funlen
+    - path: '_jsonunmar_gen\.go$'
+      linters:
+        - dupl
+        - gocyclo
+        - funlen
+    - path: '_xmlmar_gen\.go$'
+      linters:
+        - dupl
+        - gocyclo
+        - funlen

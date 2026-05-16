@@ -28,5 +28,18 @@ go.work.sum
 .env
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+
+# Claude Code local settings (per-user, not committed)
+.claude/settings.local.json
+
+# Codebase-memory MCP server local cache (per-user, not committed)
+.codebase-memory/
+
+# Build output
+bin/
+
+# OS
+.DS_Store
+Thumbs.db

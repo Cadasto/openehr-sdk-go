@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/gofmt-on-save.sh",
+            "timeout": 20000
+          }
+        ]
+      }
+    ]
+  }
+}
