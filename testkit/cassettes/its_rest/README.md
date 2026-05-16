@@ -18,8 +18,9 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 |---|---|---|
 | `errors/` | openEHR REST error envelopes (REQ-093) | `transport/` error-mapping tests; PROBE-068 |
 | `discovery/` | SMART configuration document + JWKS | `smart/discovery/` tests; PROBE-001, PROBE-002, PROBE-040, PROBE-041 |
+| `system/` | openEHR REST System API responses | `openehr/client/system/` tests |
 
-Resource-level cassettes (Composition POST/GET/PUT/DELETE, EHR_STATUS, Directory, AQL, Templates) are **deferred** until the corresponding leaf clients in `openehr/client/{system,ehr/*,query,definition}/` land in Phases 2–6 of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md). The provenance README and the error/discovery cassettes here are the Phase 0 foundation; each later phase adds its cassette directory under `its_rest/` with its own provenance subsection.
+Resource-level cassettes (Composition POST/GET/PUT/DELETE, EHR_STATUS, Directory, AQL, Templates) are **deferred** until the corresponding leaf clients in `openehr/client/{ehr/*,query,definition}/` land in Phases 3–6 of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md). Each later phase adds its cassette directory under `its_rest/` with its own provenance subsection.
 
 ## Provenance
 
@@ -38,6 +39,14 @@ Hand-crafted error envelopes that match the REQ-093 shape (`{message, code, code
 | `428.json` | 428 Precondition Required | PUT without `If-Match` against versioned resource |
 
 The envelopes are deliberately small and language-agnostic so the same cassettes are reusable across the Go and PHP SDKs (REQ-080, REQ-081). When a real deployment surfaces a richer envelope (e.g. `coded_text` populated against an openEHR terminology), refresh from that deployment and record the source commit here.
+
+### `system/`
+
+Hand-crafted capabilities response matching the openEHR REST 1.1.0-development System API shape (REQ-095). Fields populated to exercise `ServiceCapabilities` decode including the `Extras` forward-compat path (`support_email`, `documentation_url`, `supported_formats` are deployment-specific and land in `Extras` rather than the typed fields).
+
+| File | Notes |
+|---|---|
+| `capabilities.json` | Reference capabilities advertising `restapi_specs_version: 1.1.0-development` and a representative endpoint set. |
 
 ### `discovery/`
 

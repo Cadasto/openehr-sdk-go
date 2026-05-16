@@ -1,0 +1,26 @@
+{
+  "solution": "Cadasto",
+  "solution_version": "2.4.0",
+  "vendor": "Cadasto",
+  "restapi_specs_version": "1.1.0-development",
+  "conformance_profile": "default",
+  "endpoints": [
+    "/ehr",
+    "/ehr/{ehr_id}",
+    "/ehr/{ehr_id}/ehr_status",
+    "/ehr/{ehr_id}/composition",
+    "/ehr/{ehr_id}/composition/{versioned_object_id}",
+    "/ehr/{ehr_id}/directory",
+    "/ehr/{ehr_id}/contribution",
+    "/ehr/{ehr_id}/item_tag/{target}",
+    "/query/aql",
+    "/query/{qualified_query_name}",
+    "/definition/template/adl1.4",
+    "/definition/template/adl2",
+    "/definition/query/{qualified_query_name}",
+    "/admin/ehr/{ehr_id}"
+  ],
+  "support_email": "support@cadasto.example",
+  "documentation_url": "https://docs.cadasto.example/openehr",
+  "supported_formats": ["application/json", "application/xml"]
+}
