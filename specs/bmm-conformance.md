@@ -137,11 +137,12 @@ Inheritance via `ancestors` is materialised by **embedding the ancestor struct(s
 JSON tags **MUST** preserve the original BMM property name (snake_case), with `omitempty` for non-mandatory single properties. The example below is **conceptual** — it shows the BMM property → Go field mapping and the `DV_AMOUNT` ancestor relationship:
 
 ```go
+// Conceptual mapping only — not the generated struct shape.
 type DVQuantity struct {
     DVAmount                            // conceptual ancestor; flattened by generator (ADR 0002 D4)
-    Magnitude            float64        `json:"magnitude"`
+    Magnitude            rm.Real        `json:"magnitude"`   // BMM Real → rm.Real per REQ-046 / ADR 0004
     Units                string         `json:"units"`
-    Precision            *int32         `json:"precision,omitempty"`
+    Precision            *rm.Integer    `json:"precision,omitempty"`
     NormalRange          *DVInterval[DVQuantity] `json:"normal_range,omitempty"`
     OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
     UnitsSystem          *string        `json:"units_system,omitempty"`

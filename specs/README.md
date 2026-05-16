@@ -35,12 +35,16 @@ At v0 scaffolding stage, all specs are **Draft**.
 The chain that drift detection works against:
 
 ```
-specs/REQ.md (REQ-NNN)
-    └─→ docs/plans/YYYY-MM-DD-*.md
-            └─→ code (Go package)
-                    └─→ tests (*_test.go)
-                            └─→ specs/conformance.md (PROBE-NNN)
+specs/REQ.md (registry index — one row per REQ-NNN)
+    └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
+            └─→ specs/traceability.yaml (packages, probes, tests, plans)
+                    └─→ docs/plans/YYYY-MM-DD-*.md
+                            └─→ code (Go package)
+                                    └─→ tests (*_test.go)
+                                            └─→ specs/conformance.md (PROBE-NNN)
 ```
+
+**Single canonical home:** normative MUST/SHALL prose lives in exactly one topic spec per REQ (see [REQ.md](REQ.md) registry `Canonical` column). REQ.md is an index only — do not duplicate requirement bodies there.
 
 Cite identifiers when crossing the chain:
 
@@ -48,14 +52,15 @@ Cite identifiers when crossing the chain:
 - Every public package's `doc.go` SHOULD reference the REQ-IDs and/or spec sections it covers.
 - Every test that exercises a normative requirement SHOULD cite the REQ-ID and (if applicable) PROBE-ID in a comment.
 - Every ADR in `docs/adr/` MUST cite the STRAND-ID it resolves (from `research-strands.md`) and any REQ-IDs it amends.
+- When landing code or probes, update [`traceability.yaml`](traceability.yaml) and the registry `Impl.` column in [REQ.md](REQ.md).
 
-A requirement with no plan, a plan with no code, code with no test, or a conformance probe with no test — each is a mechanically detectable drift signal.
+A requirement with no plan, a plan with no code, code with no test, or a conformance probe with no test — each is a mechanically detectable drift signal. Run `make spec-check` to catch registry rot.
 
 ## Identifier scheme
 
 | Prefix | Meaning | Lives in |
 |---|---|---|
-| `REQ-NNN` | Enumerated SDK requirement | `REQ.md` |
+| `REQ-NNN` | Enumerated SDK requirement (index) | `REQ.md` (registry); canonical prose in topic specs |
 | `PROBE-NNN` | Conformance probe | `conformance.md` |
 | `STRAND-NN` | Open research strand | `research-strands.md` |
 | `ADR-NNN` | Resolved architectural decision | `../docs/adr/` |
@@ -66,7 +71,10 @@ Identifiers MUST be stable once published — they are referenced from outside t
 
 | File | Scope |
 |---|---|
-| [REQ.md](REQ.md) | Enumerated requirements — the SDK's normative checklist |
+| [REQ.md](REQ.md) | Requirement registry (index) — links to canonical topic specs |
+| [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
+| [packaging.md](packaging.md) | Module identity REQ-001–005 |
+| [transport.md](transport.md) | Transport layer REQ-090–094 |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [scope.md](scope.md) | What is in and out of v1 scope |
 | [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, boundary rules, versioning |

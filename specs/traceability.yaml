@@ -1,0 +1,196 @@
+# Machine-readable REQ traceability. Canonical normative prose: see REQ.md registry + topic specs.
+# Run: make spec-check
+
+requirements:
+  - id: REQ-001
+    title: Module path
+    canonical: specs/packaging.md#req-001--module-path
+    status: draft
+    implementation: landed
+    packages: [go.mod]
+
+  - id: REQ-041
+    title: Pinned BMM sources
+    canonical: specs/bmm-conformance.md#req-041--pinned-bmm-sources
+    status: draft
+    implementation: landed
+    packages: [resources/bmm, openehr/bmm]
+    plans: [docs/plans/2026-05-15-bmm-codegen.md]
+
+  - id: REQ-042
+    title: Generated code drift-detected
+    canonical: specs/bmm-conformance.md#req-042--generated-code-drift-detected
+    status: draft
+    implementation: landed
+    packages: [openehr/rm, openehr/aom/aom14, internal/bmmgen, cmd/bmmgen]
+    plans: [docs/plans/2026-05-15-bmm-codegen.md]
+
+  - id: REQ-045
+    title: BMM loader building block
+    canonical: specs/bmm-conformance.md#req-045--bmm-loader-is-a-building-block
+    status: draft
+    implementation: landed
+    packages: [openehr/bmm]
+
+  - id: REQ-046
+    title: Primitive type mapping
+    canonical: specs/bmm-conformance.md#primitive-type-mapping
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+    adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    tests:
+      - openehr/serialize/canjson/edgecases_test.go
+
+  - id: REQ-040
+    title: Type registry
+    canonical: specs/rm-modeling.md#type-registry-req-040
+    status: draft
+    implementation: landed
+    packages: [openehr/rm/typereg]
+    probes: [PROBE-031]
+
+  - id: REQ-052
+    title: Canonical JSON
+    canonical: specs/wire.md#req-052
+    status: draft
+    implementation: landed
+    packages: [openehr/serialize/canjson]
+    plans: [docs/plans/2026-05-15-canonical-json-serialization.md]
+    probes: [PROBE-030, PROBE-031]
+    adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    tests:
+      - openehr/serialize/canjson/encode_test.go
+      - testkit/probes/serialize/probe_030_canjson_round_trip.go
+
+  - id: REQ-021
+    title: Injected http.Client
+    canonical: specs/idiom.md#http-client-injection-req-021
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-060
+    title: TokenSource interface
+    canonical: specs/auth.md#req-060
+    status: draft
+    implementation: landed
+    packages: [auth]
+
+  - id: REQ-066
+    title: Caller attribution
+    canonical: specs/auth.md#req-066
+    status: draft
+    implementation: landed
+    packages: [transport, auth]
+
+  - id: REQ-068
+    title: SMART flows and launch modes
+    canonical: specs/auth.md#req-068
+    status: draft
+    implementation: partial
+    packages: [auth/clientcreds, auth/jwtbearer]
+
+  - id: REQ-070
+    title: First-class discovery
+    canonical: specs/service-discovery.md#req-070
+    status: draft
+    implementation: landed
+    packages: [smart/discovery]
+
+  - id: REQ-071
+    title: Discovery cache
+    canonical: specs/service-discovery.md#req-071
+    status: draft
+    implementation: landed
+    packages: [smart/discovery]
+
+  - id: REQ-072
+    title: Discovery validation
+    canonical: specs/service-discovery.md#req-072
+    status: draft
+    implementation: landed
+    packages: [smart/discovery]
+
+  - id: REQ-050
+    title: REST 1.1.0-development pin
+    canonical: specs/wire.md#req-050
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/system]
+    plans: [docs/plans/2026-05-15-rest-api-client.md]
+
+  - id: REQ-054
+    title: Optimistic concurrency
+    canonical: specs/wire.md#req-054
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
+    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    probes: [PROBE-010, PROBE-011, PROBE-012]
+    tests:
+      - testkit/probes/versioned/probe_010_put_without_if_match.go
+
+  - id: REQ-059
+    title: openEHR custom headers
+    canonical: specs/wire.md#req-059
+    status: draft
+    implementation: partial
+    packages: [transport, openehr/client/ehr/contribution]
+
+  - id: REQ-090
+    title: OpenTelemetry hooks
+    canonical: specs/transport.md#req-090--opentelemetry-hooks
+    status: draft
+    implementation: landed
+    packages: [transport]
+    probes: [PROBE-050, PROBE-051]
+    tests:
+      - transport/client_test.go
+
+  - id: REQ-091
+    title: Retry policy
+    canonical: specs/transport.md#req-091--retry-policy
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-092
+    title: TLS posture
+    canonical: specs/transport.md#req-092--tls-posture
+    status: draft
+    implementation: landed
+    packages: [transport, smart/discovery]
+
+  - id: REQ-093
+    title: Error envelope mapping
+    canonical: specs/transport.md#req-093--openehr-error-envelope-mapping
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-094
+    title: Prefer negotiation
+    canonical: specs/transport.md#req-094--prefer-response-shape-negotiation
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client/ehr]
+
+  - id: REQ-095
+    title: OpenAPI authoritative source
+    canonical: specs/wire.md#req-095
+    status: draft
+    implementation: partial
+    packages: [testkit/cassettes/its_rest]
+
+  - id: REQ-053
+    title: FLAT and STRUCTURED
+    canonical: specs/wire.md#req-053
+    status: draft
+    implementation: planned
+
+  - id: REQ-061
+    title: SMART-on-openEHR PKCE
+    canonical: specs/auth.md#req-061
+    status: draft
+    implementation: planned

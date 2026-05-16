@@ -57,6 +57,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live.
 - **Status** — Draft (in this spec), Implemented (in code), Ratified (cross-SDK pass against reference).
+- **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Authentication and discovery
 
@@ -141,6 +142,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`. The Go SDK additionally short-circuits empty `ifMatch` at the call site with `transport.ErrInvalidConfig` per the typed-write-path guard.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../testkit/probes/versioned/probe_010_put_without_if_match.go).
+- **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-011 — PUT Composition with stale If-Match
 
@@ -149,6 +151,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion:** PUT returns `412` or `409`; SDK maps to `ErrPreconditionFailed` or `ErrVersionConflict` accordingly.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_011_put_stale_if_match.go`](../testkit/probes/versioned/probe_011_put_stale_if_match.go).
+- **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-012 — ETag survives round trip
 
@@ -157,6 +160,7 @@ The catalog is the normative list. Each entry has:
 - **Wire assertion:** GET response carries `ETag`; PUT carries the same value as `If-Match`; PUT returns `204` or `200`.
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_012_etag_round_trip.go`](../testkit/probes/versioned/probe_012_etag_round_trip.go).
+- **Satisfies:** REQ-054
 
 #### PROBE-013 — Cross-EHR isolation
 
@@ -192,7 +196,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A reference Composition cassette.
 - **Wire assertion:** `serialize.Decode → struct → serialize.Encode` produces output that, after the SDK's canonical-ordering pass, matches the input.
 - **Modes:** Sandbox (no network).
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_030_canjson_round_trip.go`](../testkit/probes/serialize/probe_030_canjson_round_trip.go).
+- **Satisfies:** REQ-052, REQ-040, REQ-082
 
 #### PROBE-031 — `_type` discriminator decoded via registry
 
@@ -200,7 +205,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A cassette containing an unregistered `_type`.
 - **Wire assertion:** Decode returns `typereg.ErrUnknownType` with the unknown `_type` value.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
+- **Satisfies:** REQ-040, REQ-052
 
 #### PROBE-033 — Canonical-XML round trip
 
@@ -329,6 +335,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Wire assertion:** Captured span has the expected attribute set; URL does not contain the bearer token.
 - **Modes:** Sandbox.
 - **Status:** Draft.
+- **Satisfies:** REQ-090
 
 #### PROBE-051 — No-OTel is a silent no-op
 
@@ -336,7 +343,8 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Default context.
 - **Wire assertion:** Request succeeds; no global state mutation.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — covered by [`transport/client_test.go`](../transport/client_test.go).
+- **Satisfies:** REQ-090
 
 ## Adding probes
 
@@ -359,12 +367,12 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 
 ## Coverage matrix
 
-| Topic | Probes | Lives in (test code, TBD) |
+| Topic | Probes | Lives in (test code) |
 |---|---|---|
-| Auth + discovery | PROBE-001 … 009 | `testkit/probes/auth/` |
-| Versioned writes | PROBE-010 … 013 | `testkit/probes/versioned/` |
-| AQL | PROBE-020 … 021 | `testkit/probes/aql/` |
-| Canonical JSON / formats | PROBE-030 … 034 | `testkit/probes/serialize/` |
-| Service discovery | PROBE-040 … 041 | `testkit/probes/discovery/` |
-| Observability | PROBE-050 … 051 | `testkit/probes/observability/` |
-| REST binding | PROBE-060 … 068 | `testkit/probes/rest/` |
+| Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
+| Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — 010–012 implemented; 013 not yet |
+| AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
+| Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031 implemented; 032–034 not yet |
+| Service discovery | PROBE-040 … 041 | *planned* — `testkit/probes/discovery/` (resolver tests in `smart/discovery/`) |
+| Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
+| REST binding | PROBE-060 … 068 | *planned* — `testkit/probes/rest/` (subset covered by `openehr/client/*_test.go` and `transport/`) |

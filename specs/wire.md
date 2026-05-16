@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and headers), REQ-090 / REQ-091 / REQ-092 (transport hygiene), REQ-093 / REQ-094 / REQ-095 (REST binding: error envelope, `Prefer` negotiation, OpenAPI authoritative source).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers) and REQ-095 (OpenAPI authoritative source). Transport hygiene (REQ-090–094) lives in [transport.md](transport.md).
 
 The premise: cross-SDK parity is wire-level (REQ-081). Source-level idioms diverge between Go and PHP SDKs; the bytes on the wire and the AQL strings are identical.
 
@@ -79,55 +79,9 @@ Response headers in this family **MUST** be surfaced on the typed response metad
 
 The SDK **MUST NOT** require consumers to construct the audit envelope by hand — `*rm.AuditDetails` is a generated RM type per REQ-042, serialised via canonical JSON / canonical XML at the codec boundary.
 
-## `Prefer` negotiation
+## `Prefer` negotiation and error envelope
 
-### REQ-094
-
-openEHR REST 1.1.0-development uses the standard HTTP `Prefer: return=<mode>` header to negotiate the response body on write paths. The SDK **MUST** support the three documented modes:
-
-| Mode | Server response | SDK return |
-|---|---|---|
-| `minimal` | empty body; `Location` + `ETag` | typed return value carries only metadata (`*VersionMetadata`) |
-| `identifier` | body contains identifier only | typed return value populated to the identifier slot |
-| `representation` | body contains the full new resource | typed return value populated fully |
-
-Rules:
-
-- Per-call option: `transport.WithPrefer(Prefer)`. `Prefer` is a typed enum, not a raw string, to keep call sites compile-checked.
-- **Defaults:** writes default to `minimal` (matches the CDR benchmark's POST-then-GET pattern and minimises wire bandwidth); reads default to `representation` (no Prefer header sent — `representation` is the natural response).
-- The SDK **MUST NOT** silently downgrade `representation` to `minimal` when the server omits the body; that is a server bug and surfaces as `ErrInvalidShape` on decode.
-
-## Error envelope
-
-### REQ-093
-
-openEHR REST 1.1.0-development returns a structured JSON body on non-2xx responses:
-
-```json
-{
-  "message": "Composition violates template constraints at /content[1]/...",
-  "code": "VALIDATION_FAILED",
-  "coded_text": [
-    {"terminology_id": {"value": "openehr"}, "code_string": "..."}
-  ]
-}
-```
-
-The SDK **MUST**:
-
-- Decode this envelope on every non-2xx response (best-effort; missing fields default to zero values).
-- Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText}`.
-- Map the HTTP status to the typed sentinel per [idiom.md § Errors](idiom.md#errors): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrPreconditionRequired` (428).
-- Preserve the raw response body for diagnostics: `WireError.RawBody` is accessible for logging / forensic use.
-
-Consumers check the error class with `errors.Is(err, transport.ErrVersionConflict)` and reach the openEHR-specific detail with:
-
-```go
-var wire *transport.WireError
-if errors.As(err, &wire) && wire.OpenEHR != nil {
-    log.Printf("openEHR error code=%s message=%s", wire.OpenEHR.Code, wire.OpenEHR.Message)
-}
-```
+REQ-094 (`Prefer`) and REQ-093 (structured error envelope) are normative in [transport.md](transport.md). Leaf clients under `openehr/client/*` consume them via `transport.Client`.
 
 ## Canonical JSON
 
@@ -239,54 +193,9 @@ Rules the SDK **MUST** enforce:
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value so the caller can use it for the next PUT.
 
-## Observability hooks
+## Transport cross-cutting concerns
 
-### REQ-090
-
-`transport/` **MUST** expose OpenTelemetry hooks:
-
-- **Spans.** Every outgoing request opens an OTel span named `<METHOD> <route_template>` (e.g. `GET /ehr/{ehr_id}`). The span **MUST** carry attributes: HTTP method, URL (sanitised — no tokens), status code, response size, `openehr.spec_version`, `openehr.resource_type` (where applicable).
-- **Propagation.** Trace context **MUST** be propagated outbound via the standard W3C `traceparent` / `tracestate` headers (using the OTel `propagation` API).
-- **No-op safety.** The absence of a `TracerProvider` in the context **MUST** be a silent no-op — the SDK **MUST NOT** require an OTel setup to function.
-
-Metrics and logs **MAY** be added later (request count, request duration histogram, retry attempts) once the OTel SDK stabilises a metrics surface and the SDK has a benchmarked basis for which metrics to emit.
-
-## TLS posture
-
-### REQ-092
-
-The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration is the consumer's responsibility. However, the SDK **SHOULD**:
-
-- Emit a warning (via a configurable logger or a typed result on construction) when a `ServiceCatalog` entry's `BaseURL` uses plaintext `http://` and the entry is not explicitly marked `Insecure: true`.
-- Emit a warning when the SMART discovery document is fetched over `http://`.
-- Default the *opt-in* discovery fetcher (when the SDK does its own fetching rather than receiving a hand-built catalog) to refusing plaintext URLs unless `discovery.WithAllowInsecure()` is set.
-
-The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config. A consumer who wants to talk to a local development backend over plaintext does so explicitly; production deployments fail visibly.
-
-## Retry policy
-
-### REQ-091
-
-`transport/` **MUST** offer a default retry / backoff policy that is **off by default**. Enabling retries **MUST** be an explicit functional option:
-
-```go
-client, err := transport.New(catalog,
-    transport.WithRetry(retry.Policy{
-        MaxAttempts:     3,
-        InitialBackoff:  100 * time.Millisecond,
-        MaxBackoff:      5 * time.Second,
-        Multiplier:      2.0,
-        RetriableStatus: []int{502, 503, 504},
-    }),
-)
-```
-
-Rules:
-
-- Retries **MUST NOT** be enabled by default for **any** method. Benchmarks and federators need clean latency tails.
-- Retries **MUST NOT** be applied to non-idempotent methods (POST, PATCH, DELETE-with-side-effects) unless the consumer explicitly opts in per call.
-- Retries **MUST** respect `ctx` cancellation — a cancelled context aborts retry waits immediately.
-- The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
+REQ-090 (OpenTelemetry), REQ-091 (retry), REQ-092 (TLS posture), REQ-093 (error envelope), and REQ-094 (`Prefer`) are specified in [transport.md](transport.md).
 
 ## Streaming and large payloads
 
@@ -309,9 +218,5 @@ Out of v1 scope:
 | AQL wire | REQ-055 | `openehr/aql/`, `openehr/client/query/` |
 | Stored AQL | REQ-057 | `openehr/client/definition/`, `openehr/client/query/` |
 | openEHR custom header family | REQ-059 | `transport/` (option API), `openehr/client/*` (typed per-method options) |
-| Error envelope mapping | REQ-093 | `transport/` (decoding), `openehr/client/*` (typed-error propagation) |
-| `Prefer` negotiation | REQ-094 | `transport/` (option), `openehr/client/*` (per-write default) |
 | OpenAPI authoritative source | REQ-095 | `testkit/cassettes/its_rest/` (records upstream commit) |
-| Observability | REQ-090 | `transport/` |
-| Retry policy | REQ-091 | `transport/` |
-| TLS posture | REQ-092 | `transport/`, `smart/discovery/` |
+| Transport (OTel, retry, TLS, errors, Prefer) | REQ-090–094 | [transport.md](transport.md) → `transport/`, `smart/discovery/` |

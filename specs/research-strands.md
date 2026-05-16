@@ -83,21 +83,31 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-04 — RM polymorphism and codec performance
 
-**Status:** Open.
+**Status:** Partially resolved.
 
 **Question:** The RM modeling rules in [rm-modeling.md](rm-modeling.md) (concrete structs + embedded base + interfaces + central type registry) need validation against the full RM 1.1.0-development surface. And: which JSON codec — `encoding/json`, `sonic`, `easyjson` — is the default?
 
-**Why it's open:** REQ-024 (no reflection) and REQ-040 (type registry) describe the *strategy*, but the inventory work and codec benchmarking haven't happened. Some RM polymorphic sites may need bespoke handling.
+### Resolved sub-questions
 
-**Evidence needed:**
+| Sub-question | Resolution | ADR |
+|---|---|---|
+| Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../docs/adr/0003-rm-event-polymorphism.md) |
+| `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../docs/adr/0004-numeric-wire-tolerance.md) |
 
-- Decode every RM type from the BMM dictionary through the registry; identify any that resist the pattern.
-- Benchmark `encoding/json` vs `sonic` vs `easyjson` under the seeder and benchmark workloads. Measure throughput, allocations, and memory residency.
-- Confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
+### Still open
 
-**Resolution form:** ADR-NNN choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking.
+- **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
+- **Default codec benchmark:** `encoding/json` (current, via generator-emitted `MarshalJSON`) vs `sonic` vs `easyjson` under seeder/benchmark workloads.
+- **Validation independence:** confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
 
-**Implementation gate:** Phase 1 — affects every read path in `openehr/client/*`.
+**Evidence needed (remaining):**
+
+- Benchmark throughput, allocations, and memory residency for codec candidates.
+- Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
+
+**Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking.
+
+**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and cross-SDK parity (REQ-080).
 
 ---
 
@@ -188,7 +198,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-01](#strand-01--extraction-from-openehr-cdr) | Extraction from openehr-cdr | Open | REQ-001..014; Phase 1 |
 | [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | Open | REQ-050; cross-SDK |
 | [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | Open | REQ-021..023 |
-| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | Open | REQ-024, REQ-040, REQ-052..053 |
+| [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | REQ-024, REQ-040, REQ-052..053 |
 | [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | Open | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |

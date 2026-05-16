@@ -114,19 +114,39 @@ testkit/  -. helpers for .-→ all of the above
 - `openehr/bmm/` MUST NOT depend on `transport/`, `auth/`, or any HTTP package — it is a building block (REQ-045).
 - `internal/bmmgen` depends on `openehr/bmm/` and the standard `text/template` / `go/format` packages — no SDK runtime packages.
 
-## Boundary rules
+## REQ-010 — `cadasto/` cut line
 
-Five load-bearing rules. A violation forfeits future options that the cut lines preserve.
+No package outside `cadasto/…` **MAY** import from `cadasto/…`. The packages allowed to import `cadasto/<X>` are: the consuming application (in `cmd/` and downstream repos) and other `cadasto/<X>` packages **only via** openEHR-core types or interface contracts (see REQ-011).
 
-1. **No upward imports into `cadasto/`** (REQ-010). Nothing under `openehr/`, `auth/`, `smart/`, `transport/`, `sandbox/`, or `testkit/` **MAY** import from `cadasto/…`. The `cadasto/` subtree is the single cut line for an optional later extraction (STRAND-08).
+Nothing under `openehr/`, `auth/`, `smart/`, `transport/`, `sandbox/`, or `testkit/` **MAY** import from `cadasto/…`. The `cadasto/` subtree is the single cut line for an optional later extraction (STRAND-08).
 
-2. **No sideways imports inside `cadasto/`** (REQ-011). No `cadasto/<name>` package **MAY** import another `cadasto/<other>` directly. Shared types live in openEHR-core packages, or are expressed as interfaces consumed by both.
+## REQ-011 — No sideways imports inside `cadasto/`
 
-3. **Layered `auth/`** (REQ-012). `auth/` exposes only the generic `TokenSource` abstraction and shared OAuth2 primitives. SMART-on-openEHR, Client Credentials, JWT Bearer, and any future provider live in sub-packages and are not re-exported from `auth/`.
+No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. Shared types **MUST** live in openEHR-core packages (under `openehr/…`, `auth/…`, `smart/…`, or `transport/…`), or be expressed as interfaces consumed by both.
 
-4. **Building-block independence** (REQ-013). Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/aql` (models only) **MUST** be importable and useful without instantiating `transport/`, `auth/`, or any HTTP client.
+## REQ-012 — Auth layering
 
-5. **Service discovery is first-class** (REQ-070). Constructors **MUST** take a `smart/discovery.ServiceCatalog`, not a single base URL.
+`auth/` **MUST** define a generic `TokenSource` abstraction. Provider-specific implementations (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, …) **MUST** be sub-packages and **MUST NOT** appear in the public surface of `auth/` itself.
+
+## REQ-013 — Building-block independence
+
+Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, and `openehr/aql` (models only) **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`.
+
+See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
+
+## REQ-014 — Dependency direction
+
+Imports between SDK packages **MUST** flow strictly downward through the dependency graph in [§ Dependency direction](#dependency-direction). Upward or cyclic imports are prohibited.
+
+## Boundary rules (summary)
+
+Five load-bearing rules — normative detail in REQ-010 through REQ-014 above and REQ-070 in [service-discovery.md](service-discovery.md). A violation forfeits future options that the cut lines preserve.
+
+1. **No upward imports into `cadasto/`** — REQ-010.
+2. **No sideways imports inside `cadasto/`** — REQ-011.
+3. **Layered `auth/`** — REQ-012.
+4. **Building-block independence** — REQ-013.
+5. **Service discovery is first-class** — REQ-070; constructors **MUST** take a `smart/discovery.ServiceCatalog`, not a single base URL.
 
 ## The `internal/` boundary
 
