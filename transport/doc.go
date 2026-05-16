@@ -4,8 +4,8 @@
 // spec-version pinning.
 //
 // Implements REQ-021 (injected client), REQ-051, REQ-054, REQ-059,
-// REQ-066, REQ-090, REQ-091, REQ-093, and REQ-094 per specs/transport.md
-// and specs/wire.md.
+// REQ-060, REQ-066, REQ-069, REQ-090, REQ-091, REQ-093, and REQ-094 per
+// specs/transport.md, specs/wire.md, and specs/auth.md.
 //
 // The SDK does not allocate its own transport — consumers must inject
 // the *http.Client whose connection pool, timeouts, and TLS config they

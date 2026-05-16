@@ -68,7 +68,8 @@ github.com/cadasto/openehr-sdk-go/
 ├── auth/                      # generic TokenSource + OAuth2 primitives
 │   ├── smart/                 # SMART-on-openEHR provider (PKCE, launch) — planned
 │   ├── clientcreds/           # Client Credentials provider
-│   └── jwtbearer/             # JWT Bearer provider
+│   ├── jwtbearer/             # JWT Bearer provider
+│   └── basic/                 # HTTP Basic on openEHR REST (REQ-069)
 ├── transport/                 # HTTP wrapper around injected *http.Client
 ├── openehr/
 │   ├── rm/                    # RM types + type registry (typereg)

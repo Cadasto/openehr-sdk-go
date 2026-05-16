@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-064.
+Normative contract for the `auth/` package family and the application-level `smart/` package. Covers REQ-060 through REQ-064 and REQ-069.
 
 The SDK supports authenticated requests through a layered model:
 
@@ -31,10 +31,10 @@ import (
     "time"
 )
 
-// Token is the credential delivered to the wire — typically an OAuth2 access token.
+// Token is the credential delivered to the wire.
 type Token struct {
-    Value     string        // raw token (Bearer credential)
-    Type      string        // "Bearer" — pinned for now
+    Value     string        // scheme-specific credential (bearer token or Basic payload)
+    Type      string        // Authorization scheme: "Bearer" (default), "Basic", …
     ExpiresAt time.Time     // absolute expiry; zero value = "no expiry / unknown"
     Scope     string        // space-separated scope grant (informational; not enforced by SDK)
     Issuer    string        // issuer URL the token was minted by (for audit / disambiguation)
@@ -53,7 +53,7 @@ type TokenSource interface {
 Rules:
 
 - Every authenticated request path **MUST** acquire its bearer through a `TokenSource`. No package outside `auth/<provider>/` may construct a `Token` directly.
-- `Token.Value` is opaque to `transport/`; transports forward it as `Authorization: Bearer <value>` without inspection.
+- `Token.Value` is opaque to `transport/`; transports forward it as `Authorization: <Type> <Value>` without inspection. When `Type` is empty, `transport/` treats it as `Bearer`.
 - A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use (REQ-026).
 
 ### Provider sub-packages (REQ-012)
@@ -65,8 +65,9 @@ Rules:
 | `auth/smart/` | SMART-on-openEHR (Authorization Code + PKCE + launch) | Interactive end-user app on top of a SMART-on-openEHR EHR / CDR |
 | `auth/clientcreds/` | OAuth2 Client Credentials | Service-to-service callers (benchmark, seeder, MCP server, federator backend) |
 | `auth/jwtbearer/` | OAuth2 JWT Bearer (RFC 7523) | Systems holding a signed assertion (e.g. trusted intermediaries) |
+| `auth/basic/` | HTTP Basic (RFC 7617) on openEHR REST | Deployments that accept a static username/password per request (dev, legacy gateways) |
 
-Additional providers (Basic, plain OIDC, session-cookie) **MAY** be added as further sub-packages without changing the `TokenSource` contract.
+Additional providers (plain OIDC, session-cookie) **MAY** be added as further sub-packages without changing the `TokenSource` contract.
 
 ### Per-request TokenSource
 
@@ -258,6 +259,41 @@ Each SDK client instance **MUST** bind to exactly one issuer and therefore one t
 
 Multi-issuer / multi-tenant fan-out is achieved by constructing **one client per issuer**. The SDK **MUST NOT** internally multiplex issuers behind a single client. This matters most for the federator use case ([use-cases.md § Federative API client](use-cases.md#federative-api-client)).
 
+## HTTP Basic on openEHR REST
+
+### REQ-069
+
+Some openEHR REST deployments (development CDRs, legacy gateways, internal tools) authenticate API calls with **HTTP Basic** — a static username and password on every request, not an OAuth2 access token.
+
+`auth/basic` **MUST** implement `auth.TokenSource` for this case:
+
+```go
+// auth/basic/basic.go (sketch)
+
+package basic
+
+// New returns a TokenSource that always yields Type "Basic" and Value set to the
+// base64-encoded "username:password" payload per RFC 7617.
+func New(username, password string) (*Source, error)
+```
+
+Rules:
+
+- `New` **MUST** reject an empty username with `auth.ErrInvalidConfig`. Password **MAY** be empty when the deployment allows it.
+- `Token()` **MUST** return `auth.Token{Type: "Basic", Value: <base64(user-pass)>}` with no expiry (`ExpiresAt` zero) — there is no token exchange or refresh.
+- The implementation **MUST** be safe for concurrent use (REQ-026) and honour `context.Context` cancellation (REQ-020).
+- `transport/` **MUST** emit `Authorization: Basic <Value>` when `Token.Type` is `Basic` (already satisfied by the generic `Authorization: <Type> <Value>` rule in REQ-060).
+- `auth/basic` **MUST NOT** perform OAuth2 token-endpoint calls; it is unrelated to `client_secret_basic` on the token endpoint (see `auth/clientcreds`).
+
+Consumers wire Basic auth at client construction:
+
+```go
+ts, _ := basic.New("service", os.Getenv("OPENEHR_PASSWORD"))
+client, _ := transport.New(catalog, transport.WithTokenSource(ts), ...)
+```
+
+Per-request override via `auth.WithTokenSource(ctx, ts)` **MUST** work the same as for Bearer providers (REQ-060).
+
 ## Client Credentials and JWT Bearer providers
 
 `auth/clientcreds` and `auth/jwtbearer` are simpler — no interactive flow, no launch context. They:
@@ -316,3 +352,4 @@ Consumers detect classes via `errors.Is`. The underlying wire error is preserved
 | AI caller attribution | REQ-066 | `transport/`, `auth/context.go` |
 | Platform principal claims | REQ-067 | `auth/smart/`, `smart/` |
 | Flow + launch-mode coverage | REQ-068 | `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/` |
+| HTTP Basic on openEHR REST | REQ-069 | `auth/basic/`, consumed by `transport/` |

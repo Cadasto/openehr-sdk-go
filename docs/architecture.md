@@ -2,7 +2,7 @@
 
 **Narrative companion to [`specs/`](../specs/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`specs/`](../specs/). When the two disagree, `specs/` wins and this document is the one to update.
 
-> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, `transport/`, auth providers (`clientcreds`, `jwtbearer`), `smart/discovery/`, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write) are landed. `auth/smart` PKCE, Query/Definition clients, composition builder, and Cadasto extras remain stubs or open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
+> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, `transport/`, auth providers (`clientcreds`, `jwtbearer`, `basic`), `smart/discovery/`, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write) are landed. `auth/smart` PKCE, Query/Definition clients, composition builder, and Cadasto extras remain stubs or open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
 ## Where to find what
 
@@ -32,7 +32,7 @@ The full taxonomy with package-level scope notes lives in [`../specs/module-layo
 
 ```
 openehr-sdk-go/
-├── auth/             smart/  clientcreds/  jwtbearer/
+├── auth/             smart/  clientcreds/  jwtbearer/  basic/
 ├── transport/
 ├── openehr/
 │   ├── rm/           typereg/
@@ -139,7 +139,7 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per ADR 0002 |
 | Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | REQ-052; PROBE-030/031 |
 | Transport | [`transport/`](../transport/) | REQ-021, 054, 059, 066, 090–094 |
-| Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/) | REQ-060, 066, 068 |
+| Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/), [`auth/basic/`](../auth/basic/) | REQ-060, 066, 068, 069 |
 | Discovery | [`smart/discovery/`](../smart/discovery/) | REQ-070–072, 092 |
 | REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution) | REST plan Phases 2–4; PROBE-010–012 |
 | Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031), `versioned/` (010–012) |

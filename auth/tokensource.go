@@ -5,13 +5,19 @@ import (
 	"time"
 )
 
-// Token is the credential delivered to the wire — typically an OAuth2 access
-// token. Carriage is bearer-only in v1 (REQ-060). Token is opaque to
-// transport/ which forwards Value verbatim as Authorization: Bearer <Value>.
+// TokenTypeBearer is the OAuth2 access-token scheme (default when Type is empty).
+const TokenTypeBearer = "Bearer"
+
+// TokenTypeBasic is the HTTP Basic scheme; Value MUST be the base64-encoded
+// user-pass payload per RFC 7617 (REQ-069).
+const TokenTypeBasic = "Basic"
+
+// Token is the credential delivered to the wire. Token is opaque to
+// transport/, which emits Authorization: <Type> <Value> (REQ-060, REQ-069).
 type Token struct {
-	// Value is the raw bearer credential.
+	// Value is the scheme-specific credential (bearer token or Basic payload).
 	Value string
-	// Type is the token type. "Bearer" is the only pinned value in v1.
+	// Type is the Authorization scheme ("Bearer", "Basic", …). Empty means Bearer.
 	Type string
 	// ExpiresAt is the absolute expiry instant. The zero value means
 	// "no expiry / unknown" — TokenSource implementations that cannot

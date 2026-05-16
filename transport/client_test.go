@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/basic"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -196,6 +198,30 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 	}
 	if captured != "Bearer default-tok" {
 		t.Errorf("fallback Authorization = %q, want Bearer default-tok", captured)
+	}
+}
+
+func TestDoBasicAuthAuthorization(t *testing.T) {
+	var captured string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	src, err := basic.New("alice", "secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, _ := New(newCatalog(t, srv),
+		WithHTTPClient(srv.Client()),
+		WithTokenSource(src),
+	)
+	if _, err := c.Do(context.Background(), &Request{Path: "/ehr"}); err != nil {
+		t.Fatal(err)
+	}
+	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("alice:secret"))
+	if captured != want {
+		t.Errorf("Authorization = %q, want %q (REQ-069)", captured, want)
 	}
 }
 

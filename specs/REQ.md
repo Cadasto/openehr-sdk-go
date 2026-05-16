@@ -62,6 +62,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-066 | Caller attribution | [auth.md § REQ-066](auth.md#req-066) | landed |
 | REQ-067 | Platform principal claims | [auth.md § REQ-067](auth.md#req-067) | planned |
 | REQ-068 | SMART flows and launch modes | [auth.md § REQ-068](auth.md#req-068) | partial |
+| REQ-069 | HTTP Basic on openEHR REST | [auth.md § REQ-069](auth.md#req-069) | landed |
 | REQ-070 | First-class discovery | [service-discovery.md § REQ-070](service-discovery.md#req-070) | landed |
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |
 | REQ-072 | Discovery validation | [service-discovery.md § REQ-072](service-discovery.md#req-072) | landed |

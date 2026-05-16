@@ -24,6 +24,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `auth/smart/` | SMART-on-openEHR provider — PKCE, authorization-code launch flow, token refresh, JWKS rotation. |
 | `auth/clientcreds/` | OAuth2 Client Credentials grant provider. |
 | `auth/jwtbearer/` | OAuth2 JWT Bearer (RFC 7523) grant provider. |
+| `auth/basic/` | HTTP Basic (RFC 7617) credentials for openEHR REST (REQ-069). |
 | `transport/` | HTTP client wrapper around an injected `*http.Client`. Hosts interceptors, retry/backoff, OTel hooks, error mapping, optional spec-version pinning. Named `transport/` (not `http/`) to avoid collision with `net/http` at consumer call sites. |
 | `openehr/` | Namespace marker; exports nothing. |
 | `openehr/rm/` | RM types (clinical + demographic) as concrete structs with embedded base types; abstract RM categories as Go interfaces. **Generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-042). |
@@ -126,7 +127,7 @@ No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. 
 
 ## REQ-012 — Auth layering
 
-`auth/` **MUST** define a generic `TokenSource` abstraction. Provider-specific implementations (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, …) **MUST** be sub-packages and **MUST NOT** appear in the public surface of `auth/` itself.
+`auth/` **MUST** define a generic `TokenSource` abstraction. Provider-specific implementations (`auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, …) **MUST** be sub-packages and **MUST NOT** appear in the public surface of `auth/` itself.
 
 ## REQ-013 — Building-block independence
 

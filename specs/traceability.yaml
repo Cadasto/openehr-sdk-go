@@ -91,6 +91,16 @@ requirements:
     implementation: partial
     packages: [auth/clientcreds, auth/jwtbearer]
 
+  - id: REQ-069
+    title: HTTP Basic on openEHR REST
+    canonical: specs/auth.md#req-069
+    status: draft
+    implementation: landed
+    packages: [auth/basic]
+    tests:
+      - auth/basic/basic_test.go
+      - transport/client_test.go
+
   - id: REQ-070
     title: First-class discovery
     canonical: specs/service-discovery.md#req-070
