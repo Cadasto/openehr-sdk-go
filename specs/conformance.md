@@ -310,7 +310,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend supports ADL1.4 template upload at the standard path.
 - **Wire assertion:** Upload request carries `Content-Type: application/xml`; GET response body equals the uploaded OPT bytes (modulo backend-side reformatting documented per deployment).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/definition/probe_067_template_upload_round_trip.go`](../testkit/probes/definition/probe_067_template_upload_round_trip.go).
 
 #### PROBE-068 — Error envelope decodes into `WireError.OpenEHR`
 

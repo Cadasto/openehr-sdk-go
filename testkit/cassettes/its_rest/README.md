@@ -20,8 +20,9 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `discovery/` | SMART configuration document + JWKS | `smart/discovery/` tests; PROBE-001, PROBE-002, PROBE-040, PROBE-041 |
 | `system/` | openEHR REST System API responses | `openehr/client/system/` tests |
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
+| `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
 
-Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../canonical_json/`](../canonical_json/) — those carry full COMPOSITION shapes and are reused here without duplication. Write paths (Phase 4) and the remaining resource cassettes (AQL, Templates) are **deferred** until their leaf clients land in Phases 4–6 of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md).
+Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../canonical_json/`](../canonical_json/) — those carry full COMPOSITION shapes and are reused here without duplication. AQL cassettes and ADL 2 source-form templates are **deferred** until their leaf clients land in later phases of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md).
 
 ## Provenance
 
@@ -48,6 +49,16 @@ Hand-crafted capabilities response matching the openEHR REST 1.1.0-development S
 | File | Notes |
 |---|---|
 | `capabilities.json` | Reference capabilities advertising `restapi_specs_version: 1.1.0-development` and a representative endpoint set. |
+
+### `definition/`
+
+Hand-crafted Definition API fixtures for the ADL 1.4 template lifecycle (Phase 6). ADL 2 source-form and stored-AQL fixtures will land alongside their leaf-client implementations.
+
+| File | Format | Notes |
+|---|---|---|
+| `body_weight.opt` | OPT XML | Minimal OPT — exercises the upload/get round-trip without depending on a full template-parser implementation. |
+| `template_metadata.json` | JSON | Single-template metadata (typed + a deployment-specific `uri` Extras key). |
+| `template_list.json` | JSON | Two-template listing response. |
 
 ### `ehr/`
 
