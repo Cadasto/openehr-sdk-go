@@ -8,6 +8,7 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -42,9 +43,225 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
+// writeConfig is the resolved option set for Save / Update.
+type writeConfig struct {
+	prefer       transport.Prefer
+	auditDetails *rm.AuditDetails
+	templateID   string
+}
+
+// WriteOption mutates the request shape for [Save] and [Update].
+type WriteOption func(*writeConfig)
+
+// WithPrefer overrides the response-shape preference (REQ-094). The
+// default is [transport.PreferMinimal] per the spec.
+func WithPrefer(p transport.Prefer) WriteOption {
+	return func(c *writeConfig) { c.prefer = p }
+}
+
+// WithAuditDetails attaches the commit-time audit envelope via the
+// `openehr-audit-details` header (REQ-059). Nil omits the header.
+func WithAuditDetails(a *rm.AuditDetails) WriteOption {
+	return func(c *writeConfig) { c.auditDetails = a }
+}
+
+// WithTemplateID sets the `openehr-template-id` header (REQ-059) so
+// the deployment can validate the payload against the declared
+// template. Empty omits the header.
+func WithTemplateID(id string) WriteOption {
+	return func(c *writeConfig) { c.templateID = id }
+}
+
+// deleteConfig is the resolved option set for [Delete]. Delete does
+// not return a body so it shares only the audit-details option with
+// the writes.
+type deleteConfig struct {
+	auditDetails *rm.AuditDetails
+}
+
+// DeleteOption mutates [Delete]'s request shape.
+type DeleteOption func(*deleteConfig)
+
+// WithDeleteAudit attaches the commit-time audit envelope as the
+// `openehr-audit-details` header on a delete (REQ-059). Nil omits.
+func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
+	return func(c *deleteConfig) { c.auditDetails = a }
+}
+
+// Save creates a new Composition under ehrID.
+//
+// Wire: POST /ehr/{ehr_id}/composition.
+//
+// The response shape follows the Prefer option (REQ-094):
+//   - PreferMinimal (default) — server returns the new version's
+//     identifier in the `Location` header; the returned
+//     `*rm.OriginalVersion[*rm.Composition]` is nil and only the
+//     metadata is populated (ETag + parsed VersionUID).
+//   - PreferRepresentation — server returns the full
+//     ORIGINAL_VERSION<COMPOSITION> body which is decoded into the
+//     returned value.
+//
+// Audit details and the template id flow via the `openehr-*` header
+// family (REQ-059).
+func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error) {
+	if ehrID == "" {
+		return nil, nil, fmt.Errorf("composition.Save: %w: empty EHRID", transport.ErrInvalidConfig)
+	}
+	if comp == nil {
+		return nil, nil, fmt.Errorf("composition.Save: %w: nil Composition", transport.ErrInvalidConfig)
+	}
+	cfg := writeConfig{prefer: transport.PreferMinimal}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	body, err := canjson.Marshal(comp)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Save: marshal body: %w", err)
+	}
+	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Save: %w", err)
+	}
+	req := &transport.Request{
+		Method:             http.MethodPost,
+		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition",
+		Route:              "/ehr/{ehr_id}/composition",
+		Body:               body,
+		Prefer:             cfg.prefer,
+		AuditDetailsHeader: auditHeader,
+		TemplateID:         cfg.templateID,
+	}
+	return doWrite(ctx, c, req, cfg.prefer)
+}
+
+// Update modifies the Composition family identified by voID, attaching
+// `ifMatch` as the required `If-Match` header (REQ-054).
+//
+// Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors
+// per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
+// [transport.ErrPreconditionFailed], 428 →
+// [transport.ErrPreconditionRequired]. Forgetting ifMatch returns
+// [transport.ErrInvalidConfig] without issuing a request.
+func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error) {
+	if ehrID == "" {
+		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
+	}
+	if voID == "" {
+		return nil, nil, fmt.Errorf("composition.Update: %w: empty VersionedObjectID", transport.ErrInvalidConfig)
+	}
+	if ifMatch == "" {
+		return nil, nil, fmt.Errorf("composition.Update: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+	}
+	if comp == nil {
+		return nil, nil, fmt.Errorf("composition.Update: %w: nil Composition", transport.ErrInvalidConfig)
+	}
+	cfg := writeConfig{prefer: transport.PreferMinimal}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	body, err := canjson.Marshal(comp)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Update: marshal body: %w", err)
+	}
+	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Update: %w", err)
+	}
+	req := &transport.Request{
+		Method:             http.MethodPut,
+		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(voID)),
+		Route:              "/ehr/{ehr_id}/composition/{versioned_object_id}",
+		Body:               body,
+		IfMatch:            ifMatch,
+		Prefer:             cfg.prefer,
+		AuditDetailsHeader: auditHeader,
+		TemplateID:         cfg.templateID,
+	}
+	return doWrite(ctx, c, req, cfg.prefer)
+}
+
+// Delete logically deletes the Composition version addressed by
+// versionUID, attaching the preceding version's identifier as
+// `If-Match` (REQ-054). The server typically responds 204 No Content.
+//
+// Wire: DELETE /ehr/{ehr_id}/composition/{version_uid} with If-Match.
+// REQ-054 enforcement mirrors [Update].
+func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+	if ehrID == "" {
+		return nil, fmt.Errorf("composition.Delete: %w: empty EHRID", transport.ErrInvalidConfig)
+	}
+	if versionUID == "" {
+		return nil, fmt.Errorf("composition.Delete: %w: empty VersionUID", transport.ErrInvalidConfig)
+	}
+	if ifMatch == "" {
+		return nil, fmt.Errorf("composition.Delete: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
+	}
+	cfg := deleteConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	if err != nil {
+		return nil, fmt.Errorf("composition.Delete: %w", err)
+	}
+	req := &transport.Request{
+		Method:             http.MethodDelete,
+		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(versionUID)),
+		Route:              "/ehr/{ehr_id}/composition/{version_uid}",
+		IfMatch:            ifMatch,
+		AuditDetailsHeader: auditHeader,
+	}
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		if resp != nil {
+			return openehrclient.NewVersionMetadata(resp.Metadata), err
+		}
+		return nil, err
+	}
+	return openehrclient.NewVersionMetadata(resp.Metadata), nil
+}
+
+// doWrite executes a Save / Update request and decodes the response
+// body when Prefer=representation. With other Prefer values the body
+// is empty and the returned ORIGINAL_VERSION pointer is nil.
+func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error) {
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		if resp != nil {
+			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
+		}
+		return nil, nil, err
+	}
+	meta := openehrclient.NewVersionMetadata(resp.Metadata)
+	if prefer != transport.PreferRepresentation || len(resp.Body) == 0 {
+		return nil, meta, nil
+	}
+	var version rm.OriginalVersion[*rm.Composition]
+	if err := canjson.Unmarshal(resp.Body, &version); err != nil {
+		return nil, meta, fmt.Errorf("composition: decode ORIGINAL_VERSION: %w", err)
+	}
+	return &version, meta, nil
+}
+
+// marshalAuditDetails canjson-encodes a non-nil AuditDetails for the
+// openehr-audit-details header. Returns "" for nil input.
+func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
+	if a == nil {
+		return "", nil
+	}
+	b, err := canjson.Marshal(a)
+	if err != nil {
+		return "", fmt.Errorf("marshal audit details: %w", err)
+	}
+	return string(b), nil
+}
+
 // Repository mirrors the package-level Composition functions.
 type Repository interface {
 	Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error)
+	Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error)
+	Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -54,4 +271,16 @@ type repository struct{ c *transport.Client }
 
 func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	return Get(ctx, r.c, ehrID, ref)
+}
+
+func (r *repository) Save(ctx context.Context, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error) {
+	return Save(ctx, r.c, ehrID, comp, opts...)
+}
+
+func (r *repository) Update(ctx context.Context, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.OriginalVersion[*rm.Composition], *openehrclient.VersionMetadata, error) {
+	return Update(ctx, r.c, ehrID, voID, ifMatch, comp, opts...)
+}
+
+func (r *repository) Delete(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+	return Delete(ctx, r.c, ehrID, versionUID, ifMatch, opts...)
 }

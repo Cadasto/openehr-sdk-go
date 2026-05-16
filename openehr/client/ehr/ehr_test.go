@@ -182,6 +182,59 @@ func TestVersionUIDParsing(t *testing.T) {
 	}
 }
 
+func TestCreateServerAssigned(t *testing.T) {
+	var captured *http.Request
+	body := readCassette(t, "ehr", "ehr.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Location", "/ehr/"+ehrIDFixture)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	got, meta, err := openehrclient.Create(context.Background(), newClient(t, srv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPost {
+		t.Errorf("method = %q, want POST", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/ehr" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	if got.EHRID.Value != ehrIDFixture {
+		t.Errorf("EHRID.Value = %q", got.EHRID.Value)
+	}
+	if meta == nil || meta.Location == "" {
+		t.Errorf("expected Location captured, got %+v", meta)
+	}
+}
+
+func TestCreateClientSupplied(t *testing.T) {
+	var captured *http.Request
+	body := readCassette(t, "ehr", "ehr.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	_, _, err := openehrclient.Create(context.Background(), newClient(t, srv),
+		openehrclient.WithEHRID(ehrIDFixture),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPut {
+		t.Errorf("method = %q, want PUT", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/ehr/"+ehrIDFixture {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	if got := captured.Header.Get("Prefer"); got != "return=representation" {
+		t.Errorf("Prefer = %q, want return=representation (Create default)", got)
+	}
+}
+
 func TestRefConstruction(t *testing.T) {
 	if r := openehrclient.LatestOf("voID"); r.PathSegment() != "voID" {
 		t.Errorf("LatestOf PathSegment = %q", r.PathSegment())

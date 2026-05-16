@@ -13,6 +13,8 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -158,4 +160,135 @@ func TestRepository(t *testing.T) {
 	if _, _, err := repo.Get(context.Background(), ehrIDFixture, openehrclient.LatestOf(compositionVOID)); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestSaveMinimal(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	out, meta, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		composition.WithTemplateID("openEHR-EHR-COMPOSITION.body_weight.v1"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		t.Errorf("expected nil ORIGINAL_VERSION on default Prefer=minimal, got %+v", out)
+	}
+	if captured.Method != http.MethodPost {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/composition" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	if got := captured.Header.Get("Prefer"); got != "return=minimal" {
+		t.Errorf("Prefer = %q (default), want return=minimal", got)
+	}
+	if got := captured.Header.Get("Openehr-Template-Id"); got != "openEHR-EHR-COMPOSITION.body_weight.v1" {
+		t.Errorf("openehr-template-id = %q", got)
+	}
+	if meta.VersionUID != compositionVUID {
+		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
+func TestSaveRejectsNil(t *testing.T) {
+	_, _, err := composition.Save(context.Background(), nil, ehrIDFixture, nil)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+func TestUpdateRequiresIfMatch(t *testing.T) {
+	_, _, err := composition.Update(context.Background(), nil, ehrIDFixture, compositionVOID, "", &rm.Composition{})
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig on empty If-Match, got %v", err)
+	}
+}
+
+func TestUpdateRoundTrip(t *testing.T) {
+	var capturedPUT *http.Request
+	newVUID := openehrclient.VersionUID("1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedPUT = r.Clone(r.Context())
+		w.Header().Set("ETag", `"`+string(newVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(newVUID))
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	_, meta, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capturedPUT.Method != http.MethodPut {
+		t.Errorf("method = %q", capturedPUT.Method)
+	}
+	if got := capturedPUT.Header.Get("If-Match"); got != `"`+string(compositionVUID)+`"` {
+		t.Errorf("If-Match = %q (expected re-quoted)", got)
+	}
+	if meta.VersionUID != newVUID {
+		t.Errorf("new VersionUID = %q", meta.VersionUID)
+	}
+}
+
+func TestUpdateMapsPreconditionFailed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusPreconditionFailed)
+		_, _ = w.Write([]byte(`{"message":"stale","code":"PRECONDITION_FAILED"}`))
+	}))
+	defer srv.Close()
+	_, _, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	if !errors.Is(err, transport.ErrPreconditionFailed) {
+		t.Errorf("expected ErrPreconditionFailed, got %v", err)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	_, err := composition.Delete(context.Background(), newClient(t, srv), ehrIDFixture, compositionVUID, string(compositionVUID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodDelete {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID) {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	if got := captured.Header.Get("If-Match"); got != `"`+string(compositionVUID)+`"` {
+		t.Errorf("If-Match = %q", got)
+	}
+}
+
+func TestDeleteRequiresIfMatch(t *testing.T) {
+	_, err := composition.Delete(context.Background(), nil, ehrIDFixture, compositionVUID, "")
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+// readComposition decodes the body_weight cassette into a *rm.Composition
+// so write-path tests have a valid payload without hand-constructing one.
+func readComposition(t *testing.T) *rm.Composition {
+	t.Helper()
+	body := readCompositionCassette(t)
+	var comp rm.Composition
+	if err := canjson.Unmarshal(body, &comp); err != nil {
+		t.Fatalf("decode composition cassette: %v", err)
+	}
+	return &comp
 }

@@ -13,6 +13,7 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -132,5 +133,80 @@ func TestRepository(t *testing.T) {
 	repo := directory.NewRepository(newClient(t, srv))
 	if _, _, err := repo.Get(context.Background(), ehrIDFixture); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSaveDirectory(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("ETag", `"`+string(folderVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root Directory"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	_, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPost {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/directory" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	if meta.VersionUID != folderVUID {
+		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
+func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
+	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+func TestUpdateDirectory(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	if _, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPut {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if got := captured.Header.Get("If-Match"); got != `"`+string(folderVUID)+`"` {
+		t.Errorf("If-Match = %q", got)
+	}
+}
+
+func TestDeleteDirectory(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	if _, err := directory.Delete(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID)); err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodDelete {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if got := captured.Header.Get("If-Match"); got != `"`+string(folderVUID)+`"` {
+		t.Errorf("If-Match = %q", got)
 	}
 }

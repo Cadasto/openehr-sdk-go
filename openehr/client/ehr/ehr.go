@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -75,6 +76,71 @@ func GetBySubject(ctx context.Context, c *transport.Client, subjectNamespace, su
 	return out, NewVersionMetadata(meta), err
 }
 
+// createConfig is the resolved option set for [Create].
+type createConfig struct {
+	ehrID         EHRID
+	initialStatus *rm.EHRStatus
+}
+
+// CreateOption mutates [Create]'s behaviour.
+type CreateOption func(*createConfig)
+
+// WithEHRID binds the new EHR to a client-supplied identifier. When
+// set, [Create] issues PUT /ehr/{ehr_id}. When unset (default), POST
+// /ehr is used and the server assigns the id (returned via Location +
+// the decoded *rm.EHR).
+func WithEHRID(id EHRID) CreateOption {
+	return func(c *createConfig) { c.ehrID = id }
+}
+
+// WithInitialStatus carries an initial EHR_STATUS in the request body.
+// When unset the server creates a default EHR_STATUS (no subject
+// linkage, queryable + modifiable per the deployment's policy).
+func WithInitialStatus(s *rm.EHRStatus) CreateOption {
+	return func(c *createConfig) { c.initialStatus = s }
+}
+
+// Create issues an EHR-creation request. POST /ehr (server-assigned
+// ehr_id) or PUT /ehr/{ehr_id} (client-supplied via [WithEHRID]).
+//
+// The optional initial EHR_STATUS body is canjson-encoded; if omitted
+// the request body is empty and the server creates a default
+// EHR_STATUS. Returns the decoded *rm.EHR (Prefer=representation by
+// default — callers almost always need the new ehr_id back even when
+// they supplied one).
+func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
+	cfg := createConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
+	var body []byte
+	if cfg.initialStatus != nil {
+		b, err := canjson.Marshal(cfg.initialStatus)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ehr.Create: marshal initial status: %w", err)
+		}
+		body = b
+	}
+
+	req := &transport.Request{
+		Body:   body,
+		Prefer: transport.PreferRepresentation,
+	}
+	if cfg.ehrID != "" {
+		req.Method = http.MethodPut
+		req.Path = "/ehr/" + url.PathEscape(string(cfg.ehrID))
+		req.Route = "/ehr/{ehr_id}"
+	} else {
+		req.Method = http.MethodPost
+		req.Path = "/ehr"
+		req.Route = "/ehr"
+	}
+
+	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
+	return out, NewVersionMetadata(meta), err
+}
+
 // Repository mirrors the package-level EHR functions as a method set
 // bound to a single *transport.Client. Useful for dependency-injection
 // seams (REQ-023).
@@ -82,6 +148,7 @@ type Repository interface {
 	Get(ctx context.Context, id EHRID) (*rm.EHR, *VersionMetadata, error)
 	Exists(ctx context.Context, id EHRID) (bool, error)
 	GetBySubject(ctx context.Context, subjectNamespace, subjectID string) (*rm.EHR, *VersionMetadata, error)
+	Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -99,4 +166,8 @@ func (r *repository) Exists(ctx context.Context, id EHRID) (bool, error) {
 
 func (r *repository) GetBySubject(ctx context.Context, ns, id string) (*rm.EHR, *VersionMetadata, error) {
 	return GetBySubject(ctx, r.c, ns, id)
+}
+
+func (r *repository) Create(ctx context.Context, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
+	return Create(ctx, r.c, opts...)
 }

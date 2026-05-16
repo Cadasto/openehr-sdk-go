@@ -3,6 +3,7 @@ package ehrstatus_test
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -144,4 +146,122 @@ func TestRepository(t *testing.T) {
 	if _, _, err := repo.Get(context.Background(), ehrIDFixture); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestPutMinimal(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		body, _ := io.ReadAll(r.Body)
+		if len(body) == 0 {
+			t.Error("expected non-empty request body")
+		}
+		w.Header().Set("ETag", `"new-version-uid"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/ehr_status/new-version-uid")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject:         rm.PartySelf{},
+	}
+	got, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPut {
+		t.Errorf("method = %q, want PUT", captured.Method)
+	}
+	if captured.Header.Get("If-Match") != `"old-version-uid"` {
+		t.Errorf("If-Match = %q", captured.Header.Get("If-Match"))
+	}
+	if captured.Header.Get("Prefer") != "return=minimal" {
+		t.Errorf("Prefer = %q, want return=minimal (default)", captured.Header.Get("Prefer"))
+	}
+	if got != nil {
+		t.Errorf("expected nil EHR_STATUS body on PreferMinimal, got %+v", got)
+	}
+	if meta == nil || meta.ETag != "new-version-uid" {
+		t.Errorf("expected ETag captured, got %+v", meta)
+	}
+	if meta.VersionUID != "new-version-uid" {
+		t.Errorf("VersionUID parsed from Location = %q", meta.VersionUID)
+	}
+}
+
+func TestPutRejectsEmptyIfMatch(t *testing.T) {
+	_, _, err := ehrstatus.Put(context.Background(), nil, ehrIDFixture, "", &rm.EHRStatus{})
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+func TestPutMapsPreconditionRequired(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Server simulates a 428 even though SDK sent an If-Match
+		// (to exercise wire-level mapping; SDK's compile-time guard
+		// already prevents empty If-Match).
+		w.WriteHeader(http.StatusPreconditionRequired)
+		_, _ = w.Write([]byte(`{"message":"PUT requires If-Match","code":"PRECONDITION_REQUIRED"}`))
+	}))
+	defer srv.Close()
+	_, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{})
+	if !errors.Is(err, transport.ErrPreconditionRequired) {
+		t.Errorf("expected ErrPreconditionRequired, got %v", err)
+	}
+}
+
+func TestPutMapsVersionConflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"stale If-Match","code":"VERSION_CONFLICT"}`))
+	}))
+	defer srv.Close()
+	_, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "stale", &rm.EHRStatus{})
+	if !errors.Is(err, transport.ErrVersionConflict) {
+		t.Errorf("expected ErrVersionConflict, got %v", err)
+	}
+}
+
+func TestPutWithAuditDetails(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	aliceName := "alice"
+	audit := &rm.AuditDetails{
+		SystemID:  "cdr.example",
+		Committer: rm.PartyIdentified{Name: &aliceName},
+		ChangeType: rm.DVCodedText{
+			DVText:       rm.DVText{Value: "modification"},
+			DefiningCode: rm.CodePhrase{CodeString: "249"},
+		},
+		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
+	}
+	if _, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
+		ehrstatus.WithAuditDetails(audit),
+	); err != nil {
+		t.Fatal(err)
+	}
+	header := captured.Header.Get("openehr-audit-details")
+	if header == "" {
+		t.Fatal("openehr-audit-details header not set")
+	}
+	if !contains(header, `"system_id":"cdr.example"`) {
+		t.Errorf("audit header = %q", header)
+	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }

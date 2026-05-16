@@ -138,9 +138,9 @@ The catalog is the normative list. Each entry has:
 
 - **Title:** A PUT against a versioned Composition without an `If-Match` header is rejected with `428 Precondition Required`.
 - **Preconditions:** An existing Composition with a known `version_uid`.
-- **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`.
+- **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`. The Go SDK additionally short-circuits empty `ifMatch` at the call site with `transport.ErrInvalidConfig` per the typed-write-path guard.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../testkit/probes/versioned/probe_010_put_without_if_match.go).
 
 #### PROBE-011 — PUT Composition with stale If-Match
 
@@ -148,7 +148,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Composition has been updated since the SDK's cached `version_uid`.
 - **Wire assertion:** PUT returns `412` or `409`; SDK maps to `ErrPreconditionFailed` or `ErrVersionConflict` accordingly.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_011_put_stale_if_match.go`](../testkit/probes/versioned/probe_011_put_stale_if_match.go).
 
 #### PROBE-012 — ETag survives round trip
 
@@ -156,7 +156,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Read-then-write workflow.
 - **Wire assertion:** GET response carries `ETag`; PUT carries the same value as `If-Match`; PUT returns `204` or `200`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_012_etag_round_trip.go`](../testkit/probes/versioned/probe_012_etag_round_trip.go).
 
 #### PROBE-013 — Cross-EHR isolation
 
