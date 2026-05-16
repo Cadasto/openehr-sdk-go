@@ -1,0 +1,4 @@
+{
+  "message": "Bearer token missing or rejected",
+  "code": "UNAUTHENTICATED"
+}

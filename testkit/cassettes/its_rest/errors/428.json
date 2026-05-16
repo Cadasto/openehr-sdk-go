@@ -1,0 +1,4 @@
+{
+  "message": "PUT against a versioned resource requires an If-Match header",
+  "code": "PRECONDITION_REQUIRED"
+}

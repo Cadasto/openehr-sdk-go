@@ -1,0 +1,17 @@
+{
+  "issuer": "https://auth.example.com",
+  "authorization_endpoint": "https://auth.example.com/authorize",
+  "token_endpoint": "https://auth.example.com/token",
+  "jwks_uri": "https://auth.example.com/jwks",
+  "scopes_supported": ["openid", "profile", "patient/*.read"],
+  "response_types_supported": ["code"],
+  "code_challenge_methods_supported": ["S256"],
+  "services": [
+    {
+      "id": "org.openehr.rest",
+      "base_url": "https://api.example.com/openehr/v1",
+      "spec_version": "1.0.3",
+      "capabilities": []
+    }
+  ]
+}

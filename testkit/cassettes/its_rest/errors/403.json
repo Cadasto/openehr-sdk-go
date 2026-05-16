@@ -1,0 +1,4 @@
+{
+  "message": "Token lacks required scope patient/COMPOSITION.write",
+  "code": "PERMISSION_DENIED"
+}

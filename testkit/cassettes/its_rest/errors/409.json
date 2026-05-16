@@ -1,0 +1,4 @@
+{
+  "message": "If-Match references a stale version_uid for this versioned object",
+  "code": "VERSION_CONFLICT"
+}

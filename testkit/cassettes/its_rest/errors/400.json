@@ -1,0 +1,10 @@
+{
+  "message": "Composition violates template constraints at /content[openEHR-EHR-OBSERVATION.body_weight.v2]/data[at0002]/events[at0003]/data[at0001]/items[at0004]/value/magnitude",
+  "code": "VALIDATION_FAILED",
+  "coded_text": [
+    {
+      "terminology_id": {"value": "openehr"},
+      "code_string": "VALIDATION_FAILED"
+    }
+  ]
+}
