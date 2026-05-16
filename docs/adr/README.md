@@ -7,5 +7,7 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
+| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D6) | Accepted (2026-05-16) |
+| [0003](0003-rm-event-polymorphism.md) | Codec polymorphism for abstract generic RM classes (EVENT, …) | Accepted (2026-05-16) |
 
 See [docs/architecture.md § Open research strands](../architecture.md#open-research-strands) for the strand-to-ADR mapping.

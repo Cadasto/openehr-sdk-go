@@ -2,7 +2,7 @@
 
 **Narrative companion to [`specs/`](../specs/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`specs/`](../specs/). When the two disagree, `specs/` wins and this document is the one to update.
 
-> **Status: scaffolding.** The directory tree is in place via `doc.go` stubs and the spec set; concrete types and methods are not yet written. Sections below describe the *intended* shape — when implementation lands, this doc gets concrete request/response flow examples.
+> **Status: early implementation.** Generated RM and AOM 1.4 types, BMM loader, type registry, and canonical JSON codec are landed; auth, transport, REST clients, and Cadasto extras remain `doc.go` stubs. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
 ## Where to find what
 
@@ -25,7 +25,7 @@
 
 ## Package layout (summary)
 
-The full taxonomy with package-level scope notes lives in [`../specs/module-layout.md`](../specs/module-layout.md). Each leaf has a `doc.go` stub today:
+The full taxonomy with package-level scope notes lives in [`../specs/module-layout.md`](../specs/module-layout.md). Most leaves still have only `doc.go` stubs; exceptions are noted in [Current implementation](#current-implementation).
 
 ```
 openehr-sdk-go/
@@ -122,7 +122,41 @@ The SDK does not take a "base URL". It takes a `smart/discovery.ServiceCatalog` 
 
 ### `internal/` is invisible
 
-Anything under `internal/` is excluded from BC promises (REQ-005). When in doubt about whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`; if yes, it goes in a named public package.
+Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling: `internal/bmmgen` (RM/AOM/canonical JSON emission) and `internal/bmmdiff` (BMM corpus diff for version bumps). When in doubt about whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`; if yes, it goes in a named public package.
+
+## Current implementation
+
+| Area | Location | Notes |
+|---|---|---|
+| Pinned BMM corpus | [`resources/bmm/`](../resources/bmm/) | Six `openehr_*.bmm.json` files; see [ADR 0001](adr/0001-bmm-version-bump-runbook.md) |
+| BMM loader | [`openehr/bmm/`](../openehr/bmm/) | `LoadAll`, `FSResolver`, descendant-shadows-ancestor merge |
+| Code generator | [`internal/bmmgen/`](../internal/bmmgen/), [`cmd/bmmgen`](../cmd/bmmgen) | `make codegen` / `make codegen-verify` (chained in `make test`) |
+| Generated RM | [`openehr/rm/`](../openehr/rm/) | `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go`, `typereg_gen.go` |
+| Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
+| Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per ADR 0002 |
+| Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | Plan: [plans/2026-05-15-canonical-json-serialization.md](plans/2026-05-15-canonical-json-serialization.md) |
+| Conformance probes | [`testkit/probes/`](../testkit/probes/) | PROBE-030/031 for canjson landed |
+
+### BMM codegen pipeline
+
+```mermaid
+flowchart LR
+  BMM["resources/bmm/*.bmm.json"]
+  Load["openehr/bmm LoadAll"]
+  Gen["internal/bmmgen"]
+  RM["openehr/rm *_gen.go"]
+  AOM["openehr/aom/aom14"]
+  Reg["typereg_gen.go"]
+  JSON["*_jsonmar_gen.go / *_jsonunmar_gen.go"]
+
+  BMM --> Load --> Gen
+  Gen --> RM
+  Gen --> AOM
+  Gen --> Reg
+  Gen --> JSON
+```
+
+Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). Normative conformance rules remain in [`specs/bmm-conformance.md`](../specs/bmm-conformance.md).
 
 ## Versioning
 

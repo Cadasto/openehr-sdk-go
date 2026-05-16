@@ -13,7 +13,7 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 | Go version | `1.25.x` (N-1 release line) |
 | openEHR REST | `1.1.0-development` |
 | Sister SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
-| Status | **Scaffolding** — module layout in place; no implementation yet |
+| Status | **Early implementation** — BMM, codegen, RM/AOM, canjson landed; REST/auth/SMART not started |
 
 ## Source of truth
 
@@ -176,18 +176,19 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 | Phase | Description | Status |
 |---|---|---|
 | 0 | Repo scaffolding — module layout, AI-assistant docs, Makefile, Dockerfile, `specs/` tree | **complete** |
-| 1 | Auth + transport + RM + EHR / EHR_STATUS REST (CDR-extraction MVP) | not started |
-| 2 | Composition + Templates + AQL builder | not started |
+| 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON (partial) | **landed** — see [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md) |
+| 1 | Auth + transport + EHR / EHR_STATUS REST (CDR-extraction MVP) | not started |
+| 2 | Composition builder + Templates + AQL executor | not started |
 | 3 | SMART-on-openEHR end-to-end + discovery | not started |
 | 4 | Cadasto extras (Extra, Datamap, MPI preview, Admin, Care) | not started |
-| 5 | Sandbox + testkit + conformance probes | not started |
+| 5 | Sandbox + full conformance probe ratification | partial — serialize probes landed |
 
 Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/research-strands.md`](specs/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 
 ## Do not touch (yet)
 
 - `docs/adr/0000-*` numbered ADRs — none promoted yet. Open decisions stay as research strands in [`specs/research-strands.md`](specs/research-strands.md) until an ADR lands.
-- `internal/` — empty for now; nothing depends on it. When you add anything here, document the rationale in [`docs/architecture.md`](docs/architecture.md).
+- `internal/bmmgen` and `internal/bmmdiff` — generator tooling only; not public API. Changes need rationale in [`docs/architecture.md`](docs/architecture.md) and, for structural choices, [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - REQ-NNN, PROBE-NNN, STRAND-NN identifiers are **stable** once published — never renumber, never reuse.
 
