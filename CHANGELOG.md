@@ -10,6 +10,8 @@ Entries under `## [Unreleased]` are **short and high-level**: one-line bullets n
 
 ### Added
 
+- Specs SDD structure: [specs/REQ.md](specs/REQ.md) requirement registry (canonical prose in topic specs), [specs/packaging.md](specs/packaging.md), [specs/transport.md](specs/transport.md), [specs/traceability.yaml](specs/traceability.yaml), `make spec-check`, plan template, PROBE `Satisfies` / coverage-matrix sync.
+
 - Repository scaffolding: module layout, build tooling (Makefile + Docker `dev` stage), AI-assistant documentation set (`AGENTS.md`, `.claude/CLAUDE.md`, `docs/architecture.md`, `docs/ai-workflow.md`), and CI workflow (`.github/workflows/ci.yml` + `docs/ci.md` + `make ci`).
 - Normative specifications tree under `specs/`: REQ/PROBE/STRAND identifiers; module layout, idiom, RM modeling, BMM conformance (REQ-041..047), auth, wire format, service discovery, conformance probes, use cases, research strands; Cadasto-platform extensions (canonical XML REQ-056, stored AQL REQ-057, Datamap V2 REQ-058, tenant binding REQ-065, AI caller REQ-066, platform principal REQ-067, SMART REQ-068, TLS REQ-092, openEHR header family REQ-059, error envelope REQ-093, `Prefer` REQ-094, OpenAPI source REQ-095).
 - Implementation plans under `docs/plans/`: BMM codegen, canonical JSON / XML serialization, REST API client.

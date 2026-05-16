@@ -7,6 +7,19 @@
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)
 **Defers:** SMART OAuth2/PKCE flow implementation (covered separately by the SMART plan when it lands); federator policy (separate proposal); FLAT/STRUCTURED simplified-format clients (separate plan); cassette recording infrastructure (testkit work)
 
+## Implementation progress (normative detail stays in `specs/`)
+
+| Plan phase | Outcome | Status |
+|---|---|---|
+| 1 — `transport/` | HTTP client, headers, retry, OTel, error envelope | **Done** |
+| 2 — `openehr/client/system/` | Capabilities, version, health | **Done** |
+| 3 — EHR read path | `ehr`, `ehrstatus`, `composition`, `directory` GET | **Done** |
+| 4 — EHR versioned writes | PUT/POST/DELETE, `contribution`, PROBE-010–012 | **Done** |
+| 5 — Query API | `openehr/client/query/` | Open |
+| 6 — Definition API | templates, stored queries | Open |
+| 7–8 — Demographic / Admin | stub `doc.go` only | Open |
+| 9 — CDR benchmark (STRAND-01) | migrate openehr-cdr benchmark | Open |
+
 ## Goal
 
 Implement the typed openEHR REST 1.1.0-development client family under `openehr/client/{system,ehr,query,definition,demographic,admin}/`, layered on `transport/`, `auth/`, `smart/discovery/`, `openehr/rm/`, and `openehr/serialize/canjson/`. The client is the wire-binding of the openEHR Platform Service Model — it MUST be the surface every downstream consumer (benchmark, seeder, MCP server, federator) uses to reach a Cadasto CDR or any conformant openEHR backend.

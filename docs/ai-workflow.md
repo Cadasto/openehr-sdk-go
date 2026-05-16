@@ -6,11 +6,14 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
 
 1. **Read** [AGENTS.md](../AGENTS.md) (1-page) and this file.
 2. **Locate** the spec that covers your task — `specs/` is the normative tree:
-   - requirements / contract you must satisfy → [`../specs/REQ.md`](../specs/REQ.md)
+   - requirement index → [`../specs/REQ.md`](../specs/REQ.md) (registry row → **canonical** topic spec)
+   - traceability (packages, probes, tests) → [`../specs/traceability.yaml`](../specs/traceability.yaml)
+   - packaging REQ-001–005 → [`../specs/packaging.md`](../specs/packaging.md)
    - module layout / dependency / boundary → [`../specs/module-layout.md`](../specs/module-layout.md)
    - idiomatic surface (ctx, http.Client, options, errors, generics) → [`../specs/idiom.md`](../specs/idiom.md)
    - RM modeling rules → [`../specs/rm-modeling.md`](../specs/rm-modeling.md)
    - wire format (REST, AQL, canonical JSON, FLAT, STRUCTURED) → [`../specs/wire.md`](../specs/wire.md)
+   - transport (OTel, retry, TLS, errors, Prefer) → [`../specs/transport.md`](../specs/transport.md)
    - auth contracts → [`../specs/auth.md`](../specs/auth.md)
    - discovery flow → [`../specs/service-discovery.md`](../specs/service-discovery.md)
    - conformance probes (PROBE-NNN) → [`../specs/conformance.md`](../specs/conformance.md)
@@ -18,13 +21,13 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
    - open research strand → [`../specs/research-strands.md`](../specs/research-strands.md)
    - design narrative / mermaid → [architecture.md](architecture.md)
    - closed architectural decision → [adr/](adr/)
-3. **Cite identifiers** when working: every plan in [plans/](plans/) MUST list the REQ-IDs it implements; tests SHOULD cite REQ-IDs and PROBE-IDs in comments; ADRs MUST cite STRAND-IDs they resolve.
+3. **Cite identifiers** when working: read the **canonical** spec section from the REQ.md registry row (not duplicate prose in REQ.md); every plan in [plans/](plans/) MUST list REQ-IDs; update [`../specs/traceability.yaml`](../specs/traceability.yaml) when landing packages or probes; tests SHOULD cite REQ-IDs and PROBE-IDs; ADRs MUST cite STRAND-IDs they resolve.
 4. **Inspect ground truth** before editing:
    - For openEHR RM type shapes, prefer **MCP `type_specification_get`** over inferring.
    - For terminology codes, prefer **MCP `terminology_resolve`** — never hardcode a numeric literal without verifying.
    - For ITS-REST envelope semantics, use the **openehr-assistant** skills (see table below) and the spec MD twin (see `guide_get(category="howto", name="spec-lookup")`).
    - For RM mapping during CDR extraction, cross-check against the sibling `openehr-cdr` repo's structures — but do not blindly port; the SDK has stricter boundary rules.
-5. **Build** before claiming done: `make ci` (or `make fmt && make vet && make test && make lint && make build`). See [ci.md](ci.md) for what GitHub runs on every PR.
+5. **Build** before claiming done: `make ci` (includes `make spec-check`). See [ci.md](ci.md) for what GitHub runs on every PR.
 
 ## Editing rules
 
@@ -45,7 +48,7 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
 - **Don't import one `cadasto/<X>` from another `cadasto/<Y>` directly.** Share through openEHR-core types or interface contracts.
 - **Don't add inheritance-emulation patterns** for the RM. Use concrete structs + embedded base structs + interfaces for abstract categories + the `typereg` central registry for `_type` decoding.
 - **Don't silently resolve open research strands** (STRAND-NN in [`../specs/research-strands.md`](../specs/research-strands.md)) in code. Open a discussion or draft an ADR — code is the *output* of the decision, not the decision.
-- **Don't introduce a new normative statement** (a MUST / SHOULD / MAY) without a REQ-NNN, PROBE-NNN, or STRAND-NN to anchor it. New requirements go in [`../specs/REQ.md`](../specs/REQ.md) before they go in code.
+- **Don't introduce a new normative statement** (a MUST / SHOULD / MAY) without a REQ-NNN, PROBE-NNN, or STRAND-NN to anchor it. New requirements go in the canonical topic spec and [`../specs/REQ.md`](../specs/REQ.md) registry + [`traceability.yaml`](../specs/traceability.yaml) before code.
 - **Don't renumber** REQ / PROBE / STRAND identifiers. They are stable once published.
 - **Don't introduce a reflection-based decoder for RM types** without benchmarking against the typed-generic path.
 - **Don't allocate `*http.Client` inside the SDK.** Inject it.

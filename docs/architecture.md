@@ -2,13 +2,15 @@
 
 **Narrative companion to [`specs/`](../specs/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`specs/`](../specs/). When the two disagree, `specs/` wins and this document is the one to update.
 
-> **Status: early implementation.** Generated RM and AOM 1.4 types, BMM loader, type registry, and canonical JSON codec are landed; auth, transport, REST clients, and Cadasto extras remain `doc.go` stubs. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
+> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, `transport/`, auth providers (`clientcreds`, `jwtbearer`), `smart/discovery/`, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write) are landed. `auth/smart` PKCE, Query/Definition clients, composition builder, and Cadasto extras remain stubs or open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
 ## Where to find what
 
 | Need | Place |
 |---|---|
-| Normative requirements (REQ-NNN) | [`../specs/REQ.md`](../specs/REQ.md) |
+| Requirement registry (REQ-NNN index) | [`../specs/REQ.md`](../specs/REQ.md) |
+| Traceability index (machine-readable) | [`../specs/traceability.yaml`](../specs/traceability.yaml) |
+| Packaging (REQ-001–005) | [`../specs/packaging.md`](../specs/packaging.md) |
 | Glossary | [`../specs/glossary.md`](../specs/glossary.md) |
 | In / out of scope | [`../specs/scope.md`](../specs/scope.md) |
 | Package taxonomy + dependency rules (normative) | [`../specs/module-layout.md`](../specs/module-layout.md) |
@@ -16,6 +18,7 @@
 | RM modeling rules | [`../specs/rm-modeling.md`](../specs/rm-modeling.md) |
 | Auth & SMART-on-openEHR contract | [`../specs/auth.md`](../specs/auth.md) |
 | Wire format (REST, AQL, canonical JSON, FLAT, STRUCTURED) | [`../specs/wire.md`](../specs/wire.md) |
+| Transport (retry, OTel, TLS posture) | [`../specs/transport.md`](../specs/transport.md) |
 | Service discovery flow | [`../specs/service-discovery.md`](../specs/service-discovery.md) |
 | Cross-SDK conformance probes (PROBE-NNN) | [`../specs/conformance.md`](../specs/conformance.md) |
 | Use cases — primary, building-block, POC | [`../specs/use-cases.md`](../specs/use-cases.md) |
@@ -25,7 +28,7 @@
 
 ## Package layout (summary)
 
-The full taxonomy with package-level scope notes lives in [`../specs/module-layout.md`](../specs/module-layout.md). Most leaves still have only `doc.go` stubs; exceptions are noted in [Current implementation](#current-implementation).
+The full taxonomy with package-level scope notes lives in [`../specs/module-layout.md`](../specs/module-layout.md). Landed packages are listed in [Current implementation](#current-implementation); remaining leaves are stubs or planned.
 
 ```
 openehr-sdk-go/
@@ -134,8 +137,12 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | Generated RM | [`openehr/rm/`](../openehr/rm/) | `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go`, `typereg_gen.go` |
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per ADR 0002 |
-| Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | Plan: [plans/2026-05-15-canonical-json-serialization.md](plans/2026-05-15-canonical-json-serialization.md) |
-| Conformance probes | [`testkit/probes/`](../testkit/probes/) | PROBE-030/031 for canjson landed |
+| Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | REQ-052; PROBE-030/031 |
+| Transport | [`transport/`](../transport/) | REQ-021, 054, 059, 066, 090–094 |
+| Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/) | REQ-060, 066, 068 |
+| Discovery | [`smart/discovery/`](../smart/discovery/) | REQ-070–072, 092 |
+| REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution) | REST plan Phases 2–4; PROBE-010–012 |
+| Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031), `versioned/` (010–012) |
 
 ### BMM codegen pipeline
 
@@ -164,4 +171,4 @@ Semver via standard Go module versioning. Module path locked at `github.com/cada
 
 ## Open decisions
 
-Tracked in [`../specs/research-strands.md`](../specs/research-strands.md). Eight strands at v0; one resolved (STRAND-07: versioning + module path); seven open. Resolutions become ADRs under [`adr/`](adr/).
+Tracked in [`../specs/research-strands.md`](../specs/research-strands.md). STRAND-07 resolved (versioning + module path); STRAND-04 partially resolved (EVENT + numeric wire — ADRs 0003–0004). Four ADRs Accepted under [`adr/`](adr/). Resolutions become ADRs here.

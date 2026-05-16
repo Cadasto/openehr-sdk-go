@@ -13,7 +13,7 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 | Go version | `1.25.x` (N-1 release line) |
 | openEHR REST | `1.1.0-development` |
 | Sister SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
-| Status | **Early implementation** — BMM, codegen, RM/AOM, canjson landed; REST/auth/SMART not started |
+| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM/canjson + transport/EHR REST landed; `auth/smart` PKCE and Query/Definition clients open |
 
 ## Source of truth
 
@@ -37,14 +37,27 @@ Reading order for any contributor or agent:
 | # | Doc | Scope |
 |---|---|---|
 | 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
-| 2 | [specs/](specs/) | **Normative specifications** — REQ-NNN, PROBE-NNN, STRAND-NN; the SDK's contract |
+| 2 | [specs/](specs/) | **Normative specifications** — REQ/PROBE/STRAND identifiers; canonical prose in topic specs |
+| 2a | [specs/REQ.md](specs/REQ.md) | Requirement **registry** (index only — one row per REQ-NNN) |
+| 2b | [specs/traceability.yaml](specs/traceability.yaml) | Machine-readable REQ → package / probe / test map |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package map, dependency mermaid, why-it's-shaped-this-way |
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks |
-| 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (none yet) |
-| 6 | [docs/plans/](docs/plans/) | Implementation plans (none yet) |
+| 5 | [docs/adr/](docs/adr/) | Closed architectural decisions — see [docs/adr/README.md](docs/adr/README.md) (0001–0004 Accepted) |
+| 6 | [docs/plans/](docs/plans/) | Implementation plans — see [docs/plans/README.md](docs/plans/README.md) |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
 
 **Normative vs narrative.** `specs/` carries RFC-2119 `MUST/SHOULD/MAY` statements that code, plans, and tests are measured against. `docs/architecture.md` carries the design *narrative* — the same information re-told as prose with a mermaid diagram. If they disagree, `specs/` wins and the narrative is updated.
+
+### Spec-driven workflow (agents)
+
+When implementing or reviewing against a REQ:
+
+1. Open the row in [`specs/REQ.md`](specs/REQ.md) → follow the **Canonical** link (e.g. [`specs/wire.md`](specs/wire.md), [`specs/transport.md`](specs/transport.md)).
+2. Check [`specs/traceability.yaml`](specs/traceability.yaml) for landed packages, probes, and tests.
+3. Cite `REQ-NNN` / `PROBE-NNN` in tests and `doc.go`; update `traceability.yaml` when landing new code.
+4. Run `make spec-check` before claiming spec compliance (`make ci` includes it).
+
+New normative text goes in the **canonical topic spec** first, then the REQ registry row — not duplicate bodies in `REQ.md`.
 
 ## Module layout
 
@@ -53,7 +66,7 @@ The normative taxonomy and dependency rules live in [`specs/module-layout.md`](s
 ```
 github.com/cadasto/openehr-sdk-go/
 ├── auth/                      # generic TokenSource + OAuth2 primitives
-│   ├── smart/                 # SMART-on-openEHR provider (PKCE, launch)
+│   ├── smart/                 # SMART-on-openEHR provider (PKCE, launch) — planned
 │   ├── clientcreds/           # Client Credentials provider
 │   └── jwtbearer/             # JWT Bearer provider
 ├── transport/                 # HTTP wrapper around injected *http.Client
@@ -66,10 +79,10 @@ github.com/cadasto/openehr-sdk-go/
 │   ├── composition/           # OPT-driven generic builder
 │   └── client/                # REST clients grouped per openEHR resource
 │       ├── ehr/               # EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags
-│       ├── query/             # AQL executor
-│       ├── definition/        # templates, stored queries
-│       ├── demographic/
-│       └── system/
+│       ├── query/             # AQL executor (stub)
+│       ├── definition/        # templates, stored queries (stub)
+│       ├── demographic/       # stub
+│       └── system/            # landed
 ├── smart/                     # application-level SMART AppContext + App Registration
 │   └── discovery/             # service catalog resolver
 ├── sandbox/                   # in-memory + recorded-fixture transports
@@ -98,14 +111,14 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 
 - `context.Context` is the first parameter on every method that does I/O.
 - `*http.Client` is **injected**, never allocated by the SDK.
-- Functional options for configuration: `sdk.New(sdk.WithBaseURL(...), sdk.WithSpecVersion(...))`.
+- Functional options for configuration (per package), e.g. `transport.New(catalog, transport.WithHTTPClient(hc), transport.WithTokenSource(ts))`.
 - Package-level functions for the primary surface; repository structs offered as a convenience for injection seams.
 - Generics for typed REST responses, validators, repositories, template bindings — **no reflection** to carry types.
 - Concrete structs for concrete RM types + embedded base structs for shared fields; interfaces for abstract RM categories; central type registry for `_type` decoding. **No inheritance emulation.**
 
 ## Building-block use cases
 
-Each core package stands on its own — applications must not be forced to construct an authenticated client to use the RM, codecs, or template parser. Normative rule: REQ-013 in [`specs/REQ.md`](specs/REQ.md). Constructors and zero-values must be ergonomic for these cases:
+Each core package stands on its own — applications must not be forced to construct an authenticated client to use the RM, codecs, or template parser. Normative rule: REQ-013 ([`specs/module-layout.md`](specs/module-layout.md#req-013--building-block-independence)). Constructors and zero-values must be ergonomic for these cases:
 
 - `openehr/rm/` alone — model openEHR data in memory.
 - `openehr/serialize/` alone — canonicalize / reformat / hash.
@@ -163,9 +176,10 @@ Each core package stands on its own — applications must not be forced to const
 | Tidy modules | `make mod-tidy` |
 | Verify `go.mod` tidy | `make mod-tidy-check` |
 | BMM codegen verify | `make codegen-verify` |
+| Spec traceability check | `make spec-check` |
 | Build examples | `make build` |
 
-GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (the cross-SDK contract with the PHP SDK) run via `make test` once landed.
+GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; PROBE-030/031 (serialize) and PROBE-010–012 (versioned writes) are implemented — see [`specs/conformance.md`](specs/conformance.md).
 
 ## openEHR knowledge
 
@@ -176,18 +190,20 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 | Phase | Description | Status |
 |---|---|---|
 | 0 | Repo scaffolding — module layout, AI-assistant docs, Makefile, Dockerfile, `specs/` tree | **complete** |
-| 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON (partial) | **landed** — see [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md) |
-| 1 | Auth + transport + EHR / EHR_STATUS REST (CDR-extraction MVP) | not started |
-| 2 | Composition builder + Templates + AQL executor | not started |
-| 3 | SMART-on-openEHR end-to-end + discovery | not started |
+| 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **landed** — [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md), [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md) |
+| 1a | Transport, auth providers (`clientcreds`, `jwtbearer`), discovery, System + EHR REST (read/write) | **landed** — see [REST client plan](docs/plans/2026-05-15-rest-api-client.md) Phases 2–4 |
+| 1b | `auth/smart` PKCE end-to-end, Query/Definition clients, CDR benchmark (STRAND-01) | **open** |
+| 2 | Composition builder + Templates + AQL builder/executor | not started |
+| 3 | Application-level SMART (`smart/` AppContext) on top of landed discovery | partial — discovery landed; launch flow open (STRAND-05) |
 | 4 | Cadasto extras (Extra, Datamap, MPI preview, Admin, Care) | not started |
-| 5 | Sandbox + full conformance probe ratification | partial — serialize probes landed |
+| 5 | Sandbox + full conformance probe ratification | partial — serialize + versioned probes landed |
 
 Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/research-strands.md`](specs/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 
 ## Do not touch (yet)
 
-- `docs/adr/0000-*` numbered ADRs — none promoted yet. Open decisions stay as research strands in [`specs/research-strands.md`](specs/research-strands.md) until an ADR lands.
+- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`specs/REQ.md`](specs/REQ.md), and [`specs/traceability.yaml`](specs/traceability.yaml). Open decisions stay as research strands in [`specs/research-strands.md`](specs/research-strands.md) until an ADR lands.
+- Duplicating normative REQ prose in `REQ.md` — the registry is index-only; canonical text lives in topic specs ([`specs/packaging.md`](specs/packaging.md), [`specs/transport.md`](specs/transport.md), etc.).
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling only; not public API. Changes need rationale in [`docs/architecture.md`](docs/architecture.md) and, for structural choices, [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - REQ-NNN, PROBE-NNN, STRAND-NN identifiers are **stable** once published — never renumber, never reuse.
