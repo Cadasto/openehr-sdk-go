@@ -27,11 +27,12 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/bmmgen"
+	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
 func main() {
 	var (
-		resources = flag.String("resources", "./resources/bmm", "path to resources/bmm/ directory")
+		resources = flag.String("resources", "./"+bmm.DefaultResourcesDir, "path to resources/bmm/ directory")
 		out       = flag.String("out", ".", "output module root")
 		verify    = flag.Bool("verify", false, "verify; do not write; exit 1 on drift")
 		rootID    = flag.String("root", "", "legacy: override the first target's BMM root id (without .bmm.json)")

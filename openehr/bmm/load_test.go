@@ -13,7 +13,7 @@ import (
 
 // resourcesDir is the relative path from openehr/bmm/ to the pinned
 // BMM JSON files.
-const resourcesDir = "../../resources/bmm"
+const resourcesDir = "../../" + DefaultResourcesDir
 
 func mustOpen(t *testing.T, name string) io.ReadCloser {
 	t.Helper()

@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
-const testResources = "../../resources/bmm"
+const testResources = "../../" + bmm.DefaultResourcesDir
 
 // TestPlanFileAssignments asserts that key classes land in the
 // expected `<base>_gen.go` file. The set is deliberately small and
