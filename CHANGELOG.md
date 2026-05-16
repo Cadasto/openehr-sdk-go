@@ -23,6 +23,7 @@ Entries under `## [Unreleased]` are **short and high-level**: one-line bullets n
 - Vendored canonical-JSON cassettes (`testkit/cassettes/canonical_json/`) with provenance README (REQ-082).
 - Conformance probes (`testkit/probes/serialize/`): PROBE-030 (canonical-JSON round-trip stability, exercising leaf types + every vendored cassette) and PROBE-031 (`_type` not in registry wraps `typereg.ErrUnknownType`).
 - ADRs: [`docs/adr/0002-bmm-codegen-decisions.md`](docs/adr/0002-bmm-codegen-decisions.md) (codegen layout); [`docs/adr/0003-rm-event-polymorphism.md`](docs/adr/0003-rm-event-polymorphism.md) (promotes abstract generic `EVENT` to a Go interface; closes Event/History sub-question of STRAND-04); [`docs/adr/0004-numeric-wire-tolerance.md`](docs/adr/0004-numeric-wire-tolerance.md) (asymmetric numeric wire tolerance).
+- Conformance probes (`specs/conformance.md`): reserves PROBE-060..068 for REST binding (EHR creation, versioned writes with `Prefer`, audit-details, discovery-routed request, per-request `TokenSource` override, stored AQL, template upload, error envelope decode). PROBE-040..049 remain assigned to Service discovery per the spec's no-renumbering rule.
 
 ### Changed
 

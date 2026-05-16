@@ -244,6 +244,82 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox, Cassette.
 - **Status:** Draft.
 
+### REST binding
+
+The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract above `transport/` and the typed leaf clients under `openehr/client/`. PROBE-040 and PROBE-041 are taken by the service-discovery range; the REST-binding range starts at PROBE-060 (next free range after Observability 050–059) per the [Adding probes](#adding-probes) rule.
+
+#### PROBE-060 — EHR creation round-trip
+
+- **Title:** `POST /ehr` with an initial `EHR_STATUS` body returns `201`, surfaces the assigned `ehr_id`, and a follow-up `GET` returns the same status.
+- **Preconditions:** Backend supports server-assigned `ehr_id`.
+- **Wire assertion:** POST returns `201` with `Location` header; SDK extracts `ehr_id`; a subsequent GET returns the same EHR_STATUS.
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Draft.
+
+#### PROBE-061 — Composition versioned write with `Prefer: return=representation`
+
+- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` returns the full `ORIGINAL_VERSION<COMPOSITION>` plus a new `ETag`.
+- **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
+- **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as `ORIGINAL_VERSION<COMPOSITION>`; response `ETag` is captured into `VersionMetadata`.
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Draft.
+
+#### PROBE-062 — `openehr-audit-details` header round-trip
+
+- **Title:** A write carrying `openehr-audit-details` is reflected in the resulting Contribution's audit envelope on read-back.
+- **Preconditions:** Existing EHR; a known `*rm.AuditDetails` value.
+- **Wire assertion:** Write request carries `openehr-audit-details: <canonical-JSON>`; subsequent Contribution GET returns the same audit fields (committer name, time-committed, change-type).
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Draft.
+
+#### PROBE-063 — Discovery-routed request
+
+- **Title:** The transport resolves its base URL from `ServiceCatalog`'s `org.openehr.rest` entry, not from a hard-coded value.
+- **Preconditions:** Catalog with `org.openehr.rest.base_url = "https://override.example/openehr/v1"`.
+- **Wire assertion:** A request made via the leaf client targets `https://override.example/openehr/v1/...`, not the SDK default.
+- **Modes:** Sandbox.
+- **Status:** Draft.
+
+#### PROBE-064 — Per-request `auth.TokenSource` overrides client default
+
+- **Title:** A `TokenSource` attached to `ctx` via `auth.WithTokenSource` overrides the client-default `TokenSource` for the duration of one request.
+- **Preconditions:** Client constructed with `TokenSource` A; request issued with `ctx` carrying `TokenSource` B.
+- **Wire assertion:** Outgoing `Authorization` header carries the bearer from B; subsequent requests without the ctx-override fall back to A.
+- **Modes:** Sandbox.
+- **Status:** Draft.
+
+#### PROBE-065 — `Prefer: return=minimal` on POST returns identifier only
+
+- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=minimal` returns an empty body and a `Location` header; a follow-up GET returns the full payload.
+- **Preconditions:** Backend honours `Prefer: return=minimal`.
+- **Wire assertion:** POST response body is empty; `Location` is set; SDK surfaces only `*VersionMetadata`. Subsequent GET returns the full Composition.
+- **Modes:** Sandbox, Cassette.
+- **Status:** Draft.
+
+#### PROBE-066 — Stored AQL query execution
+
+- **Title:** `GET /query/{qualified_query_name}` returns a typed `ResultSet`.
+- **Preconditions:** A stored query registered under a known qualified name.
+- **Wire assertion:** Request path matches the qualified-name URL template; response decodes as `query.ResultSet` with `Columns` and `Rows` populated.
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Draft.
+
+#### PROBE-067 — Template upload round-trip
+
+- **Title:** `POST /definition/template/adl1.4` with an OPT body succeeds; a subsequent `GET` returns the same OPT bytes.
+- **Preconditions:** Backend supports ADL1.4 template upload at the standard path.
+- **Wire assertion:** Upload request carries `Content-Type: application/xml`; GET response body equals the uploaded OPT bytes (modulo backend-side reformatting documented per deployment).
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Draft.
+
+#### PROBE-068 — Error envelope decodes into `WireError.OpenEHR`
+
+- **Title:** A `400 Bad Request` carrying a `{message, code}` JSON body surfaces as a `transport.WireError` whose `OpenEHR` detail is populated and which matches a typed error via `errors.As`.
+- **Preconditions:** Cassette of a real 400 error envelope.
+- **Wire assertion:** `errors.As(err, &wire)` succeeds; `wire.OpenEHR.Message`, `wire.OpenEHR.Code` are set from the envelope; `wire.RawBody` preserves the raw bytes.
+- **Modes:** Sandbox, Cassette.
+- **Status:** Draft.
+
 ### Observability
 
 #### PROBE-050 — OTel span carries openEHR attributes
@@ -285,9 +361,10 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 
 | Topic | Probes | Lives in (test code, TBD) |
 |---|---|---|
-| Auth + discovery | PROBE-001 … 007 | `testkit/probes/auth/` |
+| Auth + discovery | PROBE-001 … 009 | `testkit/probes/auth/` |
 | Versioned writes | PROBE-010 … 013 | `testkit/probes/versioned/` |
 | AQL | PROBE-020 … 021 | `testkit/probes/aql/` |
-| Canonical JSON / formats | PROBE-030 … 032 | `testkit/probes/serialize/` |
+| Canonical JSON / formats | PROBE-030 … 034 | `testkit/probes/serialize/` |
 | Service discovery | PROBE-040 … 041 | `testkit/probes/discovery/` |
 | Observability | PROBE-050 … 051 | `testkit/probes/observability/` |
+| REST binding | PROBE-060 … 068 | `testkit/probes/rest/` |
