@@ -65,7 +65,7 @@ func (d *DVDate) LessThan(other DVDate) bool {
 }
 
 // Magnitude Numeric value of the date as days since the calendar origin date `0001-01-01`.
-func (d *DVDate) Magnitude() int32 {
+func (d *DVDate) Magnitude() Integer {
 	panic("not implemented: DV_DATE.magnitude — implement in a non-generated file")
 }
 
@@ -155,7 +155,7 @@ type DVDuration struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *float64 `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitempty"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
 	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
 	// MagnitudeStatus Optional status of magnitude with values:
@@ -209,7 +209,7 @@ func (d *DVDuration) Magnitude() float64 {
 // Multiply Product of this Duration and `_factor_`.
 //
 // Aliases: &#42; (Go does not support operator overloading)
-func (d *DVDuration) Multiply(factor float64) DVDuration {
+func (d *DVDuration) Multiply(factor Real) DVDuration {
 	panic("not implemented: DV_DURATION.multiply — implement in a non-generated file")
 }
 
@@ -297,7 +297,7 @@ func (d *DVTime) LessThan(other DVTime) bool {
 }
 
 // Magnitude Numeric value of the time as seconds since the start of day, i.e. `00:00:00`.
-func (d *DVTime) Magnitude() float64 {
+func (d *DVTime) Magnitude() Real {
 	panic("not implemented: DV_TIME.magnitude — implement in a non-generated file")
 }
 

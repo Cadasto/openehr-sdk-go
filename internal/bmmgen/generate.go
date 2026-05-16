@@ -156,7 +156,7 @@ func Run(opts Options) (*Result, error) {
 // per-target diagnostic counters and appends to the global Result.
 func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result) (TargetResult, error) {
 	tr := TargetResult{Target: t}
-	plan, err := BuildPlanForTarget(context.TODO(), t, resolver)
+	plan, err := BuildPlanForTarget(context.Background(), t, resolver)
 	if err != nil {
 		return tr, err
 	}
@@ -217,9 +217,9 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 			}
 		}
 
-		// Canonical-JSON unmarshaller companion. Emitted only for
-		// concrete classes carrying at least one polymorphic field.
-		// Same skip-when-empty + drift-on-stale rules as the marshaller.
+		// Canonical-JSON unmarshaller companion — one per marshaller
+		// file (every concrete class). Same skip-when-empty +
+		// drift-on-stale rules as the marshaller.
 		unmarBody, err := RenderUnmarshalJSONFile(plan, f)
 		if err != nil {
 			return tr, err

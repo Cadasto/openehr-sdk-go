@@ -87,11 +87,11 @@ type CDuration struct {
 // CInteger Constraint on instances of Integer.
 type CInteger struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *int32 `json:"assumed_value,omitempty"`
+	AssumedValue *Integer `json:"assumed_value,omitempty"`
 	// List Set of Integers specifying constraint.
-	List []int32 `json:"list,omitempty"`
+	List []Integer `json:"list,omitempty"`
 	// Range Range of Integers specifying constraint.
-	Range *rm.Interval[int32] `json:"range,omitempty"`
+	Range *rm.Interval[Integer] `json:"range,omitempty"`
 }
 
 // CPrimitive Parent of types representing constraints on primitive types.
@@ -233,11 +233,11 @@ func (c *CTime) ValidValue(aValue any) bool {
 // CReal Constraint on instances of Real.
 type CReal struct {
 	// AssumedValue The value to assume if this item is not included in data, due to being part of an optional structure.
-	AssumedValue *float64 `json:"assumed_value,omitempty"`
+	AssumedValue *Real `json:"assumed_value,omitempty"`
 	// List Set of Reals specifying constraint.
-	List []float64 `json:"list,omitempty"`
+	List []Real `json:"list,omitempty"`
 	// Range Range of Real specifying constraint.
-	Range *rm.Interval[float64] `json:"range,omitempty"`
+	Range *rm.Interval[Real] `json:"range,omitempty"`
 }
 
 // CString Constraint on instances of STRING.

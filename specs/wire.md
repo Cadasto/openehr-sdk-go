@@ -149,6 +149,8 @@ Canonical-JSON properties:
 
 Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate. If a wire value exceeds JSON's number precision (rare in clinical data), the SDK **MUST** report this on decode as a typed error rather than silently rounding.
 
+Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). Cross-SDK parity (REQ-081) requires every SDK to follow the same asymmetric profile.
+
 ## Canonical XML
 
 ### REQ-056

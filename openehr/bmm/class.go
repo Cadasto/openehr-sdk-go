@@ -34,13 +34,16 @@ type GenericParameterDef struct {
 // classCommon is the embedded common ancestor for every concrete Class
 // variant. Captures the fields that all class kinds share.
 type classCommon struct {
-	Name           string               `json:"name"`
-	Doc            string               `json:"documentation,omitempty"`
-	Ancestors_     []string             `json:"ancestors,omitempty"`
-	IsAbstractFlag bool                 `json:"is_abstract,omitempty"`
-	Properties     map[string]Property  `json:"properties,omitempty"`
-	Functions      map[string]*Function `json:"functions,omitempty"`
-	Invariants     map[string]string    `json:"invariants,omitempty"`
+	Name           string              `json:"name"`
+	Doc            string              `json:"documentation,omitempty"`
+	Ancestors_     []string            `json:"ancestors,omitempty"`
+	IsAbstractFlag bool                `json:"is_abstract,omitempty"`
+	Properties     map[string]Property `json:"properties,omitempty"`
+	// PropertyOrder lists property names in BMM JSON declaration order
+	// (the key order of the properties object in the source file).
+	PropertyOrder []string             `json:"-"`
+	Functions     map[string]*Function `json:"functions,omitempty"`
+	Invariants    map[string]string    `json:"invariants,omitempty"`
 }
 
 // ClassName implements Class.
@@ -191,14 +194,33 @@ func decodeClassCommon(raw json.RawMessage, c *classCommon, path string) error {
 	c.Ancestors_ = aux.Ancestors
 	c.IsAbstractFlag = aux.IsAbstract
 	c.Invariants = aux.Invariants
+	propOrder, err := orderedJSONObjectKeysFromClass(raw, "properties")
+	if err != nil {
+		return fmt.Errorf("decode Class properties order at %s: %w", path, err)
+	}
+	c.PropertyOrder = propOrder
 	if len(aux.Properties) > 0 {
 		c.Properties = make(map[string]Property, len(aux.Properties))
-		for k, v := range aux.Properties {
+		for _, k := range propOrder {
+			v := aux.Properties[k]
 			p, err := decodeProperty(v, path+".properties."+k)
 			if err != nil {
 				return err
 			}
 			c.Properties[k] = p
+		}
+		// Keys present in the map but missing from PropertyOrder (should
+		// not happen with a well-formed decoder path) — append sorted.
+		for k, v := range aux.Properties {
+			if _, ok := c.Properties[k]; ok {
+				continue
+			}
+			p, err := decodeProperty(v, path+".properties."+k)
+			if err != nil {
+				return err
+			}
+			c.Properties[k] = p
+			c.PropertyOrder = append(c.PropertyOrder, k)
 		}
 	}
 	if len(aux.Functions) > 0 {

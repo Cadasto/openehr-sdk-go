@@ -31,7 +31,9 @@ These are common in dynamic-language ports. They produce reflection-heavy decode
 
 ## Embedded base structs (REQ-031)
 
-Shared RM fields **MUST** be expressed as embedded structs in concrete types:
+Shared RM fields **MUST** be expressed as embedded structs in concrete types.
+
+> **Generator output.** The example below teaches the conceptual layering REQ-031 requires. The actual `bmmgen` output diverges per [`../docs/adr/0002-bmm-codegen-decisions.md`](../docs/adr/0002-bmm-codegen-decisions.md) D4: abstract non-generic ancestors are emitted as Go marker interfaces and their properties are **flattened** into every concrete descendant struct. The generated `Composition` therefore carries `Name`, `ArchetypeNodeID`, `UID`, etc. as own fields rather than via a `Locatable` embed. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds. The teaching example below remains the normative *model* of the layering REQ-031 expresses; ADR 0002 D4 is the canonical *output rule*.
 
 ```go
 // Locatable carries the fields that every LOCATABLE descendant shares.

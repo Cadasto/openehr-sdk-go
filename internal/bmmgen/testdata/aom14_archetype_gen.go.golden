@@ -96,7 +96,7 @@ func (a *Archetype) ShortConceptName() string {
 // SpecialisationDepth Specialisation depth of this archetype; larger than 0 if this archetype has a parent. Derived from terminology.specialisation_depth.
 //
 // Post: Result = terminology.specialisation_depth
-func (a *Archetype) SpecialisationDepth() int32 {
+func (a *Archetype) SpecialisationDepth() Integer {
 	panic("not implemented: ARCHETYPE.specialisation_depth — implement in a non-generated file")
 }
 

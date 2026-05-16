@@ -208,7 +208,7 @@ func (v *VersionedObject[T]) VersionAtTime(aTime DVDateTime) Version[any] {
 }
 
 // VersionCount Return the total number of versions in this object.
-func (v *VersionedObject[T]) VersionCount() int32 {
+func (v *VersionedObject[T]) VersionCount() Integer {
 	panic("not implemented: VERSIONED_OBJECT.version_count — implement in a non-generated file")
 }
 

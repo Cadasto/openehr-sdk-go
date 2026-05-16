@@ -13,9 +13,9 @@ package bmmgen
 var primitiveGoType = map[string]string{
 	// Basic scalars
 	"Boolean":   "bool",
-	"Integer":   "int32",
+	"Integer":   "Integer",
 	"Integer64": "int64",
-	"Real":      "float64",
+	"Real":      "Real",
 	"Double":    "float64",
 	"Character": "rune",
 	"String":    "string",

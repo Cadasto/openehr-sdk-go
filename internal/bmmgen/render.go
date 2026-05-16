@@ -100,7 +100,11 @@ func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 	concrete := append([]*PlannedClass(nil), plan.ConcreteClasses...)
 	sort.Slice(concrete, func(i, j int) bool { return concrete[i].BMMName < concrete[j].BMMName })
 	for _, pc := range concrete {
-		fmt.Fprintf(&b, "\ttypereg.Default.Register(%q, func() any { return &%s{} })\n", pc.BMMName, pc.GoName)
+		goType := pc.GoName
+		if sc, ok := pc.Class.(*bmm.SimpleClass); ok && sc.IsGeneric() {
+			goType = pc.GoName + defaultGenericArgs(plan, sc)
+		}
+		fmt.Fprintf(&b, "\ttypereg.Default.Register(%q, func() any { return &%s{} })\n", pc.BMMName, goType)
 	}
 	b.WriteString("}\n")
 	formatted, err := format.Source(b.Bytes())
@@ -110,15 +114,27 @@ func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 	return formatted, nil
 }
 
+// codecPolymorphicAbstractGenericNames lists abstract generic BMM
+// classes emitted as marker interfaces for JSON polymorphism (ADR 0003).
+// Additional classes (e.g. VERSION) need separate design before widening.
+var codecPolymorphicAbstractGenericNames = map[string]bool{
+	"EVENT": true,
+}
+
+// codecPolymorphicAbstractGeneric reports whether the planned class
+// is whitelisted for codec-facing interface emission.
+func codecPolymorphicAbstractGeneric(plan *Plan, pc *PlannedClass) bool {
+	return codecPolymorphicAbstractGenericNames[pc.BMMName]
+}
+
 // renderClass dispatches on the planned class's BMM kind.
 //
-// Abstract + non-generic classes become Go interfaces with an
-// is<X>() marker; concrete descendants gain a method (see
-// renderAbstractClass). Abstract + generic classes (e.g. EVENT[T],
-// VERSION[T]) become Go structs instead, because Go's generic
-// interface form cannot carry the open type parameter on the marker
-// method receiver. The trade-off is documented in the generator's
-// package doc.
+// Abstract classes become Go interfaces with an is<X>() marker;
+// concrete descendants gain the marker method (see renderAbstractClass).
+// Abstract + generic classes without concrete descendants (e.g. some
+// internal generic bases) remain structs. Abstract + generic classes
+// with concrete descendants (EVENT, VERSION, …) become interfaces per
+// ADR 0003 so codec polymorphism works at List<Event> sites.
 func renderClass(plan *Plan, pc *PlannedClass) (string, error) {
 	switch cls := pc.Class.(type) {
 	case *bmm.Enumeration:
@@ -126,11 +142,9 @@ func renderClass(plan *Plan, pc *PlannedClass) (string, error) {
 	case *bmm.Interface:
 		return renderInterface(plan, pc, cls)
 	case *bmm.SimpleClass:
-		if cls.IsAbstract() && !cls.IsGeneric() {
+		if cls.IsAbstract() && (!cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc)) {
 			return renderAbstractClass(plan, pc, cls)
 		}
-		// Generic abstract classes fall through to renderConcreteClass
-		// (rendered as structs). The is<X>() marker is omitted.
 		return renderConcreteClass(plan, pc, cls)
 	default:
 		return "", fmt.Errorf("unhandled BMM class kind %T for %s", cls, pc.BMMName)
@@ -311,7 +325,7 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		if !isSimple {
 			continue
 		}
-		isStruct := !acls.IsAbstract() || acls.IsGeneric()
+		isStruct := !acls.IsAbstract() || (acls.IsGeneric() && !codecPolymorphicAbstractGeneric(plan, ap))
 		if !isStruct {
 			continue
 		}
@@ -402,6 +416,67 @@ func collectFlattenedProperties(plan *Plan, sc *bmm.SimpleClass, embedded map[st
 		result[name] = p
 	}
 	return result
+}
+
+// collectFlattenedPropertyOrder returns property names for a concrete
+// class in BMM declaration order: abstract-ancestor properties first
+// (each ancestor's PropertyOrder), then the class's own properties.
+// When the class shadows an ancestor property, the name moves to the
+// class's own declaration position.
+func collectFlattenedPropertyOrder(plan *Plan, sc *bmm.SimpleClass, embedded map[string]bool) []string {
+	props := collectFlattenedProperties(plan, sc, embedded)
+	var order []string
+	seen := map[string]bool{}
+	remove := func(name string) {
+		for i, n := range order {
+			if n == name {
+				order = append(order[:i], order[i+1:]...)
+				return
+			}
+		}
+	}
+	addFrom := func(cls *bmm.SimpleClass) {
+		for _, name := range propertyNamesInOrder(cls) {
+			if _, ok := props[name]; !ok {
+				continue
+			}
+			if seen[name] {
+				remove(name)
+			}
+			seen[name] = true
+			order = append(order, name)
+		}
+	}
+	var walk func(c bmm.Class)
+	visited := map[string]bool{}
+	walk = func(c bmm.Class) {
+		for _, anc := range c.Ancestors() {
+			if visited[anc] || embedded[anc] {
+				continue
+			}
+			visited[anc] = true
+			ap, ok := plan.Classes[anc]
+			if !ok {
+				continue
+			}
+			ascls, isSimple := ap.Class.(*bmm.SimpleClass)
+			if !isSimple || !ascls.IsAbstract() {
+				continue
+			}
+			addFrom(ascls)
+			walk(ascls)
+		}
+	}
+	walk(sc)
+	addFrom(sc)
+	return order
+}
+
+func propertyNamesInOrder(sc *bmm.SimpleClass) []string {
+	if len(sc.PropertyOrder) > 0 {
+		return sc.PropertyOrder
+	}
+	return sortedStringKeys(sc.Properties)
 }
 
 // genericClassParamList renders a `[T any, K comparable, ...]` type
@@ -658,6 +733,9 @@ func genericTypeRef(plan *Plan, owner *bmm.SimpleClass, gt *bmm.GenericType) (st
 		}
 	}
 
+	if pc, ok := plan.Classes[gt.RootType]; ok && codecPolymorphicAbstractGeneric(plan, pc) {
+		return qualifyClassRef(plan, pc), nil
+	}
 	root := goNameForRef(plan, gt.RootType)
 	if root == "" {
 		root = "any"
@@ -730,6 +808,9 @@ func singleTypeRef(plan *Plan, owner *bmm.SimpleClass, name string) (string, boo
 		return "any /* TODO: unmapped " + name + " */", false, nil
 	}
 	if pc, ok := plan.Classes[name]; ok {
+		if codecPolymorphicAbstractGeneric(plan, pc) {
+			return qualifyClassRef(plan, pc), true, nil
+		}
 		// Generic class without explicit args — default-instantiate.
 		if sc, isSimple := pc.Class.(*bmm.SimpleClass); isSimple && sc.IsGeneric() {
 			return qualifyClassRef(plan, pc) + defaultGenericArgs(plan, sc), true, nil
@@ -765,6 +846,9 @@ func defaultGenericArgs(plan *Plan, sc *bmm.SimpleClass) string {
 	for _, k := range keys {
 		def := sc.GenericParameterDefs[k]
 		bound := def.ConformsToType
+		if bound == "" {
+			bound = inheritedGenericBound(plan, sc, k)
+		}
 		if bound == "" || bound == "Any" {
 			parts = append(parts, "any")
 			continue
@@ -814,7 +898,7 @@ func isInterfaceTypeRef(plan *Plan, name string) bool {
 	case *bmm.Interface:
 		return true
 	case *bmm.SimpleClass:
-		return cls.IsAbstract()
+		return cls.IsAbstract() && (!cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc))
 	}
 	return false
 }

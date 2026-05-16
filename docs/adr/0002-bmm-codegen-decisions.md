@@ -42,7 +42,7 @@ Every BMM `function` becomes a Go method whose body is `panic("not implemented: 
 - Consumers construct COMPOSITION values from a single `rm` import; no six-package import fan-out.
 - Calling unimplemented BMM functions panics by design — see package doc on `openehr/rm`.
 - `make test` chains `codegen-verify`; hand-edits to `*_gen.go` fail CI.
-- Event[T] cassette decode requires a follow-up policy change (ADR 0003), not a local codec workaround.
+- `Event[T]` cassette decode required the codec-facing-interface policy change recorded in [ADR 0003](0003-rm-event-polymorphism.md), now accepted. D4 is narrowed accordingly: abstract generic → struct only when no concrete descendants exist; classes in `bmmgen.codecPolymorphicAbstractGenericNames` (EVENT today) emit as Go interfaces instead.
 
 ## References
 

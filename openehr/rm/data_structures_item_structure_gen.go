@@ -35,12 +35,12 @@ func (i *ItemList) AsHierarchy() Cluster {
 }
 
 // ItemCount Count of all items.
-func (i *ItemList) ItemCount() int32 {
+func (i *ItemList) ItemCount() Integer {
 	panic("not implemented: ITEM_LIST.item_count — implement in a non-generated file")
 }
 
 // IthItem Retrieve the i-th item with name.
-func (i *ItemList) IthItem(i_ int32) Element {
+func (i *ItemList) IthItem(i_ Integer) Element {
 	panic("not implemented: ITEM_LIST.ith_item — implement in a non-generated file")
 }
 
@@ -123,7 +123,7 @@ func (i *ItemTable) AsHierarchy() Cluster {
 }
 
 // ColumnCount Return number of columns in the table.
-func (i *ItemTable) ColumnCount() int32 {
+func (i *ItemTable) ColumnCount() Integer {
 	panic("not implemented: ITEM_TABLE.column_count — implement in a non-generated file")
 }
 
@@ -133,7 +133,7 @@ func (i *ItemTable) ColumnNames() []DVText {
 }
 
 // ElementAtCellIj Return cell at a particular location.
-func (i *ItemTable) ElementAtCellIj(i_ int32, j int32) Element {
+func (i *ItemTable) ElementAtCellIj(i_ Integer, j Integer) Element {
 	panic("not implemented: ITEM_TABLE.element_at_cell_ij — implement in a non-generated file")
 }
 
@@ -153,7 +153,7 @@ func (i *ItemTable) HasRowWithName(aKey string) bool {
 }
 
 // IthRow Return i-th row.
-func (i *ItemTable) IthRow(i_ int32) Cluster {
+func (i *ItemTable) IthRow(i_ Integer) Cluster {
 	panic("not implemented: ITEM_TABLE.ith_row — implement in a non-generated file")
 }
 
@@ -163,7 +163,7 @@ func (i *ItemTable) NamedRow(aKey string) Cluster {
 }
 
 // RowCount Number of rows in the table.
-func (i *ItemTable) RowCount() int32 {
+func (i *ItemTable) RowCount() Integer {
 	panic("not implemented: ITEM_TABLE.row_count — implement in a non-generated file")
 }
 

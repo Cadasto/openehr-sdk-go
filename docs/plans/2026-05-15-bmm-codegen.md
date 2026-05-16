@@ -94,7 +94,7 @@ Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM
    - Generic properties → generic instantiation `Foo[Bar]`.
    - Open generic parameters → typed via the surrounding class's type parameter.
    - Primitive type mapping → per [bmm-conformance.md § Primitive type mapping](../../specs/bmm-conformance.md#primitive-type-mapping).
-3. Emit `openehr/rm/typereg/registry_gen.go`: an `init()` that registers every concrete `_type` with its constructor.
+3. Emit `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`): an `init()` that registers every concrete `_type` with its constructor. **Path note:** the original plan called for `openehr/rm/typereg/registry_gen.go`; the canonical location is one level up to avoid a `typereg → rm` import cycle (see ADR 0002 D3 / [`../adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md)).
 4. Implement `cmd/bmmgen` flags: `-resources`, `-out`, `-verify` (CI mode — diff against working tree, exit non-zero on drift).
 5. CI step: add a `make codegen-verify` target that runs `go run ./cmd/bmmgen -verify`. Wire into the existing `make test` pipeline.
 6. Tests for the generator:

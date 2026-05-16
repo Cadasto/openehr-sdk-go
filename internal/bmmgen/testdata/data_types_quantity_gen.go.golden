@@ -92,7 +92,7 @@ type DVCount struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *float64 `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitempty"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
 	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
 	Magnitude         int64 `json:"magnitude"`
@@ -140,7 +140,7 @@ func (d *DVCount) LessThan(other DVCount) bool {
 // Multiply Product of this `DV_COUNT` and `_factor_`.
 //
 // Aliases: &#42; (Go does not support operator overloading)
-func (d *DVCount) Multiply(factor float64) DVCount {
+func (d *DVCount) Multiply(factor Real) DVCount {
 	panic("not implemented: DV_COUNT.multiply — implement in a non-generated file")
 }
 
@@ -336,7 +336,7 @@ type DVOrdinal struct {
 	// Symbol Coded textual representation of this value in the enumeration, which may be strings made from  +  symbols, or other enumerations of terms such as  `mild`, `moderate`, `severe`, or even the same number series as the values, e.g. 1, 2, 3.
 	Symbol DVCodedText `json:"symbol"`
 	// Value Value in ordered enumeration of values. Any integer value can be used.
-	Value int32 `json:"value"`
+	Value Integer `json:"value"`
 }
 
 // IsStrictlyComparableTo Test if this Ordinal is strictly comparable to `_other_`.
@@ -360,11 +360,11 @@ type DVProportion struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *float64 `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitempty"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
 	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
 	// Denominator Denominator of ratio.
-	Denominator float64 `json:"denominator"`
+	Denominator Real `json:"denominator"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -381,13 +381,13 @@ type DVProportion struct {
 	// NormalStatus Optional normal status indicator of value with respect to normal range for this value. Often included by lab, even if the normal range itself is not included. Coded by ordinals in series HHH, HH, H, (nothing), L, LL, LLL; see openEHR terminology group  `normal_status`.
 	NormalStatus *CodePhrase `json:"normal_status,omitempty"`
 	// Numerator Numerator of ratio
-	Numerator float64 `json:"numerator"`
+	Numerator Real `json:"numerator"`
 	// OtherReferenceRanges Optional tagged other reference ranges for this value in its particular measurement context.
 	OtherReferenceRanges []ReferenceRange[DVProportion] `json:"other_reference_ranges,omitempty"`
 	// Precision Precision  to  which  the  `_numerator_` and `_denominator_` values of  the  proportion are expressed, in terms of number  of decimal places. The value 0 implies an integral quantity. The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *int32 `json:"precision,omitempty"`
+	Precision *Integer `json:"precision,omitempty"`
 	// Type Indicates semantic type of proportion, including percent, unitary etc.
-	Type int32 `json:"type"`
+	Type Integer `json:"type"`
 }
 
 // Add Sum of two strictly comparable proportions.
@@ -423,14 +423,14 @@ func (d *DVProportion) LessThan(other DVProportion) bool {
 }
 
 // Magnitude Effective magnitude represented by ratio.
-func (d *DVProportion) Magnitude() float64 {
+func (d *DVProportion) Magnitude() Real {
 	panic("not implemented: DV_PROPORTION.magnitude — implement in a non-generated file")
 }
 
 // Multiply Product of this Proportion and `_factor_`.
 //
 // Aliases: &#42; (Go does not support operator overloading)
-func (d *DVProportion) Multiply(factor float64) DVProportion {
+func (d *DVProportion) Multiply(factor Real) DVProportion {
 	panic("not implemented: DV_PROPORTION.multiply — implement in a non-generated file")
 }
 
@@ -561,11 +561,11 @@ type DVQuantity struct {
 	// Accuracy Accuracy of measurement, expressed either as a half-range percent value (`_accuracy_is_percent_` = `True`) or a half-range quantity. A value of `0` means that accuracy is 100%, i.e. no error.
 	//
 	// A value of `_unknown_accuracy_value_` means that accuracy was not recorded.
-	Accuracy *float64 `json:"accuracy,omitempty"`
+	Accuracy *Real `json:"accuracy,omitempty"`
 	// AccuracyIsPercent If `True`, indicates that when this object was created, `_accuracy_` was recorded as a percent value; if `False`, as an absolute quantity value.
 	AccuracyIsPercent *bool `json:"accuracy_is_percent,omitempty"`
 	// Magnitude Numeric magnitude of the quantity.
-	Magnitude float64 `json:"magnitude"`
+	Magnitude Real `json:"magnitude"`
 	// MagnitudeStatus Optional status of magnitude with values:
 	//
 	// * `"="`   :   magnitude is a point value
@@ -585,7 +585,7 @@ type DVQuantity struct {
 	OtherReferenceRanges []ReferenceRange[DVQuantity] `json:"other_reference_ranges,omitempty"`
 	// Precision Precision to which the value of the quantity is expressed, in terms of number of decimal places. The value 0 implies an integral quantity.
 	// The value -1 implies no limit, i.e. any number of decimal places.
-	Precision *int32 `json:"precision,omitempty"`
+	Precision *Integer `json:"precision,omitempty"`
 	// Units Quantity units, expressed as a code or syntax string from either UCUM (the default) or the units system specified in `_units_system_`, when set.
 	//
 	// In either case, the value is the code or syntax - normally formed of standard ASCII - which is in principal not the same as the display string, although in simple cases such as 'm' (for meters) it will be.
@@ -636,7 +636,7 @@ func (d *DVQuantity) LessThan(other DVQuantity) bool {
 // Multiply Product of this `DV_QUANTITY` and `_factor_`.
 //
 // Aliases: &#42; (Go does not support operator overloading)
-func (d *DVQuantity) Multiply(factor float64) DVQuantity {
+func (d *DVQuantity) Multiply(factor Real) DVQuantity {
 	panic("not implemented: DV_QUANTITY.multiply — implement in a non-generated file")
 }
 
@@ -680,7 +680,7 @@ type DVScale struct {
 	// In some cases, a scale may include values that have no code/symbol. In this case, the symbol will be a `DV-CODED_TEXT` including the `_terminology_id_` and a blank String value for `_code_string_`.
 	Symbol DVCodedText `json:"symbol"`
 	// Value Real number value of Scale item.
-	Value float64 `json:"value"`
+	Value Real `json:"value"`
 }
 
 // IsStrictlyComparableTo Test if this Scale value is strictly comparable to `_other_`.

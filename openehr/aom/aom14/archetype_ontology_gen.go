@@ -14,7 +14,7 @@ type ArchetypeOntology struct {
 	// ParentArchetype Archetype which owns this terminology.
 	ParentArchetype *Archetype `json:"parent_archetype"`
 	// SpecialisationDepth Specialisation depth of this archetype. Unspecialised archetypes have depth 0, with each additional level of specialisation adding 1 to the specialisation_depth.
-	SpecialisationDepth int32    `json:"specialisation_depth"`
+	SpecialisationDepth Integer  `json:"specialisation_depth"`
 	TermAttributeNames  []string `json:"term_attribute_names"`
 	// TermCodes List of all term codes in the ontology. Most of these correspond to “at” codes in an ADL archetype, which are the node_ids on C_OBJECT descendants. There may be an extra one, if a different term is used as the overall archetype concept from that used as the node_id of the outermost C_OBJECT in the definition part.
 	TermCodes []string `json:"term_codes"`

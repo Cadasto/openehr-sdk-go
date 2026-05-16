@@ -251,7 +251,7 @@ type ArchetypeInternalRef struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 	// TargetPath Reference to an object node using archetype path notation.
@@ -268,7 +268,7 @@ type ArchetypeSlot struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 }
@@ -306,7 +306,7 @@ type CComplexObject struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 }
@@ -487,7 +487,7 @@ type CMultipleAttribute struct {
 	// Children Child C_OBJECT nodes. Each such node represents a constraint on the type of this attribute in its reference model. Multiples occur both for multiple items in the case of container attributes, and alternatives in the case of singular attributes.
 	Children []CObject `json:"children,omitempty"`
 	// Existence Constraint on every attribute, regardless of whether it is singular or of a container type, which indicates whether its target object exists or not (i.e. is mandatory or not).
-	Existence rm.Interval[int32] `json:"existence"`
+	Existence rm.Interval[Integer] `json:"existence"`
 	// RMAttributeName Reference model attribute within the enclosing type represented by a C_OBJECT.
 	RMAttributeName string `json:"rm_attribute_name"`
 }
@@ -528,7 +528,7 @@ type CPrimitiveObject struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 }
@@ -556,7 +556,7 @@ type CSingleAttribute struct {
 	// Children Child C_OBJECT nodes. Each such node represents a constraint on the type of this attribute in its reference model. Multiples occur both for multiple items in the case of container attributes, and alternatives in the case of singular attributes.
 	Children []CObject `json:"children,omitempty"`
 	// Existence Constraint on every attribute, regardless of whether it is singular or of a container type, which indicates whether its target object exists or not (i.e. is mandatory or not).
-	Existence rm.Interval[int32] `json:"existence"`
+	Existence rm.Interval[Integer] `json:"existence"`
 	// RMAttributeName Reference model attribute within the enclosing type represented by a C_OBJECT.
 	RMAttributeName string `json:"rm_attribute_name"`
 }
@@ -569,7 +569,7 @@ func (c *CSingleAttribute) Alternatives() []CObject {
 // Cardinality Express constraints on the cardinality of container objects which are the values of multiply-valued attributes, including uniqueness and ordering, providing the means to state that a container acts like a logical list, set or bag. The cardinality cannot contradict the cardinality of the corresponding attribute within the relevant reference model.
 type Cardinality struct {
 	// Interval The interval of this cardinality.
-	Interval rm.Interval[int32] `json:"interval"`
+	Interval rm.Interval[Integer] `json:"interval"`
 	// IsOrdered True if the members of the container attribute to which this cardinality refers are ordered.
 	IsOrdered bool `json:"is_ordered"`
 	// IsUnique True if the members of the container attribute to which this cardinality refers are unique.
@@ -597,7 +597,7 @@ type ConstraintRef struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// Reference Reference to a constraint in the archetype local ontology.
 	Reference string `json:"reference"`
 	// RMTypeName Reference model type that this node corresponds to.

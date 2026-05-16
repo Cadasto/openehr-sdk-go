@@ -415,6 +415,19 @@ func walkPackage(p *bmm.Package, path string, into map[string]string) {
 	}
 }
 
+// registryGenericConcrete reports whether a concrete generic class
+// should be registered with default type arguments (e.g. POINT_EVENT
+// for EVENT polymorphism). Most generic concretes are only used with
+// explicit parameters and are omitted.
+func registryGenericConcrete(pc *PlannedClass) bool {
+	for _, anc := range pc.Class.Ancestors() {
+		if codecPolymorphicAbstractGenericNames[anc] {
+			return true
+		}
+	}
+	return false
+}
+
 // isConcreteForRegistry reports whether the planned class should get
 // a typereg.Register(...) call: must be a SimpleClass (not Interface,
 // not Enumeration), not abstract, and not a primitive whose Go form
@@ -429,14 +442,12 @@ func isConcreteForRegistry(pc *PlannedClass) bool {
 		// discriminator in the wire format — skip them.
 		return false
 	}
-	// Generic classes (with class-level GenericParameterDefs) cannot
-	// be instantiated without parameters, so skip the registry entry.
 	if sc, ok := pc.Class.(*bmm.SimpleClass); ok {
 		if sc.IsAbstract() {
 			return false
 		}
 		if sc.IsGeneric() {
-			return false
+			return registryGenericConcrete(pc)
 		}
 		return true
 	}

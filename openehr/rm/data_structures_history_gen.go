@@ -6,33 +6,25 @@ package rm
 // BMM package: org.openehr.rm.data_structures.history
 
 // Event Defines the abstract notion of a single event in a series. This class is generic, allowing types to be generated which are locked to particular spatial types, such as `EVENT<ITEM_LIST>`. Subtypes express point or intveral data.
-type Event[T ItemStructure] struct {
-	// ArchetypeDetails Details of archetyping used on this node.
-	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
-	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
-	//
-	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
-	ArchetypeNodeID string `json:"archetype_node_id"`
-	// Data The data of this event.
-	Data T `json:"data"`
-	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
-	Links []Link `json:"links,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
-	// State Optional state data for this event.
-	State ItemStructure `json:"state,omitempty"`
-	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
-	Time DVDateTime `json:"time"`
-	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+type Event interface {
+	isEvent()
+}
+
+func (IntervalEvent[T]) isEvent() {}
+
+func (PointEvent[T]) isEvent() {}
+
+// Offset Offset of this event from origin, computed as time.diff(parent.origin).
+//
+// Post: Result = time.diff(parent.origin)
+func (i *IntervalEvent[T]) Offset() DVDuration {
+	panic("not implemented: EVENT.offset — implement in a non-generated file")
 }
 
 // Offset Offset of this event from origin, computed as time.diff(parent.origin).
 //
 // Post: Result = time.diff(parent.origin)
-func (e *Event[T]) Offset() DVDuration {
+func (p *PointEvent[T]) Offset() DVDuration {
 	panic("not implemented: EVENT.offset — implement in a non-generated file")
 }
 
@@ -49,7 +41,7 @@ type History[T ItemStructure] struct {
 	// Duration Duration of the entire History; either corresponds to the duration of all the events, and/or the duration represented by the summary, if it exists.
 	Duration *DVDuration `json:"duration,omitempty"`
 	// Events The events in the series. This attribute is of a generic type whose parameter must be a descendant of `ITEM_SUTRUCTURE`.
-	Events []Event[T] `json:"events,omitempty"`
+	Events []Event `json:"events,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
@@ -73,11 +65,30 @@ func (h *History[T]) IsPeriodic() bool {
 
 // IntervalEvent Defines a single interval event in a series.
 type IntervalEvent[T ItemStructure] struct {
-	Event[T]
+	// ArchetypeDetails Details of archetyping used on this node.
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
+	//
+	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
+	ArchetypeNodeID string `json:"archetype_node_id"`
+	// Data The data of this event.
+	Data T `json:"data"`
+	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
+	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
+	Links []Link `json:"links,omitempty"`
 	// MathFunction Mathematical function of the data of this event, e.g.  maximum, mean etc. Coded using https://github.com/openEHR/terminology/blob/master/openEHR_RM/en/openehr_terminology.xml[openEHR vocabulary `event math function`]. Default value `640|actual|`, meaning 'actual value'.
 	MathFunction DVCodedText `json:"math_function"`
+	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
+	Name DVText `json:"name"`
 	// SampleCount Optional count of original samples to which this event corresponds.
-	SampleCount *int32 `json:"sample_count,omitempty"`
+	SampleCount *Integer `json:"sample_count,omitempty"`
+	// State Optional state data for this event.
+	State ItemStructure `json:"state,omitempty"`
+	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
+	Time DVDateTime `json:"time"`
+	// UID Optional globally unique object identifier for root points of archetyped structures.
+	UID UIDBasedID `json:"uid,omitempty"`
 	// Width Duration of the time interval during which the values recorded under `data` are true and, if set, the values recorded under `state` are true. Void if an instantaneous event.
 	Width DVDuration `json:"width"`
 }
@@ -89,5 +100,24 @@ func (i *IntervalEvent[T]) IntervalStartTime() DVDateTime {
 
 // PointEvent Defines a single point event in a series.
 type PointEvent[T ItemStructure] struct {
-	Event[T]
+	// ArchetypeDetails Details of archetyping used on this node.
+	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
+	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
+	//
+	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
+	ArchetypeNodeID string `json:"archetype_node_id"`
+	// Data The data of this event.
+	Data T `json:"data"`
+	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
+	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
+	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
+	Links []Link `json:"links,omitempty"`
+	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
+	Name DVText `json:"name"`
+	// State Optional state data for this event.
+	State ItemStructure `json:"state,omitempty"`
+	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.
+	Time DVDateTime `json:"time"`
+	// UID Optional globally unique object identifier for root points of archetyped structures.
+	UID UIDBasedID `json:"uid,omitempty"`
 }

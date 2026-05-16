@@ -23,7 +23,7 @@ func (i *ISO8601Timezone) AsString() string {
 }
 
 // Hour Extract the hour part of timezone, as an Integer in the range `00 - 14`.
-func (i *ISO8601Timezone) Hour() int32 {
+func (i *ISO8601Timezone) Hour() Integer {
 	panic("not implemented: Iso8601_timezone.hour — implement in a non-generated file")
 }
 
@@ -43,7 +43,7 @@ func (i *ISO8601Timezone) IsPartial() bool {
 }
 
 // Minute Extract the hour part of timezone, as an Integer, usually either 0 or 30.
-func (i *ISO8601Timezone) Minute() int32 {
+func (i *ISO8601Timezone) Minute() Integer {
 	panic("not implemented: Iso8601_timezone.minute — implement in a non-generated file")
 }
 
@@ -53,7 +53,7 @@ func (i *ISO8601Timezone) MinuteUnknown() bool {
 }
 
 // Sign Direction of timezone expresssed as +1 or -1.
-func (i *ISO8601Timezone) Sign() int32 {
+func (i *ISO8601Timezone) Sign() Integer {
 	panic("not implemented: Iso8601_timezone.sign — implement in a non-generated file")
 }
 
@@ -64,7 +64,7 @@ type TimeDefinitions struct {
 // ValidDay True if `d >= 1 and d <= days_in_month (m, y)`.
 //
 // Post: Result = d >= 1 and d <= days_in_month (m, y)
-func (t *TimeDefinitions) ValidDay(d int32, m int32, y int32) bool {
+func (t *TimeDefinitions) ValidDay(d Integer, m Integer, y Integer) bool {
 	panic("not implemented: Time_Definitions.valid_day — implement in a non-generated file")
 }
 
@@ -78,7 +78,7 @@ func (t *TimeDefinitions) ValidFractionalSecond(fs float64) bool {
 // ValidHour True if `(h >= 0 and h < Hours_in_day) or (h = Hours_in_day and m = 0 and s = 0)` .
 //
 // Post: Result = (h >= 0 and h < Hours_in_day) or (h = Hours_in_day and m = 0 and s = 0)
-func (t *TimeDefinitions) ValidHour(h int32, m int32, s int32) bool {
+func (t *TimeDefinitions) ValidHour(h Integer, m Integer, s Integer) bool {
 	panic("not implemented: Time_Definitions.valid_hour — implement in a non-generated file")
 }
 
@@ -146,27 +146,27 @@ func (t *TimeDefinitions) ValidISO8601Time(s string) bool {
 // ValidMinute True if `m >= 0 and m < Minutes_in_hour`.
 //
 // Post: Result = m >= 0 and m < Minutes_in_hour
-func (t *TimeDefinitions) ValidMinute(m int32) bool {
+func (t *TimeDefinitions) ValidMinute(m Integer) bool {
 	panic("not implemented: Time_Definitions.valid_minute — implement in a non-generated file")
 }
 
 // ValidMonth True if `m >= 1 and m <= months_in_year`.
 //
 // Post: Result = m >= 1 and m <= Months_in_year
-func (t *TimeDefinitions) ValidMonth(m int32) bool {
+func (t *TimeDefinitions) ValidMonth(m Integer) bool {
 	panic("not implemented: Time_Definitions.valid_month — implement in a non-generated file")
 }
 
 // ValidSecond True if `s >= 0 and s < Seconds_in_minute` .
 //
 // Post: Result = s >= 0 and s < Seconds_in_minute
-func (t *TimeDefinitions) ValidSecond(s int32) bool {
+func (t *TimeDefinitions) ValidSecond(s Integer) bool {
 	panic("not implemented: Time_Definitions.valid_second — implement in a non-generated file")
 }
 
 // ValidYear True if `y >= 0`.
 //
 // Post: Result = y >= 0
-func (t *TimeDefinitions) ValidYear(y int32) bool {
+func (t *TimeDefinitions) ValidYear(y Integer) bool {
 	panic("not implemented: Time_Definitions.valid_year — implement in a non-generated file")
 }

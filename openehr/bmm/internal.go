@@ -127,7 +127,6 @@ func marshalClassObject(classKind string, c *classCommon, extra map[string]any) 
 		Doc        string               `json:"documentation,omitempty"`
 		Ancestors  []string             `json:"ancestors,omitempty"`
 		IsAbstract bool                 `json:"is_abstract,omitempty"`
-		Properties map[string]Property  `json:"properties,omitempty"`
 		Functions  map[string]*Function `json:"functions,omitempty"`
 		Invariants map[string]string    `json:"invariants,omitempty"`
 	}
@@ -136,7 +135,6 @@ func marshalClassObject(classKind string, c *classCommon, extra map[string]any) 
 		Doc:        c.Doc,
 		Ancestors:  c.Ancestors_,
 		IsAbstract: c.IsAbstractFlag,
-		Properties: c.Properties,
 		Functions:  c.Functions,
 		Invariants: c.Invariants,
 	})
@@ -163,6 +161,14 @@ func marshalClassObject(classKind string, c *classCommon, extra map[string]any) 
 	if classKind != "" {
 		writeKV("_type", []byte("\""+classKind+"\""))
 	}
+	if len(c.Properties) > 0 {
+		propsJSON, err := marshalPropertiesOrdered(c)
+		if err != nil {
+			return nil, err
+		}
+		writeKV("properties", propsJSON)
+		delete(commonMap, "properties")
+	}
 	for _, k := range sortedKeys(commonMap) {
 		writeKV(k, commonMap[k])
 	}
@@ -183,6 +189,38 @@ func marshalClassObject(classKind string, c *classCommon, extra map[string]any) 
 			continue
 		}
 		writeKV(k, vb)
+	}
+	buf.WriteByte('}')
+	return buf.Bytes(), nil
+}
+
+// marshalPropertiesOrdered emits the properties object with keys in
+// BMM declaration order (PropertyOrder).
+func marshalPropertiesOrdered(c *classCommon) ([]byte, error) {
+	names := c.PropertyOrder
+	if len(names) == 0 {
+		names = sortedKeys(c.Properties)
+	}
+	var buf bytes.Buffer
+	buf.WriteByte('{')
+	first := true
+	for _, name := range names {
+		p, ok := c.Properties[name]
+		if !ok {
+			continue
+		}
+		vb, err := json.Marshal(p)
+		if err != nil {
+			return nil, err
+		}
+		if !first {
+			buf.WriteByte(',')
+		}
+		first = false
+		kb, _ := json.Marshal(name)
+		buf.Write(kb)
+		buf.WriteByte(':')
+		buf.Write(vb)
 	}
 	buf.WriteByte('}')
 	return buf.Bytes(), nil

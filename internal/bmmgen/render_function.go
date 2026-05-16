@@ -57,8 +57,9 @@ func renderFunctions(b *strings.Builder, plan *Plan, pc *PlannedClass) error {
 		return nil
 	}
 
-	if sc.IsAbstract() && !sc.IsGeneric() {
-		// Abstract non-generic class: emit on every concrete descendant
+	if sc.IsAbstract() && (!sc.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc)) {
+		// Abstract class (non-generic or codec-polymorphic generic):
+		// emit on every concrete descendant
 		// that does not itself declare the function. Iterate in BMM-name
 		// sort order for determinism.
 		//

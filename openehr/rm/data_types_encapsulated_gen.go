@@ -33,7 +33,7 @@ type DVMultimedia struct {
 	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
 	MediaType CodePhrase `json:"media_type"`
 	// Size Original size in bytes of unencoded encapsulated data. I.e. encodings such as base64, hexadecimal etc do not change the value of this attribute.
-	Size int32 `json:"size"`
+	Size Integer `json:"size"`
 	// Thumbnail The thumbnail for this item, if one exists; mainly for graphics formats.
 	Thumbnail *DVMultimedia `json:"thumbnail,omitempty"`
 	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
@@ -73,6 +73,6 @@ type DVParsable struct {
 }
 
 // Size Size in bytes of value.
-func (d *DVParsable) Size() int32 {
+func (d *DVParsable) Size() Integer {
 	panic("not implemented: DV_PARSABLE.size — implement in a non-generated file")
 }

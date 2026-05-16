@@ -17,8 +17,8 @@ type CCodedText struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
-	Reference   *string            `json:"reference,omitempty"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
+	Reference   *string              `json:"reference,omitempty"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 	// Terminology Terminology identifier.
@@ -35,7 +35,7 @@ type COrdinal struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// RMTypeName Reference model type that this node corresponds to.
 	RMTypeName string `json:"rm_type_name"`
 }
@@ -50,7 +50,7 @@ type CQuantity struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Occurrences Occurrences of this object node in the data, under the owning attribute. Upper limit can only be greater than 1 if owning attribute has a cardinality of more than 1).
-	Occurrences rm.Interval[int32] `json:"occurrences"`
+	Occurrences rm.Interval[Integer] `json:"occurrences"`
 	// Property Name of physical property for Quantities being constrained.
 	Property string `json:"property"`
 	// RMTypeName Reference model type that this node corresponds to.
@@ -60,7 +60,7 @@ type CQuantity struct {
 // CQuantityItem Constrainer class for a single Quantity.
 type CQuantityItem struct {
 	// Magnitude Quantity magnitude constraint.
-	Magnitude rm.Interval[float64] `json:"magnitude"`
+	Magnitude rm.Interval[Real] `json:"magnitude"`
 	// Units Optional units constraint.
 	Units *string `json:"units,omitempty"`
 }
@@ -70,5 +70,5 @@ type Ordinal struct {
 	// Symbol Terminology code providing the Ordinal's symbol.
 	Symbol rm.CodePhrase `json:"symbol"`
 	// Value Ordinal value.
-	Value int32 `json:"value"`
+	Value Integer `json:"value"`
 }
