@@ -1,0 +1,109 @@
+# BMM codegen drift watcher.
+#
+# Re-runs the BMM-driven generator on a fresh checkout on a weekly
+# schedule (Mondays 06:00 UTC) and on manual dispatch. If
+# `make codegen-verify` reports drift, the workflow either creates a
+# new tracking issue with label `bmm-drift` or comments on the
+# existing one. The body carries the `bmmgen -verify` output verbatim
+# so reviewers can triage without running the tool locally.
+#
+# Tracking-issue convention:
+#  - One open issue labelled `bmm-drift` is the canonical "current
+#    drift" thread; subsequent runs append comments to it.
+#  - When the underlying drift is fixed, a maintainer closes the
+#    issue (the workflow does NOT auto-close, since the maintainer
+#    has visibility into whether the fix is the right one).
+#  - The label is created on first use; the workflow guards against
+#    its absence.
+#
+# This workflow is intentionally lean — only first-party actions and
+# the pre-installed gh CLI. See docs/adr/0001-bmm-version-bump-runbook.md
+# for the operational procedure that follows on drift detection.
+name: codegen-drift
+
+on:
+  schedule:
+    # Mondays 06:00 UTC. Adjust here when the team's review cadence
+    # changes; do not introduce a parallel schedule.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+
+      - name: Run codegen-verify
+        id: verify
+        run: |
+          set -o pipefail
+          # Capture verifier output to a file so we can post it as
+          # an issue comment on failure. Tee for live log visibility.
+          if make codegen-verify 2>&1 | tee codegen-verify.out; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+            # Do not fail the step yet — let the next step post a
+            # tracking-issue comment first.
+            exit 0
+          fi
+
+      - name: Report drift to tracking issue
+        if: steps.verify.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Ensure the `bmm-drift` label exists. Creating it is
+          # idempotent.
+          gh label create bmm-drift \
+            --description "BMM codegen drift detected by weekly bot" \
+            --color C5DEF5 || true
+
+          # Find the canonical open tracking issue.
+          ISSUE_NUMBER=$(gh issue list --state open --label bmm-drift \
+            --json number --jq '.[0].number // empty')
+
+          BODY_FILE=$(mktemp)
+          {
+            echo "Codegen drift detected by the weekly drift bot."
+            echo ""
+            echo "**Run:** [${{ github.workflow }} #${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo "**SHA:** ${{ github.sha }}"
+            echo ""
+            echo "Output of \`make codegen-verify\`:"
+            echo ""
+            echo '```'
+            tail -200 codegen-verify.out
+            echo '```'
+            echo ""
+            echo "See [docs/adr/0001-bmm-version-bump-runbook.md](../blob/main/docs/adr/0001-bmm-version-bump-runbook.md) for the procedure."
+          } > "$BODY_FILE"
+
+          if [ -z "$ISSUE_NUMBER" ]; then
+            gh issue create \
+              --title "BMM codegen drift detected" \
+              --label bmm-drift \
+              --body-file "$BODY_FILE"
+          else
+            gh issue comment "$ISSUE_NUMBER" --body-file "$BODY_FILE"
+          fi
+
+      - name: Fail run on drift
+        if: steps.verify.outputs.drift == 'true'
+        run: |
+          echo "::error::Codegen drift detected — see tracking issue."
+          exit 1
