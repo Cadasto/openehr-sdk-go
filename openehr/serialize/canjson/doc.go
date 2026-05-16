@@ -13,6 +13,7 @@
 //
 //	import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 //
+// Implements REQ-052 and REQ-040 per specs/wire.md and specs/rm-modeling.md.
 // Per REQ-013 the codec MUST be usable without the HTTP client, auth,
 // transport, or any other SDK subsystem. The only dependencies are
 // the generated RM types and the type registry under

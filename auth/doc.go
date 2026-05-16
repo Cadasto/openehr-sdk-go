@@ -8,5 +8,6 @@
 // (Basic, plain OIDC, session-cookie) are addressable later by adding
 // further sub-packages without disturbing the TokenSource contract.
 //
-// See the SDK Specification proposal — Module layout > auth/.
+// Implements REQ-060, REQ-066, and REQ-068 (partial: clientcreds, jwtbearer)
+// per specs/auth.md. SMART PKCE (REQ-061..064) lives in auth/smart (planned).
 package auth
