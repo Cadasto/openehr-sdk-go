@@ -141,8 +141,13 @@ Each core package stands on its own — applications must not be forced to const
   - Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) conventions, e.g. `fix(resources): refreshed BMM definitions in resources`, `feat(tools): added new tool for operational templates`.
   - Scope is a short noun phrase identifying the module/area touched: `auth`, `rm`, `transport`, `client/ehr`, `docs`, `agents`, `build`, etc.
 
-- **CHANGELOG.md entries:**
-  - Keep `## [Unreleased]` entries **short and high-level**: one-line bullets naming the artefact class and scope. Do not enumerate individual files, classes, drift fixes, or audit details — those belong in commit messages and PR bodies, not the CHANGELOG.
+- **CHANGELOG.md** — agents **do not need to update** this file for every change. Update it only when the user asks, or when cutting a release / merging a milestone PR. When you do touch it:
+  - **One bullet per artefact class** (e.g. “Transport layer”, “EHR REST client”) — not per file, type, REQ-ID, probe, or commit.
+  - **No** API inventories, option lists, test descriptions, ADR summaries, or copy-paste from PR bodies.
+  - **No** file paths, struct names, or “implements REQ-NNN” traceability (that lives in `specs/traceability.yaml` and commit messages).
+  - Example good bullet: `REST clients: EHR read/write surface (composition, ehrstatus, directory, contribution).`
+  - Example bad bullet: a paragraph listing every `With*` option on `transport.Client`.
+  - Put implementation detail in **Conventional Commits** and the PR description instead.
 
 ## Tooling policy
 
