@@ -32,7 +32,7 @@ endif
 
 # ---- targets -------------------------------------------------------------
 
-.PHONY: help go-version fmt fmt-check vet test test-race lint lint-ci mod-tidy mod-tidy-check build clean doctor image-dev codegen codegen-verify ci
+.PHONY: help go-version fmt fmt-check vet test test-race lint lint-ci mod-tidy mod-tidy-check build clean doctor image-dev codegen codegen-verify spec-check ci
 
 help: ## Show targets and tooling policy
 	@echo "openehr-sdk-go — Makefile"
@@ -107,7 +107,10 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 	@git diff --exit-code go.mod
 	@if test -f go.sum; then git diff --exit-code go.sum; fi
 
-ci: fmt-check mod-tidy-check vet test lint build ## Full PR gate (test includes codegen-verify; excludes test-race)
+spec-check: ## Verify specs/traceability.yaml against repo artefacts
+	@bash scripts/spec-check.sh
+
+ci: fmt-check mod-tidy-check vet test lint spec-check build ## Full PR gate (test includes codegen-verify; excludes test-race)
 
 build: ## go build ./... (compile every package; primarily for examples in cmd/)
 	@$(GO) build ./...

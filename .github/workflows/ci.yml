@@ -43,6 +43,9 @@ jobs:
       - name: Vet
         run: make vet
 
+      - name: Spec traceability
+        run: make spec-check
+
       - name: Build
         run: make build
 

@@ -15,7 +15,7 @@ Jobs run in parallel. All use Go **1.25.x** (`actions/setup-go@v5` with module c
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `vet`, `build` | Static checks and compile-all without running tests |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `vet`, `spec-check`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` |
 | **Lint** | (via `golangci-lint-action` v2.11.4, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
@@ -41,6 +41,7 @@ make test-race # optional; matches main-branch Race job
 | `make fmt-check` | Fail if `gofmt -s` would change any file |
 | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
+| `make spec-check` | `specs/traceability.yaml` paths and probes match the tree |
 | `make lint` / `make lint-ci` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
 | `make ci` | All of the above except `test-race` |
 
