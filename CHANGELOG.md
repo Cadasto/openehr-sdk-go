@@ -16,6 +16,7 @@ Entries under `## [Unreleased]` are **short and high-level**: one-line bullets n
 - Pinned BMM corpus under `resources/bmm/` and version-bump tooling (`bmmgen`, `bmmdiff`, drift workflow).
 - BMM loader (`openehr/bmm/`) and generated RM + AOM 1.4 types with type registry.
 - Canonical JSON codec (`openehr/serialize/canjson/`) and vendored cassettes; serialize conformance probes (PROBE-030/031).
+- Canonical XML codec (`openehr/serialize/canxml/`): per-class `MarshalXML`/`UnmarshalXML`/`BMMName` companions; `xsi:type` polymorphic dispatch via typereg; cross-format JSON↔XML invariant; vendored XML cassettes; conformance probes PROBE-033/034.
 - ADRs 0001–0004 (BMM runbook, codegen decisions, EVENT polymorphism, numeric wire tolerance).
 - Authentication foundation and providers (`auth/`, `clientcreds/`, `jwtbearer/`, `basic/` REQ-069).
 - Service discovery (`smart/discovery/`).

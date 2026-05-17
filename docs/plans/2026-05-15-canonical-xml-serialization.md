@@ -1,7 +1,7 @@
 # Plan — Canonical XML serialization
 
 **Date:** 2026-05-15
-**Status:** Draft
+**Status:** Implemented (Sandbox) — 2026-05-17. All six phases landed; PROBE-033/034 in `testkit/probes/serialize/`; cross-format invariant in `openehr/serialize/canxml/crossformat_test.go`. Hash<K,V> XML emission/decode deferred (v1 limitation; see `canxml/doc.go`).
 **Owner:** SDK maintainers
 **Covers:** REQ-056, REQ-040 (type registry consumption), REQ-013 (building-block), REQ-024 (no reflection on `xsi:type` dispatch); PROBE-033, PROBE-034 (reserved — see Phase 0)
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON plan Phase 0 (`internal/poly`, typereg sentinels, vendored fixtures, `wire.md` ordering); JSON plan Phase 2+ for shared cross-format tests
