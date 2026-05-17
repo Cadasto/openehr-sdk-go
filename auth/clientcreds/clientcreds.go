@@ -208,8 +208,9 @@ func (s *Source) stale() bool {
 		return true
 	}
 	if s.cur.ExpiresAt.IsZero() {
-		// No declared expiry — trust the cached token until the wire
-		// surfaces a 401. The transport layer handles that case.
+		// No declared expiry — cache until the consumer replaces the
+		// TokenSource or a wire 401 surfaces (transport does not
+		// auto-refresh; the application must obtain a new token).
 		return false
 	}
 	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
@@ -247,6 +248,9 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 	if s.cfg.AuthMethod == AuthBasic {
+		// RFC 6749 §2.3.1: client_id and client_secret are form-encoded
+		// (Appendix B) before use as the Basic username and password.
+		// net/http documents the same requirement for OAuth2.
 		req.SetBasicAuth(url.QueryEscape(s.cfg.ClientID), url.QueryEscape(s.cfg.ClientSecret))
 	}
 

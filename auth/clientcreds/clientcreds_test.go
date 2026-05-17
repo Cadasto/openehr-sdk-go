@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -136,6 +137,30 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 	}
 	if h := atomic.LoadInt32(&hits); h < 2 {
 		t.Errorf("expected ≥2 hits, got %d", h)
+	}
+}
+
+func TestTokenAuthBasicOAuth2FormEncoding(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok {
+			t.Fatal("expected Basic auth")
+		}
+		if user != url.QueryEscape("client:id") {
+			t.Errorf("Basic user = %q, want %q", user, url.QueryEscape("client:id"))
+		}
+		if pass != url.QueryEscape("s@cret") {
+			t.Errorf("Basic pass = %q, want %q", pass, url.QueryEscape("s@cret"))
+		}
+		_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":60}`))
+	}))
+	defer srv.Close()
+	src, err := New("client:id", "s@cret", srv.URL, WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.Token(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 
