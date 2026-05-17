@@ -1,6 +1,7 @@
 package ehr
 
 import (
+	"net/url"
 	"strings"
 )
 
@@ -73,6 +74,11 @@ func (v VersionUID) VersionNumber() string {
 func extractVersionUIDFromLocation(loc string) VersionUID {
 	if loc == "" {
 		return ""
+	}
+	// Absolute Location values may carry scheme/host/query; use the
+	// path tail only (RFC 9110 §7.2).
+	if u, err := url.Parse(loc); err == nil && u.Path != "" {
+		loc = u.Path
 	}
 	loc = strings.TrimSuffix(loc, "/")
 	i := strings.LastIndex(loc, "/")

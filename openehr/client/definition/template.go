@@ -358,6 +358,9 @@ func extractLastPathSegment(p string) string {
 	if p == "" {
 		return ""
 	}
+	if u, err := url.Parse(p); err == nil && u.Path != "" {
+		p = u.Path
+	}
 	for i := len(p) - 1; i >= 0; i-- {
 		if p[i] == '/' {
 			return p[i+1:]
