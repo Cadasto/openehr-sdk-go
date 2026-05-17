@@ -123,3 +123,63 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 		t.Errorf("expected at least 2 server hits (GET + PUT), got %d", phase)
 	}
 }
+
+func TestProbe013CrossEHRIsolation(t *testing.T) {
+	const (
+		ehrAID            openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
+		ehrBID            openehrclient.EHRID      = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
+		versionUIDFromA   openehrclient.VersionUID = "9999abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Tenant-isolated server: any composition GET under ehrBID for a
+		// VersionUID that doesn't belong to ehrBID is a hard 404. The
+		// probe MUST NOT see EHR A's id or data on this path.
+		if got := r.URL.Path; !contains(got, string(ehrBID)) {
+			t.Errorf("expected request path to target ehrBID, got %q", got)
+		}
+		if contains(r.URL.Path, string(ehrAID)) {
+			t.Errorf("path should NOT contain ehrAID, got %q", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"not found","code":"NOT_FOUND"}`))
+	}))
+	defer srv.Close()
+	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, srv), ehrAID, ehrBID, versionUIDFromA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-013 status = %q (detail: %s)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe013RejectsTenantLeak(t *testing.T) {
+	// Negative branch: a server that returns 200 for the cross-EHR
+	// read MUST be flagged as a tenant leak by the probe.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"leak"},"archetype_node_id":"openEHR-EHR-COMPOSITION.x.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`))
+	}))
+	defer srv.Close()
+	r, err := probes.Probe013CrossEHRIsolation(context.Background(), newClient(t, srv), "ehrA", "ehrB", "vuid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("expected fail on 200 cross-EHR read, got %q", r.Status)
+	}
+}
+
+// contains is a local micro-helper to keep the cross-EHR isolation
+// test self-contained (no `strings` import churn in this file).
+func contains(haystack, needle string) bool {
+	if len(needle) > len(haystack) {
+		return false
+	}
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
+}
