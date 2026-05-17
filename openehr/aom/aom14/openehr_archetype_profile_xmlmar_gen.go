@@ -21,6 +21,9 @@ func (c *CCodedText) BMMName() string { return "C_CODED_TEXT" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (c *CCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_CODED_TEXT")}
@@ -71,6 +74,9 @@ func (c *COrdinal) BMMName() string { return "C_ORDINAL" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (c *COrdinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_ORDINAL")}
@@ -113,6 +119,9 @@ func (c *CQuantity) BMMName() string { return "C_QUANTITY" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (c *CQuantity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_QUANTITY")}
@@ -158,6 +167,9 @@ func (c *CQuantityItem) BMMName() string { return "C_QUANTITY_ITEM" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (c *CQuantityItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("C_QUANTITY_ITEM")}
@@ -189,6 +201,9 @@ func (o *Ordinal) BMMName() string { return "ORDINAL" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (o *Ordinal) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("ORDINAL")}

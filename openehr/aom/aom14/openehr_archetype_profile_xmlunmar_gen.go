@@ -18,6 +18,8 @@ import (
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (c *CCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()
@@ -76,6 +78,8 @@ func (c *CCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (c *COrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()
@@ -125,6 +129,8 @@ func (c *COrdinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (c *CQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()
@@ -178,6 +184,8 @@ func (c *CQuantity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()
@@ -213,6 +221,8 @@ func (c *CQuantityItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (o *Ordinal) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 	for {
 		_tok, _err := _dec.Token()

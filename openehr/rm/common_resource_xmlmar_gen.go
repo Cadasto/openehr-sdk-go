@@ -21,6 +21,9 @@ func (r *ResourceDescription) BMMName() string { return "RESOURCE_DESCRIPTION" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (r *ResourceDescription) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION")}
@@ -73,6 +76,9 @@ func (r *ResourceDescriptionItem) BMMName() string { return "RESOURCE_DESCRIPTIO
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (r *ResourceDescriptionItem) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("RESOURCE_DESCRIPTION_ITEM")}
@@ -132,6 +138,9 @@ func (t *TranslationDetails) BMMName() string { return "TRANSLATION_DETAILS" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (t *TranslationDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("TRANSLATION_DETAILS")}

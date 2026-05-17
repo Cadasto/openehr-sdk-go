@@ -21,6 +21,9 @@ func (i *ISO8601Timezone) BMMName() string { return "Iso8601_timezone" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (i *ISO8601Timezone) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("Iso8601_timezone")}
@@ -44,6 +47,9 @@ func (t *TimeDefinitions) BMMName() string { return "Time_Definitions" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (t *TimeDefinitions) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("Time_Definitions")}

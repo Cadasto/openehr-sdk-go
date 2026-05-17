@@ -134,12 +134,35 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 
 	var b strings.Builder
 
+	// Partition fields: attribute-typed properties are read from
+	// _start.Attr before the token loop; element-typed properties are
+	// handled inside the switch. For attribute-typed properties we
+	// ALSO keep the child-element case so the decoder remains
+	// tolerant of producers that emit the property as a child element
+	// (legacy fixtures, the SDK's own pre-fix output). The attribute
+	// path runs first; the child-element path overwrites only if the
+	// attribute was absent and a child appears.
+	var attrFields []emittedField
+	elemFields := fields
+	for _, ef := range fields {
+		if isXMLAttributeProperty(ef.Prop) {
+			attrFields = append(attrFields, ef)
+		}
+	}
+
 	fmt.Fprintf(&b, "// UnmarshalXML decodes canonical openEHR XML into %s.\n", pc.GoName)
 	b.WriteString("// Polymorphic fields are routed through canxml.DecodeAs so the\n")
 	b.WriteString("// concrete type is selected by `xsi:type` at each polymorphic site.\n")
 	b.WriteString("// Missing/unknown/type-mismatch dispatch failures wrap typereg\n")
 	b.WriteString("// sentinels inside *canxml.DecodeError for errors.Is / errors.As.\n")
+	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
+	b.WriteString("// (currently `archetype_node_id`) are read from _start.Attr.\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
+	// Read attribute-typed properties from _start.Attr.
+	for _, ef := range attrFields {
+		line := unmarshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
+		b.WriteString(line)
+	}
 	b.WriteString("\tfor {\n")
 	b.WriteString("\t\t_tok, _err := _dec.Token()\n")
 	b.WriteString("\t\tif _err != nil {\n")
@@ -149,7 +172,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\tcase xml.StartElement:\n")
 	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
 
-	for _, ef := range fields {
+	for _, ef := range elemFields {
 		caseBody, err := renderUnmarshalXMLField(plan, recv, ef)
 		if err != nil {
 			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
@@ -305,6 +328,19 @@ func unmarshalXMLPrimitiveSlice(recv, field, elem, innerType string) string {
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\tvar _v %s\n\t\t\t\tif _err := _dec.DecodeElement(&_v, &_t); _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = append(%s.%s, _v)\n",
 		elem, innerType, recv, field, recv, field)
+}
+
+// unmarshalXMLAttribute emits the source lines that consume one
+// XML attribute from _start.Attr at the head of UnmarshalXML.
+// Mirror of [marshalXMLAttribute]. Tolerates an absent attribute —
+// the openEHR ITS-XML XSDs declare `archetype_node_id` mandatory,
+// but some upstream fixtures (e.g. ehrbase's simple_empty_folder)
+// omit it, so we treat absence as the zero value rather than an
+// error.
+func unmarshalXMLAttribute(recv, goField, attrName string) string {
+	return fmt.Sprintf(
+		"\tfor _, _a := range _start.Attr {\n\t\tif _a.Name.Local == %q && _a.Name.Space == \"\" {\n\t\t\t%s.%s = _a.Value\n\t\t\tbreak\n\t\t}\n\t}\n",
+		attrName, recv, goField)
 }
 
 func unmarshalXMLHashTODO(elem string) string {

@@ -72,11 +72,11 @@ func TestPlanIncludesConcreteRegistrations(t *testing.T) {
 		"CODE_PHRASE": false,
 		"DATA_VALUE":  false, // abstract — must NOT be registered
 		"DV_AMOUNT":   false, // abstract — must NOT be registered
-		"DV_INTERVAL": false, // generic — must NOT be registered
+		"DV_INTERVAL": false, // concrete + generic — registered under default-bound instantiation for xsi:type / _type dispatch
 		"VERSION":     false, // abstract + generic — must NOT be registered
 	}
 	abstracts := map[string]bool{
-		"DATA_VALUE": true, "DV_AMOUNT": true, "DV_INTERVAL": true, "VERSION": true,
+		"DATA_VALUE": true, "DV_AMOUNT": true, "VERSION": true,
 	}
 	for _, pc := range plan.ConcreteClasses {
 		if _, want := wantConcrete[pc.BMMName]; want {

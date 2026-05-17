@@ -18,7 +18,15 @@ import (
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
+			h.ArchetypeNodeID = _a.Value
+			break
+		}
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -103,7 +111,15 @@ func (h *History[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
+			i.ArchetypeNodeID = _a.Value
+			break
+		}
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -190,7 +206,15 @@ func (i *IntervalEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEleme
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (p *PointEvent[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
+			p.ArchetypeNodeID = _a.Value
+			break
+		}
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {

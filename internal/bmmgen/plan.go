@@ -419,11 +419,38 @@ func walkPackage(p *bmm.Package, path string, into map[string]string) {
 // should be registered with default type arguments (e.g. POINT_EVENT
 // for EVENT polymorphism). Most generic concretes are only used with
 // explicit parameters and are omitted.
+// registryGenericConcrete reports whether a generic concrete class
+// should be added to the type registry under its bare BMM name
+// (e.g. "DV_INTERVAL" → &DVInterval[DVOrdered]{}). Two cases qualify:
+//
+//  1. Descendants of a codec-polymorphic abstract generic ancestor
+//     (e.g. POINT_EVENT / INTERVAL_EVENT under EVENT — ADR 0003).
+//
+//  2. Top-level concrete generics whose `xsi:type` / `_type`
+//     discriminator appears on the wire under a polymorphic parent
+//     slot. Real-world canonical-XML fixtures emit
+//     `xsi:type="DV_INTERVAL"` at DataValue slots, so the registry
+//     must have a constructor under that bare name. The constructor
+//     produces the default-instantiated form using each parameter's
+//     `Any` / abstract bound.
+//
+// Case (2) is necessary for canxml.DecodeAs[DataValue] to resolve
+// `DV_INTERVAL`. The resulting concrete value satisfies the target
+// abstract interface (DVInterval[DVOrdered] implements DataValue).
 func registryGenericConcrete(pc *PlannedClass) bool {
 	for _, anc := range pc.Class.Ancestors() {
 		if codecPolymorphicAbstractGenericNames[anc] {
 			return true
 		}
+	}
+	// Top-level concrete generics — DV_INTERVAL, REFERENCE_RANGE, etc.
+	// — also need to be registered so polymorphic dispatch via
+	// xsi:type / _type resolves them. The default-bound
+	// instantiation is what the generator emits for cross-target
+	// references (see defaultGenericArgs), and it is what the
+	// concrete struct gets registered under in typereg.
+	if sc, ok := pc.Class.(*bmm.SimpleClass); ok && sc.IsGeneric() && !sc.IsAbstract() {
+		return true
 	}
 	return false
 }

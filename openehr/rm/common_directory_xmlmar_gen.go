@@ -21,17 +21,18 @@ func (f *Folder) BMMName() string { return "FOLDER" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (f *Folder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("FOLDER")}
 	}
+	_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: "archetype_node_id"}, Value: f.ArchetypeNodeID})
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(&f.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
-	}
-	if err := _e.EncodeElement(f.ArchetypeNodeID, xml.StartElement{Name: xml.Name{Local: "archetype_node_id"}}); err != nil {
 		return err
 	}
 	if f.UID != nil {
@@ -85,6 +86,9 @@ func (v *VersionedFolder) BMMName() string { return "VERSIONED_FOLDER" }
 // parent did not set one. Child elements follow BMM property
 // declaration order; nil-pointer optionals and empty containers are
 // omitted. Polymorphic descendants are emitted via canxml.EncodePoly.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are appended to start.Attr before
+// the start token is written.
 func (v *VersionedFolder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if _start.Name.Local == "" {
 		_start.Name = xml.Name{Local: canxml.ElementName("VERSIONED_FOLDER")}

@@ -118,6 +118,19 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	}
 	_ = typeParams // reserved — generic type parameter list lives on the receiver via typeArgs
 
+	// Partition fields: properties emitted as XML attributes
+	// (currently `archetype_node_id` on every LOCATABLE descendant,
+	// per the openEHR ITS-XML XSDs) come before the start token;
+	// element-typed properties come inside.
+	var attrFields, elemFields []emittedField
+	for _, ef := range fields {
+		if isXMLAttributeProperty(ef.Prop) {
+			attrFields = append(attrFields, ef)
+		} else {
+			elemFields = append(elemFields, ef)
+		}
+	}
+
 	var b strings.Builder
 
 	// BMMName method.
@@ -132,13 +145,21 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("// parent did not set one. Child elements follow BMM property\n")
 	b.WriteString("// declaration order; nil-pointer optionals and empty containers are\n")
 	b.WriteString("// omitted. Polymorphic descendants are emitted via canxml.EncodePoly.\n")
+	b.WriteString("// Properties typed as XML attributes per the openEHR ITS-XML XSDs\n")
+	b.WriteString("// (currently `archetype_node_id`) are appended to start.Attr before\n")
+	b.WriteString("// the start token is written.\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {\n", recv, pc.GoName, typeArgs)
 	b.WriteString("\tif _start.Name.Local == \"\" {\n")
 	fmt.Fprintf(&b, "\t\t_start.Name = xml.Name{Local: canxml.ElementName(%q)}\n", pc.BMMName)
 	b.WriteString("\t}\n")
+	// Append attribute-typed properties.
+	for _, ef := range attrFields {
+		line := marshalXMLAttribute(recv, FieldName(ef.Prop.PropertyName()), ef.Prop.PropertyName())
+		b.WriteString(line)
+	}
 	b.WriteString("\tif err := _e.EncodeToken(_start); err != nil {\n\t\treturn err\n\t}\n")
 
-	for _, ef := range fields {
+	for _, ef := range elemFields {
 		line, err := renderMarshalXMLField(plan, recv, ef)
 		if err != nil {
 			return "", fmt.Errorf("render XML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
@@ -151,6 +172,31 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("}\n")
 
 	return b.String(), nil
+}
+
+// isXMLAttributeProperty reports whether a BMM property is emitted
+// as an XML attribute (rather than a child element) in the openEHR
+// ITS-XML profile. The XSDs declare `archetype_node_id` on
+// LOCATABLE as a mandatory `xs:attribute`; the SDK mirrors that on
+// every concrete LOCATABLE descendant (the property is inherited
+// via flattening, so the check is name-based).
+//
+// Other String/primitive properties on LOCATABLE/ARCHETYPED (e.g.
+// `rm_version`) are XSD child elements — the IDCR conformance
+// fixture confirms this. Extend this list as the canonical-XML
+// surface grows.
+func isXMLAttributeProperty(prop bmm.Property) bool {
+	return prop.PropertyName() == "archetype_node_id"
+}
+
+// marshalXMLAttribute emits the source line that appends one XML
+// attribute to _start.Attr before the start token is written. Used
+// for properties that the openEHR ITS-XML profile pins to attribute
+// form. Currently primitive-String only.
+func marshalXMLAttribute(recv, goField, attrName string) string {
+	return fmt.Sprintf(
+		"\t_start.Attr = append(_start.Attr, xml.Attr{Name: xml.Name{Local: %q}, Value: %s.%s})\n",
+		attrName, recv, goField)
 }
 
 // renderMarshalXMLField returns the source-code lines that emit one
@@ -307,14 +353,20 @@ func marshalXMLPrimitiveSlice(recv, field, elem string) string {
 }
 
 func marshalXMLGenericMandatory(recv, field, elem string) string {
-	return fmt.Sprintf("\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
+	// Pass the field address so pointer-receiver MarshalXML on the
+	// concrete T (e.g. *DVQuantity for DVInterval[T]) dispatches
+	// correctly. encoding/xml only calls pointer-receiver methods on
+	// addressable values; a by-value field copy in EncodeElement is
+	// NOT addressable and falls back to reflection, which emits the
+	// Go field names (PascalCase) instead of our snake_case wire form.
+	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
 }
 
 func marshalXMLGenericOptional(recv, field, elem string) string {
 	// Open generic parameter — declared at the field as `T` (no
-	// pointer indirection). Emit unconditionally; encoding/xml skips
-	// zero-value when MarshalXML returns nothing meaningful.
-	return fmt.Sprintf("\tif err := _e.EncodeElement(%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
+	// pointer indirection). Take the address so pointer-receiver
+	// MarshalXML on T dispatches; see [marshalXMLGenericMandatory].
+	return fmt.Sprintf("\tif err := _e.EncodeElement(&%s.%s, xml.StartElement{Name: xml.Name{Local: %q}}); err != nil {\n\t\treturn err\n\t}\n", recv, field, elem)
 }
 
 func marshalXMLHashTODO(field, elem string) string {

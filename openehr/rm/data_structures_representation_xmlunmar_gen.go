@@ -18,7 +18,15 @@ import (
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (c *Cluster) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
+			c.ArchetypeNodeID = _a.Value
+			break
+		}
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
@@ -81,7 +89,15 @@ func (c *Cluster) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 // concrete type is selected by `xsi:type` at each polymorphic site.
 // Missing/unknown/type-mismatch dispatch failures wrap typereg
 // sentinels inside *canxml.DecodeError for errors.Is / errors.As.
+// Properties typed as XML attributes per the openEHR ITS-XML XSDs
+// (currently `archetype_node_id`) are read from _start.Attr.
 func (e *Element) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
+	for _, _a := range _start.Attr {
+		if _a.Name.Local == "archetype_node_id" && _a.Name.Space == "" {
+			e.ArchetypeNodeID = _a.Value
+			break
+		}
+	}
 	for {
 		_tok, _err := _dec.Token()
 		if _err != nil {
