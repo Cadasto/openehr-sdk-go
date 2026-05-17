@@ -258,9 +258,14 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 	}
 
 	// Caller-supplied extra headers — applied after so they may
-	// override the standard plumbing on purpose.
+	// override the standard plumbing on purpose. Use canonical keys so
+	// overrides merge with values set via Header.Set above.
 	for k, vv := range req.Headers {
-		httpReq.Header[k] = append(httpReq.Header[k][:0], vv...)
+		canon := http.CanonicalHeaderKey(k)
+		httpReq.Header.Del(canon)
+		for _, v := range vv {
+			httpReq.Header.Add(canon, v)
+		}
 	}
 
 	if !req.NoAuth {

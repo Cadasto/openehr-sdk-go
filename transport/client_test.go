@@ -225,6 +225,28 @@ func TestDoBasicAuthAuthorization(t *testing.T) {
 	}
 }
 
+func TestDoCallerHeadersOverrideCaseInsensitive(t *testing.T) {
+	var captured http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Header.Clone()
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
+	_, err := c.Do(context.Background(), &Request{
+		Path: "/x",
+		Headers: http.Header{
+			"accept": {"application/xml"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.Get("Accept"); got != "application/xml" {
+		t.Errorf("Accept = %q, want application/xml (case-insensitive override)", got)
+	}
+}
+
 func TestDoMapsErrorEnvelopes(t *testing.T) {
 	cases := []struct {
 		name     string
