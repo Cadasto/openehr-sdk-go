@@ -231,12 +231,73 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 					result.Drifts = append(result.Drifts, DriftRecord{Path: unmarPath, Existing: true})
 				}
 			}
+		} else {
+			tr.Files = append(tr.Files, unmarPath)
+			result.Files = append(result.Files, unmarPath)
+			if opts.Verify {
+				drift, err := compareFile(unmarPath, unmarBody)
+				if err != nil {
+					return tr, err
+				}
+				if drift != nil {
+					result.Drifts = append(result.Drifts, *drift)
+				}
+			} else {
+				if err := writeAtomic(unmarPath, unmarBody); err != nil {
+					return tr, err
+				}
+			}
+		}
+
+		// Canonical-XML marshaller companion — same skip-when-empty +
+		// drift-on-stale rules as JSON.
+		xmlMarBody, err := RenderMarshalXMLFile(plan, f)
+		if err != nil {
+			return tr, err
+		}
+		xmlMarPath := filepath.Join(outDir, f.FileBase+"_xmlmar_gen.go")
+		if xmlMarBody == nil {
+			if opts.Verify {
+				if _, statErr := os.Stat(xmlMarPath); statErr == nil {
+					result.Drifts = append(result.Drifts, DriftRecord{Path: xmlMarPath, Existing: true})
+				}
+			}
+		} else {
+			tr.Files = append(tr.Files, xmlMarPath)
+			result.Files = append(result.Files, xmlMarPath)
+			if opts.Verify {
+				drift, err := compareFile(xmlMarPath, xmlMarBody)
+				if err != nil {
+					return tr, err
+				}
+				if drift != nil {
+					result.Drifts = append(result.Drifts, *drift)
+				}
+			} else {
+				if err := writeAtomic(xmlMarPath, xmlMarBody); err != nil {
+					return tr, err
+				}
+			}
+		}
+
+		// Canonical-XML unmarshaller companion.
+		xmlUnmarBody, err := RenderUnmarshalXMLFile(plan, f)
+		if err != nil {
+			return tr, err
+		}
+		xmlUnmarPath := filepath.Join(outDir, f.FileBase+"_xmlunmar_gen.go")
+		if xmlUnmarBody == nil {
+			if opts.Verify {
+				if _, statErr := os.Stat(xmlUnmarPath); statErr == nil {
+					result.Drifts = append(result.Drifts, DriftRecord{Path: xmlUnmarPath, Existing: true})
+				}
+			}
 			continue
 		}
-		tr.Files = append(tr.Files, unmarPath)
-		result.Files = append(result.Files, unmarPath)
+		tr.Files = append(tr.Files, xmlUnmarPath)
+		result.Files = append(result.Files, xmlUnmarPath)
 		if opts.Verify {
-			drift, err := compareFile(unmarPath, unmarBody)
+			drift, err := compareFile(xmlUnmarPath, xmlUnmarBody)
 			if err != nil {
 				return tr, err
 			}
@@ -244,7 +305,7 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 				result.Drifts = append(result.Drifts, *drift)
 			}
 		} else {
-			if err := writeAtomic(unmarPath, unmarBody); err != nil {
+			if err := writeAtomic(xmlUnmarPath, xmlUnmarBody); err != nil {
 				return tr, err
 			}
 		}
