@@ -168,7 +168,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Two distinct EHRs; a Composition known to belong to EHR A.
 - **Wire assertion:** GET `/ehr/{ehr_b_id}/composition/{version_uid_from_a}` returns `404 Not Found`, never `200`, never the EHR A data.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_013_cross_ehr_isolation.go`](../testkit/probes/versioned/probe_013_cross_ehr_isolation.go).
+- **Satisfies:** REQ-054
 
 ### AQL
 
@@ -242,7 +243,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Catalog with declared TTL > 0; two constructions in quick succession.
 - **Wire assertion:** Exactly one discovery fetch occurs.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/discovery/probe_040_catalog_ttl.go`](../testkit/probes/discovery/probe_040_catalog_ttl.go).
+- **Satisfies:** REQ-070, REQ-072
 
 #### PROBE-041 — Catalog refresh on 401
 
@@ -250,7 +252,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached catalog; backend rotates and returns `401` on the cached token.
 - **Wire assertion:** SDK refreshes JWKS/catalog once, retries once. On second `401`, returns `transport.ErrUnauthorized`.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The full transport-driven retry-on-401 + `transport.ErrUnauthorized` mapping (REQ-071 bullet 3) lands once the transport calls into `Resolver.Refresh` on 401 — currently transport surfaces 401 directly without re-driving discovery.
+- **Satisfies:** REQ-071 (discovery half), REQ-072
 
 ### REST binding
 
@@ -372,9 +375,9 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Topic | Probes | Lives in (test code) |
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
-| Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — 010–012 implemented; 013 not yet |
+| Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
 | Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
-| Service discovery | PROBE-040 … 041 | *planned* — `testkit/probes/discovery/` (resolver tests in `smart/discovery/`) |
+| Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
 | REST binding | PROBE-060 … 068 | *planned* — `testkit/probes/rest/` (subset covered by `openehr/client/*_test.go` and `transport/`) |

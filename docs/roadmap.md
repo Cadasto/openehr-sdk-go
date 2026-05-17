@@ -109,10 +109,11 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 
 | Feature | Status | Location | Notes |
 |---------|--------|----------|-------|
-| Serialize probes | **Landed** | `testkit/probes/serialize/` | PROBE-030/031 |
-| Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–012 |
+| Serialize probes | **Landed** | `testkit/probes/serialize/` | PROBE-030/031, 033/034 |
+| Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013 |
 | Definition probe | **Landed** | `testkit/probes/definition/` | |
-| Auth / discovery / REST probes | **Planned** | — | PROBE-001–009, 040+ in catalog |
+| Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
+| Auth / REST probes | **Planned** | — | PROBE-001–009, 060+ in catalog |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probes exist; full runner matrix open (REQ-082) |
 | PHP SDK wire parity | **Planned** | — | REQ-080–081 |
@@ -127,7 +128,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Planned** | `cmd/examples/` empty |
+| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create}` |
 
 ---
 
