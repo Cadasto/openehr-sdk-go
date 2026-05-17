@@ -55,3 +55,35 @@ func TestProbe031(t *testing.T) {
 		t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
 	}
 }
+
+// TestProbe033 runs PROBE-033 across the canonical XML input set and
+// asserts every input round-trips byte-stable through canxml. Mirror
+// of TestProbe030 for the XML wire.
+func TestProbe033(t *testing.T) {
+	if len(serializeprobes.Probe033Inputs) == 0 {
+		t.Fatal("Probe033Inputs is empty — bootstrap encoder failed at init")
+	}
+	for _, in := range serializeprobes.Probe033Inputs {
+		t.Run(in.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe033CanxmlRoundTrip(in.Body, in.Factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe034 runs PROBE-034 and asserts the unknown-xsi:type input
+// surfaces as typereg.ErrUnknownType via errors.Is.
+func TestProbe034(t *testing.T) {
+	r, err := serializeprobes.Probe034TyperegXSIUnknown()
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+	}
+}
