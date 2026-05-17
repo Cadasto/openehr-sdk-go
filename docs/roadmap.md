@@ -40,7 +40,7 @@
 | AOM 1.4 (generated) | **Landed** | `openehr/aom/aom14/` | |
 | AOM 2.4 | **Deferred** | `openehr/aom/aom2/` | BMM pinned; no codegen yet |
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031 |
-| Canonical XML | **Planned** | `openehr/serialize/canxml/` REQ-056 | [plan](plans/2026-05-15-canonical-xml-serialization.md) |
+| Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; `xsi:type` dispatch via typereg; `archetype_node_id` as XSD attribute per openEHR ITS-XML; ehrbase cassettes vendored under `testkit/cassettes/canonical_xml/ehrbase/`. Hash<K,V> XML emission deferred. [plan](plans/2026-05-15-canonical-xml-serialization.md) |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
 | Template parser (OPT/OET) | **Planned** | `openehr/template/` | |
 | Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | |
