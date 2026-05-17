@@ -37,6 +37,7 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 | 4 — AI agent conventions, MCP skills | [docs/ai-workflow.md](docs/ai-workflow.md) |
 | 5 — CI / contributor checks | [docs/ci.md](docs/ci.md) |
 | 6 — ADRs (closed) | [docs/adr/](docs/adr/) |
+| 6b — landed vs planned | [docs/roadmap.md](docs/roadmap.md) |
 | 7 — release log | [CHANGELOG.md](CHANGELOG.md) |
 
 The source of truth for module design is the in-repo [`specs/`](specs/) tree. Open research strands live in [`specs/research-strands.md`](specs/research-strands.md) until promoted ADRs land in [`docs/adr/`](docs/adr/).

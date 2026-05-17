@@ -2,6 +2,8 @@
 
 Active and historical implementation plans for `openehr-sdk-go`. Plans are derivations of [`../../specs/`](../../specs/) — they translate normative REQs into sequenced delivery.
 
+**Landed vs planned checklist:** [`../roadmap.md`](../roadmap.md) — feature matrix and milestones (updated when phases land; plans may lag).
+
 | Plan | Scope | Covers REQs / strands |
 |---|---|---|
 | [2026-05-15-bmm-codegen.md](2026-05-15-bmm-codegen.md) | BMM-driven code generation for `openehr/rm/`, `openehr/aom/aom14/` | REQ-041..047; part of STRAND-04 |

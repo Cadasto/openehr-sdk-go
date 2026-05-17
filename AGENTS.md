@@ -44,6 +44,7 @@ Reading order for any contributor or agent:
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks |
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions — see [docs/adr/README.md](docs/adr/README.md) (0001–0004 Accepted) |
 | 6 | [docs/plans/](docs/plans/) | Implementation plans — see [docs/plans/README.md](docs/plans/README.md) |
+| 6b | [docs/roadmap.md](docs/roadmap.md) | Landed vs planned feature checklist |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
 
 **Normative vs narrative.** `specs/` carries RFC-2119 `MUST/SHOULD/MAY` statements that code, plans, and tests are measured against. `docs/architecture.md` carries the design *narrative* — the same information re-told as prose with a mermaid diagram. If they disagree, `specs/` wins and the narrative is updated.
