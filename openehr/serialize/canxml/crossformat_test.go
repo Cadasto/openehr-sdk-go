@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -20,26 +21,136 @@ const canonicalJSONCassettes = "../../../testkit/cassettes/canonical_json"
 // canonicalXMLCassettes resolves the XML cassette directory.
 const canonicalXMLCassettes = "../../../testkit/cassettes/canonical_xml"
 
-// TestCrossFormatRoundTripFromJSONCassettes exercises the
-// `JSON → struct → XML → struct → JSON` invariant against every
-// vendored Composition cassette. Equality is asserted *structurally*
-// (after null/absent normalisation) — byte equality across the JSON
-// and XML wire shapes is not meaningful.
-//
-// This is the strongest shared invariant with the canjson plan:
-// failures indicate a bug in either codec.
-func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
+// discoverJSONCassettes walks the canonical_json/ tree one level
+// deep so vendored upstream sets (e.g. `ehrbase/`) are exercised
+// alongside the SDK's own fixtures. Returns paths relative to
+// [canonicalJSONCassettes].
+func discoverJSONCassettes(t *testing.T) []string {
+	t.Helper()
 	entries, err := os.ReadDir(canonicalJSONCassettes)
 	if err != nil {
 		t.Fatalf("read JSON cassette dir: %v", err)
 	}
-	var names []string
+	var out []string
 	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+		if e.IsDir() {
+			subdir := filepath.Join(canonicalJSONCassettes, e.Name())
+			subEntries, err := os.ReadDir(subdir)
+			if err != nil {
+				t.Fatalf("read sub-cassette dir %q: %v", subdir, err)
+			}
+			for _, se := range subEntries {
+				if se.IsDir() || filepath.Ext(se.Name()) != ".json" {
+					continue
+				}
+				out = append(out, filepath.Join(e.Name(), se.Name()))
+			}
 			continue
 		}
-		names = append(names, e.Name())
+		if filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		out = append(out, e.Name())
 	}
+	return out
+}
+
+// discoverXMLCassettes mirrors [discoverJSONCassettes] for the XML
+// tree.
+func discoverXMLCassettes(t *testing.T) []string {
+	t.Helper()
+	entries, err := os.ReadDir(canonicalXMLCassettes)
+	if err != nil {
+		t.Fatalf("read XML cassette dir: %v", err)
+	}
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() {
+			subdir := filepath.Join(canonicalXMLCassettes, e.Name())
+			subEntries, err := os.ReadDir(subdir)
+			if err != nil {
+				t.Fatalf("read sub-cassette dir %q: %v", subdir, err)
+			}
+			for _, se := range subEntries {
+				if se.IsDir() || filepath.Ext(se.Name()) != ".xml" {
+					continue
+				}
+				out = append(out, filepath.Join(e.Name(), se.Name()))
+			}
+			continue
+		}
+		if filepath.Ext(e.Name()) != ".xml" {
+			continue
+		}
+		out = append(out, e.Name())
+	}
+	return out
+}
+
+// factoryForCassette returns a fresh-target factory matching the
+// expected root RM type for a cassette path. The SDK's own JSON
+// cassettes are all COMPOSITION; the ehrbase set adds EHR_STATUS
+// (filename hint `ehr_status`) and FOLDER (filename hint `folder`).
+func factoryForCassette(path string) (func() any, bool) {
+	base := strings.ToLower(filepath.Base(path))
+	switch {
+	case strings.Contains(base, "ehr_status"):
+		return func() any { return new(rm.EHRStatus) }, true
+	case strings.Contains(base, "folder"):
+		return func() any { return new(rm.Folder) }, true
+	default:
+		return func() any { return new(rm.Composition) }, true
+	}
+}
+
+// factoryForXMLBody picks the factory by sniffing the root element
+// local name. Tolerant of both the SDK profile (xmlns="…openehr…")
+// and the upstream ehrbase profile (no default xmlns).
+func factoryForXMLBody(body []byte) (func() any, bool) {
+	// Look at the first non-whitespace `<…` token, skipping the XML
+	// declaration if present.
+	s := string(body)
+	for {
+		i := strings.Index(s, "<")
+		if i < 0 {
+			return nil, false
+		}
+		s = s[i:]
+		if strings.HasPrefix(s, "<?") {
+			end := strings.Index(s, "?>")
+			if end < 0 {
+				return nil, false
+			}
+			s = s[end+2:]
+			continue
+		}
+		break
+	}
+	// s now starts with the root element open token.
+	switch {
+	case strings.HasPrefix(s, "<dv_quantity"):
+		return func() any { return new(rm.DVQuantity) }, true
+	case strings.HasPrefix(s, "<composition"):
+		return func() any { return new(rm.Composition) }, true
+	case strings.HasPrefix(s, "<folder"):
+		return func() any { return new(rm.Folder) }, true
+	case strings.HasPrefix(s, "<ehr_status"):
+		return func() any { return new(rm.EHRStatus) }, true
+	default:
+		return nil, false
+	}
+}
+
+// TestCrossFormatRoundTripFromJSONCassettes exercises the
+// `JSON → struct → XML → struct → JSON` invariant against every
+// vendored cassette. Equality is asserted *structurally* (after
+// null/absent normalisation) — byte equality across the JSON and
+// XML wire shapes is not meaningful.
+//
+// This is the strongest shared invariant with the canjson plan:
+// failures indicate a bug in either codec.
+func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
+	names := discoverJSONCassettes(t)
 	if len(names) == 0 {
 		t.Fatal("no JSON cassettes discovered — check testkit/cassettes/canonical_json/")
 	}
@@ -49,29 +160,33 @@ func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read cassette: %v", err)
 			}
+			factory, ok := factoryForCassette(name)
+			if !ok {
+				t.Skipf("no factory wired for cassette %q", name)
+			}
 			// JSON → struct A
-			var a rm.Composition
-			if err := canjson.Unmarshal(raw, &a); err != nil {
+			a := factory()
+			if err := canjson.Unmarshal(raw, a); err != nil {
 				t.Fatalf("JSON Unmarshal: %v", err)
 			}
 			// struct A → XML
-			xb, err := canxml.Marshal(&a)
+			xb, err := canxml.Marshal(a)
 			if err != nil {
 				t.Fatalf("XML Marshal: %v", err)
 			}
 			// XML → struct C
-			var c rm.Composition
-			if err := canxml.Unmarshal(xb, &c); err != nil {
+			c := factory()
+			if err := canxml.Unmarshal(xb, c); err != nil {
 				t.Fatalf("XML Unmarshal: %v\nbody: %s", err, xb)
 			}
 			// struct C → JSON
-			jd, err := canjson.Marshal(&c)
+			jd, err := canjson.Marshal(c)
 			if err != nil {
 				t.Fatalf("JSON re-Marshal: %v", err)
 			}
 			// Structural equivalence: re-encode A as JSON too and
 			// compare the normalised JSON trees.
-			ja, err := canjson.Marshal(&a)
+			ja, err := canjson.Marshal(a)
 			if err != nil {
 				t.Fatalf("JSON canonical encode for A: %v", err)
 			}
@@ -93,20 +208,11 @@ func TestCrossFormatRoundTripFromJSONCassettes(t *testing.T) {
 }
 
 // TestCrossFormatXMLCassetteRoundTrip — every vendored XML cassette
-// round-trips byte-stable through canxml. Mirror of
-// TestRoundTripCassettes in canjson for the XML wire.
+// round-trips byte-stable through canxml. The first pass (decoding
+// the upstream form) may consume non-canonical bytes; from the second
+// pass on the encoder's compact canonical form is byte-stable.
 func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
-	entries, err := os.ReadDir(canonicalXMLCassettes)
-	if err != nil {
-		t.Fatalf("read XML cassette dir: %v", err)
-	}
-	var names []string
-	for _, e := range entries {
-		if e.IsDir() || filepath.Ext(e.Name()) != ".xml" {
-			continue
-		}
-		names = append(names, e.Name())
-	}
+	names := discoverXMLCassettes(t)
 	if len(names) == 0 {
 		t.Skip("no XML cassettes vendored yet")
 	}
@@ -116,19 +222,11 @@ func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("read cassette: %v", err)
 			}
-			// Pick the target type from the root element local name. The
-			// minimal cassette set uses dv_quantity and composition;
-			// extend this switch as new cassettes land.
-			var into func() any
-			switch {
-			case bytes.HasPrefix(body, []byte("<dv_quantity")):
-				into = func() any { return new(rm.DVQuantity) }
-			case bytes.HasPrefix(body, []byte("<composition")):
-				into = func() any { return new(rm.Composition) }
-			default:
-				t.Skipf("no factory wired for cassette %q", name)
+			factory, ok := factoryForXMLBody(body)
+			if !ok {
+				t.Skipf("no factory wired for cassette %q (root element not recognised)", name)
 			}
-			v1 := into()
+			v1 := factory()
 			if err := canxml.Unmarshal(body, v1); err != nil {
 				t.Fatalf("first decode: %v", err)
 			}
@@ -136,7 +234,7 @@ func TestCrossFormatXMLCassetteRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatalf("first encode: %v", err)
 			}
-			v2 := into()
+			v2 := factory()
 			if err := canxml.Unmarshal(b1, v2); err != nil {
 				t.Fatalf("second decode: %v\nbody: %s", err, b1)
 			}
