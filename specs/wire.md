@@ -113,7 +113,15 @@ The SDK **MUST** provide a canonical XML codec in `openehr/serialize`, symmetric
 
 Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources. Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property. Element names **MUST** be snake_case BMM names (same as canonical JSON keys). The codec **MUST** carry the namespace declarations the openEHR XML schemas require (`http://schemas.openehr.org/v1` default namespace; `xmlns:xsi` when `xsi:type` is present).
 
-Canonical ordering for XML **MUST** mirror the JSON profile where applicable (see [`docs/plans/2026-05-15-canonical-xml-serialization.md`](../docs/plans/2026-05-15-canonical-xml-serialization.md)): child elements in BMM declaration order; `xsi:type` first among attributes when present; compact XML (no insignificant inter-element whitespace) is the byte-equality target for round-trip tests.
+Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/2026-05-15-canonical-xml-serialization.md`](../docs/plans/2026-05-15-canonical-xml-serialization.md)):
+
+- Child elements follow **BMM property declaration order** (same order code generation emits struct fields).
+- `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites unless [`WithRelaxedTypeDispatch`] is set.
+- Nil-pointer optional fields and empty containers with `cardinality.lower == 0` are emitted as **ABSENT** (no element). Both ABSENT and an empty self-closing element are accepted on decode.
+- ISO 8601 dates/times/durations are passed through as element text content; the codec does not parse them at codec layer (REQ-046).
+- Numeric magnitudes use IEEE 754 double-precision (same posture as canonical JSON); decode also accepts quoted decimal strings per [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md).
+- Compact XML (no insignificant inter-element whitespace) is the byte-equality target for round-trip tests.
+- `xmi:type` is **rejected** on decode with `ErrInvalidShape` and an explicit message — only `xsi:type` is recognised.
 
 XML is a second-class format on the wire today (REST 1.1.0-development is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 

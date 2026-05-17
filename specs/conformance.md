@@ -211,18 +211,20 @@ The catalog is the normative list. Each entry has:
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
-- **Preconditions:** A reference Composition XML cassette.
+- **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/canonical_xml/`.
 - **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
 - **Modes:** Sandbox (no network).
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../testkit/probes/serialize/probe_033_canxml_round_trip.go).
+- **Satisfies:** REQ-056, REQ-040, REQ-082
 
 #### PROBE-034 — `xsi:type` discriminator decoded via registry
 
 - **Title:** An `xsi:type` not in the type registry decodes to `typereg.ErrUnknownType`, not silently to an untyped value.
-- **Preconditions:** A cassette containing an unregistered `xsi:type`.
-- **Wire assertion:** Decode returns `typereg.ErrUnknownType` with the unknown type value.
+- **Preconditions:** A cassette (or hand-crafted XML) containing an unregistered `xsi:type`.
+- **Wire assertion:** Decode returns `typereg.ErrUnknownType` with the unknown type value, wrapped in `*typereg.DecodeError`.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_034_typereg_xsi_unknown.go`](../testkit/probes/serialize/probe_034_typereg_xsi_unknown.go).
+- **Satisfies:** REQ-040, REQ-056
 
 #### PROBE-032 — FLAT → canonical → FLAT round trip
 
@@ -372,7 +374,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — 010–012 implemented; 013 not yet |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
-| Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031 implemented; 032–034 not yet |
+| Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
 | Service discovery | PROBE-040 … 041 | *planned* — `testkit/probes/discovery/` (resolver tests in `smart/discovery/`) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
 | REST binding | PROBE-060 … 068 | *planned* — `testkit/probes/rest/` (subset covered by `openehr/client/*_test.go` and `transport/`) |
