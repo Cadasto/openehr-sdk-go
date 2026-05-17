@@ -13,7 +13,7 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 | Go version | `1.25.x` (N-1 release line) |
 | openEHR REST | `1.1.0-development` |
 | Sister SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
-| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM/canjson + transport/EHR REST landed; `auth/smart` PKCE and Query/Definition clients open |
+| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM, canonical JSON/XML codecs, transport, auth (clientcreds/jwtbearer/basic), discovery, System/EHR/Definition-ADL14 REST clients landed; `auth/smart` PKCE, Query (AQL), Composition builder, OPT parser, Cadasto extras open |
 
 ## Source of truth
 
@@ -82,7 +82,7 @@ github.com/cadasto/openehr-sdk-go/
 │   └── client/                # REST clients grouped per openEHR resource
 │       ├── ehr/               # EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags
 │       ├── query/             # AQL executor (stub)
-│       ├── definition/        # templates, stored queries (stub)
+│       ├── definition/        # ADL 1.4 templates landed; stored AQL (open)
 │       ├── demographic/       # stub
 │       └── system/            # landed
 ├── smart/                     # application-level SMART AppContext + App Registration
@@ -186,7 +186,7 @@ Each core package stands on its own — applications must not be forced to const
 | Spec traceability check | `make spec-check` |
 | Build examples | `make build` |
 
-GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; PROBE-030/031 (serialize) and PROBE-010–012 (versioned writes) are implemented — see [`specs/conformance.md`](specs/conformance.md).
+GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; PROBE-010–013 (versioned writes), 030/031/033/034 (serialize), 040/041 (discovery), and 067 (template upload) are implemented — see [`specs/conformance.md`](specs/conformance.md).
 
 ## openEHR knowledge
 
@@ -198,12 +198,12 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 |---|---|---|
 | 0 | Repo scaffolding — module layout, AI-assistant docs, Makefile, Dockerfile, `specs/` tree | **complete** |
 | 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **landed** — [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md), [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md) |
-| 1a | Transport, auth providers (`clientcreds`, `jwtbearer`), discovery, System + EHR REST (read/write) | **landed** — see [REST client plan](docs/plans/2026-05-15-rest-api-client.md) Phases 2–4 |
-| 1b | `auth/smart` PKCE end-to-end, Query/Definition clients, CDR benchmark (STRAND-01) | **open** |
+| 1a | Transport, auth providers (`clientcreds`, `jwtbearer`, `basic`), discovery, System + EHR REST (read/write), Definition ADL 1.4 templates, canonical XML codec | **landed** — see [REST client plan](docs/plans/2026-05-15-rest-api-client.md) Phases 2–6 |
+| 1b | `auth/smart` PKCE end-to-end, Query (AQL) client, Definition stored AQL, CDR benchmark (STRAND-01) | **open** |
 | 2 | Composition builder + Templates + AQL builder/executor | not started |
 | 3 | Application-level SMART (`smart/` AppContext) on top of landed discovery | partial — discovery landed; launch flow open (STRAND-05) |
 | 4 | Cadasto extras (Extra, Datamap, MPI preview, Admin, Care) | not started |
-| 5 | Sandbox + full conformance probe ratification | partial — serialize + versioned probes landed |
+| 5 | Sandbox + full conformance probe ratification | partial — serialize (030/031, 033/034), versioned (010–013), discovery (040/041), and definition (067) probes landed |
 
 Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/research-strands.md`](specs/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 

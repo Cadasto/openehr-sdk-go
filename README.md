@@ -2,7 +2,7 @@
 
 First-party **Go SDK for openEHR** — covers openEHR REST `1.1.0-development`, the Reference Model, AQL, OPT/OET, and SMART-on-openEHR auth, with Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) shipped in the same module for v1.
 
-> **Status: early implementation.** The [normative `specs/` tree](specs/), BMM loader (`openehr/bmm/`), generated RM/AOM types (`openehr/rm/`, `openehr/aom/aom14/`), type registry, and canonical JSON codec (`openehr/serialize/canjson/`) are in place. Auth, transport, REST clients, SMART, and Cadasto extras remain stubs. The SDK contract lives in [`specs/`](specs/) and is self-contained.
+> **Status: early implementation.** The [normative `specs/` tree](specs/), BMM loader, generated RM/AOM types, type registry, canonical JSON + XML codecs, transport, auth (`clientcreds`/`jwtbearer`/`basic`), service discovery, and REST clients (System, EHR read/write, Definition ADL 1.4) are landed. SMART PKCE, AQL (builder + executor), Composition builder, OPT/OET parser, and Cadasto extras remain stubs. The SDK contract lives in [`specs/`](specs/) and is self-contained. See [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
 
 ## Use cases
 
