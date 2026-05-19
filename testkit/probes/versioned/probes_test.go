@@ -126,9 +126,9 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 
 func TestProbe013CrossEHRIsolation(t *testing.T) {
 	const (
-		ehrAID            openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
-		ehrBID            openehrclient.EHRID      = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
-		versionUIDFromA   openehrclient.VersionUID = "9999abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
+		ehrAID          openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
+		ehrBID          openehrclient.EHRID      = "ehrB-aaaa-bbbb-cccc-dddddddddddd"
+		versionUIDFromA openehrclient.VersionUID = "9999abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Tenant-isolated server: any composition GET under ehrBID for a

@@ -34,8 +34,8 @@ func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Resu
 		return r, fmt.Errorf("PROBE-041: cassetteBody is empty")
 	}
 	var (
-		hits      int32
-		mode      atomic.Int32 // 0 = serve cassette; 1 = 401 reject
+		hits int32
+		mode atomic.Int32 // 0 = serve cassette; 1 = 401 reject
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&hits, 1)

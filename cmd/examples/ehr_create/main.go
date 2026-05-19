@@ -76,5 +76,5 @@ func locationOf(meta *openehrclient.VersionMetadata) string {
 	if meta == nil || meta.Metadata == nil {
 		return ""
 	}
-	return meta.Metadata.Location
+	return meta.Location
 }

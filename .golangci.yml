@@ -14,27 +14,26 @@ linters:
     - unconvert
   disable:
     - depguard # no third-party deps yet; enable when the module grows
-
-issues:
-  exclude-rules:
-    - path: '_gen\.go$'
-      linters:
-        - dupl
-        - gocyclo
-        - funlen
-        - revive
-    - path: '_jsonmar_gen\.go$'
-      linters:
-        - dupl
-        - gocyclo
-        - funlen
-    - path: '_jsonunmar_gen\.go$'
-      linters:
-        - dupl
-        - gocyclo
-        - funlen
-    - path: '_xmlmar_gen\.go$'
-      linters:
-        - dupl
-        - gocyclo
-        - funlen
+  exclusions:
+    rules:
+      - path: '_gen\.go$'
+        linters:
+          - dupl
+          - gocyclo
+          - funlen
+          - revive
+      - path: '_jsonmar_gen\.go$'
+        linters:
+          - dupl
+          - gocyclo
+          - funlen
+      - path: '_jsonunmar_gen\.go$'
+        linters:
+          - dupl
+          - gocyclo
+          - funlen
+      - path: '_xmlmar_gen\.go$'
+        linters:
+          - dupl
+          - gocyclo
+          - funlen
