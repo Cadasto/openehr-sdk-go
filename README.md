@@ -1,8 +1,15 @@
 # openehr-sdk-go
 
+[![CI](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/Cadasto/openehr-sdk-go/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/cadasto/openehr-sdk-go.svg)](https://pkg.go.dev/github.com/cadasto/openehr-sdk-go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cadasto/openehr-sdk-go)](https://goreportcard.com/report/github.com/cadasto/openehr-sdk-go)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/Cadasto/openehr-sdk-go)](go.mod)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status: v0 preview](https://img.shields.io/badge/status-v0--preview-orange)](docs/roadmap.md)
+
 First-party **Go SDK for openEHR** — covers openEHR REST `1.1.0-development`, the Reference Model, AQL, OPT/OET, and SMART-on-openEHR auth, with Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) shipped in the same module for v1.
 
-> **Status: early implementation.** The [normative `specs/` tree](specs/), BMM loader, generated RM/AOM types, type registry, canonical JSON + XML codecs, transport, auth (`clientcreds`/`jwtbearer`/`basic`), service discovery, and REST clients (System, EHR read/write, Definition ADL 1.4) are landed. SMART PKCE, AQL (builder + executor), Composition builder, OPT/OET parser, and Cadasto extras remain stubs. The SDK contract lives in [`specs/`](specs/) and is self-contained. See [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
+> **Status:** early implementation (v0 preview) — see [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
 
 ## Use cases
 
@@ -42,7 +49,7 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 
 The source of truth for module design is the in-repo [`specs/`](specs/) tree. Open research strands live in [`specs/research-strands.md`](specs/research-strands.md) until promoted ADRs land in [`docs/adr/`](docs/adr/).
 
-## Sister SDK
+## Equivalent SDK
 
 Cadasto's **PHP SDK** targets the same openEHR REST surface and the same SMART-on-openEHR conformance probe set, with an idiomatic PHP API. Cross-language parity is enforced by the shared probe set, not by source-code mirroring.
 
