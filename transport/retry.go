@@ -10,9 +10,19 @@ import (
 // RetryPolicy configures retry-on-status behaviour. Disabled by default
 // per REQ-091; enable via transport.WithRetry. Retries respect ctx
 // cancellation immediately.
+//
+// "Disable" semantics (REQ-096): the zero value disables retries (exactly
+// one attempt). To force-disable retries for an explicitly-constructed
+// policy, set Disabled=true or pass transport.NoRetry. MaxAttempts=0
+// means "use package default" (currently: disabled — one attempt);
+// MaxAttempts=1 means exactly one attempt (no retries); MaxAttempts=N
+// for N ≥ 2 means up to N total attempts.
 type RetryPolicy struct {
-	// MaxAttempts is the total attempt count (1 = no retries, 2 = one
-	// retry, …).
+	// Disabled, when true, forces exactly one attempt regardless of
+	// MaxAttempts. Use NoRetry as the canonical zero-config form.
+	Disabled bool
+	// MaxAttempts is the total attempt count (0 = use default, 1 = no
+	// retries, 2 = one retry, …).
 	MaxAttempts int
 	// InitialBackoff is the wait before the first retry. Subsequent
 	// waits grow by Multiplier, capped at MaxBackoff.
@@ -31,7 +41,18 @@ type RetryPolicy struct {
 	RetryNonIdempotent bool
 }
 
-func (p RetryPolicy) enabled() bool { return p.MaxAttempts > 1 }
+// NoRetry is the canonical "exactly one attempt, no retries" policy.
+// Equivalent to RetryPolicy{Disabled: true}. Use it when constructing
+// a transport.Client to make the intent explicit at the call site
+// (REQ-096).
+var NoRetry = RetryPolicy{Disabled: true}
+
+func (p RetryPolicy) enabled() bool {
+	if p.Disabled {
+		return false
+	}
+	return p.MaxAttempts > 1
+}
 
 func (p RetryPolicy) backoff(attempt int) time.Duration {
 	if attempt <= 0 {

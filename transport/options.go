@@ -23,6 +23,8 @@ type config struct {
 	callerAttributionHeader string
 
 	logger *slog.Logger
+
+	observer Observer
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -86,4 +88,12 @@ func WithCallerAttributionHeader(name string) Option {
 // diagnostics (TLS warnings, retry attempts). Default slog.Default().
 func WithLogger(l *slog.Logger) Option {
 	return func(cfg *config) { cfg.logger = l }
+}
+
+// WithObserver installs an Observer (REQ-098). The observer fires
+// exactly once per logical Client.Do call after retries settle. A nil
+// observer is treated as a no-op (safe to pass through configuration
+// layers that don't know whether the consumer wants observability).
+func WithObserver(o Observer) Option {
+	return func(cfg *config) { cfg.observer = o }
 }

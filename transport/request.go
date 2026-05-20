@@ -48,6 +48,11 @@ type Request struct {
 	// canonicalised to a quoted strong validator if not already
 	// quoted.
 	IfMatch string
+	// IdempotencyKey, when non-empty, sets the `Idempotency-Key` HTTP
+	// header (REQ-097). The value is opaque to the SDK; callers are
+	// responsible for generation (typically a UUIDv7 per write
+	// attempt). Empty omits the header.
+	IdempotencyKey string
 	// Prefer sets the Prefer header (REQ-094). PreferDefault omits the
 	// header.
 	Prefer Prefer

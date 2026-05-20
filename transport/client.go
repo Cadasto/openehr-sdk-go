@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -126,7 +127,11 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		),
 	)
 	defer span.End()
+	if req.IdempotencyKey != "" {
+		span.SetAttributes(attribute.String("http.request.idempotency_key", req.IdempotencyKey))
+	}
 
+	start := time.Now()
 	var (
 		resp    *Response
 		lastErr error
@@ -149,6 +154,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if lastErr != nil {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
+		c.emitObservation(ctx, req, target, resp, lastErr, attempt, time.Since(start))
 		return resp, lastErr
 	}
 	if resp != nil {
@@ -157,7 +163,36 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 			span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 		}
 	}
+	c.emitObservation(ctx, req, target, resp, nil, attempt, time.Since(start))
 	return resp, nil
+}
+
+// emitObservation delivers an Observation to the configured Observer
+// (REQ-098). A nil observer is a no-op. Panics inside the observer are
+// recovered and logged via the configured slog.Logger so a faulty
+// observer cannot break request handling.
+func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.URL, resp *Response, err error, attempts int, dur time.Duration) {
+	if c.cfg.observer == nil {
+		return
+	}
+	obs := Observation{
+		Method:   req.effectiveMethod(),
+		Route:    req.effectiveRoute(),
+		URL:      sanitisedURL(target),
+		Duration: dur,
+		Attempts: attempts,
+		Err:      err,
+		Tags:     observationTagsFromContext(ctx),
+	}
+	if resp != nil {
+		obs.StatusCode = resp.StatusCode
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			c.cfg.logger.Error("transport: observer panicked", "panic", r, "route", obs.Route)
+		}
+	}()
+	c.cfg.observer.OnRequest(obs)
 }
 
 // doOnce performs one HTTP attempt. Returns (resp, err) where err is
@@ -214,6 +249,9 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 	}
 	if req.IfMatch != "" {
 		httpReq.Header.Set("If-Match", quoteIfMatch(req.IfMatch))
+	}
+	if req.IdempotencyKey != "" {
+		httpReq.Header.Set("Idempotency-Key", req.IdempotencyKey)
 	}
 	if v := req.Prefer.HeaderValue(); v != "" {
 		httpReq.Header.Set("Prefer", v)
