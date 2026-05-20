@@ -193,6 +193,42 @@ requirements:
     implementation: partial
     packages: [testkit/cassettes/its_rest]
 
+  - id: REQ-096
+    title: Unambiguous "disable retry"
+    canonical: specs/transport.md#req-096--unambiguous-disable-retry
+    status: draft
+    implementation: landed
+    packages: [transport]
+    tests:
+      - transport/client_test.go
+
+  - id: REQ-097
+    title: First-class Idempotency-Key
+    canonical: specs/transport.md#req-097--first-class-idempotency-key
+    status: draft
+    implementation: landed
+    packages: [transport]
+    tests:
+      - transport/client_test.go
+
+  - id: REQ-098
+    title: Request-level observer hook
+    canonical: specs/transport.md#req-098--request-level-observer-hook
+    status: draft
+    implementation: landed
+    packages: [transport]
+    tests:
+      - transport/observer_test.go
+
+  - id: REQ-099
+    title: ITS-REST Admin client surface
+    canonical: specs/module-layout.md#req-099--its-rest-admin-client-surface
+    status: draft
+    implementation: landed
+    packages: [openehr/client/admin]
+    tests:
+      - openehr/client/admin/admin_test.go
+
   - id: REQ-053
     title: FLAT and STRUCTURED
     canonical: specs/wire.md#req-053

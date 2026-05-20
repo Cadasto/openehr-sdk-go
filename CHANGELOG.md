@@ -26,6 +26,10 @@ Entries under `## [Unreleased]` are **short and high-level**: one-line bullets n
 - Vendored ITS-REST and SMART cassettes; versioned-write (010–013), definition, serialize (030–031, 033–034), and discovery (040–041) conformance probes.
 - Worked examples (`cmd/examples/{canonical_json,canxml_roundtrip,ehr_create}`) demonstrating canjson, JSON↔XML round-trip, and end-to-end EHR creation against an httptest backend.
 - Implementation roadmap (`docs/roadmap.md`).
+- Transport `RetryPolicy.Disabled` + `NoRetry` sentinel (REQ-096): unambiguous opt-out for benchmark / load-tool consumers.
+- Transport `Request.IdempotencyKey` field (REQ-097): first-class `Idempotency-Key` header with OTel attribute pickup.
+- Transport request-level `Observer` hook (REQ-098): `WithObserver` + `WithObservationTag` deliver retry-aware `Observation` records per logical call.
+- REST client `openehr/client/admin/`: ITS-REST `/admin/*` housekeeping — `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates`, `Repository` (REQ-099).
 
 ### Changed
 

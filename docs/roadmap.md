@@ -65,6 +65,9 @@
 | Token refresh on wire 401 | **Planned** | REQ-063 | Not auto-wired in transport today |
 | Platform principal claims | **Planned** | REQ-067 | `smart/` launch context |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–094 | |
+| Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
+| Transport `Idempotency-Key` | **Landed** | `transport/` REQ-097 | First-class `Request.IdempotencyKey` |
+| Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
 | Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
 
 ---
@@ -85,7 +88,7 @@
 | Definition — stored AQL | **Planned** | `openehr/client/definition/` | REQ-057; needs AQL builder |
 | Definition — ADL 2 | **Planned** | — | Deferred in package docs |
 | Demographic | **Planned** | `openehr/client/demographic/` | `doc.go` only |
-| Admin (ITS-REST) | **Planned** | `openehr/client/admin/` | Named in layout; no package yet |
+| Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
 
 REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-client.md) (plan table may lag — this roadmap reflects the tree).
 

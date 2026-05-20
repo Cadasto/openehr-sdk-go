@@ -139,6 +139,21 @@ See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-c
 
 Imports between SDK packages **MUST** flow strictly downward through the dependency graph in [§ Dependency direction](#dependency-direction). Upward or cyclic imports are prohibited.
 
+## REQ-099 — ITS-REST Admin client surface
+
+`openehr/client/admin/` **MUST** expose typed package-level functions for the ITS-REST `/admin/*` housekeeping endpoints that deployments commonly ship for test setup/teardown:
+
+- `DeleteEHR(ctx, c, ehrID) error` — admin-mode delete (404 surfaces as `transport.ErrNotFound`).
+- `DeleteAllEHRs(ctx, c) error` — wholesale reset (deployments **MAY** disable; failures surface as the typed wire error).
+- `PurgeTemplates(ctx, c) error` — clear the template registry.
+
+The package **MUST** mirror the `Repository` pattern used by `openehr/client/ehr/*` so it composes with the dependency-injection seams in REQ-023. The Cadasto admin extras (`cadasto/admin/`) **MUST NOT** be conflated with this surface — they target distinct endpoint families and the module-layout cut line under `cadasto/` (REQ-010, REQ-011) keeps them separated.
+
+Out of scope at v1: bulk operations, async-job admin endpoints, ITS-REST capability negotiation (lives in `openehr/client/system`).
+
+- **Lives in:** [`openehr/client/admin/`](../openehr/client/admin/)
+- **Probes:** unit tests `TestDeleteEHR*`, `TestDeleteAllEHRs`, `TestPurgeTemplates`, `TestRepositoryRoundTrip` in `openehr/client/admin/admin_test.go`
+
 ## Boundary rules (summary)
 
 Five load-bearing rules — normative detail in REQ-010 through REQ-014 above and REQ-070 in [service-discovery.md](service-discovery.md). A violation forfeits future options that the cut lines preserve.

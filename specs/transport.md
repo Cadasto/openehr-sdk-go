@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094.
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094 plus the REQ-096..098 extension range.
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [service-discovery.md](service-discovery.md).
 
@@ -109,6 +109,86 @@ Rules:
 
 ---
 
+## REQ-096 — Unambiguous "disable retry"
+
+`transport.RetryPolicy` **MUST** distinguish "no retries" from "use the package default" so consumers can opt out of retry behaviour unambiguously at construction time. The contract:
+
+| `RetryPolicy` value | Behaviour |
+|---|---|
+| `RetryPolicy{}` (zero value) | Disabled — one attempt. Equivalent to today's default. |
+| `RetryPolicy{Disabled: true, ...}` | Disabled regardless of `MaxAttempts`. |
+| `transport.NoRetry` | Canonical sentinel for the above. |
+| `RetryPolicy{MaxAttempts: 0, ...}` | Disabled (use package default; documented). |
+| `RetryPolicy{MaxAttempts: 1, ...}` | Exactly one attempt. |
+| `RetryPolicy{MaxAttempts: N, ...}` for N ≥ 2 | Up to N total attempts. |
+
+Rationale: benchmark / load-tool consumers that measure server-observed latency **MUST** be able to express "no retries" at construction without reading the implementation. This clarification is non-breaking — callers that previously passed `MaxAttempts: N` for N ≥ 2 see no behavioural change.
+
+- **Lives in:** [`transport/`](../transport/)
+- **Probes:** unit test `TestRetryNoRetrySentinel` in `transport/client_test.go`
+
+---
+
+## REQ-097 — First-class `Idempotency-Key`
+
+`transport.Request` **MUST** expose a first-class `IdempotencyKey string` field. When non-empty, the transport **MUST** set the `Idempotency-Key` HTTP header on the outgoing request verbatim — no quoting, no prefixing. Empty **MUST NOT** set the header.
+
+The header is first-class for the same reason `If-Match` (REQ-054) and `Prefer` (REQ-094) are: every write client that targets a deployment supporting idempotent retries cares about it, and routing it through `Request.Headers` loses ergonomics and observability.
+
+The OTel span **MUST** carry the attribute `http.request.idempotency_key` (verbatim value). Operators that consider the key PII-sensitive can wrap the configured `Observer` (REQ-098) and hash before forwarding to a sink — body-level redaction is out of scope.
+
+Out of scope:
+- Idempotency-key *generation* (caller responsibility, identical to `If-Match`).
+- Server-side conflict handling (already covered by REQ-093 sentinels).
+
+- **Lives in:** [`transport/`](../transport/)
+- **Probes:** unit test `TestDoIdempotencyKey` in `transport/client_test.go`
+
+---
+
+## REQ-098 — Request-level observer hook
+
+`transport.Client` **MUST** expose a structured observer hook that fires once per request lifecycle, independent of OTel:
+
+```go
+type Observation struct {
+    Method     string
+    Route      string
+    URL        string
+    StatusCode int
+    Duration   time.Duration
+    Attempts   int
+    Err        error
+    Tags       map[string]any
+}
+
+type Observer interface {
+    OnRequest(Observation)
+}
+
+// Option:
+transport.WithObserver(o Observer) Option
+// Context tag plumbing:
+transport.WithObservationTag(ctx, k, v) context.Context
+```
+
+Rules:
+
+- The observer **MUST** fire exactly once per logical `Client.Do` call — after retries settle — with retry-aware `Attempts` and total wall-clock `Duration`.
+- `WithObserver(nil)` **MUST** be a safe no-op.
+- A panicking observer **MUST NOT** break the request lifecycle. The transport **MUST** recover the panic and log via the configured `slog.Logger`.
+- `Observation.Tags` **MUST** be a defensive copy of any context-attached tags — observers **MUST NOT** be able to mutate the caller's context.
+- The hook is **additive** to REQ-090 OTel — not a substitute. Consumers that want both keep both.
+
+Out of scope:
+- Per-observer filtering / sampling (composition concern).
+- Body-level observation (PII risk; wrap the injected `*http.Client` if needed).
+
+- **Lives in:** [`transport/`](../transport/)
+- **Probes:** unit tests `TestObserver*` and `TestObservation*` in `transport/observer_test.go`
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -118,3 +198,6 @@ Rules:
 | REQ-092 | `transport/`, `smart/discovery/` |
 | REQ-093 | `transport/` |
 | REQ-094 | `transport/`, `openehr/client/*` |
+| REQ-096 | `transport/` |
+| REQ-097 | `transport/` |
+| REQ-098 | `transport/` |
