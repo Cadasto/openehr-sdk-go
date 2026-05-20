@@ -9,20 +9,17 @@ import (
 
 // RetryPolicy configures retry-on-status behaviour. Disabled by default
 // per REQ-091; enable via transport.WithRetry. Retries respect ctx
-// cancellation immediately.
-//
-// "Disable" semantics (REQ-096): the zero value disables retries (exactly
-// one attempt). To force-disable retries for an explicitly-constructed
-// policy, set Disabled=true or pass transport.NoRetry. MaxAttempts=0
-// means "use package default" (currently: disabled — one attempt);
-// MaxAttempts=1 means exactly one attempt (no retries); MaxAttempts=N
-// for N ≥ 2 means up to N total attempts.
+// cancellation immediately. See RetryPolicy.MaxAttempts / Disabled for
+// the precise "no-retry" semantics (REQ-096).
 type RetryPolicy struct {
 	// Disabled, when true, forces exactly one attempt regardless of
-	// MaxAttempts. Use NoRetry as the canonical zero-config form.
+	// MaxAttempts. Use NoRetry as the canonical zero-config form for
+	// "no retries"; Disabled is useful when composing on top of a
+	// caller-supplied base policy that already sets MaxAttempts.
 	Disabled bool
-	// MaxAttempts is the total attempt count (0 = use default, 1 = no
-	// retries, 2 = one retry, …).
+	// MaxAttempts is the total attempt count: 0 means "use package
+	// default" (currently disabled — one attempt); 1 means exactly one
+	// attempt (no retries); N ≥ 2 means up to N total attempts.
 	MaxAttempts int
 	// InitialBackoff is the wait before the first retry. Subsequent
 	// waits grow by Multiplier, capped at MaxBackoff.

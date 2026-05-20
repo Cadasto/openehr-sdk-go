@@ -131,7 +131,14 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetAttributes(attribute.String("http.request.idempotency_key", req.IdempotencyKey))
 	}
 
-	start := time.Now()
+	// Skip the wall-clock capture when no observer is registered —
+	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
+	// callers are the hot path the benchmark consumer of REQ-098 cares
+	// about. Gate at the call site so emitObservation has no nil-check.
+	var start time.Time
+	if c.cfg.observer != nil {
+		start = time.Now()
+	}
 	var (
 		resp    *Response
 		lastErr error
@@ -154,7 +161,9 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if lastErr != nil {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
-		c.emitObservation(ctx, req, target, resp, lastErr, attempt, time.Since(start))
+		if c.cfg.observer != nil {
+			c.emitObservation(ctx, req, target, resp, lastErr, attempt, time.Since(start))
+		}
 		return resp, lastErr
 	}
 	if resp != nil {
@@ -163,18 +172,17 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 			span.SetStatus(codes.Error, http.StatusText(resp.StatusCode))
 		}
 	}
-	c.emitObservation(ctx, req, target, resp, nil, attempt, time.Since(start))
+	if c.cfg.observer != nil {
+		c.emitObservation(ctx, req, target, resp, nil, attempt, time.Since(start))
+	}
 	return resp, nil
 }
 
 // emitObservation delivers an Observation to the configured Observer
-// (REQ-098). A nil observer is a no-op. Panics inside the observer are
-// recovered and logged via the configured slog.Logger so a faulty
-// observer cannot break request handling.
+// (REQ-098). Caller MUST ensure c.cfg.observer is non-nil. Panics
+// inside the observer are recovered and logged via the configured
+// slog.Logger so a faulty observer cannot break request handling.
 func (c *Client) emitObservation(ctx context.Context, req *Request, target *url.URL, resp *Response, err error, attempts int, dur time.Duration) {
-	if c.cfg.observer == nil {
-		return
-	}
 	obs := Observation{
 		Method:   req.effectiveMethod(),
 		Route:    req.effectiveRoute(),

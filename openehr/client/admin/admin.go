@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,8 +13,8 @@ import (
 // DeleteEHR issues an admin-mode delete of the EHR identified by id.
 //
 // Wire: DELETE /admin/ehr/{ehr_id}. A 404 surfaces as
-// transport.ErrNotFound (idempotent — absence is not an error and
-// callers may choose to treat it as success).
+// transport.ErrNotFound; callers that treat absence as success can
+// errors.Is against it without unwrapping the *WireError envelope.
 func DeleteEHR(ctx context.Context, c *transport.Client, id ehr.EHRID) error {
 	if id == "" {
 		return fmt.Errorf("admin.DeleteEHR: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -25,15 +24,7 @@ func DeleteEHR(ctx context.Context, c *transport.Client, id ehr.EHRID) error {
 		Path:   "/admin/ehr/" + url.PathEscape(string(id)),
 		Route:  "/admin/ehr/{ehr_id}",
 	})
-	if err != nil {
-		// Preserve the typed sentinel so callers can errors.Is
-		// without unwrapping the *WireError envelope.
-		if errors.Is(err, transport.ErrNotFound) {
-			return err
-		}
-		return err
-	}
-	return nil
+	return err
 }
 
 // DeleteAllEHRs wipes every EHR on the deployment. Gated by deployment
