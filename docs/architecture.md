@@ -139,11 +139,11 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per ADR 0002 |
 | Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | REQ-052; PROBE-030/031 |
 | Canonical XML | [`openehr/serialize/canxml/`](../openehr/serialize/canxml/) | REQ-056; PROBE-033/034; `xsi:type` dispatch via typereg; `archetype_node_id` as XSD attribute |
-| Transport | [`transport/`](../transport/) | REQ-021, 054, 059, 066, 090–094 |
+| Transport | [`transport/`](../transport/) | REQ-021, 054, 059, 066, 090–094, 096–098 |
 | Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/), [`auth/basic/`](../auth/basic/) | REQ-060, 066, 068, 069 |
 | Discovery | [`smart/discovery/`](../smart/discovery/) | REQ-070–072, 092 |
-| REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution) | REST plan Phases 2–4; PROBE-010–012 |
-| Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031, 033–034), `versioned/` (010–012) |
+| REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution), [`openehr/client/admin/`](../openehr/client/admin/), [`openehr/client/definition/`](../openehr/client/definition/) | REST plan Phases 2–4; REQ-099 (admin); PROBE-010–013, 067 |
+| Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031, 033–034), `versioned/` (010–013), `discovery/` (040–041), `definition/` (067) |
 
 ### BMM codegen pipeline
 

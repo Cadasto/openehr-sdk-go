@@ -331,6 +331,24 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Modes:** Sandbox, Cassette.
 - **Status:** Draft.
 
+#### PROBE-069 — `Idempotency-Key` header round-trip
+
+- **Title:** A POST/PUT write that carries `Request.IdempotencyKey` emits the `Idempotency-Key` HTTP header verbatim and surfaces it on the OTel span as `http.request.idempotency_key`.
+- **Preconditions:** Backend accepts the header (no server-side dedup behaviour required for the SDK-side assertion).
+- **Wire assertion:** Captured request headers include `Idempotency-Key: <value>` exactly as supplied; absent when `IdempotencyKey` is empty.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — covered by `TestDoIdempotencyKey` in [`transport/client_test.go`](../transport/client_test.go). Cross-SDK probe file (`testkit/probes/transport/`) deferred until the PHP SDK lands a matching feature.
+- **Satisfies:** REQ-097
+
+#### PROBE-070 — Admin `DeleteEHR` round-trip
+
+- **Title:** `DELETE /admin/ehr/{ehr_id}` returns 2xx; a subsequent `GET /ehr/{ehr_id}` returns 404 surfaced as `transport.ErrNotFound`.
+- **Preconditions:** Backend exposes the ITS-REST `/admin/*` surface; admin deletion is enabled for the tenant.
+- **Wire assertion:** `admin.DeleteEHR` succeeds; `errors.Is(ehr.Get(...), transport.ErrNotFound)` is true after the delete.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../openehr/client/admin/admin_test.go). Cross-SDK probe file (`testkit/probes/admin/`) deferred until the PHP SDK lands the admin client.
+- **Satisfies:** REQ-099
+
 ### Observability
 
 #### PROBE-050 — OTel span carries openEHR attributes
