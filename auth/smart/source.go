@@ -2,12 +2,10 @@ package smart
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,6 +78,7 @@ type Source struct {
 	mu       sync.Mutex
 	cur      auth.Token
 	refresh  string
+	lastTR   TokenResponse
 	inflight *tokenExchange
 }
 
@@ -192,20 +191,32 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 
 // ExchangeAuthorizationCode completes the PKCE flow (REQ-061). req
 // MUST be the [AuthorizationRequest] returned by [Source.BeginAuthorization]
-// for this launch (state + PKCE verifier).
-func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, req AuthorizationRequest) (auth.Token, error) {
+// for this launch (state + PKCE verifier). The returned [TokenResponse]
+// carries SMART launch parameters for smart/ (REQ-064).
+func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
-		return auth.Token{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
+		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
 	}
-	tok, refresh, err := s.exchangeCode(ctx, code, req.PKCE.Verifier)
+	tok, tr, refresh, err := s.exchangeCode(ctx, code, req.PKCE.Verifier)
 	if err != nil {
-		return auth.Token{}, err
+		return auth.Token{}, TokenResponse{}, err
 	}
 	s.mu.Lock()
 	s.cur = tok
 	s.refresh = refresh
+	s.lastTR = tr
 	s.mu.Unlock()
-	return tok, nil
+	return tok, tr, nil
+}
+
+// LastTokenResponse returns SMART fields from the most recent successful
+// token-endpoint call (authorization_code or refresh_token). After
+// [Source.Token] refreshes, callers that need an updated [LaunchContext]
+// should re-run smart.LaunchContextFromTokenResponse with this value.
+func (s *Source) LastTokenResponse() TokenResponse {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastTR
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).
@@ -251,8 +262,9 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 
 	var tok auth.Token
 	var err error
+	var refreshedTR TokenResponse
 	if refreshTok != "" {
-		tok, refreshTok, err = s.refreshGrant(ctx, refreshTok)
+		tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
 	} else {
 		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: fmt.Errorf("no token or refresh_token")}
 	}
@@ -261,6 +273,9 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if err == nil {
 		s.cur = tok
 		s.refresh = refreshTok
+		if refreshedTR.AccessToken != "" {
+			s.lastTR = refreshedTR
+		}
 	}
 	s.inflight = nil
 	s.mu.Unlock()
@@ -280,7 +295,7 @@ func (s *Source) staleLocked() bool {
 	return time.Until(s.cur.ExpiresAt) <= s.cfg.RefreshThreshold
 }
 
-func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.Token, string, error) {
+func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
@@ -291,7 +306,7 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 	return s.postToken(ctx, form)
 }
 
-func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, string, error) {
+func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
@@ -300,10 +315,10 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 	return s.postToken(ctx, form)
 }
 
-func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, string, error) {
+func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
 	if err != nil {
-		return auth.Token{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
@@ -312,48 +327,34 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, st
 	}
 	resp, err := s.cfg.HTTPClient.Do(req)
 	if err != nil {
-		return auth.Token{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return auth.Token{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		sentinel := auth.ErrTokenExchangeFailed
 		if form.Get("grant_type") == "refresh_token" {
 			sentinel = auth.ErrRefreshFailed
 		}
-		return auth.Token{}, "", &auth.ExchangeError{
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
 			Sentinel:   sentinel,
 			StatusCode: resp.StatusCode,
 			OAuth2:     auth.ParseOAuth2Error(body),
 			Inner:      fmt.Errorf("token endpoint returned %d", resp.StatusCode),
 		}
 	}
-	var tr tokenResponse
-	if err := json.Unmarshal(body, &tr); err != nil {
-		return auth.Token{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
+	parsed, err := ParseTokenResponse(body)
+	if err != nil {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
 	}
-	if tr.AccessToken == "" {
-		return auth.Token{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: fmt.Errorf("empty access_token")}
+	if parsed.AccessToken == "" {
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: fmt.Errorf("empty access_token")}
 	}
-	tok := auth.Token{
-		Value:  tr.AccessToken,
-		Type:   tr.TokenType,
-		Scope:  tr.Scope,
-		Issuer: s.cfg.Issuer,
-	}
-	if tok.Type == "" {
-		tok.Type = auth.TokenTypeBearer
-	}
-	if tr.ExpiresIn != "" {
-		sec, err := strconv.ParseInt(string(tr.ExpiresIn), 10, 64)
-		if err == nil && sec > 0 {
-			tok.ExpiresAt = time.Now().Add(time.Duration(sec) * time.Second)
-		}
-	}
-	refresh := tr.RefreshToken
+	tok := tokenFromResponse(parsed, s.cfg.Issuer)
+	refresh := parsed.RefreshToken
 	if refresh == "" {
 		// Keep prior refresh when the server omits a new one.
 		s.mu.Lock()
@@ -362,15 +363,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, st
 		}
 		s.mu.Unlock()
 	}
-	return tok, refresh, nil
-}
-
-type tokenResponse struct {
-	AccessToken  string      `json:"access_token"`
-	TokenType    string      `json:"token_type"`
-	ExpiresIn    json.Number `json:"expires_in"`
-	RefreshToken string      `json:"refresh_token"`
-	Scope        string      `json:"scope"`
+	return tok, parsed, refresh, nil
 }
 
 // JWKS returns the JWKS helper when configured (REQ-062).

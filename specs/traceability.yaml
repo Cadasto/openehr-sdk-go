@@ -288,3 +288,22 @@ requirements:
     packages: [auth/smart]
     tests:
       - auth/smart/smart_test.go
+
+  - id: REQ-064
+    title: Launch context
+    canonical: specs/auth.md#req-064
+    status: draft
+    implementation: landed
+    packages: [smart, auth/smart]
+    tests:
+      - smart/launch_test.go
+      - auth/smart/exchange_test.go
+
+  - id: REQ-067
+    title: Platform principal claims
+    canonical: specs/auth.md#req-067
+    status: draft
+    implementation: landed
+    packages: [smart]
+    tests:
+      - smart/launch_test.go

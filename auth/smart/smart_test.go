@@ -69,7 +69,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 				return
 			}
 			if vals.Get("grant_type") == "refresh_token" {
-				_, _ = w.Write([]byte(`{"access_token":"at-2","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-2"}`))
+				_, _ = w.Write([]byte(`{"access_token":"at-2","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-2","patient":"p-refreshed"}`))
 				return
 			}
 			w.WriteHeader(http.StatusBadRequest)
@@ -92,9 +92,12 @@ func TestExchangeAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", req)
+	tok, tr, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", req)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if tr.AccessToken != "at-1" {
+		t.Fatalf("token response access = %q", tr.AccessToken)
 	}
 	if tok.Value != "at-1" {
 		t.Fatalf("access = %q", tok.Value)
@@ -111,6 +114,9 @@ func TestExchangeAndRefresh(t *testing.T) {
 	}
 	if tokenCalls < 2 {
 		t.Fatalf("token calls = %d", tokenCalls)
+	}
+	if tr := src.LastTokenResponse(); tr.Patient != "p-refreshed" {
+		t.Fatalf("LastTokenResponse after refresh = %#v", tr)
 	}
 }
 
@@ -146,7 +152,7 @@ func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, err := src.ExchangeAuthorizationCode(context.Background(), "code", smart.AuthorizationRequest{})
+	_, _, err := src.ExchangeAuthorizationCode(context.Background(), "code", smart.AuthorizationRequest{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -176,10 +182,10 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	if reqA.PKCE.Verifier == reqB.PKCE.Verifier {
 		t.Fatal("expected distinct verifiers")
 	}
-	if _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {
