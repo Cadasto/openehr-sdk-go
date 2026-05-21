@@ -146,10 +146,11 @@ requirements:
     canonical: specs/wire.md#req-059
     status: draft
     implementation: partial
-    packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
     tests:
-      - openehr/client/ehr/itemtags/wire_test.go
+      - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
+      - transport/response_test.go
 
   - id: REQ-090
     title: OpenTelemetry hooks
