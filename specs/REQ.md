@@ -76,11 +76,11 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-094 | `Prefer` negotiation | [transport.md § REQ-094](transport.md#req-094) | landed |
 | REQ-095 | OpenAPI authoritative source | [wire.md § REQ-095](wire.md#req-095) | partial |
 | REQ-096 | Unambiguous "disable retry" | [transport.md § REQ-096](transport.md#req-096--unambiguous-disable-retry) | landed |
-| REQ-097 | First-class `Idempotency-Key` | [transport.md § REQ-097](transport.md#req-097--first-class-idempotency-key) | landed |
+| REQ-097 | First-class `Idempotency-Key` (deprecated) | [transport.md § REQ-097](transport.md#req-097--first-class-idempotency-key-deprecated) | deprecated |
 | REQ-098 | Request-level observer hook | [transport.md § REQ-098](transport.md#req-098--request-level-observer-hook) | landed |
 | REQ-099 | ITS-REST Admin client surface | [module-layout.md § REQ-099](module-layout.md#req-099--its-rest-admin-client-surface) | landed |
 
-**Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only). Detail in [`traceability.yaml`](traceability.yaml).
+**Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
 ---
 

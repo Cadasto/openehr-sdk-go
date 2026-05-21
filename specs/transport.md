@@ -129,20 +129,11 @@ Rationale: benchmark / load-tool consumers that measure server-observed latency 
 
 ---
 
-## REQ-097 — First-class `Idempotency-Key`
+## REQ-097 — First-class `Idempotency-Key` (deprecated)
 
-`transport.Request` **MUST** expose a first-class `IdempotencyKey string` field. When non-empty, the transport **MUST** set the `Idempotency-Key` HTTP header on the outgoing request verbatim — no quoting, no prefixing. Empty **MUST NOT** set the header.
+**Status: Deprecated (2026-05).** Removal target: **v1.0.0** (first tagged release). Cadasto openEHR services no longer accept the `Idempotency-Key` HTTP header. Until removal, the SDK **MUST NOT** expose first-class `Idempotency-Key` support on `transport.Request` or emit the header on outgoing requests.
 
-The header is first-class for the same reason `If-Match` (REQ-054) and `Prefer` (REQ-094) are: every write client that targets a deployment supporting idempotent retries cares about it, and routing it through `Request.Headers` loses ergonomics and observability.
-
-The OTel span **MUST** carry the attribute `http.request.idempotency_key` (verbatim value). Operators that consider the key PII-sensitive can wrap the configured `Observer` (REQ-098) and hash before forwarding to a sink — body-level redaction is out of scope.
-
-Out of scope:
-- Idempotency-key *generation* (caller responsibility, identical to `If-Match`).
-- Server-side conflict handling (already covered by REQ-093 sentinels).
-
-- **Lives in:** [`transport/`](../transport/)
-- **Probes:** unit test `TestDoIdempotencyKey` in `transport/client_test.go`
+The original REQ-097 design (first-class field, verbatim header, OTel attribute) is superseded by this deprecation. The identifier is retained for traceability.
 
 ---
 
@@ -199,5 +190,4 @@ Out of scope:
 | REQ-093 | `transport/` |
 | REQ-094 | `transport/`, `openehr/client/*` |
 | REQ-096 | `transport/` |
-| REQ-097 | `transport/` |
 | REQ-098 | `transport/` |

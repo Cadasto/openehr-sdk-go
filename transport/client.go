@@ -127,9 +127,6 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		),
 	)
 	defer span.End()
-	if req.IdempotencyKey != "" {
-		span.SetAttributes(attribute.String("http.request.idempotency_key", req.IdempotencyKey))
-	}
 
 	// Skip the wall-clock capture when no observer is registered —
 	// the cost is only sub-µs (time.Now is a vDSO call) but observerless
@@ -257,9 +254,6 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 	}
 	if req.IfMatch != "" {
 		httpReq.Header.Set("If-Match", quoteIfMatch(req.IfMatch))
-	}
-	if req.IdempotencyKey != "" {
-		httpReq.Header.Set("Idempotency-Key", req.IdempotencyKey)
 	}
 	if v := req.Prefer.HeaderValue(); v != "" {
 		httpReq.Header.Set("Prefer", v)

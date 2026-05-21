@@ -56,7 +56,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live.
-- **Status** — Draft (in this spec), Implemented (in code), Ratified (cross-SDK pass against reference).
+- **Status** — Draft (in this spec), Implemented (in code), Ratified (cross-SDK pass against reference), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Authentication and discovery
@@ -337,7 +337,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend accepts the header (no server-side dedup behaviour required for the SDK-side assertion).
 - **Wire assertion:** Captured request headers include `Idempotency-Key: <value>` exactly as supplied; absent when `IdempotencyKey` is empty.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — covered by `TestDoIdempotencyKey` in [`transport/client_test.go`](../transport/client_test.go). Cross-SDK probe file (`testkit/probes/transport/`) deferred until the PHP SDK lands a matching feature.
+- **Status:** Deprecated — REQ-097 deprecated; Cadasto openEHR services no longer accept `Idempotency-Key`. Removal target: v1.0.0. Sandbox assertion removed from the tree pre-1.0 (was `TestDoIdempotencyKey` in `transport/client_test.go`).
 - **Satisfies:** REQ-097
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
@@ -376,7 +376,7 @@ A new probe **MUST**:
 - Be assigned the next available `PROBE-NNN` for its topic range (gap of 10 between topics).
 - Have a definition in this catalog *before* any implementation lands.
 - Be runnable in at least Sandbox mode; Cassette and Live modes follow when fixtures are recorded.
-- Carry a `Status:` transition (Draft → Implemented → Ratified) in this spec when its state changes; transitions go in the CHANGELOG.
+- Carry a `Status:` transition (Draft → Implemented → Ratified, or Deprecated before removal) in this spec when its state changes; transitions go in the CHANGELOG.
 
 ## Removing probes
 

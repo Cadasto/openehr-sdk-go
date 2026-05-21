@@ -13,7 +13,7 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 | Go version | `1.25.x` (N-1 release line) |
 | openEHR REST | `1.1.0-development` |
 | Sister SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
-| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM, canonical JSON/XML codecs, transport (incl. observer / idempotency-key / NoRetry — REQ-096–098), auth (clientcreds/jwtbearer/basic), discovery, System/EHR/Definition-ADL14/Admin-ITS REST clients landed; `auth/smart` PKCE, Query (AQL), Composition builder, OPT parser, Cadasto extras open |
+| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM, canonical JSON/XML codecs, transport (incl. observer / NoRetry — REQ-096, REQ-098), auth (clientcreds/jwtbearer/basic), discovery, System/EHR/Definition-ADL14/Admin-ITS REST clients landed; `auth/smart` PKCE, Query (AQL), Composition builder, OPT parser, Cadasto extras open |
 
 ## Source of truth
 

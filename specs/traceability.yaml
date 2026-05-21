@@ -207,13 +207,10 @@ requirements:
       - transport/client_test.go
 
   - id: REQ-097
-    title: First-class Idempotency-Key
-    canonical: specs/transport.md#req-097--first-class-idempotency-key
-    status: draft
-    implementation: landed
-    packages: [transport]
-    tests:
-      - transport/client_test.go
+    title: First-class Idempotency-Key (deprecated)
+    canonical: specs/transport.md#req-097--first-class-idempotency-key-deprecated
+    status: deprecated
+    implementation: deprecated
 
   - id: REQ-098
     title: Request-level observer hook
