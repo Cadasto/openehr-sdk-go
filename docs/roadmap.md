@@ -40,7 +40,7 @@
 | AOM 1.4 (generated) | **Landed** | `openehr/aom/aom14/` | |
 | AOM 2.4 | **Deferred** | `openehr/aom/aom2/` | BMM pinned; no codegen yet |
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031 |
-| Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; `xsi:type` dispatch via typereg; `archetype_node_id` as XSD attribute per openEHR ITS-XML; ehrbase cassettes vendored under `testkit/cassettes/canonical_xml/ehrbase/`. Hash<K,V> XML emission deferred. [plan](plans/2026-05-15-canonical-xml-serialization.md) |
+| Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
 | Template parser (OPT/OET) | **Planned** | `openehr/template/` | |
 | Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | |
@@ -63,8 +63,7 @@
 | SMART PKCE + launch | **Partial** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; wire 401 re-auth open |
 | Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims |
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
-| Token refresh (SMART provider) | **Landed** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; not auto-wired in transport on 401 |
-| Platform principal claims | **Planned** | REQ-067 | `smart/` launch context |
+| Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–094 | |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
@@ -118,7 +117,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
 | Auth / REST probes | **Planned** | — | PROBE-001–009, 060+ in catalog |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
-| Testkit helpers + probe runner | **Partial** | `testkit/` | Probes exist; full runner matrix open (REQ-082) |
+| Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed; `sandbox/` cassette runner open (REQ-082) |
 | PHP SDK wire parity | **Planned** | — | REQ-080–081 |
 | OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Not all surfaces covered |
 
