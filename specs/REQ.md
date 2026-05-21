@@ -48,15 +48,15 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-052 | Canonical JSON | [wire.md § REQ-052](wire.md#req-052) | landed |
 | REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | planned |
 | REQ-054 | Optimistic concurrency | [wire.md § REQ-054](wire.md#req-054) | landed |
-| REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055) | planned |
+| REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055) | landed |
 | REQ-056 | Canonical XML | [wire.md § REQ-056](wire.md#req-056) | planned |
-| REQ-057 | Stored AQL queries | [wire.md § REQ-057](wire.md#req-057) | planned |
+| REQ-057 | Stored AQL queries | [wire.md § REQ-057](wire.md#req-057) | landed |
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md), [scope.md](scope.md) | planned |
 | REQ-059 | openEHR custom headers | [wire.md § REQ-059](wire.md#req-059) | partial |
 | REQ-060 | TokenSource interface | [auth.md § REQ-060](auth.md#req-060) | landed |
-| REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061) | planned |
-| REQ-062 | JWKS rotation | [auth.md § REQ-062](auth.md#req-062) | planned |
-| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063) | planned |
+| REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061) | landed |
+| REQ-062 | JWKS rotation | [auth.md § REQ-062](auth.md#req-062) | landed |
+| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063) | landed |
 | REQ-064 | Launch context | [auth.md § REQ-064](auth.md#req-064) | planned |
 | REQ-065 | Per-client tenant binding | [auth.md § REQ-065](auth.md#req-065) | landed |
 | REQ-066 | Caller attribution | [auth.md § REQ-066](auth.md#req-066) | landed |

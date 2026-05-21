@@ -15,8 +15,8 @@
 | 2 — `openehr/client/system/` | Capabilities, version, health | **Done** |
 | 3 — EHR read path | `ehr`, `ehrstatus`, `composition`, `directory` GET | **Done** |
 | 4 — EHR versioned writes | PUT/POST/DELETE, `contribution`, PROBE-010–012 | **Done** |
-| 5 — Query API | `openehr/client/query/` | Open |
-| 6 — Definition API | templates, stored queries | Open |
+| 5 — Query API | `openehr/client/query/` | **Done** |
+| 6 — Definition API | templates, stored queries | **Done** (stored AQL CRUD; ADL 1.4 templates were Phase 6 subset) |
 | 7–8 — Demographic / Admin | stub `doc.go` only | Open |
 | 9 — CDR benchmark (STRAND-01) | migrate openehr-cdr benchmark | Open |
 

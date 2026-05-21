@@ -235,8 +235,52 @@ requirements:
     status: draft
     implementation: planned
 
+  - id: REQ-055
+    title: AQL wire boundary
+    canonical: specs/wire.md#req-055
+    status: draft
+    implementation: landed
+    packages: [openehr/aql, openehr/client/query]
+    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    tests:
+      - openehr/aql/aql_test.go
+      - openehr/client/query/query_test.go
+
+  - id: REQ-057
+    title: Stored AQL queries
+    canonical: specs/wire.md#req-057
+    status: draft
+    implementation: landed
+    packages: [openehr/client/query, openehr/client/definition]
+    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    tests:
+      - openehr/client/query/query_test.go
+      - openehr/client/definition/stored_query_test.go
+
   - id: REQ-061
     title: SMART-on-openEHR PKCE
     canonical: specs/auth.md#req-061
     status: draft
-    implementation: planned
+    implementation: landed
+    packages: [auth/smart]
+    tests:
+      - auth/smart/smart_test.go
+      - auth/smart/pkce.go
+
+  - id: REQ-062
+    title: JWKS rotation
+    canonical: specs/auth.md#req-062
+    status: draft
+    implementation: landed
+    packages: [auth/smart]
+    tests:
+      - auth/smart/smart_test.go
+
+  - id: REQ-063
+    title: Token refresh
+    canonical: specs/auth.md#req-063
+    status: draft
+    implementation: landed
+    packages: [auth/smart]
+    tests:
+      - auth/smart/smart_test.go

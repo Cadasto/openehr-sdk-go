@@ -377,6 +377,10 @@ type Repository interface {
 	ListTemplates(ctx context.Context, format TemplateFormat) ([]TemplateMetadata, *transport.Metadata, error)
 	DeleteTemplate(ctx context.Context, templateID string, format TemplateFormat) (*transport.Metadata, error)
 	ExampleComposition(ctx context.Context, templateID string, format TemplateFormat, opts ...ExampleOption) (*rm.Composition, *transport.Metadata, error)
+	PutStoredQuery(ctx context.Context, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error)
+	GetStoredQuery(ctx context.Context, qualifiedName, version string) (*StoredQueryMetadata, *transport.Metadata, error)
+	ListStoredQueries(ctx context.Context, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error)
+	DeleteStoredQuery(ctx context.Context, qualifiedName, version string) (*transport.Metadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -402,4 +406,20 @@ func (r *repository) DeleteTemplate(ctx context.Context, templateID string, form
 
 func (r *repository) ExampleComposition(ctx context.Context, templateID string, format TemplateFormat, opts ...ExampleOption) (*rm.Composition, *transport.Metadata, error) {
 	return ExampleComposition(ctx, r.c, templateID, format, opts...)
+}
+
+func (r *repository) PutStoredQuery(ctx context.Context, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
+	return PutStoredQuery(ctx, r.c, qualifiedName, aqlText, opts...)
+}
+
+func (r *repository) GetStoredQuery(ctx context.Context, qualifiedName, version string) (*StoredQueryMetadata, *transport.Metadata, error) {
+	return GetStoredQuery(ctx, r.c, qualifiedName, version)
+}
+
+func (r *repository) ListStoredQueries(ctx context.Context, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error) {
+	return ListStoredQueries(ctx, r.c, namePattern)
+}
+
+func (r *repository) DeleteStoredQuery(ctx context.Context, qualifiedName, version string) (*transport.Metadata, error) {
+	return DeleteStoredQuery(ctx, r.c, qualifiedName, version)
 }

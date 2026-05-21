@@ -200,7 +200,7 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 | 0 | Repo scaffolding — module layout, AI-assistant docs, Makefile, Dockerfile, `specs/` tree | **complete** |
 | 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **landed** — [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md), [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md) |
 | 1a | Transport, auth providers (`clientcreds`, `jwtbearer`, `basic`), discovery, System + EHR REST (read/write), Definition ADL 1.4 templates, canonical XML codec | **landed** — see [REST client plan](docs/plans/2026-05-15-rest-api-client.md) Phases 2–6 |
-| 1b | `auth/smart` PKCE end-to-end, Query (AQL) client, Definition stored AQL, CDR benchmark (STRAND-01) | **open** |
+| 1b | `auth/smart` PKCE end-to-end, Query (AQL) client, Definition stored AQL, CDR benchmark (STRAND-01) | **partial** — PKCE/query/stored AQL landed; ID-token validation + STRAND-01 benchmark open |
 | 2 | Composition builder + Templates + AQL builder/executor | not started |
 | 3 | Application-level SMART (`smart/` AppContext) on top of landed discovery | partial — discovery landed; launch flow open (STRAND-05) |
 | 4 | Cadasto extras (Extra, Datamap, MPI preview, Admin, Care) | not started |

@@ -22,7 +22,7 @@
 | **0** | Scaffolding — module layout, specs, Makefile, CI | **Complete** |
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
-| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, CDR benchmark (STRAND-01) | **Open** |
+| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL landed; CDR benchmark deferred) |
 | **2** | Composition builder, template parser, AQL builder + executor | **Not started** |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery only) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
@@ -44,7 +44,7 @@
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
 | Template parser (OPT/OET) | **Planned** | `openehr/template/` | |
 | Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | |
-| AQL builder (models only) | **Planned** | `openehr/aql/` | No executor without Query client |
+| AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; struct builder deferred |
 | Composition builder | **Planned** | `openehr/composition/` | |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | EHR Extract RM | **Deferred** | — | Skipped per v1 scope |
@@ -60,9 +60,9 @@
 | JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | |
 | HTTP Basic on openEHR REST | **Landed** | `auth/basic/` REQ-069 | |
 | Caller attribution | **Landed** | `transport/` REQ-066 | |
-| SMART PKCE + launch | **Planned** | `auth/smart/` REQ-061–064 | `doc.go` only |
-| JWKS rotation | **Planned** | REQ-062 | With SMART |
-| Token refresh on wire 401 | **Planned** | REQ-063 | Not auto-wired in transport today |
+| SMART PKCE + launch | **Partial** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; ID-token validation / launch context open |
+| JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
+| Token refresh (SMART provider) | **Landed** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; not auto-wired in transport on 401 |
 | Platform principal claims | **Planned** | REQ-067 | `smart/` launch context |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–094 | |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
@@ -83,9 +83,9 @@
 | Directory | **Landed** | `openehr/client/ehr/directory/` | |
 | Contribution | **Landed** | `openehr/client/ehr/contribution/` | |
 | ItemTags | **Planned** | `openehr/client/ehr/itemtags/` | REQ-059; not created yet |
-| Query (AQL execute) | **Planned** | `openehr/client/query/` | `doc.go` only; REQ-055 |
+| Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
-| Definition — stored AQL | **Planned** | `openehr/client/definition/` | REQ-057; needs AQL builder |
+| Definition — stored AQL | **Landed** | `openehr/client/definition/` | Put/get/list/delete; REQ-057 |
 | Definition — ADL 2 | **Planned** | — | Deferred in package docs |
 | Demographic | **Planned** | `openehr/client/demographic/` | `doc.go` only |
 | Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
