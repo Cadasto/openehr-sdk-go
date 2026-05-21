@@ -24,7 +24,7 @@
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
 | **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL landed; CDR benchmark deferred) |
 | **2** | Composition builder, template parser, AQL builder + executor | **Not started** |
-| **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery only) |
+| **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
 
@@ -60,7 +60,8 @@
 | JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | |
 | HTTP Basic on openEHR REST | **Landed** | `auth/basic/` REQ-069 | |
 | Caller attribution | **Landed** | `transport/` REQ-066 | |
-| SMART PKCE + launch | **Partial** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; ID-token validation / launch context open |
+| SMART PKCE + launch | **Partial** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; wire 401 re-auth open |
+| Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims |
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
 | Token refresh (SMART provider) | **Landed** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; not auto-wired in transport on 401 |
 | Platform principal claims | **Planned** | REQ-067 | `smart/` launch context |
@@ -99,7 +100,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Feature | Status | Package | Notes |
 |---------|--------|---------|-------|
 | Discovery resolver + cache | **Landed** | `smart/discovery/` | |
-| AppContext / launch helpers | **Planned** | `smart/` | `doc.go` only; STRAND-05 |
+| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067); App Registration open (STRAND-05) |
 | Cadasto Extra API | **Planned** | `cadasto/extra/` | |
 | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 | |
 | MPI preview | **Planned** | `cadasto/mpi/` | |
