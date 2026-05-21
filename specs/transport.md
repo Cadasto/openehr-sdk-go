@@ -129,11 +129,11 @@ Rationale: benchmark / load-tool consumers that measure server-observed latency 
 
 ---
 
-## REQ-097 — First-class `Idempotency-Key` (withdrawn)
+## REQ-097 — First-class `Idempotency-Key` (deprecated)
 
-**Withdrawn (2026-05).** Cadasto openEHR services no longer accept the `Idempotency-Key` HTTP header. The SDK **MUST NOT** expose first-class `Idempotency-Key` support on `transport.Request` or emit the header on outgoing requests.
+**Status: Deprecated (2026-05).** Removal target: **v1.0.0** (first tagged release). Cadasto openEHR services no longer accept the `Idempotency-Key` HTTP header. Until removal, the SDK **MUST NOT** expose first-class `Idempotency-Key` support on `transport.Request` or emit the header on outgoing requests.
 
-This requirement identifier is retained for traceability; the normative obligation above supersedes the original REQ-097 design.
+The original REQ-097 design (first-class field, verbatim header, OTel attribute) is superseded by this deprecation. The identifier is retained for traceability.
 
 ---
 
