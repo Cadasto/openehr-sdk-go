@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -93,7 +92,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", req.State)
+	tok, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,13 +142,70 @@ func readJWKS() []byte {
 	return []byte(`{"keys":[{"kty":"RSA","kid":"key-2026-04","n":"abc","e":"AQAB"}]}`)
 }
 
-func TestExchangeRejectsBadState(t *testing.T) {
+func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, _ = src.BeginAuthorization("good")
-	_, err := src.ExchangeAuthorizationCode(context.Background(), "code", "bad")
-	if err == nil || !strings.Contains(err.Error(), "state") {
-		t.Fatalf("err = %v", err)
+	_, err := src.ExchangeAuthorizationCode(context.Background(), "code", smart.AuthorizationRequest{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		vals, _ := url.ParseQuery(string(b))
+		seen = append(seen, vals.Get("code_verifier"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"ok","token_type":"Bearer","expires_in":60}`))
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqA, _ := src.BeginAuthorization("state-a")
+	reqB, _ := src.BeginAuthorization("state-b")
+	if reqA.PKCE.Verifier == reqB.PKCE.Verifier {
+		t.Fatal("expected distinct verifiers")
+	}
+	if _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB); err != nil {
+		t.Fatal(err)
+	}
+	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {
+		t.Fatalf("verifiers = %v, want %q then %q", seen, reqA.PKCE.Verifier, reqB.PKCE.Verifier)
+	}
+}
+
+func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src.SetTokens(auth.Token{Value: "cached", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		_, _ = src.Token(ctx)
+		close(done)
+	}()
+	if _, err := src.Token(ctx); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-ctx.Done():
+		t.Fatal("concurrent Token deadlocked")
 	}
 }

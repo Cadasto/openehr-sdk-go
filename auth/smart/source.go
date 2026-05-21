@@ -81,9 +81,6 @@ type Source struct {
 	cur      auth.Token
 	refresh  string
 	inflight *tokenExchange
-
-	pendingState    string
-	pendingVerifier string
 }
 
 type tokenExchange struct {
@@ -151,8 +148,10 @@ type AuthorizationRequest struct {
 	PKCE   PKCEPair
 }
 
-// BeginAuthorization generates PKCE material and records state for a
-// later [Source.ExchangeAuthorizationCode] call.
+// BeginAuthorization generates PKCE material for a single launch.
+// Callers MUST retain the returned [AuthorizationRequest] and pass it
+// unchanged to [Source.ExchangeAuthorizationCode]; a Source supports
+// many concurrent launches when each flow keeps its own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
 		return AuthorizationRequest{}, fmt.Errorf("%w: state is required", auth.ErrInvalidConfig)
@@ -161,10 +160,6 @@ func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) 
 	if err != nil {
 		return AuthorizationRequest{}, err
 	}
-	s.mu.Lock()
-	s.pendingState = state
-	s.pendingVerifier = pkce.Verifier
-	s.mu.Unlock()
 	return AuthorizationRequest{State: state, PKCE: pkce}, nil
 }
 
@@ -195,27 +190,20 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	return u.String(), nil
 }
 
-// ExchangeAuthorizationCode completes the PKCE flow (REQ-061).
-func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code, state string) (auth.Token, error) {
-	s.mu.Lock()
-	expectState := s.pendingState
-	verifier := s.pendingVerifier
-	s.mu.Unlock()
-	if state == "" || state != expectState {
-		return auth.Token{}, fmt.Errorf("%w: state mismatch", auth.ErrInvalidConfig)
+// ExchangeAuthorizationCode completes the PKCE flow (REQ-061). req
+// MUST be the [AuthorizationRequest] returned by [Source.BeginAuthorization]
+// for this launch (state + PKCE verifier).
+func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, req AuthorizationRequest) (auth.Token, error) {
+	if req.State == "" || req.PKCE.Verifier == "" {
+		return auth.Token{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
 	}
-	if verifier == "" {
-		return auth.Token{}, fmt.Errorf("%w: no pending PKCE verifier", auth.ErrInvalidConfig)
-	}
-	tok, refresh, err := s.exchangeCode(ctx, code, verifier)
+	tok, refresh, err := s.exchangeCode(ctx, code, req.PKCE.Verifier)
 	if err != nil {
 		return auth.Token{}, err
 	}
 	s.mu.Lock()
 	s.cur = tok
 	s.refresh = refresh
-	s.pendingState = ""
-	s.pendingVerifier = ""
 	s.mu.Unlock()
 	return tok, nil
 }
@@ -249,17 +237,22 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 			return auth.Token{}, ctx.Err()
 		}
 	}
+	refreshTok := s.refresh
+	cur := s.cur
+	if refreshTok == "" && !cur.IsZero() {
+		// Stale but no refresh_token — return the cached access token
+		// without claiming inflight (REQ-026).
+		s.mu.Unlock()
+		return cur, nil
+	}
 	ex := &tokenExchange{done: make(chan struct{})}
 	s.inflight = ex
-	refreshTok := s.refresh
 	s.mu.Unlock()
 
 	var tok auth.Token
 	var err error
 	if refreshTok != "" {
 		tok, refreshTok, err = s.refreshGrant(ctx, refreshTok)
-	} else if !s.cur.IsZero() {
-		return s.cur, nil
 	} else {
 		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: fmt.Errorf("no token or refresh_token")}
 	}
