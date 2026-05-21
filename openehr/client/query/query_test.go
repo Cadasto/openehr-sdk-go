@@ -81,6 +81,49 @@ func TestExecuteAdhoc(t *testing.T) {
 	}
 }
 
+func TestExecuteWithEHRID(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
+	_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.Query{
+		Q:     "SELECT e/ehr_id/value FROM EHR e",
+		EHRID: ehrID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.URL.Query().Get("ehr_id") != ehrID {
+		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	}
+}
+
+func TestRunStoredWithEHRID(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
+	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions", nil,
+		query.WithEHRID(ehrID),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.URL.Query().Get("ehr_id") != ehrID {
+		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	}
+}
+
 func TestRunStored(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/openehr/v1/query/org.openehr::compositions" {

@@ -21,9 +21,9 @@ type Query struct {
 	// Parameters bind $name placeholders in Q. Keys MUST NOT include
 	// the leading dollar sign (e.g. "ehr_id", not "$ehr_id").
 	Parameters map[string]any
-	// EHRID scopes execution to a single EHR when non-empty. Mapped to
-	// the `ehr_id` query parameter on GET and included in POST bodies
-	// when the executor uses POST.
+	// EHRID scopes execution to a single EHR when non-empty. The query
+	// executor maps this to the `ehr_id` URL query parameter (distinct
+	// from AQL placeholder keys inside Parameters).
 	EHRID string
 }
 

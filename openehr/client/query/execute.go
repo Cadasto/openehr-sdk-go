@@ -37,6 +37,7 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 		ContentType: "application/json",
 		Accept:      "application/json",
 	}
+	applyEHRScope(req, cfg)
 	return doResultSet(ctx, c, req)
 }
 
@@ -86,7 +87,20 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 		ContentType: "application/json",
 		Accept:      "application/json",
 	}
+	applyEHRScope(req, cfg)
 	return doResultSet(ctx, c, req)
+}
+
+// applyEHRScope sets the openEHR REST `ehr_id` query parameter when the
+// caller scoped execution to one EHR (REQ-055).
+func applyEHRScope(req *transport.Request, cfg executeConfig) {
+	if cfg.ehrID == "" {
+		return
+	}
+	if req.Query == nil {
+		req.Query = url.Values{}
+	}
+	req.Query.Set("ehr_id", cfg.ehrID)
 }
 
 func adhocBody(q aql.Query, cfg executeConfig) map[string]any {
