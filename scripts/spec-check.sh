@@ -69,7 +69,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     current_id="${BASH_REMATCH[1]}"
     continue
   fi
-  if [[ -n "$current_id" && "$line" =~ implementation:[[:space:]]*(landed|partial|planned) ]]; then
+  if [[ -n "$current_id" && "$line" =~ implementation:[[:space:]]*(landed|partial|planned|withdrawn) ]]; then
     current_impl="${BASH_REMATCH[1]}"
     continue
   fi

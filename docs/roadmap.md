@@ -67,7 +67,6 @@
 | Platform principal claims | **Planned** | REQ-067 | `smart/` launch context |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–094 | |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
-| Transport `Idempotency-Key` | **Landed** | `transport/` REQ-097 | First-class `Request.IdempotencyKey` |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
 | Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
 

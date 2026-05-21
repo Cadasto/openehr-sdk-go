@@ -331,14 +331,9 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Modes:** Sandbox, Cassette.
 - **Status:** Draft.
 
-#### PROBE-069 — `Idempotency-Key` header round-trip
+#### PROBE-069 — `Idempotency-Key` header round-trip (withdrawn)
 
-- **Title:** A POST/PUT write that carries `Request.IdempotencyKey` emits the `Idempotency-Key` HTTP header verbatim and surfaces it on the OTel span as `http.request.idempotency_key`.
-- **Preconditions:** Backend accepts the header (no server-side dedup behaviour required for the SDK-side assertion).
-- **Wire assertion:** Captured request headers include `Idempotency-Key: <value>` exactly as supplied; absent when `IdempotencyKey` is empty.
-- **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — covered by `TestDoIdempotencyKey` in [`transport/client_test.go`](../transport/client_test.go). Cross-SDK probe file (`testkit/probes/transport/`) deferred until the PHP SDK lands a matching feature.
-- **Satisfies:** REQ-097
+- **Status:** Withdrawn — REQ-097 withdrawn; Cadasto services no longer accept `Idempotency-Key`.
 
 #### PROBE-070 — Admin `DeleteEHR` round-trip
 
