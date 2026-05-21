@@ -32,7 +32,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/bmm/` | Public BMM loader and in-memory model (`bmm.Schema`, `bmm.Class`, `bmm.Property`, …). Parses P_BMM JSON; resolves `includes`. Importable as a building block (REQ-013, REQ-045). |
 | `openehr/serialize/` | Canonical JSON / XML, FLAT, STRUCTURED codecs. |
 | `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation, AQL syntax / path resolution. |
-| `openehr/template/` | OPT / OET parsing, template/package deployment helpers, path utilities. **Consumes** `openehr/aom/` types but does not own them. |
+| `openehr/template/` | ADL 1.4 operational template (OPT: `.opt` / `OPERATIONAL_TEMPLATE`) parse and path utilities. **Consumes** `openehr/aom/` types but does not own them. OET (`.oet`) is out of scope for v1. |
 | `openehr/aom/` | Archetype Object Model — the in-memory form of an archetype after parsing ADL. Sibling of `openehr/rm/` (both are top-level openEHR information models). |
 | `openehr/aom/aom14/` | AOM 1.4 types (ADL 1.4). **Generated** from `openehr_am_1.4.0.bmm.json` + `openehr_base_1.3.0.bmm.json` (REQ-042). |
 | `openehr/aom/aom2/` | AOM 2 types (ADL 2). **Deferred for v1** — BMM file kept in `resources/bmm/`. |

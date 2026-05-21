@@ -24,7 +24,7 @@ The in-memory model representing an *archetype* after parsing ADL. Sibling of th
 A constraint model on an RM class, expressed in ADL (Archetype Definition Language). Defines the structural and value constraints under which a domain concept (e.g. "blood pressure measurement") is recorded. Archetypes are reusable across templates.
 
 **Operational Template (OPT)**
-A flattened, validation-ready artifact derived from a template (`.oet`) and its referenced archetypes. The OPT is what a CDR uses to validate incoming Compositions. The SDK consumes OPTs via `openehr/template`.
+A flattened, validation-ready artifact derived from an authoring template (`.oet`) and its referenced archetypes. The OPT is what a CDR uses to validate incoming Compositions (`OPERATIONAL_TEMPLATE` XML, typically `.opt`). The SDK v1 parser in `openehr/template/` consumes **OPT only**; the parsed type is `OperationalTemplate`. OET is out of scope for v1.
 
 **Composition**
 The primary openEHR clinical document unit — a versioned, signed record of one or more clinical observations / evaluations / instructions / actions, anchored to an EHR and produced under a Template.
