@@ -88,17 +88,32 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		if lc.Issuer == "" {
 			lc.Issuer = claims.Issuer
 		}
-		allClaims := map[string]any{
-			"iss": claims.Issuer,
-			"sub": claims.Subject,
-			"aud": claims.Audience,
-			"exp": claims.ExpiresAt.Unix(),
-			"iat": claims.IssuedAt.Unix(),
-		}
-		for k, v := range claims.Extra {
-			allClaims[k] = v
-		}
-		lc.Principal = principalFromClaims(allClaims, cfg.PrincipalClaims)
+		lc.Principal = principalFromClaims(idTokenClaimMap(claims), cfg.PrincipalClaims)
+	}
+	if lc.Principal == nil && len(tr.Raw) > 0 {
+		lc.Principal = principalFromClaims(tr.Raw, cfg.PrincipalClaims)
 	}
 	return lc, nil
+}
+
+func idTokenClaimMap(claims *IDTokenClaims) map[string]any {
+	all := map[string]any{
+		"iss": claims.Issuer,
+		"sub": claims.Subject,
+		"aud": claims.Audience,
+		"exp": claims.ExpiresAt.Unix(),
+	}
+	if !claims.IssuedAt.IsZero() {
+		all["iat"] = claims.IssuedAt.Unix()
+	}
+	if claims.FHIRUser != "" {
+		all["fhirUser"] = claims.FHIRUser
+	}
+	if claims.Nonce != "" {
+		all["nonce"] = claims.Nonce
+	}
+	for k, v := range claims.Extra {
+		all[k] = v
+	}
+	return all
 }

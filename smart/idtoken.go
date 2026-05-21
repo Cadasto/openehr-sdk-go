@@ -16,6 +16,9 @@ import (
 	authsmart "github.com/cadasto/openehr-sdk-go/auth/smart"
 )
 
+// clockSkew tolerates minor clock drift for exp/nbf/iat checks (OIDC).
+const clockSkew = 30 * time.Second
+
 // IDTokenClaims holds parsed OpenID ID-token claims (REQ-064).
 type IDTokenClaims struct {
 	Subject   string
@@ -138,8 +141,18 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	if err != nil {
 		return nil, err
 	}
-	if !exp.After(now.Add(-30 * time.Second)) {
+	if !exp.After(now.Add(-clockSkew)) {
 		return nil, fmt.Errorf("%w: token expired", auth.ErrJWKSValidationFailed)
+	}
+	if nbf, ok, err := optionalClaimNumericTime(claims, "nbf"); err != nil {
+		return nil, err
+	} else if ok && nbf.After(now.Add(clockSkew)) {
+		return nil, fmt.Errorf("%w: nbf in future", auth.ErrJWKSValidationFailed)
+	}
+	if iat, ok, err := optionalClaimNumericTime(claims, "iat"); err != nil {
+		return nil, err
+	} else if ok && iat.After(now.Add(clockSkew)) {
+		return nil, fmt.Errorf("%w: iat in future", auth.ErrJWKSValidationFailed)
 	}
 	if nonce != "" {
 		n, _ := claimString(claims, "nonce")
@@ -147,7 +160,7 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 			return nil, fmt.Errorf("%w: nonce mismatch", auth.ErrJWKSValidationFailed)
 		}
 	}
-	iat, _ := claimNumericTime(claims, "iat")
+	iat, _, _ := optionalClaimNumericTime(claims, "iat")
 	sub, _ := claimString(claims, "sub")
 	fhirUser, _ := claimString(claims, "fhirUser")
 	extra := make(map[string]any, len(claims))
@@ -201,20 +214,31 @@ func audContains(aud []string, want string) bool {
 }
 
 func claimNumericTime(claims map[string]any, key string) (time.Time, error) {
-	v, ok := claims[key]
+	t, ok, err := optionalClaimNumericTime(claims, key)
+	if err != nil {
+		return time.Time{}, err
+	}
 	if !ok {
 		return time.Time{}, fmt.Errorf("%w: missing %s", auth.ErrJWKSValidationFailed, key)
 	}
+	return t, nil
+}
+
+func optionalClaimNumericTime(claims map[string]any, key string) (time.Time, bool, error) {
+	v, ok := claims[key]
+	if !ok {
+		return time.Time{}, false, nil
+	}
 	switch n := v.(type) {
 	case float64:
-		return time.Unix(int64(n), 0), nil
+		return time.Unix(int64(n), 0), true, nil
 	case json.Number:
 		i, err := n.Int64()
 		if err != nil {
-			return time.Time{}, fmt.Errorf("%w: invalid %s", auth.ErrJWKSValidationFailed, key)
+			return time.Time{}, false, fmt.Errorf("%w: invalid %s", auth.ErrJWKSValidationFailed, key)
 		}
-		return time.Unix(i, 0), nil
+		return time.Unix(i, 0), true, nil
 	default:
-		return time.Time{}, fmt.Errorf("%w: invalid %s type", auth.ErrJWKSValidationFailed, key)
+		return time.Time{}, false, fmt.Errorf("%w: invalid %s type", auth.ErrJWKSValidationFailed, key)
 	}
 }

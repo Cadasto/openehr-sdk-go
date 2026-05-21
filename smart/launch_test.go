@@ -143,6 +143,123 @@ func TestLaunchContextRequiresTrustAnchorsForIDToken(t *testing.T) {
 	}
 }
 
+func TestValidateIDTokenRejectsFutureNBF(t *testing.T) {
+	priv, jwksBody := testRSAKey(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(jwksBody)
+	}))
+	defer srv.Close()
+	jwks, err := authsmart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_700_000_000, 0)
+	claims := map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "u",
+		"aud": "c",
+		"exp": now.Add(time.Hour).Unix(),
+		"iat": now.Unix(),
+		"nbf": now.Add(2 * time.Hour).Unix(),
+	}
+	idTok := signJWT(t, priv, "test-kid", claims)
+	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now)
+	if err == nil || !isJWKSFail(err) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestPrincipalFromTokenResponseBody(t *testing.T) {
+	tr := authsmart.TokenResponse{
+		Patient: "p1",
+		Raw: map[string]any{
+			"principal_uid":  "body-uid",
+			"principal_type": "PERSON",
+		},
+	}
+	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.Principal == nil || lc.Principal.UID != "body-uid" {
+		t.Fatalf("principal = %#v", lc.Principal)
+	}
+}
+
+func TestPrincipalFromCustomClaimNames(t *testing.T) {
+	priv, jwksBody := testRSAKey(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(jwksBody)
+	}))
+	defer srv.Close()
+	jwks, err := authsmart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_700_000_000, 0)
+	idTok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss":         "https://issuer.example",
+		"sub":         "u",
+		"aud":         "client-id",
+		"exp":         now.Add(time.Hour).Unix(),
+		"iat":         now.Unix(),
+		"custom_uid":  "uid-99",
+		"custom_type": "AGENT",
+	})
+	tr := authsmart.TokenResponse{IDToken: idTok}
+	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr,
+		smart.WithJWKS(jwks),
+		smart.WithIssuer("https://issuer.example"),
+		smart.WithClientID("client-id"),
+		smart.WithValidationTime(now),
+		smart.WithPrincipalClaimNames(smart.PrincipalClaimNames{
+			UIDClaim:  "custom_uid",
+			TypeClaim: "custom_type",
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.Principal == nil || lc.Principal.UID != "uid-99" || lc.Principal.Type != smart.PrincipalTypeAgent {
+		t.Fatalf("principal = %#v", lc.Principal)
+	}
+}
+
+func TestPrincipalFromFHIRUserClaimName(t *testing.T) {
+	priv, jwksBody := testRSAKey(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(jwksBody)
+	}))
+	defer srv.Close()
+	jwks, err := authsmart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Unix(1_700_000_000, 0)
+	idTok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss":      "https://issuer.example",
+		"sub":      "u",
+		"aud":      "client-id",
+		"exp":      now.Add(time.Hour).Unix(),
+		"iat":      now.Unix(),
+		"fhirUser": "Practitioner/custom",
+	})
+	tr := authsmart.TokenResponse{IDToken: idTok}
+	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr,
+		smart.WithJWKS(jwks),
+		smart.WithIssuer("https://issuer.example"),
+		smart.WithClientID("client-id"),
+		smart.WithValidationTime(now),
+		smart.WithPrincipalClaimNames(smart.PrincipalClaimNames{UIDClaim: "fhirUser"}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.Principal == nil || lc.Principal.UID != "Practitioner/custom" {
+		t.Fatalf("principal = %#v", lc.Principal)
+	}
+}
+
 func TestPrincipalAbsentWhenNoClaims(t *testing.T) {
 	tr := authsmart.TokenResponse{Patient: "p"}
 	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
