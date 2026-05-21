@@ -82,7 +82,7 @@
 | Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match |
 | Directory | **Landed** | `openehr/client/ehr/directory/` | |
 | Contribution | **Landed** | `openehr/client/ehr/contribution/` | |
-| ItemTags | **Planned** | `openehr/client/ehr/itemtags/` | REQ-059; not created yet |
+| ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |
 | Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
 | Definition — stored AQL | **Landed** | `openehr/client/definition/` | Put/get/list/delete; REQ-057 |

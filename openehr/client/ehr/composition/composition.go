@@ -45,9 +45,11 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 
 // writeConfig is the resolved option set for Save / Update.
 type writeConfig struct {
-	prefer       transport.Prefer
-	auditDetails *rm.AuditDetails
-	templateID   string
+	prefer          transport.Prefer
+	auditDetails    *rm.AuditDetails
+	templateID      string
+	objectItemTags  string
+	versionItemTags string
 }
 
 // WriteOption mutates the request shape for [Save] and [Update].
@@ -70,6 +72,18 @@ func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 // template. Empty omits the header.
 func WithTemplateID(id string) WriteOption {
 	return func(c *writeConfig) { c.templateID = id }
+}
+
+// WithObjectItemTags sets the openehr-item-tag header (REQ-059). The
+// value MUST already be formatted (see itemtags.FormatHeader).
+func WithObjectItemTags(header string) WriteOption {
+	return func(c *writeConfig) { c.objectItemTags = header }
+}
+
+// WithVersionItemTags sets the openehr-version-item-tag header
+// (REQ-059). The value MUST already be formatted.
+func WithVersionItemTags(header string) WriteOption {
+	return func(c *writeConfig) { c.versionItemTags = header }
 }
 
 // deleteConfig is the resolved option set for [Delete]. Delete does
@@ -130,6 +144,8 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
 		TemplateID:         cfg.templateID,
+		ItemTag:            cfg.objectItemTags,
+		VersionItemTag:     cfg.versionItemTags,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }
@@ -176,6 +192,8 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
 		TemplateID:         cfg.templateID,
+		ItemTag:            cfg.objectItemTags,
+		VersionItemTag:     cfg.versionItemTags,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }

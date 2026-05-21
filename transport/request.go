@@ -70,6 +70,9 @@ type Request struct {
 	URI string
 	// ItemTag sets the openehr-item-tag header (REQ-059). Empty omits.
 	ItemTag string
+	// VersionItemTag sets the openehr-version-item-tag header (REQ-059).
+	// Empty omits.
+	VersionItemTag string
 	// NoAuth suppresses the Authorization header for this request
 	// even when a TokenSource is configured. Used for endpoints that
 	// reject bearer tokens (typically capabilities probes).

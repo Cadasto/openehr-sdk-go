@@ -279,6 +279,9 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 	if req.ItemTag != "" {
 		httpReq.Header.Set("openehr-item-tag", req.ItemTag)
 	}
+	if req.VersionItemTag != "" {
+		httpReq.Header.Set("openehr-version-item-tag", req.VersionItemTag)
+	}
 
 	// Caller attribution: per-request override wins over client default.
 	attr := c.cfg.callerAttribution

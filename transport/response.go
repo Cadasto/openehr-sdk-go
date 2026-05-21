@@ -41,6 +41,9 @@ type Metadata struct {
 	URI string
 	// ItemTag captures the response openehr-item-tag header (REQ-059).
 	ItemTag string
+	// VersionItemTag captures the response openehr-version-item-tag
+	// header (REQ-059).
+	VersionItemTag string
 	// TemplateID captures the response openehr-template-id header
 	// (REQ-059), surfaced when a composition response advertises it.
 	TemplateID string
@@ -60,6 +63,7 @@ func parseMetadata(h http.Header) *Metadata {
 		AuditDetails:       h.Get("openehr-audit-details"),
 		URI:                h.Get("openehr-uri"),
 		ItemTag:            h.Get("openehr-item-tag"),
+		VersionItemTag:     h.Get("openehr-version-item-tag"),
 		TemplateID:         h.Get("openehr-template-id"),
 		CadastoSpecVersion: h.Get("Cadasto-OpenEhr-Spec-Version"),
 	}
