@@ -71,6 +71,9 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		lc.Scopes = strings.Fields(tr.Scope)
 	}
 	if tr.IDToken != "" {
+		if err := requireIDTokenTrustAnchors(cfg.JWKS, cfg.Issuer, cfg.ClientID); err != nil {
+			return nil, fmt.Errorf("smart: id_token: %w", err)
+		}
 		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now)
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)

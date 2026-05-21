@@ -34,8 +34,8 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 	if raw == "" {
 		return nil, fmt.Errorf("%w: empty id_token", auth.ErrJWKSValidationFailed)
 	}
-	if jwks == nil {
-		return nil, fmt.Errorf("%w: JWKS is required to validate id_token", auth.ErrInvalidConfig)
+	if err := requireIDTokenTrustAnchors(jwks, issuer, clientID); err != nil {
+		return nil, err
 	}
 	headerB64, payloadB64, sigB64, err := splitJWT(raw)
 	if err != nil {
@@ -127,11 +127,11 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 		now = time.Now()
 	}
 	iss, _ := claimString(claims, "iss")
-	if issuer != "" && iss != issuer {
+	if iss != issuer {
 		return nil, fmt.Errorf("%w: iss mismatch", auth.ErrJWKSValidationFailed)
 	}
 	aud := audienceStrings(claims["aud"])
-	if clientID != "" && !audContains(aud, clientID) {
+	if !audContains(aud, clientID) {
 		return nil, fmt.Errorf("%w: aud mismatch", auth.ErrJWKSValidationFailed)
 	}
 	exp, err := claimNumericTime(claims, "exp")

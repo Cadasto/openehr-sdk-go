@@ -119,6 +119,30 @@ func TestValidateIDTokenRejectsExpired(t *testing.T) {
 	}
 }
 
+func TestLaunchContextRequiresTrustAnchorsForIDToken(t *testing.T) {
+	priv, jwksBody := testRSAKey(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(jwksBody)
+	}))
+	defer srv.Close()
+	jwks, err := authsmart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idTok := signJWT(t, priv, "test-kid", map[string]any{
+		"iss": "https://issuer.example",
+		"sub": "u",
+		"aud": "client-id",
+		"exp": time.Now().Add(time.Hour).Unix(),
+	})
+	tr := authsmart.TokenResponse{IDToken: idTok}
+
+	_, err = smart.LaunchContextFromTokenResponse(context.Background(), tr, smart.WithJWKS(jwks))
+	if err == nil || !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Fatalf("missing issuer/client_id: err = %v", err)
+	}
+}
+
 func TestPrincipalAbsentWhenNoClaims(t *testing.T) {
 	tr := authsmart.TokenResponse{Patient: "p"}
 	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
