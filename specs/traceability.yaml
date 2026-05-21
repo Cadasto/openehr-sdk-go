@@ -63,6 +63,27 @@ requirements:
       - openehr/serialize/canjson/encode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
 
+  - id: REQ-056
+    title: Canonical XML
+    canonical: specs/wire.md#req-056
+    status: draft
+    implementation: landed
+    packages: [openehr/serialize/canxml]
+    plans: [docs/plans/2026-05-15-canonical-xml-serialization.md]
+    probes: [PROBE-033, PROBE-034]
+    adrs: [docs/adr/0004-numeric-wire-tolerance.md]
+    tests:
+      - openehr/serialize/canxml/roundtrip_test.go
+      - testkit/probes/serialize/probe_033_canxml_round_trip.go
+      - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
+
+  - id: REQ-051
+    title: Cadasto spec-version header
+    canonical: specs/wire.md#req-051
+    status: draft
+    implementation: landed
+    packages: [transport]
+
   - id: REQ-021
     title: Injected http.Client
     canonical: specs/idiom.md#http-client-injection-req-021
@@ -89,7 +110,7 @@ requirements:
     canonical: specs/auth.md#req-068
     status: draft
     implementation: partial
-    packages: [auth/clientcreds, auth/jwtbearer]
+    packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST
@@ -127,7 +148,7 @@ requirements:
     canonical: specs/wire.md#req-050
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/system]
+    packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin]
     plans: [docs/plans/2026-05-15-rest-api-client.md]
 
   - id: REQ-054
@@ -137,9 +158,10 @@ requirements:
     implementation: landed
     packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
     plans: [docs/plans/2026-05-15-rest-api-client.md]
-    probes: [PROBE-010, PROBE-011, PROBE-012]
+    probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
     tests:
       - testkit/probes/versioned/probe_010_put_without_if_match.go
+      - testkit/probes/versioned/probe_013_cross_ehr_isolation.go
 
   - id: REQ-059
     title: openEHR custom headers
@@ -284,7 +306,7 @@ requirements:
     title: Token refresh
     canonical: specs/auth.md#req-063
     status: draft
-    implementation: landed
+    implementation: partial
     packages: [auth/smart]
     tests:
       - auth/smart/smart_test.go
@@ -307,3 +329,11 @@ requirements:
     packages: [smart]
     tests:
       - smart/launch_test.go
+
+  - id: REQ-082
+    title: Probe runnability
+    canonical: specs/conformance.md#runnability
+    status: draft
+    implementation: partial
+    packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery]
+    probes: [PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067]

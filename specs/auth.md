@@ -151,6 +151,10 @@ Refresh uses the stored `refresh_token` against the deployment's `token_endpoint
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
 
+Out of scope (v1 implementation status):
+
+- **Transport-layer 401 → refresh:** `transport/` maps `401 Unauthorized` to `ErrUnauthorized` and does **not** invoke `auth/smart` refresh automatically. Proactive refresh on `TokenSource.Token()` before expiry is implemented; wire-triggered re-auth after an expired access token on an in-flight REST call is the consumer's responsibility (call `Token()` again or restart the launch flow). `auth/clientcreds` and `auth/jwtbearer` have no refresh path.
+
 ### REQ-064 — Launch context
 
 The application-level `smart/` package **MUST** expose the SMART launch context as typed values:
