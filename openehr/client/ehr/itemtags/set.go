@@ -25,15 +25,11 @@ func SetComposition(ctx context.Context, c *transport.Client, ehrID openehrclien
 		return nil, fmt.Errorf("itemtags.SetComposition: %w: nil Composition", transport.ErrInvalidConfig)
 	}
 	opts := append([]composition.WriteOption{}, opt.WriteOpts...)
-	if h, err := FormatHeader(opt.Object); err != nil {
-		return nil, err
-	} else if h != "" {
-		opts = append(opts, composition.WithObjectItemTags(h))
+	if len(opt.Object) > 0 {
+		opts = append(opts, composition.WithObjectItemTags(opt.Object))
 	}
-	if h, err := FormatHeader(opt.Version); err != nil {
-		return nil, err
-	} else if h != "" {
-		opts = append(opts, composition.WithVersionItemTags(h))
+	if len(opt.Version) > 0 {
+		opts = append(opts, composition.WithVersionItemTags(opt.Version))
 	}
 	_, meta, err := composition.Update(ctx, c, ehrID, voID, ifMatch, comp, opts...)
 	return meta, err
