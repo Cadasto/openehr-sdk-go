@@ -2,7 +2,7 @@
 
 **Narrative companion to [`specs/`](../specs/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`specs/`](../specs/). When the two disagree, `specs/` wins and this document is the one to update.
 
-> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, canonical XML, `transport/`, auth providers (`clientcreds`, `jwtbearer`, `basic`), `smart/discovery/`, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write, `openehr/client/definition` ADL 1.4) are landed. `auth/smart` PKCE, Query (AQL), composition builder, and Cadasto extras remain stubs or open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
+> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, canonical XML, `transport/` (incl. observer / NoRetry — REQ-096, REQ-098), auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart` — PKCE/JWKS/refresh), `smart/discovery/`, `smart/` LaunchContext + RS256 ID-token validation, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write incl. ItemTags, `openehr/client/definition` ADL 1.4 + stored AQL, `openehr/client/query` AQL execute, `openehr/client/admin`) are landed. Composition builder, OPT parser, App Registration, and Cadasto extras remain open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
 ## Where to find what
 
@@ -142,8 +142,8 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | Transport | [`transport/`](../transport/) | REQ-021, 054, 059, 066, 090–094, 096–098 |
 | Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/), [`auth/basic/`](../auth/basic/) | REQ-060, 066, 068, 069 |
 | Discovery | [`smart/discovery/`](../smart/discovery/) | REQ-070–072, 092 |
-| REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution), [`openehr/client/admin/`](../openehr/client/admin/), [`openehr/client/definition/`](../openehr/client/definition/) | REST plan Phases 2–4; REQ-099 (admin); PROBE-010–013, 067 |
-| Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031, 033–034), `versioned/` (010–013), `discovery/` (040–041), `definition/` (067) |
+| REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution, itemtags), [`openehr/client/query/`](../openehr/client/query/), [`openehr/client/definition/`](../openehr/client/definition/) (templates + stored AQL), [`openehr/client/admin/`](../openehr/client/admin/) | REQ-054, 055, 057, 059, 099; PROBE-010–013, 067, 070 |
+| Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031, 033–034), `versioned/` (010–013), `discovery/` (040–041), `definition/` (067), `admin/` (070) |
 
 ### BMM codegen pipeline
 

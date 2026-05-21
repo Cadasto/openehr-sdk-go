@@ -1,7 +1,7 @@
 # Plan — BMM-driven code generation for openEHR domain types
 
 **Date:** 2026-05-15
-**Status:** Draft
+**Status:** Implemented (Sandbox)
 **Owner:** SDK maintainers
 **Covers:** REQ-041, REQ-042, REQ-043, REQ-044, REQ-045, REQ-046, REQ-047
 **Resolves:** part of STRAND-04 (RM polymorphism + codec performance — the polymorphism side)
@@ -39,11 +39,11 @@ The plan is sequenced so each phase delivers a runnable artefact and the SDK bui
 
 | Phase | Title | Status |
 |---|---|---|
-| 1 | BMM loader (`openehr/bmm/`) | not started |
-| 2 | Code generator skeleton + drift detection | not started |
-| 3 | Function stubs and documentation | not started |
-| 4 | AOM 1.4 generation | not started |
-| 5 | Drift bot + version-bump runbook | not started |
+| 1 | BMM loader (`openehr/bmm/`) | Done |
+| 2 | Code generator skeleton + drift detection | Done |
+| 3 | Function stubs and documentation | Done |
+| 4 | AOM 1.4 generation | Done |
+| 5 | Drift bot + version-bump runbook | Done |
 
 Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM EHR Extract generation. The BMM files for these stay in `resources/bmm/` and the conformance contract continues to apply when those phases are picked up.
 

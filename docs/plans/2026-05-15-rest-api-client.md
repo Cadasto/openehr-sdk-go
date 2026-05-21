@@ -1,7 +1,7 @@
 # Plan — openEHR REST API client (1.1.0-development)
 
 **Date:** 2026-05-15
-**Status:** Draft
+**Status:** Implemented (Partial) — Phases 1–6 + 8 landed; Phase 7 (Demographic) and Phase 9 (CDR benchmark, STRAND-01) open.
 **Owner:** SDK maintainers
 **Covers:** REQ-050, REQ-051, REQ-054, REQ-055, REQ-057, REQ-058, **REQ-059 (openEHR custom headers)**, REQ-013, REQ-014, REQ-020, REQ-021, REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-060..068 (auth integration), REQ-070..072 (discovery integration), REQ-090..092 (observability/retry/TLS), **REQ-093 (error envelope)**, **REQ-094 (`Prefer` negotiation)**, **REQ-095 (OpenAPI authoritative source)**; PROBE-010..013 implement; reserves PROBE-040..049 (REST-binding probes)
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)

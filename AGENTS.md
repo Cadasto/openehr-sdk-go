@@ -12,8 +12,8 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 | License | MIT |
 | Go version | `1.25.x` (N-1 release line) |
 | openEHR REST | `1.1.0-development` |
-| Sister SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
-| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM, canonical JSON/XML codecs, transport (incl. observer / NoRetry — REQ-096, REQ-098), auth (clientcreds/jwtbearer/basic), discovery, System/EHR/Definition-ADL14/Admin-ITS REST clients landed; `auth/smart` PKCE, Query (AQL), Composition builder, OPT parser, Cadasto extras open |
+| Equivalent SDK | Cadasto PHP SDK (semantic parity, identical conformance probe set) |
+| Status | **Early implementation** — see [Status and active scope](#status-and-active-scope); BMM, canonical JSON/XML codecs, transport (incl. observer / NoRetry — REQ-096, REQ-098), auth (clientcreds/jwtbearer/basic/smart-PKCE), discovery, System / EHR (incl. ItemTags) / Definition-ADL14 (incl. stored AQL) / Query (AQL) / Admin-ITS REST clients, `smart/` LaunchContext + ID-token validation landed; Composition builder, OPT parser, App Registration, Cadasto extras open |
 
 ## Source of truth
 
@@ -23,7 +23,7 @@ The normative specification for this SDK lives **in this repo** under [`specs/`]
 
 Related Cadasto proposals (referred to here by role, not by identifier):
 
-- **PHP SDK Specification proposal** — sister SDK; semantic parity contract.
+- **PHP SDK Specification proposal** — equivalent SDK; semantic parity contract.
 - **MPI / identity federation research** — feeds the `cadasto/mpi/` preview shape.
 - **Cadasto authorization-server design** — the SDK consumes its outcome via `auth/`.
 - **Cadasto SMART-on-openEHR decision** — the basis for `auth/smart/` and `smart/`.
@@ -67,7 +67,7 @@ The normative taxonomy and dependency rules live in [`specs/module-layout.md`](s
 ```
 github.com/cadasto/openehr-sdk-go/
 ├── auth/                      # generic TokenSource + OAuth2 primitives
-│   ├── smart/                 # SMART-on-openEHR provider (PKCE, launch) — planned
+│   ├── smart/                 # SMART-on-openEHR provider (PKCE, JWKS, refresh)
 │   ├── clientcreds/           # Client Credentials provider
 │   ├── jwtbearer/             # JWT Bearer provider
 │   └── basic/                 # HTTP Basic on openEHR REST (REQ-069)
@@ -81,12 +81,12 @@ github.com/cadasto/openehr-sdk-go/
 │   ├── composition/           # OPT-driven generic builder
 │   └── client/                # REST clients grouped per openEHR resource
 │       ├── ehr/               # EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags
-│       ├── query/             # AQL executor (stub)
-│       ├── definition/        # ADL 1.4 templates landed; stored AQL (open)
+│       ├── query/             # AQL executor (REQ-055)
+│       ├── definition/        # ADL 1.4 templates; stored AQL CRUD (REQ-057)
 │       ├── demographic/       # stub
 │       ├── admin/             # ITS-REST /admin/* — DeleteEHR, DeleteAllEHRs, PurgeTemplates (REQ-099)
 │       └── system/            # landed
-├── smart/                     # application-level SMART AppContext + App Registration
+├── smart/                     # LaunchContext, RS256 ID-token validation, principal claim extraction (REQ-064, REQ-067); App Registration — planned
 │   └── discovery/             # service catalog resolver
 ├── sandbox/                   # in-memory + recorded-fixture transports
 ├── testkit/                   # test doubles, fluent builders, conformance probes
@@ -151,6 +151,7 @@ Each core package stands on its own — applications must not be forced to const
   - Example good bullet: `REST clients: EHR read/write surface (composition, ehrstatus, directory, contribution).`
   - Example bad bullet: a paragraph listing every `With*` option on `transport.Client`.
   - Put implementation detail in **Conventional Commits** and the PR description instead.
+  - **Pre-1.0 only:** only `### Added` is used; `### Changed` / `### Fixed` / `### Removed` are reserved for post-v1.0 entries. Pre-release renames, fix-ups, and dropped experiments fold into the relevant Added bullet or are dropped entirely.
 
 ## Tooling policy
 
@@ -187,7 +188,7 @@ Each core package stands on its own — applications must not be forced to const
 | Spec traceability check | `make spec-check` |
 | Build examples | `make build` |
 
-GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; PROBE-010–013 (versioned writes), 030/031/033/034 (serialize), 040/041 (discovery), and 067 (template upload) are implemented — see [`specs/conformance.md`](specs/conformance.md).
+GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; PROBE-010–013 (versioned writes), 030/031/033/034 (serialize), 040/041 (discovery), 067 (template upload), and 070 (admin) are implemented — see [`specs/conformance.md`](specs/conformance.md).
 
 ## openEHR knowledge
 
@@ -200,11 +201,11 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 | 0 | Repo scaffolding — module layout, AI-assistant docs, Makefile, Dockerfile, `specs/` tree | **complete** |
 | 0.5 | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **landed** — [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md), [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md) |
 | 1a | Transport, auth providers (`clientcreds`, `jwtbearer`, `basic`), discovery, System + EHR REST (read/write), Definition ADL 1.4 templates, canonical XML codec | **landed** — see [REST client plan](docs/plans/2026-05-15-rest-api-client.md) Phases 2–6 |
-| 1b | `auth/smart` PKCE end-to-end, Query (AQL) client, Definition stored AQL, CDR benchmark (STRAND-01) | **partial** — PKCE/query/stored AQL landed; ID-token validation + STRAND-01 benchmark open |
+| 1b | `auth/smart` PKCE end-to-end, Query (AQL) client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **partial** — PKCE / query / stored AQL / ID-token validation landed; STRAND-01 benchmark open |
 | 2 | Composition builder + Templates + AQL builder/executor | not started |
-| 3 | Application-level SMART (`smart/` AppContext) on top of landed discovery | partial — discovery landed; launch flow open (STRAND-05) |
+| 3 | Application-level SMART (`smart/` LaunchContext + App Registration) on top of landed discovery | partial — discovery + LaunchContext + ID-token validation landed; App Registration open (STRAND-05) |
 | 4 | Cadasto extras (Extra, Datamap, MPI preview, Admin, Care) | not started |
-| 5 | Sandbox + full conformance probe ratification | partial — serialize (030/031, 033/034), versioned (010–013), discovery (040/041), and definition (067) probes landed |
+| 5 | Sandbox + full conformance probe ratification | partial — serialize (030/031, 033/034), versioned (010–013), discovery (040/041), definition (067), and admin (070) probes landed |
 
 Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/research-strands.md`](specs/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 
@@ -219,4 +220,4 @@ Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/resea
 ## Cross-references
 
 - Cadasto architecture (private) — source of truth for SDK and platform proposals. Linked by role, not by path.
-- Sibling repos cloned under `/src/cadasto/`: `architecture`, `openehr-cdr`, `openehr-bmm`, `openehr-assistant-mcp`, `openehr-assistant-plugin`.
+- Sibling repos cloned under `/src/cadasto/`: `openehr-cdr`, `openehr-bmm`, `openehr-assistant-mcp`, `openehr-assistant-plugin` (plus an internal Cadasto architecture repo, referenced by role above rather than by path).

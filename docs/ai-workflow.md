@@ -40,7 +40,7 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
 - **Functional options** for configuration. Constructors take options, not config structs.
 - **`internal/` for implementation helpers** with no public-surface rationale — document the rationale in [architecture.md](architecture.md) when adding to `internal/`.
 - **Conventional Commits** for commit messages (see [AGENTS.md § Code style and conventions](../AGENTS.md#code-style-and-conventions)).
-- **CHANGELOG.md** — short, high-level `## [Unreleased]` bullets only. File-level detail belongs in commit messages and PR bodies.
+- **CHANGELOG.md** — short, high-level `## [Unreleased]` bullets only. File-level detail belongs in commit messages and PR bodies. **Pre-1.0:** only `### Added` is used; `### Changed` / `### Fixed` / `### Removed` are reserved for post-v1.0 entries. See [AGENTS.md § Code style and conventions](../AGENTS.md#code-style-and-conventions).
 
 ### Never
 

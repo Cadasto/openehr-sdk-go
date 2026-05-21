@@ -1,7 +1,7 @@
 # Plan — Canonical JSON serialization
 
 **Date:** 2026-05-15
-**Status:** Draft
+**Status:** Implemented (Sandbox)
 **Owner:** SDK maintainers
 **Covers:** REQ-052, REQ-040 (type registry consumption), REQ-013 (building-block), REQ-024 (no reflection on `_type` dispatch); PROBE-030, PROBE-031
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md) Phases 1–5) — generated RM/AOM types, JSON tags, and `openehr/rm/typereg_gen.go` (ADR D3: registrations in package `rm`, not under `typereg/`)

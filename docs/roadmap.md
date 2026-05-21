@@ -22,7 +22,7 @@
 | **0** | Scaffolding — module layout, specs, Makefile, CI | **Complete** |
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
-| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL landed; CDR benchmark deferred) |
+| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
 | **2** | Composition builder, template parser, AQL builders (+ executor landed) | **Not started** — see [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md) |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
@@ -60,7 +60,7 @@
 | JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | |
 | HTTP Basic on openEHR REST | **Landed** | `auth/basic/` REQ-069 | |
 | Caller attribution | **Landed** | `transport/` REQ-066 | |
-| SMART PKCE + launch | **Partial** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache; wire 401 re-auth open |
+| SMART PKCE + launch | **Landed** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache (REQ-063 transport-401 → refresh wiring remains the partial sub-point) |
 | Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims |
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
 | Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
