@@ -45,9 +45,11 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 
 // writeConfig is the resolved option set for Save / Update.
 type writeConfig struct {
-	prefer       transport.Prefer
-	auditDetails *rm.AuditDetails
-	templateID   string
+	prefer          transport.Prefer
+	auditDetails    *rm.AuditDetails
+	templateID      string
+	objectItemTags  []openehrclient.ItemTag
+	versionItemTags []openehrclient.ItemTag
 }
 
 // WriteOption mutates the request shape for [Save] and [Update].
@@ -70,6 +72,17 @@ func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 // template. Empty omits the header.
 func WithTemplateID(id string) WriteOption {
 	return func(c *writeConfig) { c.templateID = id }
+}
+
+// WithObjectItemTags sets the openehr-item-tag header (REQ-059).
+func WithObjectItemTags(tags []openehrclient.ItemTag) WriteOption {
+	return func(c *writeConfig) { c.objectItemTags = tags }
+}
+
+// WithVersionItemTags sets the openehr-version-item-tag header
+// (REQ-059).
+func WithVersionItemTags(tags []openehrclient.ItemTag) WriteOption {
+	return func(c *writeConfig) { c.versionItemTags = tags }
 }
 
 // deleteConfig is the resolved option set for [Delete]. Delete does
@@ -122,6 +135,10 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: %w", err)
 	}
+	objectTags, versionTags, err := marshalItemTagHeaders(cfg.objectItemTags, cfg.versionItemTags)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Save: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition",
@@ -130,6 +147,8 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
 		TemplateID:         cfg.templateID,
+		ItemTag:            objectTags,
+		VersionItemTag:     versionTags,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }
@@ -167,6 +186,10 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w", err)
 	}
+	objectTags, versionTags, err := marshalItemTagHeaders(cfg.objectItemTags, cfg.versionItemTags)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Update: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
 		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(voID)),
@@ -176,6 +199,8 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
 		TemplateID:         cfg.templateID,
+		ItemTag:            objectTags,
+		VersionItemTag:     versionTags,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }
@@ -254,6 +279,22 @@ func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
 		return "", fmt.Errorf("marshal audit details: %w", err)
 	}
 	return string(b), nil
+}
+
+func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, versionHdr string, err error) {
+	if len(object) > 0 {
+		objectHdr, err = openehrclient.FormatItemTagHeader(object)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	if len(version) > 0 {
+		versionHdr, err = openehrclient.FormatItemTagHeader(version)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	return objectHdr, versionHdr, nil
 }
 
 // Repository mirrors the package-level Composition functions.

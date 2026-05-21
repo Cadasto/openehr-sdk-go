@@ -2,6 +2,7 @@ package transport
 
 import (
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -41,6 +42,9 @@ type Metadata struct {
 	URI string
 	// ItemTag captures the response openehr-item-tag header (REQ-059).
 	ItemTag string
+	// VersionItemTag captures the response openehr-version-item-tag
+	// header (REQ-059).
+	VersionItemTag string
 	// TemplateID captures the response openehr-template-id header
 	// (REQ-059), surfaced when a composition response advertises it.
 	TemplateID string
@@ -59,7 +63,8 @@ func parseMetadata(h http.Header) *Metadata {
 		RMVersion:          h.Get("openehr-version"),
 		AuditDetails:       h.Get("openehr-audit-details"),
 		URI:                h.Get("openehr-uri"),
-		ItemTag:            h.Get("openehr-item-tag"),
+		ItemTag:            joinHeaderField(h, "openehr-item-tag"),
+		VersionItemTag:     joinHeaderField(h, "openehr-version-item-tag"),
 		TemplateID:         h.Get("openehr-template-id"),
 		CadastoSpecVersion: h.Get("Cadasto-OpenEhr-Spec-Version"),
 	}
@@ -69,4 +74,16 @@ func parseMetadata(h http.Header) *Metadata {
 		}
 	}
 	return m
+}
+
+// joinHeaderField returns one logical openEHR header value. When a
+// server emits repeated header lines (one tag per line), they are
+// joined with "; " before leaf clients parse the semicolon-separated
+// ITS-REST item-tag shape (REQ-059).
+func joinHeaderField(h http.Header, name string) string {
+	lines := h.Values(name)
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(strings.Join(lines, "; "))
 }
