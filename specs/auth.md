@@ -182,7 +182,7 @@ Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` 
 
 ### REQ-067
 
-When the access token or ID token carries platform-issued principal claims, the SDK **MUST** surface them on `LaunchContext` (or the equivalent for non-SMART providers) verbatim:
+When the token-endpoint response or ID token carries platform-issued principal claims, the SDK **MUST** surface them on `LaunchContext` (or the equivalent for non-SMART providers) verbatim:
 
 ```go
 type LaunchContext struct {
@@ -212,7 +212,7 @@ Rules:
 
 - The SDK **MUST NOT** coerce the principal type — if the claim is missing or carries an unrecognised value, `Type` is `PrincipalTypeUnknown` and consumers handle it.
 - The SDK **MUST NOT** invent a `Principal` value when no claim is present — `LaunchContext.Principal` is `nil` in that case.
-- Claim names (`principal_uid`, `principal_type`) are configurable via `auth.WithPrincipalClaimNames(...)` for deployments that use a different naming convention.
+- Claim names (`principal_uid`, `principal_type`) are configurable via `smart.WithPrincipalClaimNames(...)` when building a `LaunchContext`. Principal claims are read from the validated ID token when present, otherwise from the token-endpoint JSON body (`TokenResponse.Raw`).
 
 ## AI caller attribution
 
