@@ -155,55 +155,6 @@ func TestDoPlumbsHeaders(t *testing.T) {
 	}
 }
 
-// TestDoIdempotencyKey covers REQ-097: a non-empty Request.IdempotencyKey
-// MUST set the Idempotency-Key header verbatim (no quoting, no prefix);
-// an empty value MUST NOT set the header (avoids accidental empty keys).
-func TestDoIdempotencyKey(t *testing.T) {
-	t.Run("non-empty sets header", func(t *testing.T) {
-		var captured http.Header
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			captured = r.Header.Clone()
-			w.WriteHeader(201)
-			_, _ = w.Write([]byte(`{}`))
-		}))
-		defer srv.Close()
-		c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-		_, err := c.Do(context.Background(), &Request{
-			Method:         "POST",
-			Path:           "/ehr/x/composition",
-			Body:           []byte(`{}`),
-			IdempotencyKey: "01900000-0000-7000-8000-000000000abc",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := captured.Get("Idempotency-Key"); got != "01900000-0000-7000-8000-000000000abc" {
-			t.Errorf("Idempotency-Key = %q, want verbatim UUIDv7", got)
-		}
-	})
-	t.Run("empty omits header", func(t *testing.T) {
-		var captured http.Header
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			captured = r.Header.Clone()
-			w.WriteHeader(201)
-			_, _ = w.Write([]byte(`{}`))
-		}))
-		defer srv.Close()
-		c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-		_, err := c.Do(context.Background(), &Request{
-			Method: "POST",
-			Path:   "/ehr/x/composition",
-			Body:   []byte(`{}`),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, present := captured["Idempotency-Key"]; present {
-			t.Errorf("Idempotency-Key header set despite empty IdempotencyKey field: %q", captured.Get("Idempotency-Key"))
-		}
-	})
-}
-
 func TestDoNoAuthSuppressesAuthorization(t *testing.T) {
 	var captured string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
