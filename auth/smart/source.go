@@ -78,6 +78,7 @@ type Source struct {
 	mu       sync.Mutex
 	cur      auth.Token
 	refresh  string
+	lastTR   TokenResponse
 	inflight *tokenExchange
 }
 
@@ -203,8 +204,19 @@ func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, req
 	s.mu.Lock()
 	s.cur = tok
 	s.refresh = refresh
+	s.lastTR = tr
 	s.mu.Unlock()
 	return tok, tr, nil
+}
+
+// LastTokenResponse returns SMART fields from the most recent successful
+// token-endpoint call (authorization_code or refresh_token). After
+// [Source.Token] refreshes, callers that need an updated [LaunchContext]
+// should re-run smart.LaunchContextFromTokenResponse with this value.
+func (s *Source) LastTokenResponse() TokenResponse {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastTR
 }
 
 // SetTokens seeds access and optional refresh tokens (testing / token import).
@@ -250,8 +262,9 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 
 	var tok auth.Token
 	var err error
+	var refreshedTR TokenResponse
 	if refreshTok != "" {
-		tok, refreshTok, err = s.refreshGrant(ctx, refreshTok)
+		tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
 	} else {
 		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: fmt.Errorf("no token or refresh_token")}
 	}
@@ -260,6 +273,9 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if err == nil {
 		s.cur = tok
 		s.refresh = refreshTok
+		if refreshedTR.AccessToken != "" {
+			s.lastTR = refreshedTR
+		}
 	}
 	s.inflight = nil
 	s.mu.Unlock()
@@ -290,14 +306,13 @@ func (s *Source) exchangeCode(ctx context.Context, code, verifier string) (auth.
 	return s.postToken(ctx, form)
 }
 
-func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, string, error) {
+func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, TokenResponse, string, error) {
 	form := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refresh},
 		"client_id":     {s.cfg.ClientID},
 	}
-	tok, _, refreshOut, err := s.postToken(ctx, form)
-	return tok, refreshOut, err
+	return s.postToken(ctx, form)
 }
 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
