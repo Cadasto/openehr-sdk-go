@@ -74,7 +74,7 @@ Several Phase 2 behaviours are described in [`specs/module-layout.md`](../../spe
 
 | Topic | Current anchor | Child plan |
 |---|---|---|
-| OPT/OET parse + paths | scope + module-layout | template |
+| ADL 1.4 OPT parse + paths | scope + module-layout | template (package); `OperationalTemplate` type |
 | Generic composition builder | module-layout + rm-modeling sketch | composition |
 | Validation surfaces | module-layout + validation `doc.go` | validation |
 | AQL dual builders | [`specs/wire.md` § REQ-055](../../specs/wire.md#req-055--wire-boundary) | aql-builders |
@@ -91,7 +91,7 @@ Several Phase 2 behaviours are described in [`specs/module-layout.md`](../../spe
 
 | Child plan | Phase 0 (spec/fixtures) | Phase 1 (MVP) | Phase 2 (hardening) | Status |
 |---|---|---|---|---|
-| Template parser | | | | **Open** |
+| OPT parser (`openehr/template/`) | | | | **Open** |
 | Composition builder | | | | **Open** |
 | Validation | | | | **Open** |
 | AQL builders | | | | **Open** (wire models **Done**) |
@@ -105,6 +105,7 @@ Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md
 - **Terminology validation** — no typed TERM client in v1.
 - **Full OPT constraint engine parity with Archie/Linker** — v1 targets CDR-relevant constraint checks, not every ADL semantic rule.
 - **Codegen of per-template Go structs** — consumer responsibility.
+- **OET (`.oet`) parsing** — authoring templates; v1 assumes callers already have `.opt` ([template plan](2026-05-21-template-parser.md)).
 
 ## Mapping to specs
 

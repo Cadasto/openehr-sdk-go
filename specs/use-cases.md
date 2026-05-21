@@ -72,7 +72,7 @@ REQ-013 mandates that each core package be importable and useful without constru
 | `openehr/serialize/` alone | Canonical-JSON pre-processors for archival (hashing, deduplication); JSON-to-JSON diff utilities for migration scripts. |
 | `openehr/validation/` alone | CI validators that check Composition-vs-OPT conformance on pull-request; webhook handlers that gate uploads; pre-commit hooks in a clinical-modeling repo. |
 | `openehr/aql/` (models only) | AQL linters, formatters, static analysers that don't execute the query — they parse, normalise, and report. |
-| `openehr/template/` alone | OPT/OET parsing for IDE plugins; path-utility tooling for archetype editors; package-deployment helpers in CI pipelines. |
+| `openehr/template/` alone | ADL 1.4 OPT (`.opt`) parsing and path utilities for IDE plugins and CI; OET out of scope for v1. |
 
 These consumers **MUST NOT** be forced to import `transport/`, `auth/`, or `smart/`. Their dependency graph stops at the leaf package they use.
 

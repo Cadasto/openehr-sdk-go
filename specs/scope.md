@@ -14,7 +14,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | BMM loader | Public `openehr/bmm/` (hand-written for v1) — P_BMM JSON parser, includes resolution, queryable in-memory model. Building block (REQ-045). |
 | Code generator | In-tree `internal/bmmgen` + `cmd/bmmgen` emitting RM + AOM 1.4 + type registry — drift-checked in CI |
 | openEHR Archetype Query Language (AQL) | Struct-builder and verb-function builders, request/result models, executor in `openehr/client/query` ([wire.md § AQL](wire.md#aql)) |
-| OPT / OET handling | Parsing, deployment helpers, path utilities; OPT-driven generic Composition builder ([wire.md § OPT/OET](wire.md#optoet-handling)) |
+| Operational template (OPT) handling | ADL 1.4 `.opt` parse and path utilities (`openehr/template/`); OPT-driven generic Composition builder. OET (`.oet`) parsing is out of scope for v1. |
 | Canonical JSON / FLAT / STRUCTURED codecs | All three openEHR serialization shapes, independently usable ([wire.md § Canonical JSON](wire.md#canonical-json), [§ Simplified formats](wire.md#simplified-formats)) |
 | SMART-on-openEHR authentication | PKCE, JWKS rotation, token refresh, launch context ([auth.md](auth.md)) |
 | Auth providers — alternative grants | Client Credentials, JWT Bearer; abstracted under `auth.TokenSource` |

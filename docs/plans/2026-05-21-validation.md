@@ -17,14 +17,14 @@
 2. **Demographic** — structural RM checks on `PARTY` hierarchies (no OPT).
 3. **AQL** — static checks without execution where possible; execution-time errors stay in `openehr/client/query/`.
 
-Clean separation: validators walk **`openehr/rm`** values and **`openehr/template`** trees — never decode JSON/XML.
+Clean separation: validators walk **`openehr/rm`** values and parsed **`template.OperationalTemplate`** trees — never decode JSON/XML.
 
 ## Integration with existing stack
 
 | Piece | Location | Role |
 |---|---|---|
 | RM graph | `openehr/rm/` | Validation input |
-| OPT | `openehr/template/` | Constraint source |
+| OPT (`OperationalTemplate`) | `openehr/template/` | Constraint source |
 | AQL models | `openehr/aql/` | Optional path extraction for lint |
 | Query client | `openehr/client/query/` | Maps backend AQL errors (`ErrPathResolution` already in `aql/errors.go`) |
 | Serialize | `openehr/serialize/` | **Must not import** |
@@ -70,13 +70,13 @@ Document in REQ-102 so consumers know what v1 does **not** guarantee:
 3. **Interfaces:**
    ```go
    type CompositionValidator interface {
-       Validate(comp *rm.Composition, tpl *template.Template) ValidationResult
+       Validate(comp *rm.Composition, opt *template.OperationalTemplate) ValidationResult
    }
    type DemographicValidator interface {
        Validate(party rm.PartyProxy) ValidationResult
    }
    type AQLValidator interface {
-       ValidateQuery(q aql.Query, tpl *template.Template) ValidationResult
+       ValidateQuery(q aql.Query, opt *template.OperationalTemplate) ValidationResult
    }
    ```
 4. **Registry** — REQ-102 planned in traceability.
@@ -104,7 +104,7 @@ Document in REQ-102 so consumers know what v1 does **not** guarantee:
 **Tasks:**
 
 1. **`ValidateDemographic`** — `PARTY`, `PERSON`, `ORGANISATION` required fields per RM (names, identities list non-empty where BMM marks required).
-2. **`ValidateAQL`** — non-empty `q`; brace balance; `FROM` contains archetype id present in template when `tpl != nil`; does **not** replace server-side path resolution (PROBE-021 execute path).
+2. **`ValidateAQL`** — non-empty `q`; brace balance; `FROM` contains archetype id present in OPT when `opt != nil`; does **not** replace server-side path resolution (PROBE-021 execute path).
 3. **PROBE-024** — composition missing required element → stable issue code in result (sandbox).
 4. **REQ-102** → landed when Composition validator + tests + probe stable.
 
@@ -113,9 +113,9 @@ Document in REQ-102 so consumers know what v1 does **not** guarantee:
 ## Public API (target)
 
 ```go
-func ValidateComposition(comp *rm.Composition, tpl *template.Template) ValidationResult
+func ValidateComposition(comp *rm.Composition, opt *template.OperationalTemplate) ValidationResult
 func ValidateDemographic(party rm.PartyProxy) ValidationResult
-func ValidateAQL(q aql.Query, tpl *template.Template) ValidationResult
+func ValidateAQL(q aql.Query, opt *template.OperationalTemplate) ValidationResult
 
 type ValidationResult struct {
     OK     bool

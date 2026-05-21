@@ -11,7 +11,7 @@
 
 ## Goal
 
-Provide **`openehr/composition`**: build a `*rm.Composition` in memory by assigning values at **template paths** against a parsed OPT. The engine is generic — consumers pass `template.Template` + path + typed values; they do **not** import codegen’d vital-signs structs from this repo.
+Provide **`openehr/composition`**: build a `*rm.Composition` in memory by assigning values at **openEHR paths** against a parsed OPT. The engine is generic — consumers pass `*template.OperationalTemplate` + path + typed values; they do **not** import codegen’d vital-signs structs from this repo.
 
 Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the application boundary.
 
@@ -19,7 +19,7 @@ Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the app
 
 | Piece | Location | Role |
 |---|---|---|
-| Parsed OPT | `openehr/template/` | Path resolution + RM type hints |
+| Parsed OPT | `openehr/template/` (`OperationalTemplate`) | Path resolution + RM type hints |
 | RM + typereg | `openehr/rm/` | Target `Composition` graph |
 | Canonical JSON | `openehr/serialize/canjson/` | **Tests and apps only** — builder does not import `serialize/` |
 | EHR client | `openehr/client/ehr/composition/` | `Create` / `Update` with `composition.WithTemplateID` |
@@ -47,7 +47,7 @@ Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the app
 **Tasks:**
 
 1. **`specs/clinical-modeling.md` § REQ-101** — builder invariants:
-   - Requires `*template.Template` at construction.
+   - Requires `*template.OperationalTemplate` at construction.
    - `Build() (*rm.Composition, error)` returns graph or aggregated path errors.
    - Path must exist on template; wrong RM type → typed error.
    - `language` / `territory` / `category` — document required defaults for v1 (e.g. `ISO_639-1::en`, `ISO_3166-1::NL`, `433` event).
@@ -63,7 +63,7 @@ Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the app
 
 **Tasks:**
 
-1. **`NewBuilder(t *template.Template) *Builder`**
+1. **`NewBuilder(t *template.OperationalTemplate) *Builder`**
 2. **`Set(path string, v any) error`** — dispatch on template node RM type:
    - `DV_TEXT`, `DV_CODED_TEXT`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DATE_TIME` (string ISO per REQ-046).
    - Nested `CLUSTER` / `ITEM_TREE` via path prefixes.
@@ -96,7 +96,7 @@ Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the app
 ## Public API (target)
 
 ```go
-func New(t *template.Template) *Builder
+func New(t *template.OperationalTemplate) *Builder
 
 // Set assigns v at path. v must match the template node's RM type.
 func (b *Builder) Set(path string, v any) error

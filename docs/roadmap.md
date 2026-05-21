@@ -42,7 +42,7 @@
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031 |
 | Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
-| Template parser (OPT/OET) | **Planned** | `openehr/template/` | [plan](plans/2026-05-21-template-parser.md) |
+| OPT parser (ADL 1.4 `.opt`) | **Planned** | `openehr/template/` | [plan](plans/2026-05-21-template-parser.md); OET out of scope |
 | Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | [plan](plans/2026-05-21-validation.md) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
 | Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md) |
