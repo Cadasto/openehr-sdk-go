@@ -4,14 +4,14 @@
 requirements:
   - id: REQ-001
     title: Module path
-    canonical: specs/packaging.md#req-001--module-path
+    canonical: docs/specifications/packaging.md#req-001--module-path
     status: draft
     implementation: landed
     packages: [go.mod]
 
   - id: REQ-041
     title: Pinned BMM sources
-    canonical: specs/bmm-conformance.md#req-041--pinned-bmm-sources
+    canonical: docs/specifications/bmm-conformance.md#req-041--pinned-bmm-sources
     status: draft
     implementation: landed
     packages: [resources/bmm, openehr/bmm]
@@ -19,7 +19,7 @@ requirements:
 
   - id: REQ-042
     title: Generated code drift-detected
-    canonical: specs/bmm-conformance.md#req-042--generated-code-drift-detected
+    canonical: docs/specifications/bmm-conformance.md#req-042--generated-code-drift-detected
     status: draft
     implementation: landed
     packages: [openehr/rm, openehr/aom/aom14, internal/bmmgen, cmd/bmmgen]
@@ -27,14 +27,14 @@ requirements:
 
   - id: REQ-045
     title: BMM loader building block
-    canonical: specs/bmm-conformance.md#req-045--bmm-loader-is-a-building-block
+    canonical: docs/specifications/bmm-conformance.md#req-045--bmm-loader-is-a-building-block
     status: draft
     implementation: landed
     packages: [openehr/bmm]
 
   - id: REQ-046
     title: Primitive type mapping
-    canonical: specs/bmm-conformance.md#primitive-type-mapping
+    canonical: docs/specifications/bmm-conformance.md#primitive-type-mapping
     status: draft
     implementation: landed
     packages: [openehr/rm]
@@ -44,7 +44,7 @@ requirements:
 
   - id: REQ-040
     title: Type registry
-    canonical: specs/rm-modeling.md#type-registry-req-040
+    canonical: docs/specifications/rm-modeling.md#type-registry-req-040
     status: draft
     implementation: landed
     packages: [openehr/rm/typereg]
@@ -52,7 +52,7 @@ requirements:
 
   - id: REQ-052
     title: Canonical JSON
-    canonical: specs/wire.md#req-052
+    canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson]
@@ -65,7 +65,7 @@ requirements:
 
   - id: REQ-056
     title: Canonical XML
-    canonical: specs/wire.md#req-056
+    canonical: docs/specifications/wire.md#req-056
     status: draft
     implementation: landed
     packages: [openehr/serialize/canxml]
@@ -79,42 +79,42 @@ requirements:
 
   - id: REQ-051
     title: Cadasto spec-version header
-    canonical: specs/wire.md#req-051
+    canonical: docs/specifications/wire.md#req-051
     status: draft
     implementation: landed
     packages: [transport]
 
   - id: REQ-021
     title: Injected http.Client
-    canonical: specs/idiom.md#http-client-injection-req-021
+    canonical: docs/specifications/idiom.md#http-client-injection-req-021
     status: draft
     implementation: landed
     packages: [transport]
 
   - id: REQ-060
     title: TokenSource interface
-    canonical: specs/auth.md#req-060
+    canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
     packages: [auth]
 
   - id: REQ-066
     title: Caller attribution
-    canonical: specs/auth.md#req-066
+    canonical: docs/specifications/auth.md#req-066
     status: draft
     implementation: landed
     packages: [transport, auth]
 
   - id: REQ-068
     title: SMART flows and launch modes
-    canonical: specs/auth.md#req-068
+    canonical: docs/specifications/auth.md#req-068
     status: draft
     implementation: partial
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST
-    canonical: specs/auth.md#req-069
+    canonical: docs/specifications/auth.md#req-069
     status: draft
     implementation: landed
     packages: [auth/basic]
@@ -124,28 +124,28 @@ requirements:
 
   - id: REQ-070
     title: First-class discovery
-    canonical: specs/service-discovery.md#req-070
+    canonical: docs/specifications/service-discovery.md#req-070
     status: draft
     implementation: landed
     packages: [smart/discovery]
 
   - id: REQ-071
     title: Discovery cache
-    canonical: specs/service-discovery.md#req-071
+    canonical: docs/specifications/service-discovery.md#req-071
     status: draft
     implementation: landed
     packages: [smart/discovery]
 
   - id: REQ-072
     title: Discovery validation
-    canonical: specs/service-discovery.md#req-072
+    canonical: docs/specifications/service-discovery.md#req-072
     status: draft
     implementation: landed
     packages: [smart/discovery]
 
   - id: REQ-050
     title: REST 1.1.0-development pin
-    canonical: specs/wire.md#req-050
+    canonical: docs/specifications/wire.md#req-050
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin]
@@ -153,7 +153,7 @@ requirements:
 
   - id: REQ-054
     title: Optimistic concurrency
-    canonical: specs/wire.md#req-054
+    canonical: docs/specifications/wire.md#req-054
     status: draft
     implementation: landed
     packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
@@ -165,7 +165,7 @@ requirements:
 
   - id: REQ-059
     title: openEHR custom headers
-    canonical: specs/wire.md#req-059
+    canonical: docs/specifications/wire.md#req-059
     status: draft
     implementation: partial
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
@@ -176,7 +176,7 @@ requirements:
 
   - id: REQ-090
     title: OpenTelemetry hooks
-    canonical: specs/transport.md#req-090--opentelemetry-hooks
+    canonical: docs/specifications/transport.md#req-090--opentelemetry-hooks
     status: draft
     implementation: landed
     packages: [transport]
@@ -186,42 +186,42 @@ requirements:
 
   - id: REQ-091
     title: Retry policy
-    canonical: specs/transport.md#req-091--retry-policy
+    canonical: docs/specifications/transport.md#req-091--retry-policy
     status: draft
     implementation: landed
     packages: [transport]
 
   - id: REQ-092
     title: TLS posture
-    canonical: specs/transport.md#req-092--tls-posture
+    canonical: docs/specifications/transport.md#req-092--tls-posture
     status: draft
     implementation: landed
     packages: [transport, smart/discovery]
 
   - id: REQ-093
     title: Error envelope mapping
-    canonical: specs/transport.md#req-093--openehr-error-envelope-mapping
+    canonical: docs/specifications/transport.md#req-093--openehr-error-envelope-mapping
     status: draft
     implementation: landed
     packages: [transport]
 
   - id: REQ-094
     title: Prefer negotiation
-    canonical: specs/transport.md#req-094--prefer-response-shape-negotiation
+    canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
     implementation: landed
     packages: [transport, openehr/client/ehr]
 
   - id: REQ-095
     title: OpenAPI authoritative source
-    canonical: specs/wire.md#req-095
+    canonical: docs/specifications/wire.md#req-095
     status: draft
     implementation: partial
     packages: [testkit/cassettes/its_rest]
 
   - id: REQ-096
     title: Unambiguous "disable retry"
-    canonical: specs/transport.md#req-096--unambiguous-disable-retry
+    canonical: docs/specifications/transport.md#req-096--unambiguous-disable-retry
     status: draft
     implementation: landed
     packages: [transport]
@@ -230,13 +230,13 @@ requirements:
 
   - id: REQ-097
     title: First-class Idempotency-Key (deprecated)
-    canonical: specs/transport.md#req-097--first-class-idempotency-key-deprecated
+    canonical: docs/specifications/transport.md#req-097--first-class-idempotency-key-deprecated
     status: deprecated
     implementation: deprecated
 
   - id: REQ-098
     title: Request-level observer hook
-    canonical: specs/transport.md#req-098--request-level-observer-hook
+    canonical: docs/specifications/transport.md#req-098--request-level-observer-hook
     status: draft
     implementation: landed
     packages: [transport]
@@ -245,7 +245,7 @@ requirements:
 
   - id: REQ-099
     title: ITS-REST Admin client surface
-    canonical: specs/module-layout.md#req-099--its-rest-admin-client-surface
+    canonical: docs/specifications/module-layout.md#req-099--its-rest-admin-client-surface
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
@@ -254,13 +254,13 @@ requirements:
 
   - id: REQ-053
     title: FLAT and STRUCTURED
-    canonical: specs/wire.md#req-053
+    canonical: docs/specifications/wire.md#req-053
     status: draft
     implementation: planned
 
   - id: REQ-055
     title: AQL wire boundary
-    canonical: specs/wire.md#req-055
+    canonical: docs/specifications/wire.md#req-055
     status: draft
     implementation: landed
     packages: [openehr/aql, openehr/client/query]
@@ -271,7 +271,7 @@ requirements:
 
   - id: REQ-057
     title: Stored AQL queries
-    canonical: specs/wire.md#req-057
+    canonical: docs/specifications/wire.md#req-057
     status: draft
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
@@ -282,7 +282,7 @@ requirements:
 
   - id: REQ-061
     title: SMART-on-openEHR PKCE
-    canonical: specs/auth.md#req-061
+    canonical: docs/specifications/auth.md#req-061
     status: draft
     implementation: landed
     packages: [auth/smart]
@@ -292,7 +292,7 @@ requirements:
 
   - id: REQ-062
     title: JWKS rotation
-    canonical: specs/auth.md#req-062
+    canonical: docs/specifications/auth.md#req-062
     status: draft
     implementation: landed
     packages: [auth/smart]
@@ -301,7 +301,7 @@ requirements:
 
   - id: REQ-063
     title: Token refresh
-    canonical: specs/auth.md#req-063
+    canonical: docs/specifications/auth.md#req-063
     status: draft
     implementation: partial
     packages: [auth/smart]
@@ -310,7 +310,7 @@ requirements:
 
   - id: REQ-064
     title: Launch context
-    canonical: specs/auth.md#req-064
+    canonical: docs/specifications/auth.md#req-064
     status: draft
     implementation: landed
     packages: [smart, auth/smart]
@@ -320,7 +320,7 @@ requirements:
 
   - id: REQ-067
     title: Platform principal claims
-    canonical: specs/auth.md#req-067
+    canonical: docs/specifications/auth.md#req-067
     status: draft
     implementation: landed
     packages: [smart]
@@ -329,7 +329,7 @@ requirements:
 
   - id: REQ-082
     title: Probe runnability
-    canonical: specs/conformance.md#runnability
+    canonical: docs/specifications/conformance.md#runnability
     status: draft
     implementation: partial
     packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery]

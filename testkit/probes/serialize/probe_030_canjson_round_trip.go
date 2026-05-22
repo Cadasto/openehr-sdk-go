@@ -1,6 +1,6 @@
 // Package serializeprobes hosts the cross-SDK conformance probes
 // for the openEHR serialization codecs. Each probe corresponds to a
-// PROBE-NNN entry in specs/conformance.md and is implemented in both
+// PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
 // the Go and PHP SDKs against shared cassettes (REQ-080).
 //
 // Probes are plain Go functions returning (Result, error) and are

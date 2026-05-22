@@ -13,7 +13,7 @@
 //
 //	import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 //
-// Implements REQ-052 and REQ-040 per specs/wire.md and specs/rm-modeling.md.
+// Implements REQ-052 and REQ-040 per docs/specifications/wire.md and docs/specifications/rm-modeling.md.
 // Per REQ-013 the codec MUST be usable without the HTTP client, auth,
 // transport, or any other SDK subsystem. The only dependencies are
 // the generated RM types and the type registry under
@@ -22,7 +22,7 @@
 // # Wire profile
 //
 // The codec implements the deterministic profile pinned by REQ-052
-// (see specs/wire.md):
+// (see docs/specifications/wire.md):
 //
 //   - `_type` is the first JSON object key on every encoded concrete
 //     RM value.

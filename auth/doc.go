@@ -9,6 +9,6 @@
 // session-cookie) MAY be added without disturbing the TokenSource contract.
 //
 // Implements REQ-060, REQ-066, REQ-068 (partial: clientcreds, jwtbearer),
-// and REQ-069 (auth/basic) per specs/auth.md. SMART PKCE (REQ-061..064)
+// and REQ-069 (auth/basic) per docs/specifications/auth.md. SMART PKCE (REQ-061..064)
 // lives in auth/smart (planned).
 package auth

@@ -5,13 +5,13 @@
 
 ## Context
 
-The BMM-conformance spec ([`specs/bmm-conformance.md`](../../specs/bmm-conformance.md) § Primitive type mapping) pins:
+The BMM-conformance spec ([`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) § Primitive type mapping) pins:
 
 - `Real` → Go `float64`.
 - `Integer` → Go `int32`.
 - "Mappings are **fixed**; alternative widenings are not permitted."
 
-The canonical-JSON wire profile ([`specs/wire.md`](../../specs/wire.md) REQ-052) requires:
+The canonical-JSON wire profile ([`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-052) requires:
 
 - "`DV_QUANTITY` magnitudes are emitted as JSON numbers, not strings, **unless the spec mandates otherwise** (some implementations have used strings to avoid float-precision loss; the SDK takes a position — see § Floating-point precision below)."
 - "Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate."
@@ -52,12 +52,12 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 - Cross-SDK parity (REQ-081): the PHP SDK MUST adopt the same tolerance to keep cassette round-trip semantics identical. Without this ADR the two SDKs could disagree on whether `"magnitude": "354"` is a decode error.
 - Consumers that need strict-number-only decode can wrap `canjson.Unmarshal` with a pre-pass that rejects quoted numerics, but the SDK itself does not offer a strict-decode mode in v1 — the loss of cassette interoperability outweighs the parity benefit at this stage.
 - The generated `MarshalJSON` for every concrete RM type continues to emit numbers (no behaviour change on the encode side).
-- Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md) § Primitive type mapping.
+- Documentation: REQ-046 stays as written — its "fixed mapping" pertains to underlying type only. The Floating-point precision section of REQ-052 references this ADR for decode tolerance. The note that `primitiveGoType` emits the alias type name (not the raw primitive) is captured in [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) § Primitive type mapping.
 
 ## References
 
-- [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md) — REQ-046 (primitive mapping).
-- [`specs/wire.md`](../../specs/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
+- [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — REQ-046 (primitive mapping).
+- [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go) — the alias types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
 - [`testkit/cassettes/canonical_json/BMI.json`](../../testkit/cassettes/canonical_json/BMI.json) — concrete fixture with quoted-number magnitudes.

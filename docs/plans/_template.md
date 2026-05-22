@@ -33,5 +33,5 @@ One paragraph: what ships and who consumes it.
 
 ## Mapping to specs
 
-- [specs/&lt;canonical&gt;.md § REQ-xxx](../../specs/&lt;file&gt;.md#req-xxx) — normative contract
-- [specs/REQ.md](../../specs/REQ.md) — registry row
+- [docs/specifications/&lt;canonical&gt;.md § REQ-xxx](../../docs/specifications/&lt;file&gt;.md#req-xxx) — normative contract
+- [docs/specifications/REQ.md](../../docs/specifications/REQ.md) — registry row

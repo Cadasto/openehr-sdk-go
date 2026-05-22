@@ -4,7 +4,7 @@ package bmmgen
 // `primitive_types` in openehr_base_1.3.0.bmm.json — or as
 // type-name references inside properties) to the Go type expression
 // the generator should emit for them. Per
-// specs/bmm-conformance.md § Primitive type mapping.
+// docs/specifications/bmm-conformance.md § Primitive type mapping.
 //
 // An entry mapping to "" means "skip this primitive — do NOT emit a
 // Go type for it, and a property typed by this name should be

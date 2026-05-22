@@ -7,7 +7,7 @@ type tokenSourceCtxKey struct{}
 // WithTokenSource returns a derived context carrying ts as a per-request
 // override. transport/ MUST consult TokenSourceFromContext on every
 // outgoing request and prefer the per-request TokenSource over the
-// client-default when present (specs/auth.md § Per-request TokenSource;
+// client-default when present (docs/specifications/auth.md § Per-request TokenSource;
 // PROBE-064).
 //
 // Use case: an MCP server holds one transport.Client and forwards each

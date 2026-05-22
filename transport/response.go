@@ -22,7 +22,7 @@ type Response struct {
 }
 
 // Metadata extracts the headers leaf clients consume most often,
-// parsed into typed values per [specs/wire.md REQ-054, REQ-059].
+// parsed into typed values per [docs/specifications/wire.md REQ-054, REQ-059].
 type Metadata struct {
 	// ETag is the response ETag, with surrounding quotes stripped so
 	// the value round-trips into a future If-Match without double

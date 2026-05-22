@@ -65,6 +65,6 @@
 // openehr/rm/ and openehr/aom/aom14/ lives in internal/bmmgen and
 // cmd/bmmgen and consumes the types declared here.
 //
-// See specs/bmm-conformance.md for the conformance contract and
+// See docs/specifications/bmm-conformance.md for the conformance contract and
 // resources/bmm/README.md for the pinned BMM file inventory.
 package bmm

@@ -8,7 +8,7 @@ import "strings"
 // Empty parts collapse to omitted segments — BuildScope("", "COMPOSITION", "read")
 // returns "COMPOSITION.read". BuildScope is purely lexical and does NOT
 // validate the parts against any scope grammar; the deployment is
-// authoritative on which scopes it accepts (specs/auth.md § Scope handling).
+// authoritative on which scopes it accepts (docs/specifications/auth.md § Scope handling).
 //
 // The helper exists so consumers do not template scope strings by hand
 // in the most common case; consumers MAY pass raw scopes to providers

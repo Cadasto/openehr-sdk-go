@@ -77,7 +77,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
 | `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../resources/README.md) and [`../resources/bmm/README.md`](../resources/bmm/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
-| `specs/` | Normative specifications — this tree. |
+| `docs/specifications/` | Normative specifications — this tree. |
 
 ## Dependency direction
 

@@ -15,7 +15,7 @@ Complete **REQ-055** by implementing both builder styles in `openehr/aql/`:
 - **Struct-builder** — compose typed `Select`, `From`, `Where`, … into an `aql.Query`.
 - **Verb-functions** — `aql.Select(...)`, `aql.From(...)`, chained fluently.
 
-Both **MUST** produce **byte-identical** `Query.Q` strings for the same logical query (PROBE-020). Canonicalisation rules live in [`specs/wire.md` § REQ-055](../../specs/wire.md#req-055--wire-boundary).
+Both **MUST** produce **byte-identical** `Query.Q` strings for the same logical query (PROBE-020). Canonicalisation rules live in [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary).
 
 Execution stays in **`openehr/client/query/`** — this plan does not change the executor.
 
@@ -30,7 +30,7 @@ Execution stays in **`openehr/client/query/`** — this plan does not change the
 
 ## Canonicalisation rules (implement in Phase 0)
 
-Pin in `specs/wire.md` amendment (same PR as builder Phase 1) so goldens are stable:
+Pin in `docs/specifications/wire.md` amendment (same PR as builder Phase 1) so goldens are stable:
 
 1. **Keywords** — uppercase: `SELECT`, `FROM`, `WHERE`, `ORDER BY`, `OFFSET`, `LIMIT`, `CONTAINS`, `AND`, `OR`.
 2. **Whitespace** — single space between tokens; no leading/trailing space on `Query.Q`.
@@ -55,7 +55,7 @@ Breaking change policy: changing canonicalisation requires updating **all** wire
 
 **Tasks:**
 
-1. **Amend [`specs/wire.md`](../../specs/wire.md) REQ-055** — add canonicalisation subsection (six rules above).
+1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-055** — add canonicalisation subsection (six rules above).
 2. **Cassettes** — `testkit/cassettes/aql/` or `openehr/aql/testdata/wire/`:
    - Reference query: "all OBSERVATIONs of archetype X for EHR" (from PROBE-020 preconditions).
    - Expected `Q` string golden file.
@@ -101,7 +101,7 @@ Breaking change policy: changing canonicalisation requires updating **all** wire
 
 - PROBE-020 Implemented (Sandbox).
 - `make ci` green.
-- [`specs/conformance.md`](../../specs/conformance.md) table row AQL probes updated.
+- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) table row AQL probes updated.
 
 ## Public API (target)
 
@@ -135,6 +135,6 @@ q2, err := aql.Select(aql.Field{"o", "data"}).
 
 ## Mapping to specs
 
-- [`specs/wire.md` § REQ-055](../../specs/wire.md#req-055--wire-boundary)
-- [`specs/conformance.md`](../../specs/conformance.md) — PROBE-020, PROBE-021
+- [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary)
+- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-020, PROBE-021
 - [`openehr/aql/query.go`](../../openehr/aql/query.go) — current partial implementation

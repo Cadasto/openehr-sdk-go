@@ -57,7 +57,7 @@ Document in REQ-102 so consumers know what v1 does **not** guarantee:
 
 **Tasks:**
 
-1. **`specs/clinical-modeling.md` § REQ-102** — three validator entry points, error aggregation (`ValidationResult` with `Issues []Issue`), severity (error vs warning in v1 = error only).
+1. **`docs/specifications/clinical-modeling.md` § REQ-102** — three validator entry points, error aggregation (`ValidationResult` with `Issues []Issue`), severity (error vs warning in v1 = error only).
 2. **Sentinels** in `openehr/validation/errors.go`:
    ```go
    var (
@@ -135,7 +135,7 @@ type ValidationResult struct {
 
 ## Mapping to specs
 
-- [`specs/module-layout.md`](../../specs/module-layout.md) — validation must not import serialize
+- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — validation must not import serialize
 - [`openehr/validation/doc.go`](../../openehr/validation/doc.go) — package intent
-- Proposed: [`specs/clinical-modeling.md`](../../specs/clinical-modeling.md) § REQ-102
-- [`specs/conformance.md`](../../specs/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)
+- Proposed: [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-102
+- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)

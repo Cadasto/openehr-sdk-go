@@ -30,5 +30,5 @@ Other abstract generics (including **VERSION**) continue to emit as generic stru
 
 ## References
 
-- [`specs/rm-modeling.md`](../../specs/rm-modeling.md)
+- [`docs/specifications/rm-modeling.md`](../../docs/specifications/rm-modeling.md)
 - [`internal/bmmgen/render.go`](../../internal/bmmgen/render.go) — `codecPolymorphicAbstractGeneric`

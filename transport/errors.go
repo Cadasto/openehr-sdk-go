@@ -8,7 +8,7 @@ import (
 
 // Sentinel transport errors. Detect classes with errors.Is.
 //
-// Wire-status mappings track [specs/wire.md § Error envelope] REQ-093.
+// Wire-status mappings track [docs/specifications/wire.md § Error envelope] REQ-093.
 // Additional sentinels for non-wire failures (discovery, configuration)
 // live in their owning packages.
 var (

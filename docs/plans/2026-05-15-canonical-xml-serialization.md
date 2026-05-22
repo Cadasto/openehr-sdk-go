@@ -70,8 +70,8 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 
 **Tasks:**
 
-1. **Amend [`specs/wire.md`](../../specs/wire.md) REQ-056** — add element/attribute ordering aligned with JSON plan (BMM order, `xsi:type` first). Same CHANGELOG bullet as JSON Phase 0 if not already done.
-2. **Reserve probes in [`specs/conformance.md`](../../specs/conformance.md)** (Draft placeholders):
+1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-056** — add element/attribute ordering aligned with JSON plan (BMM order, `xsi:type` first). Same CHANGELOG bullet as JSON Phase 0 if not already done.
+2. **Reserve probes in [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)** (Draft placeholders):
    - **PROBE-033** — canonical-XML round trip (modulo compact whitespace)
    - **PROBE-034** — unknown `xsi:type` → `typereg.ErrUnknownType`
 3. **Vendor XML fixtures** → `testkit/cassettes/canonical_xml/`:
@@ -194,10 +194,10 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 
 ## Mapping to specs
 
-- [specs/wire.md § Canonical XML](../../specs/wire.md#canonical-xml) — REQ-056 (amend in Phase 0)
-- [specs/rm-modeling.md § Type registry](../../specs/rm-modeling.md#type-registry) — REQ-040; use `Lookup`, not `Decode`
-- [specs/idiom.md § Generics policy](../../specs/idiom.md#generics-policy) — REQ-024
-- [specs/conformance.md PROBE-033, PROBE-034](../../specs/conformance.md) — reserved Phase 0
+- [docs/specifications/wire.md § Canonical XML](../../docs/specifications/wire.md#canonical-xml) — REQ-056 (amend in Phase 0)
+- [docs/specifications/rm-modeling.md § Type registry](../../docs/specifications/rm-modeling.md#type-registry) — REQ-040; use `Lookup`, not `Decode`
+- [docs/specifications/idiom.md § Generics policy](../../docs/specifications/idiom.md#generics-policy) — REQ-024
+- [docs/specifications/conformance.md PROBE-033, PROBE-034](../../docs/specifications/conformance.md) — reserved Phase 0
 - [Canonical JSON plan](2026-05-15-canonical-json-serialization.md) — shared ordering, `poly`, cross-format tests
 - [`.codebase-memory/adr.md`](../../.codebase-memory/adr.md) — typereg layout (D3), flattening (D4)
 

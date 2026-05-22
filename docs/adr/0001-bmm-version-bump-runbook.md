@@ -7,7 +7,7 @@
 
 ## Context
 
-The pinned BMM files under [`resources/bmm/`](../../resources/bmm/) are the SDK's **source of truth** for the openEHR Reference Model, Archetype Object Model, and Base types (see [`resources/bmm/README.md`](../../resources/bmm/README.md) and [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md)). The BMM-driven generator (`cmd/bmmgen`, `internal/bmmgen`) emits `openehr/rm/`, `openehr/aom/aom14/`, and the typereg `_gen.go` files deterministically from those inputs.
+The pinned BMM files under [`resources/bmm/`](../../resources/bmm/) are the SDK's **source of truth** for the openEHR Reference Model, Archetype Object Model, and Base types (see [`resources/bmm/README.md`](../../resources/bmm/README.md) and [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)). The BMM-driven generator (`cmd/bmmgen`, `internal/bmmgen`) emits `openehr/rm/`, `openehr/aom/aom14/`, and the typereg `_gen.go` files deterministically from those inputs.
 
 Bumping any pinned BMM file touches the generated tree at a scale beyond casual hand-review: the RM has ~146 classes; AOM 1.4 has 39. Two failure modes follow:
 
@@ -52,7 +52,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 5. **Audit hand-written companions.** If the diff removes a class or renames a property, every `*_ext.go` companion referencing it WILL fail to compile against the regenerated `_gen.go` file. Run `go build ./...` and fix or remove the affected companions in this PR — do not defer.
 
-6. **Update version pins.** Edit [`specs/bmm-conformance.md § Schema → Go package set`](../../specs/bmm-conformance.md#schema--go-package-set) so the table reflects the new schema id and bmm_version.
+6. **Update version pins.** Edit [`docs/specifications/bmm-conformance.md § Schema → Go package set`](../../docs/specifications/bmm-conformance.md#schema--go-package-set) so the table reflects the new schema id and bmm_version.
 
 7. **Update [`resources/bmm/README.md`](../../resources/bmm/README.md)** — both the `Files` table (schema id, bmm_version, class count) and any prose that pins a specific version. The `## Updating` section there defers to this ADR; do not duplicate the procedure.
 
@@ -95,12 +95,12 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 **Neutral.**
 
-- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`specs/module-layout.md § Versioning`](../../specs/module-layout.md#versioning). The CHANGELOG sub-section choice (Added / Changed / Removed) is the closest the runbook gets to a SemVer signal.
+- The procedure does not prescribe a SemVer impact (major / minor / patch); that lives in [`docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning). The CHANGELOG sub-section choice (Added / Changed / Removed) is the closest the runbook gets to a SemVer signal.
 
 ## See also
 
 - [`docs/plans/2026-05-15-bmm-codegen.md`](../plans/2026-05-15-bmm-codegen.md) — Phase 5 ("Drift bot + version-bump runbook").
 - [`resources/bmm/README.md`](../../resources/bmm/README.md) — pinned BMM file inventory; the `## Updating` section defers to this ADR.
-- [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md) — normative conformance contract; § Schema → Go package set carries the version pins.
+- [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — normative conformance contract; § Schema → Go package set carries the version pins.
 - [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml) — weekly drift bot implementation.
 - [`cmd/bmmdiff`](../../cmd/bmmdiff/) — semantic BMM diff CLI.

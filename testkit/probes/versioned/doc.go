@@ -1,6 +1,6 @@
 // Package versionedprobes hosts the cross-SDK conformance probes for
 // the openEHR REST versioned-write contract (REQ-054). Each probe
-// corresponds to a PROBE-NNN entry in specs/conformance.md and is
+// corresponds to a PROBE-NNN entry in docs/specifications/conformance.md and is
 // implemented identically in the Go and PHP SDKs (REQ-080).
 //
 // Probes are plain functions returning (Result, error) so they can

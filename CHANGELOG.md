@@ -14,7 +14,7 @@ Entries under `## [Unreleased]` are **short and high-level**: one-line bullets n
 
 - Specs SDD structure: requirement registry, topic specs (`packaging`, `transport`), `traceability.yaml`, and `make spec-check`.
 - Repository scaffolding: module layout, Makefile/Docker toolchain, AI docs, and CI.
-- Normative `specs/` tree (REQ / PROBE / STRAND) and implementation plans under `docs/plans/`.
+- Normative `docs/specifications/` tree (REQ / PROBE / STRAND) and implementation plans under `docs/plans/`.
 - Pinned BMM corpus under `resources/bmm/` and version-bump tooling (`bmmgen`, `bmmdiff`, drift workflow).
 - BMM loader (`openehr/bmm/`) and generated RM + AOM 1.4 types with type registry.
 - Canonical JSON codec (`openehr/serialize/canjson/`) and vendored cassettes; serialize conformance probes (PROBE-030/031).

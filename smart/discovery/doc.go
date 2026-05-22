@@ -10,5 +10,5 @@
 // hand-built catalog.
 //
 // Implements REQ-070, REQ-071, REQ-072, and REQ-092 per
-// specs/service-discovery.md and specs/transport.md.
+// docs/specifications/service-discovery.md and docs/specifications/transport.md.
 package discovery

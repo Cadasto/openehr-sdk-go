@@ -46,7 +46,7 @@ Persistence remains **`openehr/client/ehr/composition/`** + `canjson` at the app
 
 **Tasks:**
 
-1. **`specs/clinical-modeling.md` § REQ-101** — builder invariants:
+1. **`docs/specifications/clinical-modeling.md` § REQ-101** — builder invariants:
    - Requires `*template.OperationalTemplate` at construction.
    - `Build() (*rm.Composition, error)` returns graph or aggregated path errors.
    - Path must exist on template; wrong RM type → typed error.
@@ -121,6 +121,6 @@ Typed helpers (`SetQuantity`, `SetText`, …) MAY be added when they remove boil
 
 ## Mapping to specs
 
-- [`specs/module-layout.md`](../../specs/module-layout.md) — composition vs client split
-- [`specs/rm-modeling.md`](../../specs/rm-modeling.md) — concrete types, typereg
-- Proposed: [`specs/clinical-modeling.md`](../../specs/clinical-modeling.md) § REQ-101
+- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — composition vs client split
+- [`docs/specifications/rm-modeling.md`](../../docs/specifications/rm-modeling.md) — concrete types, typereg
+- Proposed: [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-101

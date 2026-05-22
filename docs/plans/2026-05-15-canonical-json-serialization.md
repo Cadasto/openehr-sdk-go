@@ -45,7 +45,7 @@ The wire format used by openEHR REST 1.1.0-development for openEHR data instance
 
 ## Canonical ordering (normative for this SDK)
 
-openEHR has not published a strict canonical-JSON field-order rule. **`specs/wire.md` REQ-052 currently defaults to lexicographic order when no spec rule exists; this plan supersedes that default for implementation** and MUST be followed by a matching `wire.md` edit in Phase 0.
+openEHR has not published a strict canonical-JSON field-order rule. **`docs/specifications/wire.md` REQ-052 currently defaults to lexicographic order when no spec rule exists; this plan supersedes that default for implementation** and MUST be followed by a matching `wire.md` edit in Phase 0.
 
 **SDK rule:**
 
@@ -78,7 +78,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 **Tasks:**
 
-1. **Amend [`specs/wire.md`](../../specs/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
+1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
 2. **Vendor golden fixtures** into this repo (REQ-082 cassette independence):
    - Copy a minimal set from `openehr-cdr` `cmd/benchmark/internal/fixtures/compositions/` → `testkit/cassettes/canonical_json/` (or `openehr/serialize/canjson/testdata/`).
    - Record provenance in `testkit/cassettes/README.md` (source commit, refresh command).
@@ -215,7 +215,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 1. `bench_test.go`: encode/decode ~50 KiB composition; batch 10k decodes.
 2. Compare stdlib vs optional build-tag backends **after** baseline exists — default remains **`encoding/json`** unless evidence says otherwise (document alloc/op costs of per-type `MarshalJSON`).
-3. Close STRAND-04 **polymorphism** sub-strand in [`specs/research-strands.md`](../../specs/research-strands.md); leave codec-perf open if benchmarks are inconclusive.
+3. Close STRAND-04 **polymorphism** sub-strand in [`docs/specifications/research-strands.md`](../../docs/specifications/research-strands.md); leave codec-perf open if benchmarks are inconclusive.
 
 **Definition of done:** `go test -bench=. ./openehr/serialize/canjson/...` runs; short numbers in this plan or an ADR.
 
@@ -235,12 +235,12 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 ## Mapping to specs
 
-- [specs/wire.md § Canonical JSON](../../specs/wire.md#canonical-json) — REQ-052 (amended in Phase 0)
-- [specs/rm-modeling.md § Type registry](../../specs/rm-modeling.md#type-registry) — REQ-040
-- [specs/idiom.md § Generics policy](../../specs/idiom.md#generics-policy) — REQ-024: reflection OK for ordinary field mapping; `_type` dispatch only via typereg
-- [specs/conformance.md PROBE-030, PROBE-031](../../specs/conformance.md)
+- [docs/specifications/wire.md § Canonical JSON](../../docs/specifications/wire.md#canonical-json) — REQ-052 (amended in Phase 0)
+- [docs/specifications/rm-modeling.md § Type registry](../../docs/specifications/rm-modeling.md#type-registry) — REQ-040
+- [docs/specifications/idiom.md § Generics policy](../../docs/specifications/idiom.md#generics-policy) — REQ-024: reflection OK for ordinary field mapping; `_type` dispatch only via typereg
+- [docs/specifications/conformance.md PROBE-030, PROBE-031](../../docs/specifications/conformance.md)
 - [`.codebase-memory/adr.md`](../../.codebase-memory/adr.md) — D3 typereg layout, D4 flattening, D5 `rm.CodePhrase`
-- [specs/research-strands.md STRAND-04](../../specs/research-strands.md)
+- [docs/specifications/research-strands.md STRAND-04](../../docs/specifications/research-strands.md)
 
 ## References
 

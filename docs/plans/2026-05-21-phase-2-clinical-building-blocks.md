@@ -51,11 +51,11 @@ flowchart TD
   AqlBuild --> AqlExec
 ```
 
-**Invariants** ([`specs/module-layout.md`](../../specs/module-layout.md)):
+**Invariants** ([`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md)):
 
 - `openehr/validation/` **MUST NOT** import `openehr/serialize/` — validate in-memory RM, not wire bytes.
 - `openehr/template/` **MUST NOT** import `transport/`, `auth/`, or `openehr/client/*`.
-- Template-specific generated structs (per-OPT Go types) **MUST NOT** live in `openehr/composition/` — consuming projects only ([`specs/scope.md`](../../specs/scope.md)).
+- Template-specific generated structs (per-OPT Go types) **MUST NOT** live in `openehr/composition/` — consuming projects only ([`docs/specifications/scope.md`](../../docs/specifications/scope.md)).
 
 ## Integration with landed stack
 
@@ -70,21 +70,21 @@ flowchart TD
 
 ## Normative gaps to close (before or during Phase 0 of each child)
 
-Several Phase 2 behaviours are described in [`specs/module-layout.md`](../../specs/module-layout.md) and [`specs/scope.md`](../../specs/scope.md) but lack dedicated REQ-NNN rows in [`specs/REQ.md`](../../specs/REQ.md). Each child plan lists proposed REQ IDs / spec locations to add when implementation starts — **do not invent REQ numbers in code without updating the registry**.
+Several Phase 2 behaviours are described in [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) and [`docs/specifications/scope.md`](../../docs/specifications/scope.md) but lack dedicated REQ-NNN rows in [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md). Each child plan lists proposed REQ IDs / spec locations to add when implementation starts — **do not invent REQ numbers in code without updating the registry**.
 
 | Topic | Current anchor | Child plan |
 |---|---|---|
 | ADL 1.4 OPT parse + paths | scope + module-layout | template (package); `OperationalTemplate` type |
 | Generic composition builder | module-layout + rm-modeling sketch | composition |
 | Validation surfaces | module-layout + validation `doc.go` | validation |
-| AQL dual builders | [`specs/wire.md` § REQ-055](../../specs/wire.md#req-055--wire-boundary) | aql-builders |
+| AQL dual builders | [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary) | aql-builders |
 
 ## Cross-cutting delivery rules
 
 1. **Building-block independence (REQ-013).** Each package must be demo-able from `cmd/examples/` or tests without `transport.New`.
 2. **Package-level API (REQ-023).** Prefer functions + options; optional `Repository` only where the REST client already established the pattern.
 3. **No reflection for type dispatch (REQ-024).** Template/composition paths use generics or closed switches over known RM categories — not `reflect` for clinical data.
-4. **Traceability.** Land code → update [`specs/traceability.yaml`](../../specs/traceability.yaml) + [`specs/REQ.md`](../../specs/REQ.md) in the **same PR** as the child plan phase completes.
+4. **Traceability.** Land code → update [`docs/specifications/traceability.yaml`](../../docs/specifications/traceability.yaml) + [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md) in the **same PR** as the child plan phase completes.
 5. **Probes.** Sandbox-first probes under `testkit/probes/{template,composition,validation,aql}/` when wire assertions exist; ratification (REQ-081) stays out of scope until PHP SDK parity.
 
 ## Umbrella progress
@@ -101,7 +101,7 @@ Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md
 ## Out of scope (entire Phase 2 umbrella)
 
 - **REQ-053 FLAT/STRUCTURED** — separate plan after canonical codecs; composition builder may later accept FLAT maps as input once REQ-053 exists.
-- **AOM 2.4 / ADL2** — BMM pinned; no codegen ([`specs/scope.md`](../../specs/scope.md)).
+- **AOM 2.4 / ADL2** — BMM pinned; no codegen ([`docs/specifications/scope.md`](../../docs/specifications/scope.md)).
 - **Terminology validation** — no typed TERM client in v1.
 - **Full OPT constraint engine parity with Archie/Linker** — v1 targets CDR-relevant constraint checks, not every ADL semantic rule.
 - **Codegen of per-template Go structs** — consumer responsibility.
@@ -109,8 +109,8 @@ Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md
 
 ## Mapping to specs
 
-- [`specs/module-layout.md`](../../specs/module-layout.md) — package taxonomy and dependency direction
-- [`specs/scope.md`](../../specs/scope.md) — in/out of v1
-- [`specs/wire.md`](../../specs/wire.md) — REQ-055 (AQL), REQ-053 (deferred)
-- [`specs/conformance.md`](../../specs/conformance.md) — PROBE-020, PROBE-021
-- [`specs/use-cases.md`](../../specs/use-cases.md) — seeder, MCP, building-block cases
+- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — package taxonomy and dependency direction
+- [`docs/specifications/scope.md`](../../docs/specifications/scope.md) — in/out of v1
+- [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-055 (AQL), REQ-053 (deferred)
+- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-020, PROBE-021
+- [`docs/specifications/use-cases.md`](../../docs/specifications/use-cases.md) — seeder, MCP, building-block cases

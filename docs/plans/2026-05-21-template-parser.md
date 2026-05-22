@@ -57,12 +57,12 @@ In openEHR terminology, “template” without qualification often means the aut
 
 **Tasks:**
 
-1. **Add canonical spec** — new [`specs/clinical-modeling.md`](../../specs/clinical-modeling.md) section **REQ-100 — ADL 1.4 operational template (OPT) parse and paths**. Cover:
+1. **Add canonical spec** — new [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) section **REQ-100 — ADL 1.4 operational template (OPT) parse and paths**. Cover:
    - v1 input: OPT XML / `.opt` only; OET explicitly excluded.
    - `OperationalTemplate` identity fields (`TemplateID`, `Concept`, `UID`).
    - Path syntax subset the SDK guarantees (document exclusions: e.g. no predicates beyond `[at0001]` style in v1).
    - Error taxonomy: `ErrInvalidOPT`, `ErrNotOPTFile`, `ErrPathSyntax`, `ErrPathNotFound`.
-2. **Registry** — row in [`specs/REQ.md`](../../specs/REQ.md) + [`specs/traceability.yaml`](../../specs/traceability.yaml) (`implementation: planned`).
+2. **Registry** — row in [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md) + [`docs/specifications/traceability.yaml`](../../docs/specifications/traceability.yaml) (`implementation: planned`).
 3. **Fixtures** — `openehr/template/testdata/*.opt`:
    - At least one small CKM-style OPT (e.g. vitals fragment) + minimal hand-crafted OPT for unit tests.
    - Provenance in `testdata/README.md` (source, license).
@@ -139,7 +139,7 @@ Functional options only if needed (e.g. `WithStrictPaths()`); default strict.
 
 | Step | Status |
 |---|---|
-| REQ-100 in `specs/clinical-modeling.md` + REQ.md + traceability | |
+| REQ-100 in `docs/specifications/clinical-modeling.md` + REQ.md + traceability | |
 | Fixtures + README (`.opt` only) | |
 | `ParseOPT` + tree walk | |
 | Path parse + `NodeAt` | |
@@ -148,8 +148,8 @@ Functional options only if needed (e.g. `WithStrictPaths()`); default strict.
 
 ## Mapping to specs
 
-- [`specs/module-layout.md`](../../specs/module-layout.md) — `openehr/template/` row
-- [`specs/scope.md`](../../specs/scope.md) — OPT parse in v1 scope
-- [`specs/glossary.md`](../../specs/glossary.md) — Operational Template (OPT)
-- [`specs/use-cases.md`](../../specs/use-cases.md) — building-block: `openehr/template/` alone
-- Proposed: [`specs/clinical-modeling.md`](../../specs/clinical-modeling.md) § REQ-100
+- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — `openehr/template/` row
+- [`docs/specifications/scope.md`](../../docs/specifications/scope.md) — OPT parse in v1 scope
+- [`docs/specifications/glossary.md`](../../docs/specifications/glossary.md) — Operational Template (OPT)
+- [`docs/specifications/use-cases.md`](../../docs/specifications/use-cases.md) — building-block: `openehr/template/` alone
+- Proposed: [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-100

@@ -42,7 +42,7 @@
 // from the regenerated output. Internal package — not part of the
 // public SDK API.
 //
-// CLI: cmd/bmmgen. Conformance contract: specs/bmm-conformance.md.
+// CLI: cmd/bmmgen. Conformance contract: docs/specifications/bmm-conformance.md.
 package bmmgen
 
 import (

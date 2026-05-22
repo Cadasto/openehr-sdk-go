@@ -16,8 +16,8 @@
 //
 //	import "github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 //
-// Implements REQ-056 per specs/wire.md and REQ-040 per
-// specs/rm-modeling.md. Per REQ-013 the codec MUST be usable without
+// Implements REQ-056 per docs/specifications/wire.md and REQ-040 per
+// docs/specifications/rm-modeling.md. Per REQ-013 the codec MUST be usable without
 // the HTTP client, auth, transport, or any other SDK subsystem. The
 // only dependencies are the generated RM types and the type registry
 // under [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg].
@@ -25,7 +25,7 @@
 // # Wire profile
 //
 // The codec implements the deterministic profile pinned by REQ-056
-// (see specs/wire.md § Canonical XML):
+// (see docs/specifications/wire.md § Canonical XML):
 //
 //   - Default namespace: `http://schemas.openehr.org/v1`.
 //   - `xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"` is

@@ -1,6 +1,6 @@
 # `resources/bmm/` — pinned openEHR BMM schemas
 
-Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are **derived** from these files (see [`../../specs/bmm-conformance.md`](../../specs/bmm-conformance.md)).
+Machine-readable openEHR meta-model schemas (BMM) in their canonical `P_BMM` JSON form. The SDK's domain types in `openehr/rm/`, `openehr/aom/aom14/`, and related packages are **derived** from these files (see [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)).
 
 These files are **the SDK's source of truth** for the openEHR Reference Model, Archetype Object Model, base types, language types, and terminology service interface. The SDK pins them as in-tree assets so that:
 
@@ -19,7 +19,7 @@ These files are **the SDK's source of truth** for the openEHR Reference Model, A
 | `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | (BMM meta-classes, ODIN, expression model) | — | **deferred** (reference only) | LANG types — meta-model, ODIN, expression model. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
-**Primary** files drive v1 code generation. **Deferred** files stay here (no removal) — they are kept for future generation phases or as cross-references. See [`../../specs/scope.md`](../../specs/scope.md#out-of-scope-v1) and [`../../specs/bmm-conformance.md § v1 scope summary`](../../specs/bmm-conformance.md#v1-scope-summary).
+**Primary** files drive v1 code generation. **Deferred** files stay here (no removal) — they are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
 
 Schema dependencies (transitive `includes`):
 
@@ -43,8 +43,8 @@ A BMM version bump is **never accidental**. The canonical procedure is **[ADR 00
 
 1. Drop the new file alongside the old (e.g. `openehr_rm_1.2.1.bmm.json` next to `openehr_rm_1.2.0.bmm.json`). Do **not** overwrite the old file.
 2. Run `make codegen` then `make codegen-verify`. Optionally inspect the semantic diff with `go run ./cmd/bmmdiff <old> <new>`.
-3. Update version pins in [`../../specs/bmm-conformance.md`](../../specs/bmm-conformance.md) and the schema ID table above.
-4. Add a short CHANGELOG bullet under `## [Unreleased]` (Added / Changed / Removed per [`../../specs/module-layout.md § Versioning`](../../specs/module-layout.md#versioning)).
+3. Update version pins in [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) and the schema ID table above.
+4. Add a short CHANGELOG bullet under `## [Unreleased]` (Added / Changed / Removed per [`../../docs/specifications/module-layout.md § Versioning`](../../docs/specifications/module-layout.md#versioning)).
 5. Remove the old file **in the same commit** once the regen and tests pass.
 
 See ADR 0001 for the full procedure, roles, and tooling notes. The weekly drift bot ([`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml)) catches accidental hand-edits or generator-template changes between bumps.
@@ -65,5 +65,5 @@ Each BMM file SHOULD be accompanied by a checksum in this README's git history (
 
 - BMM (abstract meta-model): openEHR LANG specification — *Basic Meta-Model*.
 - P_BMM persistence: openEHR LANG specification — *BMM Persistence Format*.
-- SDK conformance contract: [`../../specs/bmm-conformance.md`](../../specs/bmm-conformance.md).
+- SDK conformance contract: [`../../docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md).
 - Generator design: [`../../docs/plans/`](../../docs/plans/) — `bmm-codegen` plan.

@@ -1,8 +1,8 @@
 # SDK roadmap — landed vs planned
 
-**Status:** Living checklist (2026-05). Tracks **implementation reality** against the normative contract in [`specs/`](../specs/). When this file and `specs/` disagree, **`specs/` wins** — update this roadmap.
+**Status:** Living checklist (2026-05). Tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
 
-**Also see:** phase table in [AGENTS.md](../AGENTS.md#status-and-active-scope), REQ registry [`specs/REQ.md`](../specs/REQ.md), machine traceability [`specs/traceability.yaml`](../specs/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
+**Also see:** phase table in [AGENTS.md](../AGENTS.md#status-and-active-scope), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
 
 ## Legend
 
@@ -10,7 +10,7 @@
 |--------|---------|
 | **Landed** | Code + tests in tree; usable (may still be v1-preview quality) |
 | **Partial** | Subset implemented or spec-only traceability incomplete |
-| **Planned** | Normative in `specs/`; directory may exist with `doc.go` only |
+| **Planned** | Normative in `docs/specifications/`; directory may exist with `doc.go` only |
 | **Deferred** | Explicitly out of v1 scope in specs or ADRs |
 
 ---
@@ -136,6 +136,6 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 
 ## How to update this file
 
-1. After landing a feature: flip status here and set `Impl. landed` in [`specs/REQ.md`](../specs/REQ.md); add paths to [`specs/traceability.yaml`](../specs/traceability.yaml).
+1. After landing a feature: flip status here and set `Impl. landed` in [`docs/specifications/REQ.md`](../docs/specifications/REQ.md); add paths to [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml).
 2. After closing a plan phase: update the plan’s progress table **and** the milestone row above.
-3. Do **not** duplicate normative REQ prose here — link to `specs/` instead.
+3. Do **not** duplicate normative REQ prose here — link to `docs/specifications/` instead.

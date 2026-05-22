@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Verify specs/traceability.yaml against the working tree.
+# Verify docs/specifications/traceability.yaml against the working tree.
 # Warn-only for planned REQs; fails on landed/partial entries with missing artefacts.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-YAML="${ROOT}/specs/traceability.yaml"
-CONF="${ROOT}/specs/conformance.md"
-REQ_REG="${ROOT}/specs/REQ.md"
+YAML="${ROOT}/docs/specifications/traceability.yaml"
+CONF="${ROOT}/docs/specifications/conformance.md"
+REQ_REG="${ROOT}/docs/specifications/REQ.md"
 
 fail=0
 warn=0

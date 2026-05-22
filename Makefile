@@ -134,7 +134,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 
 ##@ Specs
 
-spec-check: ## Verify specs/traceability.yaml against repo artefacts
+spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
 	@bash scripts/spec-check.sh
 
 ##@ Build

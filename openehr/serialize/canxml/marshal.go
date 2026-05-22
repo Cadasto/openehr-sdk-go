@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Canonical XML namespaces — pinned per specs/wire.md § Canonical XML.
+// Canonical XML namespaces — pinned per docs/specifications/wire.md § Canonical XML.
 const (
 	// NSDefault is the openEHR canonical-XML default namespace.
 	NSDefault = "http://schemas.openehr.org/v1"
@@ -145,7 +145,7 @@ func rootStartElement(v any) xml.StartElement {
 // XML element local name. BMM class names are upper-snake_case
 // (DV_QUANTITY); property names are already lower-snake_case
 // (magnitude_status). Both lower-case verbatim — the snake_case
-// shape is identical to canjson JSON keys per specs/wire.md.
+// shape is identical to canjson JSON keys per docs/specifications/wire.md.
 func ElementName(bmmName string) string {
 	return strings.ToLower(bmmName)
 }

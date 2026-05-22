@@ -7,7 +7,7 @@
 
 ## Context
 
-The BMM-driven generator (`internal/bmmgen`, `cmd/bmmgen`) emits the SDK's openEHR domain types from pinned schemas under `resources/bmm/`. Several layout choices are non-obvious from [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md) alone and would be expensive to reverse after v1. This ADR records them for reviewers and agents.
+The BMM-driven generator (`internal/bmmgen`, `cmd/bmmgen`) emits the SDK's openEHR domain types from pinned schemas under `resources/bmm/`. Several layout choices are non-obvious from [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) alone and would be expensive to reverse after v1. This ADR records them for reviewers and agents.
 
 Operational BMM bumps are covered by [ADR 0001](0001-bmm-version-bump-runbook.md).
 
@@ -46,6 +46,6 @@ Every BMM `function` becomes a Go method whose body is `panic("not implemented: 
 
 ## References
 
-- [`specs/bmm-conformance.md`](../../specs/bmm-conformance.md)
+- [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md)
 - [`docs/architecture.md`](../architecture.md) — narrative companion
 - [`internal/bmmgen/`](../../internal/bmmgen/)

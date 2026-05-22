@@ -7,7 +7,7 @@
 // This package sits next to [openehr/rm], not under
 // [openehr/template]. Per
 // docs/plans/2026-05-15-bmm-codegen.md Phase 4 (referenced from
-// specs/bmm-conformance.md § Schema → Go package set): AOM is the
+// docs/specifications/bmm-conformance.md § Schema → Go package set): AOM is the
 // model of an archetype; templates consume archetypes (an OPT
 // contains flattened archetype definitions). The future
 // openehr/template/ parser will import this package, but does not

@@ -1,6 +1,6 @@
 # Continuous integration
 
-How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is **operational process** — it is not part of the normative `specs/` contract (wire semantics and conformance probes live there).
+How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks locally. CI is **operational process** — it is not part of the normative `docs/specifications/` contract (wire semantics and conformance probes live there).
 
 ## Workflows
 
@@ -46,7 +46,7 @@ Run `make help` for the full grouped list. Common targets:
 | Format | `make fmt-check` | Fail if `gofmt -s` would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
-| Specs | `make spec-check` | `specs/traceability.yaml` paths and probes match the tree |
+| Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
 | Lint | `make lint` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
 
 **Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).
@@ -84,4 +84,4 @@ Also enable **Require branches to be up to date before merging** when PR volume 
 
 - [docs/ai-workflow.md](ai-workflow.md) — agent pre-merge checklist
 - [resources/README.md](../resources/README.md) — BMM pin and update procedure
-- [specs/conformance.md](../specs/conformance.md) — PROBE-NNN definitions (tests run via `make test` today)
+- [docs/specifications/conformance.md](../docs/specifications/conformance.md) — PROBE-NNN definitions (tests run via `make test` today)

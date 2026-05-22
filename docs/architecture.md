@@ -1,6 +1,6 @@
 # Architecture
 
-**Narrative companion to [`specs/`](../specs/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`specs/`](../specs/). When the two disagree, `specs/` wins and this document is the one to update.
+**Narrative companion to [`docs/specifications/`](../docs/specifications/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.
 
 > **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, canonical XML, `transport/` (incl. observer / NoRetry — REQ-096, REQ-098), auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart` — PKCE/JWKS/refresh), `smart/discovery/`, `smart/` LaunchContext + RS256 ID-token validation, and openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write incl. ItemTags, `openehr/client/definition` ADL 1.4 + stored AQL, `openehr/client/query` AQL execute, `openehr/client/admin`) are landed. Composition builder, OPT parser, App Registration, and Cadasto extras remain open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
@@ -8,27 +8,27 @@
 
 | Need | Place |
 |---|---|
-| Requirement registry (REQ-NNN index) | [`../specs/REQ.md`](../specs/REQ.md) |
-| Traceability index (machine-readable) | [`../specs/traceability.yaml`](../specs/traceability.yaml) |
-| Packaging (REQ-001–005) | [`../specs/packaging.md`](../specs/packaging.md) |
-| Glossary | [`../specs/glossary.md`](../specs/glossary.md) |
-| In / out of scope | [`../specs/scope.md`](../specs/scope.md) |
-| Package taxonomy + dependency rules (normative) | [`../specs/module-layout.md`](../specs/module-layout.md) |
-| Idiomatic Go surface rules | [`../specs/idiom.md`](../specs/idiom.md) |
-| RM modeling rules | [`../specs/rm-modeling.md`](../specs/rm-modeling.md) |
-| Auth & SMART-on-openEHR contract | [`../specs/auth.md`](../specs/auth.md) |
-| Wire format (REST, AQL, canonical JSON, FLAT, STRUCTURED) | [`../specs/wire.md`](../specs/wire.md) |
-| Transport (retry, OTel, TLS posture) | [`../specs/transport.md`](../specs/transport.md) |
-| Service discovery flow | [`../specs/service-discovery.md`](../specs/service-discovery.md) |
-| Cross-SDK conformance probes (PROBE-NNN) | [`../specs/conformance.md`](../specs/conformance.md) |
-| Use cases — primary, building-block, POC | [`../specs/use-cases.md`](../specs/use-cases.md) |
-| Open research strands (STRAND-NN) | [`../specs/research-strands.md`](../specs/research-strands.md) |
+| Requirement registry (REQ-NNN index) | [`../docs/specifications/REQ.md`](../docs/specifications/REQ.md) |
+| Traceability index (machine-readable) | [`../docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml) |
+| Packaging (REQ-001–005) | [`../docs/specifications/packaging.md`](../docs/specifications/packaging.md) |
+| Glossary | [`../docs/specifications/glossary.md`](../docs/specifications/glossary.md) |
+| In / out of scope | [`../docs/specifications/scope.md`](../docs/specifications/scope.md) |
+| Package taxonomy + dependency rules (normative) | [`../docs/specifications/module-layout.md`](../docs/specifications/module-layout.md) |
+| Idiomatic Go surface rules | [`../docs/specifications/idiom.md`](../docs/specifications/idiom.md) |
+| RM modeling rules | [`../docs/specifications/rm-modeling.md`](../docs/specifications/rm-modeling.md) |
+| Auth & SMART-on-openEHR contract | [`../docs/specifications/auth.md`](../docs/specifications/auth.md) |
+| Wire format (REST, AQL, canonical JSON, FLAT, STRUCTURED) | [`../docs/specifications/wire.md`](../docs/specifications/wire.md) |
+| Transport (retry, OTel, TLS posture) | [`../docs/specifications/transport.md`](../docs/specifications/transport.md) |
+| Service discovery flow | [`../docs/specifications/service-discovery.md`](../docs/specifications/service-discovery.md) |
+| Cross-SDK conformance probes (PROBE-NNN) | [`../docs/specifications/conformance.md`](../docs/specifications/conformance.md) |
+| Use cases — primary, building-block, POC | [`../docs/specifications/use-cases.md`](../docs/specifications/use-cases.md) |
+| Open research strands (STRAND-NN) | [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md) |
 | Closed architectural decisions | [`adr/`](adr/) |
 | Implementation plans (per phase) | [`plans/`](plans/) |
 
 ## Package layout (summary)
 
-The full taxonomy with package-level scope notes lives in [`../specs/module-layout.md`](../specs/module-layout.md). Landed packages are listed in [Current implementation](#current-implementation); remaining leaves are stubs or planned.
+The full taxonomy with package-level scope notes lives in [`../docs/specifications/module-layout.md`](../docs/specifications/module-layout.md). Landed packages are listed in [Current implementation](#current-implementation); remaining leaves are stubs or planned.
 
 ```
 openehr-sdk-go/
@@ -98,7 +98,7 @@ flowchart TD
   Sandbox -. implements .-> Cadasto
 ```
 
-Normative rules: REQ-010 through REQ-014 in [`../specs/REQ.md`](../specs/REQ.md).
+Normative rules: REQ-010 through REQ-014 in [`../docs/specifications/REQ.md`](../docs/specifications/REQ.md).
 
 ## Why it's shaped this way (narrative)
 
@@ -164,12 +164,12 @@ flowchart LR
   Gen --> JSON
 ```
 
-Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). Normative conformance rules remain in [`specs/bmm-conformance.md`](../specs/bmm-conformance.md).
+Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). Normative conformance rules remain in [`docs/specifications/bmm-conformance.md`](../docs/specifications/bmm-conformance.md).
 
 ## Versioning
 
-Semver via standard Go module versioning. Module path locked at `github.com/cadasto/openehr-sdk-go` (REQ-001, STRAND-07 resolved). `v2`+ would live under `…/v2/` per Go's semantic-import-versioning convention. The version-bump rules per change kind are in [`../specs/module-layout.md § Versioning`](../specs/module-layout.md#versioning).
+Semver via standard Go module versioning. Module path locked at `github.com/cadasto/openehr-sdk-go` (REQ-001, STRAND-07 resolved). `v2`+ would live under `…/v2/` per Go's semantic-import-versioning convention. The version-bump rules per change kind are in [`../docs/specifications/module-layout.md § Versioning`](../docs/specifications/module-layout.md#versioning).
 
 ## Open decisions
 
-Tracked in [`../specs/research-strands.md`](../specs/research-strands.md). STRAND-07 resolved (versioning + module path); STRAND-04 partially resolved (EVENT + numeric wire — ADRs 0003–0004). Four ADRs Accepted under [`adr/`](adr/). Resolutions become ADRs here.
+Tracked in [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md). STRAND-07 resolved (versioning + module path); STRAND-04 partially resolved (EVENT + numeric wire — ADRs 0003–0004). Four ADRs Accepted under [`adr/`](adr/). Resolutions become ADRs here.

@@ -690,7 +690,7 @@ func containerInner(plan *Plan, owner *bmm.SimpleClass, td *bmm.ContainerType) (
 // Special-case for container kinds: when the root_type is Hash,
 // List, Set, or Array the result is the Go shorthand (`map[K]V`,
 // `[]T`) rather than a generic Go-type instantiation. Per
-// specs/bmm-conformance.md § Container mapping.
+// docs/specifications/bmm-conformance.md § Container mapping.
 func genericTypeRef(plan *Plan, owner *bmm.SimpleClass, gt *bmm.GenericType) (string, error) {
 	if gt == nil {
 		return "any", nil

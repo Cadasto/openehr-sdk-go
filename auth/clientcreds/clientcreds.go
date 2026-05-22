@@ -68,7 +68,7 @@ type Config struct {
 	AuthMethod AuthMethod
 	// RefreshThreshold is how long before ExpiresAt the source treats
 	// the cached token as stale and triggers a refresh. Default 30s
-	// (matches specs/auth.md REQ-063).
+	// (matches docs/specifications/auth.md REQ-063).
 	RefreshThreshold time.Duration
 	// Issuer is the issuer URL recorded on the produced Token. Optional;
 	// when set it is round-tripped to Token.Issuer for audit.

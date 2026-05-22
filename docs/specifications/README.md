@@ -2,7 +2,7 @@
 
 Normative, addressable specifications for `github.com/cadasto/openehr-sdk-go`. This tree is **the source of truth** for the SDK's contract: requirements, idioms, wire format, auth flow, conformance. It is **self-contained** — implementing or reviewing the SDK does not require access to the Cadasto architecture sources.
 
-`docs/architecture.md` carries the structural / design *narrative* (mermaid diagram, package map, "why it's shaped this way"). This `specs/` tree carries the *normative* statements every plan, PR, code change, and test is measured against.
+`docs/architecture.md` carries the structural / design *narrative* (mermaid diagram, package map, "why it's shaped this way"). This `docs/specifications/` tree carries the *normative* statements every plan, PR, code change, and test is measured against.
 
 ## How to read these specs
 
@@ -17,6 +17,35 @@ Each file uses **RFC 2119 keywords** to mark normative statements:
 | **MAY** / **OPTIONAL** | truly optional — no conformance impact |
 
 Statements without these keywords are **informative** — context, rationale, examples. Do not implement informative text as a requirement; do not relax normative text as a suggestion.
+
+## Document kinds
+
+The repo uses several document kinds, each with a distinct role and boundary:
+
+| Kind | Answers | Normative? | Where it lives |
+|------|---------|------------|----------------|
+| **Specification** (this tree) | How must the system behave / be structured? | Yes (MUST / SHALL / SHOULD / MAY) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
+| **ADR** | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
+| **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
+| **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
+| **Roadmap** | What has landed and what hasn't? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
+
+**Boundaries between kinds:**
+
+- **Topic specs** carry RFC 2119 prose only — no checkbox task lists, no implementation file paths, no PR-style summaries (use a plan for those).
+- **`REQ.md`** is registry-only — one row per REQ-NNN — canonical prose lives in the topic spec linked from each row.
+- **Plans** MUST cite the REQ-NNN / STRAND-NN identifiers they implement in the header `**Covers:**` line.
+- **ADRs** cover one decision each — long flows or invariants stay in the topic spec; ADRs cite the STRAND-NN they resolve plus any REQ-NNN they amend.
+- **Guides** describe how we work — they're informative, not normative; when a guide disagrees with a spec, the spec wins and the guide is updated.
+
+## Source of truth
+
+| Mode | When | Order |
+|------|------|-------|
+| **Spec-first** | New capability, new wire surface, new identifier | REQ row → canonical topic spec (Draft) → ADR if irreversible fork → Plan → Code → spec status update → REQ `Impl.` column |
+| **Implementation-aligned** | Hardening, fix-up, perf, behaviour clarification on shipped code | Code change → update topic spec section + `traceability.yaml` in the same PR |
+
+For implementation-aligned PRs, **code wins until the spec is updated in the same PR**.
 
 ## Status header
 
@@ -35,13 +64,13 @@ At v0 scaffolding stage, all specs are **Draft**.
 The chain that drift detection works against:
 
 ```
-specs/REQ.md (registry index — one row per REQ-NNN)
+docs/specifications/REQ.md (registry index — one row per REQ-NNN)
     └─→ canonical topic spec (packaging.md, wire.md, transport.md, …)
-            └─→ specs/traceability.yaml (packages, probes, tests, plans)
+            └─→ docs/specifications/traceability.yaml (packages, probes, tests, plans)
                     └─→ docs/plans/YYYY-MM-DD-*.md
                             └─→ code (Go package)
                                     └─→ tests (*_test.go)
-                                            └─→ specs/conformance.md (PROBE-NNN)
+                                            └─→ docs/specifications/conformance.md (PROBE-NNN)
 ```
 
 **Single canonical home:** normative MUST/SHALL prose lives in exactly one topic spec per REQ (see [REQ.md](REQ.md) registry `Canonical` column). REQ.md is an index only — do not duplicate requirement bodies there.

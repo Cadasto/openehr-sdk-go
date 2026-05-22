@@ -17,9 +17,9 @@ A first-party **Go SDK for openEHR** — package `github.com/cadasto/openehr-sdk
 
 ## Source of truth
 
-The normative specification for this SDK lives **in this repo** under [`specs/`](specs/). That tree is self-contained — implementing or reviewing the SDK does not require access to external architecture sources. Read [`specs/README.md`](specs/README.md) for the conventions (RFC-2119 keywords, status headers, identifier scheme, traceability).
+The normative specification for this SDK lives **in this repo** under [`docs/specifications/`](docs/specifications/). That tree is self-contained — implementing or reviewing the SDK does not require access to external architecture sources. Read [`docs/specifications/README.md`](docs/specifications/README.md) for the conventions (RFC-2119 keywords, status headers, identifier scheme, traceability).
 
-`specs/` reflects and supersedes the upstream **Cadasto SDK Specification proposal**: when the two disagree, this tree wins until the upstream is reconciled. Open research strands in [`specs/research-strands.md`](specs/research-strands.md) MUST NOT be silently resolved by code — surface the decision and record an in-repo ADR under [`docs/adr/`](docs/adr/).
+`docs/specifications/` reflects and supersedes the upstream **Cadasto SDK Specification proposal**: when the two disagree, this tree wins until the upstream is reconciled. Open research strands in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md) MUST NOT be silently resolved by code — surface the decision and record an in-repo ADR under [`docs/adr/`](docs/adr/).
 
 Related Cadasto proposals (referred to by role, not by identifier):
 
@@ -37,21 +37,21 @@ Reading order for any contributor or agent:
 | # | Doc | Scope |
 |---|---|---|
 | 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
-| 2 | [specs/](specs/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](specs/REQ.md); machine-readable map in [traceability.yaml](specs/traceability.yaml) |
+| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine-readable map in [traceability.yaml](docs/specifications/traceability.yaml) |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package map + mermaid diagram |
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks |
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (0001–0004 Accepted) |
 | 6 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
 
-**Normative vs narrative.** `specs/` carries RFC-2119 statements that code, plans, and tests are measured against. `docs/architecture.md` carries the design narrative. If they disagree, `specs/` wins.
+**Normative vs narrative.** `docs/specifications/` carries RFC-2119 statements that code, plans, and tests are measured against. `docs/architecture.md` carries the design narrative. If they disagree, `docs/specifications/` wins.
 
 ### Spec-driven workflow (agents)
 
 When implementing or reviewing against a REQ:
 
-1. Open the row in [`specs/REQ.md`](specs/REQ.md) → follow the **Canonical** link.
-2. Check [`specs/traceability.yaml`](specs/traceability.yaml) for landed packages, probes, and tests.
+1. Open the row in [`docs/specifications/REQ.md`](docs/specifications/REQ.md) → follow the **Canonical** link.
+2. Check [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) for landed packages, probes, and tests.
 3. Cite `REQ-NNN` / `PROBE-NNN` in tests and `doc.go`; update `traceability.yaml` when landing new code.
 4. Run `make spec-check` before claiming spec compliance (`make ci` includes it).
 
@@ -59,7 +59,7 @@ New normative text goes in the **canonical topic spec** first, then the REQ regi
 
 ## Module layout
 
-Normative taxonomy and dependency rules: [`specs/module-layout.md`](specs/module-layout.md). Top-level shape:
+Normative taxonomy and dependency rules: [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md). Top-level shape:
 
 - `auth/` + providers `auth/{smart,clientcreds,jwtbearer,basic}/` — TokenSource + OAuth2 primitives
 - `transport/` — HTTP wrapper around injected `*http.Client`
@@ -77,7 +77,7 @@ Normative taxonomy and dependency rules: [`specs/module-layout.md`](specs/module
 
 ## Idiomatic surface
 
-The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enforced by the shared conformance probe set; per-language API is independent. Normative rules in [`specs/idiom.md`](specs/idiom.md).
+The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enforced by the shared conformance probe set; per-language API is independent. Normative rules in [`docs/specifications/idiom.md`](docs/specifications/idiom.md).
 
 - `context.Context` is the first parameter on every method that does I/O.
 - `*http.Client` is **injected**, never allocated by the SDK.
@@ -85,7 +85,7 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 - Package-level functions for the primary surface; repository structs offered as a convenience for injection seams.
 - Generics for typed REST responses, validators, repositories, template bindings — **no reflection** to carry types.
 - Concrete structs for concrete RM types + embedded base structs for shared fields; interfaces for abstract RM categories; central type registry for `_type` decoding. **No inheritance emulation.**
-- **Building-block independence** (REQ-013, [`specs/module-layout.md`](specs/module-layout.md#req-013--building-block-independence)): `openehr/{rm,serialize,validation,template}/` and `openehr/aql/` (models only) MUST be usable standalone without constructing an authenticated client.
+- **Building-block independence** (REQ-013, [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md#req-013--building-block-independence)): `openehr/{rm,serialize,validation,template}/` and `openehr/aql/` (models only) MUST be usable standalone without constructing an authenticated client.
 
 ## Code style and conventions
 
@@ -102,7 +102,7 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 **CHANGELOG.md** — agents **do not need to update** this file for every change. Update only when the user asks, or when cutting a release / merging a milestone PR. When you do:
 
 - **One bullet per artefact class** (e.g. "Transport layer", "EHR REST client") — not per file, type, REQ-ID, probe, or commit.
-- **No** API inventories, option lists, file paths, struct names, or "implements REQ-NNN" traceability — that lives in `specs/traceability.yaml`, commit messages, and PR bodies.
+- **No** API inventories, option lists, file paths, struct names, or "implements REQ-NNN" traceability — that lives in `docs/specifications/traceability.yaml`, commit messages, and PR bodies.
 - **Pre-1.0:** only `### Added` is used; `### Changed` / `### Fixed` / `### Removed` are reserved for post-v1.0 entries. Pre-release renames, fix-ups, and dropped experiments fold into the relevant Added bullet or are dropped entirely.
 
 ## Tooling policy
@@ -140,7 +140,7 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 | Spec traceability check | `make spec-check` |
 | Build examples | `make build` |
 
-GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; landed inventory in [`specs/conformance.md`](specs/conformance.md).
+GitHub Actions workflows and branch-protection guidance: [docs/ci.md](docs/ci.md). Conformance probes (`testkit/probes/…`) run via `make test`; landed inventory in [`docs/specifications/conformance.md`](docs/specifications/conformance.md).
 
 ## openEHR knowledge
 
@@ -148,12 +148,12 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 
 ## Status and active scope
 
-Current landed-vs-planned phases live in [docs/roadmap.md](docs/roadmap.md). Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`specs/research-strands.md`](specs/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
+Current landed-vs-planned phases live in [docs/roadmap.md](docs/roadmap.md). Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 
 ## Do not touch (yet)
 
-- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`specs/REQ.md`](specs/REQ.md), and [`specs/traceability.yaml`](specs/traceability.yaml). Open decisions stay as research strands in [`specs/research-strands.md`](specs/research-strands.md) until an ADR lands.
-- Duplicating normative REQ prose in `REQ.md` — the registry is index-only; canonical text lives in topic specs ([`specs/packaging.md`](specs/packaging.md), [`specs/transport.md`](specs/transport.md), etc.).
+- Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`docs/specifications/REQ.md`](docs/specifications/REQ.md), and [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as research strands in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md) until an ADR lands.
+- Duplicating normative REQ prose in `REQ.md` — the registry is index-only; canonical text lives in topic specs ([`docs/specifications/packaging.md`](docs/specifications/packaging.md), [`docs/specifications/transport.md`](docs/specifications/transport.md), etc.).
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling only; not public API. Changes need rationale in [`docs/architecture.md`](docs/architecture.md) and, for structural choices, [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
 - REQ-NNN, PROBE-NNN, STRAND-NN identifiers are **stable** once published — never renumber, never reuse.

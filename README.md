@@ -39,7 +39,7 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 | Reading order | Doc |
 |---|---|
 | 1 — entry point for any agent | [AGENTS.md](AGENTS.md) |
-| 2 — **normative specifications** (REQ / PROBE / STRAND) | [specs/](specs/) |
+| 2 — **normative specifications** (REQ / PROBE / STRAND) | [docs/specifications/](docs/specifications/) |
 | 3 — design narrative, dependency mermaid | [docs/architecture.md](docs/architecture.md) |
 | 4 — AI agent conventions, MCP skills | [docs/ai-workflow.md](docs/ai-workflow.md) |
 | 5 — CI / contributor checks | [docs/ci.md](docs/ci.md) |
@@ -47,7 +47,7 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 | 6b — landed vs planned | [docs/roadmap.md](docs/roadmap.md) |
 | 7 — release log | [CHANGELOG.md](CHANGELOG.md) |
 
-The source of truth for module design is the in-repo [`specs/`](specs/) tree. Open research strands live in [`specs/research-strands.md`](specs/research-strands.md) until promoted ADRs land in [`docs/adr/`](docs/adr/).
+The source of truth for module design is the in-repo [`docs/specifications/`](docs/specifications/) tree. Open research strands live in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md) until promoted ADRs land in [`docs/adr/`](docs/adr/).
 
 ## Equivalent SDK
 

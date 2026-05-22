@@ -1,6 +1,6 @@
 # Implementation plans
 
-Active and historical implementation plans for `openehr-sdk-go`. Plans are derivations of [`../../specs/`](../../specs/) — they translate normative REQs into sequenced delivery.
+Active and historical implementation plans for `openehr-sdk-go`. Plans are derivations of [`../../docs/specifications/`](../../docs/specifications/) — they translate normative REQs into sequenced delivery.
 
 **Landed vs planned checklist:** [`../roadmap.md`](../roadmap.md) — feature matrix and milestones (updated when phases land; plans may lag).
 
@@ -23,4 +23,15 @@ Deliver in order; umbrella plan holds sequencing and dependency rules.
 | [2026-05-21-validation.md](2026-05-21-validation.md) | `openehr/validation/` — comp↔OPT, demographic, AQL lint | REQ-102 (proposed); PROBE-024 (proposed); PROBE-021 (execute) |
 | [2026-05-21-aql-builders.md](2026-05-21-aql-builders.md) | `openehr/aql/` — struct + verb builders (executor already landed) | REQ-055; PROBE-020, PROBE-021 |
 
-Naming convention: `YYYY-MM-DD-<short-title>.md`. New plans: copy [_template.md](_template.md). Each plan cites REQ-IDs / STRAND-IDs and links to **canonical** spec sections only (specs/[README.md § Traceability](../../specs/README.md#traceability)).
+## Header convention (load-bearing)
+
+Every plan in this tree MUST start with the fields in [`_template.md`](_template.md):
+
+- **`Covers:`** — list of REQ-NNN / PROBE-NNN / STRAND-NN identifiers this plan implements. A plan without a covered identifier is not landed in the registry.
+- **`Status:`** — `Draft` / `Implemented (Sandbox)` / `Implemented (Partial)` / `Implemented` (mirrors topic-spec status; see [`../specifications/README.md` § Status header](../specifications/README.md#status-header)).
+- **`Implementation:`** — `planned` / `partial` / `landed` (mirrors the REQ.md `Impl.` column).
+- **`Depends on:`** / **`Defers:`** — other plans or landed packages this assumes; explicit out-of-scope.
+
+Plans link to **canonical** spec sections only (one section per REQ); never duplicate the normative prose. See [`../specifications/README.md` § Traceability](../specifications/README.md#traceability) for the full chain.
+
+Naming convention: `YYYY-MM-DD-<short-title>.md`. New plans: copy [`_template.md`](_template.md).
