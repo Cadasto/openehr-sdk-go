@@ -63,7 +63,7 @@ Normative taxonomy and dependency rules: [`docs/specifications/module-layout.md`
 
 - `auth/` + providers `auth/{smart,clientcreds,jwtbearer,basic}/` — TokenSource + OAuth2 primitives
 - `transport/` — HTTP wrapper around injected `*http.Client`
-- `openehr/` — `rm/`, `aom/aom14/`, `serialize/`, `validation/`, `template/`, `aql/`, `composition/`, and `client/{system,ehr,query,definition,demographic,admin}/`
+- `openehr/` — `rm/` (+ `rm/rminfo/` BMM structural lookup), `aom/aom14/`, `serialize/`, `validation/`, `template/`, `aql/`, `composition/`, and `client/{system,ehr,query,definition,demographic,admin}/`
 - `smart/` + `smart/discovery/` — application-level SMART LaunchContext + ID-token validation + service catalog resolver
 - `cadasto/` — platform extras behind the single cut line (`extra/`, `datamap/`, `care/`, `mpi/`, `admin/`)
 - `sandbox/`, `testkit/`, `cmd/examples/`, `internal/`, `docs/`

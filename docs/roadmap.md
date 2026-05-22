@@ -23,7 +23,7 @@
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
 | **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
-| **2** | Composition builder, template parser, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) landed; composition builder and AQL builder still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
+| **2** | Composition builder, template parser, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-up Phases 1–4 landed (strict-mode parse, path ergonomics, OPT metadata capture, `rm/rminfo` BMM lookup, `internal/templatecompile` foundation — [ADR 0005](adr/0005-compiled-template-foundation.md)); composition builder and AQL builder still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
@@ -42,7 +42,9 @@
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031 |
 | Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
-| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; OET out of scope. [plan](plans/2026-05-21-template-parser.md) |
+| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/2026-05-22-template-req100-followups.md) |
+| RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
+| Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Internal until public shape stabilises. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | [plan](plans/2026-05-21-validation.md) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
 | Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md) |
@@ -130,7 +132,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create}` |
+| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse}` |
 
 ---
 
