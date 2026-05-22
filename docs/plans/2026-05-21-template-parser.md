@@ -7,7 +7,7 @@
 **Probes:** PROBE-022 (OPT path resolution) — sandbox; cross-SDK ratification deferred (REQ-081).
 **Implementation:** partial — parser, path utilities, and sandbox probe landed; OET, ADL 2, and full Archie linker remain out of scope.
 **Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
-**Defers:** ADL2 / AOM 2.4 OPT; **OET** (`.oet` authoring templates); package-deployment to CDR (use `openehr/client/definition/`); FLAT path keys (REQ-053)
+**Defers:** ADL2 / AOM 2.4 OPT; **OET** (`.oet` authoring templates); package-deployment to CDR (use `openehr/client/definition/`); FLAT path keys (REQ-053). Post–PR #10 hardening: [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md).
 
 ## Goal
 
