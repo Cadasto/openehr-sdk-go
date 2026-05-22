@@ -146,6 +146,7 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | Auth | [`auth/`](../auth/), [`auth/clientcreds/`](../auth/clientcreds/), [`auth/jwtbearer/`](../auth/jwtbearer/), [`auth/basic/`](../auth/basic/) | REQ-060, 066, 068, 069 |
 | Discovery | [`smart/discovery/`](../smart/discovery/) | REQ-070–072, 092 |
 | REST clients | [`openehr/client/system/`](../openehr/client/system/), [`openehr/client/ehr/`](../openehr/client/ehr/) (+ composition, ehrstatus, directory, contribution, itemtags), [`openehr/client/query/`](../openehr/client/query/), [`openehr/client/definition/`](../openehr/client/definition/) (templates + stored AQL), [`openehr/client/admin/`](../openehr/client/admin/) | REQ-054, 055, 057, 059, 099; PROBE-010–013, 067, 070 |
+| Cadasto admin probes | [`cadasto/admin/`](../cadasto/admin/) | `Live` / `Ready` deployment health probes (SDK-GAP-07); borrows REQ-093 transport sentinels for 401/403/404/5xx, bypasses `transport.Do` (no envelope/OTel/retry) |
 | Conformance probes | [`testkit/probes/`](../testkit/probes/) | `serialize/` (030–031, 033–034), `versioned/` (010–013), `discovery/` (040–041), `definition/` (067), `admin/` (070) |
 
 ### BMM codegen pipeline
