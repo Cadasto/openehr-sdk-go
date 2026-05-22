@@ -30,7 +30,7 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 	dec := xml.NewDecoder(br)
 	var wire xmlTemplate
 	if err := dec.Decode(&wire); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidOPT, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
 	if wire.TemplateID == nil || strings.TrimSpace(wire.TemplateID.Value) == "" {
 		return nil, fmt.Errorf("%w: missing or empty template_id", ErrInvalidOPT)
@@ -41,7 +41,10 @@ func ParseOPT(r io.Reader) (*OperationalTemplate, error) {
 
 	root, err := buildNode(wire.Definition)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidOPT, err)
+		// Use %w for the inner error so errors.Is reaches the
+		// builder sentinel (e.g. ErrUnsupportedNode) through the
+		// outer ErrInvalidOPT wrap.
+		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
 
 	tmpl := &OperationalTemplate{

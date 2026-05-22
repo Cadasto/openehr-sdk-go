@@ -48,8 +48,7 @@ func main() {
 	case *template.ComplexObject:
 		attrs = r.Attributes()
 	default:
-		fmt.Printf("(unsupported root node type: %T)\n", root)
-		return
+		log.Fatalf("unsupported root node type: %T", root)
 	}
 	fmt.Println("attributes  :")
 	for _, a := range attrs {
@@ -60,16 +59,22 @@ func main() {
 		fmt.Printf("  %s (%s, children=%d)\n", a.Name(), card, len(a.Children()))
 	}
 
-	// Demonstrate path resolution: walk to the first content child.
-	if p, err := opt.ParsePath("/content"); err == nil {
-		if n, err := opt.NodeAt(p); err == nil {
-			fmt.Printf("NodeAt(/content): %s [%s]", n.RMTypeName(), n.NodeID())
-			if ar, ok := n.(*template.ArchetypeRoot); ok {
-				fmt.Printf(" archetype=%s", ar.ArchetypeID())
-			}
-			fmt.Println()
-		}
+	// Demonstrate path resolution. /content is COMPOSITION-shaped;
+	// the example assumes a composition-rooted OPT and fails loud
+	// on a different shape so misuse surfaces.
+	p, err := opt.ParsePath("/content")
+	if err != nil {
+		log.Fatalf("ParsePath(/content): %v", err)
 	}
+	n, err := opt.NodeAt(p)
+	if err != nil {
+		log.Fatalf("NodeAt(/content): %v", err)
+	}
+	fmt.Printf("NodeAt(/content): %s [%s]", n.RMTypeName(), n.NodeID())
+	if ar, ok := n.(*template.ArchetypeRoot); ok {
+		fmt.Printf(" archetype=%s", ar.ArchetypeID())
+	}
+	fmt.Println()
 }
 
 func resolveOPTPath() string {

@@ -6,9 +6,11 @@ import "errors"
 // errors.Is rather than equality, since parser internals wrap them
 // with positional context via fmt.Errorf("...: %w", err).
 var (
-	// ErrInvalidOPT signals malformed XML, missing required wrapper
-	// elements (template_id, definition), or an unsupported root
-	// element.
+	// ErrInvalidOPT signals malformed XML or missing required
+	// wrapper elements (template_id, definition). encoding/xml
+	// errors from the XML decoder are wrapped through this sentinel
+	// — callers can match either with errors.Is(err, ErrInvalidOPT)
+	// or unwrap to the inner decoder error.
 	ErrInvalidOPT = errors.New("template: invalid OPT")
 
 	// ErrNotOPTFile signals ParseFile was called with a path whose
@@ -23,9 +25,11 @@ var (
 	// attribute or could not match a segment predicate.
 	ErrPathNotFound = errors.New("template: path not found")
 
-	// ErrUnsupportedNode signals the parser encountered an OPT XML
-	// element shape outside the v1 node taxonomy. It is a
-	// forward-compatible escape hatch — callers may inspect the
-	// wrapped detail and decide whether to skip or fail.
+	// ErrUnsupportedNode signals the parser encountered an
+	// <attributes> element whose xsi:type is outside the v1
+	// attribute taxonomy (C_SINGLE_ATTRIBUTE, C_MULTIPLE_ATTRIBUTE).
+	// Unknown <children> xsi:type values are NOT surfaced via this
+	// sentinel in v1; they are admitted as leaf *ComplexObject
+	// nodes (forward-compatible escape hatch).
 	ErrUnsupportedNode = errors.New("template: unsupported node shape")
 )

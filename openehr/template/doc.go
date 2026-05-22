@@ -19,8 +19,8 @@
 // this package operates on deployment artifacts locally without HTTP.
 // Upload to a CDR uses openehr/client/definition.
 //
-// Building-block use: this package depends only on the standard library
-// and openehr/rm/. It does not depend on transport/, auth/, or
-// openehr/client/*. See docs/specifications/clinical-modeling.md
+// Building-block use: this package is stdlib-only in v1. It does not
+// depend on transport/, auth/, openehr/client/*, openehr/rm/, or
+// openehr/aom/aom14/. See docs/specifications/clinical-modeling.md
 // REQ-100 for the normative contract.
 package template

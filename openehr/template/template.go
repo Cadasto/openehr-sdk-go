@@ -27,9 +27,13 @@ func (t *OperationalTemplate) UID() string { return t.uid }
 // or an empty string when absent.
 func (t *OperationalTemplate) Language() string { return t.language }
 
-// Root returns the root definition node. The OPT contract guarantees
-// it is a *ComplexObject whose RMTypeName is the composition RM class
-// (conventionally "COMPOSITION").
+// Root returns the root definition node. Its RMTypeName is the
+// composition RM class (conventionally "COMPOSITION"). The concrete
+// type is *ArchetypeRoot for OPTs whose <definition> declares an
+// archetype id (the typical Ocean Template Designer shape), and
+// *ComplexObject for OPTs without an explicit root archetype id.
+// Callers that need to descend into attributes should type-switch
+// on both *ArchetypeRoot and *ComplexObject, or use OperationalTemplate.NodeAt.
 func (t *OperationalTemplate) Root() Node { return t.root }
 
 // Node is the sealed root interface for OPT definition-tree nodes.

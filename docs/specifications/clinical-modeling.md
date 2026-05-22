@@ -28,7 +28,7 @@ In openEHR terminology, "template" without qualification often means the authori
 - `Concept() string` — the value of `<concept>` (machine-readable concept slug).
 - `UID() string` — the value of `<uid>/<value>` when present; empty string otherwise.
 - `Language() string` — the value of `<language>/<code_string>` (ISO 639-1) when present; empty string otherwise.
-- `Root() Node` — the root definition node (always a `ComplexObject` whose `RMTypeName()` is the composition RM class, conventionally `COMPOSITION`).
+- `Root() Node` — the root definition node. Its `RMTypeName()` is the composition RM class (conventionally `COMPOSITION`). The concrete type is `*ArchetypeRoot` when the OPT `<definition>` carries an explicit archetype id (the typical Ocean Template Designer shape) and `*ComplexObject` otherwise. Callers that descend into attributes MUST handle both via a type-switch or via `NodeAt`.
 
 ### Node taxonomy
 
@@ -74,13 +74,13 @@ The package **MUST** expose these typed sentinel errors:
 | `ErrNotOPTFile` | `ParseFile` called with non-`.opt` path |
 | `ErrPathSyntax` | path string fails the grammar subset above |
 | `ErrPathNotFound` | parsed path traverses through an unknown attribute or unmatched predicate |
-| `ErrUnsupportedNode` | encountered an OPT XML element shape not in the v1 node taxonomy (forward-compatible escape hatch) |
+| `ErrUnsupportedNode` | encountered an `<attributes>` element whose `xsi:type` is outside the v1 attribute taxonomy (`C_SINGLE_ATTRIBUTE`, `C_MULTIPLE_ATTRIBUTE`). Unknown **child** `xsi:type` values are not surfaced through this sentinel in v1 — they are admitted as leaf `*ComplexObject` nodes (forward-compatible escape hatch). A future REQ MAY add a strict mode that surfaces unknown child shapes; see [`docs/plans/2026-05-22-template-req100-followups.md`](../plans/2026-05-22-template-req100-followups.md) Phase 2. |
 
 All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with `errors.Is`.
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/` **MUST** be importable without `transport/`, `auth/`, or `openehr/client/*`. It depends on `openehr/rm/` only for RM type-name constants (informational; no decoder use in v1).
+`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`. In v1 the package is **stdlib-only** — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
 
 ### Out of scope (v1)
 
