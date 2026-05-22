@@ -2,6 +2,7 @@ package template_test
 
 import (
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,6 +71,19 @@ func TestParseFile_RejectsNonOPTSuffix(t *testing.T) {
 	_, err := template.ParseFile(filepath.Join("testdata", "README.md"))
 	if !errors.Is(err, template.ErrNotOPTFile) {
 		t.Fatalf("got %v, want ErrNotOPTFile", err)
+	}
+}
+
+// ParseFile MUST wrap the underlying os.Open error so callers can
+// classify with errors.Is(err, fs.ErrNotExist). Self-review finding
+// #2 from PR #10 multi-agent review.
+func TestParseFile_MissingFileWrapsFSError(t *testing.T) {
+	_, err := template.ParseFile(filepath.Join("testdata", "does_not_exist.opt"))
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("got %v, want errors.Is(err, fs.ErrNotExist) to be true", err)
 	}
 }
 

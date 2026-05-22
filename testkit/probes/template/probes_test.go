@@ -61,6 +61,25 @@ func TestProbe022OPTPathResolution_RejectsEmptyAssertions(t *testing.T) {
 	}
 }
 
+// PROBE-022 — ExpectNotFound MUST be satisfied by ErrPathNotFound
+// specifically, not by any error type. Self-review finding #1 from
+// PR #10 multi-agent review.
+func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	// A syntactically invalid path triggers ParsePath (ErrPathSyntax)
+	// before NodeAt; the probe MUST report this as a parse failure,
+	// not silently accept it as "not found".
+	r, err := probes.Probe022OPTPathResolution(body, []probes.PathAssertion{
+		{Path: "no_leading_slash", ExpectNotFound: true},
+	})
+	if err != nil {
+		t.Fatalf("unexpected Go error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("status = %q, want fail (ParsePath error must not satisfy ExpectNotFound)", r.Status)
+	}
+}
+
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, here, _, ok := runtime.Caller(0)

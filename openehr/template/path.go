@@ -5,9 +5,12 @@ import (
 	"strings"
 )
 
-// Path is a parsed openEHR path. The zero value is the root path
-// ("/") and points to the OperationalTemplate root node. Construct
-// non-root paths via OperationalTemplate.ParsePath.
+// Path is a parsed openEHR path. The zero value renders as "/" and
+// resolves to the template root when passed to
+// [OperationalTemplate.NodeAt]. A Path is decoupled from any
+// particular template — the same Path can be applied to multiple
+// OperationalTemplates. Construct non-root paths via
+// [OperationalTemplate.ParsePath].
 type Path struct {
 	segments []pathSegment
 }
@@ -52,9 +55,11 @@ func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 // empty segments, multi-predicate constructs, AQL projection syntax
 // (predicates with name= / @ / quoted values).
 //
-// The template receiver is currently informational — ParsePath does
-// not validate the path against the OPT tree. NodeAt performs that
-// resolution.
+// ParsePath validates grammar only — it does not check that segment
+// names or predicates resolve against any OPT. The template receiver
+// is retained for API symmetry with NodeAt and for future template-
+// aware path validation (see ValidatePath in the REQ-100 follow-up
+// plan); today the grammar is template-independent.
 func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 	if s == "" {
 		return Path{}, fmt.Errorf("%w: empty path", ErrPathSyntax)
@@ -198,9 +203,11 @@ func walkPath(n Node, segs []pathSegment) (Node, error) {
 }
 
 // descendableObject returns the embedded ComplexObject of a node
-// when descent into RM attributes is possible. ArchetypeRoot wraps
-// ComplexObject by composition; Slot and pure-leaf ComplexObject
-// (no attributes) are not descendable from a path perspective.
+// when its concrete type exposes RM attributes — *ComplexObject and
+// *ArchetypeRoot (which wraps *ComplexObject by composition). *Slot
+// and *Attribute return (nil, false); empty-attribute *ComplexObject
+// values are descendable here and rejected later in walkPath with
+// a per-segment ErrPathNotFound message.
 func descendableObject(n Node) (*ComplexObject, bool) {
 	switch v := n.(type) {
 	case *ComplexObject:

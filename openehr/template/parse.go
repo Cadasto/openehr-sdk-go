@@ -70,7 +70,10 @@ func ParseFile(path string) (*OperationalTemplate, error) {
 	}
 	f, err := os.Open(path) //nolint:gosec // callers control the path
 	if err != nil {
-		return nil, err
+		// Preserve fs.ErrNotExist (and peers) on the chain so
+		// callers can errors.Is-classify, and attach the path for
+		// debuggability when reports surface deep in a stack.
+		return nil, fmt.Errorf("template: open %q: %w", path, err)
 	}
 	defer f.Close() //nolint:errcheck // read-only file
 	return ParseOPT(f)
@@ -219,10 +222,10 @@ func intervalToMultiplicity(i *xmlInterval) *Multiplicity {
 		return nil
 	}
 	return &Multiplicity{
-		Lower:          i.Lower,
-		Upper:          i.Upper,
-		LowerUnbounded: i.LowerUnbounded,
-		UpperUnbounded: i.UpperUnbounded,
+		lower:          i.Lower,
+		upper:          i.Upper,
+		lowerUnbounded: i.LowerUnbounded,
+		upperUnbounded: i.UpperUnbounded,
 	}
 }
 

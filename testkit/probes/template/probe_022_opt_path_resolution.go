@@ -2,6 +2,7 @@ package templateprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -82,7 +83,13 @@ func checkAssertion(t *template.OperationalTemplate, a PathAssertion) string {
 	n, err := t.NodeAt(p)
 	if err != nil {
 		if a.ExpectNotFound {
-			return "" // expected
+			// REQ-100 error taxonomy: negative assertions MUST be
+			// satisfied by ErrPathNotFound specifically — any other
+			// error indicates a regression worth surfacing.
+			if errors.Is(err, template.ErrPathNotFound) {
+				return ""
+			}
+			return fmt.Sprintf("%s: expected ErrPathNotFound, got %v", a.Path, err)
 		}
 		return fmt.Sprintf("%s: resolve: %v", a.Path, err)
 	}

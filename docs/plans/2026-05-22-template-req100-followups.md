@@ -58,8 +58,17 @@ Close gaps identified in PR #10 review **without** blocking merge of the initial
 6. **BOM handling** — propagate `Peek`/`Discard` errors as `ErrInvalidOPT` wrap.
 7. **`ParseFile` I/O** — wrap `os.Open` with context path; preserve `fs.ErrNotExist` via `%w`.
 8. **Parse edge tests** — `ParseOPT(nil)`, non-`<template>` root, `.OPT` extension case-insensitive acceptance.
+9. **Defensive xsi:type namespace anchor** — change struct tags on `xmlCObject.Type` and `xmlCAttribute.Type` from `xml:"type,attr"` to `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`. The current tag works correctly for all valid OPTs (the only `type` attribute on `<attributes>` / `<children>` is `xsi:type`) but anchoring to the XSI namespace removes a speculative future-mismatch risk surfaced by the PR #10 self-review.
 
 **Definition of done:** New tests for each behavior; CHANGELOG bullet only if public API adds options/types.
+
+### Additional test gaps from PR #10 self-review (not yet in Phase 1)
+
+10. **`TestParseOPT_InvalidXML_UnwrapsXMLError`** — assert `var se *xml.SyntaxError; errors.As(err, &se)` reaches the inner decoder error through the double-`%w` wrap. Regression to single-`%w` would silently break callers using line/column diagnostics.
+11. **`TestParsePath_RejectsCharAfterCloseBracket`** — `/content[at0001]extra` must fail with `ErrPathSyntax`. The branch at `path.go:107-109` is currently unexercised.
+12. **`TestNodeAt_LeafMidPath`** — synthetic OPT with two-level path through a leaf `*ComplexObject` that has no attributes — exercises the "cannot descend" branch in `walkPath` (distinct from the `*Slot` descent case already in Phase 1 task 3).
+13. **`TestParseOPT_AcceptsBOM` cleanup** — current test reads `os.ReadFile` and discards the result (`_ = bytes`). Either parse the bytes for dual-prove or drop the read.
+14. **`TestPathAssertion_PrecedenceContradiction`** — PROBE-022 `PathAssertion` with both `ExpectNotFound: true` and `WantRMType: "X"` — document/test which wins; today the negative-path short-circuit hides the contradiction.
 
 ## Phase 3 — Ergonomics (before REQ-101)
 
@@ -69,7 +78,11 @@ Close gaps identified in PR #10 review **without** blocking merge of the initial
 
 1. **`ErrAmbiguousPath`** (new sentinel) — when predicate-less segment has `len(children) > 1`, or duplicate predicate match; optional `WithStrictPaths()` on `OperationalTemplate` resolution (default: current first-child rule per REQ-100).
 2. **`ValidatePath(p Path) error`** — optional walk that checks segment names exist on tree (today `ParsePath` is syntax-only).
-3. **`Multiplicity` validation** — reject `lower > upper` at parse time if both set (or document opaque interval until validation REQ).
+3. **`Multiplicity` validation** — reject `lower > upper` at parse time if both set (or document opaque interval until validation REQ). Field encapsulation landed in PR #10 self-review fix.
+4. **`Attribute` in `Node` interface — category-error fix.** `Attribute`'s `RMTypeName()` / `NodeID()` are forced to `""` because attributes are not RM-typed and carry no archetype node id. Two cleaner shapes: (a) split `Node` into `ObjectNode` (RM-typed) and `AttributeNode` (named), or (b) keep one `Node` interface but move `RMTypeName/NodeID` off the interface onto concrete object types and have callers type-switch. Either removes the always-empty methods. Today `NodeAt` cannot return an `*Attribute`, so the cost is conceptual + future evolution friction.
+5. **`Root() Node` union collapse.** Today `Root()` returns either `*ComplexObject` or `*ArchetypeRoot`, forcing callers to type-switch on two shapes. Consider storing `*ComplexObject` directly and lifting `archetypeID` to an optional `OperationalTemplate.RootArchetypeID() string` accessor. Smaller mental model for callers.
+6. **`Cardinality` ergonomics** — add `String() string` and `IsValid() bool` methods. Today `Cardinality(42)` is constructible and the zero value coincides with `Single`; both are correct but diagnostics would benefit from a stringer.
+7. **`Attribute.children []Node` typing** — only `*ComplexObject | *ArchetypeRoot | *Slot` can appear there; `*Attribute` cannot. Either document this invariant in the `Children()` godoc, or fold into the `ObjectNode` split above.
 
 ## Out of scope (this plan)
 

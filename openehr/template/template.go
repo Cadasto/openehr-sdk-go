@@ -56,13 +56,29 @@ type Node interface {
 }
 
 // Multiplicity is the min/max interval that OPT uses for both
-// existence and occurrences blocks.
+// existence and occurrences blocks. Fields are unexported to keep
+// parsed intervals immutable from outside the package — construct
+// values only via the parser (no public constructor exists in v1).
 type Multiplicity struct {
-	Lower          int
-	Upper          int
-	LowerUnbounded bool
-	UpperUnbounded bool
+	lower          int
+	upper          int
+	lowerUnbounded bool
+	upperUnbounded bool
 }
+
+// Lower returns the lower bound of the interval.
+func (m Multiplicity) Lower() int { return m.lower }
+
+// Upper returns the upper bound of the interval.
+func (m Multiplicity) Upper() int { return m.upper }
+
+// LowerUnbounded reports whether the lower bound is "*" / unbounded
+// in the OPT XML.
+func (m Multiplicity) LowerUnbounded() bool { return m.lowerUnbounded }
+
+// UpperUnbounded reports whether the upper bound is "*" / unbounded
+// in the OPT XML.
+func (m Multiplicity) UpperUnbounded() bool { return m.upperUnbounded }
 
 // Cardinality tags an Attribute as single-valued or multi-valued.
 type Cardinality int
