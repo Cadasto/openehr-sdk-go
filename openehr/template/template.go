@@ -247,14 +247,82 @@ func (c *ComplexObject) isNode() {}
 // the slot fill within the template (e.g.
 // "openEHR-EHR-OBSERVATION.blood_pressure.v1").
 type ArchetypeRoot struct {
-	archetypeID string
+	archetypeID  string
+	terms        map[string]ArchetypeTerm
+	termBindings []TermBinding
 	ComplexObject
 }
 
 // ArchetypeID returns the slot-fill archetype identifier.
 func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
 
+// Terms returns the per-at-code term definitions captured from the
+// OPT's <term_definitions code="..."> blocks on this archetype root.
+// Returns nil when none were declared. The returned map is a
+// defensive copy.
+func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
+	return maps.Clone(a.terms)
+}
+
+// Term returns the term definition for the given at-code, or
+// (zero, false) when none exists. The returned [ArchetypeTerm.Items]
+// map is a defensive copy.
+func (a *ArchetypeRoot) Term(code string) (ArchetypeTerm, bool) {
+	t, ok := a.terms[code]
+	if !ok {
+		return ArchetypeTerm{}, false
+	}
+	return ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true
+}
+
+// TermBindings returns a defensive copy of the term-binding records
+// captured from this archetype root's <term_bindings> blocks. Order
+// matches OPT document order. Returns nil when none were declared.
+func (a *ArchetypeRoot) TermBindings() []TermBinding {
+	return slices.Clone(a.termBindings)
+}
+
 func (a *ArchetypeRoot) isNode() {}
+
+// ArchetypeTerm is one <term_definitions code="...">...<items
+// id="...">value</items></term_definitions> record from an
+// archetype root. Items are open-keyed by id (typical keys: "text",
+// "description", "comment"). The OPT carries a single canonical
+// language per document; multi-language ontology is deferred to
+// REQ-105.
+type ArchetypeTerm struct {
+	// Code is the at-code this definition applies to (e.g. "at0000").
+	Code string
+	// Items maps the items/@id attribute (e.g. "text") to its
+	// character-data value. Defensive-copy on every accessor read —
+	// callers may mutate the returned map.
+	Items map[string]string
+}
+
+// TermBinding is one <term_bindings terminology="..."><items
+// code="...">...</items></term_bindings> entry from an archetype
+// root. The code may be a bare at-code ("at0013") or an AQL-like
+// path ("/data[at0002]/events[at0006]/..."); callers should treat
+// it opaquely until compile-time resolution lands.
+type TermBinding struct {
+	// Terminology is the value of the terminology attribute on the
+	// containing <term_bindings> block (e.g. "SNOMED-CT", "LOINC").
+	Terminology string
+	// NodeOrPath is the items/@code attribute — either an at-code
+	// or an AQL-like locator path.
+	NodeOrPath string
+	// Target is the bound external terminology code.
+	Target CodedTermRef
+}
+
+// CodedTermRef is the openEHR CODE_PHRASE shape used inside
+// term_bindings: a terminology id + a code string. Captured as a
+// flat record here rather than dragged through the rm package — the
+// template package is stdlib-only.
+type CodedTermRef struct {
+	TerminologyID string
+	CodeString    string
+}
 
 // Attribute is xsi:type="C_SINGLE_ATTRIBUTE" or "C_MULTIPLE_ATTRIBUTE".
 // Implements Node; an Attribute's RMTypeName and NodeID are always

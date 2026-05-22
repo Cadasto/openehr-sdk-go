@@ -197,11 +197,47 @@ type xmlCObject struct {
 	Attributes  []*xmlCAttribute `xml:"attributes"`
 	// C_ARCHETYPE_ROOT extras — the archetype_id element wraps a
 	// <value> child in the openEHR OPT shape.
-	ArchetypeID string `xml:"archetype_id>value"`
+	ArchetypeID     string               `xml:"archetype_id>value"`
+	TermDefinitions []xmlTermDefSection  `xml:"term_definitions"`
+	TermBindings    []xmlTermBindSection `xml:"term_bindings"`
 	// ARCHETYPE_SLOT extras (raw text — assertion grammar not
 	// interpreted in v1)
 	Includes []xmlAssertion `xml:"includes"`
 	Excludes []xmlAssertion `xml:"excludes"`
+}
+
+// xmlTermDefSection is one <term_definitions code="..."> block on a
+// C_ARCHETYPE_ROOT. Each block carries the term definition for a
+// single at-code in the OPT's primary language; the ADL 1.4 OPT
+// shape does not interleave language per block (the root OPT element
+// pins one language for the whole document).
+type xmlTermDefSection struct {
+	Code  string        `xml:"code,attr"`
+	Items []xmlTermItem `xml:"items"`
+}
+
+// xmlTermItem is one <items id="text|description|...">value</items>
+// entry inside a term_definitions or term_bindings block.
+type xmlTermItem struct {
+	ID    string            `xml:"id,attr"`
+	Code  string            `xml:"code,attr"`
+	Value string            `xml:",chardata"`
+	Coded *xmlCodePhraseRef `xml:"value"`
+}
+
+// xmlCodePhraseRef captures the <value><terminology_id><value>X</value></terminology_id><code_string>Y</code_string></value>
+// shape used inside term_bindings items.
+type xmlCodePhraseRef struct {
+	TerminologyID *xmlValueWrapper `xml:"terminology_id"`
+	CodeString    string           `xml:"code_string"`
+}
+
+// xmlTermBindSection is one <term_bindings terminology="..."> block
+// on a C_ARCHETYPE_ROOT. Items inside bind an at-code (or path) to
+// an external terminology code.
+type xmlTermBindSection struct {
+	Terminology string        `xml:"terminology,attr"`
+	Items       []xmlTermItem `xml:"items"`
 }
 
 type xmlCAttribute struct {
@@ -273,7 +309,12 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &ArchetypeRoot{archetypeID: strings.TrimSpace(o.ArchetypeID), ComplexObject: *co}, nil
+		return &ArchetypeRoot{
+			archetypeID:   strings.TrimSpace(o.ArchetypeID),
+			ComplexObject: *co,
+			terms:         collectTermDefs(o.TermDefinitions),
+			termBindings:  collectTermBindings(o.TermBindings),
+		}, nil
 	case "ARCHETYPE_SLOT":
 		return &Slot{
 			rmTypeName: o.RMTypeName,
@@ -443,6 +484,78 @@ func identifiedValuesToMap(vs []xmlIdentifiedValue) map[string]string {
 	}
 	if len(out) == 0 {
 		return nil
+	}
+	return out
+}
+
+// collectTermDefs flattens wire <term_definitions code="..."><items
+// id="..."/></term_definitions> blocks into a per-at-code map keyed
+// by at-code, value = map[itemID]itemValue (e.g. "at0000" →
+// {"text": "Blood Pressure", "description": "..."}).
+//
+// The ADL 1.4 OPT shape ships one term_definitions block per
+// at-code in the OPT's primary language; multi-language ontologies
+// belong to the AOM 1.4 ARCHETYPE_ONTOLOGY block which v1 does not
+// surface (the OPT carries a single canonical-language view).
+func collectTermDefs(xs []xmlTermDefSection) map[string]ArchetypeTerm {
+	if len(xs) == 0 {
+		return nil
+	}
+	out := make(map[string]ArchetypeTerm, len(xs))
+	for _, x := range xs {
+		code := strings.TrimSpace(x.Code)
+		if code == "" {
+			continue
+		}
+		items := make(map[string]string, len(x.Items))
+		for _, item := range x.Items {
+			id := strings.TrimSpace(item.ID)
+			if id == "" {
+				continue
+			}
+			items[id] = strings.TrimSpace(item.Value)
+		}
+		if len(items) == 0 {
+			continue
+		}
+		out[code] = ArchetypeTerm{Code: code, Items: items}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// collectTermBindings flattens wire <term_bindings
+// terminology="..."><items code="..."><value>...</value></items>...
+// blocks into a flat slice of TermBinding records. The "code"
+// attribute may be either a bare at-code (e.g. "at0013") or an
+// AQL-like path (e.g. "/data[at0002]/events[at0005]/..."); callers
+// MUST treat it opaquely until compile-time resolution lands.
+func collectTermBindings(xs []xmlTermBindSection) []TermBinding {
+	if len(xs) == 0 {
+		return nil
+	}
+	var out []TermBinding
+	for _, x := range xs {
+		terminology := strings.TrimSpace(x.Terminology)
+		for _, item := range x.Items {
+			code := strings.TrimSpace(item.Code)
+			if code == "" {
+				continue
+			}
+			b := TermBinding{
+				Terminology: terminology,
+				NodeOrPath:  code,
+			}
+			if item.Coded != nil {
+				if item.Coded.TerminologyID != nil {
+					b.Target.TerminologyID = strings.TrimSpace(item.Coded.TerminologyID.Value)
+				}
+				b.Target.CodeString = strings.TrimSpace(item.Coded.CodeString)
+			}
+			out = append(out, b)
+		}
 	}
 	return out
 }

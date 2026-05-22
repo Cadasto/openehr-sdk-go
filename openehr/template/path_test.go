@@ -523,6 +523,132 @@ func TestObjectNode_SatisfiedByObjectNodes(t *testing.T) {
 	}
 }
 
+// Phase 4 prep — Terms() captures the <term_definitions code="..."> blocks
+// nested under a C_ARCHETYPE_ROOT. Spot-check a known at-code from
+// the blood-pressure archetype root in vital_signs.opt.
+func TestArchetypeRoot_TermsCaptured(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("root = %T, want *template.ArchetypeRoot", opt.Root())
+	}
+	bp := findArchetypeRoot(t, root, "openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if bp == nil {
+		t.Fatal("blood_pressure archetype root not found under /content")
+	}
+	terms := bp.Terms()
+	if len(terms) == 0 {
+		t.Fatal("Terms() empty; expected at least one term definition on blood_pressure root")
+	}
+	// at0004 = "Systolic" per the vendored fixture.
+	t4, ok := bp.Term("at0004")
+	if !ok {
+		t.Fatal("Term(at0004) missing on blood_pressure root")
+	}
+	if t4.Items["text"] != "Systolic" {
+		t.Errorf("at0004.text = %q, want %q", t4.Items["text"], "Systolic")
+	}
+	if t4.Items["description"] == "" {
+		t.Errorf("at0004.description empty; expected a description string")
+	}
+}
+
+// Phase 4 prep — TermBindings() captures the <term_bindings
+// terminology="..."> blocks. The blood-pressure fixture binds at-codes
+// to SNOMED-CT codes; at least one binding must surface.
+func TestArchetypeRoot_TermBindingsCaptured(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("root = %T, want *template.ArchetypeRoot", opt.Root())
+	}
+	bp := findArchetypeRoot(t, root, "openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if bp == nil {
+		t.Fatal("blood_pressure archetype root not found under /content")
+	}
+	bindings := bp.TermBindings()
+	if len(bindings) == 0 {
+		t.Fatal("TermBindings() empty; expected at least one binding on blood_pressure root")
+	}
+	// The fixture pins SNOMED-CT bindings on at0013 and similar; assert
+	// shape rather than exact at-code so the test survives fixture
+	// re-flow.
+	var snomed *template.TermBinding
+	for i := range bindings {
+		if bindings[i].Terminology == "SNOMED-CT" {
+			snomed = &bindings[i]
+			break
+		}
+	}
+	if snomed == nil {
+		t.Fatalf("no SNOMED-CT binding found; bindings = %+v", bindings)
+	}
+	if snomed.NodeOrPath == "" {
+		t.Errorf("SNOMED-CT binding missing NodeOrPath: %+v", snomed)
+	}
+	if snomed.Target.CodeString == "" {
+		t.Errorf("SNOMED-CT binding missing Target.CodeString: %+v", snomed)
+	}
+}
+
+// Phase 4 prep — Terms() returns a defensive copy: caller mutation
+// must not leak into the underlying ArchetypeRoot.
+func TestArchetypeRoot_TermsImmutable(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("root = %T, want *template.ArchetypeRoot", opt.Root())
+	}
+	bp := findArchetypeRoot(t, root, "openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if bp == nil {
+		t.Skip("fixture changed: blood_pressure root missing")
+	}
+	first := bp.Terms()
+	original := len(first)
+	delete(first, "at0004")
+	if got := len(bp.Terms()); got != original {
+		t.Errorf("Terms() shared underlying map: %d after delete, %d originally", got, original)
+	}
+}
+
+// findArchetypeRoot returns the first *ArchetypeRoot descendant of
+// root whose ArchetypeID matches archetypeID. Returns nil when no
+// match exists.
+func findArchetypeRoot(t *testing.T, root *template.ArchetypeRoot, archetypeID string) *template.ArchetypeRoot {
+	t.Helper()
+	var found *template.ArchetypeRoot
+	var visit func(n template.Node)
+	visit = func(n template.Node) {
+		if found != nil {
+			return
+		}
+		switch v := n.(type) {
+		case *template.ArchetypeRoot:
+			if v.ArchetypeID() == archetypeID {
+				found = v
+				return
+			}
+			for _, a := range v.Attributes() {
+				for _, c := range a.Children() {
+					visit(c)
+				}
+			}
+		case *template.ComplexObject:
+			for _, a := range v.Attributes() {
+				for _, c := range a.Children() {
+					visit(c)
+				}
+			}
+		}
+	}
+	for _, a := range root.Attributes() {
+		for _, c := range a.Children() {
+			visit(c)
+		}
+	}
+	return found
+}
+
 // collectSlots returns every *Slot reachable from n via attribute
 // children, depth-first.
 func collectSlots(n template.Node) []*template.Slot {
