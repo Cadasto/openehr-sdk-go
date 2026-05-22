@@ -403,6 +403,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
+| Clinical modeling | PROBE-022 | [`testkit/probes/template/`](../../testkit/probes/template/) — implemented (Sandbox); two fixture bodies (`vital_signs.opt`, `clinical_note.opt`) under `openehr/template/testdata/` |
 | Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |

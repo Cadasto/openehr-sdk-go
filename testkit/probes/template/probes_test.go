@@ -24,6 +24,11 @@ func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 			WantRMType:      "OBSERVATION",
 			WantArchetypeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
 		},
+		// At-code predicate — every OBSERVATION archetype root in
+		// vital_signs.opt carries at0000 as its own node id. Exercises
+		// the at-code branch of matchesPredicate (REQ-100 § Resolution
+		// semantics).
+		{Path: "/content[at0000]", WantRMType: "OBSERVATION", WantNodeID: "at0000"},
 		{Path: "/no_such_attribute", ExpectNotFound: true},
 		{Path: "/content[at9999]", ExpectNotFound: true},
 	}
@@ -36,6 +41,50 @@ func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 	}
 	if r.Probe != "PROBE-022" {
 		t.Errorf("Probe id = %q, want PROBE-022", r.Probe)
+	}
+}
+
+// PROBE-022 — second fixture body (clinical_notes.v0). Confirms the
+// probe runs against structurally distinct OPTs, not just one.
+func TestProbe022OPTPathResolution_ClinicalNote(t *testing.T) {
+	body := loadFixture(t, "clinical_note.opt")
+	assertions := []probes.PathAssertion{
+		{Path: "/", WantRMType: "COMPOSITION"},
+		{
+			Path:            "/content[openEHR-EHR-OBSERVATION.story.v1]",
+			WantRMType:      "OBSERVATION",
+			WantArchetypeID: "openEHR-EHR-OBSERVATION.story.v1",
+		},
+	}
+	r, err := probes.Probe022OPTPathResolution(body, assertions)
+	if err != nil {
+		t.Fatalf("Probe022: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe022 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// PROBE-022 — contradiction precedence. An assertion that sets both
+// ExpectNotFound and a positive want (WantRMType / WantNodeID /
+// WantArchetypeID) is a caller bug, not a fixture mismatch. The
+// probe MUST satisfy ExpectNotFound first (the negative branch
+// short-circuits before positive-want checks run), so a path that
+// genuinely does not exist passes regardless of the positive wants.
+// Documents the precedence rule for harness authors.
+func TestPathAssertion_PrecedenceContradiction(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	r, err := probes.Probe022OPTPathResolution(body, []probes.PathAssertion{
+		{Path: "/no_such_attribute", ExpectNotFound: true, WantRMType: "DV_TEXT"},
+	})
+	if err != nil {
+		t.Fatalf("Probe022: %v", err)
+	}
+	// ExpectNotFound short-circuits; the positive WantRMType is
+	// ignored on the negative branch. Validates the documented
+	// precedence: negative-first.
+	if r.Status != "pass" {
+		t.Fatalf("ExpectNotFound must short-circuit before WantRMType; status=%q detail=%q", r.Status, r.Detail)
 	}
 }
 

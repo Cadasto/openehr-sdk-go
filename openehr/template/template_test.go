@@ -1,6 +1,8 @@
 package template_test
 
 import (
+	"bytes"
+	"encoding/xml"
 	"errors"
 	"io/fs"
 	"os"
@@ -123,14 +125,21 @@ func TestParseOPT_MissingDefinition(t *testing.T) {
 // REQ-100 — ParseOPT MUST accept a UTF-8 BOM prefix (some authoring
 // tools emit BOM-prefixed UTF-8).
 func TestParseOPT_AcceptsBOM(t *testing.T) {
-	bytes, err := os.ReadFile(filepath.Join("testdata", "vital_signs.opt"))
+	// vital_signs.opt already ships with a BOM. Dual-prove BOM handling:
+	// (a) the on-disk fixture parses, and (b) a synthetic minimal OPT
+	// with an injected BOM also parses.
+	fixturePath := filepath.Join("testdata", "vital_signs.opt")
+	body, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	// vital_signs.opt already ships with a BOM — proof BOM handling
-	// works end to end is the existing identity test above. As a
-	// belt-and-braces unit guard, also accept BOM on a synthetic
-	// minimal OPT.
+	if !bytes.HasPrefix(body, []byte{0xEF, 0xBB, 0xBF}) {
+		t.Fatalf("fixture %s expected to ship with UTF-8 BOM (BOM-handling regression)", fixturePath)
+	}
+	if _, err := template.ParseOPT(bytes.NewReader(body)); err != nil {
+		t.Fatalf("ParseOPT(vital_signs.opt with BOM): %v", err)
+	}
+
 	const bom = "\xEF\xBB\xBF"
 	mini := bom + `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1">
@@ -139,7 +148,52 @@ func TestParseOPT_AcceptsBOM(t *testing.T) {
   <definition><rm_type_name>COMPOSITION</rm_type_name><node_id>at0000</node_id></definition>
 </template>`
 	if _, err := template.ParseOPT(strings.NewReader(mini)); err != nil {
-		t.Fatalf("ParseOPT with BOM: %v", err)
+		t.Fatalf("ParseOPT(synthetic mini with BOM): %v", err)
 	}
-	_ = bytes // capture for diagnostics on failure
+}
+
+// REQ-100 § Error taxonomy — ParseOPT MUST surface an <attributes>
+// element with an unknown xsi:type as ErrUnsupportedNode (wrapped via
+// ErrInvalidOPT). Unknown <children> xsi:type values are admitted as
+// forward-compatible leaves (parse.go default branch); only the
+// attribute taxonomy is closed in v1.
+func TestParseOPT_UnsupportedAttributeType(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>t</value></template_id>
+  <concept>t</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_TUPLE_ATTRIBUTE"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <rm_attribute_name>category</rm_attribute_name>
+    </attributes>
+  </definition>
+</template>`
+	_, err := template.ParseOPT(strings.NewReader(body))
+	if !errors.Is(err, template.ErrUnsupportedNode) {
+		t.Fatalf("got %v, want errors.Is(err, ErrUnsupportedNode) — chain must reach the inner sentinel through ErrInvalidOPT wrap", err)
+	}
+}
+
+// REQ-100 § Error taxonomy — malformed XML MUST be surfaced via
+// ErrInvalidOPT AND the inner *xml.SyntaxError must be reachable via
+// errors.As, so callers can render decoder-style positional context.
+// Validates the double-%w wrap in parse.go.
+func TestParseOPT_InvalidXML_UnwrapsXMLError(t *testing.T) {
+	// Unterminated element — guaranteed to trigger encoding/xml's
+	// SyntaxError type from the decoder.
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>oops</template_id>
+</template>`
+	_, err := template.ParseOPT(strings.NewReader(body))
+	if !errors.Is(err, template.ErrInvalidOPT) {
+		t.Fatalf("got %v, want ErrInvalidOPT", err)
+	}
+	var se *xml.SyntaxError
+	if !errors.As(err, &se) {
+		t.Fatalf("got %v, want chain to expose *xml.SyntaxError via errors.As", err)
+	}
 }
