@@ -27,9 +27,18 @@ var (
 
 	// ErrUnsupportedNode signals the parser encountered an
 	// <attributes> element whose xsi:type is outside the v1
-	// attribute taxonomy (C_SINGLE_ATTRIBUTE, C_MULTIPLE_ATTRIBUTE).
-	// Unknown <children> xsi:type values are NOT surfaced via this
-	// sentinel in v1; they are admitted as leaf *ComplexObject
-	// nodes (forward-compatible escape hatch).
+	// attribute taxonomy (C_SINGLE_ATTRIBUTE, C_MULTIPLE_ATTRIBUTE),
+	// or — in strict mode — a <children> xsi:type that the parser
+	// does not recognise AND that carries nested attributes. In
+	// lenient mode, unknown <children> xsi:type values are admitted
+	// as leaf *ComplexObject nodes (forward-compatible escape
+	// hatch).
 	ErrUnsupportedNode = errors.New("template: unsupported node shape")
+
+	// ErrAmbiguousPath signals strict-mode resolution found multiple
+	// candidate children for a predicate-less segment (the lenient
+	// "first-child" rule per REQ-100 would arbitrate a pick; strict
+	// mode forces the caller to disambiguate via predicate). Only
+	// surfaced when NodeAt is called with WithStrictPaths().
+	ErrAmbiguousPath = errors.New("template: ambiguous path resolution")
 )

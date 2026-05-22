@@ -134,10 +134,31 @@ func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 	return Path{segments: segs}, nil
 }
 
+// ResolveOption tunes path-resolution behaviour. Construct via the
+// With* functions in this package. Options compose; passing the same
+// option twice is idempotent.
+type ResolveOption func(*resolveOpts)
+
+type resolveOpts struct {
+	strictPaths bool
+}
+
+// WithStrictPaths enables strict-mode path resolution: a
+// predicate-less segment that matches an attribute with multiple
+// candidate children returns ErrAmbiguousPath instead of silently
+// picking the first child (REQ-100's documented default). Use this
+// in validators and code generators that must surface ambiguity to
+// the caller rather than guess.
+func WithStrictPaths() ResolveOption {
+	return func(o *resolveOpts) { o.strictPaths = true }
+}
+
 // NodeAt resolves a parsed path against the OPT definition tree.
 // Returns ErrPathNotFound (wrapped) when any segment fails to match
 // an attribute, when a predicate fails to match a child node id or
 // archetype id, or when descent encounters a non-descendable node.
+// Returns ErrAmbiguousPath when [WithStrictPaths] is set and a
+// predicate-less segment matches multiple candidate children.
 //
 // Match rules:
 //   - Segment names match attribute names exactly (case-sensitive).
@@ -145,20 +166,36 @@ func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 //     ArchetypeRoot.ArchetypeID() (full slot-fill archetype id).
 //   - When a segment has no predicate and the matched attribute has
 //     multiple children, the first child (document order) is taken
-//     deterministically.
+//     deterministically in lenient mode. In strict mode the call
+//     returns ErrAmbiguousPath.
 //
 // The root path (Path{}) returns the template root unchanged.
-func (t *OperationalTemplate) NodeAt(p Path) (Node, error) {
+func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error) {
 	if t == nil || t.root == nil {
 		return nil, fmt.Errorf("%w: empty template", ErrPathNotFound)
 	}
 	if p.IsRoot() {
 		return t.root, nil
 	}
-	return walkPath(t.root, p.segments)
+	o := resolveOpts{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+	return walkPath(t.root, p.segments, &o)
 }
 
-func walkPath(n Node, segs []pathSegment) (Node, error) {
+// ValidatePath reports whether p resolves against the OPT — a
+// composed shorthand for [OperationalTemplate.NodeAt] that discards
+// the resolved node. Returns the same sentinels as NodeAt
+// (ErrPathNotFound; ErrAmbiguousPath when strict). Convenience for
+// code-generator preconditions and call-site assertions that do not
+// need the resolved node.
+func (t *OperationalTemplate) ValidatePath(p Path, opts ...ResolveOption) error {
+	_, err := t.NodeAt(p, opts...)
+	return err
+}
+
+func walkPath(n Node, segs []pathSegment, o *resolveOpts) (Node, error) {
 	if len(segs) == 0 {
 		return n, nil
 	}
@@ -193,13 +230,17 @@ func walkPath(n Node, segs []pathSegment) (Node, error) {
 			return nil, fmt.Errorf("%w: predicate %q under %q", ErrPathNotFound, seg.predicate, seg.name)
 		}
 	} else {
+		if o.strictPaths && len(attr.children) > 1 {
+			return nil, fmt.Errorf("%w: attribute %q has %d candidates (add a predicate)",
+				ErrAmbiguousPath, seg.name, len(attr.children))
+		}
 		matched = attr.children[0]
 	}
 
 	if len(segs) == 1 {
 		return matched, nil
 	}
-	return walkPath(matched, segs[1:])
+	return walkPath(matched, segs[1:], o)
 }
 
 // descendableObject returns the embedded ComplexObject of a node

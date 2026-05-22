@@ -4,7 +4,7 @@
 **Status:** Draft
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
-**Implementation:** partial — Phases 1–2 landed, Phase 3 in flight; Phases 4+ deferred per follow-up sequencing
+**Implementation:** partial — Phases 1–3 landed (Root collapse deferred); Phases 4+ deferred per follow-up sequencing
 **Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
 **Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md))
 
@@ -89,7 +89,7 @@ Key findings from the XSD confirmed during planning:
    - **(a) ObjectNode/AttributeNode split** — recommended.
    - (b) Move `RMTypeName/NodeID` off the interface onto concrete object types.
    `ObjectNode` supertype enables walker `case ObjectNode:` to collapse `*ComplexObject` + `*ArchetypeRoot` arms.
-5. **`Root() Node` union collapse.** Store `*ComplexObject` directly; lift `archetypeID` to `OperationalTemplate.RootArchetypeID() string`. Smaller mental model.
+5. **`Root() Node` union collapse.** Store `*ComplexObject` directly; lift `archetypeID` to `OperationalTemplate.RootArchetypeID() string`. Smaller mental model. **Deferred** — paired with the Phase 4 open question about which type (`OperationalTemplate` vs `Compiled`) becomes the primary public API; making `Root()` lose its `*ArchetypeRoot` shape is a breaking change worth doing once, alongside the compiled-template surface.
 6. **`Cardinality` ergonomics** — add `String() string` and `IsValid() bool`.
 7. **`Attribute.children []Node` typing invariant** — document `*ComplexObject | *ArchetypeRoot | *Slot` only (fold into 4 if adopted).
 
@@ -402,7 +402,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 |---|---|
 | Phase 1 tests + traceability `landed` | landed |
 | Phase 2 parser hardening | landed |
-| Phase 3 path ergonomics (ErrAmbiguousPath, NodeKind, ObjectNode) | |
+| Phase 3 path ergonomics (ErrAmbiguousPath, NodeKind, ObjectNode) | landed (Root collapse deferred to Phase 4 — see open question) |
 | Phase 4-bis RMInfoLookup (codegen + PROBE-023) | |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | |
 | Phase 5 Walker pattern + composition walker | |

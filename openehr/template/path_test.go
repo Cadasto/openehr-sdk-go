@@ -407,6 +407,122 @@ func findSlotUnderRoot(t *testing.T, opt *template.OperationalTemplate) (attr, n
 	return "", ""
 }
 
+// Phase 3 — strict-mode resolution: a predicate-less segment over an
+// attribute with multiple candidate children returns ErrAmbiguousPath
+// rather than silently picking the first child.
+func TestNodeAt_StrictPathsRejectsAmbiguousSegment(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	p, err := opt.ParsePath("/content")
+	if err != nil {
+		t.Fatalf("ParsePath: %v", err)
+	}
+	// Lenient (default) — picks first child without error.
+	if _, err := opt.NodeAt(p); err != nil {
+		t.Fatalf("lenient NodeAt(/content): %v", err)
+	}
+	// Strict — vital_signs.opt has multiple OBSERVATION roots under
+	// /content, so a predicate-less /content must trip ErrAmbiguousPath.
+	if _, err := opt.NodeAt(p, template.WithStrictPaths()); !errors.Is(err, template.ErrAmbiguousPath) {
+		t.Fatalf("strict NodeAt(/content) = %v, want ErrAmbiguousPath", err)
+	}
+}
+
+// Phase 3 — strict-mode resolution still works with an explicit
+// predicate; ambiguity is only about predicate-less segments.
+func TestNodeAt_StrictPathsAcceptsPredicate(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	p, err := opt.ParsePath("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
+	if err != nil {
+		t.Fatalf("ParsePath: %v", err)
+	}
+	if _, err := opt.NodeAt(p, template.WithStrictPaths()); err != nil {
+		t.Errorf("strict NodeAt with predicate: %v", err)
+	}
+}
+
+// Phase 3 — ValidatePath composes NodeAt and discards the resolved
+// node. Same sentinel taxonomy.
+func TestValidatePath(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	good, _ := opt.ParsePath("/")
+	if err := opt.ValidatePath(good); err != nil {
+		t.Errorf("ValidatePath(/): %v", err)
+	}
+	bad, _ := opt.ParsePath("/nope")
+	if err := opt.ValidatePath(bad); !errors.Is(err, template.ErrPathNotFound) {
+		t.Errorf("ValidatePath(/nope) = %v, want ErrPathNotFound", err)
+	}
+	ambiguous, _ := opt.ParsePath("/content")
+	if err := opt.ValidatePath(ambiguous, template.WithStrictPaths()); !errors.Is(err, template.ErrAmbiguousPath) {
+		t.Errorf("ValidatePath(/content, strict) = %v, want ErrAmbiguousPath", err)
+	}
+}
+
+// Phase 3 — Multiplicity validation: parser rejects intervals with
+// concrete lower > upper at parse time.
+func TestParseOPT_RejectsInvertedMultiplicity(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>t</value></template_id>
+  <concept>t</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <occurrences>
+      <lower_unbounded>false</lower_unbounded>
+      <upper_unbounded>false</upper_unbounded>
+      <lower>5</lower>
+      <upper>2</upper>
+    </occurrences>
+  </definition>
+</template>`
+	_, err := template.ParseOPT(strings.NewReader(body))
+	if !errors.Is(err, template.ErrInvalidOPT) {
+		t.Fatalf("ParseOPT got %v, want ErrInvalidOPT for inverted multiplicity", err)
+	}
+}
+
+// Phase 3 — Cardinality.String / IsValid sanity.
+func TestCardinality_StringAndIsValid(t *testing.T) {
+	if got := template.Single.String(); got != "single" {
+		t.Errorf("Single.String() = %q, want %q", got, "single")
+	}
+	if got := template.Multiple.String(); got != "multiple" {
+		t.Errorf("Multiple.String() = %q, want %q", got, "multiple")
+	}
+	if !template.Single.IsValid() || !template.Multiple.IsValid() {
+		t.Errorf("Single and Multiple must report IsValid()=true")
+	}
+	if template.Cardinality(99).IsValid() {
+		t.Errorf("out-of-range Cardinality(99) must report IsValid()=false")
+	}
+	if got := template.Cardinality(99).String(); !strings.Contains(got, "99") {
+		t.Errorf("Cardinality(99).String() = %q, want token containing 99", got)
+	}
+}
+
+// Phase 3 — ObjectNode supertype: both *ComplexObject and
+// *ArchetypeRoot satisfy ObjectNode; *Slot and *Attribute do not.
+// Walker code can use a single `case template.ObjectNode:` arm
+// instead of listing the two concrete types.
+func TestObjectNode_SatisfiedByObjectNodes(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	root := opt.Root()
+	if _, ok := root.(template.ObjectNode); !ok {
+		t.Errorf("root %T does not satisfy ObjectNode", root)
+	}
+	// Find a *Slot in the tree and assert it does NOT satisfy
+	// ObjectNode (it is a leaf).
+	slots := collectSlots(opt.Root())
+	if len(slots) == 0 {
+		t.Skip("fixture has no *Slot to negative-check")
+	}
+	var slot template.Node = slots[0]
+	if _, ok := slot.(template.ObjectNode); ok {
+		t.Errorf("*Slot must NOT satisfy ObjectNode")
+	}
+}
+
 // collectSlots returns every *Slot reachable from n via attribute
 // children, depth-first.
 func collectSlots(n template.Node) []*template.Slot {

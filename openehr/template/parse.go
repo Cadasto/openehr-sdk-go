@@ -296,19 +296,27 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 			return nil, fmt.Errorf("%w: unknown xsi:type=%q on %q with %d nested attributes (strict mode)",
 				ErrUnsupportedNode, o.Type, o.RMTypeName, len(o.Attributes))
 		}
+		occ, err := intervalToMultiplicity(o.Occurrences)
+		if err != nil {
+			return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
+		}
 		return &ComplexObject{
 			rmTypeName:  o.RMTypeName,
 			nodeID:      o.NodeID,
-			occurrences: intervalToMultiplicity(o.Occurrences),
+			occurrences: occ,
 		}, nil
 	}
 }
 
 func buildComplexObject(o *xmlCObject, strict bool) (*ComplexObject, error) {
+	occ, err := intervalToMultiplicity(o.Occurrences)
+	if err != nil {
+		return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
+	}
 	co := &ComplexObject{
 		rmTypeName:  o.RMTypeName,
 		nodeID:      o.NodeID,
-		occurrences: intervalToMultiplicity(o.Occurrences),
+		occurrences: occ,
 	}
 	for _, a := range o.Attributes {
 		attr, err := buildAttribute(a, strict)
@@ -321,9 +329,13 @@ func buildComplexObject(o *xmlCObject, strict bool) (*ComplexObject, error) {
 }
 
 func buildAttribute(a *xmlCAttribute, strict bool) (*Attribute, error) {
+	existence, err := intervalToMultiplicity(a.Existence)
+	if err != nil {
+		return nil, fmt.Errorf("existence on attribute %q: %w", a.Name, err)
+	}
 	attr := &Attribute{
 		name:      a.Name,
-		existence: intervalToMultiplicity(a.Existence),
+		existence: existence,
 	}
 	switch a.Type {
 	case "C_SINGLE_ATTRIBUTE", "":
@@ -343,16 +355,23 @@ func buildAttribute(a *xmlCAttribute, strict bool) (*Attribute, error) {
 	return attr, nil
 }
 
-func intervalToMultiplicity(i *xmlInterval) *Multiplicity {
+func intervalToMultiplicity(i *xmlInterval) (*Multiplicity, error) {
 	if i == nil {
-		return nil
+		return nil, nil
+	}
+	// Reject inverted intervals at parse time so downstream walkers
+	// can assume `Lower <= Upper` whenever both bounds are present.
+	// Unbounded sides are skipped — by definition they have no
+	// concrete value to compare.
+	if !i.LowerUnbounded && !i.UpperUnbounded && i.Lower > i.Upper {
+		return nil, fmt.Errorf("inverted interval lower=%d > upper=%d", i.Lower, i.Upper)
 	}
 	return &Multiplicity{
 		lower:          i.Lower,
 		upper:          i.Upper,
 		lowerUnbounded: i.LowerUnbounded,
 		upperUnbounded: i.UpperUnbounded,
-	}
+	}, nil
 }
 
 func collectAssertions(xs []xmlAssertion) []string {

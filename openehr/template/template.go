@@ -1,6 +1,9 @@
 package template
 
-import "slices"
+import (
+	"slices"
+	"strconv"
+)
 
 // OperationalTemplate is a parsed ADL 1.4 operational template (OPT).
 // Construct via ParseOPT or ParseFile; the zero value is not useful.
@@ -110,6 +113,11 @@ func (t *OperationalTemplate) Root() Node { return t.root }
 // Implementations are *ComplexObject, *ArchetypeRoot, *Attribute, and
 // *Slot. The interface is closed; new concrete types may appear in a
 // future REQ but only within this package.
+//
+// Callers that walk the tree and need to distinguish descendable
+// objects from attribute carriers should match against ObjectNode
+// (covers *ComplexObject + *ArchetypeRoot) rather than re-listing
+// the two concrete types.
 type Node interface {
 	// RMTypeName returns the openEHR Reference Model class name this
 	// node constrains (e.g. "COMPOSITION", "DV_QUANTITY"). For an
@@ -123,6 +131,25 @@ type Node interface {
 	NodeID() string
 
 	isNode()
+}
+
+// ObjectNode is the supertype of the two descendable OPT node kinds
+// — *ComplexObject and *ArchetypeRoot. Walker code that does not
+// need to discriminate between archetype-root and bare complex-object
+// should type-switch on ObjectNode instead of listing the two
+// concrete types separately. *Slot and *Attribute are NOT
+// ObjectNodes (a slot is a leaf with opaque slot-fill semantics; an
+// attribute holds an RM attribute name and its children rather than
+// being a typed object).
+type ObjectNode interface {
+	Node
+	// Attributes returns the OPT-declared child attributes in
+	// document order. The returned slice is a defensive copy; see
+	// ComplexObject.Attributes.
+	Attributes() []*Attribute
+	// Occurrences returns the parsed occurrences interval, or nil
+	// when the OPT did not declare one for this node.
+	Occurrences() *Multiplicity
 }
 
 // Multiplicity is the min/max interval that OPT uses for both
@@ -159,6 +186,26 @@ const (
 	// Multiple corresponds to xsi:type="C_MULTIPLE_ATTRIBUTE".
 	Multiple
 )
+
+// String returns "single" or "multiple"; out-of-range values render
+// as "cardinality(N)" for diagnostic readability.
+func (c Cardinality) String() string {
+	switch c {
+	case Single:
+		return "single"
+	case Multiple:
+		return "multiple"
+	default:
+		return "cardinality(" + strconv.Itoa(int(c)) + ")"
+	}
+}
+
+// IsValid reports whether c is one of the recognised Cardinality
+// constants. Useful for guard assertions in walker code that build
+// Cardinality values from external input.
+func (c Cardinality) IsValid() bool {
+	return c == Single || c == Multiple
+}
 
 // ComplexObject is xsi:type="C_COMPLEX_OBJECT" in the OPT XML and
 // also the embedded payload of *ArchetypeRoot. It is used for both
@@ -227,6 +274,12 @@ func (a *Attribute) Existence() *Multiplicity { return a.existence }
 // Children returns a defensive copy of the child nodes in OPT
 // document order. The Node pointers themselves are still shared with
 // the OPT.
+//
+// Children are constrained by the OPT tree shape to be one of
+// *ComplexObject, *ArchetypeRoot, or *Slot — never another
+// *Attribute. Walker code that needs to descend may type-switch on
+// ObjectNode (covers ComplexObject + ArchetypeRoot) and treat *Slot
+// as a leaf.
 func (a *Attribute) Children() []Node { return slices.Clone(a.children) }
 
 // RMTypeName implements Node and always returns the empty string —
