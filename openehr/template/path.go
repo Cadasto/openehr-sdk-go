@@ -57,9 +57,10 @@ func (p Path) IsRoot() bool { return len(p.segments) == 0 }
 //
 // ParsePath validates grammar only — it does not check that segment
 // names or predicates resolve against any OPT. The template receiver
-// is retained for API symmetry with NodeAt and for future template-
-// aware path validation (see ValidatePath in the REQ-100 follow-up
-// plan); today the grammar is template-independent.
+// is retained for API symmetry with NodeAt; the grammar itself is
+// template-independent. For tree-aware validation use
+// [OperationalTemplate.ValidatePath] (or [OperationalTemplate.NodeAt]
+// when the resolved node is needed).
 func (t *OperationalTemplate) ParsePath(s string) (Path, error) {
 	if s == "" {
 		return Path{}, fmt.Errorf("%w: empty path", ErrPathSyntax)

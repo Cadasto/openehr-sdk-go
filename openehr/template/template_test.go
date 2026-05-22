@@ -412,3 +412,74 @@ func TestComplexObject_AttributesIsImmutable(t *testing.T) {
 		t.Errorf("Attributes() shared backing array: second call element nil-after-mutation or name=%v != %q", second[0], originalName)
 	}
 }
+
+// Phase 2 follow-up: map getter immutability — mutating the returned
+// Annotations / OriginalAuthors / OtherDetails map MUST NOT affect the
+// next caller, mirroring the slice-getter contract (godoc claims the
+// returned map is a defensive copy).
+func TestOperationalTemplate_MapGettersAreCloned(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>t</value></template_id>
+  <concept>t</concept>
+  <description>
+    <original_author id="name">Alice</original_author>
+    <original_author id="organisation">Acme</original_author>
+    <lifecycle_state>initial</lifecycle_state>
+    <other_details id="licence">CC-BY-SA</other_details>
+    <other_details id="sem_ver">1.2.3</other_details>
+  </description>
+  <definition><rm_type_name>COMPOSITION</rm_type_name></definition>
+  <annotations path="/content[at0001]">
+    <items id="comment">manual review</items>
+  </annotations>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+
+	t.Run("Annotations", func(t *testing.T) {
+		first := opt.Annotations()
+		delete(first, "/content[at0001]")
+		first["/poisoned"] = nil
+		second := opt.Annotations()
+		if _, ok := second["/content[at0001]"]; !ok {
+			t.Errorf("Annotations() shared map: /content[at0001] removed by caller delete")
+		}
+		if _, ok := second["/poisoned"]; ok {
+			t.Errorf("Annotations() shared map: /poisoned leaked from caller insert")
+		}
+	})
+
+	d := opt.Description()
+	if d == nil {
+		t.Fatal("Description() = nil")
+	}
+
+	t.Run("OriginalAuthors", func(t *testing.T) {
+		first := d.OriginalAuthors()
+		first["name"] = "MUTATED"
+		first["poisoned"] = "x"
+		second := d.OriginalAuthors()
+		if second["name"] != "Alice" {
+			t.Errorf("OriginalAuthors() shared map: name=%q, want %q", second["name"], "Alice")
+		}
+		if _, ok := second["poisoned"]; ok {
+			t.Errorf("OriginalAuthors() shared map: poisoned key leaked")
+		}
+	})
+
+	t.Run("OtherDetails", func(t *testing.T) {
+		first := d.OtherDetails()
+		first["sem_ver"] = "MUTATED"
+		delete(first, "licence")
+		second := d.OtherDetails()
+		if second["sem_ver"] != "1.2.3" {
+			t.Errorf("OtherDetails() shared map: sem_ver=%q, want %q", second["sem_ver"], "1.2.3")
+		}
+		if second["licence"] != "CC-BY-SA" {
+			t.Errorf("OtherDetails() shared map: licence removed by caller, got %q", second["licence"])
+		}
+	})
+}

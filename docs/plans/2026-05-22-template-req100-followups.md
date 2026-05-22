@@ -1,7 +1,7 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Draft
+**Status:** Phases 1–3 landed; Phases 4+ deferred
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** partial — Phases 1–3 landed (Root collapse deferred); Phases 4+ deferred per follow-up sequencing
@@ -82,7 +82,7 @@ Key findings from the XSD confirmed during planning:
 
 **Tasks:**
 
-1. **`ErrAmbiguousPath`** (new sentinel) — when predicate-less segment has `len(children) > 1`, or duplicate predicate match; optional `WithStrictPaths()` on `OperationalTemplate` resolution (default: current first-child rule per REQ-100).
+1. **`ErrAmbiguousPath`** (new sentinel) — surfaced in strict mode when a predicate-less segment has `len(children) > 1`; optional `WithStrictPaths()` on `OperationalTemplate.NodeAt` (default: current first-child rule per REQ-100). Duplicate-predicate ambiguity (two children sharing the same node-id or archetype-id under a single attribute) is **not** flagged in v1 — first match wins; revisit if a real OPT shape surfaces it.
 2. **`ValidatePath(p Path) error`** — optional walk that checks segment names exist on tree (today `ParsePath` is syntax-only).
 3. **`Multiplicity` validation** — reject `lower > upper` at parse time if both set.
 4. **`Attribute` in `Node` interface — category-error fix.** Two cleaner shapes:
@@ -402,7 +402,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 |---|---|
 | Phase 1 tests + traceability `landed` | landed |
 | Phase 2 parser hardening | landed |
-| Phase 3 path ergonomics (ErrAmbiguousPath, NodeKind, ObjectNode) | landed (Root collapse deferred to Phase 4 — see open question) |
+| Phase 3 path ergonomics (ErrAmbiguousPath, ObjectNode, ValidatePath) | landed (Root collapse deferred to Phase 4 — see open question) |
 | Phase 4-bis RMInfoLookup (codegen + PROBE-023) | |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | |
 | Phase 5 Walker pattern + composition walker | |

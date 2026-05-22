@@ -1,6 +1,7 @@
 package template
 
 import (
+	"maps"
 	"slices"
 	"strconv"
 )
@@ -43,8 +44,12 @@ func (t *OperationalTemplate) Description() *Description { return t.description 
 // Annotations returns the parsed <annotations path="..."> blocks,
 // keyed by the path attribute (empty string when the annotation has
 // no path). Returns nil when the OPT carries no annotations or only
-// empty ones. The returned map MUST NOT be mutated by callers.
-func (t *OperationalTemplate) Annotations() map[string][]Annotation { return t.annotations }
+// empty ones. The returned map is a defensive copy: map mutation
+// does not affect the underlying template (the Annotation slice
+// headers and their entries are still shared with the OPT).
+func (t *OperationalTemplate) Annotations() map[string][]Annotation {
+	return maps.Clone(t.annotations)
+}
 
 // Annotation is one <items id="..."> entry inside an <annotations>
 // block. Annotations carry UI / editor hints in the OPT and are
@@ -80,24 +85,25 @@ func (d *Description) LifecycleState() string {
 
 // OriginalAuthors returns the parsed <original_author id="...">
 // attribute map (e.g. {"name": "Alice", "organisation": "Acme"}).
-// Returns nil when the OPT omits the element; never mutate the
-// returned map.
+// Returns nil when the OPT omits the element. The returned map is
+// a defensive copy: caller mutation does not affect the underlying
+// Description.
 func (d *Description) OriginalAuthors() map[string]string {
 	if d == nil {
 		return nil
 	}
-	return d.originalAuthors
+	return maps.Clone(d.originalAuthors)
 }
 
 // OtherDetails returns the parsed <other_details id="..."> attribute
 // map. These are open-ended provenance fields (e.g. "licence",
-// "sem_ver", "build_uid"). Returns nil when absent; never mutate the
-// returned map.
+// "sem_ver", "build_uid"). Returns nil when absent. The returned
+// map is a defensive copy.
 func (d *Description) OtherDetails() map[string]string {
 	if d == nil {
 		return nil
 	}
-	return d.otherDetails
+	return maps.Clone(d.otherDetails)
 }
 
 // Root returns the root definition node. Its RMTypeName is the

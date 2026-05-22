@@ -10,8 +10,11 @@ import (
 )
 
 // PathAssertion describes one expected path → node match for
-// PROBE-022. At most one of WantNodeID, WantArchetypeID, or
-// WantRMType is non-empty; if multiple are set, all MUST match.
+// PROBE-022. Any combination of WantRMType, WantNodeID, and
+// WantArchetypeID may be set; every non-empty Want* field MUST
+// match the resolved node. Leaving all Want* fields empty asserts
+// only that the path resolves successfully (or fails — see
+// ExpectNotFound).
 type PathAssertion struct {
 	// Path is the openEHR path string (REQ-100 § Path syntax subset).
 	Path string
