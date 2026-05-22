@@ -88,6 +88,14 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 // a request (e.g. to extract the SpecVersion for observability).
 func (c *Client) Catalog() *discovery.ServiceCatalog { return c.catalog }
 
+// HTTPClient returns the injected *http.Client (REQ-021). Exposed so
+// SDK packages that need to issue requests outside the catalog-routed
+// Do pipeline — e.g. cadasto/admin/ deployment-level health probes
+// (SDK-GAP-07) — can reuse the configured HTTP transport without
+// re-injection or wrapping. Returns nil only when New rejected the
+// configuration (which is impossible for a constructed Client).
+func (c *Client) HTTPClient() *http.Client { return c.cfg.httpClient }
+
 // Do executes req and returns the captured Response. Status codes in
 // 2xx surface as a non-nil Response with err=nil; non-2xx surface as
 // err of type *WireError plus a possibly-non-nil Response carrying the

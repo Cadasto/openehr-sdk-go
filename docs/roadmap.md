@@ -102,7 +102,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Cadasto Extra API | **Planned** | `cadasto/extra/` | |
 | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 | |
 | MPI preview | **Planned** | `cadasto/mpi/` | |
-| Cadasto admin | **Planned** | `cadasto/admin/` | Distinct from ITS Admin client |
+| Cadasto admin | **Partial** | `cadasto/admin/` | Health probes (`Live`, `Ready`) landed per SDK-GAP-07; tenant/env/system-info planned. Distinct from ITS Admin client. |
 | Care aggregates | **Planned** | `cadasto/care/` | |
 
 ---
