@@ -403,7 +403,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Phase 1 tests + traceability `landed` | landed |
 | Phase 2 parser hardening | landed |
 | Phase 3 path ergonomics (ErrAmbiguousPath, ObjectNode, ValidatePath) | landed (Root collapse deferred to Phase 4 — see open question) |
-| Phase 4-bis RMInfoLookup (codegen + PROBE-023) | |
+| Phase 4-bis RMInfoLookup (codegen + PROBE-023) | landed (codegen + tests; PROBE-023 deferred to consumer surface) |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | |
 | Phase 5 Walker pattern + composition walker | |
 | Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | |

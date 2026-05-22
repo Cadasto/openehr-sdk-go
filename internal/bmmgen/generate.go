@@ -333,6 +333,32 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 		}
 	}
 
+	// rminfo lookup data — emitted alongside the RM target (one
+	// sub-package down). RenderRMInfoFile returns nil for non-RM
+	// targets, so AOM 1.4 doesn't get one. Lives in its own
+	// sub-package so it can be imported by the openehr/template
+	// compile step without dragging in the full rm package.
+	if rminfoBody, err := RenderRMInfoFile(plan); err != nil {
+		return tr, err
+	} else if rminfoBody != nil {
+		rminfoPath := filepath.Join(opts.OutDir, "openehr", "rm", "rminfo", "lookup_gen.go")
+		tr.Files = append(tr.Files, rminfoPath)
+		result.Files = append(result.Files, rminfoPath)
+		if opts.Verify {
+			drift, err := compareFile(rminfoPath, rminfoBody)
+			if err != nil {
+				return tr, err
+			}
+			if drift != nil {
+				result.Drifts = append(result.Drifts, *drift)
+			}
+		} else {
+			if err := writeAtomic(rminfoPath, rminfoBody); err != nil {
+				return tr, err
+			}
+		}
+	}
+
 	tr.MethodStubsEmitted = plan.MethodStubsEmitted
 	tr.MethodTodoEscapes = plan.MethodTodoEscapes
 	result.MethodStubsEmitted += plan.MethodStubsEmitted
