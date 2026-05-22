@@ -1,13 +1,13 @@
 # Plan — ADL 1.4 operational template (OPT) parser and path utilities
 
 **Date:** 2026-05-21
-**Status:** Draft
+**Status:** Implemented (Sandbox)
 **Owner:** SDK maintainers
-**Covers:** REQ-013, REQ-014; proposed **REQ-100** (ADL 1.4 OPT parse + paths) — normative stub in Phase 0
-**Probes:** PROBE-022 (proposed — OPT path resolution); ratification deferred (REQ-081)
-**Implementation:** planned
+**Covers:** REQ-013, REQ-014; **REQ-100** (ADL 1.4 OPT parse + paths) — canonical spec at [`docs/specifications/clinical-modeling.md`](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths).
+**Probes:** PROBE-022 (OPT path resolution) — sandbox; cross-SDK ratification deferred (REQ-081).
+**Implementation:** partial — parser, path utilities, and sandbox probe landed; OET, ADL 2, and full Archie linker remain out of scope.
 **Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
-**Defers:** ADL2 / AOM 2.4 OPT; **OET** (`.oet` authoring templates); package-deployment to CDR (use `openehr/client/definition/`); FLAT path keys (REQ-053)
+**Defers:** ADL2 / AOM 2.4 OPT; **OET** (`.oet` authoring templates); package-deployment to CDR (use `openehr/client/definition/`); FLAT path keys (REQ-053). Post–PR #10 hardening: [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md).
 
 ## Goal
 
@@ -139,12 +139,13 @@ Functional options only if needed (e.g. `WithStrictPaths()`); default strict.
 
 | Step | Status |
 |---|---|
-| REQ-100 in `docs/specifications/clinical-modeling.md` + REQ.md + traceability | |
-| Fixtures + README (`.opt` only) | |
-| `ParseOPT` + tree walk | |
-| Path parse + `NodeAt` | |
-| `cmd/examples/opt-parse` | |
-| `make spec-check` + `make ci` | |
+| REQ-100 in `docs/specifications/clinical-modeling.md` + REQ.md + traceability | done |
+| Fixtures + README (`.opt` only) | done — `vital_signs.opt`, `clinical_note.opt` under `openehr/template/testdata/` |
+| `ParseOPT` + tree walk | done — `parse.go`; OPT root archetype-root detection via embedded `archetype_id` |
+| Path parse + `NodeAt` | done — `path.go`; archetype-id and at-code predicates |
+| `cmd/examples/opt-parse` | done |
+| PROBE-022 sandbox probe | done — `testkit/probes/template/probe_022_opt_path_resolution.go` |
+| `make spec-check` + `make ci` | green |
 
 ## Mapping to specs
 

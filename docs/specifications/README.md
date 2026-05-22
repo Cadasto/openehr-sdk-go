@@ -114,6 +114,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [wire.md](wire.md) | openEHR REST 1.1.0-development pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
 | [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
 | [conformance.md](conformance.md) | Probe catalog and cross-SDK parity contract with the PHP SDK |
+| [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths (REQ-100); composition, validation, AQL paths follow in later REQs |
 | [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, POC extraction scope |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 

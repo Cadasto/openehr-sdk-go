@@ -18,7 +18,8 @@ Deliver in order; umbrella plan holds sequencing and dependency rules.
 | Plan | Scope | Covers REQs / probes |
 |---|---|---|
 | [2026-05-21-phase-2-clinical-building-blocks.md](2026-05-21-phase-2-clinical-building-blocks.md) | Umbrella — template → composition → validation → AQL builders | REQ-013, REQ-014; links REQ-055, REQ-053 (deferred) |
-| [2026-05-21-template-parser.md](2026-05-21-template-parser.md) | `openehr/template/` — ADL 1.4 OPT (`.opt`) parse, `OperationalTemplate`, paths; OET out of scope | REQ-100 (proposed); PROBE-022 (proposed) |
+| [2026-05-21-template-parser.md](2026-05-21-template-parser.md) | `openehr/template/` — ADL 1.4 OPT (`.opt`) parse, `OperationalTemplate`, paths; OET out of scope | REQ-100; PROBE-022 |
+| [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) | Post–PR #10 hardening: tests, traceability `landed`, optional strict parse | REQ-100; PROBE-022 |
 | [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | `openehr/composition/` — generic OPT-driven builder | REQ-101 (proposed); PROBE-023 (proposed) |
 | [2026-05-21-validation.md](2026-05-21-validation.md) | `openehr/validation/` — comp↔OPT, demographic, AQL lint | REQ-102 (proposed); PROBE-024 (proposed); PROBE-021 (execute) |
 | [2026-05-21-aql-builders.md](2026-05-21-aql-builders.md) | `openehr/aql/` — struct + verb builders (executor already landed) | REQ-055; PROBE-020, PROBE-021 |

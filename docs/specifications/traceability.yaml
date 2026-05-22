@@ -332,5 +332,19 @@ requirements:
     canonical: docs/specifications/conformance.md#runnability
     status: draft
     implementation: partial
-    packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery]
-    probes: [PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067]
+    packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
+    probes: [PROBE-022, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067]
+
+  - id: REQ-100
+    title: ADL 1.4 operational template (OPT) parse and paths
+    canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
+    status: draft
+    implementation: partial
+    packages: [openehr/template, testkit/probes/template]
+    probes: [PROBE-022]
+    tests:
+      - openehr/template/template_test.go
+      - openehr/template/path_test.go
+      - testkit/probes/template/probes_test.go
+    plans:
+      - docs/plans/2026-05-21-template-parser.md
