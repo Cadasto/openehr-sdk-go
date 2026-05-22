@@ -189,6 +189,14 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Draft.
 
+#### PROBE-022 — OPT path resolution
+
+- **Title:** Parsing an ADL 1.4 operational template (OPT) and resolving a fixture-defined list of openEHR paths returns nodes whose RM type, archetype node id, and (for archetype roots) archetype id match the expected values; explicitly unknown attributes and unmatched predicates produce `ErrPathNotFound`.
+- **Preconditions:** A reference OPT body (XML bytes) and an assertion list mapping paths to expected node identity.
+- **Wire assertion:** Sandbox-only — `template.ParseOPT` + `template.ParsePath` + `OperationalTemplate.NodeAt` against the fixture body MUST match every assertion in the list. Negative assertions (`ExpectNotFound`) MUST surface `ErrPathNotFound` (wrapped).
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/template/probe_022_opt_path_resolution.go`](../../testkit/probes/template/probe_022_opt_path_resolution.go).
+
 ### Canonical JSON and formats
 
 #### PROBE-030 — Canonical-JSON round trip
