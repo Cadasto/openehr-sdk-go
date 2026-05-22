@@ -84,10 +84,93 @@ Close gaps identified in PR #10 review **without** blocking merge of the initial
 6. **`Cardinality` ergonomics** — add `String() string` and `IsValid() bool` methods. Today `Cardinality(42)` is constructible and the zero value coincides with `Single`; both are correct but diagnostics would benefit from a stringer.
 7. **`Attribute.children []Node` typing** — only `*ComplexObject | *ArchetypeRoot | *Slot` can appear there; `*Attribute` cannot. Either document this invariant in the `Children()` godoc, or fold into the `ObjectNode` split above.
 
+## Phase 4 — Recursive traversal + consumer-driven extensions (before REQ-101 / REQ-102)
+
+**Outcome:** Composition builder (REQ-101) and validation (REQ-102) can walk the OPT tree without rewriting visitor boilerplate, and reach the constraint detail their use cases require.
+
+### What works today (no change needed)
+
+Every node in the definition tree is reachable via the existing public API. A hand-rolled depth-first visitor is ~15 lines:
+
+```go
+func Walk(n template.Node, visit func(template.Node)) {
+    visit(n)
+    switch v := n.(type) {
+    case *template.ArchetypeRoot:
+        for _, a := range v.Attributes() { Walk(a, visit) }
+    case *template.ComplexObject:
+        for _, a := range v.Attributes() { Walk(a, visit) }
+    case *template.Attribute:
+        for _, c := range v.Children()   { Walk(c, visit) }
+    case *template.Slot:
+        // leaf
+    }
+}
+```
+
+So the **shape** of the tree is fully traversable. What's missing is ergonomic helpers and **constraint payload depth** at the leaves.
+
+### 4.1 Walker helpers (low-risk, can land independently)
+
+**Tasks:**
+
+1. **`template.Walk(n Node, visit func(Node) error) error`** — depth-first visitor; returns the first non-nil error from `visit`. Sentinel `template.SkipSubtree` (returned from `visit`) skips children but continues siblings.
+2. **`template.WalkPath(opt *OperationalTemplate, visit func(Path, Node) error) error`** — path-aware variant. `Path` accumulates as the walker descends; predicates are added per archetype-root / node-id boundary so consumers can use the path as a stable key.
+3. **`ObjectNode` interface** — supertype of `*ComplexObject` and `*ArchetypeRoot` exposing `Attributes() []*Attribute`. Lets visitors collapse the two type-switch arms. Pairs naturally with Phase 3 task 4 (Attribute category-error fix).
+
+**Open questions** (resolve when REQ-101 implementation begins, not before):
+
+- Does `WalkPath` predicate every archetype-root segment (`/content[openEHR-EHR-OBSERVATION...]`) or every node-id (`/content[at0001]`)? Two different stable-key strategies, FLAT-format vs at-code-keyed; consumer call sites will pick.
+- Does `visit` receive parent context (e.g. `(Path, Node, parent ObjectNode)`)? Validator likely yes; composition builder maybe not.
+
+### 4.2 Primitive constraint payload — gap blocking REQ-102
+
+Today v1 leaf nodes (`C_PRIMITIVE_OBJECT`, `C_CODE_PHRASE`, `C_DV_QUANTITY`, `C_DV_ORDINAL`) collapse to a bare `*ComplexObject` carrying only the RM type name string. The constraint detail in the OPT XML is **silently dropped**.
+
+This blocks:
+
+- **REQ-102 validation:** "the systolic value MUST be 0..300 mmHg" — the magnitude range and unit list live in `<children xsi:type="C_DV_QUANTITY">` payload which is not currently parsed.
+- **REQ-101 composition builder defaults:** "this OPT defaults the language to en" — `default_value` blocks are not parsed.
+
+**Candidate REQs to file when REQ-101 / REQ-102 begin:**
+
+- **REQ-103 (proposed):** Primitive constraint introspection — extend the `Node` taxonomy with typed leaves (`PrimitiveObject` with method `Constraints() PrimitiveConstraint`) carrying union types for `DV_QUANTITY` (units, magnitude range, precision), `CODE_PHRASE` (terminology id, code list), `C_STRING` (pattern, allowed values), etc.
+- **REQ-104 (proposed):** Slot assertion grammar — parse `archetype_id matches {...}` assertion expressions in `*Slot.Includes()` / `*Slot.Excludes()` into a typed predicate AST. Today these are raw text.
+- **REQ-105 (proposed):** Terminology bindings (`<term_definitions>` and `<term_bindings>` blocks) — parsed metadata that maps at-codes to display text and external terminology codes. Required for clinical-display tooling and AQL-result rendering, but not for parse/path basics.
+
+**Design choice:** Where do REQ-103 leaves live?
+
+- **Option A:** Extend `openehr/template/` with typed primitive leaves. Keeps the parser self-contained; grows the public surface.
+- **Option B:** Add a sibling package `openehr/template/constraints/` that re-walks the OPT XML for primitive payload only. Keeps the v1 surface stable; adds a second pass over the bytes.
+- **Option C:** Bring back `openehr/aom/aom14/` for primitive constraint types only (selective import). Reuses generated code but reintroduces the dependency this plan deliberately avoided.
+
+Pick when REQ-102 design begins and the validator's actual access pattern is clear.
+
+### 4.3 What REQ-101 / REQ-102 will and will not get from this package
+
+| Need | Current state | Gap closed in |
+|---|---|---|
+| Walk every node | ✅ via hand-rolled visitor | helper landing in Phase 4.1 |
+| RM type at any path | ✅ `node.RMTypeName()` | — |
+| at-code at any path | ✅ `node.NodeID()` | — |
+| Archetype id at archetype root | ✅ `ar.ArchetypeID()` | — |
+| Cardinality (single / multiple) on attributes | ✅ `attr.Cardinality()` | — |
+| Existence / occurrences intervals | ✅ `attr.Existence()` / `co.Occurrences()` | — |
+| **Primitive constraint payload** (units, ranges, code lists) | ❌ leaf-only | REQ-103 (proposed) |
+| **Slot assertion AST** | ⚠️ raw strings via `slot.Includes()` | REQ-104 (proposed) |
+| **Terminology bindings** | ❌ not parsed | REQ-105 (proposed) |
+| **Default values** | ❌ not parsed | REQ-103 or REQ-101 design |
+
+### 4.4 Sequencing
+
+1. Phase 4.1 walker helpers **MAY** land before REQ-101 begins, or alongside the first REQ-101 implementation PR. Low risk, additive only.
+2. REQ-103 / REQ-104 / REQ-105 **SHOULD NOT** be authored speculatively — defer until REQ-101 (composition builder) or REQ-102 (validation) call sites reveal which constraint detail is actually consumed and at what call-frequency.
+3. The walker helper signatures **MUST** be informed by real REQ-101 / REQ-102 implementation usage, not guessed in isolation. Land them in the same PR as the first consumer.
+
 ## Out of scope (this plan)
 
 - OET parse; ADL 2 OPT; Archie linker; terminology expansion (unchanged REQ-100 v1 bounds).
-- Importing `openehr/aom/aom14/` into parser (defer until constraint payloads are needed for REQ-102 validation).
+- Importing `openehr/aom/aom14/` into parser (defer until constraint payloads are needed for REQ-102 validation; see Phase 4.2 Option C).
 
 ## Implementation checklist
 
@@ -97,6 +180,8 @@ Close gaps identified in PR #10 review **without** blocking merge of the initial
 | Traceability `landed` + conformance matrix row | |
 | Phase 2 immutability / strict parse (if adopted) | |
 | Phase 3 ambiguity / ValidatePath (if needed for composition) | |
+| Phase 4.1 walker helpers (alongside first REQ-101 consumer PR) | |
+| REQ-103 / REQ-104 / REQ-105 spec drafts (only when REQ-101 / REQ-102 surface real call sites) | |
 | `make ci` | |
 
 ## Mapping to specs
