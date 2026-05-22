@@ -2,7 +2,7 @@
 
 **Narrative companion to [`docs/specifications/`](../docs/specifications/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.
 
-> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, canonical XML, `transport/` (incl. observer / NoRetry — REQ-096, REQ-098), auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart` — PKCE/JWKS/refresh), `smart/discovery/`, `smart/` LaunchContext + RS256 ID-token validation, openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write incl. ItemTags, `openehr/client/definition` ADL 1.4 + stored AQL, `openehr/client/query` AQL execute, `openehr/client/admin`), and `openehr/template/` (ADL 1.4 OPT parse + path utilities — REQ-100) are landed. Composition builder, AQL builder, App Registration, and Cadasto extras remain open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
+> **Status: early implementation.** BMM loader, codegen, type registry, canonical JSON, canonical XML, `transport/` (incl. observer / NoRetry — REQ-096, REQ-098), auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart` — PKCE/JWKS/refresh), `smart/discovery/`, `smart/` LaunchContext + RS256 ID-token validation, openEHR REST clients (`openehr/client/system`, `openehr/client/ehr` read/write incl. ItemTags, `openehr/client/definition` ADL 1.4 + stored AQL, `openehr/client/query` AQL execute, `openehr/client/admin`), `openehr/template/` (ADL 1.4 OPT parse + path utilities — REQ-100), `openehr/rm/rminfo/` (BMM lookup — [ADR 0005](adr/0005-compiled-template-foundation.md)), and `internal/templatecompile/` (compiled OPT tree) are landed. Composition builder, AQL builder, App Registration, and Cadasto extras remain open. Sections below describe both the intended shape and what runs today (`make test`, `make codegen`).
 
 ## Where to find what
 
@@ -135,7 +135,10 @@ Anything under `internal/` is excluded from BC promises (REQ-005). Today this ho
 | BMM loader | [`openehr/bmm/`](../openehr/bmm/) | `LoadAll`, `FSResolver`, descendant-shadows-ancestor merge |
 | Code generator | [`internal/bmmgen/`](../internal/bmmgen/), [`cmd/bmmgen`](../cmd/bmmgen) | `make codegen` / `make codegen-verify` (chained in `make test`) |
 | Generated RM | [`openehr/rm/`](../openehr/rm/) | `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go`, `typereg_gen.go` |
+| RM structural lookup | [`openehr/rm/rminfo/`](../openehr/rm/rminfo/) | BMM-derived `lookup_gen.go`; [ADR 0005](adr/0005-compiled-template-foundation.md) |
+| Compiled OPT (internal) | [`internal/templatecompile/`](../internal/templatecompile/) | `Compile`, AQL paths, implicit attrs; consumed by REQ-101/102 |
 | Generated AOM 1.4 | [`openehr/aom/aom14/`](../openehr/aom/aom14/) | One-way import of `rm` for base types |
+| OPT wire parser | [`openehr/template/`](../openehr/template/) | REQ-100; PROBE-022 |
 | Type registry | [`openehr/rm/typereg/`](../openehr/rm/typereg/) | Hand-written `Registry`; registrations in `typereg_gen.go` per ADR 0002 |
 | Canonical JSON | [`openehr/serialize/canjson/`](../openehr/serialize/canjson/) | REQ-052; PROBE-030/031 |
 | Canonical XML | [`openehr/serialize/canxml/`](../openehr/serialize/canxml/) | REQ-056; PROBE-033/034; `xsi:type` dispatch via typereg; `archetype_node_id` as XSD attribute |
@@ -172,4 +175,4 @@ Semver via standard Go module versioning. Module path locked at `github.com/cada
 
 ## Open decisions
 
-Tracked in [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md). STRAND-07 resolved (versioning + module path); STRAND-04 partially resolved (EVENT + numeric wire — ADRs 0003–0004). Four ADRs Accepted under [`adr/`](adr/). Resolutions become ADRs here.
+Tracked in [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md). STRAND-07 resolved (versioning + module path); STRAND-04 partially resolved (EVENT + numeric wire — ADRs 0003–0004). Five ADRs Accepted under [`adr/`](adr/) (0001–0005). Resolutions become ADRs here.

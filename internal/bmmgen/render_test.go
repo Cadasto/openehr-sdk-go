@@ -197,7 +197,9 @@ func TestVerifyOnFreshTreeIsClean(t *testing.T) {
 }
 
 // compareDirs asserts that every file in a exists in b with the
-// same content, and vice versa.
+// same content, and vice versa. Recurses into sub-directories so
+// targets that emit into sub-packages (e.g. openehr/rm/rminfo/) are
+// covered.
 func compareDirs(t *testing.T, a, b string) {
 	t.Helper()
 	aEntries, err := os.ReadDir(a)
@@ -214,6 +216,10 @@ func compareDirs(t *testing.T, a, b string) {
 	for _, ae := range aEntries {
 		ap := filepath.Join(a, ae.Name())
 		bp := filepath.Join(b, ae.Name())
+		if ae.IsDir() {
+			compareDirs(t, ap, bp)
+			continue
+		}
 		ab, err := os.ReadFile(ap)
 		if err != nil {
 			t.Fatalf("read %s: %v", ap, err)
