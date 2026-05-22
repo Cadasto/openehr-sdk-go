@@ -339,7 +339,7 @@ requirements:
     title: ADL 1.4 operational template (OPT) parse and paths
     canonical: docs/specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [openehr/template, testkit/probes/template]
     probes: [PROBE-022]
     tests:
@@ -348,3 +348,4 @@ requirements:
       - testkit/probes/template/probes_test.go
     plans:
       - docs/plans/2026-05-21-template-parser.md
+      - docs/plans/2026-05-22-template-req100-followups.md

@@ -201,6 +201,355 @@ func TestNodeAt_DeepNonexistent(t *testing.T) {
 	}
 }
 
+// REQ-100 § Resolution semantics — predicate by at-code selects a
+// specific archetype-root sibling. Complements TestNodeAt_PredicateArchetypeID
+// (which uses an archetype-id predicate) by exercising the at-code
+// branch of matchesPredicate.
+func TestNodeAt_PredicateAtCode(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	// Find an at-code on a content child; vital_signs.opt's OBSERVATION
+	// archetype roots each carry at0000 as their own node id, so we
+	// instead descend into one and pick a deeper at-code.
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("root = %T, want *template.ArchetypeRoot", opt.Root())
+	}
+	atCode, hostAttr := findAtCode(t, root)
+	if atCode == "" {
+		t.Skip("fixture changed: no at-code child found under root")
+	}
+
+	path := "/" + hostAttr + "[" + atCode + "]"
+	p, err := opt.ParsePath(path)
+	if err != nil {
+		t.Fatalf("ParsePath(%q): %v", path, err)
+	}
+	n, err := opt.NodeAt(p)
+	if err != nil {
+		t.Fatalf("NodeAt(%q): %v", path, err)
+	}
+	if n.NodeID() != atCode {
+		t.Errorf("NodeAt(%q) NodeID = %q, want %q", path, n.NodeID(), atCode)
+	}
+}
+
+// REQ-100 § Resolution semantics — *Slot is a leaf in v1; an OPT
+// path that attempts to descend through a slot returns
+// ErrPathNotFound (the slot's child shape is opaque until slot-fill
+// validation lands — REQ-104).
+func TestNodeAt_CannotDescendSlot(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	slotAttrName, slotNodeID := findSlotUnderRoot(t, opt)
+	if slotAttrName == "" {
+		t.Skip("fixture changed: vital_signs.opt no longer carries a top-level *Slot")
+	}
+	// First, resolve the slot itself — that must succeed.
+	slotPath := "/" + slotAttrName
+	if slotNodeID != "" {
+		slotPath += "[" + slotNodeID + "]"
+	}
+	p, err := opt.ParsePath(slotPath)
+	if err != nil {
+		t.Fatalf("ParsePath(%q): %v", slotPath, err)
+	}
+	slotNode, err := opt.NodeAt(p)
+	if err != nil {
+		t.Fatalf("NodeAt(%q): %v", slotPath, err)
+	}
+	if _, ok := slotNode.(*template.Slot); !ok {
+		t.Fatalf("NodeAt(%q) = %T, want *template.Slot", slotPath, slotNode)
+	}
+
+	// Then attempt to descend through the slot — must fail with
+	// ErrPathNotFound (the "cannot descend" branch in walkPath).
+	deeper := slotPath + "/anything"
+	dp, err := opt.ParsePath(deeper)
+	if err != nil {
+		t.Fatalf("ParsePath(%q): %v", deeper, err)
+	}
+	if _, err := opt.NodeAt(dp); !errors.Is(err, template.ErrPathNotFound) {
+		t.Fatalf("NodeAt(%q) = %v, want ErrPathNotFound", deeper, err)
+	}
+}
+
+// REQ-100 § Resolution semantics — at least one *Slot exists under the
+// vital_signs fixture, and at least one carries a non-empty includes
+// assertion string.
+func TestParseFile_VitalSigns_ContainsSlot(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	slots := collectSlots(opt.Root())
+	if len(slots) == 0 {
+		t.Fatal("expected at least one *Slot in vital_signs.opt tree")
+	}
+	var withIncludes int
+	for _, s := range slots {
+		if len(s.Includes()) > 0 {
+			withIncludes++
+		}
+	}
+	if withIncludes == 0 {
+		t.Errorf("expected at least one *Slot with non-empty Includes(); none found in %d slots", len(slots))
+	}
+}
+
+// REQ-100 § Resolution semantics — clinical_note.opt resolves a deep
+// /content path. Complements the identity-only check in
+// TestParseFile_ClinicalNote_Identity by proving traversal works on a
+// structurally distinct OPT.
+func TestParseFile_ClinicalNote_Path(t *testing.T) {
+	opt, err := template.ParseFile(filepath.Join("testdata", "clinical_note.opt"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	p, err := opt.ParsePath("/content")
+	if err != nil {
+		t.Fatalf("ParsePath(/content): %v", err)
+	}
+	n, err := opt.NodeAt(p)
+	if err != nil {
+		t.Fatalf("NodeAt(/content): %v", err)
+	}
+	// First /content child in clinical_note.opt is the OBSERVATION
+	// archetype root for openEHR-EHR-OBSERVATION.story.v1.
+	ar, ok := n.(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("NodeAt(/content) = %T, want *template.ArchetypeRoot", n)
+	}
+	if ar.RMTypeName() != "OBSERVATION" {
+		t.Errorf("RMTypeName = %q, want OBSERVATION", ar.RMTypeName())
+	}
+	if !strings.HasPrefix(ar.ArchetypeID(), "openEHR-EHR-OBSERVATION.") {
+		t.Errorf("ArchetypeID = %q, want openEHR-EHR-OBSERVATION.* prefix", ar.ArchetypeID())
+	}
+}
+
+// REQ-100 § Path syntax — characters after a closing ']' must be the
+// segment separator '/' (or end of input). Any other character is a
+// grammar error. Guards against accidental AQL-style trailing tags.
+func TestParsePath_RejectsCharAfterCloseBracket(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	_, err := opt.ParsePath("/content[at0001]extra")
+	if !errors.Is(err, template.ErrPathSyntax) {
+		t.Fatalf("got %v, want ErrPathSyntax", err)
+	}
+}
+
+// REQ-100 § Resolution semantics — descending past a leaf
+// *ComplexObject (no attributes — e.g. an unknown xsi:type that the
+// parser admits as a forward-compatible leaf) returns ErrPathNotFound,
+// because the subsequent segment cannot resolve to an attribute on
+// the leaf.
+func TestNodeAt_LeafMidPath(t *testing.T) {
+	// Synthetic OPT: the `category` attribute resolves to a leaf
+	// DV_CODED_TEXT *ComplexObject (no attributes admitted under it
+	// in v1). A two-segment path "/category/defining_code" must fail
+	// with ErrPathNotFound at the second step.
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>leaf</value></template_id>
+  <concept>leaf</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <rm_attribute_name>category</rm_attribute_name>
+      <children xsi:type="C_DV_CODED_TEXT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+      </children>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	p, err := opt.ParsePath("/category/defining_code")
+	if err != nil {
+		t.Fatalf("ParsePath: %v", err)
+	}
+	if _, err := opt.NodeAt(p); !errors.Is(err, template.ErrPathNotFound) {
+		t.Fatalf("NodeAt(/category/defining_code) on leaf = %v, want ErrPathNotFound", err)
+	}
+}
+
+// findAtCode returns the first (attribute-name, at-code) pair found
+// among the root's direct attribute children. Returns ("", "") when
+// no at-coded child exists.
+func findAtCode(t *testing.T, root *template.ArchetypeRoot) (atCode, hostAttr string) {
+	t.Helper()
+	for _, a := range root.Attributes() {
+		for _, c := range a.Children() {
+			if id := c.NodeID(); strings.HasPrefix(id, "at") {
+				return id, a.Name()
+			}
+		}
+	}
+	return "", ""
+}
+
+// findSlotUnderRoot returns the (attribute-name, node-id) of the first
+// *Slot directly under the root's attributes. Empty strings indicate
+// none found.
+func findSlotUnderRoot(t *testing.T, opt *template.OperationalTemplate) (attr, nodeID string) {
+	t.Helper()
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		return "", ""
+	}
+	for _, a := range root.Attributes() {
+		for _, c := range a.Children() {
+			if s, ok := c.(*template.Slot); ok {
+				return a.Name(), s.NodeID()
+			}
+		}
+	}
+	return "", ""
+}
+
+// Phase 3 — strict-mode resolution: a predicate-less segment over an
+// attribute with multiple candidate children returns ErrAmbiguousPath
+// rather than silently picking the first child.
+func TestNodeAt_StrictPathsRejectsAmbiguousSegment(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	p, err := opt.ParsePath("/content")
+	if err != nil {
+		t.Fatalf("ParsePath: %v", err)
+	}
+	// Lenient (default) — picks first child without error.
+	if _, err := opt.NodeAt(p); err != nil {
+		t.Fatalf("lenient NodeAt(/content): %v", err)
+	}
+	// Strict — vital_signs.opt has multiple OBSERVATION roots under
+	// /content, so a predicate-less /content must trip ErrAmbiguousPath.
+	if _, err := opt.NodeAt(p, template.WithStrictPaths()); !errors.Is(err, template.ErrAmbiguousPath) {
+		t.Fatalf("strict NodeAt(/content) = %v, want ErrAmbiguousPath", err)
+	}
+}
+
+// Phase 3 — strict-mode resolution still works with an explicit
+// predicate; ambiguity is only about predicate-less segments.
+func TestNodeAt_StrictPathsAcceptsPredicate(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	p, err := opt.ParsePath("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
+	if err != nil {
+		t.Fatalf("ParsePath: %v", err)
+	}
+	if _, err := opt.NodeAt(p, template.WithStrictPaths()); err != nil {
+		t.Errorf("strict NodeAt with predicate: %v", err)
+	}
+}
+
+// Phase 3 — ValidatePath composes NodeAt and discards the resolved
+// node. Same sentinel taxonomy.
+func TestValidatePath(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	good, _ := opt.ParsePath("/")
+	if err := opt.ValidatePath(good); err != nil {
+		t.Errorf("ValidatePath(/): %v", err)
+	}
+	bad, _ := opt.ParsePath("/nope")
+	if err := opt.ValidatePath(bad); !errors.Is(err, template.ErrPathNotFound) {
+		t.Errorf("ValidatePath(/nope) = %v, want ErrPathNotFound", err)
+	}
+	ambiguous, _ := opt.ParsePath("/content")
+	if err := opt.ValidatePath(ambiguous, template.WithStrictPaths()); !errors.Is(err, template.ErrAmbiguousPath) {
+		t.Errorf("ValidatePath(/content, strict) = %v, want ErrAmbiguousPath", err)
+	}
+}
+
+// Phase 3 — Multiplicity validation: parser rejects intervals with
+// concrete lower > upper at parse time.
+func TestParseOPT_RejectsInvertedMultiplicity(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1">
+  <template_id><value>t</value></template_id>
+  <concept>t</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <occurrences>
+      <lower_unbounded>false</lower_unbounded>
+      <upper_unbounded>false</upper_unbounded>
+      <lower>5</lower>
+      <upper>2</upper>
+    </occurrences>
+  </definition>
+</template>`
+	_, err := template.ParseOPT(strings.NewReader(body))
+	if !errors.Is(err, template.ErrInvalidOPT) {
+		t.Fatalf("ParseOPT got %v, want ErrInvalidOPT for inverted multiplicity", err)
+	}
+}
+
+// Phase 3 — Cardinality.String / IsValid sanity.
+func TestCardinality_StringAndIsValid(t *testing.T) {
+	if got := template.Single.String(); got != "single" {
+		t.Errorf("Single.String() = %q, want %q", got, "single")
+	}
+	if got := template.Multiple.String(); got != "multiple" {
+		t.Errorf("Multiple.String() = %q, want %q", got, "multiple")
+	}
+	if !template.Single.IsValid() || !template.Multiple.IsValid() {
+		t.Errorf("Single and Multiple must report IsValid()=true")
+	}
+	if template.Cardinality(99).IsValid() {
+		t.Errorf("out-of-range Cardinality(99) must report IsValid()=false")
+	}
+	if got := template.Cardinality(99).String(); !strings.Contains(got, "99") {
+		t.Errorf("Cardinality(99).String() = %q, want token containing 99", got)
+	}
+}
+
+// Phase 3 — ObjectNode supertype: both *ComplexObject and
+// *ArchetypeRoot satisfy ObjectNode; *Slot and *Attribute do not.
+// Walker code can use a single `case template.ObjectNode:` arm
+// instead of listing the two concrete types.
+func TestObjectNode_SatisfiedByObjectNodes(t *testing.T) {
+	opt := mustParseVitalSigns(t)
+	root := opt.Root()
+	if _, ok := root.(template.ObjectNode); !ok {
+		t.Errorf("root %T does not satisfy ObjectNode", root)
+	}
+	// Find a *Slot in the tree and assert it does NOT satisfy
+	// ObjectNode (it is a leaf).
+	slots := collectSlots(opt.Root())
+	if len(slots) == 0 {
+		t.Skip("fixture has no *Slot to negative-check")
+	}
+	var slot template.Node = slots[0]
+	if _, ok := slot.(template.ObjectNode); ok {
+		t.Errorf("*Slot must NOT satisfy ObjectNode")
+	}
+}
+
+// collectSlots returns every *Slot reachable from n via attribute
+// children, depth-first.
+func collectSlots(n template.Node) []*template.Slot {
+	var out []*template.Slot
+	var visit func(template.Node)
+	visit = func(n template.Node) {
+		switch v := n.(type) {
+		case *template.Slot:
+			out = append(out, v)
+		case *template.ArchetypeRoot:
+			for _, a := range v.Attributes() {
+				for _, c := range a.Children() {
+					visit(c)
+				}
+			}
+		case *template.ComplexObject:
+			for _, a := range v.Attributes() {
+				for _, c := range a.Children() {
+					visit(c)
+				}
+			}
+		}
+	}
+	visit(n)
+	return out
+}
+
 // --- helpers ------------------------------------------------------------
 
 func mustParseVitalSigns(t *testing.T) *template.OperationalTemplate {

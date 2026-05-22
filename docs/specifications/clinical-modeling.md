@@ -28,7 +28,14 @@ In openEHR terminology, "template" without qualification often means the authori
 - `Concept() string` — the value of `<concept>` (machine-readable concept slug).
 - `UID() string` — the value of `<uid>/<value>` when present; empty string otherwise.
 - `Language() string` — the value of `<language>/<code_string>` (ISO 639-1) when present; empty string otherwise.
-- `Root() Node` — the root definition node. Its `RMTypeName()` is the composition RM class (conventionally `COMPOSITION`). The concrete type is `*ArchetypeRoot` when the OPT `<definition>` carries an explicit archetype id (the typical Ocean Template Designer shape) and `*ComplexObject` otherwise. Callers that descend into attributes MUST handle both via a type-switch or via `NodeAt`.
+- `Root() Node` — the root definition node. Its `RMTypeName()` is the composition RM class (conventionally `COMPOSITION`). The concrete type is `*ArchetypeRoot` when the OPT `<definition>` carries an explicit archetype id (the typical Ocean Template Designer shape) and `*ComplexObject` otherwise. Callers that descend into attributes MUST handle both via a type-switch (or match on `ObjectNode`, the supertype of `*ComplexObject` + `*ArchetypeRoot`), or via `NodeAt`.
+
+### Provenance metadata (optional)
+
+`*OperationalTemplate` **MAY** additionally expose top-level OPT provenance for auditing and editor tooling:
+
+- `Description() *Description` — parsed `<description>` block; nil when omitted. The returned `*Description` exposes `LifecycleState() string`, `OriginalAuthors() map[string]string`, and `OtherDetails() map[string]string`. The returned maps are defensive copies — mutation by the caller does not affect the underlying template.
+- `Annotations() map[string][]Annotation` — parsed `<annotations path="...">` blocks keyed by the path attribute (empty string when no path). Returns nil when the OPT carries no annotations. The returned map is a defensive copy.
 
 ### Node taxonomy
 
@@ -64,6 +71,12 @@ Given a parsed `Path`, `NodeAt`:
 - Returns `ErrPathNotFound` if no node matches a segment.
 - Returns the first matching node when a segment has multiple candidates without a predicate (deterministic by document order).
 
+`NodeAt` accepts variadic `ResolveOption` values. `WithStrictPaths()` switches to strict resolution: a predicate-less segment that matches an attribute with more than one candidate child returns `ErrAmbiguousPath` instead of silently selecting the first child. The default (no option) preserves the first-match behaviour above. `ValidatePath(p Path, opts ...ResolveOption) error` is a shorthand for `NodeAt` that discards the resolved node — convenience for code-generator preconditions.
+
+### Strict parse mode (optional)
+
+The default `ParseOPT` / `ParseFile` entry points remain forward-compatible: unknown child `xsi:type` values are admitted as leaf `*ComplexObject` nodes. `ParseOPTStrict` / `ParseFileStrict` opt into stricter behaviour — an unknown child `xsi:type` that carries nested `<attributes>` is rejected with `ErrUnsupportedNode` (the only case where lenient mode would silently drop a non-trivial subtree). Use strict mode in validators and code generators that must surface unsupported shapes rather than silently truncate them.
+
 ### Error taxonomy
 
 The package **MUST** expose these typed sentinel errors:
@@ -74,7 +87,8 @@ The package **MUST** expose these typed sentinel errors:
 | `ErrNotOPTFile` | `ParseFile` called with non-`.opt` path |
 | `ErrPathSyntax` | path string fails the grammar subset above |
 | `ErrPathNotFound` | parsed path traverses through an unknown attribute or unmatched predicate |
-| `ErrUnsupportedNode` | encountered an `<attributes>` element whose `xsi:type` is outside the v1 attribute taxonomy (`C_SINGLE_ATTRIBUTE`, `C_MULTIPLE_ATTRIBUTE`). Unknown **child** `xsi:type` values are not surfaced through this sentinel in v1 — they are admitted as leaf `*ComplexObject` nodes (forward-compatible escape hatch). A future REQ MAY add a strict mode that surfaces unknown child shapes; see [`docs/plans/2026-05-22-template-req100-followups.md`](../plans/2026-05-22-template-req100-followups.md) Phase 2. |
+| `ErrAmbiguousPath` | strict mode (`WithStrictPaths`) — predicate-less segment matches an attribute with multiple candidate children. Never returned by the default first-match behaviour. |
+| `ErrUnsupportedNode` | encountered an `<attributes>` element whose `xsi:type` is outside the v1 attribute taxonomy (`C_SINGLE_ATTRIBUTE`, `C_MULTIPLE_ATTRIBUTE`). Unknown **child** `xsi:type` values are not surfaced through this sentinel by default — they are admitted as leaf `*ComplexObject` nodes (forward-compatible escape hatch). In strict mode (`ParseOPTStrict` / `ParseFileStrict`), an unknown child `xsi:type` that carries nested `<attributes>` is rejected via this sentinel. |
 
 All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with `errors.Is`.
 

@@ -1,13 +1,21 @@
 package template
 
+import (
+	"maps"
+	"slices"
+	"strconv"
+)
+
 // OperationalTemplate is a parsed ADL 1.4 operational template (OPT).
 // Construct via ParseOPT or ParseFile; the zero value is not useful.
 type OperationalTemplate struct {
-	templateID string
-	concept    string
-	uid        string
-	language   string
-	root       Node
+	templateID  string
+	concept     string
+	uid         string
+	language    string
+	root        Node
+	annotations map[string][]Annotation
+	description *Description
 }
 
 // TemplateID returns the value of <template_id>/<value> from the OPT
@@ -27,6 +35,77 @@ func (t *OperationalTemplate) UID() string { return t.uid }
 // or an empty string when absent.
 func (t *OperationalTemplate) Language() string { return t.language }
 
+// Description returns the parsed top-level <description> block, or
+// nil when the OPT omits it (or carries only empty sub-elements).
+// The returned pointer is owned by the OperationalTemplate — callers
+// MUST NOT mutate the map values it exposes.
+func (t *OperationalTemplate) Description() *Description { return t.description }
+
+// Annotations returns the parsed <annotations path="..."> blocks,
+// keyed by the path attribute (empty string when the annotation has
+// no path). Returns nil when the OPT carries no annotations or only
+// empty ones. The returned map is a defensive copy: map mutation
+// does not affect the underlying template (the Annotation slice
+// headers and their entries are still shared with the OPT).
+func (t *OperationalTemplate) Annotations() map[string][]Annotation {
+	return maps.Clone(t.annotations)
+}
+
+// Annotation is one <items id="..."> entry inside an <annotations>
+// block. Annotations carry UI / editor hints in the OPT and are
+// addressable by path (an AQL-style locator string). The format is
+// open-ended in the OPT XSD — consumers interpret IDs by convention.
+type Annotation struct {
+	// ID is the items/@id attribute (e.g. "name", "comment", "ui-hint").
+	ID string
+	// Value is the raw character data of the <items> element, trimmed
+	// of surrounding whitespace.
+	Value string
+}
+
+// Description is the parsed top-level <description> block. The OPT
+// XSD models it as a RESOURCE_DESCRIPTION, of which v1 captures the
+// most frequently consumed fields. Translations and per-language
+// details are deferred to a later REQ.
+type Description struct {
+	lifecycleState  string
+	originalAuthors map[string]string
+	otherDetails    map[string]string
+}
+
+// LifecycleState returns the OPT's <lifecycle_state> value (e.g.
+// "initial", "in_review", "published", "unmanaged"). Empty when
+// the OPT omits the element.
+func (d *Description) LifecycleState() string {
+	if d == nil {
+		return ""
+	}
+	return d.lifecycleState
+}
+
+// OriginalAuthors returns the parsed <original_author id="...">
+// attribute map (e.g. {"name": "Alice", "organisation": "Acme"}).
+// Returns nil when the OPT omits the element. The returned map is
+// a defensive copy: caller mutation does not affect the underlying
+// Description.
+func (d *Description) OriginalAuthors() map[string]string {
+	if d == nil {
+		return nil
+	}
+	return maps.Clone(d.originalAuthors)
+}
+
+// OtherDetails returns the parsed <other_details id="..."> attribute
+// map. These are open-ended provenance fields (e.g. "licence",
+// "sem_ver", "build_uid"). Returns nil when absent. The returned
+// map is a defensive copy.
+func (d *Description) OtherDetails() map[string]string {
+	if d == nil {
+		return nil
+	}
+	return maps.Clone(d.otherDetails)
+}
+
 // Root returns the root definition node. Its RMTypeName is the
 // composition RM class (conventionally "COMPOSITION"). The concrete
 // type is *ArchetypeRoot for OPTs whose <definition> declares an
@@ -40,6 +119,11 @@ func (t *OperationalTemplate) Root() Node { return t.root }
 // Implementations are *ComplexObject, *ArchetypeRoot, *Attribute, and
 // *Slot. The interface is closed; new concrete types may appear in a
 // future REQ but only within this package.
+//
+// Callers that walk the tree and need to distinguish descendable
+// objects from attribute carriers should match against ObjectNode
+// (covers *ComplexObject + *ArchetypeRoot) rather than re-listing
+// the two concrete types.
 type Node interface {
 	// RMTypeName returns the openEHR Reference Model class name this
 	// node constrains (e.g. "COMPOSITION", "DV_QUANTITY"). For an
@@ -53,6 +137,25 @@ type Node interface {
 	NodeID() string
 
 	isNode()
+}
+
+// ObjectNode is the supertype of the two descendable OPT node kinds
+// — *ComplexObject and *ArchetypeRoot. Walker code that does not
+// need to discriminate between archetype-root and bare complex-object
+// should type-switch on ObjectNode instead of listing the two
+// concrete types separately. *Slot and *Attribute are NOT
+// ObjectNodes (a slot is a leaf with opaque slot-fill semantics; an
+// attribute holds an RM attribute name and its children rather than
+// being a typed object).
+type ObjectNode interface {
+	Node
+	// Attributes returns the OPT-declared child attributes in
+	// document order. The returned slice is a defensive copy; see
+	// ComplexObject.Attributes.
+	Attributes() []*Attribute
+	// Occurrences returns the parsed occurrences interval, or nil
+	// when the OPT did not declare one for this node.
+	Occurrences() *Multiplicity
 }
 
 // Multiplicity is the min/max interval that OPT uses for both
@@ -90,6 +193,26 @@ const (
 	Multiple
 )
 
+// String returns "single" or "multiple"; out-of-range values render
+// as "cardinality(N)" for diagnostic readability.
+func (c Cardinality) String() string {
+	switch c {
+	case Single:
+		return "single"
+	case Multiple:
+		return "multiple"
+	default:
+		return "cardinality(" + strconv.Itoa(int(c)) + ")"
+	}
+}
+
+// IsValid reports whether c is one of the recognised Cardinality
+// constants. Useful for guard assertions in walker code that build
+// Cardinality values from external input.
+func (c Cardinality) IsValid() bool {
+	return c == Single || c == Multiple
+}
+
 // ComplexObject is xsi:type="C_COMPLEX_OBJECT" in the OPT XML and
 // also the embedded payload of *ArchetypeRoot. It is used for both
 // internal nodes (with child attributes) and leaf primitive
@@ -112,9 +235,10 @@ func (c *ComplexObject) NodeID() string { return c.nodeID }
 // OPT did not declare one for this node.
 func (c *ComplexObject) Occurrences() *Multiplicity { return c.occurrences }
 
-// Attributes returns the child attributes in OPT document order.
-// The returned slice MUST NOT be mutated by callers.
-func (c *ComplexObject) Attributes() []*Attribute { return c.attributes }
+// Attributes returns a defensive copy of the child attributes in OPT
+// document order. Slice mutation does not affect the underlying tree;
+// the *Attribute pointers themselves are still shared with the OPT.
+func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attributes) }
 
 func (c *ComplexObject) isNode() {}
 
@@ -153,8 +277,16 @@ func (a *Attribute) Cardinality() Cardinality { return a.cardinality }
 // did not declare one.
 func (a *Attribute) Existence() *Multiplicity { return a.existence }
 
-// Children returns the child nodes in OPT document order.
-func (a *Attribute) Children() []Node { return a.children }
+// Children returns a defensive copy of the child nodes in OPT
+// document order. The Node pointers themselves are still shared with
+// the OPT.
+//
+// Children are constrained by the OPT tree shape to be one of
+// *ComplexObject, *ArchetypeRoot, or *Slot — never another
+// *Attribute. Walker code that needs to descend may type-switch on
+// ObjectNode (covers ComplexObject + ArchetypeRoot) and treat *Slot
+// as a leaf.
+func (a *Attribute) Children() []Node { return slices.Clone(a.children) }
 
 // RMTypeName implements Node and always returns the empty string —
 // attributes are not RM-typed.
@@ -182,10 +314,12 @@ func (s *Slot) RMTypeName() string { return s.rmTypeName }
 // NodeID implements Node.
 func (s *Slot) NodeID() string { return s.nodeID }
 
-// Includes returns the raw archetype-id include assertion strings.
-func (s *Slot) Includes() []string { return s.includes }
+// Includes returns a defensive copy of the raw archetype-id include
+// assertion strings.
+func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 
-// Excludes returns the raw archetype-id exclude assertion strings.
-func (s *Slot) Excludes() []string { return s.excludes }
+// Excludes returns a defensive copy of the raw archetype-id exclude
+// assertion strings.
+func (s *Slot) Excludes() []string { return slices.Clone(s.excludes) }
 
 func (s *Slot) isNode() {}
