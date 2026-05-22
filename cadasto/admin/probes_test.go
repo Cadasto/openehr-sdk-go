@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -108,15 +109,49 @@ func TestReadyWithReadyPathOverride(t *testing.T) {
 
 // Acceptance criterion: 2xx → nil.
 func TestProbe2xxReturnsNil(t *testing.T) {
+	// strconv.Itoa instead of http.StatusText: the latter returns ""
+	// for non-standard codes (e.g. 299), producing useless subtest
+	// names like "#00".
 	cases := []int{200, 201, 204, 299}
 	for _, status := range cases {
-		t.Run(http.StatusText(status), func(t *testing.T) {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
 			var got string
 			srv := httptest.NewServer(captureHandler(status, &got))
 			defer srv.Close()
 			c := newClient(t, srv)
 			if err := admin.Ready(context.Background(), c); err != nil {
 				t.Errorf("status=%d: Ready returned %v, want nil", status, err)
+			}
+		})
+	}
+}
+
+// Acceptance criterion: unmapped non-2xx codes (400, 405, 408, 429)
+// surface as a plain formatted error WITHOUT a transport sentinel.
+// Callers MUST NOT depend on errors.Is matching outside the documented
+// mapping (404/401/403/5xx).
+func TestProbeUnmapped4xxHasNoSentinel(t *testing.T) {
+	cases := []int{http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusRequestTimeout, http.StatusTooManyRequests}
+	for _, status := range cases {
+		t.Run(strconv.Itoa(status), func(t *testing.T) {
+			var got string
+			srv := httptest.NewServer(captureHandler(status, &got))
+			defer srv.Close()
+			c := newClient(t, srv)
+			err := admin.Live(context.Background(), c)
+			if err == nil {
+				t.Fatalf("status=%d: expected error", status)
+			}
+			// None of the mapped sentinels should match.
+			for _, sentinel := range []error{
+				transport.ErrNotFound,
+				transport.ErrUnauthorized,
+				transport.ErrForbidden,
+				transport.ErrServerError,
+			} {
+				if errors.Is(err, sentinel) {
+					t.Errorf("status=%d: err matched %v but unmapped codes must not carry a sentinel", status, sentinel)
+				}
 			}
 		})
 	}
@@ -167,26 +202,121 @@ func TestProbeTypedErrorsByStatus(t *testing.T) {
 
 // Catalog without openEHR REST entry → ErrServiceUnavailable so callers
 // get a typed signal rather than a panic.
+//
+// Fails the test (rather than t.Skip) on any setup error: the prior
+// shape wrapped the assertion in `if err == nil` after NewStaticCatalog,
+// which made the entire test vacuous if catalog construction ever
+// changed shape. Now construction failures are real test failures.
 func TestProbeMissingOpenEHRRestEntry(t *testing.T) {
 	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
 		Issuer:   "https://test.example.com",
 		Services: map[string]discovery.ServiceEntry{},
 	})
+	if err != nil {
+		t.Fatalf("NewStaticCatalog rejected empty services map (setup change?): %v", err)
+	}
+	c, err := transport.New(cat, transport.WithHTTPClient(http.DefaultClient))
+	if err != nil {
+		t.Fatalf("transport.New rejected empty-services catalog (setup change?): %v", err)
+	}
+	err = admin.Live(context.Background(), c)
 	if err == nil {
-		// NewStaticCatalog may itself reject empty services; tolerate
-		// either path — if construction fails we already get a typed
-		// error, no further probe call needed.
-		c, err := transport.New(cat, transport.WithHTTPClient(http.DefaultClient))
-		if err != nil {
-			t.Skip("transport.New rejected empty catalog before Live could run")
-		}
-		err = admin.Live(context.Background(), c)
-		if err == nil {
-			t.Fatal("expected error when openEHR REST entry missing")
-		}
-		if !errors.Is(err, transport.ErrServiceUnavailable) {
-			t.Errorf("err = %v, want errors.Is(err, transport.ErrServiceUnavailable)", err)
-		}
+		t.Fatal("expected error when openEHR REST entry missing")
+	}
+	if !errors.Is(err, transport.ErrServiceUnavailable) {
+		t.Errorf("err = %v, want errors.Is(err, transport.ErrServiceUnavailable)", err)
+	}
+}
+
+// Connection-failure path: server closed before probe issues request
+// → hc.Do returns a network error → probe wraps it with the full URL
+// via %w so callers can errors.Is / errors.As the underlying error.
+func TestProbeConnectionRefused(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	target := srv.URL
+	srv.Close() // close before probe — connection will refuse.
+
+	cat, err := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer: "https://test.example.com",
+		Services: map[string]discovery.ServiceEntry{
+			discovery.ServiceIDOpenEHRRest: {
+				BaseURL:     discovery.MustParseURL(target + "/openehr/v1"),
+				SpecVersion: discovery.SpecVersionPin,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewStaticCatalog: %v", err)
+	}
+	c, err := transport.New(cat, transport.WithHTTPClient(http.DefaultClient))
+	if err != nil {
+		t.Fatalf("transport.New: %v", err)
+	}
+	err = admin.Ready(context.Background(), c)
+	if err == nil {
+		t.Fatal("expected error for closed server")
+	}
+	// Error message MUST contain the probe URL so loop-mode callers
+	// can identify which endpoint failed without parsing the wrapped
+	// error type.
+	if !strings.Contains(err.Error(), "/health/ready") {
+		t.Errorf("err = %q, want probe URL in message", err)
+	}
+}
+
+// Path-option validation: empty / non-absolute overrides surface as
+// ErrInvalidPath before any network I/O.
+func TestProbePathOptionValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		path string
+	}{
+		{"empty", ""},
+		{"no_leading_slash", "health/live"},
+		{"relative_dot", "./health/live"},
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("path validation should fail before hitting the server, but got request to %s", r.URL.Path)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	for _, tc := range cases {
+		t.Run("Live/"+tc.name, func(t *testing.T) {
+			err := admin.Live(context.Background(), c, admin.WithLivePath(tc.path))
+			if !errors.Is(err, admin.ErrInvalidPath) {
+				t.Errorf("path=%q: err = %v, want errors.Is(err, ErrInvalidPath)", tc.path, err)
+			}
+		})
+		t.Run("Ready/"+tc.name, func(t *testing.T) {
+			err := admin.Ready(context.Background(), c, admin.WithReadyPath(tc.path))
+			if !errors.Is(err, admin.ErrInvalidPath) {
+				t.Errorf("path=%q: err = %v, want errors.Is(err, ErrInvalidPath)", tc.path, err)
+			}
+		})
+	}
+}
+
+// Header contract: probe sets Accept but never Authorization. An
+// injected http.RoundTripper MAY add auth — that is outside the
+// probe's contract — but the probe itself MUST NOT attach a token.
+func TestProbeSetsAcceptNoAuthorization(t *testing.T) {
+	var gotAccept, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+	if err := admin.Live(context.Background(), c); err != nil {
+		t.Fatalf("Live: %v", err)
+	}
+	if gotAccept != "application/json" {
+		t.Errorf("Accept = %q, want application/json", gotAccept)
+	}
+	if gotAuth != "" {
+		t.Errorf("Authorization = %q, want empty (probes do not attach auth)", gotAuth)
 	}
 }
 
