@@ -4,7 +4,7 @@
 **Status:** Draft
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
-**Implementation:** partial — Phase 1 (tests + traceability honesty) landed, Phases 2–3 in flight; Phases 4+ deferred per follow-up sequencing
+**Implementation:** partial — Phases 1–2 landed, Phase 3 in flight; Phases 4+ deferred per follow-up sequencing
 **Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
 **Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md))
 
@@ -401,7 +401,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Step | Status |
 |---|---|
 | Phase 1 tests + traceability `landed` | landed |
-| Phase 2 parser hardening | |
+| Phase 2 parser hardening | landed |
 | Phase 3 path ergonomics (ErrAmbiguousPath, NodeKind, ObjectNode) | |
 | Phase 4-bis RMInfoLookup (codegen + PROBE-023) | |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | |
