@@ -1,7 +1,7 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Phases 1–3 landed; Phases 4+ deferred
+**Status:** Phases 1–4 + 4-bis landed; Phases 5+ open
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** partial — Phases 1–4 + 4-bis landed (Root collapse + REQ-103 primitives deferred); Phases 5+ deferred per follow-up sequencing
@@ -403,8 +403,8 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Phase 1 tests + traceability `landed` | landed |
 | Phase 2 parser hardening | landed |
 | Phase 3 path ergonomics (ErrAmbiguousPath, ObjectNode, ValidatePath) | landed (Root collapse deferred to Phase 4 — see open question) |
-| Phase 4-bis RMInfoLookup (codegen + PROBE-023) | landed (codegen + tests; PROBE-023 deferred to consumer surface) |
-| Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | landed (internal package; public surface deferred until REQ-101 / REQ-102 confirms shape) |
+| Phase 4-bis RMInfoLookup (codegen + PROBE-023) | landed (codegen + tests; PROBE-023 deferred; see [ADR 0005](../adr/0005-compiled-template-foundation.md)) |
+| Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | landed ([ADR 0005](../adr/0005-compiled-template-foundation.md); public `template.Compile` deferred) |
 | Phase 5 Walker pattern + composition walker | |
 | Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | |
 | Phase 7 REQ-104 slot assertions (when REQ-101 / REQ-102 surfaces real call sites) | |

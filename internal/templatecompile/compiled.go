@@ -53,10 +53,18 @@ func (c *Compiled) Language() string { return c.language }
 // Compile.
 func (c *Compiled) Root() *CompiledNode { return c.root }
 
-// NodeAt resolves an OPT path string to the matching CompiledNode.
-// Equivalent to [template.OperationalTemplate.NodeAt] but O(1) via
-// the pre-built byPath index. Returns ErrPathNotFound when the path
-// does not resolve.
+// NodeAt resolves a path string by exact lookup in the pre-built
+// byPath index (O(1)). Keys are fully qualified AQL paths computed
+// at compile time — e.g. "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+// not predicate-less prefixes like "/content".
+//
+// This differs from [template.OperationalTemplate.NodeAt], which
+// walks the wire tree and applies lenient first-child rules for
+// predicate-less segments on multi-cardinality attributes. Use
+// [CompiledNode.AQLPath] or wire NodeAt when you need tree-walk
+// semantics; use NodeAt here when you already hold a canonical path.
+//
+// Returns [ErrPathNotFound] when the path string is not indexed.
 func (c *Compiled) NodeAt(path string) (*CompiledNode, error) {
 	n, ok := c.byPath[path]
 	if !ok {

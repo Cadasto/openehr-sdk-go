@@ -40,7 +40,7 @@ Reading order for any contributor or agent:
 | 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine-readable map in [traceability.yaml](docs/specifications/traceability.yaml) |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package map + mermaid diagram |
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks |
-| 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (0001–0004 Accepted) |
+| 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (0001–0005 Accepted) |
 | 6 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
 

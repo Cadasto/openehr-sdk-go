@@ -8,11 +8,11 @@
 // contains only the Lookup interface and the [Default] accessor.
 // No runtime BMM dependency — generated tables are pure Go strings.
 //
-// Consumed by the openehr/template compile step (REQ-100 follow-up
-// Phase 4) for implicit attribute injection on the compiled
-// template, and by composition-builder / validator code that needs
-// to enumerate the RM-mandatory fields the OPT does not model
-// explicitly (e.g. COMPOSITION.category, COMPOSITION.language).
+// Consumed by [internal/templatecompile] (REQ-100 follow-up Phase 4)
+// for implicit attribute injection on the compiled template, and
+// by composition-builder / validator code that needs to enumerate
+// the RM-mandatory fields the OPT does not model explicitly (e.g.
+// COMPOSITION.category, COMPOSITION.language).
 //
 // Building-block weight: stdlib-only, single internal data table,
 // no init-time work beyond a map literal. Safe to import from any

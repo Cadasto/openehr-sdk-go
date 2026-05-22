@@ -3,7 +3,10 @@ package templatecompile
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -120,7 +123,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		// Per-archetype-root terms live on the node; bindings flatten
 		// to the Compiled aggregate (binding records carry their own
 		// terminology + at-code/path, so collisions are non-issues).
-		cn.terms = v.Terms()
+		cn.terms = copyTerms(v.Terms())
 		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
 		if err := w.attachAttributes(cn, v.Attributes()); err != nil {
 			return nil, err
@@ -142,10 +145,9 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		return nil, fmt.Errorf("templatecompile: unhandled wire node type %T", n)
 	}
 
-	// Index. Skip the byPath entry for "/" only when called on the
-	// root — we still want NodeAt("/") to return root, so always
-	// register.
-	w.compiled.byPath[cn.aqlPath] = cn
+	if err := w.registerPath(cn); err != nil {
+		return nil, err
+	}
 	if cn.nodeID != "" {
 		w.compiled.byNodeID[cn.nodeID] = append(w.compiled.byNodeID[cn.nodeID], cn)
 	}
@@ -182,7 +184,10 @@ func (w *walker) attachAttributes(cn *CompiledNode, declared []*template.Attribu
 		if declaredByName[attrName] {
 			continue
 		}
-		rm, _ := w.lookup.AttributeRMType(cn.rmTypeName, attrName)
+		rm, ok := w.lookup.AttributeRMType(cn.rmTypeName, attrName)
+		if !ok || rm == "" {
+			continue
+		}
 		container, _ := w.lookup.IsContainer(cn.rmTypeName, attrName)
 		// Skip implicit attributes the RM declares but does NOT
 		// mandate — the composition builder only needs implicit
@@ -224,8 +229,8 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 		rmTypeName:  rm,
 		required:    required,
 	}
-	for _, child := range a.Children() {
-		segment := pathSegment(a.Name(), a.Cardinality(), child)
+	for i, child := range a.Children() {
+		segment := pathSegment(a.Name(), a.Cardinality(), child, i)
 		cn, err := w.compileNode(child, parent, segment)
 		if err != nil {
 			return nil, err
@@ -238,9 +243,10 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 // pathSegment computes the path delta for descending from parent
 // (attribute name + cardinality) into a child node. For single
 // attributes the delta is "/name"; for multiple attributes the
-// child contributes a predicate (archetype id if it's an archetype
-// root, otherwise the at-code).
-func pathSegment(attrName string, card template.Cardinality, child template.Node) string {
+// child contributes a predicate (archetype id, at-code, slot
+// include pattern, or a 1-based sibling suffix when the OPT omits
+// all of the above).
+func pathSegment(attrName string, card template.Cardinality, child template.Node, siblingIndex int) string {
 	seg := "/" + attrName
 	if card != template.Multiple {
 		return seg
@@ -251,7 +257,24 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 	if id := child.NodeID(); id != "" {
 		return seg + "[" + id + "]"
 	}
-	return seg
+	if sl, ok := child.(*template.Slot); ok {
+		if p := slotPathPredicate(sl); p != "" {
+			return seg + "[" + p + "]"
+		}
+	}
+	return seg + "[@" + strconv.Itoa(siblingIndex+1) + "]"
+}
+
+// slotPathPredicate derives a stable bracket predicate for an
+// ARCHETYPE_SLOT that omits node_id. Uses the first include
+// assertion (regex escapes stripped) so sibling slots under the
+// same attribute do not collide in byPath.
+func slotPathPredicate(s *template.Slot) string {
+	inc := s.Includes()
+	if len(inc) == 0 || inc[0] == "" {
+		return ""
+	}
+	return strings.ReplaceAll(inc[0], `\`, "")
 }
 
 // allAttributesInOrder returns the BMM-declared attributes of an RM
@@ -268,4 +291,29 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 // suffices.
 func allAttributesInOrder(l rminfo.Lookup, rmType string) []string {
 	return l.RequiredAttributes(rmType)
+}
+
+func (w *walker) registerPath(cn *CompiledNode) error {
+	if prev, exists := w.compiled.byPath[cn.aqlPath]; exists {
+		return fmt.Errorf(
+			"%w: duplicate AQL path %q (existing %s, new %s)",
+			ErrInvalidInput, cn.aqlPath, prev.rmTypeName, cn.rmTypeName,
+		)
+	}
+	w.compiled.byPath[cn.aqlPath] = cn
+	return nil
+}
+
+// copyTerms deep-copies per-archetype-root term maps so compile
+// output does not alias mutable state from the wire tree.
+func copyTerms(src map[string]template.ArchetypeTerm) map[string]template.ArchetypeTerm {
+	if src == nil {
+		return nil
+	}
+	out := make(map[string]template.ArchetypeTerm, len(src))
+	for code, term := range src {
+		items := maps.Clone(term.Items)
+		out[code] = template.ArchetypeTerm{Code: term.Code, Items: items}
+	}
+	return out
 }

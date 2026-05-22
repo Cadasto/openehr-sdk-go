@@ -68,6 +68,16 @@ func TestCompile_AQLPaths(t *testing.T) {
 	}
 }
 
+// Phase 4 — Compiled.NodeAt is exact-match on precomputed AQL paths,
+// not wire tree-walk. Predicate-less "/content" on a multi-child
+// attribute resolves on the wire tree but is not indexed here.
+func TestCompiled_NodeAt_RejectsPredicatelessMultiChild(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	if _, err := c.NodeAt("/content"); !errors.Is(err, templatecompile.ErrPathNotFound) {
+		t.Fatalf("NodeAt(/content) = %v, want ErrPathNotFound (use full AQL path)", err)
+	}
+}
+
 // Phase 4 — AllByRMType + AllByNodeID indexes deliver O(1)
 // reverse lookups. Sanity: at least one entry for each well-known
 // term.
