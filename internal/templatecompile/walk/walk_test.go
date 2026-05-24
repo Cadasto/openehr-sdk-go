@@ -245,9 +245,13 @@ func TestWalk_NilInputs(t *testing.T) {
 	}
 }
 
-// Phase 5 — implicit attribute nodes contribute no recursion (they
-// have no children) but the walker does not crash on them. Spot-
-// check by counting visited nodes against the byPath index size.
+// Phase 5 — the walker must reach every CompiledNode in the
+// compiled tree, including implicit-attribute children. The "truth
+// count" is the byPath index size (every node was registered there
+// during Compile, with duplicate-collision detection — see
+// registerPath in compile.go). Comparing the walker's PreHandle
+// tally to NumNodes catches subtree-pruning bugs that comparing the
+// walker against itself cannot.
 func TestWalk_VisitsEveryNode(t *testing.T) {
 	c := mustCompile(t, "vital_signs.opt")
 	var visited int
@@ -259,30 +263,97 @@ func TestWalk_VisitsEveryNode(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Walk: %v", err)
 	}
-	// Every CompiledNode is in the byPath index. AllByRMType returns
-	// every node grouped by RM type; sum the groups for the total.
-	want := totalNodes(c)
+	want := c.NumNodes()
+	if want == 0 {
+		t.Fatal("Compile produced zero nodes; fixture broken")
+	}
 	if visited != want {
-		t.Errorf("Walk visited %d nodes, byRMType total %d (walker missed some nodes)", visited, want)
+		t.Errorf("Walk visited %d nodes, byPath index has %d (walker missed some nodes)", visited, want)
 	}
 }
 
-// totalNodes sums every node visible via AllByRMType. AllByRMType
-// is keyed by RM type name; every node has one, so each node
-// appears exactly once across the groups.
-func totalNodes(c *templatecompile.Compiled) int {
-	seen := map[*templatecompile.CompiledNode]struct{}{}
-	// Iterate every RM type we know about via the compiled tree's
-	// own walker (Compile populates byRMType for every node). We
-	// don't have a direct enumerator, so deduplicate via pointer
-	// identity from a small walk that uses a separate visitor.
-	_ = walk.Walk(c, walk.VisitorFunc{
+// Phase 5 — *Slot leaves still receive both PreHandle and
+// PostHandle, but the walker does NOT descend into them: their
+// Includes / Excludes assertions are opaque slot-fill semantics
+// (REQ-104 surfaces them). Verify by visiting a known CLUSTER slot
+// in vital_signs.opt and asserting (a) both hooks fire and (b) no
+// descendant of the slot's AQL path appears.
+func TestWalk_SlotLeafVisitedNoDescent(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+
+	var slotPath string
+	for _, n := range c.AllByRMType("CLUSTER") {
+		if n.IsSlot() {
+			slotPath = n.AQLPath()
+			break
+		}
+	}
+	if slotPath == "" {
+		t.Fatal("vital_signs.opt has no CLUSTER *Slot to exercise; fixture changed?")
+	}
+
+	var pre, post int
+	var leaked []string
+	err := walk.Walk(c, walk.VisitorFunc{
 		Pre: func(ctx *walk.Context) error {
-			seen[ctx.Node()] = struct{}{}
+			if ctx.Path() == slotPath {
+				pre++
+			}
+			if strings.HasPrefix(ctx.Path(), slotPath+"/") {
+				leaked = append(leaked, ctx.Path())
+			}
+			return nil
+		},
+		Post: func(ctx *walk.Context) error {
+			if ctx.Path() == slotPath {
+				post++
+			}
 			return nil
 		},
 	})
-	return len(seen)
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+	if pre != 1 {
+		t.Errorf("PreHandle fired %d times on slot %s, want 1", pre, slotPath)
+	}
+	if post != 1 {
+		t.Errorf("PostHandle fired %d times on slot %s, want 1 (slot leaves still get post-order)", post, slotPath)
+	}
+	if len(leaked) > 0 {
+		t.Errorf("walker descended into slot %s: visited %v", slotPath, leaked)
+	}
+}
+
+// Phase 5 — a non-nil error returned from PostHandle aborts the walk
+// just as it does from PreHandle. Distinct from TestWalk_ErrorAborts
+// (which exercises the PreHandle path).
+func TestWalk_PostHandleErrorAborts(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	boom := errors.New("post-boom")
+	var preCount, postCount int
+	err := walk.Walk(c, walk.VisitorFunc{
+		Pre: func(*walk.Context) error {
+			preCount++
+			return nil
+		},
+		Post: func(ctx *walk.Context) error {
+			postCount++
+			if ctx.Path() == "/category" {
+				return boom
+			}
+			return nil
+		},
+	})
+	if !errors.Is(err, boom) {
+		t.Errorf("Walk = %v, want errors.Is(err, boom)", err)
+	}
+	if postCount == 0 {
+		t.Errorf("PostHandle never fired before abort; walker likely returned earlier than expected")
+	}
+	if preCount < postCount {
+		t.Errorf("pre=%d post=%d — Pre must run at least as often as Post", preCount, postCount)
+	}
 }
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {

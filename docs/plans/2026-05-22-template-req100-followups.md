@@ -1,7 +1,7 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Phases 1–4 + 4-bis landed; Phases 5+ open
+**Status:** Phases 1–5 + 4-bis landed; Phases 6+ open
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** partial — Phases 1–5 + 4-bis landed (Root collapse, WalkComposition, REQ-103 primitives deferred); Phases 6+ deferred per follow-up sequencing

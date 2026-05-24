@@ -12,10 +12,22 @@ import (
 // any child is visited, then post-order after every child has been
 // visited.
 //
-// PreHandle returning [SkipSubtree] prunes the subtree (no children
-// visited, PostHandle not fired) while letting sibling traversal
-// continue. Any other non-nil error aborts the walk. PostHandle's
-// error semantics are simpler: a non-nil return aborts.
+// Asymmetric error semantics:
+//
+//   - PreHandle returning [SkipSubtree] prunes the subtree (no
+//     children visited, PostHandle not fired) while letting sibling
+//     traversal continue. Any OTHER non-nil error aborts the walk.
+//   - PostHandle treats every non-nil return as an abort.
+//     [SkipSubtree] is meaningless here — the children have already
+//     been walked by the time PostHandle fires, so there is nothing
+//     left to prune — and is propagated to the caller as if it were
+//     any other error.
+//
+// Visitors that need to inspect the attributes a node carries (e.g.
+// to surface the implicit rminfo-injected ones to a composition
+// builder) call ctx.Node().Attributes() inside PreHandle. The walker
+// visits nodes only; [CompiledAttribute] entries are never passed
+// to either hook.
 type Visitor interface {
 	PreHandle(ctx *Context) error
 	PostHandle(ctx *Context) error

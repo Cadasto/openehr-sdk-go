@@ -14,9 +14,13 @@ import (
 // to a strings.Builder accessible via [Printer.String]; supply an
 // alternative writer via NewPrinter.
 //
-// Each line carries the AQL path plus the RM type name, with a
-// "(slot)" tag for *Slot leaves. Implicit attributes (rminfo-injected)
-// are rendered with an asterisk before the attribute name.
+// Each line carries the AQL path plus the RM type name. *Slot
+// leaves get a trailing " (slot)" tag. Nodes whose parent attribute
+// is implicit (rminfo-injected — see
+// [templatecompile.CompiledAttribute.Implicit]) carry a trailing
+// " (implicit attr)" marker on the same line. The marker is rare in
+// practice because v1 implicit attributes have no Children; it is
+// reserved for future RM-injection that populates default values.
 //
 // Use as:
 //

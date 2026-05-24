@@ -60,25 +60,22 @@ func TestPrinter_RendersTree(t *testing.T) {
 	}
 }
 
-// Phase 5 — Printer marks implicit-attribute children with the
-// "(implicit attr)" tag, so visitors that hand the output to humans
-// can see which fields were RM-injected vs OPT-declared.
-func TestPrinter_MarksImplicitAttrChildren(t *testing.T) {
+// Phase 5 — Printer does not panic when the compiled tree carries
+// implicit (rminfo-injected) attributes. vital_signs.opt declares
+// only category + content explicitly; composer / language / territory
+// arrive via rminfo as implicit CompiledAttributes with empty
+// Children slices — the walker therefore never visits a child *under*
+// an implicit attribute and the "(implicit attr)" marker branch in
+// PreHandle stays dormant. This test asserts only the no-panic
+// property; the marker itself has no behavioural coverage in v1 and
+// would need a synthetic Compiled with a populated implicit attribute
+// (out of scope for Phase 5) to exercise.
+func TestPrinter_DoesNotPanicOnImplicitAttrs(t *testing.T) {
 	c := mustCompile(t, "vital_signs.opt")
 	out, err := templatedump.Dump(c, "  ")
 	if err != nil {
 		t.Fatalf("Dump: %v", err)
 	}
-	// vital_signs.opt declares only category + content explicitly;
-	// composer / language / territory arrive via rminfo. The Printer
-	// renders the parent attribute's Implicit flag, but the implicit
-	// attribute itself has NO children — so the tag appears only
-	// when a CHILD of an implicit attribute is visited. Implicit
-	// attributes have no children, so the tag stays effectively
-	// reserved for future RM-injection that DOES populate values.
-	// We don't assert any specific output here — just sanity-check
-	// that the dump completes without panic on implicit-bearing
-	// nodes.
 	if len(out) == 0 {
 		t.Fatal("Dump empty")
 	}
