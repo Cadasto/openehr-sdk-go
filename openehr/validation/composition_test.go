@@ -244,6 +244,79 @@ func TestValidateComposition_NilElementValue(t *testing.T) {
 	}
 }
 
+// REQ-102 v2 Phase 3 — out-of-range systolic magnitude triggers
+// primitive_out_of_range at the element's /value path. vital_signs.opt
+// pins the systolic DV_QUANTITY range upper at 1000 mm[Hg].
+func TestValidateComposition_PrimitiveOutOfRange(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	list.Items[0].Value = &rm.DVQuantity{
+		Magnitude: rm.Real(2000),
+		Units:     "mm[Hg]",
+	}
+	r := validation.ValidateComposition(comp, c)
+	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"
+	found := false
+	for _, i := range r.Issues {
+		if i.Path == wantPath && strings.HasPrefix(i.Code, "primitive_") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected primitive_* issue at %s, got %+v", wantPath, r.Issues)
+	}
+}
+
+// REQ-102 v2 Phase 3 — DV_QUANTITY units not in the OPT-allowed
+// list trigger primitive_unit_unknown.
+func TestValidateComposition_PrimitiveUnitsUnknown(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	list.Items[0].Value = &rm.DVQuantity{
+		Magnitude: rm.Real(120),
+		Units:     "psi", // not in {mm[Hg]}
+	}
+	r := validation.ValidateComposition(comp, c)
+	if !containsCode(r.Issues, "primitive_unit_unknown") {
+		t.Errorf("expected primitive_unit_unknown issue, got %+v", r.Issues)
+	}
+}
+
+// REQ-102 v2 Phase 3 — category defining_code is constrained by the
+// OPT to a closed list (openehr::433). Supplying a code outside that
+// list surfaces a primitive_not_in_list issue at
+// /category/defining_code.
+func TestValidateComposition_PrimitiveCategoryNotInList(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	comp.Category.DefiningCode = rm.CodePhrase{
+		TerminologyID: rm.TerminologyID{Value: "openehr"},
+		CodeString:    "999",
+	}
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected primitive issue for category not in list, got OK")
+	}
+	wantPath := "/category/defining_code"
+	found := false
+	for _, i := range r.Issues {
+		if i.Path == wantPath && strings.HasPrefix(i.Code, "primitive_") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected primitive_* at %s, got %+v", wantPath, r.Issues)
+	}
+}
+
 // REQ-102 v2 Phase 2 — removing the systolic element entirely
 // (empty items slice on the ITEM_LIST) surfaces a `required`
 // issue at /content[…]/data/events[at0006]/data/items.

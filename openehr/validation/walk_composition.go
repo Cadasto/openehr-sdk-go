@@ -6,6 +6,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
@@ -38,13 +39,15 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 		// walkMultipleAttribute).
 		return
 	}
-	if optNode.PrimitiveConstraint() != nil {
-		// REQ-103 primitive constraint leaves — the typed primitive
-		// validator handles the value in Phase 3. The structural
-		// walker MUST NOT descend into implicit RM-mandatory attrs
-		// of the primitive's RM type (e.g. DV_QUANTITY.magnitude /
-		// .units): those are the primitive validator's territory,
-		// not the structural pass.
+	if pc := optNode.PrimitiveConstraint(); pc != nil {
+		// REQ-103 primitive constraint leaf. Convert the RM
+		// DataValue (or RM-typed primitive Go value) to the
+		// constraint's expected input via dataValueInput, then
+		// fan Violations out as Issues. The structural walker
+		// MUST NOT descend further: implicit RM attrs of the
+		// primitive's RM type (e.g. DV_QUANTITY.magnitude / .units)
+		// are the primitive validator's territory.
+		w.applyPrimitive(optNode, rmValue, path, pc)
 		return
 	}
 
@@ -167,6 +170,63 @@ func (w *walker) walkMultipleAttribute(
 		}
 		w.walkNode(matched, item, itemPath)
 	}
+}
+
+// applyPrimitive runs the REQ-103 primitive constraint against the
+// RM value bound to `optNode` and emits one Issue per Violation.
+// The constraint's expected input is computed via dataValueInput;
+// for non-DataValue RM types that map to a primitive (e.g.
+// CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
+// the value is passed through as-is.
+func (w *walker) applyPrimitive(
+	optNode *templatecompile.CompiledNode,
+	rmValue any,
+	path string,
+	pc constraints.PrimitiveConstraint,
+) {
+	input := primitiveInput(rmValue)
+	for _, v := range pc.Validate(input) {
+		w.emit(Issue{
+			Path:     path,
+			Code:     "primitive_" + string(v.Code),
+			Detail:   v.Detail,
+			Severity: Error,
+		})
+	}
+}
+
+// primitiveInput converts an RM value into the Go value the typed
+// primitive validator expects. Handles three layers:
+//
+//   - rm.DataValue concretes (DvQuantity, DvCodedText, DvText, …)
+//     via dataValueInput — REQ-103 primitive types that bind to
+//     ELEMENT.value.
+//   - rm.CodePhrase directly (e.g. category/defining_code) — bind
+//     to constraints.CodedTermRef.
+//   - everything else: pass through unchanged. The typed primitive
+//     validator returns CodeWrongType when the input shape does not
+//     fit; that is a contract failure on the caller side, not a
+//     constraint failure.
+func primitiveInput(rmValue any) any {
+	if dv, ok := rmValue.(rm.DataValue); ok {
+		if input, ok := dataValueInput(dv); ok {
+			return input
+		}
+		return dv
+	}
+	switch v := rmValue.(type) {
+	case rm.CodePhrase:
+		return constraints.CodedTermRef{
+			Terminology: v.TerminologyID.Value,
+			CodeString:  v.CodeString,
+		}
+	case *rm.CodePhrase:
+		return constraints.CodedTermRef{
+			Terminology: v.TerminologyID.Value,
+			CodeString:  v.CodeString,
+		}
+	}
+	return rmValue
 }
 
 // isRequired reports whether the compiled attribute carries an

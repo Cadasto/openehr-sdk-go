@@ -368,13 +368,17 @@ requirements:
     title: Composition validation
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
-    # Phase 0 of the v2 plan landed the compiled-template
-    # prerequisites (CARDINALITY interval on CompiledAttribute) and
-    # the normative REQ-102 spec section. Implementation flips to
-    # `partial` when Phase 2 (structural visitor) lands and to
-    # `landed` after Phase 4. See
+    # Phases 0-3 of the v2 plan landed: cardinality on
+    # CompiledAttribute, the rmread RM-attribute access table, the
+    # template-driven structural walker, and the REQ-103 primitive
+    # pass on template bindings. Flips to `landed` after Phase 4
+    # (alternative matching + PROBE-026 sandbox probe). See
     # docs/plans/2026-05-24-validation-v2-template-driven.md.
-    implementation: planned
+    implementation: partial
+    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile]
+    tests:
+      - openehr/validation/composition_test.go
+      - openehr/validation/rmread/read_test.go
     plans:
       - docs/plans/2026-05-21-validation.md
       - docs/plans/2026-05-24-validation-v2-template-driven.md
