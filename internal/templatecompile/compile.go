@@ -224,11 +224,12 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 		required = slices.Contains(w.lookup.RequiredAttributes(parent.rmTypeName), a.Name())
 	}
 	ca := &CompiledAttribute{
-		name:        a.Name(),
-		cardinality: a.Cardinality(),
-		existence:   a.Existence(),
-		rmTypeName:  rm,
-		required:    required,
+		name:              a.Name(),
+		cardinality:       a.Cardinality(),
+		existence:         a.Existence(),
+		childMultiplicity: a.ChildMultiplicity(),
+		rmTypeName:        rm,
+		required:          required,
 	}
 	for i, child := range a.Children() {
 		segment := pathSegment(a.Name(), a.Cardinality(), child, i)

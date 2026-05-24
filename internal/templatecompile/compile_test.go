@@ -357,6 +357,126 @@ func TestCompile_ThreadsPrimitiveConstraint(t *testing.T) {
 	}
 }
 
+// Phase 0 (REQ-102 v2) — C_MULTIPLE_ATTRIBUTE carries an AOM 1.4
+// CARDINALITY block in addition to existence. The parser must lift
+// its <interval> to a Multiplicity and the compile step must
+// surface it via CompiledAttribute.ChildMultiplicity. C_SINGLE_ATTRIBUTE
+// has no cardinality block — accessor stays nil.
+func TestCompile_ChildMultiplicity(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>card-test</value></template_id>
+  <concept>card-test</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <existence>
+        <lower>0</lower>
+        <upper>1</upper>
+        <lower_unbounded>false</lower_unbounded>
+        <upper_unbounded>false</upper_unbounded>
+      </existence>
+      <cardinality>
+        <is_ordered>false</is_ordered>
+        <is_unique>false</is_unique>
+        <interval>
+          <lower>1</lower>
+          <upper_unbounded>true</upper_unbounded>
+          <lower_unbounded>false</lower_unbounded>
+        </interval>
+      </cardinality>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>OBSERVATION</rm_type_name>
+        <node_id>at0001</node_id>
+      </children>
+    </attributes>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>category</rm_attribute_name>
+      <existence>
+        <lower>1</lower>
+        <upper>1</upper>
+      </existence>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: true})
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	root := c.Root()
+
+	var contentAttr, categoryAttr *templatecompile.CompiledAttribute
+	for _, a := range root.Attributes() {
+		switch a.Name() {
+		case "content":
+			contentAttr = a
+		case "category":
+			categoryAttr = a
+		}
+	}
+	if contentAttr == nil || categoryAttr == nil {
+		t.Fatalf("missing attrs: content=%v category=%v", contentAttr, categoryAttr)
+	}
+
+	cm := contentAttr.ChildMultiplicity()
+	if cm == nil {
+		t.Fatal("content.ChildMultiplicity() = nil; want lower=1 upper-unbounded")
+	}
+	if cm.Lower() != 1 {
+		t.Errorf("content cardinality.Lower = %d, want 1", cm.Lower())
+	}
+	if !cm.UpperUnbounded() {
+		t.Errorf("content cardinality.UpperUnbounded = false, want true")
+	}
+
+	if categoryAttr.ChildMultiplicity() != nil {
+		t.Errorf("category.ChildMultiplicity() = %+v, want nil (single attr has no cardinality)", categoryAttr.ChildMultiplicity())
+	}
+
+	// Existence is independent: content's existence is 0..1.
+	if exi := contentAttr.Existence(); exi == nil || exi.Lower() != 0 || exi.Upper() != 1 {
+		t.Errorf("content.Existence = %+v, want [0..1]", exi)
+	}
+}
+
+// Phase 0 (REQ-102 v2) — Cardinality survives compilation through
+// a real fixture (vital_signs.opt /content is lower=0,
+// upper-unbounded per the OPT wire). The accessor must report the
+// same interval on the multi-valued attribute, and report nil on a
+// C_SINGLE_ATTRIBUTE sibling at the same root depth (/category).
+func TestCompile_ChildMultiplicity_FixtureRoundTrip(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	root := c.Root()
+	var content, category *templatecompile.CompiledAttribute
+	for _, a := range root.Attributes() {
+		switch a.Name() {
+		case "content":
+			content = a
+		case "category":
+			category = a
+		}
+	}
+	if content == nil || category == nil {
+		t.Fatalf("missing attrs: content=%v category=%v", content, category)
+	}
+	cm := content.ChildMultiplicity()
+	if cm == nil {
+		t.Fatal("/content ChildMultiplicity = nil; fixture declares lower=0 upper-unbounded")
+	}
+	if cm.Lower() != 0 || !cm.UpperUnbounded() {
+		t.Errorf("/content cardinality = {lower=%d upperUnbounded=%v}, want {0, true}", cm.Lower(), cm.UpperUnbounded())
+	}
+	if got := category.ChildMultiplicity(); got != nil {
+		t.Errorf("/category (C_SINGLE_ATTRIBUTE) ChildMultiplicity = %+v, want nil", got)
+	}
+}
+
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(filepath.Join("..", "..", "openehr", "template", "testdata", fixture))

@@ -254,10 +254,15 @@ type xmlTermBindSection struct {
 }
 
 type xmlCAttribute struct {
-	Type      string        `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
-	Name      string        `xml:"rm_attribute_name"`
-	Existence *xmlInterval  `xml:"existence"`
-	Children  []*xmlCObject `xml:"children"`
+	Type      string       `xml:"http://www.w3.org/2001/XMLSchema-instance type,attr"`
+	Name      string       `xml:"rm_attribute_name"`
+	Existence *xmlInterval `xml:"existence"`
+	// Cardinality is the AOM 1.4 CARDINALITY block on
+	// C_MULTIPLE_ATTRIBUTE. The is_ordered / is_unique flags are
+	// declared but not retained by v1; only the interval (min/max
+	// child count) is consumed downstream by the validator.
+	Cardinality *xmlCardinality `xml:"cardinality"`
+	Children    []*xmlCObject   `xml:"children"`
 }
 
 type xmlInterval struct {
@@ -265,6 +270,17 @@ type xmlInterval struct {
 	Upper          int  `xml:"upper"`
 	LowerUnbounded bool `xml:"lower_unbounded"`
 	UpperUnbounded bool `xml:"upper_unbounded"`
+}
+
+// xmlCardinality maps the AOM 1.4 CARDINALITY type — the
+// child-count interval that decorates C_MULTIPLE_ATTRIBUTE alongside
+// existence. Only the interval is captured in v1; is_ordered /
+// is_unique are parsed-but-ignored (no validator dimension consumes
+// them).
+type xmlCardinality struct {
+	IsOrdered bool         `xml:"is_ordered"`
+	IsUnique  bool         `xml:"is_unique"`
+	Interval  *xmlInterval `xml:"interval"`
 }
 
 type xmlAssertion struct {
@@ -401,8 +417,18 @@ func buildAttribute(a *xmlCAttribute, strict bool) (*Attribute, error) {
 	switch a.Type {
 	case "C_SINGLE_ATTRIBUTE", "":
 		attr.cardinality = Single
+		// C_SINGLE_ATTRIBUTE has no <cardinality> block per the AOM
+		// 1.4 schema. Silently ignore the field if a non-conformant
+		// wire payload supplies one.
 	case "C_MULTIPLE_ATTRIBUTE":
 		attr.cardinality = Multiple
+		if a.Cardinality != nil {
+			cm, err := intervalToMultiplicity(a.Cardinality.Interval)
+			if err != nil {
+				return nil, fmt.Errorf("cardinality on attribute %q: %w", a.Name, err)
+			}
+			attr.childMultiplicity = cm
+		}
 	default:
 		return nil, fmt.Errorf("%w: attribute xsi:type=%q", ErrUnsupportedNode, a.Type)
 	}

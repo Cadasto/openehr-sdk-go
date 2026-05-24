@@ -199,3 +199,106 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
+
+---
+
+## REQ-102 — Composition validation
+
+The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Result` entry point that walks a parsed RM `Composition` against a compiled OPT and returns a `Result` aggregating every issue found in a single pass.
+
+### Contract
+
+- **Pure function.** No I/O, no goroutines, no reflection. Stateless — concurrent callers share `c` safely.
+- **Collect-all, not fail-fast.** Validators emit one `Issue` per failing clause; the walk completes regardless of how many issues fire. UIs and CI consumers need the full list.
+- **Result shape:**
+  ```go
+  type Result struct {
+      OK     bool      // true ⇔ len(Issues) == 0
+      Issues []Issue
+  }
+  type Issue struct {
+      Path     string   // AQL path of the offending node (empty for global issues)
+      Code     string   // stable programmatic identifier — see code taxonomy below
+      Detail   string   // human-readable message
+      Severity Severity // Error in v1; Warning reserved
+  }
+  type Severity int
+  const (
+      Error   Severity = iota
+      Warning              // reserved; not emitted in v1
+  )
+  ```
+
+### Trust model
+
+The validator treats the **compiled OPT as authoritative for structure** and the **composition as the instance under test**. Structural traversal is template-driven: for each compiled OPT node, the walker reads the corresponding RM property by `rm_attribute_name`, enforces existence / cardinality / alternatives, and recurses into matched RM children. Path strings in `Issue.Path` come from the OPT's pre-computed `AQLPath` (`templatecompile.CompiledNode.AQLPath`) — composition-supplied predicates never form lookup keys, so missing nodes are reported instead of silently bypassed.
+
+An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: it descended the composition graph via typed switches, built AQL paths from the composition's at-codes, looked up OPT constraints at those paths, and applied REQ-103 primitive checks at every matched leaf. That intermediate could not flag missing OPT-required nodes (no RM subtree → no path → no lookup); the template-driven walk closes that gap. See the plan at [`docs/plans/2026-05-24-validation-v2-template-driven.md`](../plans/2026-05-24-validation-v2-template-driven.md) for the migration's phase split.
+
+### Validation dimensions
+
+| Dimension | Implementation |
+|---|---|
+| **Structural — root archetype match** | comp.ArchetypeNodeID matches the OPT root's archetype id |
+| **Structural — required attributes (composition root + recursive)** | RM-mandatory attrs at the root (Category, Composer, Language, Territory); template-driven existence checks at every OPT node whose attribute interval lower ≥ 1 |
+| **Structural — child cardinality** | for each C_MULTIPLE_ATTRIBUTE, the RM child count is checked against the parsed `CompiledAttribute.ChildMultiplicity()` interval and each child's `Occurrences()` |
+| **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | RM value must match one of the attribute's child constraints; first-match wins, no match emits `alternative_mismatch` |
+| **Structural — RM type match** | the RM instance's concrete type must satisfy the OPT child's `RMTypeName` (with abstract supertype admission per BMM) |
+| **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
+| **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk |
+| **Slot fit — RM-type prefix fallback** | each `Content[i].ArchetypeNodeID` must match one of the OPT's archetype-root or slot-include archetype ids (or, when no slot constraint applies, share the slot's RM-type prefix `openEHR-EHR-<rmType>.`) |
+| **Slot assertion grammar** | deferred — REQ-104 |
+| **Extra RM nodes not declared in OPT** | not flagged in v2; optional `warning` policy is a follow-up |
+| **Terminology binding value-set** | deferred — REQ-105 |
+
+### Issue codes
+
+`Issue.Code` is a stable programmatic identifier; the closed set is:
+
+| Code | Triggered by |
+|---|---|
+| `required` | a required attribute (OPT-declared or RM-mandatory) is absent / zero-valued |
+| `cardinality` | a multi-valued attribute's child count violates the OPT-declared cardinality / occurrences interval |
+| `alternative_mismatch` | no child of a C_SINGLE_ATTRIBUTE matches the RM value |
+| `rm_type_mismatch` | the RM instance's concrete type disagrees with the OPT child's declared `RMTypeName` |
+| `archetype_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned archetype id at the matched node |
+| `node_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned at-code at the matched node |
+| `primitive_*` | a REQ-103 primitive `Violation.Code` (`out_of_range`, `pattern_mismatch`, `not_in_list`, `wrong_type`, `unit_unknown`, `invalid_value`) at a leaf |
+| `slot_fill` | a `Content[i]` archetype id does not satisfy the OPT's slot include / exclude (RM-type-prefix fallback in v1) |
+| `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
+
+### Sentinels
+
+The package **MUST** expose typed sentinels callers compare via `errors.Is` for programmatic dispatch:
+
+| Sentinel | Triggered by |
+|---|---|
+| `ErrCardinality` | `cardinality` code |
+| `ErrRequired` | `required` code |
+| `ErrTypeMismatch` | `rm_type_mismatch`, `alternative_mismatch`, `archetype_id_mismatch`, `node_id_mismatch` |
+| `ErrPrimitive` | any `primitive_*` code |
+| `ErrSlotFill` | `slot_fill` code |
+| `ErrAQLSyntax` | reserved — AQL lint surface not yet implemented |
+
+### Building-block independence (REQ-013)
+
+`openehr/validation/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The forbidden `serialize/` import is enforced by a test (`TestValidationNoSerializeImport`).
+
+The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `internal/templatecompile/` (same-module internal access).
+
+### Public surface scope (v1 — module-local)
+
+The `c *templatecompile.Compiled` argument is typed against the SDK's internal compiled-template package. Per Go's `internal/` visibility rule, **external consumers (modules outside `github.com/cadasto/openehr-sdk-go`) cannot construct the argument and therefore cannot call `ValidateComposition` directly in v1**. The validator is callable from any package within this module — composition builder, codegen, CI tools, MCP servers vendoring the SDK.
+
+This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2: `internal/templatecompile/` stays internal until REQ-101 (composition builder) confirms the public shape. The public re-export (`template.Compile` / `template.Compiled`) lands alongside REQ-101 Phase 1, after which the validator's public signature becomes externally callable without code change. Until then, downstream consumers either vendor the SDK as a private dependency or wait for the promotion.
+
+### Out of scope (this REQ)
+
+- **Demographic validator** (`ValidateDemographic`) and **AQL lint** (`ValidateAQL`) — separate entry points in the same package, deferred.
+- **Validating wire bytes / canonical JSON** — the validator never imports `serialize/`. Callers decode first, validate second.
+- **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services. REQ-103 closed-code-list checking is the v1 ceiling.
+- **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit uses the RM-type-prefix fallback.
+- **Full ADL2 / AOM 2 validation semantics.**
+
+- **Lives in:** [`openehr/validation/`](../../openehr/validation/)
+- **Probes:** PROBE-025 (composition validation against fixture OPT + composition); PROBE-026 (proposed — missing required node + cardinality negative cases)

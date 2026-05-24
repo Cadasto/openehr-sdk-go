@@ -345,10 +345,11 @@ type CodedTermRef struct {
 // empty (attributes are not RM-typed and do not carry archetype
 // node ids).
 type Attribute struct {
-	name        string
-	cardinality Cardinality
-	existence   *Multiplicity
-	children    []Node
+	name              string
+	cardinality       Cardinality
+	existence         *Multiplicity
+	childMultiplicity *Multiplicity
+	children          []Node
 }
 
 // Name returns the RM attribute name (e.g. "content", "data").
@@ -358,8 +359,22 @@ func (a *Attribute) Name() string { return a.name }
 func (a *Attribute) Cardinality() Cardinality { return a.cardinality }
 
 // Existence returns the parsed existence block, or nil when the OPT
-// did not declare one.
+// did not declare one. Existence answers "must this attribute be
+// filled with at least one value?" — i.e. a constraint on the
+// attribute as a whole. For child-count bounds on a multi-valued
+// attribute, see [Attribute.ChildMultiplicity].
 func (a *Attribute) Existence() *Multiplicity { return a.existence }
+
+// ChildMultiplicity returns the AOM 1.4 CARDINALITY interval that
+// constrains how many child objects may live under a
+// C_MULTIPLE_ATTRIBUTE. Returns nil for C_SINGLE_ATTRIBUTE (which
+// has no such block) and for multi-valued attributes whose OPT
+// omitted the <cardinality> element.
+//
+// Semantic distinction from [Attribute.Existence]: existence is a
+// 0/1 yes-or-no constraint on the attribute itself; cardinality is
+// the min/max count on its children when present.
+func (a *Attribute) ChildMultiplicity() *Multiplicity { return a.childMultiplicity }
 
 // Children returns a defensive copy of the child nodes in OPT
 // document order. The Node pointers themselves are still shared with

@@ -195,14 +195,20 @@ const (
 | Step | Status |
 |---|---|
 | Depends-on: REQ-100 follow-up plan Phases 4 + 4-bis + 5 + 6 | |
-| Phase 0 REQ-102 spec + sentinels + interfaces + import-guard test | |
-| Phase 1 Composition validator (structural + primitive dispatchers) | |
+| Phase 0 REQ-102 spec + sentinels + interfaces + import-guard test | landed |
+| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [2026-05-24-validation-v2-template-driven.md](2026-05-24-validation-v2-template-driven.md)) |
 | Phase 2 Demographic validator | |
 | Phase 2 AQL lint subset | |
 | PROBE-024 sandbox probe | |
 | `validate-composition` example | |
 | `TestValidationNoSerializeImport` import-guard test | |
 | `make ci` green | |
+
+### Phase 1 superseded by template-driven v2
+
+The Phase 1 deliverable above landed on `feat/req102-validation` as an **RM-guided** validator: descend the composition graph via typed switches, build AQL paths from the composition's at-codes, look up OPT constraints at those paths, and apply REQ-103 primitive checks at every matched leaf. That intermediate cannot flag composition-side **missing** required nodes (no RM subtree → no path → no constraint lookup).
+
+The v2 plan ([`2026-05-24-validation-v2-template-driven.md`](2026-05-24-validation-v2-template-driven.md)) inverts the walk: the compiled OPT is the driver, the composition is the value source. v2 closes the structural completion gap (existence, cardinality, alternatives, RM type match) using the same public `ValidateComposition` signature.
 
 ## Mapping to specs
 
