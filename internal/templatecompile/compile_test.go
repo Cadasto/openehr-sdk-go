@@ -3,12 +3,15 @@ package templatecompile_test
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // Phase 4 — Compile turns a parsed OPT into a walker-friendly tree.
@@ -274,6 +277,83 @@ func TestCompile_SlotsPreserved(t *testing.T) {
 		return len(n.SlotIncludes()) > 0
 	}) {
 		t.Errorf("no slot carries Includes; expected at least one slot with includes")
+	}
+}
+
+// Phase 4 / REQ-103 — Compile threads the typed
+// [constraints.PrimitiveConstraint] from each wire-side ComplexObject
+// onto the matching CompiledNode unchanged. Catches regressions where
+// the compile step drops, mutates, or rebuilds the primitive (e.g. a
+// "DeepCopy"-style refactor that loses pointer identity on
+// *float64 / *int64 default fields).
+//
+// Uses a synthetic OPT with a C_INTEGER child so the path is
+// predictable and the constraint value is small enough to compare
+// via reflect.DeepEqual.
+func TestCompile_ThreadsPrimitiveConstraint(t *testing.T) {
+	const body = `<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>primitive_thread</value></template_id>
+  <concept>primitive_thread</concept>
+  <definition xsi:type="C_COMPLEX_OBJECT">
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="C_INTEGER">
+        <rm_type_name>INTEGER</rm_type_name>
+        <node_id>at0001</node_id>
+        <range>
+          <lower_included>true</lower_included>
+          <upper_included>true</upper_included>
+          <lower_unbounded>false</lower_unbounded>
+          <upper_unbounded>false</upper_unbounded>
+          <lower>0</lower>
+          <upper>100</upper>
+        </range>
+        <list>1</list>
+        <list>5</list>
+        <list>10</list>
+        <assumed_value>5</assumed_value>
+      </children>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+
+	// Wire-side: locate the C_INTEGER child via the root → attribute → children chain.
+	rootCO, ok := opt.Root().(*template.ComplexObject)
+	if !ok {
+		t.Fatalf("Root not *ComplexObject: %T", opt.Root())
+	}
+	wireChild, ok := rootCO.Attributes()[0].Children()[0].(*template.ComplexObject)
+	if !ok {
+		t.Fatalf("expected wire leaf *ComplexObject, got %T", rootCO.Attributes()[0].Children()[0])
+	}
+	wirePrim := wireChild.PrimitiveConstraint()
+	if _, isInt := wirePrim.(constraints.CInteger); !isInt {
+		t.Fatalf("wire primitive = %T, want constraints.CInteger", wirePrim)
+	}
+
+	// Compile-side: the C_INTEGER node appears under /content with its
+	// at-code predicate (multi-cardinality attribute).
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	cn, err := c.NodeAt("/content[at0001]")
+	if err != nil {
+		t.Fatalf("NodeAt(/content[at0001]): %v", err)
+	}
+	compiledPrim := cn.PrimitiveConstraint()
+	if compiledPrim == nil {
+		t.Fatal("CompiledNode.PrimitiveConstraint() returned nil — Compile dropped the wire primitive")
+	}
+	if !reflect.DeepEqual(wirePrim, compiledPrim) {
+		t.Errorf("primitive constraint mutated by Compile:\n  wire     = %#v\n  compiled = %#v", wirePrim, compiledPrim)
 	}
 }
 

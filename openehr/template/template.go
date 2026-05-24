@@ -4,6 +4,8 @@ import (
 	"maps"
 	"slices"
 	"strconv"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // OperationalTemplate is a parsed ADL 1.4 operational template (OPT).
@@ -216,13 +218,14 @@ func (c Cardinality) IsValid() bool {
 // ComplexObject is xsi:type="C_COMPLEX_OBJECT" in the OPT XML and
 // also the embedded payload of *ArchetypeRoot. It is used for both
 // internal nodes (with child attributes) and leaf primitive
-// constraints (e.g. CODE_PHRASE, DV_QUANTITY) which appear without
-// child attributes in v1.
+// constraints (e.g. CODE_PHRASE, DV_QUANTITY); for the latter, the
+// typed constraint surface is on [PrimitiveConstraint] (REQ-103).
 type ComplexObject struct {
 	rmTypeName  string
 	nodeID      string
 	occurrences *Multiplicity
 	attributes  []*Attribute
+	primitive   constraints.PrimitiveConstraint
 }
 
 // RMTypeName implements Node.
@@ -239,6 +242,19 @@ func (c *ComplexObject) Occurrences() *Multiplicity { return c.occurrences }
 // document order. Slice mutation does not affect the underlying tree;
 // the *Attribute pointers themselves are still shared with the OPT.
 func (c *ComplexObject) Attributes() []*Attribute { return slices.Clone(c.attributes) }
+
+// PrimitiveConstraint returns the typed REQ-103 constraint payload
+// when the wire xsi:type was a primitive (C_BOOLEAN, C_INTEGER,
+// C_REAL, C_STRING, C_DATE, C_TIME, C_DATE_TIME, C_DURATION,
+// C_CODE_PHRASE, C_DV_QUANTITY, C_DV_ORDINAL). Returns nil for
+// non-primitive nodes (C_COMPLEX_OBJECT proper, archetype roots,
+// slots, attribute containers).
+//
+// The returned value is one of the concrete types in the
+// [constraints] package — pattern-match on it via a type switch.
+func (c *ComplexObject) PrimitiveConstraint() constraints.PrimitiveConstraint {
+	return c.primitive
+}
 
 func (c *ComplexObject) isNode() {}
 

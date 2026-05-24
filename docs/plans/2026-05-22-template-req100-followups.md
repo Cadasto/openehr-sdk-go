@@ -1,10 +1,10 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Phases 1–5 + 4-bis landed; Phases 6+ open
+**Status:** Phases 1–6 + 4-bis landed; Phases 7+ open
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
-**Implementation:** partial — Phases 1–5 + 4-bis landed (Root collapse, WalkComposition, REQ-103 primitives deferred); Phases 6+ deferred per follow-up sequencing
+**Implementation:** partial — Phases 1–6 + 4-bis landed (walker + REQ-103 primitives); Phases 7+ deferred per follow-up sequencing
 **Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
 **Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md))
 
@@ -275,8 +275,8 @@ type PrimitiveConstraint interface {
 
 type DvQuantity struct {
     Units    []QuantityUnit                // (units string, magnitude range, precision range)
-    Property string                        // optional terminology binding for the property
-    Default  *DvQuantityDefault            // assumed_value when present
+    Property *CodedTermRef                 // optional terminology binding for the property; landed as *CodedTermRef rather than the plan's original `string` so terminology + code stay structured (matches AOM <property> XML shape)
+    Default  *DvQuantityDefault            // assumed_value when present (deferred — wire decode covers Default for primitives where the OPT supplies <assumed_value>)
 }
 
 type CodePhrase struct {
@@ -406,7 +406,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Phase 4-bis RMInfoLookup (codegen + PROBE-023) | landed (codegen + tests; PROBE-023 deferred; see [ADR 0005](../adr/0005-compiled-template-foundation.md)) |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | landed ([ADR 0005](../adr/0005-compiled-template-foundation.md); public `template.Compile` deferred) |
 | Phase 5 Walker pattern + composition walker | landed (Walk / WalkSubtree / SkipSubtree + templatedump reference visitors; WalkComposition + Choice handling deferred to REQ-101/102 surface) |
-| Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | |
+| Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | landed (constraints sub-package, wire-parse extension, compile-time threading, PROBE-024; AOM partial-pattern enforcement deferred) |
 | Phase 7 REQ-104 slot assertions (when REQ-101 / REQ-102 surfaces real call sites) | |
 | Phase 8 REQ-105 terminology bindings (when renderer / FHIR consumer arrives) | |
 | `make ci` green throughout | |
