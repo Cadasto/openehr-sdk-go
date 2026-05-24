@@ -231,6 +231,10 @@ func readObservationSingle(o *rm.Observation, attr string) (any, bool) {
 		return codePhrasePresent(o.Language)
 	case "encoding":
 		return codePhrasePresent(o.Encoding)
+	case "subject":
+		return ifacePresent(o.Subject)
+	case "provider":
+		return ifacePresent(o.Provider)
 	case "data":
 		// HISTORY value-typed; absent iff zero-valued (no events,
 		// no origin). The structural walker descends regardless;
@@ -261,6 +265,10 @@ func readEvaluationSingle(e *rm.Evaluation, attr string) (any, bool) {
 		return codePhrasePresent(e.Language)
 	case "encoding":
 		return codePhrasePresent(e.Encoding)
+	case "subject":
+		return ifacePresent(e.Subject)
+	case "provider":
+		return ifacePresent(e.Provider)
 	case "data":
 		return ifacePresent(e.Data)
 	case "protocol":
@@ -289,6 +297,10 @@ func readInstructionSingle(i *rm.Instruction, attr string) (any, bool) {
 		return ptrPresent(i.ExpiryTime)
 	case "wf_definition":
 		return ptrPresent(i.WfDefinition)
+	case "subject":
+		return ifacePresent(i.Subject)
+	case "provider":
+		return ifacePresent(i.Provider)
 	}
 	return nil, false
 }
@@ -321,6 +333,10 @@ func readActionSingle(a *rm.Action, attr string) (any, bool) {
 		return ifacePresent(a.Description)
 	case "protocol":
 		return ifacePresent(a.Protocol)
+	case "subject":
+		return ifacePresent(a.Subject)
+	case "provider":
+		return ifacePresent(a.Provider)
 	}
 	return nil, false
 }
@@ -339,6 +355,10 @@ func readAdminEntrySingle(a *rm.AdminEntry, attr string) (any, bool) {
 		return codePhrasePresent(a.Encoding)
 	case "data":
 		return ifacePresent(a.Data)
+	case "subject":
+		return ifacePresent(a.Subject)
+	case "provider":
+		return ifacePresent(a.Provider)
 	}
 	return nil, false
 }

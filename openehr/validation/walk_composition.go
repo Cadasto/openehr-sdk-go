@@ -1,0 +1,496 @@
+package validation
+
+import (
+	"fmt"
+
+	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
+)
+
+// walkNode is the lockstep visitor: it enters the OPT node `optNode`
+// bound to the RM value `rmValue`, emits structural issues at this
+// node, then descends each OPT-declared attribute into its matched
+// RM child(ren). The `path` argument is the OPT-authoritative AQL
+// path of `optNode` (root = "/").
+//
+// Phase 2 ceiling: existence, child cardinality, RM-type / archetype-id
+// identity, slot-fit on /content. Alternative matching against
+// C_SINGLE_ATTRIBUTE children with two or more siblings is Phase 4 —
+// for now the walker takes attr.Children()[0] as the canonical OPT
+// child for a single attribute. Primitive checks land in Phase 3.
+func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, path string) {
+	if optNode == nil || rmValue == nil {
+		return
+	}
+
+	// Identity + RM-type checks at this node (no-op for the
+	// composition root when optNode is the OPT root; root archetype
+	// id is validated as part of the COMPOSITION attribute walk via
+	// the LOCATABLE archetype_node_id channel below).
+	w.checkLocatableIdentity(optNode, rmValue, path)
+	w.checkRMType(optNode, rmValue, path)
+
+	if optNode.IsSlot() {
+		// Slot leaves carry no descendable structure — slot-fill
+		// matching is the parent attribute's responsibility (see
+		// walkMultipleAttribute).
+		return
+	}
+	if optNode.PrimitiveConstraint() != nil {
+		// REQ-103 primitive constraint leaves — the typed primitive
+		// validator handles the value in Phase 3. The structural
+		// walker MUST NOT descend into implicit RM-mandatory attrs
+		// of the primitive's RM type (e.g. DV_QUANTITY.magnitude /
+		// .units): those are the primitive validator's territory,
+		// not the structural pass.
+		return
+	}
+
+	for _, attr := range optNode.Attributes() {
+		// Implicit (BMM-mandatory, OPT-silent) attributes have no
+		// children — the OPT did not pin a structural constraint
+		// for them. We still run the existence check so a
+		// BMM-mandatory attribute (e.g. COMPOSITION.composer,
+		// /language, /territory) that the composition leaves nil
+		// or zero-valued surfaces as `required`. No descent
+		// happens because Children() is empty for implicit attrs.
+		switch attr.Cardinality() {
+		case template.Single:
+			w.walkSingleAttribute(optNode, attr, rmValue, path)
+		case template.Multiple:
+			w.walkMultipleAttribute(optNode, attr, rmValue, path)
+		}
+	}
+}
+
+// walkSingleAttribute enforces existence and (Phase 2 ceiling) picks
+// the first OPT child as the canonical descent target. C_SINGLE_ATTRIBUTE
+// with multiple children = alternatives; Phase 4 will try each in
+// turn.
+func (w *walker) walkSingleAttribute(
+	opt *templatecompile.CompiledNode,
+	attr *templatecompile.CompiledAttribute,
+	parentRM any,
+	parentPath string,
+) {
+	attrPath := joinPath(parentPath, "/"+attr.Name())
+	val, ok := rmread.ReadSingle(parentRM, opt.RMTypeName(), attr.Name())
+	if !ok {
+		if isRequired(attr) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "required",
+				Detail:   fmt.Sprintf("required attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
+				Severity: Error,
+			})
+		}
+		return
+	}
+	children := attr.Children()
+	if len(children) == 0 {
+		// No OPT children → nothing structural to enforce; primitive
+		// checks (Phase 3) consult opt.PrimitiveConstraint() on the
+		// parent OPT node directly when the attribute has no nested
+		// constraint.
+		return
+	}
+	// Phase 2: take the first OPT child as the canonical descent
+	// target. Phase 4 will iterate alternatives.
+	child := children[0]
+	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
+}
+
+// walkMultipleAttribute enforces existence + cardinality on a
+// multi-valued attribute and binds each RM item to the OPT child
+// whose archetype_node_id matches. Items without a matching OPT
+// child surface as slot_fill issues (Phase 2 reuses the
+// archetype-id-equality rule; REQ-104 will swap in the parsed slot
+// grammar).
+func (w *walker) walkMultipleAttribute(
+	opt *templatecompile.CompiledNode,
+	attr *templatecompile.CompiledAttribute,
+	parentRM any,
+	parentPath string,
+) {
+	attrPath := joinPath(parentPath, "/"+attr.Name())
+	items, ok := rmread.ReadMultiple(parentRM, opt.RMTypeName(), attr.Name())
+	if !ok {
+		// Attribute not addressable on this RM type — silently skip.
+		// The OPT walker arriving here means the compiled template
+		// declared the attribute; the RM read path's coverage is
+		// asserted in rmread tests.
+		return
+	}
+	// Existence: lower ≥ 1 with zero items is "required".
+	if isRequired(attr) && len(items) == 0 {
+		w.emit(Issue{
+			Path:     attrPath,
+			Code:     "required",
+			Detail:   fmt.Sprintf("required multi-valued attribute %q is empty on %s", attr.Name(), describeRMType(parentRM)),
+			Severity: Error,
+		})
+	}
+	// Child-count cardinality interval (when the OPT pinned one).
+	if cm := attr.ChildMultiplicity(); cm != nil {
+		if outOfMultiplicityInterval(len(items), cm) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "cardinality",
+				Detail:   fmt.Sprintf("attribute %q has %d children; OPT cardinality %s", attr.Name(), len(items), formatInterval(cm)),
+				Severity: Error,
+			})
+		}
+	}
+	// Recurse into each matched item. Items without a matching OPT
+	// child contribute one slot_fill issue — UNLESS the OPT declared
+	// no children for this attribute, in which case the attribute is
+	// "open" (any RM item passes; the OPT pinned only existence /
+	// cardinality, not membership).
+	children := attr.Children()
+	if len(children) == 0 {
+		return
+	}
+	for idx, item := range items {
+		matched := matchChildByID(children, item)
+		segment := segmentForRMItem(attr, item, idx)
+		itemPath := joinPath(parentPath, segment)
+		if matched == nil {
+			w.emit(Issue{
+				Path:     itemPath,
+				Code:     "slot_fill",
+				Detail:   fmt.Sprintf("RM item %s does not match any OPT child of %q (archetype/at-code mismatch)", describeLocatableID(item), attr.Name()),
+				Severity: Error,
+			})
+			continue
+		}
+		w.walkNode(matched, item, itemPath)
+	}
+}
+
+// isRequired reports whether the compiled attribute carries an
+// existence interval with lower bound ≥ 1 — i.e. the OPT mandates
+// presence. Also honours the BMM-mandatory bit (Required()): some
+// attributes are mandatory by RM even when the OPT existence
+// element is silent (e.g. COMPOSITION.category).
+func isRequired(attr *templatecompile.CompiledAttribute) bool {
+	if attr.Required() {
+		return true
+	}
+	e := attr.Existence()
+	if e == nil {
+		return false
+	}
+	if e.LowerUnbounded() {
+		return false
+	}
+	return e.Lower() >= 1
+}
+
+// outOfMultiplicityInterval reports whether `count` falls outside the
+// closed interval encoded in `m`. Honours the unbounded flags.
+func outOfMultiplicityInterval(count int, m *template.Multiplicity) bool {
+	if !m.LowerUnbounded() && count < m.Lower() {
+		return true
+	}
+	if !m.UpperUnbounded() && count > m.Upper() {
+		return true
+	}
+	return false
+}
+
+// formatInterval renders a Multiplicity for inclusion in human-
+// readable Issue.Detail strings.
+func formatInterval(m *template.Multiplicity) string {
+	lo := fmt.Sprintf("%d", m.Lower())
+	if m.LowerUnbounded() {
+		lo = "*"
+	}
+	hi := fmt.Sprintf("%d", m.Upper())
+	if m.UpperUnbounded() {
+		hi = "*"
+	}
+	return "[" + lo + ".." + hi + "]"
+}
+
+// segmentForChild computes the path delta from a single-attribute
+// descent. For Single attrs the delta is "/attr"; for Multiple
+// attrs (rare on this code path — walkMultipleAttribute uses
+// segmentForRMItem instead) we fall back to the child's
+// id-or-index segment.
+func segmentForChild(attr *templatecompile.CompiledAttribute, child *templatecompile.CompiledNode, idx int) string {
+	seg := "/" + attr.Name()
+	if attr.Cardinality() != template.Multiple {
+		return seg
+	}
+	if id := child.ArchetypeID(); id != "" {
+		return seg + "[" + id + "]"
+	}
+	if id := child.NodeID(); id != "" {
+		return seg + "[" + id + "]"
+	}
+	return seg + fmt.Sprintf("[@%d]", idx+1)
+}
+
+// segmentForRMItem computes the path delta for an RM item under a
+// Multiple attribute. Predicate is the RM item's
+// archetype_node_id when available; otherwise a 1-based sibling
+// index ("@1", "@2", ...).
+func segmentForRMItem(attr *templatecompile.CompiledAttribute, item any, idx int) string {
+	seg := "/" + attr.Name()
+	if id := locatableArchetypeNodeID(item); id != "" {
+		return seg + "[" + id + "]"
+	}
+	return seg + fmt.Sprintf("[@%d]", idx+1)
+}
+
+// matchChildByID picks the OPT child whose ArchetypeID (for
+// archetype-root pins) or NodeID (for at-code pins) matches the RM
+// item's archetype_node_id. Returns nil when none match — caller
+// emits slot_fill in that case.
+func matchChildByID(children []*templatecompile.CompiledNode, item any) *templatecompile.CompiledNode {
+	id := locatableArchetypeNodeID(item)
+	if id == "" {
+		return nil
+	}
+	for _, c := range children {
+		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
+			return c
+		}
+		if c.NodeID() != "" && c.NodeID() == id {
+			return c
+		}
+		// Slot: RM-type-prefix fallback. The slot's RMTypeName is
+		// the RM class it gates; an archetype id of the shape
+		// "openEHR-EHR-<rmType>.<concept>.v<n>" satisfies it when
+		// the rmType matches. v2 keeps this fallback to maintain
+		// parity with the existing v1 behaviour until REQ-104
+		// supplies a parsed assertion grammar.
+		if c.IsSlot() && slotFitsArchetypeID(c, id) {
+			return c
+		}
+	}
+	return nil
+}
+
+// slotFitsArchetypeID checks the RM-type-prefix fallback: an
+// archetype id `openEHR-EHR-<RMType>.<concept>.v<n>` fits a slot
+// constrained to `<RMType>` when their RM type segments match.
+// Used until REQ-104 parses the OPT's <includes>/<excludes>
+// grammar.
+func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
+	prefix := "openEHR-EHR-" + slot.RMTypeName() + "."
+	return len(archetypeID) >= len(prefix) && archetypeID[:len(prefix)] == prefix
+}
+
+// locatableArchetypeNodeID extracts archetype_node_id from any RM
+// LOCATABLE value via closed type-switch. Returns "" for non-
+// LOCATABLE values (DataValue subtypes, primitive Go types).
+func locatableArchetypeNodeID(v any) string {
+	switch x := v.(type) {
+	case *rm.Composition:
+		return x.ArchetypeNodeID
+	case rm.Composition:
+		return x.ArchetypeNodeID
+	case *rm.Observation:
+		return x.ArchetypeNodeID
+	case rm.Observation:
+		return x.ArchetypeNodeID
+	case *rm.Evaluation:
+		return x.ArchetypeNodeID
+	case rm.Evaluation:
+		return x.ArchetypeNodeID
+	case *rm.Instruction:
+		return x.ArchetypeNodeID
+	case rm.Instruction:
+		return x.ArchetypeNodeID
+	case *rm.Action:
+		return x.ArchetypeNodeID
+	case rm.Action:
+		return x.ArchetypeNodeID
+	case *rm.AdminEntry:
+		return x.ArchetypeNodeID
+	case rm.AdminEntry:
+		return x.ArchetypeNodeID
+	case *rm.GenericEntry:
+		return x.ArchetypeNodeID
+	case rm.GenericEntry:
+		return x.ArchetypeNodeID
+	case *rm.Section:
+		return x.ArchetypeNodeID
+	case rm.Section:
+		return x.ArchetypeNodeID
+	case *rm.Activity:
+		return x.ArchetypeNodeID
+	case rm.Activity:
+		return x.ArchetypeNodeID
+	case *rm.History[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case rm.History[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case *rm.PointEvent[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case rm.PointEvent[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case rm.IntervalEvent[rm.ItemStructure]:
+		return x.ArchetypeNodeID
+	case *rm.ItemTree:
+		return x.ArchetypeNodeID
+	case rm.ItemTree:
+		return x.ArchetypeNodeID
+	case *rm.ItemList:
+		return x.ArchetypeNodeID
+	case rm.ItemList:
+		return x.ArchetypeNodeID
+	case *rm.ItemSingle:
+		return x.ArchetypeNodeID
+	case rm.ItemSingle:
+		return x.ArchetypeNodeID
+	case *rm.ItemTable:
+		return x.ArchetypeNodeID
+	case rm.ItemTable:
+		return x.ArchetypeNodeID
+	case *rm.Cluster:
+		return x.ArchetypeNodeID
+	case rm.Cluster:
+		return x.ArchetypeNodeID
+	case *rm.Element:
+		return x.ArchetypeNodeID
+	case rm.Element:
+		return x.ArchetypeNodeID
+	}
+	return ""
+}
+
+// describeLocatableID renders an RM item identity for diagnostic
+// messages. Falls back to the Go type when the value carries no
+// archetype_node_id (e.g. DataValue subtypes).
+func describeLocatableID(v any) string {
+	if id := locatableArchetypeNodeID(v); id != "" {
+		return fmt.Sprintf("%s[%s]", describeRMType(v), id)
+	}
+	return describeRMType(v)
+}
+
+// checkLocatableIdentity emits node_id_mismatch / archetype_id_mismatch
+// when the RM's archetype_node_id disagrees with the OPT-pinned id
+// at this node. Archetype-root nodes compare against ArchetypeID();
+// inner nodes (at-code-pinned) compare against NodeID().
+func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, path string) {
+	if opt.IsSlot() {
+		// Slot fit is by archetype-id assertion (RM-type-prefix
+		// fallback in v2; REQ-104 grammar to come). The slot's
+		// NodeID is the OPT's own at-code for the slot point — it
+		// is not expected to match the filling archetype's
+		// archetype_node_id, so a direct identity check here would
+		// false-positive on every legitimate slot fill.
+		return
+	}
+	id := locatableArchetypeNodeID(rmValue)
+	if id == "" {
+		return
+	}
+	if want := opt.ArchetypeID(); want != "" {
+		if id != want {
+			w.emit(Issue{
+				Path:     path + "/archetype_node_id",
+				Code:     "archetype_id_mismatch",
+				Detail:   fmt.Sprintf("archetype_node_id %q does not match template archetype id %q at %s", id, want, path),
+				Severity: Error,
+			})
+		}
+		return
+	}
+	if want := opt.NodeID(); want != "" && id != want {
+		w.emit(Issue{
+			Path:     path + "/archetype_node_id",
+			Code:     "node_id_mismatch",
+			Detail:   fmt.Sprintf("archetype_node_id %q does not match template node_id %q at %s", id, want, path),
+			Severity: Error,
+		})
+	}
+}
+
+// checkRMType emits rm_type_mismatch when the concrete RM Go type
+// disagrees with the compiled OPT node's RMTypeName. Honours BMM
+// abstract supertypes: an OPT slot constrained to ITEM_STRUCTURE
+// admits ITEM_TREE / ITEM_LIST / ITEM_SINGLE / ITEM_TABLE, etc.
+func (w *walker) checkRMType(opt *templatecompile.CompiledNode, rmValue any, path string) {
+	want := opt.RMTypeName()
+	if want == "" {
+		return
+	}
+	got := describeRMType(rmValue)
+	if got == want {
+		return
+	}
+	if rmTypeIsSubtypeOf(got, want) {
+		return
+	}
+	w.emit(Issue{
+		Path:     path,
+		Code:     "rm_type_mismatch",
+		Detail:   fmt.Sprintf("RM type %s does not satisfy template RM type %s at %s", got, want, path),
+		Severity: Error,
+	})
+}
+
+// rmTypeIsSubtypeOf encodes the BMM supertype relations the
+// validator exercises. Restricted to the abstract slots the OPT
+// can name (LOCATABLE, ITEM, ITEM_STRUCTURE, DATA_VALUE, EVENT,
+// CONTENT_ITEM, ENTRY, CARE_ENTRY, PARTY_PROXY); concrete
+// subtypes admitted under each.
+func rmTypeIsSubtypeOf(concrete, abstract string) bool {
+	subtypes := bmmSubtypes[abstract]
+	for _, t := range subtypes {
+		if concrete == t {
+			return true
+		}
+	}
+	return false
+}
+
+// bmmSubtypes is the closed lookup of abstract → concrete RM type
+// admission rules used by checkRMType. Sourced from
+// openehr_rm_1.2.0.bmm: concrete classes that satisfy each
+// abstract slot. Extending the table is the migration path for new
+// RM types in a future REQ.
+var bmmSubtypes = map[string][]string{
+	"LOCATABLE": {
+		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
+		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION", "ACTIVITY",
+		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
+		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
+		"CLUSTER", "ELEMENT", "FOLDER", "EHR_STATUS",
+	},
+	"CONTENT_ITEM": {
+		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
+		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION",
+	},
+	"ENTRY": {
+		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY",
+	},
+	"CARE_ENTRY": {
+		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
+	},
+	"ITEM_STRUCTURE": {
+		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
+	},
+	"ITEM": {
+		"CLUSTER", "ELEMENT",
+	},
+	"EVENT": {
+		"POINT_EVENT", "INTERVAL_EVENT",
+	},
+	"DATA_VALUE": {
+		"DV_TEXT", "DV_CODED_TEXT", "DV_QUANTITY", "DV_COUNT",
+		"DV_BOOLEAN", "DV_ORDINAL", "DV_DATE", "DV_TIME",
+		"DV_DATE_TIME", "DV_DURATION", "DV_INTERVAL",
+		"DV_PROPORTION", "DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
+		"DV_MULTIMEDIA", "DV_PARSABLE", "DV_SCALE", "DV_STATE",
+		"DV_GENERAL_TIME_SPECIFICATION", "DV_PERIODIC_TIME_SPECIFICATION",
+	},
+}
