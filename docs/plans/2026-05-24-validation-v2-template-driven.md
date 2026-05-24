@@ -114,20 +114,18 @@ The validator package (`openehr/validation/`) implements the visitor + RM read h
 
 ## Compile / parser prerequisites
 
-Some OPT metadata needed for v2 is **not yet on the compiled surface**:
+Some OPT metadata needed for v2 is **landed on the compiled surface** (Phase 0):
 
 | Metadata | Wire location | Parser today | Needed for |
 |---|---|---|---|
 | Attribute **existence** | `<existence>` on `<attributes>` | Parsed → `CompiledAttribute.Existence()` | Required attribute checks |
 | Attribute **single vs multiple** | `xsi:type` on attribute | Parsed → `CompiledAttribute.Cardinality()` | Single vs collection read |
-| Attribute **cardinality interval** | `<cardinality><interval>…` under `C_MULTIPLE_ATTRIBUTE` | **Not parsed** (`xmlCAttribute` has no field) | Min/max child counts |
+| Attribute **cardinality interval** | `<cardinality><interval>…` under `C_MULTIPLE_ATTRIBUTE` | Parsed → `CompiledAttribute.ChildMultiplicity()` | Min/max child counts |
 | Object **occurrences** | `<occurrences>` on `<children>` | Parsed → `CompiledNode.Occurrences()` | Per-child instance counts |
 | **Alternatives** | Multiple `<children>` under `C_SINGLE_ATTRIBUTE` | Available as `CompiledAttribute.Children()` | AnyOf matching |
 | Slot **includes/excludes** | `<includes>` / `<excludes>` | Raw strings on slot nodes | REQ-104 (optional v2 phase) |
 
-**Phase 0 task:** extend `openehr/template` parse + `internal/templatecompile` compile to capture `<cardinality>` on `C_MULTIPLE_ATTRIBUTE` → `CompiledAttribute.Occurrences()` (or `ChildCardinality()`) distinct from existence. Existence answers "must the attribute be filled?"; cardinality answers "how many children under a filled attribute?".
-
-Until that lands, v2 can enforce existence + node occurrences + alternative matching; full multiplicities on container attributes use existence lower bound as a floor and defer upper-bound to Phase 2.
+**Phase 0 (landed):** `<cardinality>` on `C_MULTIPLE_ATTRIBUTE` → `CompiledAttribute.ChildMultiplicity()` distinct from existence. Existence answers "must the attribute be filled?"; cardinality answers "how many children under a filled attribute?"
 
 ---
 

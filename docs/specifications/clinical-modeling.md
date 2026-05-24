@@ -242,8 +242,8 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 | **Structural — root archetype match** | comp.ArchetypeNodeID matches the OPT root's archetype id |
 | **Structural — required attributes (composition root + recursive)** | RM-mandatory attrs at the root (Category, Composer, Language, Territory); template-driven existence checks at every OPT node whose attribute interval lower ≥ 1 |
 | **Structural — child cardinality** | for each C_MULTIPLE_ATTRIBUTE, the RM child count is checked against the parsed `CompiledAttribute.ChildMultiplicity()` interval and each child's `Occurrences()` |
-| **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | RM value must match one of the attribute's child constraints; first-match wins, no match emits `alternative_mismatch` |
-| **Structural — RM type match** | the RM instance's concrete type must satisfy the OPT child's `RMTypeName` (with abstract supertype admission per BMM) |
+| **Structural — alternatives (C_SINGLE_ATTRIBUTE)** | RM value must match one of the attribute's child constraints; first-match wins. Exactly one child → `rm_type_mismatch` on failure; two or more children → `alternative_mismatch` |
+| **Structural — RM type match** | the RM instance's concrete type must satisfy the OPT child's `RMTypeName` (with abstract supertype admission per BMM); single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
 | **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
 | **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk |
 | **Slot fit — RM-type prefix fallback** | each `Content[i].ArchetypeNodeID` must match one of the OPT's archetype-root or slot-include archetype ids (or, when no slot constraint applies, share the slot's RM-type prefix `openEHR-EHR-<rmType>.`) |
@@ -259,12 +259,12 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 |---|---|
 | `required` | a required attribute (OPT-declared or RM-mandatory) is absent / zero-valued |
 | `cardinality` | a multi-valued attribute's child count violates the OPT-declared cardinality / occurrences interval |
-| `alternative_mismatch` | no child of a C_SINGLE_ATTRIBUTE matches the RM value |
-| `rm_type_mismatch` | the RM instance's concrete type disagrees with the OPT child's declared `RMTypeName` |
+| `alternative_mismatch` | no child of a C_SINGLE_ATTRIBUTE with **two or more** alternatives matches the RM value |
+| `rm_type_mismatch` | the RM instance's concrete type disagrees with the OPT child's declared `RMTypeName`, including single-child C_SINGLE_ATTRIBUTE type constraints |
 | `archetype_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned archetype id at the matched node |
 | `node_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned at-code at the matched node |
 | `primitive_*` | a REQ-103 primitive `Violation.Code` (`out_of_range`, `pattern_mismatch`, `not_in_list`, `wrong_type`, `unit_unknown`, `invalid_value`) at a leaf |
-| `slot_fill` | a `Content[i]` archetype id does not satisfy the OPT's slot include / exclude (RM-type-prefix fallback in v1) |
+| `slot_fill` | an RM item under a C_MULTIPLE_ATTRIBUTE whose `archetype_node_id` matches no OPT child (including slot RM-type-prefix fallback in v2) |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
 
 Existence and child-count cardinality are **independent constraints**: a multi-valued attribute with `existence.lower ≥ 1` AND `cardinality.lower ≥ 1` whose RM-side slice is empty fires BOTH `required` AND `cardinality` at the same path. Validators MUST emit both codes when both clauses fail; collect-all semantics make this the natural outcome. Consumers de-duplicating for display SHOULD treat the pair as a single user-facing failure at that path.
@@ -303,4 +303,4 @@ This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-temp
 - **Full ADL2 / AOM 2 validation semantics.**
 
 - **Lives in:** [`openehr/validation/`](../../openehr/validation/)
-- **Probes:** PROBE-025 (composition validation against fixture OPT + composition); PROBE-026 (proposed — missing required node + cardinality negative cases)
+- **Probes:** PROBE-025 (composition validation against fixture OPT + composition); PROBE-026 (missing required node, cardinality, alternative_mismatch, rm_type_mismatch, and primitive negative cases — see [`testkit/probes/validation/`](../../testkit/probes/validation/))

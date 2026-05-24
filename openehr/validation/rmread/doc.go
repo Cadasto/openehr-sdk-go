@@ -23,9 +23,11 @@
 //   - ReadSingle returns the attribute's RM value (interface- or
 //     value-typed) plus `ok=true`. When the parent type carries the
 //     attribute but the value is the RM zero (e.g. an empty
-//     DVCodedText, a nil interface-typed slot, an empty
-//     CodePhrase), `ok` is `false` so callers can flag the
-//     attribute as absent for existence checks. Pointer-typed RM
+//     DVCodedText, a nil interface-typed slot, a typed-nil pointer
+//     behind an interface such as Element.Value =
+//     (*rm.DVQuantity)(nil), an empty CodePhrase), `ok` is `false`
+//     so callers can flag the attribute as absent for existence
+//     checks. See [IsTypedNilPointer]. Pointer-typed RM
 //     attributes (e.g. `*EventContext`, `*History`) report
 //     `ok=false` only when the pointer is nil; the underlying value
 //     may still be the RM zero and the structural walker should
@@ -38,11 +40,11 @@
 //     empty" semantics should use `len(items) == 0`.
 //
 //   - For unknown `(parentType, attrName)` pairs the functions
-//     return `(nil, false)`. Validators interpret this as
-//     "attribute not addressable on this RM type"; the OPT walker
-//     should not have descended through that constraint in the
-//     first place, so the case is treated as a no-op rather than a
-//     hard error.
+//     return `(nil, false)`. The structural validator treats this
+//     as "attribute not addressable on this RM type": when the OPT
+//     marks the attribute required (existence lower ≥ 1 or BMM-
+//     mandatory), the walker emits a `required` issue; optional
+//     attributes return silently with no issue.
 //
 // # Coverage
 //
