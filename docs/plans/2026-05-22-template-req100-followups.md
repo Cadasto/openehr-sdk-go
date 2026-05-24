@@ -1,10 +1,10 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Phases 1–4 + 4-bis landed; Phases 5+ open
+**Status:** Phases 1–5 + 4-bis landed; Phases 6+ open
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
-**Implementation:** partial — Phases 1–4 + 4-bis landed (Root collapse + REQ-103 primitives deferred); Phases 5+ deferred per follow-up sequencing
+**Implementation:** partial — Phases 1–5 + 4-bis landed (Root collapse, WalkComposition, REQ-103 primitives deferred); Phases 6+ deferred per follow-up sequencing
 **Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
 **Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md))
 
@@ -405,7 +405,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Phase 3 path ergonomics (ErrAmbiguousPath, ObjectNode, ValidatePath) | landed (Root collapse deferred to Phase 4 — see open question) |
 | Phase 4-bis RMInfoLookup (codegen + PROBE-023) | landed (codegen + tests; PROBE-023 deferred; see [ADR 0005](../adr/0005-compiled-template-foundation.md)) |
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | landed ([ADR 0005](../adr/0005-compiled-template-foundation.md); public `template.Compile` deferred) |
-| Phase 5 Walker pattern + composition walker | |
+| Phase 5 Walker pattern + composition walker | landed (Walk / WalkSubtree / SkipSubtree + templatedump reference visitors; WalkComposition + Choice handling deferred to REQ-101/102 surface) |
 | Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | |
 | Phase 7 REQ-104 slot assertions (when REQ-101 / REQ-102 surfaces real call sites) | |
 | Phase 8 REQ-105 terminology bindings (when renderer / FHIR consumer arrives) | |
