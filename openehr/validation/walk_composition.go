@@ -68,10 +68,13 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	}
 }
 
-// walkSingleAttribute enforces existence and (Phase 2 ceiling) picks
-// the first OPT child as the canonical descent target. C_SINGLE_ATTRIBUTE
-// with multiple children = alternatives; Phase 4 will try each in
-// turn.
+// walkSingleAttribute enforces existence on a C_SINGLE_ATTRIBUTE
+// and binds the RM value to one of attr.Children() via the AOM 1.4
+// "one alternative MUST match" semantics. Tries each OPT child in
+// order; first that fits the RM value's concrete type (with BMM
+// abstract-supertype admission) wins. When none match an
+// `alternative_mismatch` issue is emitted listing the allowed RM
+// types so the caller can see what the OPT wanted.
 func (w *walker) walkSingleAttribute(
 	opt *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -93,16 +96,56 @@ func (w *walker) walkSingleAttribute(
 	}
 	children := attr.Children()
 	if len(children) == 0 {
-		// No OPT children → nothing structural to enforce; primitive
-		// checks (Phase 3) consult opt.PrimitiveConstraint() on the
-		// parent OPT node directly when the attribute has no nested
-		// constraint.
+		// No OPT children → no structural constraint; primitive
+		// constraints fire when walkNode reaches a primitive leaf.
 		return
 	}
-	// Phase 2: take the first OPT child as the canonical descent
-	// target. Phase 4 will iterate alternatives.
-	child := children[0]
+	child := matchSingleAlternative(children, val)
+	if child == nil {
+		w.emit(Issue{
+			Path:     attrPath,
+			Code:     "alternative_mismatch",
+			Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
+			Severity: Error,
+		})
+		return
+	}
 	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
+}
+
+// matchSingleAlternative picks the OPT child whose declared
+// RMTypeName admits the RM value (concrete equality + BMM
+// supertype expansion). Returns nil when no child fits. With
+// exactly one child the function is effectively "does the child
+// fit?"; the alternative_mismatch case fires only when the OPT
+// declared more than one alternative.
+func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *templatecompile.CompiledNode {
+	gotType := describeRMType(val)
+	for _, c := range children {
+		want := c.RMTypeName()
+		if want == "" {
+			// Wildcard / not-typed OPT child — accept.
+			return c
+		}
+		if gotType == want || rmTypeIsSubtypeOf(gotType, want) {
+			return c
+		}
+	}
+	return nil
+}
+
+// formatAllowedTypes renders the OPT child RM types for inclusion
+// in alternative_mismatch Detail messages.
+func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
+	out := "["
+	for i, c := range children {
+		if i > 0 {
+			out += ", "
+		}
+		out += c.RMTypeName()
+	}
+	out += "]"
+	return out
 }
 
 // walkMultipleAttribute enforces existence + cardinality on a
@@ -150,11 +193,13 @@ func (w *walker) walkMultipleAttribute(
 	// child contribute one slot_fill issue — UNLESS the OPT declared
 	// no children for this attribute, in which case the attribute is
 	// "open" (any RM item passes; the OPT pinned only existence /
-	// cardinality, not membership).
+	// cardinality, not membership). Tally per-child occurrences for
+	// the AOM 1.4 occurrences upper-bound check.
 	children := attr.Children()
 	if len(children) == 0 {
 		return
 	}
+	perChildCount := make(map[*templatecompile.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := matchChildByID(children, item)
 		segment := segmentForRMItem(attr, item, idx)
@@ -168,8 +213,45 @@ func (w *walker) walkMultipleAttribute(
 			})
 			continue
 		}
+		perChildCount[matched]++
 		w.walkNode(matched, item, itemPath)
 	}
+	// AOM 1.4 occurrences upper bound on each OPT child: when the
+	// OPT pins a child's `<occurrences>` interval, the count of
+	// matching RM items must fall within it. A zero count + lower
+	// ≥ 1 surfaces as `cardinality` at the attribute level — that
+	// case is already covered by the multi-attribute existence
+	// check above when the attribute itself is empty, but we still
+	// fire here per-child when the attribute is non-empty and a
+	// specific OPT child is missing or over-represented.
+	for _, c := range children {
+		occ := c.Occurrences()
+		if occ == nil {
+			continue
+		}
+		got := perChildCount[c]
+		if outOfMultiplicityInterval(got, occ) {
+			w.emit(Issue{
+				Path:     joinPath(parentPath, segmentForChild(attr, c, 0)),
+				Code:     "cardinality",
+				Detail:   fmt.Sprintf("OPT child %s appears %d times under %q; occurrences %s", childIdentity(c), got, attr.Name(), formatInterval(occ)),
+				Severity: Error,
+			})
+		}
+	}
+}
+
+// childIdentity describes an OPT child for inclusion in cardinality
+// diagnostics. Prefers the archetype id (for *ArchetypeRoot children)
+// then the at-code then the RM type name.
+func childIdentity(c *templatecompile.CompiledNode) string {
+	if id := c.ArchetypeID(); id != "" {
+		return id
+	}
+	if id := c.NodeID(); id != "" {
+		return id
+	}
+	return c.RMTypeName()
 }
 
 // applyPrimitive runs the REQ-103 primitive constraint against the

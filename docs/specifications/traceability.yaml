@@ -368,17 +368,19 @@ requirements:
     title: Composition validation
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
-    # Phases 0-3 of the v2 plan landed: cardinality on
-    # CompiledAttribute, the rmread RM-attribute access table, the
-    # template-driven structural walker, and the REQ-103 primitive
-    # pass on template bindings. Flips to `landed` after Phase 4
-    # (alternative matching + PROBE-026 sandbox probe). See
-    # docs/plans/2026-05-24-validation-v2-template-driven.md.
-    implementation: partial
-    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile]
+    # All phases of the v2 plan landed: cardinality on
+    # CompiledAttribute, rmread attribute access, template-driven
+    # structural walker, REQ-103 primitive pass on bindings,
+    # C_SINGLE_ATTRIBUTE alternative matching, occurrences upper-
+    # bound enforcement, and PROBE-025 / PROBE-026 sandbox probes.
+    # See docs/plans/2026-05-24-validation-v2-template-driven.md.
+    implementation: landed
+    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
+    probes: [PROBE-025, PROBE-026]
     tests:
       - openehr/validation/composition_test.go
       - openehr/validation/rmread/read_test.go
+      - testkit/probes/validation/probes_test.go
     plans:
       - docs/plans/2026-05-21-validation.md
       - docs/plans/2026-05-24-validation-v2-template-driven.md

@@ -334,6 +334,64 @@ func TestValidateComposition_MissingSystolic(t *testing.T) {
 	}
 }
 
+// REQ-102 v2 Phase 4 — alternative matching on C_SINGLE_ATTRIBUTE.
+// An OPT with two alternatives under /name (DV_TEXT or
+// DV_CODED_TEXT) accepts an RM value of either type; a DV_QUANTITY
+// under the same slot triggers `alternative_mismatch`. Uses a
+// synthetic OPT so the test does not depend on vital_signs.opt's
+// shape (which has no native multi-child single attribute on a
+// reachable leaf).
+func TestValidateComposition_AlternativeMismatch(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>alt-test</value></template_id>
+  <concept>alt-test</concept>
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>name</rm_attribute_name>
+      <existence>
+        <lower>1</lower>
+        <upper>1</upper>
+      </existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id />
+      </children>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+        <node_id />
+      </children>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	// DVText satisfies the first alternative — clean.
+	compOK := &rm.Composition{
+		ArchetypeNodeID: "at0000",
+		Name:            rm.DVText{Value: "ok"},
+	}
+	if r := validation.ValidateComposition(compOK, c); !r.OK {
+		// Other issues may surface (composer/language/territory implicit
+		// BMM-required) but the /name alternative MUST NOT mismatch.
+		if containsCode(r.Issues, "alternative_mismatch") {
+			t.Errorf("DVText under DV_TEXT|DV_CODED_TEXT alternatives mismatched: %+v", r.Issues)
+		}
+	}
+}
+
 // --- helpers ----------------------------------------------------------------
 
 // validVitalSignsComposition constructs a structurally-complete

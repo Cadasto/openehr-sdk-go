@@ -296,11 +296,16 @@ func allAttributesInOrder(l rminfo.Lookup, rmType string) []string {
 }
 
 func (w *walker) registerPath(cn *CompiledNode) error {
-	if prev, exists := w.compiled.byPath[cn.aqlPath]; exists {
-		return fmt.Errorf(
-			"%w: duplicate AQL path %q (existing %s, new %s)",
-			ErrInvalidInput, cn.aqlPath, prev.rmTypeName, cn.rmTypeName,
-		)
+	if _, exists := w.compiled.byPath[cn.aqlPath]; exists {
+		// AOM 1.4 admits C_SINGLE_ATTRIBUTE with multiple
+		// `<children>` (alternatives); every alternative shares
+		// the same AQL path. byPath only needs to resolve to one
+		// representative for callers that ask "what's at this
+		// path?" — by convention we keep the first. The
+		// structural validator iterates alternatives via the
+		// parent attribute's Children() directly, so dropping the
+		// duplicate from byPath does not lose information.
+		return nil
 	}
 	w.compiled.byPath[cn.aqlPath] = cn
 	return nil

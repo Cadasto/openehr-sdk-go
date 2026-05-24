@@ -206,6 +206,24 @@ The catalog is the normative list. Each entry has:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/template/probe_024_primitive_validate.go`](../../testkit/probes/template/probe_024_primitive_validate.go).
 - **Satisfies:** REQ-103, REQ-082
 
+#### PROBE-025 — Composition validate
+
+- **Title:** Parsing an OPT, compiling it, and running `ValidateComposition(comp, c)` over a fixture-defined list of (OPT, composition, expected codes) tuples returns the expected multiset of [`validation.Issue.Code`](../../openehr/validation/issue.go) values per case.
+- **Preconditions:** A reference OPT body (XML bytes) and a hand-built or fixture-decoded `*rm.Composition`; each case carries a `WantCodes []string` that captures the multiset semantics (order irrelevant, duplicates count).
+- **Wire assertion:** Sandbox-only — `template.ParseOPT` + `templatecompile.Compile` + `validation.ValidateComposition` MUST produce an `Issue.Code` multiset that matches each case's `WantCodes`. Positive cases assert `WantCodes` is empty; primitive / structural mismatches assert specific codes (`primitive_out_of_range`, `primitive_unit_unknown`, `primitive_not_in_list`, `slot_fill`, …).
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_025_composition_validate.go`](../../testkit/probes/validation/probe_025_composition_validate.go).
+- **Satisfies:** REQ-102, REQ-103, REQ-082
+
+#### PROBE-026 — Missing required nodes / cardinality
+
+- **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across SDKs.
+- **Preconditions:** Same OPT + composition tuple shape as PROBE-025; cases focus on the v2 template-driven structural completion surface that the RM-guided intermediate could not detect.
+- **Wire assertion:** Sandbox-only — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces `required` at the ITEM_LIST `/items` path; an empty `events` slice surfaces `required` + `cardinality`; an unmatched alternative surfaces `alternative_mismatch`.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_025_composition_validate.go`](../../testkit/probes/validation/probe_025_composition_validate.go).
+- **Satisfies:** REQ-102, REQ-082
+
 ### Canonical JSON and formats
 
 #### PROBE-030 — Canonical-JSON round trip
