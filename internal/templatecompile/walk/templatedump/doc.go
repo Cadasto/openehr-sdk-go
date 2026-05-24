@@ -6,6 +6,8 @@
 // These exist primarily as documentation-by-example for the
 // [walk] package — both visitors are short, exercise the
 // pre-/post-order hooks, and demonstrate the typical Context
-// usage. Worked examples (e.g. cmd/examples/opt-parse) re-use them
-// instead of hand-rolling tree-traversal loops.
+// usage. Once [internal/templatecompile] is promoted to a public
+// surface (REQ-101 / REQ-102), worked examples under cmd/examples/
+// can re-use these visitors directly instead of hand-rolling
+// tree-traversal loops.
 package templatedump
