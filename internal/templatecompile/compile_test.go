@@ -482,7 +482,7 @@ func TestCompile_ChildMultiplicity_FixtureRoundTrip(t *testing.T) {
 // Compile MUST accept the collision when both candidates were
 // registered under the same wire attribute. (Genuine cross-
 // attribute duplicates are still rejected — see
-// TestCompile_DuplicatePathFromDifferentAttribute below.)
+// registerpath_test.go TestRegisterPath_DuplicateFromDifferentAttribute.)
 func TestCompile_SingleAttributeAlternativesShareAQLPath(t *testing.T) {
 	const body = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">

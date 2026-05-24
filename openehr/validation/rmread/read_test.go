@@ -217,3 +217,18 @@ func TestReadSingle_NilParent(t *testing.T) {
 		t.Error("ReadSingle(nil) ok=true, want false")
 	}
 }
+
+// REQ-102 v2 — typed-nil DataValue behind Element.Value reports
+// ok=false via ifacePresent / IsTypedNilPointer.
+func TestReadSingle_TypedNilElementValue(t *testing.T) {
+	el := rm.Element{
+		ArchetypeNodeID: "at0004",
+		Value:           (*rm.DVQuantity)(nil),
+	}
+	if _, ok := rmread.ReadSingle(&el, "ELEMENT", "value"); ok {
+		t.Error("Element.value typed-nil ok=true, want false")
+	}
+	if !rmread.IsTypedNilPointer((*rm.DVQuantity)(nil)) {
+		t.Error("IsTypedNilPointer((*DVQuantity)(nil)) = false, want true")
+	}
+}

@@ -204,6 +204,136 @@ func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 	}
 }
 
+const probe026AlternativeMismatchOPT = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>alt-probe</value></template_id>
+  <concept>alt-probe</concept>
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>composer</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_SELF</rm_type_name>
+        <node_id />
+      </children>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_IDENTIFIED</rm_type_name>
+        <node_id />
+      </children>
+    </attributes>
+  </definition>
+</template>`
+
+const probe026RMTypeMismatchOPT = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>type-probe</value></template_id>
+  <concept>type-probe</concept>
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>composer</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_SELF</rm_type_name>
+        <node_id />
+      </children>
+    </attributes>
+  </definition>
+</template>`
+
+// PROBE-026 — C_SINGLE_ATTRIBUTE with two alternatives: PartyRelated
+// matches neither PARTY_SELF nor PARTY_IDENTIFIED → alternative_mismatch.
+func TestProbe026MissingNodes_AlternativeMismatch(t *testing.T) {
+	cases := []probes.ValidateCase{
+		{
+			Name: "composer_party_related",
+			OPT:  []byte(probe026AlternativeMismatchOPT),
+			Composition: &rm.Composition{
+				ArchetypeNodeID: "at0000",
+				Name:            rm.DVText{Value: "probe"},
+				Category: rm.DVCodedText{
+					DVText: rm.DVText{Value: "event"},
+					DefiningCode: rm.CodePhrase{
+						TerminologyID: rm.TerminologyID{Value: "openehr"},
+						CodeString:    "433",
+					},
+				},
+				Language: rm.CodePhrase{
+					TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
+					CodeString:    "en",
+				},
+				Territory: rm.CodePhrase{
+					TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
+					CodeString:    "NL",
+				},
+				Composer: &rm.PartyRelated{
+					PartyIdentified: rm.PartyIdentified{},
+				},
+			},
+			WantCodes: []string{"alternative_mismatch"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// PROBE-026 — single-child C_SINGLE_ATTRIBUTE type constraint:
+// PartyRelated under PARTY_SELF-only composer → rm_type_mismatch.
+func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
+	cases := []probes.ValidateCase{
+		{
+			Name: "composer_party_related_single_alt",
+			OPT:  []byte(probe026RMTypeMismatchOPT),
+			Composition: &rm.Composition{
+				ArchetypeNodeID: "at0000",
+				Name:            rm.DVText{Value: "probe"},
+				Category: rm.DVCodedText{
+					DVText: rm.DVText{Value: "event"},
+					DefiningCode: rm.CodePhrase{
+						TerminologyID: rm.TerminologyID{Value: "openehr"},
+						CodeString:    "433",
+					},
+				},
+				Language: rm.CodePhrase{
+					TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
+					CodeString:    "en",
+				},
+				Territory: rm.CodePhrase{
+					TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
+					CodeString:    "NL",
+				},
+				Composer: &rm.PartyRelated{
+					PartyIdentified: rm.PartyIdentified{},
+				},
+			},
+			WantCodes: []string{"rm_type_mismatch"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
 // loadFixture reads an OPT file from openehr/template/testdata
 // relative to the test file's own location. Reaches across the
 // module tree but stays inside the SDK; no transport involvement.

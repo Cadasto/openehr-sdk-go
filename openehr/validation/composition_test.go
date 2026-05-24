@@ -347,7 +347,7 @@ func TestValidateComposition_MissingSystolic(t *testing.T) {
 // synthetic OPT so the test does not depend on vital_signs.opt's
 // shape (which has no native multi-child single attribute on a
 // reachable leaf).
-func TestValidateComposition_AlternativeMismatch(t *testing.T) {
+func TestValidateComposition_AlternativeMismatch_Positive(t *testing.T) {
 	const body = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>alt-test</value></template_id>
@@ -476,6 +476,62 @@ func TestValidateComposition_TypedNilDataValueNoPanic(t *testing.T) {
 	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"
 	if !containsIssue(r.Issues, wantPath, "required") {
 		t.Errorf("expected required at %s for typed-nil Element.Value, got %+v", wantPath, r.Issues)
+	}
+}
+
+// REQ-102 v2 — typed-nil ContentItem in Composition.Content MUST NOT
+// panic. Same Go interface footgun as Element.Value but on multi-
+// valued interface slices: (*rm.Observation)(nil) in content[].
+func TestValidateComposition_TypedNilContentItemNoPanic(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	comp.Content = []rm.ContentItem{(*rm.Observation)(nil)}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ValidateComposition panicked on typed-nil ContentItem: %v", r)
+		}
+	}()
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected slot_fill for typed-nil content item, got OK")
+	}
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Errorf("expected slot_fill for typed-nil content item, got %+v", r.Issues)
+	}
+}
+
+// REQ-102 v2 — typed-nil Event in History.Events MUST NOT panic.
+func TestValidateComposition_TypedNilEventNoPanic(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	obs.Data.Events = []rm.Event{(*rm.PointEvent[rm.ItemStructure])(nil)}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ValidateComposition panicked on typed-nil Event: %v", r)
+		}
+	}()
+	r := validation.ValidateComposition(comp, c)
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Errorf("expected slot_fill for typed-nil event, got %+v", r.Issues)
+	}
+}
+
+// REQ-102 v2 — per-child occurrences upper bound. vital_signs.opt pins
+// systolic ELEMENT (at0004) at 0..1; duplicating it fires
+// `cardinality` at the child path.
+func TestValidateComposition_DuplicateSystolicOccurrences(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	systolic := list.Items[0]
+	list.Items = []rm.Element{systolic, systolic}
+	r := validation.ValidateComposition(comp, c)
+	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]"
+	if !containsIssue(r.Issues, wantPath, "cardinality") {
+		t.Errorf("expected cardinality at %s for duplicate systolic, got %+v", wantPath, r.Issues)
 	}
 }
 
