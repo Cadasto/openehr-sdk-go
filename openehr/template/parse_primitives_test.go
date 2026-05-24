@@ -1,6 +1,7 @@
 package template_test
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -79,6 +80,94 @@ func TestParse_CBoolean(t *testing.T) {
 	}
 }
 
+// REQ-103 — single-element omission on C_BOOLEAN: AOM 1.4 declares
+// both true_valid and false_valid as mandatory with the invariant
+// "Both attributes cannot be set to False" (an unsatisfiable
+// constraint). When the OPT XML omits one element, buildBoolean
+// defaults each flag *independently* to true so the resulting
+// constraint never synthesises the BMM-forbidden {false,false} case.
+func TestParse_CBoolean_DefaultsAreIndependent(t *testing.T) {
+	cases := []struct {
+		name       string
+		body       string
+		wantTrue   bool
+		wantFalse  bool
+		wantReject string // non-empty when the value must NOT be reported as valid
+	}{
+		{
+			// Only <false_valid>false</false_valid> on the wire — the
+			// classic bug case. Pre-fix this returned (false, false);
+			// fixed it returns (true, false) — "true is allowed,
+			// false is forbidden", a satisfiable constraint.
+			name: "only_false_valid_false",
+			body: `<children xsi:type="C_BOOLEAN">
+				<rm_type_name>BOOLEAN</rm_type_name>
+				<node_id />
+				<false_valid>false</false_valid>
+			</children>`,
+			wantTrue:  true,
+			wantFalse: false,
+		},
+		{
+			// Only <true_valid>true</true_valid> on the wire — implies
+			// "no constraint on the false side, so it defaults to
+			// allowed".
+			name: "only_true_valid_true",
+			body: `<children xsi:type="C_BOOLEAN">
+				<rm_type_name>BOOLEAN</rm_type_name>
+				<node_id />
+				<true_valid>true</true_valid>
+			</children>`,
+			wantTrue:  true,
+			wantFalse: true,
+		},
+		{
+			// Both omitted — unconstrained boolean, both allowed.
+			// Existing pre-fix behaviour, preserved.
+			name: "both_omitted",
+			body: `<children xsi:type="C_BOOLEAN">
+				<rm_type_name>BOOLEAN</rm_type_name>
+				<node_id />
+			</children>`,
+			wantTrue:  true,
+			wantFalse: true,
+		},
+		{
+			// Explicit {false, true} — "true is forbidden, false is
+			// allowed". The other satisfiable single-value
+			// constraint. Asserts the explicit false on true_valid
+			// still propagates.
+			name: "explicit_false_true",
+			body: `<children xsi:type="C_BOOLEAN">
+				<rm_type_name>BOOLEAN</rm_type_name>
+				<node_id />
+				<true_valid>false</true_valid>
+				<false_valid>true</false_valid>
+			</children>`,
+			wantTrue:  false,
+			wantFalse: true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl := parseOPTWithChild(t, tc.body)
+			p := firstChildPrimitive(t, tmpl)
+			c, ok := p.(constraints.CBoolean)
+			if !ok {
+				t.Fatalf("want CBoolean, got %T", p)
+			}
+			if c.TrueValid != tc.wantTrue || c.FalseValid != tc.wantFalse {
+				t.Errorf("flags = (%v, %v), want (%v, %v)",
+					c.TrueValid, c.FalseValid, tc.wantTrue, tc.wantFalse)
+			}
+			// AOM invariant: not both false.
+			if !c.TrueValid && !c.FalseValid {
+				t.Errorf("unsatisfiable {false,false} synthesised — violates AOM 1.4 C_BOOLEAN invariant")
+			}
+		})
+	}
+}
+
 func TestParse_CInteger(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_INTEGER">
 		<rm_type_name>INTEGER</rm_type_name>
@@ -105,6 +194,71 @@ func TestParse_CInteger(t *testing.T) {
 	}
 	if !c.Range.IsBounded() || c.Range.Upper != 100 {
 		t.Errorf("Range = %s, want [0..100]", c.Range)
+	}
+}
+
+// REQ-103 — malformed list entries on C_INTEGER / C_REAL are silently
+// dropped in lenient mode (forward-compat: a partially-broken OPT
+// still yields a usable, weaker constraint) but surfaced as
+// ErrInvalidOPT under [ParseOPTStrict] / [ParseFileStrict] so
+// validators see the parse failure instead of an undocumented
+// constraint loosening. Mirrors the strict/lenient split that already
+// applies to unknown xsi:type values with nested attributes.
+func TestParse_PrimitiveList_StrictRejectsMalformed(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{
+			name: "CInteger_malformed_list",
+			body: `<children xsi:type="C_INTEGER">
+				<rm_type_name>INTEGER</rm_type_name>
+				<node_id />
+				<list>1</list>
+				<list>not-a-number</list>
+				<list>3</list>
+			</children>`,
+		},
+		{
+			name: "CReal_malformed_list",
+			body: `<children xsi:type="C_REAL">
+				<rm_type_name>REAL</rm_type_name>
+				<node_id />
+				<list>1.0</list>
+				<list>banana</list>
+			</children>`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name+"_lenient_skips", func(t *testing.T) {
+			// ParseOPT (lenient) MUST drop the bad entry and parse.
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.body, 1)
+			tmpl, err := template.ParseOPT(strings.NewReader(body))
+			if err != nil {
+				t.Fatalf("ParseOPT (lenient) returned %v, want success with weakened constraint", err)
+			}
+			// Sanity: the well-formed entries still made it through.
+			p := firstChildPrimitive(t, tmpl)
+			switch c := p.(type) {
+			case constraints.CInteger:
+				if len(c.List) == 0 {
+					t.Errorf("CInteger lenient: list lost ALL entries; expected the well-formed ones to survive")
+				}
+			case constraints.CReal:
+				if len(c.List) == 0 {
+					t.Errorf("CReal lenient: list lost ALL entries; expected the well-formed ones to survive")
+				}
+			default:
+				t.Fatalf("unexpected primitive type %T", p)
+			}
+		})
+		t.Run(tc.name+"_strict_rejects", func(t *testing.T) {
+			body := strings.Replace(primitiveOPTTemplate, "%s", tc.body, 1)
+			_, err := template.ParseOPTStrict(strings.NewReader(body))
+			if !errors.Is(err, template.ErrInvalidOPT) {
+				t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+			}
+		})
 	}
 }
 

@@ -1,6 +1,7 @@
 package template
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -50,45 +51,52 @@ type xmlIntValue struct {
 // node's xsi:type, or nil when xsi:type is not a primitive in the
 // REQ-103 closed set. The caller (buildNode) attaches the result to
 // the resulting *ComplexObject for downstream Validate use.
-func buildPrimitive(o *xmlCObject) constraints.PrimitiveConstraint {
+//
+// In strict mode (strict=true), builders that decode list-item text
+// surface a parse failure on the first malformed entry rather than
+// silently dropping it. Lenient mode preserves the forward-compatible
+// behaviour: malformed list items are skipped so a partially-broken
+// OPT still yields a usable (but weaker) constraint. The same split
+// already exists at the node level for unknown xsi:type values.
+func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint, error) {
 	switch o.Type {
 	case "C_BOOLEAN":
-		return buildBoolean(o)
+		return buildBoolean(o), nil
 	case "C_INTEGER":
-		return buildInteger(o)
+		return buildInteger(o, strict)
 	case "C_REAL":
-		return buildReal(o)
+		return buildReal(o, strict)
 	case "C_STRING":
-		return buildString(o)
+		return buildString(o), nil
 	case "C_DATE":
-		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern)}
+		return constraints.CDate{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
 	case "C_TIME":
-		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}
+		return constraints.CTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
 	case "C_DATE_TIME":
-		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}
+		return constraints.CDateTime{Pattern: strings.TrimSpace(o.PrimitivePattern)}, nil
 	case "C_DURATION":
-		return buildDuration(o)
+		return buildDuration(o), nil
 	case "C_CODE_PHRASE":
-		return buildCodePhrase(o)
+		return buildCodePhrase(o), nil
 	case "C_DV_QUANTITY":
-		return buildDvQuantity(o)
+		return buildDvQuantity(o), nil
 	case "C_DV_ORDINAL":
-		return buildDvOrdinal(o)
+		return buildDvOrdinal(o), nil
 	}
-	return nil
+	return nil, nil
 }
 
 func buildBoolean(o *xmlCObject) constraints.CBoolean {
+	// AOM 1.4 declares both true_valid and false_valid as mandatory on
+	// C_BOOLEAN, with the invariant "Both attributes cannot be set to
+	// False" (an unsatisfiable constraint). When the OPT XML omits one
+	// or both elements, default each flag *independently* to true —
+	// the safe direction, since the spec's only invariant forbids the
+	// {false,false} case. A literal nil → false default on a single
+	// omitted element would actively synthesise that forbidden case.
 	c := constraints.CBoolean{
-		TrueValid:  o.TrueValid != nil && *o.TrueValid,
-		FalseValid: o.FalseValid != nil && *o.FalseValid,
-	}
-	// AOM convention: both flags default to true when the OPT omits
-	// the <true_valid> / <false_valid> elements entirely (i.e. an
-	// unconstrained boolean). We treat "nil" as "unset → both true".
-	if o.TrueValid == nil && o.FalseValid == nil {
-		c.TrueValid = true
-		c.FalseValid = true
+		TrueValid:  o.TrueValid == nil || *o.TrueValid,
+		FalseValid: o.FalseValid == nil || *o.FalseValid,
 	}
 	if v, ok := parseBool(o.AssumedValue); ok {
 		c.Default = &v
@@ -96,30 +104,46 @@ func buildBoolean(o *xmlCObject) constraints.CBoolean {
 	return c
 }
 
-func buildInteger(o *xmlCObject) constraints.CInteger {
+func buildInteger(o *xmlCObject, strict bool) (constraints.CInteger, error) {
 	c := constraints.CInteger{Range: numericRange(o.Range)}
-	for _, item := range o.PrimitiveList {
-		if n, err := strconv.ParseInt(strings.TrimSpace(item.Text), 10, 64); err == nil {
-			c.List = append(c.List, n)
+	for i, item := range o.PrimitiveList {
+		text := strings.TrimSpace(item.Text)
+		n, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			if strict {
+				return c, fmt.Errorf("%w: C_INTEGER list[%d]=%q is not a valid integer", ErrInvalidOPT, i, text)
+			}
+			// Lenient mode: skip malformed entries so a partially-broken
+			// OPT still yields a usable (weaker) constraint. Use
+			// ParseOPTStrict to surface this as ErrInvalidOPT.
+			continue
 		}
+		c.List = append(c.List, n)
 	}
 	if n, err := strconv.ParseInt(strings.TrimSpace(o.AssumedValue), 10, 64); err == nil {
 		c.Default = &n
 	}
-	return c
+	return c, nil
 }
 
-func buildReal(o *xmlCObject) constraints.CReal {
+func buildReal(o *xmlCObject, strict bool) (constraints.CReal, error) {
 	c := constraints.CReal{Range: numericRange(o.Range)}
-	for _, item := range o.PrimitiveList {
-		if f, err := strconv.ParseFloat(strings.TrimSpace(item.Text), 64); err == nil {
-			c.List = append(c.List, f)
+	for i, item := range o.PrimitiveList {
+		text := strings.TrimSpace(item.Text)
+		f, err := strconv.ParseFloat(text, 64)
+		if err != nil {
+			if strict {
+				return c, fmt.Errorf("%w: C_REAL list[%d]=%q is not a valid real", ErrInvalidOPT, i, text)
+			}
+			// Lenient mode: see buildInteger for rationale.
+			continue
 		}
+		c.List = append(c.List, f)
 	}
 	if f, err := strconv.ParseFloat(strings.TrimSpace(o.AssumedValue), 64); err == nil {
 		c.Default = &f
 	}
-	return c
+	return c, nil
 }
 
 func buildString(o *xmlCObject) constraints.CString {

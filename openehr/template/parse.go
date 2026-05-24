@@ -348,7 +348,10 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 		// surfacing for production validators. Primitive types never
 		// carry <attributes>, so the strict check only fires on
 		// genuinely unknown shapes.
-		primitive := buildPrimitive(o)
+		primitive, err := buildPrimitive(o, strict)
+		if err != nil {
+			return nil, fmt.Errorf("%s (%s): %w", o.NodeID, o.RMTypeName, err)
+		}
 		if strict && primitive == nil && len(o.Attributes) > 0 {
 			return nil, fmt.Errorf("%w: unknown xsi:type=%q on %q with %d nested attributes (strict mode)",
 				ErrUnsupportedNode, o.Type, o.RMTypeName, len(o.Attributes))
