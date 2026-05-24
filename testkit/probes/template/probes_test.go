@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
@@ -128,6 +129,93 @@ func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) 
 		t.Errorf("status = %q, want fail (ParsePath error must not satisfy ExpectNotFound)", r.Status)
 	}
 }
+
+// PROBE-024 — primitive constraint Validate against fixture cases.
+// Uses a small synthetic OPT carrying a C_DV_QUANTITY child so the
+// probe surface is exercised end-to-end (parse → resolve → validate)
+// without depending on the much larger vital_signs.opt's actual
+// path predicates.
+func TestProbe024PrimitiveValidate_Synthetic(t *testing.T) {
+	body := []byte(syntheticDvQuantityOPT)
+	cases := []probes.ValidateCase{
+		{
+			Path:      "/content",
+			Value:     constraints.QuantityValue{Magnitude: 120, Units: "mm[Hg]"},
+			WantCodes: nil, // in-range, allowed units
+		},
+		{
+			Path:      "/content",
+			Value:     constraints.QuantityValue{Magnitude: 500, Units: "mm[Hg]"},
+			WantCodes: []constraints.ViolationCode{constraints.CodeOutOfRange},
+		},
+		{
+			Path:      "/content",
+			Value:     constraints.QuantityValue{Magnitude: 50, Units: "psi"},
+			WantCodes: []constraints.ViolationCode{constraints.CodeUnitUnknown},
+		},
+	}
+	r, err := probes.Probe024PrimitiveValidate(body, cases)
+	if err != nil {
+		t.Fatalf("Probe024: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe024 status=%q detail=%q", r.Status, r.Detail)
+	}
+	if r.Probe != "PROBE-024" {
+		t.Errorf("Probe id = %q, want PROBE-024", r.Probe)
+	}
+}
+
+// PROBE-024 — caller misuse (empty cases) surfaces as a Go error,
+// matching PROBE-022's empty-assertions contract.
+func TestProbe024PrimitiveValidate_RejectsEmptyCases(t *testing.T) {
+	if _, err := probes.Probe024PrimitiveValidate([]byte(syntheticDvQuantityOPT), nil); err == nil {
+		t.Fatal("expected Go error for nil cases")
+	}
+}
+
+// PROBE-024 — malformed OPT surfaces as a failed Result, not an error
+// (cross-SDK aggregators bucket Results, not panics).
+func TestProbe024PrimitiveValidate_InvalidOPT(t *testing.T) {
+	r, err := probes.Probe024PrimitiveValidate([]byte("<bad/>"), []probes.ValidateCase{{Path: "/"}})
+	if err != nil {
+		t.Fatalf("expected Result, got error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("status = %q, want fail for invalid OPT", r.Status)
+	}
+}
+
+// syntheticDvQuantityOPT is a minimal OPT whose only child node is a
+// DV_QUANTITY constraint at /content. Lives here (not testdata/)
+// because the probe is the only consumer.
+const syntheticDvQuantityOPT = `<?xml version="1.0" encoding="UTF-8"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>probe024_test</value></template_id>
+  <concept>probe024</concept>
+  <definition xsi:type="C_COMPLEX_OBJECT">
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="C_DV_QUANTITY">
+        <rm_type_name>DV_QUANTITY</rm_type_name>
+        <node_id />
+        <list>
+          <magnitude>
+            <lower_included>true</lower_included>
+            <upper_included>true</upper_included>
+            <lower_unbounded>false</lower_unbounded>
+            <upper_unbounded>false</upper_unbounded>
+            <lower>0</lower>
+            <upper>300</upper>
+          </magnitude>
+          <units>mm[Hg]</units>
+        </list>
+      </children>
+    </attributes>
+  </definition>
+</template>`
 
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()

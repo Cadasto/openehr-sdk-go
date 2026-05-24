@@ -204,6 +204,19 @@ type xmlCObject struct {
 	// interpreted in v1)
 	Includes []xmlAssertion `xml:"includes"`
 	Excludes []xmlAssertion `xml:"excludes"`
+
+	// REQ-103 primitive constraint payload — only some are
+	// meaningful per xsi:type. The dispatch in buildPrimitive reads
+	// only the fields relevant to the parent xsi:type.
+	TrueValid        *bool                  `xml:"true_valid"`
+	FalseValid       *bool                  `xml:"false_valid"`
+	Range            *xmlNumericInterval    `xml:"range"`
+	PrimitivePattern string                 `xml:"pattern"`
+	PrimitiveList    []xmlPrimitiveListItem `xml:"list"`
+	AssumedValue     string                 `xml:"assumed_value"`
+	Property         *xmlCodePhraseRef      `xml:"property"`
+	TerminologyID    *xmlValueWrapper       `xml:"terminology_id"`
+	CodeList         []string               `xml:"code_list"`
 }
 
 // xmlTermDefSection is one <term_definitions code="..."> block on a
@@ -323,17 +336,20 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 			excludes:   collectAssertions(o.Excludes),
 		}, nil
 	default:
-		// Forward-compatible: unknown xsi:type values (e.g.
-		// C_PRIMITIVE_OBJECT, C_CODE_PHRASE, C_DV_QUANTITY) are
-		// surfaced as leaf ComplexObject nodes carrying the RM
-		// type name. Primitive constraint introspection is
-		// deferred to a later REQ (REQ-103).
+		// REQ-103 primitive constraint types map to leaf
+		// ComplexObject nodes carrying a typed PrimitiveConstraint.
+		// Unknown xsi:type values (outside the v1 closed set) still
+		// fall through as bare leaf ComplexObject — the
+		// forward-compatibility escape hatch from REQ-100.
 		//
 		// In strict mode, an unknown xsi:type that carries nested
 		// <attributes> means lenient mode would silently drop a
 		// non-trivial subtree — that's a forward-compat hazard worth
-		// surfacing for production validators.
-		if strict && len(o.Attributes) > 0 {
+		// surfacing for production validators. Primitive types never
+		// carry <attributes>, so the strict check only fires on
+		// genuinely unknown shapes.
+		primitive := buildPrimitive(o)
+		if strict && primitive == nil && len(o.Attributes) > 0 {
 			return nil, fmt.Errorf("%w: unknown xsi:type=%q on %q with %d nested attributes (strict mode)",
 				ErrUnsupportedNode, o.Type, o.RMTypeName, len(o.Attributes))
 		}
@@ -345,6 +361,7 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 			rmTypeName:  o.RMTypeName,
 			nodeID:      o.NodeID,
 			occurrences: occ,
+			primitive:   primitive,
 		}, nil
 	}
 }

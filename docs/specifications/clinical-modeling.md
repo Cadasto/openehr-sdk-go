@@ -48,7 +48,7 @@ The parsed definition tree is a closed taxonomy. `Node` is a sealed interface im
 | `ArchetypeRoot` | `xsi:type="C_ARCHETYPE_ROOT"` | `ArchetypeID()` (e.g. `openEHR-EHR-OBSERVATION.blood_pressure.v1`), plus the same surface as `ComplexObject` |
 | `Slot` | `xsi:type="ARCHETYPE_SLOT"` | `Includes()` / `Excludes()` archetype-id assertion lists (lists may be empty) |
 
-Concrete primitive constraints (`C_CODE_PHRASE`, `C_PRIMITIVE_OBJECT`, `C_DV_QUANTITY`, etc.) appear as **leaf `ComplexObject`** values in v1 (`RMTypeName()` returns the RM class name, no attribute children). Detailed primitive-constraint introspection is **deferred** to a later REQ (see `openehr/validation/`).
+Concrete primitive constraints (`C_CODE_PHRASE`, `C_PRIMITIVE_OBJECT`, `C_DV_QUANTITY`, etc.) appear as **leaf `ComplexObject`** values (`RMTypeName()` returns the RM class name, no attribute children). The typed primitive-constraint surface lives on `ComplexObject.PrimitiveConstraint()` and is enumerated under REQ-103.
 
 ### Path syntax (subset)
 
@@ -94,7 +94,7 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`. In v1 the package is **stdlib-only** — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
+`openehr/template/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, `openehr/rm/`, or `openehr/aom/aom14/`. In v1 the package depends only on the standard library plus its own sibling sub-package `openehr/template/constraints/` (REQ-103 typed primitive constraints) — RM class names appear only as string values surfaced from OPT XML, not as Go type references.
 
 ### Out of scope (v1)
 
@@ -106,3 +106,95 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 - **Lives in:** [`openehr/template/`](../../openehr/template/)
 - **Probes:** PROBE-022 (path resolution against fixture OPT)
+
+---
+
+## REQ-103 — Primitive constraint introspection
+
+The SDK **MUST** expose every OPT primitive constraint as a typed value attached to its leaf node, so validators and composition-builder consumers can introspect ranges, allowed lists, patterns, units, and code lists without re-parsing the OPT XML.
+
+### Scope
+
+The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 OPT XSD primitive `xsi:type` values:
+
+| OPT `xsi:type` | Go type (`openehr/template/constraints/`) | Surface |
+|---|---|---|
+| `C_BOOLEAN` | `CBoolean` | `TrueValid`, `FalseValid`, optional `Default` |
+| `C_INTEGER` | `CInteger` | `Range`, optional closed `List`, optional `Default` |
+| `C_REAL` | `CReal` | `Range`, optional closed `List`, optional `Default` |
+| `C_STRING` | `CString` | `Pattern` (regex), optional closed `List`, optional `Default` |
+| `C_DATE` | `CDate` | `Pattern` (AOM partial-date pattern, raw) |
+| `C_TIME` | `CTime` | `Pattern` (raw) |
+| `C_DATE_TIME` | `CDateTime` | `Pattern` (raw) |
+| `C_DURATION` | `CDuration` | `Pattern` (raw), optional `Range` |
+| `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate |
+| `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef) |
+| `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs) |
+
+Each type implements the sealed interface `constraints.PrimitiveConstraint`:
+
+```go
+type PrimitiveConstraint interface {
+    Validate(value any) []Violation
+    isPrimitive()              // unexported — closes the interface
+}
+```
+
+The set is closed by `isPrimitive()`; new primitive shapes appear in the `constraints` package only, behind their own REQ.
+
+### Accessor
+
+- `template.ComplexObject.PrimitiveConstraint() constraints.PrimitiveConstraint` — returns the typed value when the wire `xsi:type` was a primitive; returns nil for non-primitive nodes (composition root, archetype roots, slots, plain complex objects).
+- `templatecompile.CompiledNode.PrimitiveConstraint() constraints.PrimitiveConstraint` — same value, threaded through the compile step unchanged.
+
+### Validate contract
+
+`Validate(value any) []Violation` returns nil when the input satisfies every clause of the constraint, or one `Violation` per failing clause (range, list, pattern, …). Validators **MUST** be pure functions — no I/O, no reflection over user types beyond a small fixed coercion table per type. Concretely:
+
+- Integer / real validators accept any Go integer kind (int, int8..int64, uint, uint8..uint32); `CReal.Validate` additionally accepts `float32` / `float64`.
+- String, date, time, date-time, duration validators accept Go `string`.
+- `CBoolean.Validate` accepts Go `bool`.
+- `CodePhrase.Validate` accepts either a bare `string` (treated as the code under the constrained terminology) or a `constraints.CodedTermRef`.
+- `DvQuantity.Validate` accepts a `constraints.QuantityValue` `{Magnitude, Units, Precision}` triple.
+- `CDvOrdinal.Validate` accepts either an `int` (ordinal value) or a `constraints.OrdinalSymbol` `(value, symbol)` pair.
+
+A value whose Go type is not in the accepted set returns a single `CodeWrongType` violation; this is a contract failure on the caller side, not a constraint failure.
+
+### Violation taxonomy
+
+Every `Violation` carries a typed `ViolationCode`. The closed set is:
+
+| Code | Triggered by |
+|---|---|
+| `CodeOutOfRange` | numeric value outside a `NumericRange` |
+| `CodePatternMismatch` | string fails a regex / pattern |
+| `CodeNotInList` | value is not a member of a closed list (strings, codes, ordinals, etc.) |
+| `CodeWrongType` | input Go type cannot be coerced to the constraint's expected type |
+| `CodeUnitUnknown` | DV_QUANTITY units string is not in the enumerated allowed list |
+| `CodeInvalidValue` | constraint or input is malformed (e.g. unparseable regex in the OPT, malformed date string) |
+
+`Violation.Detail` carries a human-readable message; consumers building structured diagnostics SHOULD pattern-match on `Code`.
+
+### Numeric range
+
+`NumericRange` is the inclusive / exclusive interval shape used by `CInteger`, `CReal`, `DvQuantity.Magnitude`, `DvQuantity.Precision`, and `CDuration.Range`:
+
+- `Lower` / `Upper` (float64; lossless for INTEGER up to 2^53)
+- `LowerInclusive` / `UpperInclusive` (defaults to true when the OPT omits the wire flags — the AOM 1.4 convention)
+- `LowerUnbounded` / `UpperUnbounded` (when true, the corresponding bound is ignored)
+
+The zero value is "any value accepted" (both sides unbounded).
+
+### Out of scope (this REQ)
+
+- **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string but `Validate` performs only an ISO 8601 sanity check. Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
+- **`ARCHETYPE_SLOT` assertion grammar** — separate REQ-104. The current `Slot.Includes()` / `Slot.Excludes()` raw-string surface remains the only addressable slot constraint.
+- **External terminology lookup** — REQ-105 surfaces bindings, but neither it nor REQ-103 calls into a remote terminology service during `Validate`.
+- **AOM 2 `tuple_constraint`** — not used by ADL 1.4.
+
+### Building-block independence (REQ-013)
+
+`openehr/template/constraints/` is **stdlib-only**. It is importable independently of `openehr/template/` so codegen and downstream validators can use the constraint types without pulling the OPT parser.
+
+- **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
+- **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)

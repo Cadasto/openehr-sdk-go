@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // CompiledNode is one node in the compiled OPT tree. Mirrors the
@@ -29,6 +30,11 @@ type CompiledNode struct {
 	isSlot       bool
 	slotIncludes []string
 	slotExcludes []string
+
+	// primitive carries the typed REQ-103 constraint value when the
+	// wire xsi:type was a primitive. Nil for non-primitive nodes
+	// (composition root, archetype roots, slots, plain complex objects).
+	primitive constraints.PrimitiveConstraint
 
 	// terms is populated only on *ArchetypeRoot-derived nodes. At-codes
 	// are scoped to their enclosing archetype root; the same at-code
@@ -92,6 +98,14 @@ func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotInclu
 // SlotExcludes returns a defensive copy of the slot's raw
 // archetype-id exclude assertion strings. Empty for non-slot nodes.
 func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
+
+// PrimitiveConstraint returns the typed REQ-103 constraint value for
+// this node, or nil when the wire xsi:type was not a primitive in
+// the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint]
+// — the compile step copies the value through without modification.
+func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
+	return n.primitive
+}
 
 // Term returns the term definition for an at-code, scoped to the
 // nearest enclosing archetype root. Walks the parent chain so a

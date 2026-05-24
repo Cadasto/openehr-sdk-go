@@ -132,6 +132,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
 		cn.occurrences = v.Occurrences()
+		cn.primitive = v.PrimitiveConstraint()
 		if err := w.attachAttributes(cn, v.Attributes()); err != nil {
 			return nil, err
 		}
