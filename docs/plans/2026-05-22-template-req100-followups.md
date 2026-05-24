@@ -275,8 +275,8 @@ type PrimitiveConstraint interface {
 
 type DvQuantity struct {
     Units    []QuantityUnit                // (units string, magnitude range, precision range)
-    Property string                        // optional terminology binding for the property
-    Default  *DvQuantityDefault            // assumed_value when present
+    Property *CodedTermRef                 // optional terminology binding for the property; landed as *CodedTermRef rather than the plan's original `string` so terminology + code stay structured (matches AOM <property> XML shape)
+    Default  *DvQuantityDefault            // assumed_value when present (deferred — wire decode covers Default for primitives where the OPT supplies <assumed_value>)
 }
 
 type CodePhrase struct {

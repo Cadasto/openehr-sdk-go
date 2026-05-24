@@ -135,6 +135,16 @@ func toInt64(value any) (int64, bool) {
 		return int64(v), true
 	case uint32:
 		return int64(v), true
+	case uint64:
+		// Same overflow guard as `case uint` — values that fit
+		// int64 widen losslessly; uint64 > MaxInt64 returns
+		// !ok so the caller reports CodeWrongType rather than
+		// silently wrapping to a negative.
+		const maxInt64 = uint64(1)<<63 - 1
+		if v > maxInt64 {
+			return 0, false
+		}
+		return int64(v), true
 	}
 	return 0, false
 }

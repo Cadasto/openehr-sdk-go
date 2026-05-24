@@ -126,7 +126,7 @@ The closed set of REQ-103 primitive constraints maps **one-to-one** to ADL 1.4 O
 | `C_DATE` | `CDate` | `Pattern` (AOM partial-date pattern, raw) |
 | `C_TIME` | `CTime` | `Pattern` (raw) |
 | `C_DATE_TIME` | `CDateTime` | `Pattern` (raw) |
-| `C_DURATION` | `CDuration` | `Pattern` (raw), optional `Range` |
+| `C_DURATION` | `CDuration` | `Pattern` (raw) |
 | `C_CODE_PHRASE` | `CodePhrase` | `Terminology`, optional `CodeList`, `External()` predicate |
 | `C_DV_QUANTITY` | `DvQuantity` | enumerated `Units` (each with magnitude / precision `NumericRange`), optional `Property` (CodedTermRef) |
 | `C_DV_ORDINAL` | `CDvOrdinal` | `Values` (closed list of `(int, CodedTermRef)` pairs) |
@@ -180,10 +180,10 @@ Every `Violation` carries a typed `ViolationCode`. The closed set is:
 `NumericRange` is the inclusive / exclusive interval shape used by `CInteger`, `CReal`, `DvQuantity.Magnitude`, `DvQuantity.Precision`, and `CDuration.Range`:
 
 - `Lower` / `Upper` (float64; lossless for INTEGER up to 2^53)
-- `LowerInclusive` / `UpperInclusive` (defaults to true when the OPT omits the wire flags — the AOM 1.4 convention)
+- `LowerInclusive` / `UpperInclusive` (defaults to true when the OPT omits the wire flags — the AOM 1.4 convention; the wire parser sets them, but consumers constructing ranges manually MUST set the flags explicitly — the struct zero value is *exclusive* on both sides)
 - `LowerUnbounded` / `UpperUnbounded` (when true, the corresponding bound is ignored)
 
-The zero value is "any value accepted" (both sides unbounded).
+The zero-value `NumericRange{}` (no fields set) is treated as "any value accepted" by `Contains` and `IsBounded` — a no-op constraint. Numeric range bounds on `CDuration` are deferred (calendar conversion is out of scope for v1).
 
 ### Out of scope (this REQ)
 

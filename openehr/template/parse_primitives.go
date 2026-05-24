@@ -138,7 +138,6 @@ func buildString(o *xmlCObject) constraints.CString {
 func buildDuration(o *xmlCObject) constraints.CDuration {
 	return constraints.CDuration{
 		Pattern: strings.TrimSpace(o.PrimitivePattern),
-		Range:   numericRange(o.Range),
 	}
 }
 

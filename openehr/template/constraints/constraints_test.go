@@ -86,6 +86,13 @@ func TestCInteger_Validate(t *testing.T) {
 	if v := c.Validate(int32(2)); len(v) != 0 {
 		t.Errorf("Validate(int32(2)) = %v, want nil (widening)", v)
 	}
+	if v := c.Validate(uint64(4)); len(v) != 0 {
+		t.Errorf("Validate(uint64(4)) = %v, want nil (in-range uint64 widens to int64)", v)
+	}
+	// uint64 above MaxInt64 surfaces as CodeWrongType, NOT silent wrap.
+	if v := c.Validate(uint64(1 << 63)); len(v) != 1 || v[0].Code != constraints.CodeWrongType {
+		t.Errorf("Validate(uint64 > MaxInt64) = %v, want CodeWrongType", v)
+	}
 	// Not in list — should report.
 	v := c.Validate(5)
 	if len(v) != 1 || v[0].Code != constraints.CodeNotInList {

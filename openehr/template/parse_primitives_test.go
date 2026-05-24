@@ -129,6 +129,34 @@ func TestParse_CString(t *testing.T) {
 	}
 }
 
+func TestParse_CReal(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_REAL">
+		<rm_type_name>REAL</rm_type_name>
+		<node_id />
+		<range>
+			<lower_included>true</lower_included>
+			<upper_included>true</upper_included>
+			<lower_unbounded>false</lower_unbounded>
+			<upper_unbounded>false</upper_unbounded>
+			<lower>0.0</lower>
+			<upper>100.0</upper>
+		</range>
+		<list>1.5</list>
+		<list>2.5</list>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	c, ok := p.(constraints.CReal)
+	if !ok {
+		t.Fatalf("want CReal, got %T", p)
+	}
+	if len(c.List) != 2 || c.List[1] != 2.5 {
+		t.Errorf("List = %v, want [1.5 2.5]", c.List)
+	}
+	if !c.Range.IsBounded() || c.Range.Upper != 100.0 {
+		t.Errorf("Range = %s, want [0..100]", c.Range)
+	}
+}
+
 func TestParse_CDate(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_DATE">
 		<rm_type_name>DATE</rm_type_name>
@@ -142,6 +170,54 @@ func TestParse_CDate(t *testing.T) {
 	}
 	if c.Pattern != "yyyy-mm-dd" {
 		t.Errorf("Pattern = %q, want yyyy-mm-dd", c.Pattern)
+	}
+}
+
+func TestParse_CTime(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_TIME">
+		<rm_type_name>TIME</rm_type_name>
+		<node_id />
+		<pattern>hh:mm:ss</pattern>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	c, ok := p.(constraints.CTime)
+	if !ok {
+		t.Fatalf("want CTime, got %T", p)
+	}
+	if c.Pattern != "hh:mm:ss" {
+		t.Errorf("Pattern = %q, want hh:mm:ss", c.Pattern)
+	}
+}
+
+func TestParse_CDateTime(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_DATE_TIME">
+		<rm_type_name>DATE_TIME</rm_type_name>
+		<node_id />
+		<pattern>yyyy-mm-ddThh:mm:ss</pattern>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	c, ok := p.(constraints.CDateTime)
+	if !ok {
+		t.Fatalf("want CDateTime, got %T", p)
+	}
+	if c.Pattern != "yyyy-mm-ddThh:mm:ss" {
+		t.Errorf("Pattern = %q, want yyyy-mm-ddThh:mm:ss", c.Pattern)
+	}
+}
+
+func TestParse_CDuration(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_DURATION">
+		<rm_type_name>DURATION</rm_type_name>
+		<node_id />
+		<pattern>PYMD</pattern>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	c, ok := p.(constraints.CDuration)
+	if !ok {
+		t.Fatalf("want CDuration, got %T", p)
+	}
+	if c.Pattern != "PYMD" {
+		t.Errorf("Pattern = %q, want PYMD", c.Pattern)
 	}
 }
 

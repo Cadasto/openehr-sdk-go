@@ -83,13 +83,13 @@ func (c CDateTime) Validate(value any) []Violation {
 }
 
 // CDuration constrains an RM ISO_DURATION value (C_DURATION).
-// Validate accepts the ISO 8601 PnYnMnDTnHnMnS shape. Range, if set,
-// is checked against an approximate seconds equivalent — months and
-// years use 30 / 365 day averages so callers MUST NOT rely on
-// Range for sub-day precision.
+// Validate accepts the ISO 8601 PnYnMnDTnHnMnS shape. Numeric-range
+// bounds on durations (e.g. "between PT1H and PT24H") are deferred
+// — converting partial years / months to seconds requires calendar
+// reasoning out of scope for a stdlib-only validator. AOM-pattern
+// enforcement is similarly deferred.
 type CDuration struct {
 	Pattern string
-	Range   NumericRange
 }
 
 func (CDuration) isPrimitive() {}
@@ -97,8 +97,8 @@ func (CDuration) isPrimitive() {}
 var durationRe = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)
 
 // Validate accepts a Go string of the ISO 8601 duration shape.
-// Range enforcement uses an approximate seconds conversion (30 days
-// per month, 365 days per year) — see the type doc.
+// Returns CodeInvalidValue for shapes outside PnYnMnWnDTnHnMnS or
+// for empty / period-only stubs (P, PT).
 func (c CDuration) Validate(value any) []Violation {
 	s, ok := value.(string)
 	if !ok {
