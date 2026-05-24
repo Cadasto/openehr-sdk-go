@@ -37,6 +37,13 @@ go.work.sum
 # Codebase-memory MCP server local cache (per-user, not committed)
 .codebase-memory/
 
+# git worktrees (per-user; never tracked even when checked out inside
+# the repo). Covers ad-hoc local worktrees and Superpowers/worktree-
+# style scratch directories.
+worktrees/
+.worktrees/
+_scratch*
+
 # Build output
 bin/
 
