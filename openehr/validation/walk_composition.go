@@ -35,10 +35,9 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 		return
 	}
 
-	// Identity + RM-type checks at this node (no-op for the
-	// composition root when optNode is the OPT root; root archetype
-	// id is validated as part of the COMPOSITION attribute walk via
-	// the LOCATABLE archetype_node_id channel below).
+	// Identity + RM-type checks at this node. At the composition
+	// root, identity is checked inline against COMPOSITION's
+	// archetype_node_id (not via a separate attribute descent).
 	w.checkLocatableIdentity(optNode, rmValue, path)
 	w.checkRMType(optNode, rmValue, path)
 
@@ -177,9 +176,8 @@ func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to the OPT child
 // whose archetype_node_id matches. Items without a matching OPT
-// child surface as slot_fill issues (Phase 2 reuses the
-// archetype-id-equality rule; REQ-104 will swap in the parsed slot
-// grammar).
+// child surface as slot_fill issues (archetype-id equality today;
+// REQ-104 will swap in the parsed slot grammar).
 func (w *walker) walkMultipleAttribute(
 	opt *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -340,6 +338,9 @@ func primitiveInput(rmValue any) any {
 			CodeString:  v.CodeString,
 		}
 	case *rm.CodePhrase:
+		if v == nil {
+			return constraints.CodedTermRef{}
+		}
 		return constraints.CodedTermRef{
 			Terminology: v.TerminologyID.Value,
 			CodeString:  v.CodeString,

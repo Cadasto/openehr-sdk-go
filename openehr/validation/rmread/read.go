@@ -12,9 +12,10 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // dispatch table that wants the string key.
 //
 // `ok` is false when the attribute is absent (nil pointer, nil
-// interface, structurally-empty CodePhrase / DVText / DVCodedText,
-// empty string for the locatable archetype_node_id / name primary
-// channels). Pointer attrs with non-nil but zero-value payloads
+// interface, typed-nil pointer behind an interface — see
+// [IsTypedNilPointer] — structurally-empty CodePhrase / DVText /
+// DVCodedText, empty string for the locatable archetype_node_id /
+// name primary channels). Pointer attrs with non-nil but zero-value
 // report `ok=true` — the structural walker uses pointer presence
 // as the absent/present signal.
 //
@@ -742,10 +743,21 @@ func ifacePresent(v any) (any, bool) {
 	if v == nil {
 		return v, false
 	}
-	if isTypedNilPointer(v) {
+	if IsTypedNilPointer(v) {
 		return v, false
 	}
 	return v, true
+}
+
+// IsTypedNilPointer reports whether v is an interface value carrying
+// a typed-nil pointer (e.g. Element.Value = (*rm.DVQuantity)(nil)).
+// Bare nil interfaces and value-typed structs return false.
+//
+// Exported so openehr/validation's rmTypeInfo switch stays in lock-
+// step with ifacePresent without duplicating the closed type set.
+// REQ-024 compliant — no reflection.
+func IsTypedNilPointer(v any) bool {
+	return isTypedNilPointer(v)
 }
 
 // isTypedNilPointer detects the "interface carrying a typed-nil
@@ -760,7 +772,7 @@ func ifacePresent(v any) (any, bool) {
 // rmTypeInfo — the three switches are kept in lock-step.
 func isTypedNilPointer(v any) bool {
 	switch p := v.(type) {
-	// DataValue concretes (Element.Value, Activity.Timing values, etc.)
+	// DataValue concretes (Element.Value, etc.).
 	case *rm.DVQuantity:
 		return p == nil
 	case *rm.DVText:

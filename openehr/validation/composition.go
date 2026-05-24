@@ -5,6 +5,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // ValidateComposition validates an in-memory RM Composition
@@ -94,9 +95,10 @@ func joinPath(parent, segment string) string {
 // yields pointers while builders may yield values (REQ-024 — no
 // reflection).
 func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
-	switch x := v.(type) {
-	case nil:
+	if v == nil || rmread.IsTypedNilPointer(v) {
 		return "", "", false
+	}
+	switch x := v.(type) {
 
 	// LOCATABLE concretes — carry archetype_node_id.
 	case *rm.Composition:
