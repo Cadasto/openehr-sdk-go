@@ -94,6 +94,89 @@ func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 	}
 }
 
+// PROBE-026 — unknown archetype id under /content fires `slot_fill`.
+// A Content[i] whose archetype_node_id matches no OPT root and no
+// slot include fails the slot-fit fallback.
+func TestProbe026MissingNodes_SlotFillUnknownArchetype(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	comp := validBloodPressureComposition()
+	comp.Content = []rm.ContentItem{
+		&rm.Observation{
+			ArchetypeNodeID: "openEHR-EHR-OBSERVATION.no_such_archetype.v1",
+		},
+	}
+	cases := []probes.ValidateCase{
+		{
+			Name:        "unknown_archetype_id_under_content",
+			OPT:         body,
+			Composition: comp,
+			WantCodes:   []string{"slot_fill"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// PROBE-026 — DV_QUANTITY units outside the OPT-allowed list fires
+// `primitive_unit_unknown` at the element's /value path.
+func TestProbe026MissingNodes_PrimitiveUnitUnknown(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	comp := validBloodPressureComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	list.Items[0].Value = &rm.DVQuantity{
+		Magnitude: rm.Real(120),
+		Units:     "psi", // not in {mm[Hg]}
+	}
+	cases := []probes.ValidateCase{
+		{
+			Name:        "systolic_units_psi",
+			OPT:         body,
+			Composition: comp,
+			WantCodes:   []string{"primitive_unit_unknown"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// PROBE-026 — category defining_code outside the OPT closed list
+// fires `primitive_not_in_list` at /category/defining_code.
+func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	comp := validBloodPressureComposition()
+	comp.Category.DefiningCode = rm.CodePhrase{
+		TerminologyID: rm.TerminologyID{Value: "openehr"},
+		CodeString:    "999",
+	}
+	cases := []probes.ValidateCase{
+		{
+			Name:        "category_code_999",
+			OPT:         body,
+			Composition: comp,
+			WantCodes:   []string{"primitive_not_in_list"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
 // PROBE-026 — empty events. An OBSERVATION whose Data.Events slice
 // is empty fires BOTH `required` (existence lower ≥ 1) AND
 // `cardinality` (the OPT pins child-count lower ≥ 1) at

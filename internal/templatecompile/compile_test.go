@@ -477,6 +477,69 @@ func TestCompile_ChildMultiplicity_FixtureRoundTrip(t *testing.T) {
 	}
 }
 
+// Phase 4 (REQ-102 v2) — AOM 1.4 admits C_SINGLE_ATTRIBUTE with
+// multiple `<children>` (alternatives) that share an AQL path.
+// Compile MUST accept the collision when both candidates were
+// registered under the same wire attribute. (Genuine cross-
+// attribute duplicates are still rejected — see
+// TestCompile_DuplicatePathFromDifferentAttribute below.)
+func TestCompile_SingleAttributeAlternativesShareAQLPath(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>alt-test</value></template_id>
+  <concept>alt-test</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>name</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id />
+      </children>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+        <node_id />
+      </children>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt, templatecompile.Options{SkipImplicitAttributes: true})
+	if err != nil {
+		t.Fatalf("Compile rejected legitimate C_SINGLE_ATTRIBUTE alternatives: %v", err)
+	}
+	// /name resolves to the FIRST alternative (DV_TEXT); the second
+	// (DV_CODED_TEXT) is reachable only via the parent attribute's
+	// Children() — the structural validator iterates that directly.
+	n, err := c.NodeAt("/name")
+	if err != nil {
+		t.Fatalf("NodeAt(/name): %v", err)
+	}
+	if n.RMTypeName() != "DV_TEXT" {
+		t.Errorf("first alternative at /name = %q, want DV_TEXT", n.RMTypeName())
+	}
+	// Parent attribute exposes both children; verify the second is
+	// reachable for the walker's alternative-matching pass.
+	var nameAttr *templatecompile.CompiledAttribute
+	for _, a := range c.Root().Attributes() {
+		if a.Name() == "name" {
+			nameAttr = a
+			break
+		}
+	}
+	if nameAttr == nil {
+		t.Fatal("compile dropped /name attribute")
+	}
+	if got := len(nameAttr.Children()); got != 2 {
+		t.Errorf("nameAttr.Children() len = %d, want 2", got)
+	}
+}
+
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(filepath.Join("..", "..", "openehr", "template", "testdata", fixture))

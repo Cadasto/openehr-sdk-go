@@ -83,85 +83,155 @@ func joinPath(parent, segment string) string {
 	return parent + segment
 }
 
+// rmTypeInfo is the single source of truth for "what RM class is
+// this Go value and (when LOCATABLE) what is its archetype_node_id".
+// All v2 walker code routes through this function — describeRMType
+// and locatableArchetypeNodeID are thin wrappers. Adding a new RM
+// type means editing one switch.
+//
+// Returns ("", "", false) for Go types outside the v2 closed set.
+// Pointer + value receivers both enumerated because JSON decoding
+// yields pointers while builders may yield values (REQ-024 — no
+// reflection).
+func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
+	switch x := v.(type) {
+	case nil:
+		return "", "", false
+
+	// LOCATABLE concretes — carry archetype_node_id.
+	case *rm.Composition:
+		return "COMPOSITION", x.ArchetypeNodeID, true
+	case rm.Composition:
+		return "COMPOSITION", x.ArchetypeNodeID, true
+	case *rm.Observation:
+		return "OBSERVATION", x.ArchetypeNodeID, true
+	case rm.Observation:
+		return "OBSERVATION", x.ArchetypeNodeID, true
+	case *rm.Evaluation:
+		return "EVALUATION", x.ArchetypeNodeID, true
+	case rm.Evaluation:
+		return "EVALUATION", x.ArchetypeNodeID, true
+	case *rm.Instruction:
+		return "INSTRUCTION", x.ArchetypeNodeID, true
+	case rm.Instruction:
+		return "INSTRUCTION", x.ArchetypeNodeID, true
+	case *rm.Action:
+		return "ACTION", x.ArchetypeNodeID, true
+	case rm.Action:
+		return "ACTION", x.ArchetypeNodeID, true
+	case *rm.AdminEntry:
+		return "ADMIN_ENTRY", x.ArchetypeNodeID, true
+	case rm.AdminEntry:
+		return "ADMIN_ENTRY", x.ArchetypeNodeID, true
+	case *rm.GenericEntry:
+		return "GENERIC_ENTRY", x.ArchetypeNodeID, true
+	case rm.GenericEntry:
+		return "GENERIC_ENTRY", x.ArchetypeNodeID, true
+	case *rm.Section:
+		return "SECTION", x.ArchetypeNodeID, true
+	case rm.Section:
+		return "SECTION", x.ArchetypeNodeID, true
+	case *rm.Activity:
+		return "ACTIVITY", x.ArchetypeNodeID, true
+	case rm.Activity:
+		return "ACTIVITY", x.ArchetypeNodeID, true
+	case *rm.History[rm.ItemStructure]:
+		return "HISTORY", x.ArchetypeNodeID, true
+	case rm.History[rm.ItemStructure]:
+		return "HISTORY", x.ArchetypeNodeID, true
+	case *rm.PointEvent[rm.ItemStructure]:
+		return "POINT_EVENT", x.ArchetypeNodeID, true
+	case rm.PointEvent[rm.ItemStructure]:
+		return "POINT_EVENT", x.ArchetypeNodeID, true
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		return "INTERVAL_EVENT", x.ArchetypeNodeID, true
+	case rm.IntervalEvent[rm.ItemStructure]:
+		return "INTERVAL_EVENT", x.ArchetypeNodeID, true
+	case *rm.ItemTree:
+		return "ITEM_TREE", x.ArchetypeNodeID, true
+	case rm.ItemTree:
+		return "ITEM_TREE", x.ArchetypeNodeID, true
+	case *rm.ItemList:
+		return "ITEM_LIST", x.ArchetypeNodeID, true
+	case rm.ItemList:
+		return "ITEM_LIST", x.ArchetypeNodeID, true
+	case *rm.ItemSingle:
+		return "ITEM_SINGLE", x.ArchetypeNodeID, true
+	case rm.ItemSingle:
+		return "ITEM_SINGLE", x.ArchetypeNodeID, true
+	case *rm.ItemTable:
+		return "ITEM_TABLE", x.ArchetypeNodeID, true
+	case rm.ItemTable:
+		return "ITEM_TABLE", x.ArchetypeNodeID, true
+	case *rm.Cluster:
+		return "CLUSTER", x.ArchetypeNodeID, true
+	case rm.Cluster:
+		return "CLUSTER", x.ArchetypeNodeID, true
+	case *rm.Element:
+		return "ELEMENT", x.ArchetypeNodeID, true
+	case rm.Element:
+		return "ELEMENT", x.ArchetypeNodeID, true
+
+	// EVENT_CONTEXT — has archetype-like nature but no archetype_node_id field.
+	case *rm.EventContext, rm.EventContext:
+		return "EVENT_CONTEXT", "", true
+
+	// DataValue subtypes — no archetype_node_id.
+	case *rm.DVCodedText, rm.DVCodedText:
+		return "DV_CODED_TEXT", "", true
+	case *rm.DVText, rm.DVText:
+		return "DV_TEXT", "", true
+	case *rm.CodePhrase, rm.CodePhrase:
+		return "CODE_PHRASE", "", true
+	case *rm.DVQuantity, rm.DVQuantity:
+		return "DV_QUANTITY", "", true
+	case *rm.DVCount, rm.DVCount:
+		return "DV_COUNT", "", true
+	case *rm.DVBoolean, rm.DVBoolean:
+		return "DV_BOOLEAN", "", true
+	case *rm.DVOrdinal, rm.DVOrdinal:
+		return "DV_ORDINAL", "", true
+	case *rm.DVDate, rm.DVDate:
+		return "DV_DATE", "", true
+	case *rm.DVTime, rm.DVTime:
+		return "DV_TIME", "", true
+	case *rm.DVDateTime, rm.DVDateTime:
+		return "DV_DATE_TIME", "", true
+	case *rm.DVDuration, rm.DVDuration:
+		return "DV_DURATION", "", true
+	case *rm.DVURI, rm.DVURI:
+		return "DV_URI", "", true
+	case *rm.DVEHRURI, rm.DVEHRURI:
+		return "DV_EHR_URI", "", true
+	case *rm.DVIdentifier, rm.DVIdentifier:
+		return "DV_IDENTIFIER", "", true
+	case *rm.DVMultimedia, rm.DVMultimedia:
+		return "DV_MULTIMEDIA", "", true
+	case *rm.DVParsable, rm.DVParsable:
+		return "DV_PARSABLE", "", true
+	case *rm.DVProportion, rm.DVProportion:
+		return "DV_PROPORTION", "", true
+
+	// PartyProxy concretes.
+	case rm.PartySelf, *rm.PartySelf:
+		return "PARTY_SELF", "", true
+	case *rm.PartyIdentified, rm.PartyIdentified:
+		return "PARTY_IDENTIFIED", "", true
+	case *rm.PartyRelated, rm.PartyRelated:
+		return "PARTY_RELATED", "", true
+	}
+	return "", "", false
+}
+
 // describeRMType returns a string suitable for inclusion in Issue
 // Detail messages identifying the concrete Go type of an RM value.
 // Pointer types are unwrapped to their elem type name.
 func describeRMType(v any) string {
-	switch v.(type) {
-	case nil:
+	if v == nil {
 		return "<nil>"
-	case *rm.Composition, rm.Composition:
-		return "COMPOSITION"
-	case *rm.Observation, rm.Observation:
-		return "OBSERVATION"
-	case *rm.Evaluation, rm.Evaluation:
-		return "EVALUATION"
-	case *rm.Instruction, rm.Instruction:
-		return "INSTRUCTION"
-	case *rm.Action, rm.Action:
-		return "ACTION"
-	case *rm.AdminEntry, rm.AdminEntry:
-		return "ADMIN_ENTRY"
-	case *rm.GenericEntry, rm.GenericEntry:
-		return "GENERIC_ENTRY"
-	case *rm.Section, rm.Section:
-		return "SECTION"
-	case *rm.Activity, rm.Activity:
-		return "ACTIVITY"
-	case *rm.EventContext, rm.EventContext:
-		return "EVENT_CONTEXT"
-	case *rm.History[rm.ItemStructure], rm.History[rm.ItemStructure]:
-		return "HISTORY"
-	case *rm.PointEvent[rm.ItemStructure], rm.PointEvent[rm.ItemStructure]:
-		return "POINT_EVENT"
-	case *rm.IntervalEvent[rm.ItemStructure], rm.IntervalEvent[rm.ItemStructure]:
-		return "INTERVAL_EVENT"
-	case *rm.ItemTree, rm.ItemTree:
-		return "ITEM_TREE"
-	case *rm.ItemList, rm.ItemList:
-		return "ITEM_LIST"
-	case *rm.ItemSingle, rm.ItemSingle:
-		return "ITEM_SINGLE"
-	case *rm.ItemTable, rm.ItemTable:
-		return "ITEM_TABLE"
-	case *rm.Cluster, rm.Cluster:
-		return "CLUSTER"
-	case *rm.Element, rm.Element:
-		return "ELEMENT"
-	case *rm.DVCodedText, rm.DVCodedText:
-		return "DV_CODED_TEXT"
-	case *rm.DVText, rm.DVText:
-		return "DV_TEXT"
-	case *rm.CodePhrase, rm.CodePhrase:
-		return "CODE_PHRASE"
-	case *rm.DVQuantity, rm.DVQuantity:
-		return "DV_QUANTITY"
-	case *rm.DVCount, rm.DVCount:
-		return "DV_COUNT"
-	case *rm.DVBoolean, rm.DVBoolean:
-		return "DV_BOOLEAN"
-	case *rm.DVOrdinal, rm.DVOrdinal:
-		return "DV_ORDINAL"
-	case *rm.DVDate, rm.DVDate:
-		return "DV_DATE"
-	case *rm.DVTime, rm.DVTime:
-		return "DV_TIME"
-	case *rm.DVDateTime, rm.DVDateTime:
-		return "DV_DATE_TIME"
-	case *rm.DVDuration, rm.DVDuration:
-		return "DV_DURATION"
-	case *rm.DVURI, rm.DVURI:
-		return "DV_URI"
-	case *rm.DVEHRURI, rm.DVEHRURI:
-		return "DV_EHR_URI"
-	case *rm.DVIdentifier, rm.DVIdentifier:
-		return "DV_IDENTIFIER"
-	case *rm.DVMultimedia, rm.DVMultimedia:
-		return "DV_MULTIMEDIA"
-	case *rm.DVParsable, rm.DVParsable:
-		return "DV_PARSABLE"
-	case *rm.DVProportion, rm.DVProportion:
-		return "DV_PROPORTION"
+	}
+	if name, _, ok := rmTypeInfo(v); ok {
+		return name
 	}
 	return fmt.Sprintf("%T", v)
 }

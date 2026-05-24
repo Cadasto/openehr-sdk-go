@@ -102,12 +102,26 @@ func (w *walker) walkSingleAttribute(
 	}
 	child := matchSingleAlternative(children, val)
 	if child == nil {
-		w.emit(Issue{
-			Path:     attrPath,
-			Code:     "alternative_mismatch",
-			Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
-			Severity: Error,
-		})
+		// With multiple OPT children the OPT declared AnyOf
+		// alternatives; with a single child it is a plain type
+		// constraint. Disambiguate the Issue.Code so consumers can
+		// distinguish "wrong type" from "didn't match any of N
+		// allowed types".
+		if len(children) == 1 {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "rm_type_mismatch",
+				Detail:   fmt.Sprintf("RM value of type %s under %q does not satisfy template RM type %s", describeRMType(val), attr.Name(), children[0].RMTypeName()),
+				Severity: Error,
+			})
+		} else {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "alternative_mismatch",
+				Detail:   fmt.Sprintf("RM value of type %s under %q matches none of the OPT alternatives %s", describeRMType(val), attr.Name(), formatAllowedTypes(children)),
+				Severity: Error,
+			})
+		}
 		return
 	}
 	w.walkNode(child, val, joinPath(parentPath, segmentForChild(attr, child, 0)))
@@ -427,84 +441,12 @@ func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string)
 }
 
 // locatableArchetypeNodeID extracts archetype_node_id from any RM
-// LOCATABLE value via closed type-switch. Returns "" for non-
-// LOCATABLE values (DataValue subtypes, primitive Go types).
+// LOCATABLE value. Returns "" for non-LOCATABLE values (DataValue
+// subtypes, PartyProxy, EventContext). Thin wrapper over
+// [rmTypeInfo] — adding a new RM type means editing one switch.
 func locatableArchetypeNodeID(v any) string {
-	switch x := v.(type) {
-	case *rm.Composition:
-		return x.ArchetypeNodeID
-	case rm.Composition:
-		return x.ArchetypeNodeID
-	case *rm.Observation:
-		return x.ArchetypeNodeID
-	case rm.Observation:
-		return x.ArchetypeNodeID
-	case *rm.Evaluation:
-		return x.ArchetypeNodeID
-	case rm.Evaluation:
-		return x.ArchetypeNodeID
-	case *rm.Instruction:
-		return x.ArchetypeNodeID
-	case rm.Instruction:
-		return x.ArchetypeNodeID
-	case *rm.Action:
-		return x.ArchetypeNodeID
-	case rm.Action:
-		return x.ArchetypeNodeID
-	case *rm.AdminEntry:
-		return x.ArchetypeNodeID
-	case rm.AdminEntry:
-		return x.ArchetypeNodeID
-	case *rm.GenericEntry:
-		return x.ArchetypeNodeID
-	case rm.GenericEntry:
-		return x.ArchetypeNodeID
-	case *rm.Section:
-		return x.ArchetypeNodeID
-	case rm.Section:
-		return x.ArchetypeNodeID
-	case *rm.Activity:
-		return x.ArchetypeNodeID
-	case rm.Activity:
-		return x.ArchetypeNodeID
-	case *rm.History[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case rm.History[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.PointEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case rm.PointEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case rm.IntervalEvent[rm.ItemStructure]:
-		return x.ArchetypeNodeID
-	case *rm.ItemTree:
-		return x.ArchetypeNodeID
-	case rm.ItemTree:
-		return x.ArchetypeNodeID
-	case *rm.ItemList:
-		return x.ArchetypeNodeID
-	case rm.ItemList:
-		return x.ArchetypeNodeID
-	case *rm.ItemSingle:
-		return x.ArchetypeNodeID
-	case rm.ItemSingle:
-		return x.ArchetypeNodeID
-	case *rm.ItemTable:
-		return x.ArchetypeNodeID
-	case rm.ItemTable:
-		return x.ArchetypeNodeID
-	case *rm.Cluster:
-		return x.ArchetypeNodeID
-	case rm.Cluster:
-		return x.ArchetypeNodeID
-	case *rm.Element:
-		return x.ArchetypeNodeID
-	case rm.Element:
-		return x.ArchetypeNodeID
-	}
-	return ""
+	_, id, _ := rmTypeInfo(v)
+	return id
 }
 
 // describeLocatableID renders an RM item identity for diagnostic
@@ -598,15 +540,28 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 // bmmSubtypes is the closed lookup of abstract → concrete RM type
 // admission rules used by checkRMType. Sourced from
 // openehr_rm_1.2.0.bmm: concrete classes that satisfy each
-// abstract slot. Extending the table is the migration path for new
-// RM types in a future REQ.
+// abstract slot. Entries are limited to the RM types the rest of
+// the validator routes — describeRMType, locatableArchetypeNodeID,
+// and the rmread table. Adding an abstract→concrete row here
+// without the corresponding routing rows would surface as a false
+// rm_type_mismatch (the walker would not recognise the concrete);
+// the inverse — concretes whose abstract slot is missing — would
+// surface as the same false positive on a polymorphic OPT slot.
+// Extend in lock-step.
+//
+// Out of scope for v2: FOLDER / EHR_STATUS (not reachable from
+// COMPOSITION through the Phase 1 content-type closed set);
+// DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA / DV_PROPORTION /
+// DV_SCALE / DV_STATE / time-specifications (DataValue subtypes
+// outside the closed REQ-103 primitive set). Add when an OPT
+// surfaces a real consumer for them.
 var bmmSubtypes = map[string][]string{
 	"LOCATABLE": {
 		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
 		"ADMIN_ENTRY", "GENERIC_ENTRY", "SECTION", "ACTIVITY",
 		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
 		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
-		"CLUSTER", "ELEMENT", "FOLDER", "EHR_STATUS",
+		"CLUSTER", "ELEMENT",
 	},
 	"CONTENT_ITEM": {
 		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
@@ -627,12 +582,13 @@ var bmmSubtypes = map[string][]string{
 	"EVENT": {
 		"POINT_EVENT", "INTERVAL_EVENT",
 	},
+	"PARTY_PROXY": {
+		"PARTY_SELF", "PARTY_IDENTIFIED", "PARTY_RELATED",
+	},
 	"DATA_VALUE": {
 		"DV_TEXT", "DV_CODED_TEXT", "DV_QUANTITY", "DV_COUNT",
 		"DV_BOOLEAN", "DV_ORDINAL", "DV_DATE", "DV_TIME",
-		"DV_DATE_TIME", "DV_DURATION", "DV_INTERVAL",
-		"DV_PROPORTION", "DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
-		"DV_MULTIMEDIA", "DV_PARSABLE", "DV_SCALE", "DV_STATE",
-		"DV_GENERAL_TIME_SPECIFICATION", "DV_PERIODIC_TIME_SPECIFICATION",
+		"DV_DATE_TIME", "DV_DURATION",
+		"DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
 	},
 }

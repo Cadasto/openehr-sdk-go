@@ -27,19 +27,26 @@ import (
 //   - DV_TIME      → string (value, ISO 8601)
 //   - DV_DATE_TIME → string (value, ISO 8601)
 //   - DV_DURATION  → string (value, ISO 8601 duration)
+//
+// noPrecision is the sentinel passed to
+// [constraints.QuantityValue.Precision] when DV_QUANTITY.Precision
+// is nil on the wire. [constraints.DvQuantity.Validate] treats
+// negative precision as "unspecified" (skips precision checks).
+const noPrecision rm.Integer = -1
+
 func dataValueInput(dv rm.DataValue) (any, bool) {
 	switch v := dv.(type) {
 	case *rm.DVQuantity:
 		return constraints.QuantityValue{
 			Magnitude: float64(v.Magnitude),
 			Units:     v.Units,
-			Precision: int(deref(v.Precision, -1)),
+			Precision: int(deref(v.Precision, noPrecision)),
 		}, true
 	case rm.DVQuantity:
 		return constraints.QuantityValue{
 			Magnitude: float64(v.Magnitude),
 			Units:     v.Units,
-			Precision: int(deref(v.Precision, -1)),
+			Precision: int(deref(v.Precision, noPrecision)),
 		}, true
 	case *rm.DVCodedText:
 		return constraints.CodedTermRef{

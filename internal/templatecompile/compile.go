@@ -65,6 +65,7 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		compiled: c,
 		lookup:   o.Lookup,
 		opts:     o,
+		pathAttr: map[string]*template.Attribute{},
 	}
 	root, err := w.compileNode(opt.Root(), nil, "")
 	if err != nil {
@@ -84,6 +85,20 @@ type walker struct {
 	compiled *Compiled
 	lookup   rminfo.Lookup
 	opts     Options
+
+	// currentAttr is the wire-side *template.Attribute under whose
+	// Children() the immediately-recursed compileNode is descending.
+	// Set by buildAttribute around the per-child loop and consumed by
+	// registerPath to discriminate AOM 1.4 C_SINGLE_ATTRIBUTE
+	// alternatives (legal path duplicates) from genuine cross-
+	// attribute path collisions (an OPT bug).
+	currentAttr *template.Attribute
+
+	// pathAttr records which wire-side attribute first registered a
+	// given AQL path. registerPath consults it on duplicates: same
+	// attribute → alternative, keep first; different attribute →
+	// reject with ErrInvalidInput.
+	pathAttr map[string]*template.Attribute
 }
 
 // compileNode walks one OPT node, computes its AQL path, recurses
@@ -231,6 +246,9 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 		rmTypeName:        rm,
 		required:          required,
 	}
+	prevAttr := w.currentAttr
+	w.currentAttr = a
+	defer func() { w.currentAttr = prevAttr }()
 	for i, child := range a.Children() {
 		segment := pathSegment(a.Name(), a.Cardinality(), child, i)
 		cn, err := w.compileNode(child, parent, segment)
@@ -296,18 +314,26 @@ func allAttributesInOrder(l rminfo.Lookup, rmType string) []string {
 }
 
 func (w *walker) registerPath(cn *CompiledNode) error {
-	if _, exists := w.compiled.byPath[cn.aqlPath]; exists {
+	if prev, exists := w.compiled.byPath[cn.aqlPath]; exists {
 		// AOM 1.4 admits C_SINGLE_ATTRIBUTE with multiple
 		// `<children>` (alternatives); every alternative shares
-		// the same AQL path. byPath only needs to resolve to one
-		// representative for callers that ask "what's at this
-		// path?" — by convention we keep the first. The
-		// structural validator iterates alternatives via the
-		// parent attribute's Children() directly, so dropping the
-		// duplicate from byPath does not lose information.
-		return nil
+		// the same AQL path. Admit the collision when both
+		// nodes were registered under the SAME wire attribute —
+		// then we are looking at alternatives, not unrelated
+		// subtrees colliding on a synthetic predicate. byPath
+		// keeps the first; the structural validator walks the
+		// remaining alternatives via the parent attribute's
+		// Children() directly.
+		if w.currentAttr != nil && w.pathAttr[cn.aqlPath] == w.currentAttr {
+			return nil
+		}
+		return fmt.Errorf(
+			"%w: duplicate AQL path %q (existing %s, new %s)",
+			ErrInvalidInput, cn.aqlPath, prev.rmTypeName, cn.rmTypeName,
+		)
 	}
 	w.compiled.byPath[cn.aqlPath] = cn
+	w.pathAttr[cn.aqlPath] = w.currentAttr
 	return nil
 }
 

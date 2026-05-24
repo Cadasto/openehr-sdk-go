@@ -392,6 +392,71 @@ func TestValidateComposition_AlternativeMismatch(t *testing.T) {
 	}
 }
 
+// REQ-102 v2 Phase 2 — IntervalEvent dispatch reaches the walker
+// the same way PointEvent does. Swap the BP fixture's PointEvent
+// for an IntervalEvent over the same data and confirm out-of-range
+// systolic still surfaces through the IntervalEvent code path.
+func TestValidateComposition_IntervalEventDispatch(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	pe.Data.(*rm.ItemList).Items[0].Value = &rm.DVQuantity{
+		Magnitude: rm.Real(2000),
+		Units:     "mm[Hg]",
+	}
+	obs.Data.Events[0] = &rm.IntervalEvent[rm.ItemStructure]{
+		ArchetypeNodeID: pe.ArchetypeNodeID,
+		Name:            pe.Name,
+		Time:            pe.Time,
+		Data:            pe.Data,
+		State:           pe.State,
+	}
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected primitive_out_of_range through IntervalEvent dispatch, got OK")
+	}
+	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"
+	if !containsIssue(r.Issues, wantPath, "primitive_out_of_range") {
+		t.Errorf("expected primitive_out_of_range at %s via IntervalEvent, got %+v", wantPath, r.Issues)
+	}
+}
+
+// REQ-102 v2 Phase 2 — SECTION recursion is bounded by the OPT
+// (compiled tree is finite; slots are leaves). vital_signs.opt
+// declares no SECTION under /content, so any Section we drop into
+// the composition fails slot-fit with `slot_fill` — but the walker
+// MUST NOT panic on the empty Section.Items case, and the slot-fit
+// failure is the ONLY issue at that path.
+func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	// Replace Content with an unrelated Section so the slot-fit
+	// machinery is exercised; Items is nil to exercise the
+	// recursion-bottoms-out path without panic.
+	comp.Content = []rm.ContentItem{
+		&rm.Section{
+			ArchetypeNodeID: "openEHR-EHR-SECTION.unknown.v1",
+			Name:            rm.DVText{Value: "Section"},
+			Items:           nil,
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ValidateComposition panicked on SECTION with nil Items: %v", r)
+		}
+	}()
+	r := validation.ValidateComposition(comp, c)
+	// Slot-fit MUST flag the SECTION because vital_signs.opt's
+	// /content does not declare any SECTION archetype root or slot.
+	if r.OK {
+		t.Fatal("expected slot_fill for SECTION under /content, got OK")
+	}
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Errorf("expected slot_fill for SECTION under /content, got %+v", r.Issues)
+	}
+}
+
 // --- helpers ----------------------------------------------------------------
 
 // validVitalSignsComposition constructs a structurally-complete
