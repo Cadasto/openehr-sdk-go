@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-102 (structural completion); REQ-103 (primitive reuse); REQ-104 (slot grammar — partial overlap); REQ-013 (building-block independence)
 **Probes:** PROBE-025 (extend); proposed **PROBE-026** (missing required node / cardinality negative cases)
-**Implementation:** not started
+**Implementation:** landed (Phases 0–4 complete; see [Implementation checklist](#implementation-checklist) for per-phase status and recorded deviations from the original plan)
 **Depends on:** [`2026-05-21-validation.md`](2026-05-21-validation.md) Phase 1 (landed — RM-guided primitive pass); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103)
 **Defers:** External terminology lookup (REQ-105); full ADL2 / AOM 2; validate wire bytes; federated archetype repository for slot-fill resolution
 

@@ -218,11 +218,17 @@ func TestValidateComposition_EmptyEvents(t *testing.T) {
 	obs.Data.Events = nil
 	r := validation.ValidateComposition(comp, c)
 	if r.OK {
-		t.Fatal("expected required issue for empty events, got OK")
+		t.Fatal("expected required + cardinality issues for empty events, got OK")
 	}
+	// vital_signs.opt pins both existence ≥ 1 AND cardinality lower ≥ 1
+	// on /data/events. Both constraints are independent — the spec
+	// (clinical-modeling.md § REQ-102) and PROBE-026 expect both codes.
 	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events"
 	if !containsIssue(r.Issues, wantPath, "required") {
 		t.Errorf("expected required at %s, got %+v", wantPath, r.Issues)
+	}
+	if !containsIssue(r.Issues, wantPath, "cardinality") {
+		t.Errorf("expected cardinality at %s (OPT pins child-count lower ≥ 1), got %+v", wantPath, r.Issues)
 	}
 }
 
@@ -378,17 +384,98 @@ func TestValidateComposition_AlternativeMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Compile: %v", err)
 	}
-	// DVText satisfies the first alternative — clean.
+	// Positive: DVText satisfies the first alternative (DV_TEXT) —
+	// no alternative_mismatch fires on /name. Other issues
+	// (composer/language/territory implicit BMM-required) MAY
+	// surface but are unrelated.
 	compOK := &rm.Composition{
 		ArchetypeNodeID: "at0000",
 		Name:            rm.DVText{Value: "ok"},
 	}
-	if r := validation.ValidateComposition(compOK, c); !r.OK {
-		// Other issues may surface (composer/language/territory implicit
-		// BMM-required) but the /name alternative MUST NOT mismatch.
-		if containsCode(r.Issues, "alternative_mismatch") {
-			t.Errorf("DVText under DV_TEXT|DV_CODED_TEXT alternatives mismatched: %+v", r.Issues)
+	if r := validation.ValidateComposition(compOK, c); containsCode(r.Issues, "alternative_mismatch") {
+		t.Errorf("DVText under DV_TEXT|DV_CODED_TEXT alternatives mismatched: %+v", r.Issues)
+	}
+}
+
+// REQ-102 v2 Phase 4 — alternative mismatch NEGATIVE case. An RM
+// value whose type matches none of the OPT's C_SINGLE_ATTRIBUTE
+// alternatives surfaces `alternative_mismatch` at the attribute
+// path. Uses Composer (PartyProxy interface) since Go's static
+// typing forbids assigning a DV_QUANTITY where Name expects DVText.
+func TestValidateComposition_AlternativeMismatch_Negative(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>alt-neg-test</value></template_id>
+  <concept>alt-neg-test</concept>
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>composer</rm_attribute_name>
+      <existence><lower>1</lower><upper>1</upper></existence>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_SELF</rm_type_name>
+        <node_id />
+      </children>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>PARTY_IDENTIFIED</rm_type_name>
+        <node_id />
+      </children>
+    </attributes>
+  </definition>
+</template>`
+	opt, err := template.ParseOPT(strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("ParseOPT: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	// PartyRelated satisfies neither alternative (PARTY_SELF /
+	// PARTY_IDENTIFIED) → alternative_mismatch at /composer.
+	comp := &rm.Composition{
+		ArchetypeNodeID: "at0000",
+		Composer: &rm.PartyRelated{
+			PartyIdentified: rm.PartyIdentified{},
+		},
+	}
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected alternative_mismatch for PartyRelated under PARTY_SELF|PARTY_IDENTIFIED alternatives, got OK")
+	}
+	if !containsIssue(r.Issues, "/composer", "alternative_mismatch") {
+		t.Errorf("expected alternative_mismatch at /composer, got %+v", r.Issues)
+	}
+}
+
+// REQ-102 v2 — typed-nil DataValue inside Element.Value MUST NOT
+// panic the walker. Go stores `Element.Value = (*rm.DVQuantity)(nil)`
+// as a non-nil interface (carries a type) whose underlying pointer
+// is nil; without an explicit typed-nil check, ifacePresent would
+// return ok=true and the primitive dispatcher would dereference and
+// panic. The walker must treat typed-nil as "value absent" and
+// surface a `required` issue when the OPT pins existence ≥ 1.
+func TestValidateComposition_TypedNilDataValueNoPanic(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	list.Items[0].Value = (*rm.DVQuantity)(nil) // typed-nil — interface non-nil, pointer nil
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("ValidateComposition panicked on typed-nil DV_QUANTITY: %v", r)
 		}
+	}()
+	r := validation.ValidateComposition(comp, c)
+	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"
+	if !containsIssue(r.Issues, wantPath, "required") {
+		t.Errorf("expected required at %s for typed-nil Element.Value, got %+v", wantPath, r.Issues)
 	}
 }
 

@@ -726,12 +726,119 @@ func ptrPresent[T any](p *T) (any, bool) {
 }
 
 // ifacePresent reports whether an interface-typed RM attribute
-// carries a non-nil concrete value. The function takes `any` so a
-// single helper covers every RM interface attribute regardless of
-// its declared type.
+// carries a non-nil concrete value. Catches BOTH the bare nil case
+// (`var p DataValue; ifacePresent(p)` — interface itself is nil)
+// AND the typed-nil case (`Element.Value = (*rm.DVQuantity)(nil)` —
+// the interface is non-nil because it carries a type, but the
+// underlying pointer is). Without the typed-nil check the walker
+// would treat the slot as present and downstream dispatchers
+// (rmread.ReadSingle on pointer cases, dataValueInput) would
+// dereference and panic.
+//
+// REQ-024 compliant: a closed type switch over the RM pointer
+// concretes that can appear behind a Go interface in the v2
+// content-type closed set. No reflection.
 func ifacePresent(v any) (any, bool) {
 	if v == nil {
 		return v, false
 	}
+	if isTypedNilPointer(v) {
+		return v, false
+	}
 	return v, true
+}
+
+// isTypedNilPointer detects the "interface carrying a typed-nil
+// pointer" case for every RM concrete the validator descends into.
+// The set is intentionally narrow: RM types pointer-stored behind
+// an interface (DataValue, ItemStructure, Item, Event, ContentItem,
+// PartyProxy). Value-typed concretes never trigger the typed-nil
+// problem (a struct stored by value cannot be nil).
+//
+// Adding a new RM type means adding one switch case here, in
+// rmread.ReadSingle/ReadMultiple, and in the parent validator's
+// rmTypeInfo — the three switches are kept in lock-step.
+func isTypedNilPointer(v any) bool {
+	switch p := v.(type) {
+	// DataValue concretes (Element.Value, Activity.Timing values, etc.)
+	case *rm.DVQuantity:
+		return p == nil
+	case *rm.DVText:
+		return p == nil
+	case *rm.DVCodedText:
+		return p == nil
+	case *rm.DVBoolean:
+		return p == nil
+	case *rm.DVCount:
+		return p == nil
+	case *rm.DVOrdinal:
+		return p == nil
+	case *rm.DVDate:
+		return p == nil
+	case *rm.DVTime:
+		return p == nil
+	case *rm.DVDateTime:
+		return p == nil
+	case *rm.DVDuration:
+		return p == nil
+	case *rm.DVURI:
+		return p == nil
+	case *rm.DVEHRURI:
+		return p == nil
+	case *rm.DVIdentifier:
+		return p == nil
+	case *rm.DVMultimedia:
+		return p == nil
+	case *rm.DVParsable:
+		return p == nil
+	case *rm.DVProportion:
+		return p == nil
+
+	// ItemStructure concretes (Observation.Protocol, Activity.Description, …).
+	case *rm.ItemTree:
+		return p == nil
+	case *rm.ItemList:
+		return p == nil
+	case *rm.ItemSingle:
+		return p == nil
+	case *rm.ItemTable:
+		return p == nil
+
+	// Item concretes (Cluster.Items, Section items walked into Cluster/Element).
+	case *rm.Cluster:
+		return p == nil
+	case *rm.Element:
+		return p == nil
+
+	// Event concretes (History.Events).
+	case *rm.PointEvent[rm.ItemStructure]:
+		return p == nil
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		return p == nil
+
+	// ContentItem concretes (Composition.Content, Section.Items).
+	case *rm.Observation:
+		return p == nil
+	case *rm.Evaluation:
+		return p == nil
+	case *rm.Instruction:
+		return p == nil
+	case *rm.Action:
+		return p == nil
+	case *rm.AdminEntry:
+		return p == nil
+	case *rm.GenericEntry:
+		return p == nil
+	case *rm.Section:
+		return p == nil
+
+	// PartyProxy concretes (Composition.Composer, Entry.Subject).
+	case *rm.PartySelf:
+		return p == nil
+	case *rm.PartyIdentified:
+		return p == nil
+	case *rm.PartyRelated:
+		return p == nil
+	}
+	return false
 }

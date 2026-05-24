@@ -17,11 +17,19 @@ import (
 // RM child(ren). The `path` argument is the OPT-authoritative AQL
 // path of `optNode` (root = "/").
 //
-// Phase 2 ceiling: existence, child cardinality, RM-type / archetype-id
-// identity, slot-fit on /content. Alternative matching against
-// C_SINGLE_ATTRIBUTE children with two or more siblings is Phase 4 —
-// for now the walker takes attr.Children()[0] as the canonical OPT
-// child for a single attribute. Primitive checks land in Phase 3.
+// Per-node behaviour:
+//   - Identity (LOCATABLE.archetype_node_id ↔ OPT pin) and RM-type
+//     match (with BMM abstract-supertype admission) fire at every
+//     node.
+//   - Slot leaves: no descent (slot-fit was decided by the parent
+//     attribute when binding RM items to OPT children).
+//   - Primitive constraint leaves (PrimitiveConstraint() != nil):
+//     the REQ-103 typed validator runs against the bound RM value;
+//     no descent into implicit RM-mandatory attrs of the
+//     primitive's RM type.
+//   - Otherwise: iterate every attribute (explicit OPT-declared
+//     and BMM-mandatory implicits), enforce existence + cardinality,
+//     match RM child(ren), recurse.
 func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, path string) {
 	if optNode == nil || rmValue == nil {
 		return
@@ -73,9 +81,12 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 // and binds the RM value to one of attr.Children() via the AOM 1.4
 // "one alternative MUST match" semantics. Tries each OPT child in
 // order; first that fits the RM value's concrete type (with BMM
-// abstract-supertype admission) wins. When none match an
-// `alternative_mismatch` issue is emitted listing the allowed RM
-// types so the caller can see what the OPT wanted.
+// abstract-supertype admission) wins. When none match the walker
+// emits a typed issue:
+//   - exactly one child → `rm_type_mismatch` (plain type constraint,
+//     no real alternatives);
+//   - two or more children → `alternative_mismatch` with the list
+//     of allowed RM types.
 func (w *walker) walkSingleAttribute(
 	opt *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -178,10 +189,21 @@ func (w *walker) walkMultipleAttribute(
 	attrPath := joinPath(parentPath, "/"+attr.Name())
 	items, ok := rmread.ReadMultiple(parentRM, opt.RMTypeName(), attr.Name())
 	if !ok {
-		// Attribute not addressable on this RM type — silently skip.
-		// The OPT walker arriving here means the compiled template
-		// declared the attribute; the RM read path's coverage is
-		// asserted in rmread tests.
+		// rmread cannot address the attribute on this RM type. If
+		// the OPT pinned existence ≥ 1 (or BMM marks the attribute
+		// required), the composition has no way to satisfy the
+		// constraint — mirror walkSingleAttribute's `required` emit.
+		// Silent skip would let a missing rmread row (or a
+		// composition with an unhandled parent RM type) hide a real
+		// structural failure.
+		if isRequired(attr) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "required",
+				Detail:   fmt.Sprintf("required multi-valued attribute %q absent on %s", attr.Name(), describeRMType(parentRM)),
+				Severity: Error,
+			})
+		}
 		return
 	}
 	// Existence: lower ≥ 1 with zero items is "required".
