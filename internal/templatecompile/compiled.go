@@ -87,6 +87,14 @@ func (c *Compiled) AllByNodeID(nodeID string) []*CompiledNode {
 	return slices.Clone(c.byNodeID[nodeID])
 }
 
+// NumNodes returns the total number of unique [CompiledNode] entries
+// reachable in the compiled tree (the size of the byPath index built
+// during [Compile]). Useful as an independent "truth count" against
+// which traversal code in [internal/templatecompile/walk] can assert
+// it visited every node — comparing a walker's tally to this value
+// detects subtree-pruning bugs that a second walker call cannot.
+func (c *Compiled) NumNodes() int { return len(c.byPath) }
+
 // Term looks up the at-code's term definition under the root
 // archetype's terminology. Equivalent to [CompiledNode.Term] called
 // on the root — convenience for callers operating at the
