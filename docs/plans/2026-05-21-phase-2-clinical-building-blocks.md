@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
-**Implementation:** planned
+**Implementation:** partial — OPT parser (REQ-100), compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup landed; composition builder (REQ-101), validator (REQ-102), AQL builders open
 **Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
 **Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
 
@@ -32,7 +32,7 @@ Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-
 flowchart TD
   AOM["openehr/aom/aom14/ (landed)"]
   RM["openehr/rm/ (landed)"]
-  Template["openehr/template/"]
+  Template["openehr/template/ (landed)"]
   Composition["openehr/composition/"]
   Validation["openehr/validation/"]
   AqlBuild["openehr/aql/ builders"]
@@ -91,7 +91,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 
 | Child plan | Phase 0 (spec/fixtures) | Phase 1 (MVP) | Phase 2 (hardening) | Status |
 |---|---|---|---|---|
-| OPT parser (`openehr/template/`) | | | | **Open** |
+| OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
 | Composition builder | | | | **Open** |
 | Validation | | | | **Open** |
 | AQL builders | | | | **Open** (wire models **Done**) |
