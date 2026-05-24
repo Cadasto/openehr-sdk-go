@@ -267,6 +267,8 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 | `slot_fill` | a `Content[i]` archetype id does not satisfy the OPT's slot include / exclude (RM-type-prefix fallback in v1) |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
 
+Existence and child-count cardinality are **independent constraints**: a multi-valued attribute with `existence.lower ≥ 1` AND `cardinality.lower ≥ 1` whose RM-side slice is empty fires BOTH `required` AND `cardinality` at the same path. Validators MUST emit both codes when both clauses fail; collect-all semantics make this the natural outcome. Consumers de-duplicating for display SHOULD treat the pair as a single user-facing failure at that path.
+
 ### Sentinels
 
 The package **MUST** expose typed sentinels callers compare via `errors.Is` for programmatic dispatch:

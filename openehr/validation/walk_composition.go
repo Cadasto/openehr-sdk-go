@@ -2,6 +2,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -436,8 +437,7 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 // Used until REQ-104 parses the OPT's <includes>/<excludes>
 // grammar.
 func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
-	prefix := "openEHR-EHR-" + slot.RMTypeName() + "."
-	return len(archetypeID) >= len(prefix) && archetypeID[:len(prefix)] == prefix
+	return strings.HasPrefix(archetypeID, "openEHR-EHR-"+slot.RMTypeName()+".")
 }
 
 // locatableArchetypeNodeID extracts archetype_node_id from any RM

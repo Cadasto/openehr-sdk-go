@@ -3,9 +3,13 @@ package rmread
 import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 
 // ReadSingle returns the RM value at `attrName` on `parent`.
-// `parentType` is the OPT-declared RM class name and is accepted
-// for symmetry with ReadMultiple; routing dispatches on the Go
-// concrete type of `parent`.
+// The second (named-blank) parameter is the OPT-declared RM
+// class name; v1 dispatch is purely on the Go concrete type of
+// `parent`, but the parameter is retained so callers boxing an
+// RM value through an interface (e.g. a future `any`-typed
+// builder harness) can pass through the compiled RM type
+// without re-flattening — the contract stays open for a future
+// dispatch table that wants the string key.
 //
 // `ok` is false when the attribute is absent (nil pointer, nil
 // interface, structurally-empty CodePhrase / DVText / DVCodedText,
@@ -14,11 +18,10 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // report `ok=true` — the structural walker uses pointer presence
 // as the absent/present signal.
 //
-// Returns `(nil, false)` for unknown (parentType, attrName) pairs;
+// Returns `(nil, false)` for unknown (parent, attrName) pairs;
 // callers SHOULD treat that as "not addressable" rather than an
 // error.
-func ReadSingle(parent any, parentType, attrName string) (any, bool) {
-	_ = parentType
+func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionSingle(p, attrName)
@@ -139,8 +142,7 @@ func ReadSingle(parent any, parentType, attrName string) (any, bool) {
 // it is false for unknown (parentType, attrName) pairs. Callers
 // distinguish "absent" from "empty" via `len(items) == 0` — the
 // cardinality check at the call site needs both signals.
-func ReadMultiple(parent any, parentType, attrName string) ([]any, bool) {
-	_ = parentType
+func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool) {
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return readCompositionMultiple(p, attrName)

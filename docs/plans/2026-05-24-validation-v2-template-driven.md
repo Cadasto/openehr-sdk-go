@@ -300,17 +300,25 @@ for each attr in N.Attributes():
 
 | Step | Status |
 |---|---|
-| Phase 0: parse + compile attribute `<cardinality>` interval | |
-| Phase 0: REQ-102 spec + traceability update | |
-| Phase 1: `rmread` attribute access table | |
-| Phase 2: `walk.WalkComposition` lockstep walker | |
-| Phase 2: structural visitor (existence, cardinality, identity, type) | |
-| Phase 2: missing-node tests on `vital_signs.opt` | |
-| Phase 3: primitive pass on template bindings | |
-| Phase 3: remove RM-guided `composition_deep.go` walkers | |
-| Phase 4: `C_SINGLE_ATTRIBUTE` alternative matching | |
-| Phase 4: PROBE-026 | |
-| REQ-102 `implementation: landed` | |
+| Phase 0: parse + compile attribute `<cardinality>` interval | landed |
+| Phase 0: REQ-102 spec + traceability update | landed |
+| Phase 1: `rmread` attribute access table | landed |
+| Phase 2: `walk.WalkComposition` lockstep walker | landed (see deviation 1 below) |
+| Phase 2: structural visitor (existence, cardinality, identity, type) | landed (see deviation 2 below) |
+| Phase 2: missing-node tests on `vital_signs.opt` | landed |
+| Phase 3: primitive pass on template bindings | landed |
+| Phase 3: remove RM-guided `composition_deep.go` walkers | n/a — branch was off main; v1 walkers never existed here |
+| Phase 4: `C_SINGLE_ATTRIBUTE` alternative matching | landed |
+| Phase 4: PROBE-026 | landed |
+| REQ-102 `implementation: landed` | landed |
+
+### Deviations from the original plan
+
+1. **Walker placement.** Plan § Phase 2 placed the lockstep walker inside `internal/templatecompile/walk/` next to the existing OPT walker. Implementation lives in `openehr/validation/walk_composition.go` instead — the visitor is tightly coupled to validation issue emission (alternatives, identity, primitive dispatch) and the abstraction was not load-bearing for other consumers. If a future caller surfaces (composition builder, example generator) and wants the same lockstep machinery, extract then.
+
+2. **Implicit attribute policy.** Plan § Phase 2 said "skip `Implicit()` unless OPT silent + BMM mandatory policy says otherwise". Implementation now runs the existence check on every non-skipped attribute including implicits (BMM `Required()` flag drives the emit). Rationale: implicit attrs are precisely the BMM-mandatory ones that the OPT didn't repin — silently skipping them would let COMPOSITION.composer / .language / .territory go unchecked even though BMM mandates them. No descent happens for implicits because `Children()` is empty.
+
+3. **`alternative_mismatch` vs `rm_type_mismatch` disambiguation.** Plan § Phase 4 emits `alternative_mismatch` when no C_SINGLE_ATTRIBUTE child fits. Implementation refines this: with exactly one OPT child the code is `rm_type_mismatch` (plain type constraint, not AnyOf); with two or more children the code stays `alternative_mismatch`. Captured in [`docs/specifications/clinical-modeling.md`](../specifications/clinical-modeling.md) § REQ-102 issue-code taxonomy.
 
 ---
 
