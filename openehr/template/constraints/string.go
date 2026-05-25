@@ -20,6 +20,19 @@ type CString struct {
 
 func (CString) isPrimitive() {}
 
+// ExampleValue returns a minimal-valid string example. REQ-107.
+// First entry of List wins when non-empty so closed enumerations
+// produce a member; else the literal "example" — Validate without a
+// pattern accepts any string, and pattern-only constraints fall
+// outside the bounded-guarantee contract (callers needing pattern
+// satisfaction supply their own example).
+func (c CString) ExampleValue() any {
+	if len(c.List) > 0 {
+		return c.List[0]
+	}
+	return "example"
+}
+
 // Validate accepts a Go string. Any other type returns CodeWrongType.
 // A malformed Pattern surfaces as CodeInvalidValue so callers can
 // distinguish "value violated the constraint" from "the OPT itself

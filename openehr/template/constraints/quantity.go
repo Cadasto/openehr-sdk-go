@@ -37,6 +37,47 @@ type DvQuantity struct {
 
 func (DvQuantity) isPrimitive() {}
 
+// ExampleValue returns a minimal-valid [QuantityValue]. REQ-107.
+// First entry of Units drives the example: magnitude derived from the
+// entry's range (lower bound when set; midpoint or zero otherwise),
+// units copied verbatim. Falls back to QuantityValue{0, "1"} when the
+// constraint is open-ended (any units / any magnitude).
+func (c DvQuantity) ExampleValue() any {
+	if len(c.Units) == 0 {
+		return QuantityValue{Magnitude: 0, Units: "1", Precision: -1}
+	}
+	u := c.Units[0]
+	mag := exampleMagnitude(u.Magnitude)
+	return QuantityValue{Magnitude: mag, Units: u.Units, Precision: -1}
+}
+
+// exampleMagnitude picks an in-range float for a quantity unit. Same
+// "lower bound nudged inside exclusive ends" rule as [CReal].
+func exampleMagnitude(r NumericRange) float64 {
+	if !r.IsBounded() {
+		return 0
+	}
+	if !r.LowerUnbounded {
+		f := r.Lower
+		if !r.LowerInclusive {
+			if !r.UpperUnbounded {
+				f = (r.Lower + r.Upper) / 2
+			} else {
+				f = r.Lower + 1
+			}
+		}
+		return f
+	}
+	if !r.UpperUnbounded {
+		f := r.Upper
+		if !r.UpperInclusive {
+			f = r.Upper - 1
+		}
+		return f
+	}
+	return 0
+}
+
 // Validate accepts a [QuantityValue]. Anything else returns
 // CodeWrongType. When Units is empty the constraint accepts any
 // units / magnitude — the OPT may have omitted a list to mark the
@@ -98,6 +139,17 @@ type CDvOrdinal struct {
 }
 
 func (CDvOrdinal) isPrimitive() {}
+
+// ExampleValue returns the first ordinal value when the constraint
+// enumerates a closed list; 0 otherwise. REQ-107. Validate accepts
+// int (the ordinal value), which matches the example shape — pair
+// matching against OrdinalSymbol is the caller's choice.
+func (c CDvOrdinal) ExampleValue() any {
+	if len(c.Values) > 0 {
+		return c.Values[0].Value
+	}
+	return 0
+}
 
 // Validate accepts either an int (the ordinal value) or a full
 // [OrdinalSymbol] (value + symbol). For [OrdinalSymbol] inputs both

@@ -197,6 +197,10 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 `openehr/template/constraints/` is **stdlib-only**. It is importable independently of `openehr/template/` so codegen and downstream validators can use the constraint types without pulling the OPT parser.
 
+### Example value emission (REQ-107 hook)
+
+Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a minimal-valid Go example value in the shape `Validate` accepts. For bounded constraints (closed lists, bounded ranges, enumerated units), `Validate(c.ExampleValue())` MUST return an empty `Violation` slice; unbounded primitives return a documented sentinel (e.g. `"example"`, `int64(0)`, `"2020-01-01"`). The factory is the leaf primitive of the REQ-107 template-driven instance generator and stays on the sealed interface so the closed type-switch (REQ-024 — no reflection) remains the only entry point for new primitive shapes. See § REQ-107 for the generator contract and [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md) § "Example value factory" for the per-type strategy table.
+
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
 
@@ -318,3 +322,78 @@ This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-temp
 
 - **Lives in:** [`openehr/validation/`](../../openehr/validation/)
 - **Probes:** PROBE-025 (composition validation against fixture OPT + composition); PROBE-026 (missing required node, cardinality, alternative_mismatch, rm_type_mismatch, and primitive negative cases — see [`testkit/probes/validation/`](../../testkit/probes/validation/))
+
+---
+
+## REQ-107 — Template-driven RM instance example generator
+
+**Status:** Draft (Phase 0 landed).
+
+The SDK **MUST** ship a template-authoritative RM instance synthesiser at `openehr/instance/`: given a compiled OPT, produce a conformant RM object graph whose structure and primitive leaves satisfy the same template-driven contract REQ-102 validates against. The generator is the inverse of validation v2 — same compiled-OPT walk, opposite direction (`rmwrite` instead of `rmread`).
+
+### Scope
+
+The generator is the single skeleton-and-populate engine the composition builder (REQ-101), tests, examples, and CDR seeding (STRAND-01) all consume. The root may be **any** RM type the OPT's `rm_type_name` declares — `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `ADMIN_ENTRY`, `CLUSTER`, `SECTION`, `GENERIC_ENTRY`, `ELEMENT`. Output is **synthetic example data**: structurally and constraint-valid for the OPT, not clinically meaningful. The closed root set is v1; new root types appear through a follow-up REQ.
+
+### Contract
+
+Public entry point (target shape, lands with Phase 2):
+
+```go
+package instance
+
+type Policy int
+
+const (
+    Minimal Policy = iota // required structure only
+    Example               // required + populate primitive leaves with example values
+)
+
+type Options struct {
+    Policy    Policy
+    Language  string         // ISO 639-1; defaults from Compiled.Language()
+    Territory string         // for COMPOSITION roots
+    Composer  rm.PartyProxy  // required when root is COMPOSITION
+    Now       time.Time      // clock for EVENT / context times
+}
+
+func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error)
+func AsComposition(v any) (*rm.Composition, error)
+func AsObservation(v any) (*rm.Observation, error)
+// … closed set matching validation ContentItem + standalone archetype roots
+```
+
+`Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. Multi-valued attributes are sized to `max(existence.lower, 1)`; `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics).
+
+Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via REQ-104 prefix match or the first include pattern — same compromise as validation slot-fit.
+
+### Trust model
+
+The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>` (when compile captures them — a Phase 0 follow-up) **override** the factory.
+
+The generator is **sound** (every output is valid against the OPT), not **complete** (it does not enumerate every valid instance — different policies may produce different but equally valid trees). Sound × validator-aligned ⇒ PROBE-027 cross-checks the contract.
+
+### Trust model — phasing
+
+Phase 0 landed: `ExampleValue()` on every `PrimitiveConstraint`; spec; PROBE-027 stub; this REQ row. Phases 1–4 (rmwrite + RM construction table, core synthesiser walk, non-composition roots + PROBE-027, REQ-101 integration) are out of scope for this phase and tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md).
+
+### Out of scope
+
+- **Clinically realistic distributions** (plausible names, plausible vitals, FHIR Synthea-style synthetic patient data).
+- **FLAT / STRUCTURED example strings** — REQ-053.
+- **Authoring-time templates (OET)** — REQ-100 is OPT-only in v1.
+- **Generating every valid instance** — combinatorial coverage is out of scope.
+- **Writing to a CDR** — caller's `openehr/client/ehr/` responsibility.
+- **Validating during generation** — separate `validation.ValidateComposition` call (cross-checked by PROBE-027).
+- **Runtime federated slot-fill repository** — same compromise as validation.
+- **Multi-language term translation** — caller seeds `Options.Language`.
+
+### Building-block independence (REQ-013)
+
+`openehr/instance/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
+
+In v1 the public signature accepts `*templatecompile.Compiled` (module-local), same restriction as `validation.ValidateComposition` per [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2 — the public re-export lands with REQ-101 Phase 1.
+
+- **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
+- **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
+

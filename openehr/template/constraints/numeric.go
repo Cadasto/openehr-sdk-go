@@ -19,6 +19,14 @@ type CBoolean struct {
 
 func (CBoolean) isPrimitive() {}
 
+// ExampleValue returns the bool the constraint admits. REQ-107.
+// Prefers true when allowed; falls back to false otherwise (the
+// pathological both-false OPT still yields a value Validate accepts
+// at most one of — c.TrueValid wins by convention).
+func (c CBoolean) ExampleValue() any {
+	return c.TrueValid
+}
+
 // Validate accepts a Go bool. Any other type returns CodeWrongType.
 func (c CBoolean) Validate(value any) []Violation {
 	b, ok := value.(bool)
@@ -47,6 +55,33 @@ type CInteger struct {
 }
 
 func (CInteger) isPrimitive() {}
+
+// ExampleValue returns a minimal-valid int64 example. REQ-107.
+// First entry of List wins when non-empty (so list + range
+// intersections produce a member that's already in-range); else the
+// range's lower bound when bounded (adjusted by one when the lower
+// side is exclusive); else int64(0) as the unbounded sentinel.
+func (c CInteger) ExampleValue() any {
+	if len(c.List) > 0 {
+		return c.List[0]
+	}
+	if c.Range.IsBounded() && !c.Range.LowerUnbounded {
+		n := int64(c.Range.Lower)
+		if !c.Range.LowerInclusive {
+			n++
+		}
+		return n
+	}
+	if c.Range.IsBounded() && !c.Range.UpperUnbounded {
+		// Only upper bounded — return a value inside the bound.
+		n := int64(c.Range.Upper)
+		if !c.Range.UpperInclusive {
+			n--
+		}
+		return n
+	}
+	return int64(0)
+}
 
 // Validate accepts int / int8..int64 / uint / uint8..uint32. Larger
 // uints (uint64 above MaxInt64) return CodeWrongType to avoid silent
@@ -85,6 +120,37 @@ type CReal struct {
 }
 
 func (CReal) isPrimitive() {}
+
+// ExampleValue returns a minimal-valid float64 example. REQ-107.
+// First entry of List wins when non-empty; else the range's lower
+// bound when bounded (adjusted by a small epsilon when the lower
+// side is exclusive); else float64(0).
+func (c CReal) ExampleValue() any {
+	if len(c.List) > 0 {
+		return c.List[0]
+	}
+	if c.Range.IsBounded() && !c.Range.LowerUnbounded {
+		f := c.Range.Lower
+		if !c.Range.LowerInclusive {
+			// Move just inside the exclusive lower; midpoint with
+			// upper when bounded keeps us safely inside both sides.
+			if !c.Range.UpperUnbounded {
+				f = (c.Range.Lower + c.Range.Upper) / 2
+			} else {
+				f = c.Range.Lower + 1
+			}
+		}
+		return f
+	}
+	if c.Range.IsBounded() && !c.Range.UpperUnbounded {
+		f := c.Range.Upper
+		if !c.Range.UpperInclusive {
+			f = c.Range.Upper - 1
+		}
+		return f
+	}
+	return float64(0)
+}
 
 // Validate accepts float32 / float64 and any integer type (widened
 // to float64). Returns CodeWrongType for non-numeric inputs.
