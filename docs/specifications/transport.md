@@ -105,6 +105,8 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
+**Follow-up (not landed):** [`docs/plans/2026-05-25-req094-prefer-followups.md`](../plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` slot population on write returns and strict empty-body handling for `representation`. Search **`NOT LANDED`** in that plan before assuming REQ-094 is complete on write paths.
+
 - **Lives in:** [`transport/`](../transport/), [`openehr/client/ehr/`](../openehr/client/ehr/)
 
 ---

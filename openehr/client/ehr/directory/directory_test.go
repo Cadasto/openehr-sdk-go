@@ -223,6 +223,62 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestUpdateRepresentationDecodesBareFolder pins SDK-GAP-09 on the directory
+// PUT path: `Prefer: return=representation` on PUT returns a bare FOLDER per
+// the ITS-REST OpenAPI `200_FOLDER_retrieved` schema.
+func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
+	body := readCassette(t)
+	newVUID := openehrclient.VersionUID("0a1b2c3d-4e5f-6789-abcd-ef0123456789::cdr.example::2")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(newVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(newVUID))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root Directory"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, meta, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+		directory.WithPrefer(transport.PreferRepresentation),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil {
+		t.Fatal("expected decoded *rm.Folder on PUT Prefer=representation, got nil")
+	}
+	if out.Name.Value != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	}
+	if meta.VersionUID != newVUID {
+		t.Errorf("new VersionUID = %q", meta.VersionUID)
+	}
+}
+
+// TestUpdateRepresentationRejectsOriginalVersionShape mirrors the POST-side
+// strict-against-spec test on the directory PUT path.
+func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"x"}}}`))
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+		directory.WithPrefer(transport.PreferRepresentation),
+	)
+	if err == nil {
+		t.Fatalf("expected decode error on ORIGINAL_VERSION envelope, got out=%+v", out)
+	}
+}
+
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
 	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
