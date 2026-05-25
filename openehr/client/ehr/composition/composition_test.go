@@ -293,6 +293,61 @@ func TestUpdateRoundTrip(t *testing.T) {
 	}
 }
 
+// TestUpdateRepresentationDecodesBareComposition pins SDK-GAP-09 on
+// the PUT path: `Prefer: return=representation` on PUT returns a bare
+// COMPOSITION per the ITS-REST OpenAPI `200_COMPOSITION_updated`
+// schema. Save and Update share `doWrite` but the catalog title for
+// PROBE-071 cites both POST and PUT, so the PUT arm is exercised
+// explicitly here.
+func TestUpdateRepresentationDecodesBareComposition(t *testing.T) {
+	body := readCompositionCassette(t)
+	newVUID := openehrclient.VersionUID("1234abcd-5678-9012-3456-7890abcdef00::cdr.example::2")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(newVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(newVUID))
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	out, meta, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil {
+		t.Fatal("expected decoded *rm.Composition on PUT Prefer=representation, got nil")
+	}
+	if out.ArchetypeNodeID == "" {
+		t.Errorf("decoded Composition missing archetype_node_id (bare-body decode likely wrong)")
+	}
+	if meta.VersionUID != newVUID {
+		t.Errorf("new VersionUID = %q", meta.VersionUID)
+	}
+}
+
+// TestUpdateRepresentationRejectsOriginalVersionShape mirrors the
+// POST-side strict-against-spec test on the PUT path: a non-conformant
+// server returning ORIGINAL_VERSION on `200_COMPOSITION_updated` must
+// surface as a decode error, not silent acceptance.
+func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"}}}`))
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	out, _, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if err == nil {
+		t.Fatalf("expected decode error on ORIGINAL_VERSION envelope, got out=%+v", out)
+	}
+}
+
 func TestUpdateMapsPreconditionFailed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusPreconditionFailed)

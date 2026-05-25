@@ -338,7 +338,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
-    probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067]
+    probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
 
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths

@@ -124,28 +124,61 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 	}
 }
 
-func TestProbe071CompositionWriteResponseShape_BareBody(t *testing.T) {
-	// Happy path: server returns a bare COMPOSITION on POST, the
-	// probe surfaces a decoded *rm.Composition with archetype_node_id
-	// populated and pass status.
+// bareCompositionBody is a minimal canonical-JSON COMPOSITION body
+// used by PROBE-071 server fakes — keeps the canjson decode path
+// honest while staying inline-readable.
+const bareCompositionBody = `{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"},"archetype_node_id":"openEHR-EHR-COMPOSITION.x.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`
+
+func TestProbe071CompositionWriteResponseShape_BareBody_POSTOnly(t *testing.T) {
+	// Happy path, POST-only: caller omits voID/ifMatch so the PUT arm
+	// is skipped. The probe still passes on a clean bare-body decode.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
 		w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"},"archetype_node_id":"openEHR-EHR-COMPOSITION.x.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`))
+		_, _ = w.Write([]byte(bareCompositionBody))
 	}))
 	defer srv.Close()
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, "", "", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if r.Status != "pass" {
-		t.Errorf("PROBE-071 bare-body status = %q (detail: %s)", r.Status, r.Detail)
+		t.Errorf("PROBE-071 POST-only status = %q (detail: %s)", r.Status, r.Detail)
 	}
 }
 
-func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion(t *testing.T) {
+func TestProbe071CompositionWriteResponseShape_BareBody_POSTPlusPUT(t *testing.T) {
+	// Happy path, both arms: caller supplies voID + ifMatch so the
+	// PUT arm runs. Server returns a bare COMPOSITION on both verbs.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
+			w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
+			w.WriteHeader(http.StatusCreated)
+		case http.MethodPut:
+			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(updatedVUID))
+			w.Header().Set("ETag", `"`+string(updatedVUID)+`"`)
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected method %q", r.Method)
+		}
+		_, _ = w.Write([]byte(bareCompositionBody))
+	}))
+	defer srv.Close()
+
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-071 POST+PUT status = %q (detail: %s)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_POST(t *testing.T) {
 	// Non-conformant deployment: server returns ORIGINAL_VERSION on
 	// POST. The strict-against-spec SDK MUST decode-fail; the probe
 	// reports that as fail status (server side is the bug).
@@ -156,12 +189,41 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion(t *testing
 	}))
 	defer srv.Close()
 
-	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{})
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, "", "", &rm.Composition{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if r.Status != "fail" {
-		t.Errorf("PROBE-071 OV-envelope status = %q (expected fail, detail: %s)", r.Status, r.Detail)
+		t.Errorf("PROBE-071 POST-OV-envelope status = %q (expected fail, detail: %s)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *testing.T) {
+	// Non-conformant deployment on the PUT path: POST returns the
+	// spec-correct bare body but PUT returns ORIGINAL_VERSION. The
+	// probe must fail on the PUT arm and surface the asymmetry.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
+			w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(bareCompositionBody))
+		case http.MethodPut:
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"}}}`))
+		default:
+			t.Errorf("unexpected method %q", r.Method)
+		}
+	}))
+	defer srv.Close()
+
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(initialVUID), &rm.Composition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("PROBE-071 PUT-OV-envelope status = %q (expected fail, detail: %s)", r.Status, r.Detail)
 	}
 }
 

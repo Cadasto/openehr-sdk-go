@@ -199,6 +199,30 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 	}
 }
 
+// TestSaveRepresentationRejectsOriginalVersionShape mirrors the
+// composition strict-against-spec test on the directory leaf: a
+// non-conformant server returning ORIGINAL_VERSION on `201_directory`
+// must surface as a decode error, preventing directory-only
+// regressions of the SDK-GAP-09 contract.
+func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"x"}}}`))
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		directory.WithPrefer(transport.PreferRepresentation),
+	)
+	if err == nil {
+		t.Fatalf("expected decode error on ORIGINAL_VERSION envelope, got out=%+v", out)
+	}
+}
+
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
 	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
