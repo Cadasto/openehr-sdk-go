@@ -34,6 +34,26 @@ type CodePhrase struct {
 
 func (CodePhrase) isPrimitive() {}
 
+// ExampleValue returns a minimal-valid [CodedTermRef]. REQ-107.
+// First entry of CodeList wins when the list is non-empty (so closed
+// enumerations produce a member); else a "local::at0000" sentinel
+// under the constrained terminology (or "local" when unconstrained)
+// so external constraints surface a recognisable placeholder.
+func (c CodePhrase) ExampleValue() any {
+	if len(c.CodeList) > 0 {
+		term := c.Terminology
+		if term == "" {
+			term = "local"
+		}
+		return CodedTermRef{Terminology: term, CodeString: c.CodeList[0]}
+	}
+	term := c.Terminology
+	if term == "" {
+		term = "local"
+	}
+	return CodedTermRef{Terminology: term, CodeString: "at0000"}
+}
+
 // External reports whether the constraint enumerates a closed list
 // of codes (false) or only restricts the terminology (true).
 func (c CodePhrase) External() bool {

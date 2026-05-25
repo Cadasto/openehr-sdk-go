@@ -224,6 +224,15 @@ The catalog is the normative list. Each entry has:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_025_composition_validate.go`](../../testkit/probes/validation/probe_025_composition_validate.go).
 - **Satisfies:** REQ-102, REQ-082
 
+#### PROBE-027 — Generated instance validates clean
+
+- **Title:** `instance.Generate(c, opts)` followed by `validation.ValidateComposition(out, c)` returns `Result.OK = true` for both `Minimal` and `Example` policies on the same OPT.
+- **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
+- **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract.
+- **Modes:** Sandbox.
+- **Status:** Draft. Phase 0 lands `ExampleValue()` on every `PrimitiveConstraint`; the generator and probe arrive in later phases.
+- **Satisfies:** REQ-107.
+
 ### Canonical JSON and formats
 
 #### PROBE-030 — Canonical-JSON round trip
@@ -440,7 +449,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
-| Clinical modeling | PROBE-022, PROBE-024 | [`testkit/probes/template/`](../../testkit/probes/template/) — implemented (Sandbox); two fixture bodies (`vital_signs.opt`, `clinical_note.opt`) under `openehr/template/testdata/`; PROBE-024 uses an inline synthetic DV_QUANTITY OPT |
+| Clinical modeling | PROBE-022, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 Draft — REQ-107 Phase 0 landed `ExampleValue()`, generator + probe arrive in later phases ([`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md)). |
 | Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
