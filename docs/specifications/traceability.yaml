@@ -210,7 +210,12 @@ requirements:
     canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory]
+    probes: [PROBE-061, PROBE-065, PROBE-071]
+    tests:
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
+      - testkit/probes/versioned/probe_071_composition_write_response_shape.go
 
   - id: REQ-095
     title: OpenAPI authoritative source

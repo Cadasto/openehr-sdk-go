@@ -124,6 +124,47 @@ func TestProbe012ETagRoundTrip(t *testing.T) {
 	}
 }
 
+func TestProbe071CompositionWriteResponseShape_BareBody(t *testing.T) {
+	// Happy path: server returns a bare COMPOSITION on POST, the
+	// probe surfaces a decoded *rm.Composition with archetype_node_id
+	// populated and pass status.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
+		w.Header().Set("ETag", `"`+string(initialVUID)+`"`)
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"},"archetype_node_id":"openEHR-EHR-COMPOSITION.x.v1","language":{"_type":"CODE_PHRASE","code_string":"en","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_639-1"}},"territory":{"_type":"CODE_PHRASE","code_string":"GB","terminology_id":{"_type":"TERMINOLOGY_ID","value":"ISO_3166-1"}},"category":{"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}}}`))
+	}))
+	defer srv.Close()
+
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-071 bare-body status = %q (detail: %s)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion(t *testing.T) {
+	// Non-conformant deployment: server returns ORIGINAL_VERSION on
+	// POST. The strict-against-spec SDK MUST decode-fail; the probe
+	// reports that as fail status (server side is the bug).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(initialVUID))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"}}}`))
+	}))
+	defer srv.Close()
+
+	r, err := probes.Probe071CompositionWriteResponseShape(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("PROBE-071 OV-envelope status = %q (expected fail, detail: %s)", r.Status, r.Detail)
+	}
+}
+
 func TestProbe013CrossEHRIsolation(t *testing.T) {
 	const (
 		ehrAID          openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"

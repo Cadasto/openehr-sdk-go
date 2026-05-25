@@ -304,11 +304,11 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 #### PROBE-061 — Composition versioned write with `Prefer: return=representation`
 
-- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` returns the full `ORIGINAL_VERSION<COMPOSITION>` plus a new `ETag`.
+- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` returns a bare `COMPOSITION` body plus a new `ETag` (SDK-GAP-09).
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
-- **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as `ORIGINAL_VERSION<COMPOSITION>`; response `ETag` is captured into `VersionMetadata`.
+- **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as bare `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` schema (oneOf: `Composition` | `Identifier`) — **not** an `ORIGINAL_VERSION<COMPOSITION>` envelope, which lives at `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). The response `ETag` is captured into `VersionMetadata`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Draft. Strict-mode SDK assertion (representation body must NOT be `ORIGINAL_VERSION`) covered by `TestSaveRepresentationDecodesBareComposition` + `TestSaveRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../openehr/client/ehr/composition/composition_test.go).
 
 #### PROBE-062 — `openehr-audit-details` header round-trip
 
@@ -384,6 +384,15 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../openehr/client/admin/admin_test.go). Cross-SDK probe file (`testkit/probes/admin/`) deferred until the PHP SDK lands the admin client.
 - **Satisfies:** REQ-099
 
+#### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION (SDK-GAP-09)
+
+- **Title:** `POST /ehr/{ehr_id}/composition` and `PUT /ehr/{ehr_id}/composition/{vo_uid}` with `Prefer: return=representation` return a bare `COMPOSITION` body — not an `ORIGINAL_VERSION<COMPOSITION>` envelope.
+- **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
+- **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per [SDK-GAP-09](https://github.com/Cadasto/openehr-go-poc/blob/main/docs/sdk-gap-drafts/SDK-GAP-09-composition-save-update-spec-mismatch.md)). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
+- **Modes:** Sandbox, Cassette, Live.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) and the unit-level pin at `TestSaveRepresentationDecodesBareComposition` in [`openehr/client/ehr/composition/composition_test.go`](../openehr/client/ehr/composition/composition_test.go). The same shape applies to `directory.Save` / `directory.Update` per `201_directory` / `200_FOLDER_retrieved`; covered by `TestSaveRepresentationDecodesBareFolder` in [`openehr/client/ehr/directory/directory_test.go`](../openehr/client/ehr/directory/directory_test.go).
+- **Satisfies:** SDK-GAP-09, REQ-094.
+
 ### Observability
 
 #### PROBE-050 — OTel span carries openEHR attributes
@@ -434,4 +443,4 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
-| REST binding | PROBE-060 … 068 | *planned* — `testkit/probes/rest/` (subset covered by `openehr/client/*_test.go` and `transport/`) |
+| REST binding | PROBE-060 … 068, PROBE-071 | *planned* — `testkit/probes/rest/` (subset covered by `openehr/client/*_test.go` and `transport/`); PROBE-071 (composition write response shape, SDK-GAP-09) implemented at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) |

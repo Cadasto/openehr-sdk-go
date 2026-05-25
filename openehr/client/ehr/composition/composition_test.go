@@ -180,7 +180,7 @@ func TestSaveMinimal(t *testing.T) {
 		t.Fatal(err)
 	}
 	if out != nil {
-		t.Errorf("expected nil ORIGINAL_VERSION on default Prefer=minimal, got %+v", out)
+		t.Errorf("expected nil Composition on default Prefer=minimal, got %+v", out)
 	}
 	if captured.Method != http.MethodPost {
 		t.Errorf("method = %q", captured.Method)
@@ -196,6 +196,59 @@ func TestSaveMinimal(t *testing.T) {
 	}
 	if meta.VersionUID != compositionVUID {
 		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
+// TestSaveRepresentationDecodesBareComposition pins SDK-GAP-09:
+// `Prefer: return=representation` on POST returns a bare COMPOSITION
+// (not an ORIGINAL_VERSION<COMPOSITION>) per the ITS-REST OpenAPI
+// `201_COMPOSITION` schema (oneOf: Composition | Identifier).
+func TestSaveRepresentationDecodesBareComposition(t *testing.T) {
+	body := readCompositionCassette(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	out, meta, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil {
+		t.Fatal("expected decoded *rm.Composition on Prefer=representation, got nil")
+	}
+	if out.ArchetypeNodeID == "" {
+		t.Errorf("decoded Composition missing archetype_node_id (bare-body decode likely wrong)")
+	}
+	if meta.VersionUID != compositionVUID {
+		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
+// TestSaveRepresentationRejectsOriginalVersionShape pins the strict-
+// against-spec posture: if a non-conformant server returns an
+// `ORIGINAL_VERSION<COMPOSITION>` envelope on POST, the decode MUST
+// surface that as an error rather than silently masking it (the
+// `_type` of an OV envelope decodes as a Composition type mismatch).
+func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"x::y::1"},"data":{"_type":"COMPOSITION","name":{"_type":"DV_TEXT","value":"x"}}}`))
+	}))
+	defer srv.Close()
+
+	comp := readComposition(t)
+	out, _, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if err == nil {
+		t.Fatalf("expected decode error on ORIGINAL_VERSION envelope, got out=%+v", out)
 	}
 }
 

@@ -164,6 +164,41 @@ func TestSaveDirectory(t *testing.T) {
 	}
 }
 
+// TestSaveRepresentationDecodesBareFolder pins SDK-GAP-09 for the
+// directory leaf: `Prefer: return=representation` on POST returns a
+// bare FOLDER (not an ORIGINAL_VERSION<FOLDER>) per the ITS-REST
+// OpenAPI `201_directory` schema.
+func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
+	body := readCassette(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(folderVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root Directory"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		directory.WithPrefer(transport.PreferRepresentation),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out == nil {
+		t.Fatal("expected decoded *rm.Folder on Prefer=representation, got nil")
+	}
+	if out.Name.Value != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	}
+	if meta.VersionUID != folderVUID {
+		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
 	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
