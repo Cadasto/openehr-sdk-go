@@ -20,9 +20,10 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 | Order | Plan | Package | Blocks |
 |---|---|---|---|
 | 1 | [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation |
-| 2 | [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) | `openehr/composition/` | validation (partial) |
-| 3 | [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) | `openehr/validation/` | — |
-| 4 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | — |
+| 2 | [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) | `openehr/instance/` (proposed) | composition builder, tests |
+| 3 | [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) | `openehr/composition/` | validation (partial); depends on REQ-107 engine |
+| 4 | [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) | `openehr/validation/` | — |
+| 5 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | — |
 
 Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).
 

@@ -49,7 +49,8 @@
 | Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
 | Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [archived umbrella plan](plans/archive/2026-05-21-validation.md) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
-| Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md) |
+| OPT → RM instance synthesis | **Planned** | `openehr/instance/` (proposed) | [plan](plans/2026-05-24-template-instance-example-generator.md); proposed REQ-107; blocks REQ-101 |
+| Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md); delegates skeleton to REQ-107 |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | EHR Extract RM | **Deferred** | — | Skipped per v1 scope |
 
@@ -135,6 +136,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 |---------|--------|-------|
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
+| Release / semver strategy | **Planned** | — | [plan](plans/2026-05-25-versioning-strategy.md) — pre-`v0.1.0` tagging, compatibility metadata |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
 | Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse}` |
 

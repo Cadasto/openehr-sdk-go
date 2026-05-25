@@ -6,7 +6,7 @@
 **Covers:** REQ-013, REQ-024, REQ-030–033; proposed **REQ-101** (generic composition builder)
 **Probes:** PROBE-023 (proposed — build + canonical JSON round-trip via `canjson`, not serialize import in builder)
 **Implementation:** planned
-**Depends on:** [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 (compiled template + RMInfoLookup + walker); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
+**Depends on:** [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 (compiled template + RMInfoLookup + walker); [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) (proposed REQ-107 — skeleton engine); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Per-template generated Go structs; FLAT/STRUCTURED ingest (REQ-053); automatic `EVENT` timing population beyond documented defaults; OET-driven authoring builder
 
 ## Goal
