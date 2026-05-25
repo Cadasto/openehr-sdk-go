@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-050, REQ-051, REQ-054, REQ-055, REQ-057, REQ-058, **REQ-059 (openEHR custom headers)**, REQ-013, REQ-014, REQ-020, REQ-021, REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-060..068 (auth integration), REQ-070..072 (discovery integration), REQ-090..092 (observability/retry/TLS), **REQ-093 (error envelope)**, **REQ-094 (`Prefer` negotiation)**, **REQ-095 (OpenAPI authoritative source)**; PROBE-010..013 implement; reserves PROBE-040..049 (REST-binding probes)
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)
-**Defers:** SMART OAuth2/PKCE flow implementation (covered separately by the SMART plan when it lands); federator policy (separate proposal); FLAT/STRUCTURED simplified-format clients (separate plan); cassette recording infrastructure (testkit work)
+**Defers:** SMART OAuth2/PKCE flow implementation (covered separately by the SMART plan when it lands); federator policy (separate proposal); FLAT/STRUCTURED simplified-format clients (separate plan); cassette recording infrastructure (testkit work); REQ-094 write-path gaps (`Prefer=identifier`, `representation` + empty body) — **[`2026-05-25-req094-prefer-followups.md`](2026-05-25-req094-prefer-followups.md)** (**Implementation: not landed**)
 
 ## Implementation progress (normative detail stays in `docs/specifications/`)
 
@@ -120,9 +120,9 @@ Each leaf package follows the same shape — package-level functions over a `Cli
 package composition
 
 // Package-level surface (primary, REQ-023):
-func Save(ctx context.Context, c *transport.Client, ehrID rm.EhrID, comp *rm.Composition, opts ...SaveOption) (*rm.OriginalVersion[*rm.Composition], error)
+func Save(ctx context.Context, c *transport.Client, ehrID rm.EhrID, comp *rm.Composition, opts ...SaveOption) (*rm.Composition, *VersionMetadata, error)
 func Get(ctx context.Context, c *transport.Client, ehrID rm.EhrID, ref Ref, opts ...GetOption) (*rm.Composition, *VersionMetadata, error)
-func Update(ctx context.Context, c *transport.Client, ehrID rm.EhrID, voID rm.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...UpdateOption) (*rm.OriginalVersion[*rm.Composition], error)
+func Update(ctx context.Context, c *transport.Client, ehrID rm.EhrID, voID rm.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...UpdateOption) (*rm.Composition, *VersionMetadata, error)
 func Delete(ctx context.Context, c *transport.Client, ehrID rm.EhrID, versionUID rm.VersionUID, ifMatch string, opts ...DeleteOption) error
 
 // Repository convenience for DI seams (REQ-023):
@@ -145,7 +145,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 1. **Specs updates landed alongside this plan (already in `docs/specifications/`):** REQ-059 (openEHR custom header family), REQ-093 (error envelope), REQ-094 (`Prefer` negotiation), REQ-095 (OpenAPI YAML authoritative source); [`wire.md`](../../docs/specifications/wire.md) sections "Functional API areas", "Authoritative source", "openEHR custom header family", "`Prefer` negotiation", "Error envelope"; [`module-layout.md`](../../docs/specifications/module-layout.md) — added `openehr/client/admin/` and `openehr/client/ehr/<sub-leaves>/` (composition, contribution, directory, ehrstatus, itemtags); [`glossary.md`](../../docs/specifications/glossary.md) — `Prefer`, `openehr-audit-details`, expanded ItemTag, error envelope, OpenAPI authoritative source entries.
 2. **Reserve probes in [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)** (Draft placeholders):
    - **PROBE-040** — EHR creation round-trip (POST `/ehr` → EHR_STATUS body → 201 → `ehr_id` extracted).
-   - **PROBE-041** — Composition versioned write — `Prefer: return=representation` returns full `ORIGINAL_VERSION<COMPOSITION>` with new `ETag`.
+   - **PROBE-041** — Composition versioned write — `Prefer: return=representation` returns a bare `COMPOSITION` body with new `ETag` (SDK-GAP-09); renumbered to PROBE-061 + PROBE-071 in the REST-binding range. See [`conformance.md`](../specifications/conformance.md#probe-061--composition-versioned-write-with-prefer-returnrepresentation).
    - **PROBE-042** — `openehr-audit-details` header round-trip (write → read back via Contribution).
    - **PROBE-043** — Discovery-routed request — client uses `org.openehr.rest` base URL from `ServiceCatalog`, not a hard-coded value.
    - **PROBE-044** — Per-request `auth.TokenSource` (via `ctx`) overrides client-default `TokenSource` for the duration of one request.
@@ -287,7 +287,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 1. `ehr.Create(ctx, c, opts) (*rm.Ehr, error)` — POST `/ehr` (server-assigned ID) or PUT `/ehr/{ehr_id}` (client-supplied ID).
    - Options: `WithInitialStatus(*rm.EhrStatus)`, `WithSubject(rm.PartyRef)`.
 2. `ehrstatus.Put(ctx, c, ehrID, ifMatch string, status *rm.EhrStatus, opts ...PutOption) (*VersionMetadata, error)` — REQ-054.
-3. `composition.Save(ctx, c, ehrID, comp *rm.Composition, opts ...SaveOption) (*rm.OriginalVersion[*rm.Composition], *VersionMetadata, error)`.
+3. `composition.Save(ctx, c, ehrID, comp *rm.Composition, opts ...SaveOption) (*rm.Composition, *VersionMetadata, error)` — body decoded per the ITS-REST OpenAPI `201_COMPOSITION` schema as a bare COMPOSITION (SDK-GAP-09); the ORIGINAL_VERSION envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}`.
    - Options: `WithPrefer("return=representation"|"return=minimal"|"return=identifier")`, `WithAuditDetails(*rm.AuditDetails)`, `WithTemplateID(string)`.
 4. `composition.Update(ctx, c, ehrID, voID, ifMatch, comp, opts...)` — REQ-054.
 5. `composition.Delete(ctx, c, ehrID, versionUID, ifMatch, opts...)` — REQ-054.

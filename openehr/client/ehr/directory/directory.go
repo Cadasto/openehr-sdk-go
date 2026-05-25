@@ -118,8 +118,12 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // Directory; saving when one already exists is a server-side error
 // (typically 409). Use [Update] to modify an existing Directory.
 //
-// Wire: POST /ehr/{ehr_id}/directory.
-func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error) {
+// Wire: POST /ehr/{ehr_id}/directory. Per ITS-REST OpenAPI
+// `201_directory` (SDK-GAP-09), the response body — when the caller
+// asks for the representation — is a bare `Folder`. With
+// `PreferMinimal` (the spec default) the body is empty and only
+// metadata (`ETag` → `VersionUID`) is populated.
+func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Save: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -152,8 +156,10 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 // Update modifies the Directory under ehrID, requiring `ifMatch` per
 // REQ-054. Errors map per REQ-093.
 //
-// Wire: PUT /ehr/{ehr_id}/directory with If-Match.
-func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error) {
+// Wire: PUT /ehr/{ehr_id}/directory with If-Match. Response shape
+// matches [Save]: bare `*rm.Folder` per the ITS-REST OpenAPI
+// `200_FOLDER_retrieved` (SDK-GAP-09).
+func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Update: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
@@ -227,7 +233,12 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	return openehrclient.NewVersionMetadata(resp.Metadata), nil
 }
 
-func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error) {
+// doWrite executes a Save / Update request and decodes the response
+// body when Prefer=representation. Per ITS-REST OpenAPI `201_directory`
+// / `200_FOLDER_retrieved` (SDK-GAP-09), the body is a bare `Folder`
+// — not an `ORIGINAL_VERSION<Folder>` envelope. With other Prefer
+// values the body is empty and the returned Folder pointer is nil.
+func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
 		if resp != nil {
@@ -239,11 +250,11 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 	if prefer != transport.PreferRepresentation || len(resp.Body) == 0 {
 		return nil, meta, nil
 	}
-	var version rm.OriginalVersion[*rm.Folder]
-	if err := canjson.Unmarshal(resp.Body, &version); err != nil {
-		return nil, meta, fmt.Errorf("directory: decode ORIGINAL_VERSION: %w", err)
+	var folder rm.Folder
+	if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
+		return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
 	}
-	return &version, meta, nil
+	return &folder, meta, nil
 }
 
 func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
@@ -262,8 +273,8 @@ type Repository interface {
 	Get(ctx context.Context, ehrID openehrclient.EHRID) (*rm.Folder, *openehrclient.VersionMetadata, error)
 	GetAtTime(ctx context.Context, ehrID openehrclient.EHRID, t time.Time) (*rm.Folder, *openehrclient.VersionMetadata, error)
 	GetVersioned(ctx context.Context, ehrID openehrclient.EHRID, versionUID openehrclient.VersionUID) (*rm.Folder, *openehrclient.VersionMetadata, error)
-	Save(ctx context.Context, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error)
-	Update(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error)
+	Save(ctx context.Context, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
+	Update(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error)
 	Delete(ctx context.Context, ehrID openehrclient.EHRID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 }
 
@@ -284,11 +295,11 @@ func (r *repository) GetVersioned(ctx context.Context, id openehrclient.EHRID, u
 	return GetVersioned(ctx, r.c, id, uid)
 }
 
-func (r *repository) Save(ctx context.Context, id openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error) {
+func (r *repository) Save(ctx context.Context, id openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return Save(ctx, r.c, id, folder, opts...)
 }
 
-func (r *repository) Update(ctx context.Context, id openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.OriginalVersion[*rm.Folder], *openehrclient.VersionMetadata, error) {
+func (r *repository) Update(ctx context.Context, id openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	return Update(ctx, r.c, id, ifMatch, folder, opts...)
 }
 

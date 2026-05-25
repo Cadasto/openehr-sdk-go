@@ -73,7 +73,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091) | landed |
 | REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092) | landed |
 | REQ-093 | Error envelope mapping | [transport.md § REQ-093](transport.md#req-093) | landed |
-| REQ-094 | `Prefer` negotiation | [transport.md § REQ-094](transport.md#req-094) | landed |
+| REQ-094 | `Prefer` negotiation | [transport.md § REQ-094](transport.md#req-094) | partial |
 | REQ-095 | OpenAPI authoritative source | [wire.md § REQ-095](wire.md#req-095) | partial |
 | REQ-096 | Unambiguous "disable retry" | [transport.md § REQ-096](transport.md#req-096--unambiguous-disable-retry) | landed |
 | REQ-097 | First-class `Idempotency-Key` (deprecated) | [transport.md § REQ-097](transport.md#req-097--first-class-idempotency-key-deprecated) | deprecated |

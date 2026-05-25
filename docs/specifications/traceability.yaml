@@ -209,8 +209,17 @@ requirements:
     title: Prefer negotiation
     canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
-    implementation: landed
-    packages: [transport, openehr/client/ehr]
+    implementation: partial
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory]
+    probes: [PROBE-061, PROBE-065, PROBE-071]
+    tests:
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
+      - testkit/probes/versioned/probe_071_composition_write_response_shape.go
+    notes: >-
+      return=representation bare-body decode landed (SDK-GAP-09, PROBE-061/071).
+      NOT LANDED — Prefer=identifier slot and representation+empty-body error:
+      docs/plans/2026-05-25-req094-prefer-followups.md
 
   - id: REQ-095
     title: OpenAPI authoritative source
@@ -333,7 +342,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
-    probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067]
+    probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
 
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths
