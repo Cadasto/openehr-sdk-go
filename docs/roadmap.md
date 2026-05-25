@@ -138,7 +138,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | `make spec-check` | **Landed** | Traceability subset only |
 | Release / semver strategy | **Planned** | — | [plan](plans/2026-05-25-versioning-strategy.md) — pre-`v0.1.0` tagging, compatibility metadata |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse}` |
+| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse,validate-composition,validate-from-json,primitive-validate}` |
 
 ---
 
