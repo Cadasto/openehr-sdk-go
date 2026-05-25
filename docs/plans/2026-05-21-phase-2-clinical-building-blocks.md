@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
-**Implementation:** partial — OPT parser (REQ-100), compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup landed; composition builder (REQ-101), validator (REQ-102), AQL builders open
+**Implementation:** partial — OPT parser (REQ-100), compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, **REQ-102 composition validation** landed; composition builder (REQ-101), AQL builders open; demographic/AQL validators still planned (umbrella validation plan)
 **Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
 **Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
 
@@ -93,7 +93,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 |---|---|---|---|---|
 | OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
 | Composition builder | | | | **Open** |
-| Validation | | | | **Open** |
+| Validation (REQ-102 composition) | Done | Done | — | **Done** — [v2 plan](2026-05-24-validation-v2-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](2026-05-21-validation.md)) |
 | AQL builders | | | | **Open** (wire models **Done**) |
 
 Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md) milestone **Phase 2** flips when all four child Phase 1 rows are **Done**.

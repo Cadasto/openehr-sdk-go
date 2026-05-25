@@ -23,7 +23,7 @@
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
 | **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
-| **2** | Composition builder, template parser, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-up Phases 1–4 landed (strict-mode parse, path ergonomics, OPT metadata capture, `rm/rminfo` BMM lookup, `internal/templatecompile` foundation — [ADR 0005](adr/0005-compiled-template-foundation.md)); composition builder and AQL builder still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
+| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([v2 plan](plans/2026-05-24-validation-v2-template-driven.md)); composition builder and AQL builders still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
@@ -46,7 +46,8 @@
 | Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/2026-05-22-template-req100-followups.md) |
 | RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Internal until public shape stabilises. [ADR 0005](adr/0005-compiled-template-foundation.md) |
-| Validation (OPT, AQL, demo) | **Planned** | `openehr/validation/` | [plan](plans/2026-05-21-validation.md) |
+| Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [v2 plan](plans/2026-05-24-validation-v2-template-driven.md) |
+| Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [plan](plans/2026-05-21-validation.md) (superseded for composition by v2 plan) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
 | Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md) |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
@@ -67,7 +68,8 @@
 | Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims |
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
 | Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
-| Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–094 | |
+| Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–093, REQ-096–098 | |
+| `Prefer` negotiation (REQ-094) | **Partial** | `transport/`, `openehr/client/ehr/composition/`, `directory/` | `return=representation` bare-body decode landed (SDK-GAP-09); `identifier` + empty-body guard **not landed** — [plan](plans/2026-05-25-req094-prefer-followups.md) |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
 | Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
@@ -81,8 +83,8 @@
 | System | **Landed** | `openehr/client/system/` | Capabilities, version |
 | EHR (create, get, delete) | **Landed** | `openehr/client/ehr/` | |
 | EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
-| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match |
-| Directory | **Landed** | `openehr/client/ehr/directory/` | |
+| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 write gaps → followups plan |
+| Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / SDK-GAP-09 notes as composition |
 | Contribution | **Landed** | `openehr/client/ehr/contribution/` | |
 | ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |
 | Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
@@ -115,10 +117,11 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Feature | Status | Location | Notes |
 |---------|--------|----------|-------|
 | Serialize probes | **Landed** | `testkit/probes/serialize/` | PROBE-030/031, 033/034 |
-| Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013 |
-| Definition probe | **Landed** | `testkit/probes/definition/` | |
+| Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013; PROBE-071 (SDK-GAP-09 representation writes) |
+| Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 (REQ-102) |
+| Definition probe | **Landed** | `testkit/probes/definition/` | PROBE-067 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
-| Auth / REST probes | **Planned** | — | PROBE-001–009, 060+ in catalog |
+| Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed; `sandbox/` cassette runner open (REQ-082) |
 | PHP SDK wire parity | **Planned** | — | REQ-080–081 |

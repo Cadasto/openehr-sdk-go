@@ -23,7 +23,8 @@ Deliver in order; umbrella plan holds sequencing and dependency rules.
 | [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) | REQ-100 hardening + clinical-modeling foundation: tests, parser hardening, compiled template + RMInfoLookup + walker, primitive constraints (REQ-103), slot assertions (REQ-104), terminology bindings (REQ-105) | REQ-100; PROBE-022, PROBE-023, PROBE-024; proposed REQ-103/104/105 |
 | [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md) | WebTemplate JSON export (deferred — separate plan to keep internal compiled template decoupled from public JSON contract) | proposed REQ-106; PROBE-026 (proposed) |
 | [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | `openehr/composition/` — OPT-driven skeleton + path-assigning builder | REQ-101 (proposed); PROBE-023 (proposed) |
-| [2026-05-21-validation.md](2026-05-21-validation.md) | `openehr/validation/` — composition↔OPT, demographic, AQL lint; uses compiled template + REQ-103 primitives | REQ-102 (proposed); PROBE-024 (proposed); PROBE-021 (execute) |
+| [2026-05-21-validation.md](2026-05-21-validation.md) | Umbrella — demographic + AQL lint still **planned**; composition scope superseded by v2 plan | REQ-102 (umbrella); PROBE-021 (execute) |
+| [2026-05-24-validation-v2-template-driven.md](2026-05-24-validation-v2-template-driven.md) | REQ-102 template-driven `ValidateComposition` (**landed**) | REQ-102, REQ-103; PROBE-025, PROBE-026 |
 | [2026-05-21-aql-builders.md](2026-05-21-aql-builders.md) | `openehr/aql/` — struct + verb builders (executor already landed) | REQ-055; PROBE-020, PROBE-021 |
 
 ## Header convention (load-bearing)

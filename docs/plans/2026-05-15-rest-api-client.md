@@ -374,10 +374,11 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 **Tasks:**
 
-1. `openehr/client/admin/`:
-   - `admin.PhysicalDeleteEHR(ctx, c, ehrID, opts ...DeleteOption) error` — `DELETE /admin/ehr/{ehr_id}`. Authenticated, irrevocable.
-   - `admin.DeleteComposition(ctx, c, ehrID, versionUID, opts...) error` — admin variant that bypasses the versioned-write contract; returns 204 (per OpenAPI).
-   - `admin.DeleteContribution(ctx, c, ehrID, contributionUID, opts...) error`.
+1. `openehr/client/admin/` (REQ-099 — landed surface):
+   - `admin.DeleteEHR(ctx, c, ehrID, opts ...DeleteOption) error` — `DELETE /admin/ehr/{ehr_id}`.
+   - `admin.DeleteAllEHRs(ctx, c, opts ...) error` — bulk delete when the deployment exposes it.
+   - `admin.PurgeTemplates(ctx, c, opts ...) error` — template housekeeping per ITS-REST admin paths.
+   - **Not in v1:** `PhysicalDeleteEHR`, per-composition admin delete, per-contribution admin delete (were draft API names in an earlier plan revision).
 2. The Admin API is `Status: development` in ITS-REST 1.1.0-development; same maturity caveat as Demographic.
 3. **Distinction from `cadasto/admin/`** — that package handles Cadasto-platform admin (tenant, env). This package handles the **openEHR** Admin API (REST surface).
 
