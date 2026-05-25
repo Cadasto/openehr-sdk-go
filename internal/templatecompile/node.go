@@ -127,13 +127,14 @@ func (n *CompiledNode) Term(code string) (template.ArchetypeTerm, bool) {
 // OPT-declared cardinality + existence when the OPT had an
 // <attributes> entry for it, and the RM-derived type when implicit.
 type CompiledAttribute struct {
-	name        string
-	cardinality template.Cardinality
-	existence   *template.Multiplicity
-	rmTypeName  string // RM type from rminfo; empty when not resolved
-	implicit    bool   // true when injected from rminfo, not declared by OPT
-	required    bool   // BMM is_mandatory (true even when OPT silent)
-	children    []*CompiledNode
+	name              string
+	cardinality       template.Cardinality
+	existence         *template.Multiplicity
+	childMultiplicity *template.Multiplicity
+	rmTypeName        string // RM type from rminfo; empty when not resolved
+	implicit          bool   // true when injected from rminfo, not declared by OPT
+	required          bool   // BMM is_mandatory (true even when OPT silent)
+	children          []*CompiledNode
 }
 
 // Name returns the RM attribute name (e.g. "content", "data").
@@ -145,8 +146,21 @@ func (a *CompiledAttribute) Name() string { return a.name }
 func (a *CompiledAttribute) Cardinality() template.Cardinality { return a.cardinality }
 
 // Existence returns the OPT-declared existence interval, or nil
-// when the OPT was silent (and for implicit attributes).
+// when the OPT was silent (and for implicit attributes). Existence
+// answers "must this attribute carry at least one value?". For the
+// min/max child count on a multi-valued attribute see
+// [CompiledAttribute.ChildMultiplicity].
 func (a *CompiledAttribute) Existence() *template.Multiplicity { return a.existence }
+
+// ChildMultiplicity returns the AOM 1.4 CARDINALITY interval — the
+// min/max number of child objects under a C_MULTIPLE_ATTRIBUTE.
+// Returns nil for single attributes (no such block) and for
+// multi-valued attributes whose OPT omitted <cardinality>. Walkers
+// that need to flag too-few / too-many children should consult this
+// alongside [CompiledAttribute.Existence].
+func (a *CompiledAttribute) ChildMultiplicity() *template.Multiplicity {
+	return a.childMultiplicity
+}
 
 // RMTypeName returns the BMM-declared RM type of this attribute
 // (the element type for containers). Empty when rminfo did not

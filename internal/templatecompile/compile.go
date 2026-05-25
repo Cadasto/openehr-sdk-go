@@ -65,6 +65,7 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		compiled: c,
 		lookup:   o.Lookup,
 		opts:     o,
+		pathAttr: map[string]*template.Attribute{},
 	}
 	root, err := w.compileNode(opt.Root(), nil, "")
 	if err != nil {
@@ -84,6 +85,20 @@ type walker struct {
 	compiled *Compiled
 	lookup   rminfo.Lookup
 	opts     Options
+
+	// currentAttr is the wire-side *template.Attribute under whose
+	// Children() the immediately-recursed compileNode is descending.
+	// Set by buildAttribute around the per-child loop and consumed by
+	// registerPath to discriminate AOM 1.4 C_SINGLE_ATTRIBUTE
+	// alternatives (legal path duplicates) from genuine cross-
+	// attribute path collisions (an OPT bug).
+	currentAttr *template.Attribute
+
+	// pathAttr records which wire-side attribute first registered a
+	// given AQL path. registerPath consults it on duplicates: same
+	// attribute → alternative, keep first; different attribute →
+	// reject with ErrInvalidInput.
+	pathAttr map[string]*template.Attribute
 }
 
 // compileNode walks one OPT node, computes its AQL path, recurses
@@ -224,12 +239,16 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 		required = slices.Contains(w.lookup.RequiredAttributes(parent.rmTypeName), a.Name())
 	}
 	ca := &CompiledAttribute{
-		name:        a.Name(),
-		cardinality: a.Cardinality(),
-		existence:   a.Existence(),
-		rmTypeName:  rm,
-		required:    required,
+		name:              a.Name(),
+		cardinality:       a.Cardinality(),
+		existence:         a.Existence(),
+		childMultiplicity: a.ChildMultiplicity(),
+		rmTypeName:        rm,
+		required:          required,
 	}
+	prevAttr := w.currentAttr
+	w.currentAttr = a
+	defer func() { w.currentAttr = prevAttr }()
 	for i, child := range a.Children() {
 		segment := pathSegment(a.Name(), a.Cardinality(), child, i)
 		cn, err := w.compileNode(child, parent, segment)
@@ -296,12 +315,25 @@ func allAttributesInOrder(l rminfo.Lookup, rmType string) []string {
 
 func (w *walker) registerPath(cn *CompiledNode) error {
 	if prev, exists := w.compiled.byPath[cn.aqlPath]; exists {
+		// AOM 1.4 admits C_SINGLE_ATTRIBUTE with multiple
+		// `<children>` (alternatives); every alternative shares
+		// the same AQL path. Admit the collision when both
+		// nodes were registered under the SAME wire attribute —
+		// then we are looking at alternatives, not unrelated
+		// subtrees colliding on a synthetic predicate. byPath
+		// keeps the first; the structural validator walks the
+		// remaining alternatives via the parent attribute's
+		// Children() directly.
+		if w.currentAttr != nil && w.pathAttr[cn.aqlPath] == w.currentAttr {
+			return nil
+		}
 		return fmt.Errorf(
 			"%w: duplicate AQL path %q (existing %s, new %s)",
 			ErrInvalidInput, cn.aqlPath, prev.rmTypeName, cn.rmTypeName,
 		)
 	}
 	w.compiled.byPath[cn.aqlPath] = cn
+	w.pathAttr[cn.aqlPath] = w.currentAttr
 	return nil
 }
 

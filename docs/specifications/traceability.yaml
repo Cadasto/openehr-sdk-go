@@ -363,3 +363,24 @@ requirements:
       - testkit/probes/template/probes_test.go
     plans:
       - docs/plans/2026-05-22-template-req100-followups.md
+
+  - id: REQ-102
+    title: Composition validation
+    canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
+    status: draft
+    # All phases of the v2 plan landed: cardinality on
+    # CompiledAttribute, rmread attribute access, template-driven
+    # structural walker, REQ-103 primitive pass on bindings,
+    # C_SINGLE_ATTRIBUTE alternative matching, occurrences upper-
+    # bound enforcement, and PROBE-025 / PROBE-026 sandbox probes.
+    # See docs/plans/2026-05-24-validation-v2-template-driven.md.
+    implementation: landed
+    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
+    probes: [PROBE-025, PROBE-026]
+    tests:
+      - openehr/validation/composition_test.go
+      - openehr/validation/rmread/read_test.go
+      - testkit/probes/validation/probes_test.go
+    plans:
+      - docs/plans/2026-05-21-validation.md
+      - docs/plans/2026-05-24-validation-v2-template-driven.md
