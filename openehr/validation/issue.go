@@ -1,6 +1,9 @@
 package validation
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Severity is the typed severity attached to every [Issue]. Only
 // [Error] is emitted in v1; [Warning] is reserved for follow-up REQs
@@ -52,6 +55,45 @@ type Issue struct {
 
 	// Severity classifies the issue. Always [Error] in v1.
 	Severity Severity
+}
+
+// Err returns the typed sentinel matching this Issue's Code, or
+// nil when no sentinel maps. The mapping is the inverse of the
+// REQ-102 § Sentinels table:
+//
+//   - "required"                                          → [ErrRequired]
+//   - "cardinality"                                       → [ErrCardinality]
+//   - "rm_type_mismatch" / "alternative_mismatch" /
+//     "archetype_id_mismatch" / "node_id_mismatch"        → [ErrTypeMismatch]
+//   - "primitive_*" (any primitive_-prefixed code)        → [ErrPrimitive]
+//   - "slot_fill"                                         → [ErrSlotFill]
+//
+// Global guard codes (`nil_composition`, `nil_template`) return
+// nil — those represent caller-side argument errors rather than
+// validation failures. Callers wanting `errors.Is` dispatch wrap
+// via this method:
+//
+//	for _, i := range r.Issues {
+//	    if errors.Is(i.Err(), validation.ErrRequired) { ... }
+//	}
+func (i Issue) Err() error {
+	switch i.Code {
+	case "required":
+		return ErrRequired
+	case "cardinality":
+		return ErrCardinality
+	case "rm_type_mismatch",
+		"alternative_mismatch",
+		"archetype_id_mismatch",
+		"node_id_mismatch":
+		return ErrTypeMismatch
+	case "slot_fill":
+		return ErrSlotFill
+	}
+	if strings.HasPrefix(i.Code, "primitive_") {
+		return ErrPrimitive
+	}
+	return nil
 }
 
 // Result aggregates every [Issue] from a single validator call.

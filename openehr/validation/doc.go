@@ -19,13 +19,19 @@
 // RM property via [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
 // enforces existence / cardinality / alternatives / RM-type match
 // / archetype-id identity, and recurses into matched RM children.
-// Path strings in [Issue.Path] come from
-// [internal/templatecompile.CompiledNode.AQLPath] — composition-
-// supplied predicates never form lookup keys, so a composition
-// missing an OPT-required node is flagged rather than silently
-// bypassed. See
-// [docs/plans/2026-05-24-validation-v2-template-driven.md] for
-// the migration's phase split.
+//
+// Path strings in [Issue.Path] are built by appending OPT-side
+// attribute names and matched-child predicates to the parent OPT
+// node's path as the walker descends. The OPT contributes the
+// attribute names; the RM-side archetype_node_id of each matched
+// child contributes the bracket predicate. Composition-supplied
+// predicates therefore appear in the path only on RM nodes the
+// walker has bound to an OPT child — a composition missing an
+// OPT-required node is flagged at the parent attribute's path
+// (no descent), rather than silently bypassed.
+//
+// See [docs/plans/2026-05-24-validation-v2-template-driven.md]
+// for the migration's phase split.
 //
 // # Collect-all
 //
@@ -36,7 +42,7 @@
 //
 // The validator MUST be importable without `transport/`, `auth/`,
 // `openehr/client/*`, or `openehr/serialize/`. The forbidden
-// `serialize/` import is enforced by `TestValidationNoSerializeImport`.
+// forbidden-import set is enforced by `TestValidationForbiddenImports`.
 //
 // # v1: module-local callability
 //

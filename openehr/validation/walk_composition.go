@@ -34,6 +34,17 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	if optNode == nil || rmValue == nil {
 		return
 	}
+	// Defence-in-depth typed-nil guard. The matchers (matchChildByID
+	// for multi-valued attrs, matchSingleAlternative for single)
+	// already reject typed-nil before descent; ifacePresent /
+	// readItemSingleSingle reject it at the rmread layer. This
+	// belt-and-suspenders check costs one type-switch and prevents
+	// any future descent path from re-introducing the panic class
+	// the v2 reviewers caught twice (Element.Value, then slice
+	// elements).
+	if rmread.IsTypedNilPointer(rmValue) {
+		return
+	}
 
 	// Identity + RM-type checks at this node. At the composition
 	// root, identity is checked inline against COMPOSITION's

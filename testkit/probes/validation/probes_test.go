@@ -204,6 +204,38 @@ func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 	}
 }
 
+// PROBE-026 — per-child occurrences upper bound. vital_signs.opt
+// pins the systolic ELEMENT (at0004) under /data/events[at0006]/data/items
+// at occurrences 0..1; supplying two copies of the systolic
+// element fires `cardinality` at the child path. Mirrors the
+// unit-level TestValidateComposition_DuplicateSystolicOccurrences
+// so cross-SDK implementations are bound to the same code
+// multiset for the occurrences-upper-bound clause.
+func TestProbe026MissingNodes_DuplicateSystolicOccurrences(t *testing.T) {
+	body := loadFixture(t, "vital_signs.opt")
+	comp := validBloodPressureComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	systolic := list.Items[0]
+	list.Items = []rm.Element{systolic, systolic}
+	cases := []probes.ValidateCase{
+		{
+			Name:        "duplicate_systolic",
+			OPT:         body,
+			Composition: comp,
+			WantCodes:   []string{"cardinality"},
+		},
+	}
+	r, err := probes.Probe026MissingNodes(cases)
+	if err != nil {
+		t.Fatalf("Probe026: %v", err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("Probe026 status=%q detail=%q", r.Status, r.Detail)
+	}
+}
+
 const probe026AlternativeMismatchOPT = `<?xml version="1.0"?>
 <template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <template_id><value>alt-probe</value></template_id>

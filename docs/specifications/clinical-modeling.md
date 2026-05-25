@@ -269,9 +269,11 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 
 Existence and child-count cardinality are **independent constraints**: a multi-valued attribute with `existence.lower ≥ 1` AND `cardinality.lower ≥ 1` whose RM-side slice is empty fires BOTH `required` AND `cardinality` at the same path. Validators MUST emit both codes when both clauses fail; collect-all semantics make this the natural outcome. Consumers de-duplicating for display SHOULD treat the pair as a single user-facing failure at that path.
 
+**Open multi-valued attributes** — when a C_MULTIPLE_ATTRIBUTE declares no `<children>` (the OPT pinned only existence / cardinality, not membership), validators MUST accept any RM item under that attribute without firing `slot_fill`. The constraint surface is the attribute itself; the items inside are unconstrained. This admits the OPT idiom "items here, any shape allowed" — e.g. a SECTION whose /items is open to any archetype-root content.
+
 ### Sentinels
 
-The package **MUST** expose typed sentinels callers compare via `errors.Is` for programmatic dispatch:
+The package **MUST** expose typed sentinels callers compare via `errors.Is` for programmatic dispatch. Issues bridge to sentinels via `Issue.Err() error`:
 
 | Sentinel | Triggered by |
 |---|---|
@@ -282,9 +284,21 @@ The package **MUST** expose typed sentinels callers compare via `errors.Is` for 
 | `ErrSlotFill` | `slot_fill` code |
 | `ErrAQLSyntax` | reserved — AQL lint surface not yet implemented |
 
+Caller pattern:
+
+```go
+for _, i := range r.Issues {
+    if errors.Is(i.Err(), validation.ErrRequired) {
+        // typed handling for missing required attributes
+    }
+}
+```
+
+Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.Err()` — they represent caller-side argument errors, not validation failures of a structurally-present composition.
+
 ### Building-block independence (REQ-013)
 
-`openehr/validation/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The forbidden `serialize/` import is enforced by a test (`TestValidationNoSerializeImport`).
+`openehr/validation/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The validator operates on **in-memory RM graphs**, never on wire bytes — callers responsible for decoding feed already-parsed `*rm.Composition` values. The full forbidden-import set is enforced by `TestValidationForbiddenImports`.
 
 The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `internal/templatecompile/` (same-module internal access).
 

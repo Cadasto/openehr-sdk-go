@@ -580,10 +580,15 @@ func readItemSingleSingle(s *rm.ItemSingle, attr string) (any, bool) {
 		return dvTextPresent(s.Name)
 	case "item":
 		// ITEM_SINGLE.item is a value-typed Element. Present iff
-		// the element carries non-empty archetype_node_id (or any
-		// non-zero content); we use the archetype_node_id signal
-		// because it's the BMM-mandatory LOCATABLE field.
-		if s.Item.ArchetypeNodeID == "" && s.Item.Value == nil {
+		// the element carries non-empty archetype_node_id OR a
+		// concrete (non-typed-nil) value. A typed-nil DataValue
+		// (e.g. `(*rm.DVQuantity)(nil)` stored in
+		// `Element.Value`) is treated as absent — without the
+		// IsTypedNilPointer check the != nil arm would
+		// false-positive on an interface that carries a type but
+		// no value.
+		if s.Item.ArchetypeNodeID == "" &&
+			(s.Item.Value == nil || IsTypedNilPointer(s.Item.Value)) {
 			return &s.Item, false
 		}
 		return &s.Item, true

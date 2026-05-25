@@ -44,8 +44,17 @@ func TestValidateComposition_RequiredCategory(t *testing.T) {
 	if !containsIssue(r.Issues, "/category", "required") {
 		t.Errorf("expected /category required issue, got %+v", r.Issues)
 	}
-	if !errors.Is(validation.ErrRequired, validation.ErrRequired) {
-		t.Error("ErrRequired sentinel not reachable")
+	// Sentinel bridge: Issue.Err() maps Code → typed sentinel so
+	// callers can dispatch via errors.Is per spec § Sentinels.
+	var requiredIssue validation.Issue
+	for _, i := range r.Issues {
+		if i.Path == "/category" && i.Code == "required" {
+			requiredIssue = i
+			break
+		}
+	}
+	if !errors.Is(requiredIssue.Err(), validation.ErrRequired) {
+		t.Errorf("Issue.Err() did not bridge %q to ErrRequired (got %v)", requiredIssue.Code, requiredIssue.Err())
 	}
 }
 
@@ -532,6 +541,36 @@ func TestValidateComposition_DuplicateSystolicOccurrences(t *testing.T) {
 	wantPath := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]"
 	if !containsIssue(r.Issues, wantPath, "cardinality") {
 		t.Errorf("expected cardinality at %s for duplicate systolic, got %+v", wantPath, r.Issues)
+	}
+}
+
+// REQ-102 v2 — wrong at-code on a nested LOCATABLE bound by RM
+// type via C_SINGLE_ATTRIBUTE triggers `node_id_mismatch` at the
+// matched node. The single-attribute matcher binds by RM type
+// (not at-code), then walkNode descends and checkLocatableIdentity
+// catches the at-code disagreement. Multi-valued attributes use
+// the OR-accept matchChildByID and surface unbindable at-codes as
+// `slot_fill` at the parent attribute path — different code, same
+// underlying intent.
+//
+// Exercises the path
+// /content[bp]/data/events[at0006]/data where /data is a
+// C_SINGLE_ATTRIBUTE on POINT_EVENT pinning ITEM_LIST at0003.
+// Mutating the RM ItemList's archetype_node_id to at9999 fires
+// node_id_mismatch at the matched node.
+func TestValidateComposition_NestedNodeIDMismatch(t *testing.T) {
+	c := mustCompile(t, "vital_signs.opt")
+	comp := validVitalSignsComposition()
+	obs := comp.Content[0].(*rm.Observation)
+	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
+	list := pe.Data.(*rm.ItemList)
+	list.ArchetypeNodeID = "at9999" // OPT pins at0003 on the ITEM_LIST
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected node_id_mismatch for nested ITEM_LIST at-code, got OK")
+	}
+	if !containsCode(r.Issues, "node_id_mismatch") {
+		t.Errorf("expected node_id_mismatch on nested LOCATABLE bound via single attribute, got %+v", r.Issues)
 	}
 }
 

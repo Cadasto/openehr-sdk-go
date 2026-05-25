@@ -1,7 +1,7 @@
 # Plan — REQ-102 v2: template-driven composition validation
 
 **Date:** 2026-05-24
-**Status:** Draft
+**Status:** Landed
 **Owner:** SDK maintainers
 **Covers:** REQ-102 (structural completion); REQ-103 (primitive reuse); REQ-104 (slot grammar — partial overlap); REQ-013 (building-block independence)
 **Probes:** PROBE-025 (extend); proposed **PROBE-026** (missing required node / cardinality negative cases)

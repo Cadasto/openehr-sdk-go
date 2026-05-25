@@ -14,8 +14,13 @@ import (
 //
 // The walk is template-driven (see package doc): the compiled OPT
 // drives traversal, the composition is the value source. Path
-// strings come from CompiledNode.AQLPath() — composition-supplied
-// predicates never form lookup keys.
+// strings are built incrementally by [joinPath] as the walker
+// descends — OPT-side attribute names contribute the segments,
+// matched RM children contribute the bracket predicates. The
+// composition's at-codes therefore appear in [Issue.Path] only on
+// nodes the walker actually bound to an OPT child; missing
+// required nodes report at the parent attribute path without a
+// composition-side predicate.
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
