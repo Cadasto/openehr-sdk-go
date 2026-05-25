@@ -1,4 +1,4 @@
-# Plan — REQ-102 v2: template-driven composition validation
+# Plan — REQ-102: template-driven composition validation
 
 **Date:** 2026-05-24
 **Status:** Landed
@@ -6,7 +6,7 @@
 **Covers:** REQ-102 (structural completion); REQ-103 (primitive reuse); REQ-104 (slot grammar — partial overlap); REQ-013 (building-block independence)
 **Probes:** PROBE-025 (extend); proposed **PROBE-026** (missing required node / cardinality negative cases)
 **Implementation:** landed (Phases 0–4 complete; see [Implementation checklist](#implementation-checklist) for per-phase status and recorded deviations from the original plan)
-**Depends on:** [`2026-05-21-validation.md`](2026-05-21-validation.md) Phase 1 (landed — RM-guided primitive pass); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103)
+**Depends on:** [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) Phase 1 (landed — RM-guided primitive pass; umbrella archived); [`2026-05-22-template-req100-followups.md`](../2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103)
 **Defers:** External terminology lookup (REQ-105); full ADL2 / AOM 2; validate wire bytes; federated archetype repository for slot-fill resolution
 
 ## Goal
@@ -157,7 +157,7 @@ Some OPT metadata needed for v2 is **landed on the compiled surface** (Phase 0):
 2. **Accessor** — `CompiledAttribute.ChildMultiplicity() *template.Multiplicity` (name TBD; document existence vs child-count semantics in godoc).
 3. **Update [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-102** — move deferred rows to v2; document template-driven trust model; add issue codes (`alternative_mismatch`, …).
 4. **Update [`docs/specifications/traceability.yaml`](../../docs/specifications/traceability.yaml)** — note REQ-102 remains `partial` until v2 Phase 3; add PROBE-026 stub row.
-5. **Cross-link** this plan from [`2026-05-21-validation.md`](2026-05-21-validation.md) checklist.
+5. **Cross-link** this plan from [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) checklist.
 
 **Definition of done:** Parser/compile tests for cardinality interval; `make spec-check` green; no validator behaviour change yet.
 
@@ -288,7 +288,7 @@ for each attr in N.Attributes():
 - **Extra RM nodes** not declared in OPT — report as warning or ignore; not required for REQ-102 landing.
 - **External terminology** — REQ-105.
 - **Full ARCHETYPE_SLOT assertion grammar** — REQ-104 (slot-fit prefix fallback remains until then).
-- **Demographic / AQL validators** — still Phase 2 of [`2026-05-21-validation.md`](2026-05-21-validation.md).
+- **Demographic / AQL validators** — still Phase 2 of [`2026-05-21-validation.md`](archive/2026-05-21-validation.md).
 - **Wire-byte validation** — no `serialize/` import.
 - **Performance tuning** — correct single-pass collect-all first; memoisation (Archie `APathQueryCache` pattern) only if profiling demands it.
 
@@ -325,6 +325,6 @@ for each attr in N.Attributes():
 - [`openehr/validation/doc.go`](../../openehr/validation/doc.go) — v1 trust model
 - [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-102 — normative validator contract
 - [`internal/templatecompile/walk/doc.go`](../../internal/templatecompile/walk/doc.go) — OPT walker; `WalkComposition` deferred note
-- [`docs/plans/2026-05-21-validation.md`](2026-05-21-validation.md) — original plan (template-driven intent; Phase 1 landed as RM-guided partial)
+- [`docs/plans/archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) — original plan (template-driven intent; Phase 1 landed as RM-guided partial)
 - openEHR AM 1.4 Template XSD — `C_SINGLE_ATTRIBUTE`, `C_MULTIPLE_ATTRIBUTE`, existence vs cardinality
 - [openEHR/archie RMObjectValidator](https://github.com/openEHR/archie) — per-dimension validator split (occurrence, multiplicity, primitive) — informational, not parity target

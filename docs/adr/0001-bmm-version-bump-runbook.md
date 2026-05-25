@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** part of [`docs/plans/2026-05-15-bmm-codegen.md`](../plans/2026-05-15-bmm-codegen.md) Phase 5.
+- **Tracks:** part of [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) Phase 5.
 
 ## Context
 
@@ -99,7 +99,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 ## See also
 
-- [`docs/plans/2026-05-15-bmm-codegen.md`](../plans/2026-05-15-bmm-codegen.md) — Phase 5 ("Drift bot + version-bump runbook").
+- [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/archive/2026-05-15-bmm-codegen.md) — Phase 5 ("Drift bot + version-bump runbook").
 - [`resources/bmm/README.md`](../../resources/bmm/README.md) — pinned BMM file inventory; the `## Updating` section defers to this ADR.
 - [`docs/specifications/bmm-conformance.md`](../../docs/specifications/bmm-conformance.md) — normative conformance contract; § Schema → Go package set carries the version pins.
 - [`.github/workflows/codegen-drift.yml`](../../.github/workflows/codegen-drift.yml) — weekly drift bot implementation.

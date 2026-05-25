@@ -6,7 +6,7 @@
 **Covers:** REQ-013, REQ-014; **REQ-100** (ADL 1.4 OPT parse + paths) — canonical spec at [`docs/specifications/clinical-modeling.md`](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths).
 **Probes:** PROBE-022 (OPT path resolution) — sandbox; cross-SDK ratification deferred (REQ-081).
 **Implementation:** landed — parser, path utilities, and sandbox probe landed; OET, ADL 2, and full ADL linker remain out of scope. Phase 1 of the follow-up plan ([2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md)) extended test coverage to defend the `landed` claim.
-**Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
+**Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-21-phase-2-clinical-building-blocks.md`](../2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** ADL2 / AOM 2.4 OPT; **OET** (`.oet` authoring templates); package-deployment to CDR (use `openehr/client/definition/`); FLAT path keys (REQ-053). Post–PR #10 hardening: [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md).
 
 ## Goal

@@ -92,7 +92,7 @@ The SDK's primary write payload **MUST** be openEHR canonical JSON. Read payload
 Canonical-JSON properties:
 
 - Every RM type instance carries `_type`. The encoder **MUST** emit it; the decoder **MUST** consult the type registry (REQ-040).
-- Field order **SHOULD** follow the openEHR canonical-JSON specification when one is published; until then the SDK **MUST** use this deterministic profile (see [`docs/plans/2026-05-15-canonical-json-serialization.md`](../docs/plans/2026-05-15-canonical-json-serialization.md)):
+- Field order **SHOULD** follow the openEHR canonical-JSON specification when one is published; until then the SDK **MUST** use this deterministic profile (see [`docs/plans/archive/2026-05-15-canonical-json-serialization.md`](../docs/plans/archive/2026-05-15-canonical-json-serialization.md)):
   - `_type` is always the first key on every encoded concrete RM value.
   - Remaining object keys follow **BMM property declaration order** (the order code generation emits struct fields).
   - `Hash` (`map[K]V`) keys are serialized in **lexicographic key order** (independent of struct field order).
@@ -113,7 +113,7 @@ The SDK **MUST** provide a canonical XML codec in `openehr/serialize`, symmetric
 
 Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources. Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property. Element names **MUST** be snake_case BMM names (same as canonical JSON keys). The codec **MUST** carry the namespace declarations the openEHR XML schemas require (`http://schemas.openehr.org/v1` default namespace; `xmlns:xsi` when `xsi:type` is present).
 
-Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/2026-05-15-canonical-xml-serialization.md`](../docs/plans/2026-05-15-canonical-xml-serialization.md)):
+Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/archive/2026-05-15-canonical-xml-serialization.md`](../docs/plans/archive/2026-05-15-canonical-xml-serialization.md)):
 
 - Child elements follow **BMM property declaration order** (same order code generation emits struct fields).
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites unless [`WithRelaxedTypeDispatch`] is set.

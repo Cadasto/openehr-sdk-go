@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** partial — Phases 1–6 + 4-bis landed (walker + REQ-103 primitives); Phases 7+ deferred per follow-up sequencing
-**Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
+**Depends on:** [2026-05-21-template-parser.md](archive/2026-05-21-template-parser.md) (PR #10 landing — done)
 **Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md))
 
 ## Goal
@@ -414,7 +414,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 ## Mapping to specs
 
 - [`docs/specifications/clinical-modeling.md` § REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) — current
-- Pending: REQ-101 (composition builder, [plan](2026-05-21-composition-builder.md)), REQ-102 (validation, [plan](2026-05-21-validation.md)), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
+- Pending: REQ-101 (composition builder, [plan](2026-05-21-composition-builder.md)), REQ-102 (validation, [plan](archive/2026-05-21-validation.md)), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 
 ## References (research baseline, informational)
 

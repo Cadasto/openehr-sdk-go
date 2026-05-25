@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-05-16.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/2026-05-15-bmm-codegen.md`](../plans/2026-05-15-bmm-codegen.md).
+- **Tracks:** [`docs/plans/archive/2026-05-15-bmm-codegen.md`](../plans/2026-05-15-bmm-codegen.md).
 
 ## Context
 

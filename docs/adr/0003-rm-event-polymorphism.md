@@ -1,7 +1,7 @@
 # ADR 0003 — Codec polymorphism for abstract generic RM classes
 
 - **Status:** Accepted, 2026-05-16.
-- **Tracks:** STRAND-04 (partial — Event/History cassette decode); [canonical JSON plan](../plans/2026-05-15-canonical-json-serialization.md).
+- **Tracks:** STRAND-04 (partial — Event/History cassette decode); [canonical JSON plan](../plans/archive/2026-05-15-canonical-json-serialization.md).
 
 ## Context
 

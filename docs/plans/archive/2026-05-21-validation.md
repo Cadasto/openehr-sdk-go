@@ -3,10 +3,10 @@
 **Date:** 2026-05-21 (research-updated 2026-05-22)
 **Status:** Draft (umbrella — composition scope superseded)
 **Owner:** SDK maintainers
-**Covers:** REQ-013, REQ-014; **REQ-102** composition validation → see [`2026-05-24-validation-v2-template-driven.md`](2026-05-24-validation-v2-template-driven.md) (**landed**)
-**Probes:** PROBE-024 (landed under template — REQ-103); PROBE-025/026 (landed — v2 plan); PROBE-021 partially (AQL path errors at execute time — query plan owns syntax)
-**Implementation:** partial — REQ-102 composition validator **landed** ([v2 plan](2026-05-24-validation-v2-template-driven.md)); demographic + AQL lint **planned**
-**Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 + 6 (compiled template + RMInfoLookup + walker + REQ-103 primitives); [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) Phase 1 (fixture compositions); [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) optional for AQL lint subset
+**Covers:** REQ-013, REQ-014; **REQ-102** composition validation → see [`2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md) (**landed**)
+**Probes:** PROBE-024 (landed under template — REQ-103); PROBE-025/026 (landed — [composition validation plan](2026-05-24-composition-validation-template-driven.md)); PROBE-021 partially (AQL path errors at execute time — query plan owns syntax)
+**Implementation:** partial — REQ-102 composition validator **landed** ([composition validation plan](2026-05-24-composition-validation-template-driven.md)); demographic + AQL lint **planned**
+**Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](../2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 + 6 (compiled template + RMInfoLookup + walker + REQ-103 primitives); [`2026-05-21-composition-builder.md`](../2026-05-21-composition-builder.md) Phase 1 (fixture compositions); [`2026-05-21-aql-builders.md`](../2026-05-21-aql-builders.md) optional for AQL lint subset
 **Defers:** Full ADL2 / AOM 2 validation surface; terminology server checks (external code-list verification); validate wire bytes / canonical JSON (no `serialize/` import); cross-archetype reference integrity (slot-fill linker)
 
 ## Goal
@@ -196,7 +196,7 @@ const (
 |---|---|
 | Depends-on: REQ-100 follow-up plan Phases 4 + 4-bis + 5 + 6 | |
 | Phase 0 REQ-102 spec + sentinels + interfaces + import-guard test | landed |
-| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [2026-05-24-validation-v2-template-driven.md](2026-05-24-validation-v2-template-driven.md)) |
+| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [archive/2026-05-24-composition-validation-template-driven.md](archive/2026-05-24-composition-validation-template-driven.md)) |
 | Phase 2 Demographic validator | |
 | Phase 2 AQL lint subset | |
 | PROBE-024 sandbox probe | |
@@ -204,11 +204,11 @@ const (
 | `TestValidationNoSerializeImport` import-guard test | |
 | `make ci` green | |
 
-### Phase 1 superseded by template-driven v2
+### Phase 1 superseded by template-driven composition validation
 
 The Phase 1 deliverable above landed on `feat/req102-validation` as an **RM-guided** validator: descend the composition graph via typed switches, build AQL paths from the composition's at-codes, look up OPT constraints at those paths, and apply REQ-103 primitive checks at every matched leaf. That intermediate cannot flag composition-side **missing** required nodes (no RM subtree → no path → no constraint lookup).
 
-The v2 plan ([`2026-05-24-validation-v2-template-driven.md`](2026-05-24-validation-v2-template-driven.md)) inverts the walk: the compiled OPT is the driver, the composition is the value source. v2 closes the structural completion gap (existence, cardinality, alternatives, RM type match) using the same public `ValidateComposition` signature.
+The [composition validation plan](2026-05-24-composition-validation-template-driven.md) inverts the walk: the compiled OPT is the driver, the composition is the value source. It closes the structural completion gap (existence, cardinality, alternatives, RM type match) using the same public `ValidateComposition` signature.
 
 ## Mapping to specs
 

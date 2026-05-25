@@ -6,7 +6,7 @@
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
 **Implementation:** partial — OPT parser (REQ-100), compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, **REQ-102 composition validation** landed; composition builder (REQ-101), AQL builders open; demographic/AQL validators still planned (umbrella validation plan)
-**Depends on:** [`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
+**Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
 **Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
 
 ## Goal
@@ -19,9 +19,9 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 
 | Order | Plan | Package | Blocks |
 |---|---|---|---|
-| 1 | [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) | `openehr/template/` | composition, validation |
+| 1 | [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation |
 | 2 | [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) | `openehr/composition/` | validation (partial) |
-| 3 | [`2026-05-21-validation.md`](2026-05-21-validation.md) | `openehr/validation/` | — |
+| 3 | [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) | `openehr/validation/` | — |
 | 4 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | — |
 
 Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).
@@ -93,7 +93,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 |---|---|---|---|---|
 | OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
 | Composition builder | | | | **Open** |
-| Validation (REQ-102 composition) | Done | Done | — | **Done** — [v2 plan](2026-05-24-validation-v2-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](2026-05-21-validation.md)) |
+| Validation (REQ-102 composition) | Done | Done | — | **Done** — [composition validation plan](archive/2026-05-24-composition-validation-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](archive/2026-05-21-validation.md)) |
 | AQL builders | | | | **Open** (wire models **Done**) |
 
 Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md) milestone **Phase 2** flips when all four child Phase 1 rows are **Done**.
@@ -105,7 +105,7 @@ Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md
 - **Terminology validation** — no typed TERM client in v1.
 - **Full OPT constraint engine parity with Archie/Linker** — v1 targets CDR-relevant constraint checks, not every ADL semantic rule.
 - **Codegen of per-template Go structs** — consumer responsibility.
-- **OET (`.oet`) parsing** — authoring templates; v1 assumes callers already have `.opt` ([template plan](2026-05-21-template-parser.md)).
+- **OET (`.oet`) parsing** — authoring templates; v1 assumes callers already have `.opt` ([template plan](archive/2026-05-21-template-parser.md)).
 
 ## Mapping to specs
 

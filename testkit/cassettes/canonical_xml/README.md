@@ -19,4 +19,4 @@ XML fixtures are pinned with the BMM/XSD version bump in `resources/bmm/`. To re
 
 ## Wire profile
 
-See `docs/specifications/wire.md § Canonical XML` and `docs/plans/2026-05-15-canonical-xml-serialization.md` for the rules these fixtures encode (BMM-order children, `xsi:type` first attribute, snake_case element names, compact whitespace).
+See `docs/specifications/wire.md § Canonical XML` and `docs/plans/archive/2026-05-15-canonical-xml-serialization.md` for the rules these fixtures encode (BMM-order children, `xsi:type` first attribute, snake_case element names, compact whitespace).

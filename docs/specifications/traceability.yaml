@@ -15,7 +15,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [resources/bmm, openehr/bmm]
-    plans: [docs/plans/2026-05-15-bmm-codegen.md]
+    plans: [docs/plans/archive/2026-05-15-bmm-codegen.md]
 
   - id: REQ-042
     title: Generated code drift-detected
@@ -23,7 +23,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm, openehr/aom/aom14, internal/bmmgen, cmd/bmmgen]
-    plans: [docs/plans/2026-05-15-bmm-codegen.md]
+    plans: [docs/plans/archive/2026-05-15-bmm-codegen.md]
 
   - id: REQ-045
     title: BMM loader building block
@@ -56,7 +56,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson]
-    plans: [docs/plans/2026-05-15-canonical-json-serialization.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md]
     probes: [PROBE-030, PROBE-031]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -69,7 +69,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canxml]
-    plans: [docs/plans/2026-05-15-canonical-xml-serialization.md]
+    plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md]
     probes: [PROBE-033, PROBE-034]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
@@ -356,7 +356,7 @@ requirements:
       - openehr/template/path_test.go
       - testkit/probes/template/probes_test.go
     plans:
-      - docs/plans/2026-05-21-template-parser.md
+      - docs/plans/archive/2026-05-21-template-parser.md
       - docs/plans/2026-05-22-template-req100-followups.md
 
   - id: REQ-103
@@ -377,12 +377,12 @@ requirements:
     title: Composition validation
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
     status: draft
-    # All phases of the v2 plan landed: cardinality on
+    # Composition validation plan landed (template-driven walk): cardinality on
     # CompiledAttribute, rmread attribute access, template-driven
     # structural walker, REQ-103 primitive pass on bindings,
     # C_SINGLE_ATTRIBUTE alternative matching, occurrences upper-
     # bound enforcement, and PROBE-025 / PROBE-026 sandbox probes.
-    # See docs/plans/2026-05-24-validation-v2-template-driven.md.
+    # See docs/plans/archive/2026-05-24-composition-validation-template-driven.md.
     implementation: landed
     packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
     probes: [PROBE-025, PROBE-026]
@@ -391,5 +391,5 @@ requirements:
       - openehr/validation/rmread/read_test.go
       - testkit/probes/validation/probes_test.go
     plans:
-      - docs/plans/2026-05-21-validation.md
-      - docs/plans/2026-05-24-validation-v2-template-driven.md
+      - docs/plans/archive/2026-05-21-validation.md
+      - docs/plans/archive/2026-05-24-composition-validation-template-driven.md

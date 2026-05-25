@@ -23,7 +23,7 @@
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
 | **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
-| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([v2 plan](plans/2026-05-24-validation-v2-template-driven.md)); composition builder and AQL builders still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
+| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([composition validation plan](plans/archive/2026-05-24-composition-validation-template-driven.md)); composition builder and AQL builders still open. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
@@ -46,8 +46,8 @@
 | Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/2026-05-22-template-req100-followups.md) |
 | RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Internal until public shape stabilises. [ADR 0005](adr/0005-compiled-template-foundation.md) |
-| Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [v2 plan](plans/2026-05-24-validation-v2-template-driven.md) |
-| Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [plan](plans/2026-05-21-validation.md) (superseded for composition by v2 plan) |
+| Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
+| Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [archived umbrella plan](plans/archive/2026-05-21-validation.md) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
 | Composition builder | **Planned** | `openehr/composition/` | [plan](plans/2026-05-21-composition-builder.md) |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
