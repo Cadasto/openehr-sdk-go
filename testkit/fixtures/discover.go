@@ -32,7 +32,25 @@ var compositionJSONExcluded = map[string]bool{
 
 // rmJSONExcluded rm/*.json stems omitted from [ListCompositionJSON] (codec or wire gaps).
 var rmJSONExcluded = map[string]bool{
-	"ehr_status_invalid_003_ehr_status_subject_id_empty": true, // PARTY_SELF id without _type
+	"ehr_status_valid_000_ehr_status_ecis": true, // alternate wire (flat subjectId), not canonical JSON
+}
+
+// rmJSONExcludedPrefixes excludes rm/*.json stems from probe discovery (prefix match).
+// Robot invalid EHR_STATUS samples are API-validation payloads, not canonical JSON conformance inputs.
+var rmJSONExcludedPrefixes = []string{
+	"ehr_status_invalid_",
+}
+
+func excludedRMJSONStem(stem string) bool {
+	if rmJSONExcluded[stem] {
+		return true
+	}
+	for _, p := range rmJSONExcludedPrefixes {
+		if strings.HasPrefix(stem, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // compositionXMLExcluded composition XML on disk but not exercised by canxml
@@ -71,7 +89,7 @@ func collectJSON(dir, kind string, out *[]CompositionJSONRel) error {
 		if kind == "compositions" && compositionJSONExcluded[stem] {
 			continue
 		}
-		if kind == "rm" && rmJSONExcluded[stem] {
+		if kind == "rm" && excludedRMJSONStem(stem) {
 			continue
 		}
 		*out = append(*out, CompositionJSONRel{

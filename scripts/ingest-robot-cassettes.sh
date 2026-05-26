@@ -80,6 +80,11 @@ done
 
 # 6 — contribution submission wire (CONTRIBUTION + inline ORIGINAL_VERSION)
 while IFS= read -r -d '' f; do
+  base=$(basename "$f")
+  # ~1.2MB bulk payload; smaller contribution fixtures cover multi-version cases.
+  if [[ "$base" == "contribution.create_multiple_compositions.json" ]]; then
+    continue
+  fi
   rel=${f#"$ROBOT/"}
   safe=$(echo "$rel" | tr '/' '_')
   cp_sub "$rel" "$safe"

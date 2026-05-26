@@ -88,9 +88,9 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 **Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip, SDK-GAP-11). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
-**RM JSON** (`rm/`, flat names): 9 `ehr_status_valid_*`, 12 `ehr_status_invalid_*` (one invalid sample probe-skipped), 14 `folder_*` including `folder_update_*`.
+**RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 
-**Submissions** ([`submissions/`](submissions/README.md)): 48 CONTRIBUTION create payloads from `contributions/` — use `contribution.Submission`, not `rm.Contribution` decode.
+**Submissions** ([`submissions/`](submissions/README.md)): 47 CONTRIBUTION create payloads from `contributions/` (bulk `create_multiple_compositions` omitted) — use `contribution.Submission`, not `rm.Contribution` decode.
 
 ### SDK (`rm/`)
 

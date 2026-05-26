@@ -63,6 +63,20 @@ func TestProbe033(t *testing.T) {
 	if len(serializeprobes.Probe033Inputs) == 0 {
 		t.Fatal("Probe033Inputs is empty — bootstrap encoder failed at init")
 	}
+	var leafSeen, cassetteSeen bool
+	for _, in := range serializeprobes.Probe033Inputs {
+		if len(in.Name) > len("cassette:") && in.Name[:len("cassette:")] == "cassette:" {
+			cassetteSeen = true
+		} else {
+			leafSeen = true
+		}
+	}
+	if !leafSeen {
+		t.Error("Probe033Inputs missing leaf-type entries")
+	}
+	if !cassetteSeen {
+		t.Error("Probe033Inputs missing cassette entries — check testkit/cassettes discovery via testkit/fixtures")
+	}
 	for _, in := range serializeprobes.Probe033Inputs {
 		t.Run(in.Name, func(t *testing.T) {
 			r, err := serializeprobes.Probe033CanxmlRoundTrip(in.Body, in.Factory)
