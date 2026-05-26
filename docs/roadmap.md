@@ -23,7 +23,7 @@
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
 | **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
-| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([archive](plans/archive/2026-05-24-composition-validation-template-driven.md)); **REQ-107 template-driven instance generator landed** ([archive](plans/archive/2026-05-24-template-instance-example-generator.md)); **REQ-101 composition builder landed** ([archive](plans/archive/2026-05-21-composition-builder.md)). Open: AQL builders, plus the [C_PRIMITIVE_OBJECT wire-parser follow-up](plans/2026-05-26-c-primitive-object-wire-parser.md) (widens PROBE-023 to full unmarshal round-trip). See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
+| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([archive](plans/archive/2026-05-24-composition-validation-template-driven.md)); **REQ-107 template-driven instance generator landed** ([archive](plans/archive/2026-05-24-template-instance-example-generator.md)); **REQ-101 composition builder landed** ([archive](plans/archive/2026-05-21-composition-builder.md)); **C_PRIMITIVE_OBJECT wire-parser + UID emission landed** ([archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md)) — PROBE-023 now does full unmarshal round-trip. Open: AQL builders. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
@@ -49,8 +49,8 @@
 | Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
 | Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [archived umbrella plan](plans/archive/2026-05-21-validation.md) |
 | AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
-| OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` + closed-root accessors + `internal/templateinstance/rmwrite/`; PROBE-027 on `vital_signs.opt` + `clinical_note.opt`. [archive](plans/archive/2026-05-24-template-instance-example-generator.md). Follow-up [C_PRIMITIVE_OBJECT plan](plans/2026-05-26-c-primitive-object-wire-parser.md) covers parser inner-`<item>` extraction + UID emission (widens PROBE-023). |
-| Composition builder | **Landed** | `openehr/composition/` REQ-101 | `NewSkeleton` + `Builder.Set/SetText/SetQuantity/SetCodedText/Build`; PROBE-023 (marshal-fragment parity v1). [archive](plans/archive/2026-05-21-composition-builder.md) |
+| OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` + closed-root accessors + `internal/templateinstance/rmwrite/`; PROBE-027 on `vital_signs.opt` + `clinical_note.opt`; `Options.UIDSource` test-determinism seam; canjson-polymorphic `Composition.uid`. [archive](plans/archive/2026-05-24-template-instance-example-generator.md) + [wire-parser archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md). |
+| Composition builder | **Landed** | `openehr/composition/` REQ-101 | `NewSkeleton` + `Builder.Set/SetText/SetQuantity/SetCodedText/Build`; PROBE-023 (full unmarshal round-trip). [archive](plans/archive/2026-05-21-composition-builder.md) |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | EHR Extract RM | **Deferred** | — | Skipped per v1 scope |
 
@@ -121,7 +121,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013; PROBE-071 (SDK-GAP-09 representation writes) |
 | Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 (REQ-102) |
 | Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 (REQ-107) on `vital_signs.opt` + `clinical_note.opt` |
-| Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023 (REQ-101) — marshal-fragment parity v1 |
+| Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023 (REQ-101) — full marshal → unmarshal → re-marshal round-trip |
 | Definition probe | **Landed** | `testkit/probes/definition/` | PROBE-067 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
 | Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned |

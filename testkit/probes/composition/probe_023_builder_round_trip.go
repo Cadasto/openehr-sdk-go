@@ -8,6 +8,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
@@ -32,12 +33,16 @@ type Assignment struct {
 }
 
 // Probe023BuilderRoundTrip exercises the canonical authoring round-
-// trip: NewBuilder over c, apply each Assignment, Build, canjson
-// Marshal, then verify every fragment in every Assignment appears in
-// the marshalled bytes. The probe is sandbox-only (no transport
-// dependency); cross-SDK parity means another implementation of
-// REQ-101 against the same OPT + assignments MUST produce the same
-// pass outcome.
+// trip: NewBuilder over c, apply each Assignment, Build,
+// canjson.Marshal, canjson.Unmarshal back into a fresh *rm.Composition,
+// re-marshal, and verify every fragment in every Assignment appears in
+// BOTH the first marshal AND the post-unmarshal re-marshal — the
+// stricter parity REQ-101 + PROBE-023 promised once the REQ-107 UID
+// emission is fixed (Phase 2 of
+// [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`]). The
+// probe is sandbox-only (no transport dependency); cross-SDK parity
+// means another implementation of REQ-101 against the same OPT +
+// assignments MUST produce the same pass outcome.
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) {
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {
@@ -73,6 +78,29 @@ func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, 
 		for _, frag := range a.WireFragments {
 			if !bytes.Contains(payload, frag) {
 				failures = append(failures, fmt.Sprintf("Set@%s: marshalled output missing fragment %q", a.Path, string(frag)))
+			}
+		}
+	}
+	// Unmarshal round-trip — the full PROBE-023 promise that
+	// REQ-107 Phase 2 unblocked. Decode the marshalled payload back
+	// into a fresh *rm.Composition (proving the canjson polymorphic
+	// dispatch on Composition.uid + nested DataValues works
+	// symmetrically), then re-marshal and assert the same fragment
+	// set survives the round-trip.
+	var decoded rm.Composition
+	if err := canjson.Unmarshal(payload, &decoded); err != nil {
+		failures = append(failures, fmt.Sprintf("canjson.Unmarshal: %v", err))
+	} else {
+		reMarshalled, err := canjson.Marshal(&decoded)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("canjson.Marshal (after Unmarshal): %v", err))
+		} else {
+			for _, a := range assigns {
+				for _, frag := range a.WireFragments {
+					if !bytes.Contains(reMarshalled, frag) {
+						failures = append(failures, fmt.Sprintf("Set@%s: round-trip output missing fragment %q", a.Path, string(frag)))
+					}
+				}
 			}
 		}
 	}

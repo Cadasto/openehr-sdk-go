@@ -89,6 +89,16 @@ type generator struct {
 	opts     Options
 }
 
+// nextUID returns the next LOCATABLE.uid pointer. Honours
+// [Options.UIDSource] when set (tests pin a counter for golden
+// fixtures); falls back to a random v4 UUID otherwise.
+func (g *generator) nextUID() *rm.HierObjectID {
+	if g.opts.UIDSource != nil {
+		return g.opts.UIDSource()
+	}
+	return newHierObjectID()
+}
+
 // walkNode descends optNode under the bound rmValue, recursively
 // materialising each attribute's children. Mirrors the lockstep
 // shape of openehr/validation/walk_composition.go but in the
@@ -490,7 +500,7 @@ func (g *generator) stampSlotFill(rmValue any, slotRMType string) {
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   "1.1.0",
 	}
-	applyLocatableIdentity(rmValue, archetypeID, slotRMType, ad)
+	applyLocatableIdentity(rmValue, archetypeID, slotRMType, ad, g.nextUID)
 }
 
 // firstNonSlot returns the first OPT child that is not a slot, or
@@ -663,7 +673,7 @@ func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmVa
 		archetypeDetails = ad
 	}
 
-	applyLocatableIdentity(rmValue, id, name, archetypeDetails)
+	applyLocatableIdentity(rmValue, id, name, archetypeDetails, g.nextUID)
 }
 
 // applyPrimitiveExample materialises a primitive leaf's ExampleValue
@@ -834,9 +844,12 @@ func isRequired(attr *templatecompile.CompiledAttribute) bool {
 
 // newHierObjectID generates a HierObjectID with a random
 // UUID-shaped value. Used for LOCATABLE.uid where openEHR mandates
-// uniqueness (Composition, Entry root types). Falls back to a
-// time-derived hex string when crypto/rand fails.
-func newHierObjectID() rm.HierObjectID {
+// uniqueness (Composition, Entry root types). Returns a pointer so
+// canjson's polymorphic dispatch on the UIDBasedID interface emits
+// the `_type:"HIER_OBJECT_ID"` discriminator the decoder needs to
+// round-trip the field. Falls back to a time-derived hex string when
+// crypto/rand fails.
+func newHierObjectID() *rm.HierObjectID {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		// Random source exhausted; fall back to nanosecond timestamp
@@ -851,7 +864,7 @@ func newHierObjectID() rm.HierObjectID {
 	b[8] = (b[8] & 0x3f) | 0x80
 	s := hex.EncodeToString(b[:])
 	uuid := s[0:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:32]
-	return rm.HierObjectID{Value: uuid}
+	return &rm.HierObjectID{Value: uuid}
 }
 
 // toInt64 widens any numeric Go shape to int64. Mirrors the helper

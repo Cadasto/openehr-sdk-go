@@ -1,11 +1,11 @@
 # Plan — C_PRIMITIVE_OBJECT wire-parser + REQ-107 UID emission
 
 **Date:** 2026-05-26
-**Status:** Draft — generator-side surface fixes landed (PR #20); Phases 1 (wire-parser `C_PRIMITIVE_OBJECT.<item>` extraction) + 2 (REQ-107 UID emission) remain open
+**Status:** Landed
 **Owner:** SDK maintainers
 **Covers:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (wire parser), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance synthesiser UID emission), [REQ-101](../specifications/clinical-modeling.md#req-101) (PROBE-023 widening)
-**Probes:** PROBE-023 (widening to full unmarshal round-trip — open); PROBE-027 (extension to `clinical_note.opt` — **landed in PR #20**)
-**Implementation:** **partial** — PR #20 (merged) landed the generator-side `materialiseSingle` AOM-short-name fix + EVENT_CONTEXT rmread gap + PROBE-027 on `clinical_note.opt`. Wire-parser inner-`<item>` extraction and REQ-107 UID emission **not landed** yet (keep PROBE-023 at "marshal-fragment parity (v1)" until those close).
+**Probes:** PROBE-023 (widened to full unmarshal round-trip — landed); PROBE-027 (extension to `clinical_note.opt` — landed in PR #20)
+**Implementation:** **landed** — Phase 0 (PR #20) covered the generator-side `materialiseSingle` AOM-short-name fix + EVENT_CONTEXT rmread gap + PROBE-027 fixture extension. Phase 1 lands the wire-parser inner-`<item>` extraction (`xmlCObject.Item` + `C_PRIMITIVE_OBJECT` branch in `buildPrimitive`; lazy float parse on `xmlNumericInterval` to keep XML decode infallible for temporal ranges). Phase 2 lands `newHierObjectID() *rm.HierObjectID` + `Options.UIDSource` test-determinism seam + the PROBE-023 full unmarshal round-trip; normative spec wording restored.
 **Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18 merged, plan archived); REQ-101 Phases 0–2 (PR #19 merged, plan archived); PR #20 follow-ups (merged)
 **Defers:** REQ-104 slot-assertion grammar (separate plan); broader AOM 1.4 primitive coverage beyond the closed REQ-103 set
 
