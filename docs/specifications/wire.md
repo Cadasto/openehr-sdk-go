@@ -150,6 +150,15 @@ The openEHR REST 1.1.0-development specification defines envelope shapes for typ
 
 The exact envelope shapes are openEHR REST 1.1.0-development; this spec does not re-define them, it pins to them.
 
+### Request vs response shape asymmetry
+
+Two endpoints carry **distinct request and response shapes** that are easy to conflate because the RM ships only the persisted (response) form:
+
+- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** (SDK-GAP-09, [PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition-sdk-gap-09)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
+- **`POST /ehr/{ehr_id}/contribution`** (SDK-GAP-10, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create-sdk-gap-10)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
+
+Implementations **MUST NOT** serialise the persisted shape on either submission path. The Go SDK enforces this via [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) (distinct from `rm.Contribution`) and the composition / directory write surfaces that take bare RM types.
+
 ## AQL
 
 ### REQ-055 — Wire boundary

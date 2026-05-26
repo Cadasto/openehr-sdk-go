@@ -153,6 +153,8 @@ requirements:
     probes: [PROBE-072]
     tests:
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
+      - openehr/client/ehr/contribution/contribution_test.go
+      - openehr/client/ehr/contribution/submission_test.go
 
   - id: REQ-054
     title: Optimistic concurrency
