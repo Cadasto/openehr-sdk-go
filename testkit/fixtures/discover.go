@@ -23,6 +23,16 @@ var compositionJSONExcluded = map[string]bool{
 	"Address.v2":       true, // ADDRESS / PARTY_IDENTITY DV_CODED_TEXT
 	"Demonstration.v1": true, // DV_MULTIMEDIA in composition
 	"TestPerson.v2":    true, // PERSON / PARTY_IDENTITY DV_CODED_TEXT
+	// Robot / ehrbase Test_dv_interval_* — DV_INTERVAL[T] over DV_ORDERED (SDK-GAP-11).
+	"Test_dv_interval_dv_count_lower_upper_constraint.v0":    true,
+	"Test_dv_interval_dv_count_open_constraint.v0":         true,
+	"Test_dv_interval_dv_quantity_lower_upper_constraint.v0": true,
+	"Test_dv_interval_dv_quantity_open_constraint.v0":      true,
+}
+
+// rmJSONExcluded rm/*.json stems omitted from [ListCompositionJSON] (codec or wire gaps).
+var rmJSONExcluded = map[string]bool{
+	"ehr_status_invalid_003_ehr_status_subject_id_empty": true, // PARTY_SELF id without _type
 }
 
 // compositionXMLExcluded composition XML on disk but not exercised by canxml
@@ -59,6 +69,9 @@ func collectJSON(dir, kind string, out *[]CompositionJSONRel) error {
 		}
 		stem := strings.TrimSuffix(e.Name(), ".json")
 		if kind == "compositions" && compositionJSONExcluded[stem] {
+			continue
+		}
+		if kind == "rm" && rmJSONExcluded[stem] {
 			continue
 		}
 		*out = append(*out, CompositionJSONRel{

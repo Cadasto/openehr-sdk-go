@@ -30,6 +30,25 @@ limitations under the License.
 
 **Modifications:** Filename stems match operational `template_id` values; no clinical content edits.
 
+## ehrbase (integration-tests Robot)
+
+**Source:** https://github.com/ehrbase/ehrbase  
+**Path within source:** `integration-tests/tests/robot/_resources/test_data_sets/` (sibling clone under `/src/ehrbase/`)
+
+```
+Copyright vitasystems GmbH and Hannover Medical School (ehrbase project).
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+```
+
+**Vendored:** Minimal-entry and `Test_dv_*` template triplets under `templates/` + `compositions/`; `persistent_minimal.en.v1`; flat `rm/ehr_status_*` and `rm/folder_*` JSON; `submissions/*.json` CONTRIBUTION create wire from `contributions/`.
+
+**Modifications:** Flat `rm/` and `submissions/` filenames; composition JSON stems match operational `template_id`; no clinical content edits. Re-ingest via `scripts/ingest-robot-cassettes.sh`.
+
 ## CODE24 (Cadasto)
 
 **Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)); benchmark `vital_signs` and `clinical_notes.v0`.

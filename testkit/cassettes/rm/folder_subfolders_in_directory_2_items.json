@@ -1,0 +1,44 @@
+{
+    "_type": "FOLDER",
+    "name": {
+        "_type": "DV_TEXT",
+        "value": "root"
+    },
+    "archetype_node_id": "openEHR-EHR-FOLDER.generic.v1",
+    "folders": [
+        {
+          "_type": "FOLDER",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "test subfolder 1"
+          },
+          "archetype_node_id": "openEHR-EHR-FOLDER.generic.v1"
+        },
+        {
+          "_type": "FOLDER",
+          "name": {
+            "_type": "DV_TEXT",
+            "value": "test subfolder 2"
+          },
+          "archetype_node_id": "openEHR-EHR-FOLDER.generic.v1"
+        }
+    ],
+    "items": [
+        {
+            "id": {
+                "_type": "HIER_OBJECT_ID",
+                "value": "${composition_uid_short1}"
+            },
+            "namespace": "my.system.id",
+            "type": "VERSIONED_COMPOSITION"
+        },
+        {
+            "id": {
+                "_type": "HIER_OBJECT_ID",
+                "value": "${composition_uid_short2}"
+            },
+            "namespace": "my.system.id",
+            "type": "VERSIONED_COMPOSITION"
+        }
+    ]
+}

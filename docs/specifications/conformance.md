@@ -49,7 +49,7 @@ The probe definition is the single source; the runner picks the backend at invoc
 
 ### Vendored cassettes (`testkit/cassettes/`)
 
-Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`) — not hard-coded legacy directory names.
+Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
 
 **Layout** (vendor provenance is indexed in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md); it is not encoded in directory names):
 
@@ -59,6 +59,7 @@ testkit/cassettes/
   compositions/{template-id}.json
   compositions/{template-id}.xml     # when vendored
   rm/{name}.json | {name}.xml        # RM-only samples (ehrbase, leaf XML, …)
+  submissions/{name}.json            # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
   its_rest/                          # ITS-REST wire records (REQ-095)
 ```
 
@@ -66,9 +67,10 @@ testkit/cassettes/
 |---|---|---|
 | `templates/` + `compositions/` | Operational template + canonical instance for a `template_id` | PROBE-022–027, PROBE-030 (JSON), PROBE-033 (XML when paired) |
 | `rm/` | RM root samples without a paired OPT (ehrbase COMPOSITION/EHR_STATUS/FOLDER, leaf `DV_QUANTITY`, …) | PROBE-030, PROBE-033 |
+| `submissions/` | CONTRIBUTION create payloads for the EHR contribution client (not `rm.Contribution` decode) | contribution client tests (REQ-059) |
 | `its_rest/` | Recorded HTTP request/response shapes | PROBE-010+, discovery probes (REQ-095) |
 
-Discovery for PROBE-030 / PROBE-033 walks `compositions/` and `rm/` via [`fixtures.ListCompositionJSON`](../../testkit/fixtures/discover.go) and [`fixtures.ListRMXML`](../../testkit/fixtures/discover.go). Templates with JSON or XML on disk but known codec gaps **MAY** be listed in `compositionJSONExcluded` / `compositionXMLExcluded` in that package so probes stay green while the files remain available for template and validation work.
+Discovery for PROBE-030 / PROBE-033 walks `compositions/` and `rm/` via [`fixtures.ListCompositionJSON`](../../testkit/fixtures/discover.go) and [`fixtures.ListRMXML`](../../testkit/fixtures/discover.go). Templates with JSON or XML on disk but known codec gaps **MAY** be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work.
 
 **Legacy paths** (`testkit/cassettes/canonical_json/`, `canonical_xml/`, `fixtures/`, vendor subdirectories under `cassettes/`) are **retired** — do not reference them in new spec text, plans, or code comments.
 

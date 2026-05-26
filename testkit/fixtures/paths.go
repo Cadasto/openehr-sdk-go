@@ -6,6 +6,7 @@
 //	compositions/{template-id}.json
 //	compositions/{template-id}.xml
 //	rm/{name}.json | .xml          # RM probe samples (ehrbase, leaf, …)
+//	submissions/{name}.json       # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
 //	its_rest/                     # ITS-REST wire records
 //
 // Vendor provenance is indexed in testkit/cassettes/README.md (not in paths).
@@ -27,7 +28,8 @@ func CassettesRoot() string {
 
 func templatesDir() string  { return filepath.Join(CassettesRoot(), "templates") }
 func compositionsDir() string { return filepath.Join(CassettesRoot(), "compositions") }
-func rmDir() string         { return filepath.Join(CassettesRoot(), "rm") }
+func rmDir() string            { return filepath.Join(CassettesRoot(), "rm") }
+func submissionsDir() string { return filepath.Join(CassettesRoot(), "submissions") }
 
 // TemplateOpt returns testkit/cassettes/templates/{template-id}.opt.
 func TemplateOpt(templateID string) string {
@@ -52,6 +54,13 @@ func RMJSON(name string) string {
 // RMXML returns testkit/cassettes/rm/{name}.xml.
 func RMXML(name string) string {
 	return filepath.Join(rmDir(), name+".xml")
+}
+
+// SubmissionJSON returns testkit/cassettes/submissions/{name}.json.
+// Files use the ehrbase Robot CONTRIBUTION POST shape (versions[] hold inline
+// ORIGINAL_VERSION payloads), not persisted CONTRIBUTION with OBJECT_REF.
+func SubmissionJSON(name string) string {
+	return filepath.Join(submissionsDir(), name+".json")
 }
 
 // idAlias maps test shorthands to on-disk template ids when they differ.

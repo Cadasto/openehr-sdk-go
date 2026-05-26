@@ -10,10 +10,11 @@ cassettes/
   compositions/{template-id}.json
   compositions/{template-id}.xml      # when vendored
   rm/{name}.json | {name}.xml         # RM probe samples (ehrbase, leaf XML, …)
+  submissions/{name}.json             # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
   its_rest/                           # ITS-REST / discovery wire
 ```
 
-Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`).
+Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`).
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
@@ -69,6 +70,28 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
 | `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
 
+### ehrbase (Robot integration-tests)
+
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md). Ingest script: [`scripts/ingest-robot-cassettes.sh`](../../scripts/ingest-robot-cassettes.sh).
+
+**Minimal entry** (`valid_templates/minimal/` + `xml_compositions/`):
+
+| Template id | OPT | JSON | XML | Probes |
+|---|---|:---:|:---:|---|
+| `minimal_evaluation.en.v1` | yes | yes | yes | round-trip |
+| `minimal_observation.en.v1` | yes | — | yes | XML only upstream |
+| `minimal_admin.en.v1` | yes | — | yes | XML only upstream |
+| `minimal_instruction.en.v1` | yes | yes | yes | round-trip |
+| `minimal_action_2` | yes | yes | yes | round-trip (`minimal_action.en.v1` OPT does not compile) |
+
+**Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
+
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip, SDK-GAP-11). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+
+**RM JSON** (`rm/`, flat names): 9 `ehr_status_valid_*`, 12 `ehr_status_invalid_*` (one invalid sample probe-skipped), 14 `folder_*` including `folder_update_*`.
+
+**Submissions** ([`submissions/`](submissions/README.md)): 48 CONTRIBUTION create payloads from `contributions/` — use `contribution.Submission`, not `rm.Contribution` decode.
+
 ### SDK (`rm/`)
 
 | File | Role |
@@ -83,4 +106,4 @@ See [`its_rest/README.md`](its_rest/README.md).
 ## Conventions
 
 - Immutable inputs — fix the codec or refresh from upstream, do not patch cassettes to green tests.
-- New template: add `templates/` + `compositions/` files; update this table. If probes should skip, add the id to `compositionJSONExcluded` / `compositionXMLExcluded` in [`discover.go`](../fixtures/discover.go).
+- New template: add `templates/` + `compositions/` files; update this table. If probes should skip, add the id to `compositionJSONExcluded` / `compositionXMLExcluded` / `rmJSONExcluded` in [`discover.go`](../fixtures/discover.go).
