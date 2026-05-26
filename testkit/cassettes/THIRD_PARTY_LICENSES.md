@@ -1,13 +1,11 @@
 # Third-party licenses — vendored cassettes
 
-Some cassette fixtures under [`canonical_json/`](canonical_json/) and [`canonical_xml/`](canonical_xml/) are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here.
+Some cassette fixtures under this directory are vendored from upstream projects. Per the upstream license terms, copyright and license notices are retained here.
 
 ## ehrbase/openEHR_SDK
 
-**Files under** [`canonical_json/ehrbase/`](canonical_json/ehrbase/) **and** [`canonical_xml/ehrbase/`](canonical_xml/ehrbase/) — see those directories' `PROVENANCE.md` for the per-file mapping.
-
-**Source:** https://github.com/ehrbase/openEHR_SDK
-**Commit:** `4b5a710d3ddc3529a45222fb0398a2440bf83a9b` (2026-05-17)
+**Source:** https://github.com/ehrbase/openEHR_SDK  
+**Commit:** `4b5a710d3ddc3529a45222fb0398a2440bf83a9b` (2026-05-17)  
 **Path within source:** `test-data/src/main/resources/`
 
 ```
@@ -26,4 +24,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-**Modifications:** None. Files are vendored byte-identical from the upstream commit referenced above.
+**RM-only (`rm/`):** `minimal_evaluation.json`, `compo_with_nested_party_related.json`, `ehr_status_other_details_simple.json`, `nested_folder.json`, `test_all_types.v1.xml`, `simple_empty_folder.xml` — from `composition/canonical_json/`, `ehr/canonical_json/`, `folder/canonical_json/`, and `composition/canonical_xml/` in the commit above.
+
+**Template triplets (`templates/` + `compositions/`):** `cluster-slot.ehrbase.org.v0`, `nested.en.v1`, `IDCR Problem List.v1`, `IDCR - Laboratory Test Report.v0`, `IDCR -  Adverse Reaction List.v1` — OPT from `operationaltemplate/` (or equivalent) and matching canonical JSON/XML from `composition/` in the same upstream tree.
+
+**Modifications:** Filename stems match operational `template_id` values; no clinical content edits.
+
+## CODE24 (Cadasto)
+
+**Files:** CODE24-sourced templates under `templates/` paired with `compositions/` (see [README.md](README.md)); benchmark `vital_signs` and `clinical_notes.v0`.
+
+**License:** MIT
+
+Sample clinical and template-definition artefacts contributed by CODE24 for SDK parser, validation, and serialization testing. No patient data.

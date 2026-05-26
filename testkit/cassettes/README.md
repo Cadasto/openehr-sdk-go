@@ -1,34 +1,86 @@
 # testkit/cassettes
 
-Vendored test cassettes used by the SDK's codec, validation, and probe
-tests. Cassettes are checked into the repository so CI does **not**
-require any sibling repo to be cloned (REQ-082).
+Vendored test cassettes for codec, validation, and probe tests. Checked in so CI does not require a sibling clone (REQ-082).
 
 ## Layout
 
-| Sub-directory | Format | Used by |
-|---|---|---|
-| `canonical_json/` | openEHR canonical JSON compositions | `openehr/serialize/canjson`, PROBE-030, PROBE-031 |
+```
+cassettes/
+  templates/{template-id}.opt
+  compositions/{template-id}.json
+  compositions/{template-id}.xml      # when vendored
+  rm/{name}.json | {name}.xml         # RM probe samples (ehrbase, leaf XML, …)
+  its_rest/                           # ITS-REST / discovery wire
+```
 
-## Provenance
+Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`).
 
-### `canonical_json/`
+Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
-Vendored canonical JSON compositions from the reference CDR load harness (internal snapshot, May 2026). Upstream layout and refresh steps stay in the private consumer checkout — not documented here.
+**Probe vs on-disk.** Vendored `*.json` / `*.xml` under `compositions/` may be omitted from [`ListCompositionJSON`](../fixtures/discover.go) / [`ListRMXML`](../fixtures/discover.go) when canjson/canxml cannot round-trip yet; files remain for template and instance work via `fixtures.CompositionJSON(id)`.
 
-| File | Notes |
+## Index by vendor
+
+### Benchmark (internal)
+
+| Template id | OPT | JSON | XML |
+|---|---|:---:|:---:|
+| `vital_signs` | yes | yes | — |
+| `clinical_notes.v0` | yes | yes | — |
+
+### CODE24 (Cadasto)
+
+**License:** MIT — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+
+| Template id | OPT | JSON | XML | Probes |
+|---|---|:---:|:---:|---|
+| `body_weight` | yes | yes | yes | round-trip |
+| `BMI` | yes | yes | yes | round-trip |
+| `alternative_types.en.v1` | yes | yes | yes | round-trip |
+| `test_template_rename_node` | yes | yes | yes | round-trip |
+| `test_template_rename_node_2` | yes | yes | yes | round-trip |
+| `Episode.v2` | yes | yes | yes | round-trip |
+| `Address.v2` | yes | yes | yes | JSON/XML on disk; probes skip (codec) |
+| `Demonstration.v1` | yes | yes | yes | probes skip |
+| `TestPerson.v2` | yes | yes | yes | probes skip |
+
+### ehrbase (openEHR_SDK)
+
+**License:** Apache 2.0 — [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md) (commit `4b5a710d3ddc3529a45222fb0398a2440bf83a9b`, 2026-05-17).
+
+**RM-only** (`rm/`, no OPT):
+
+| File | RM root |
 |---|---|
-| `body_weight.json` | Minimal Composition with a single OBSERVATION. |
-| `BMI.json` | Multi-event observation with HISTORY and ITEM_TREE protocol. |
-| `clinical_note.json` | EVALUATION-bearing Composition. |
-| `vital_signs.json` | OBSERVATION with multiple data points and reference ranges. |
+| `minimal_evaluation.json` | COMPOSITION |
+| `compo_with_nested_party_related.json` | COMPOSITION |
+| `ehr_status_other_details_simple.json` | EHR_STATUS |
+| `nested_folder.json` | FOLDER |
+| `test_all_types.v1.xml` | COMPOSITION |
+| `simple_empty_folder.xml` | FOLDER |
+
+**Template triplets** (`templates/` + `compositions/`, from openEHR_SDK test-data):
+
+| Template id | OPT | JSON | XML | Probes |
+|---|---|:---:|:---:|---|
+| `cluster-slot.ehrbase.org.v0` | yes | yes | — | round-trip |
+| `nested.en.v1` | yes | yes | — | round-trip |
+| `IDCR Problem List.v1` | yes | — | yes | XML round-trip |
+| `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
+| `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
+
+### SDK (`rm/`)
+
+| File | Role |
+|---|---|
+| `composition_minimal.xml` | Minimal COMPOSITION XML |
+| `dv_quantity.xml` | Leaf `DV_QUANTITY` XML |
+
+### ITS-REST
+
+See [`its_rest/README.md`](its_rest/README.md).
 
 ## Conventions
 
-- Cassettes are immutable inputs. **Never** hand-edit a vendored
-  cassette to make a test pass — fix the codec, or open a follow-up to
-  refresh the cassette from upstream.
-- New cassette directories require a row in the Layout table and a
-  Provenance subsection.
-- Cassettes that exercise SDK-emitted bytes (e.g. round-trip outputs)
-  live next to their test as `testdata/`, not here.
+- Immutable inputs — fix the codec or refresh from upstream, do not patch cassettes to green tests.
+- New template: add `templates/` + `compositions/` files; update this table. If probes should skip, add the id to `compositionJSONExcluded` / `compositionXMLExcluded` in [`discover.go`](../fixtures/discover.go).

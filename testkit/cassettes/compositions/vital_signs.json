@@ -9,7 +9,7 @@
       "value": "openEHR-EHR-COMPOSITION.encounter.v1"
     },
     "template_id": {
-      "value": "vital_signs::141b9433-5860-390b-9463-ebe616be4729"
+      "value": "vital_signs"
     },
     "rm_version": "1.0.2"
   },
