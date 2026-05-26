@@ -197,6 +197,15 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/template/probe_022_opt_path_resolution.go`](../../testkit/probes/template/probe_022_opt_path_resolution.go).
 
+#### PROBE-023 — Composition builder marshal-fragment parity (v1)
+
+- **Title:** Building a composition via `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` yields canonical-JSON bytes containing the values supplied through `Set` at their addressed paths.
+- **Preconditions:** A compiled OPT and a list of (path, value) assignments addressed against it.
+- **Wire assertion:** Sandbox-only — `composition.NewBuilder(ctx, c, opts...)` + per-path `Set` + `Build` MUST succeed; `canjson.Marshal` of the result MUST contain the assigned primitive values (magnitude / units for DV_QUANTITY, value string for DV_TEXT, code / terminology for DV_CODED_TEXT) as byte fragments verifiable against the canonical-JSON output. Full unmarshal round-trip is **out of scope in v1** — `instance.newHierObjectID` returns a `rm.HierObjectID` value (not pointer) while `canjson` marshals UID polymorphism via a pointer-receiver method, so the emitted JSON omits the UID's `_type` discriminator. PROBE-023 is widened to "marshal → unmarshal → values preserved at paths" once the UID emission path is fixed in `openehr/instance`.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox, v1 marshal-fragment scope) — see [`testkit/probes/composition/probe_023_builder_round_trip.go`](../../testkit/probes/composition/probe_023_builder_round_trip.go). In-memory verification of the built `*rm.Composition` (no canjson round-trip) covered by `TestBuilder_SetQuantity_systolic` in [`openehr/composition/builder_test.go`](../../openehr/composition/builder_test.go).
+- **Satisfies:** REQ-101, REQ-082.
+
 #### PROBE-024 — Primitive constraint validate
 
 - **Title:** Parsing an OPT and resolving a fixture-defined list of leaf paths, calling `PrimitiveConstraint.Validate` with a supplied Go value, returns the expected multiset of `ViolationCode` values per case.
@@ -449,7 +458,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
-| Clinical modeling | PROBE-022, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
+| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
 | Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |

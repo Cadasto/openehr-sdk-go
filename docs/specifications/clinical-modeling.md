@@ -397,3 +397,45 @@ In v1 the public signature accepts `*templatecompile.Compiled` (module-local), s
 - **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
 - **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
 
+---
+
+## REQ-101 — Generic OPT-driven composition builder
+
+**Status:** Draft (Phases 0–2 landed).
+
+The SDK **MUST** ship a composition-specific authoring layer at `openehr/composition/` that produces an in-memory `*rm.Composition` graph driven by a compiled OPT. REQ-101 owns the composition options and path-first authoring API; REQ-107 owns the skeleton-synthesis engine. The composition builder is a thin shim over `openehr/instance` — no second OPT walker lives here.
+
+### Scope
+
+Two entry points:
+
+1. **`NewSkeleton(ctx, c, opts...) (*rm.Composition, error)`** — produces a structurally-conformant default composition with no clinical data. Delegates to `instance.Generate` with `Policy: Minimal` and unwraps the root via `instance.AsComposition`.
+2. **`NewBuilder(ctx, c, opts...) (*Builder, error)`** — seeds a `Builder` from `NewSkeleton`, then accepts `Set(path, value)` calls. `Build()` returns the populated graph and aggregates per-path errors.
+
+### Contract
+
+- **Composition-specific options** — `WithLanguage(code)`, `WithTerritory(code)`, `WithComposer(p)`, `WithCategory(c)`, `WithNow(t)`. The first four translate to fields on `instance.Options` and pin `Composition.language` / `.territory` / `.composer` / `.category`. `WithNow` injects the clock used for `EVENT.time` and `EventContext.start_time` defaults so tests stay deterministic.
+- **Path-first API** — `Set(path string, v any) error` looks up the compiled node via `Compiled.NodeAt(path)` and routes the assignment through the parent attribute. Typed helpers `SetText`, `SetQuantity`, `SetCodedText` wrap the most common DV shapes. Paths MUST be canonical OPT paths as produced by the compile step — predicate-bracketed segments included where the OPT pins archetype roots or at-codes.
+- **Type enforcement** — `Set` checks the supplied Go value against the compiled node's `RMTypeName()`. A mismatch (e.g. a `*rm.DVText` passed at a DV_QUANTITY path) returns `ErrTypeMismatch`. Unknown paths return `ErrUnknownPath`. Both errors wrap context with `fmt.Errorf("...: %w", err)` and are comparable via `errors.Is`.
+- **Aggregated errors** — `Set` records errors against the builder but does NOT short-circuit; subsequent assignments still attempt. `Build()` returns the populated `*rm.Composition` plus the aggregated error (joined via `errors.Join`) so callers can recover every faulty path in one round-trip rather than chasing one error at a time.
+- **TemplateID propagation** — `Builder.TemplateID()` returns the OPT's `Compiled.TemplateID()`, suitable for the REST `composition.WithTemplateID` option so the CDR validates against the same template.
+
+### Trust model
+
+REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every primitive default, every LOCATABLE identity stamp comes from `instance.Generate`. REQ-101 limits its own dispatch to (a) translating options into `instance.Options` and (b) navigating the path → target attribute → call `rmwrite.EnsureSingle` / `AppendMultiple`. Reads during navigation go through `openehr/validation/rmread.ReadSingle` — the same closed type switch the validator uses — so the read / write halves stay symmetric.
+
+### Out of scope
+
+- **Per-template generated Go structs.** v1 stays generic — consumers do not import codegen'd vital-signs structs through this package. OET-driven authoring is a follow-up.
+- **FLAT / STRUCTURED ingest.** Caller decodes externally (REQ-053) and feeds the resulting `*rm.Composition` through validation.
+- **Slot resolution against a federated archetype repository.** Same compromise as REQ-102 / REQ-107: pinned slot fills come from the OPT.
+- **Encoding to wire bytes.** The builder does not import `openehr/serialize/`; callers run `canjson.Marshal` / `canxml.Marshal` themselves.
+- **Validating during Build.** A `Build()` result MUST be runnable through `validation.ValidateComposition` separately; the builder is sound-by-construction but not a validator.
+
+### Building-block independence (REQ-013)
+
+`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
+
+- **Lives in:** [`openehr/composition/`](../../openehr/composition/)
+- **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → marshal-fragment parity at key paths (v1; full unmarshal round-trip lands once the UID emission path in `openehr/instance` is fixed).
+
