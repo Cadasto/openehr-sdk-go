@@ -86,7 +86,7 @@
 | EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
 | Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 write gaps → followups plan |
 | Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / SDK-GAP-09 notes as composition |
-| Contribution | **Landed** | `openehr/client/ehr/contribution/` | |
+| Contribution | **Partial** | `openehr/client/ehr/contribution/` | Surface landed but request body uses persisted RM shape (`versions: []OBJECT_REF`) — must switch to `Contribution_create` (inline `data: T`) per spec. See [contribution-submission-shape plan](plans/2026-05-26-contribution-submission-shape.md) / SDK-GAP-10. |
 | ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |
 | Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
