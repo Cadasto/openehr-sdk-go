@@ -80,6 +80,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-098 | Request-level observer hook | [transport.md § REQ-098](transport.md#req-098--request-level-observer-hook) | landed |
 | REQ-099 | ITS-REST Admin client surface | [module-layout.md § REQ-099](module-layout.md#req-099--its-rest-admin-client-surface) | landed |
 | REQ-100 | ADL 1.4 operational template (OPT) parse and paths | [clinical-modeling.md § REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) | landed |
+| REQ-101 | Generic OPT-driven composition builder | [clinical-modeling.md § REQ-101](clinical-modeling.md#req-101--generic-opt-driven-composition-builder) | partial |
 | REQ-102 | Composition validation | [clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) | landed |
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | partial |

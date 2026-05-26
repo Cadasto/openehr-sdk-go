@@ -396,6 +396,15 @@ requirements:
     plans:
       - docs/plans/2026-05-24-template-instance-example-generator.md
 
+  - id: REQ-101
+    title: Generic OPT-driven composition builder
+    canonical: docs/specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder
+    status: draft
+    implementation: planned  # Phase 0 — spec landed; Phases 1-2 follow in this branch
+    probes: [PROBE-023]
+    plans:
+      - docs/plans/2026-05-21-composition-builder.md
+
   - id: REQ-102
     title: Composition validation
     canonical: docs/specifications/clinical-modeling.md#req-102--composition-validation
