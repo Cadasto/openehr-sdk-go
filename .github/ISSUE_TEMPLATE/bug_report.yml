@@ -1,0 +1,85 @@
+name: Bug report
+description: Something is wrong with the SDK (build, API, wire codec, validation, probes).
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Do not use this form for security vulnerabilities** — see [SECURITY.md](https://github.com/Cadasto/openehr-sdk-go/blob/main/SECURITY.md).
+
+        Before opening, check [docs/roadmap.md](https://github.com/Cadasto/openehr-sdk-go/blob/main/docs/roadmap.md) and existing issues.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong in one or two sentences?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Smallest Go snippet, OPT, composition JSON, or probe invocation that triggers the bug.
+      placeholder: |
+        ```go
+        // ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include full error text or decode/validation output when relevant.
+    validations:
+      required: true
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      placeholder: "go version output, e.g. go1.25.0 linux/amd64"
+    validations:
+      required: true
+
+  - type: input
+    id: sdk-version
+    attributes:
+      label: SDK version
+      description: Git tag, or output of `go list -m github.com/cadasto/openehr-sdk-go`
+      placeholder: "v0.1.0 or pseudo-version from go.mod"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area (best guess)
+      options:
+        - transport / REST client
+        - auth / SMART
+        - rm / serialize / validation
+        - template / instance / composition
+        - aql
+        - testkit / probes
+        - docs / spec / CI
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Related REQ-NNN / PROBE-NNN, PR links, CDR version if wire-related.

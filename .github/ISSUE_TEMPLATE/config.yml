@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security policy
+    url: https://github.com/Cadasto/openehr-sdk-go/security/policy
+    about: Read SECURITY.md — scope, supported versions, and how to report safely.
+  - name: Report a vulnerability (maintainers)
+    url: https://github.com/Cadasto/openehr-sdk-go/security/advisories/new
+    about: Draft a private security advisory (repo collaborators). Do not use a public issue for security bugs.
+  - name: Questions & ideas
+    url: https://github.com/Cadasto/openehr-sdk-go/discussions
+    about: Open a discussion for questions, design feedback, or roadmap alignment.

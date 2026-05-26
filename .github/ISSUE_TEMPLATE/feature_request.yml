@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose new SDK behaviour or a normative REQ extension.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Feature requests that change wire behaviour usually need a **REQ** in [`docs/specifications/`](https://github.com/Cadasto/openehr-sdk-go/tree/main/docs/specifications) before code. Check [`docs/roadmap.md`](https://github.com/Cadasto/openehr-sdk-go/blob/main/docs/roadmap.md) and [`docs/plans/`](https://github.com/Cadasto/openehr-sdk-go/tree/main/docs/plans) first.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What are you trying to do, and why is the current SDK insufficient?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: API sketch, package placement, or REQ outline. Link a plan draft if you have one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: spec
+    attributes:
+      label: Specification impact
+      options:
+        - label: This needs a new or changed REQ in docs/specifications/ (normative)
+        - label: This is internal / test-only (no REQ change)
+        - label: Unsure — happy to discuss in the issue
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Links / context
+      description: ITS-REST OpenAPI section, openEHR spec reference, related issues.

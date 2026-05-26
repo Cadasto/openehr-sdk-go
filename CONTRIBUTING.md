@@ -12,7 +12,7 @@
 
 ### Reporting a bug
 
-- Open a [GitHub issue](https://github.com/Cadasto/openehr-sdk-go/issues/new).
+- Open a [bug report or feature request](https://github.com/Cadasto/openehr-sdk-go/issues/new/choose) (`.github/ISSUE_TEMPLATE/`).
 - Include: Go version (`go version`), OS, the smallest reproducing snippet, the expected vs actual behaviour. If the bug touches the wire (REST clients, canjson, validation against an OPT), include the OPT or composition shape that triggers it.
 - **Security bugs**: do NOT open a public issue — follow [`SECURITY.md`](SECURITY.md).
 

@@ -6,17 +6,20 @@
 
 ### How to report
 
-Use GitHub's **private vulnerability reporting**:
+Do **NOT** open a public issue or PR for security bugs.
 
-1. Go to <https://github.com/Cadasto/openehr-sdk-go/security/advisories/new>
-2. Fill in the form. Include:
-   - The Go version, OS, and SDK version (`go list -m github.com/cadasto/openehr-sdk-go` or the git tag) you reproduce against.
+**Repository collaborators (private repo today):**
+
+1. Open **Security → Advisories → New draft security advisory** in the GitHub UI, or go to <https://github.com/Cadasto/openehr-sdk-go/security/advisories/new>.
+2. Include:
+   - Go version, OS, and SDK version (`go list -m github.com/cadasto/openehr-sdk-go` or the git tag).
    - A minimal reproduction — the smallest snippet, OPT, or composition body that exposes the issue.
    - Impact assessment (data exposure / auth bypass / DoS / etc.).
    - Suggested fix, if you have one.
-3. Maintainers triage in private; do **NOT** open a public issue or PR until coordinated.
 
-If GitHub's private reporting is unavailable to you, email the repository owner via the email on their GitHub profile.
+**External reporters (no repo access):** email the repository owner via the contact on their GitHub profile. We coordinate disclosure the same way as for advisory reports.
+
+**When this repository is public:** enable **Settings → Code security and analysis → Private vulnerability reporting** so non-collaborators can use GitHub's reporter form at the same advisory URL. Until then, the advisory URL is for maintainers drafting advisories only — not a public intake form.
 
 ### What to expect
 
