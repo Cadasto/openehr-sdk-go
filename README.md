@@ -5,15 +5,15 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/cadasto/openehr-sdk-go)](https://goreportcard.com/report/github.com/cadasto/openehr-sdk-go)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cadasto/openehr-sdk-go)](go.mod)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version: v0.1.0](https://img.shields.io/badge/version-v0.1.0-blue)](docs/releases.md)
+[![Version: v0.2.0](https://img.shields.io/badge/version-v0.2.0-blue)](docs/releases.md)
 [![Release notes](https://img.shields.io/badge/release_notes-CHANGELOG-blue)](CHANGELOG.md)
 
 First-party **Go SDK for openEHR** — covers openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT parsing with typed primitive constraints (REQ-100 / REQ-103), template-driven composition validation (REQ-102), template-driven RM instance synthesis (REQ-107), an OPT-driven composition builder (REQ-101), and SMART-on-openEHR auth, with Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) shipped in the same module for v1. (OET / ADL 2 are out of v1 scope.)
 
-> **Status:** `v0.1.0` — first tagged release. Pre-1.0 minors may break public API; pin to the exact tag. See [`docs/releases.md`](docs/releases.md) for the version policy and [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
+> **Status:** `v0.2.0` — second `v0.x` minor. Pre-1.0 minors may break public API; pin to the exact tag. See [`docs/releases.md`](docs/releases.md) for the version policy and [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.1.0
+go get github.com/cadasto/openehr-sdk-go@v0.2.0
 ```
 
 ## Use cases

@@ -10,7 +10,13 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
-- **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — AOM 1.4 primitive short-name wrappers now flow through; `Composition.uid` emits `_type:"HIER_OBJECT_ID"`; PROBE-023 widened to full round-trip. [archive](docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md).
+## [0.2.0] - 2026-05-26
+
+Second `v0.x` minor — Contribution write path lands the spec request shape, AOM 1.4 primitive wrappers now flow through, and the release-tooling is fully wired (tag-driven workflow + auto-compatibility table). Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — `contribution.Commit`'s signature change is the only one this cycle and has no in-tree callers.
+
+### Added
+
+- **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — AOM 1.4 primitive short-name wrappers now flow through; `Composition.uid` emits `_type:"HIER_OBJECT_ID"`; PROBE-023 widened to full round-trip.
 - **GitHub repo hygiene + release workflow** — issue / PR templates, refined `CONTRIBUTING.md` / `SECURITY.md`; tag-driven [`release.yml`](.github/workflows/release.yml) re-runs `make ci` and drafts a GitHub Release with auto-generated compatibility table.
 - **Contribution submission shape (SDK-GAP-10)** — `contribution.Commit` now takes [`*Submission`](openehr/client/ehr/contribution/submission.go) (ITS-REST `Contribution_create`: inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`), not the persisted `*rm.Contribution`. Breaking change; no in-tree callers. PROBE-072.
 
