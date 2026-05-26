@@ -100,6 +100,17 @@ func TestCommitRejectsInputs(t *testing.T) {
 	}
 }
 
+// TestCommitSubmissionShape pins SDK-GAP-10 / PROBE-072. Skipped at
+// Phase 0 — see docs/plans/2026-05-26-contribution-submission-shape.md —
+// because the current `contribution.Commit` accepts `*rm.Contribution`
+// whose `versions[]` is `[]ObjectRef`, so the wire body can never carry
+// `_type:"ORIGINAL_VERSION"` with inline `data`. Phase 1 lands
+// `contribution.Submission` and unskips this test; the assertion below
+// is the regression gate the new API must satisfy.
+func TestCommitSubmissionShape(t *testing.T) {
+	t.Skip("PROBE-072 stub — unskips when contribution.Submission lands (plan Phase 1)")
+}
+
 func TestCommitMapsVersionConflict(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
