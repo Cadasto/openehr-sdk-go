@@ -227,6 +227,73 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 	}
 }
 
+// TestBuilder_Build_AggregatesErrors confirms that two bad Set calls
+// + one good Set surface as a single joined error from Build, with
+// each per-path failure recoverable via errors.Is.
+func TestBuilder_Build_AggregatesErrors(t *testing.T) {
+	c := compileFixture(t, "vital_signs.opt")
+	b, err := composition.NewBuilder(context.Background(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	// Two failures + one success — Set returns the per-call error
+	// (typed), Build joins all into one returned error.
+	_ = b.Set("/no/such/path", &rm.DVText{Value: "x"})
+	_ = b.SetQuantity(systolicPath, 120, "mm[Hg]") // valid
+	_ = b.Set("/also/missing", &rm.DVText{Value: "y"})
+
+	_, err = b.Build()
+	if err == nil {
+		t.Fatal("expected aggregated error from Build, got nil")
+	}
+	if !errors.Is(err, composition.ErrUnknownPath) {
+		t.Errorf("expected joined error to surface ErrUnknownPath, got %v", err)
+	}
+	// Both bad-path strings should appear in the joined diagnostic.
+	msg := err.Error()
+	if !contains(msg, "/no/such/path") || !contains(msg, "/also/missing") {
+		t.Errorf("joined error missing one of the two bad paths: %v", err)
+	}
+}
+
+// TestBuilder_Build_Idempotent confirms a second Build with no new
+// Set calls returns a nil error — accumulated errors from the first
+// Build are not replayed (PR #19 review suggestion: drain state
+// between Build passes for chained authoring).
+func TestBuilder_Build_Idempotent(t *testing.T) {
+	c := compileFixture(t, "vital_signs.opt")
+	b, err := composition.NewBuilder(context.Background(), c,
+		composition.WithTerritory("NL"),
+		composition.WithComposer(testComposer()),
+	)
+	if err != nil {
+		t.Fatalf("NewBuilder: %v", err)
+	}
+	// First pass fails on a bogus path.
+	_ = b.Set("/no/such/path", &rm.DVText{Value: "x"})
+	if _, err := b.Build(); err == nil {
+		t.Fatal("first Build: expected error, got nil")
+	}
+	// Second pass with no new Set must NOT replay the first pass's
+	// errors. Skeleton is returned unchanged with nil error.
+	out, err := b.Build()
+	if err != nil {
+		t.Errorf("second Build replayed prior errors: %v", err)
+	}
+	if out == nil {
+		t.Error("second Build returned nil skeleton")
+	}
+}
+
+// contains is a local micro-helper to keep the aggregated-error test
+// self-contained without pulling strings.Contains everywhere.
+func contains(haystack, needle string) bool {
+	return bytes.Contains([]byte(haystack), []byte(needle))
+}
+
 // TestBuilder_TemplateID asserts Builder.TemplateID matches the
 // compiled template's id.
 func TestBuilder_TemplateID(t *testing.T) {

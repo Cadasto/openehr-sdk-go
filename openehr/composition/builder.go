@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
@@ -133,17 +134,33 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // order against the skeleton; per-path failures accumulate via
 // errors.Join. The returned *rm.Composition is the same skeleton
 // instance — Build mutates it in place.
+//
+// Build is repeatable: pending Set calls and accumulated errors are
+// consumed by each invocation. A second Build with no intervening Set
+// returns the same skeleton with a nil error. Builder users can
+// chain Set → Build → Set → Build without errors stacking from a
+// prior pass; per-call errors return value still surfaces the
+// per-Set failures that drove the current Build to fail.
 func (b *Builder) Build() (*rm.Composition, error) {
 	if b == nil {
 		return nil, fmt.Errorf("composition: nil Builder")
 	}
-	for _, p := range b.pending {
+	// Drain accumulated state in one pass — pending consumed via the
+	// range loop snapshot below; errs reset to capture only this
+	// Build's failures.
+	pending := b.pending
+	b.pending = nil
+	carriedErrs := b.errs
+	b.errs = nil
+	var passErrs []error
+	passErrs = append(passErrs, carriedErrs...)
+	for _, p := range pending {
 		if err := b.applyAssignment(p); err != nil {
-			b.errs = append(b.errs, fmt.Errorf("%s: %w", p.path, err))
+			passErrs = append(passErrs, fmt.Errorf("%s: %w", p.path, err))
 		}
 	}
-	if len(b.errs) > 0 {
-		return b.skeleton, errors.Join(b.errs...)
+	if len(passErrs) > 0 {
+		return b.skeleton, errors.Join(passErrs...)
 	}
 	return b.skeleton, nil
 }
@@ -311,10 +328,16 @@ func descendOne(cur any, s pathSegment) (any, error) {
 				return it, nil
 			}
 		}
-		// Fall back to first item — accommodates skeletons that
-		// stamped synthetic ids (e.g. slot fills with example archetype
-		// ids) that the OPT-path predicate does not match exactly.
-		return items[0], nil
+		// No sibling matches the predicate — fail rather than silently
+		// route to items[0]. PR #19 review: an authoring API must not
+		// mis-route Set into the wrong sibling when predicates diverge
+		// (skeleton at-code vs path archetype id, multiple siblings,
+		// slot-fill mismatch). The skeleton's slot-fill stamping (the
+		// REQ-107 ".example.v1" heuristic) is exposed here as
+		// ErrInvalidPath until REQ-104 grammar parsing replaces the
+		// heuristic with the OPT's actual archetype-id assertion.
+		return nil, fmt.Errorf("%w: no sibling under %q matches predicate %q (siblings: %s)",
+			ErrInvalidPath, s.attrName, s.matchID, siblingIDs(items))
 	}
 	return nil, fmt.Errorf("%w: unsupported cardinality %v on attribute %q", ErrInvalidPath, s.cardinality, s.attrName)
 }
@@ -416,4 +439,21 @@ func archetypeNodeID(v any) string {
 		return x.ArchetypeNodeID
 	}
 	return ""
+}
+
+// siblingIDs joins the archetype_node_id (or "<empty>") of each item
+// for diagnostic output in descendOne's predicate-mismatch error path.
+func siblingIDs(items []any) string {
+	if len(items) == 0 {
+		return "<none>"
+	}
+	parts := make([]string, 0, len(items))
+	for _, it := range items {
+		id := archetypeNodeID(it)
+		if id == "" {
+			id = "<empty>"
+		}
+		parts = append(parts, id)
+	}
+	return strings.Join(parts, ", ")
 }

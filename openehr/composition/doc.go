@@ -25,8 +25,8 @@
 //
 // This package imports openehr/rm, openehr/rm/typereg,
 // openehr/template, openehr/template/constraints, openehr/instance,
-// openehr/validation/rmread, internal/templatecompile,
-// internal/templatecompile/walk, and internal/templateinstance/rmwrite.
-// It does NOT import openehr/serialize, openehr/client, transport,
-// auth, or openehr/validation (callers run validation separately).
+// openehr/validation/rmread, internal/templatecompile, and
+// internal/templateinstance/rmwrite. It does NOT import
+// openehr/serialize, openehr/client, transport, auth, or
+// openehr/validation (callers run validation separately).
 package composition

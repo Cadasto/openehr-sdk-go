@@ -197,13 +197,13 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/template/probe_022_opt_path_resolution.go`](../../testkit/probes/template/probe_022_opt_path_resolution.go).
 
-#### PROBE-023 — Composition builder round-trip
+#### PROBE-023 — Composition builder marshal-fragment parity (v1)
 
-- **Title:** Building a composition via `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → unmarshal yields a composition whose key paths carry the values supplied through `Set`.
+- **Title:** Building a composition via `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` yields canonical-JSON bytes containing the values supplied through `Set` at their addressed paths.
 - **Preconditions:** A compiled OPT and a list of (path, value) assignments addressed against it.
-- **Wire assertion:** Sandbox-only — `composition.NewBuilder(ctx, c, opts...)` + per-path `Set` + `Build` MUST succeed; `canjson.Marshal` of the result, followed by `canjson.Unmarshal` to a fresh `*rm.Composition`, MUST preserve the assigned values at the same paths (magnitude / units for DV_QUANTITY, value string for DV_TEXT, code / terminology for DV_CODED_TEXT).
+- **Wire assertion:** Sandbox-only — `composition.NewBuilder(ctx, c, opts...)` + per-path `Set` + `Build` MUST succeed; `canjson.Marshal` of the result MUST contain the assigned primitive values (magnitude / units for DV_QUANTITY, value string for DV_TEXT, code / terminology for DV_CODED_TEXT) as byte fragments verifiable against the canonical-JSON output. Full unmarshal round-trip is **out of scope in v1** — `instance.newHierObjectID` returns a `rm.HierObjectID` value (not pointer) while `canjson` marshals UID polymorphism via a pointer-receiver method, so the emitted JSON omits the UID's `_type` discriminator. PROBE-023 is widened to "marshal → unmarshal → values preserved at paths" once the UID emission path is fixed in `openehr/instance`.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/composition/probe_023_builder_round_trip.go`](../../testkit/probes/composition/probe_023_builder_round_trip.go).
+- **Status:** Implemented (Sandbox, v1 marshal-fragment scope) — see [`testkit/probes/composition/probe_023_builder_round_trip.go`](../../testkit/probes/composition/probe_023_builder_round_trip.go). In-memory verification of the built `*rm.Composition` (no canjson round-trip) covered by `TestBuilder_SetQuantity_systolic` in [`openehr/composition/builder_test.go`](../../openehr/composition/builder_test.go).
 - **Satisfies:** REQ-101, REQ-082.
 
 #### PROBE-024 — Primitive constraint validate
