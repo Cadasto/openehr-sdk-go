@@ -777,7 +777,7 @@ func newHierObjectID() rm.HierObjectID {
 		// Random source exhausted; fall back to nanosecond timestamp
 		// so the generator keeps producing distinct ids.
 		ts := uint64(time.Now().UnixNano())
-		for i := 0; i < 8; i++ {
+		for i := range 8 {
 			b[i] = byte(ts >> (i * 8))
 		}
 	}
