@@ -65,14 +65,20 @@ Today (2026-05): large surface is **landed** (transport, clients, codecs, templa
 1. **CI green on `main`** — `make ci` passes locally (`fmt-check`, `mod-tidy-check`, `codegen-verify`, `vet`, `spec-check`, `test`, `lint`, `build`). The same set is enforced by [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 2. **CHANGELOG cut** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it.
 3. **Roadmap milestone** — bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone boundary (e.g. Phase 2 closeout).
-4. **Annotated tag** from `main`:
+4. **Preview release notes locally** (optional but recommended):
+   ```bash
+   bash scripts/release-notes.sh 0.1.0   # prints what the workflow will draft
+   ```
+   The script extracts the matching `## [X.Y.Z]` block from `CHANGELOG.md` and appends an auto-generated compatibility table (SDK semver, Go minimum, openEHR REST, BMM pins, git revision). For a no-side-effects preview against a future tag, use the workflow's `workflow_dispatch` dry-run from the Actions tab.
+5. **Annotated tag** from `main`:
    ```bash
    git tag -a v0.1.0 -m "Release v0.1.0"
    git push origin v0.1.0
    ```
    Lightweight tags work but annotated tags carry the release date + author and integrate cleanly with `git describe` and Go module info.
-5. **GitHub Release** — body copies the CHANGELOG section verbatim + the compatibility metadata table below.
-6. **Announce** — link release notes from the first consumer (and any other in-flight adopter).
+6. **Release workflow runs** — [`.github/workflows/release.yml`](../.github/workflows/release.yml) fires on the `v*` tag push: re-runs `make ci` on the tagged commit, regenerates release notes via `scripts/release-notes.sh`, and creates a **draft** GitHub Release. The workflow does **not** auto-publish — the maintainer reviews and clicks publish manually. If CI fails, the draft is not created and the tag stands without a release until the issue is fixed (delete and re-tag, or push a patch).
+7. **Publish the draft** — open the [Releases page](https://github.com/Cadasto/openehr-sdk-go/releases), verify the notes, edit if needed, click **Publish release**.
+8. **Announce** — link release notes from the first consumer (and any other in-flight adopter).
 
 ### Compatibility metadata (release notes)
 
@@ -86,7 +92,7 @@ Every release notes section ends with a small table identifying the four version
 | BMM corpus | `openehr_base_1.3.0`, `openehr_rm_1.2.0`, `openehr_am_1.4.0`, `openehr_am_2.4.0`, `openehr_lang_1.1.0`, `openehr_term_3.1.0` |
 | Git revision | `<short SHA>` |
 
-Reading the BMM pins: `ls resources/bmm/*.bmm.json` — that's the authoritative list.
+Reading the BMM pins: `ls resources/bmm/*.bmm.json` — that's the authoritative list. The release workflow ([`release.yml`](../.github/workflows/release.yml)) regenerates this table automatically from `go.mod`, `resources/bmm/`, and `git rev-parse --short HEAD` via [`scripts/release-notes.sh`](../scripts/release-notes.sh), so the CHANGELOG section itself only needs to carry the human narrative.
 
 ### Pre-releases
 

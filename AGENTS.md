@@ -104,7 +104,8 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 **CHANGELOG.md** — agents **do not need to update** this file for every change. Update only when the user asks, or when cutting a release / merging a milestone PR. When you do:
 
 - **One bullet per artefact class** (e.g. "Transport layer", "EHR REST client") — not per file, type, REQ-ID, probe, or commit.
-- **No** API inventories, option lists, file paths, struct names, or "implements REQ-NNN" traceability — that lives in `docs/specifications/traceability.yaml`, commit messages, and PR bodies.
+- **Short.** Aim for **one line** per bullet; two at most. If a bullet wraps to a third line, it's too detailed — trim.
+- **No** API inventories, option lists, file paths, struct names, or "implements REQ-NNN" traceability — that lives in `docs/specifications/traceability.yaml`, commit messages, and PR bodies. Readers chasing detail follow the commit log and `traceability.yaml`; the changelog is the headline, not the changelog of the changelog.
 - **Pre-1.0:** only `### Added` is used; `### Changed` / `### Fixed` / `### Removed` are reserved for post-v1.0 entries. Pre-release renames, fix-ups, and dropped experiments fold into the relevant Added bullet or are dropped entirely.
 
 ## Tooling policy

@@ -10,7 +10,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
-- **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — `openehr/template/parse.go` now extracts the inner `<item xsi:type="C_*">` of `C_PRIMITIVE_OBJECT` wrappers (AOM 1.4 primitive short names like DURATION / DATE / BOOLEAN flow through as typed constraints); `openehr/instance/newHierObjectID()` returns `*rm.HierObjectID` so canjson's polymorphic dispatch emits `_type:"HIER_OBJECT_ID"` on `Composition.uid`; new `Options.UIDSource` test-determinism seam; PROBE-023 widened to the full `Marshal → Unmarshal → re-marshal` round-trip its normative wording always promised. [archive](docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md).
+- **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — AOM 1.4 primitive short-name wrappers now flow through; `Composition.uid` emits `_type:"HIER_OBJECT_ID"`; PROBE-023 widened to full round-trip. [archive](docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md).
+- **GitHub repo hygiene + release workflow** — issue / PR templates, refined `CONTRIBUTING.md` / `SECURITY.md`; tag-driven [`release.yml`](.github/workflows/release.yml) re-runs `make ci` and drafts a GitHub Release with auto-generated compatibility table.
 
 ## [0.1.0] - 2026-05-26
 

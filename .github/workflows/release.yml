@@ -1,0 +1,100 @@
+# Release workflow for openehr-sdk-go.
+#
+# Triggers on push of an annotated tag matching v*. Re-runs the same
+# quality gate as ci.yml on the tagged commit, builds release notes from
+# the matching CHANGELOG.md section + auto-generated compatibility table
+# (scripts/release-notes.sh), and creates a *draft* GitHub Release — the
+# maintainer still publishes manually after a final review. workflow_dispatch
+# offers a dry-run that prints the would-be release notes without creating
+# anything (useful before pushing the tag).
+#
+# Policy: docs/releases.md. Plan: docs/plans/2026-05-25-versioning-strategy.md.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag name to preview (e.g. v0.2.0). Dry-run only — no release is created.'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Verify and draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.x'
+          cache: true
+
+      - name: Resolve tag and mode
+        id: meta
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${DISPATCH_TAG}"
+            dry_run=true
+          else
+            tag="${GITHUB_REF#refs/tags/}"
+            dry_run=false
+          fi
+          case "$tag" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            v[0-9]*.[0-9]*.[0-9]*-*) ;;
+            *) echo "tag '$tag' does not match v<major>.<minor>.<patch>[-pre]"; exit 1 ;;
+          esac
+          version="${tag#v}"
+          echo "tag=$tag"           >> "$GITHUB_OUTPUT"
+          echo "version=$version"   >> "$GITHUB_OUTPUT"
+          echo "dry_run=$dry_run"   >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=$tag version=$version dry_run=$dry_run"
+
+      - name: Re-run CI gate on tagged commit
+        run: make ci
+
+      - name: Build release notes
+        run: |
+          set -euo pipefail
+          bash scripts/release-notes.sh "${{ steps.meta.outputs.version }}" release_notes.md
+          echo "----- release_notes.md -----"
+          cat release_notes.md
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes-${{ steps.meta.outputs.tag }}
+          path: release_notes.md
+
+      - name: Create draft GitHub Release
+        if: steps.meta.outputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            --title "${{ steps.meta.outputs.tag }}" \
+            --notes-file release_notes.md \
+            --draft \
+            --target "$GITHUB_SHA"
+          echo "Draft release created. Review at https://github.com/${GITHUB_REPOSITORY}/releases and publish manually."

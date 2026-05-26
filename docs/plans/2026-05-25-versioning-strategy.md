@@ -1,11 +1,11 @@
 # Plan — Versioning and release strategy
 
 **Date:** 2026-05-25
-**Status:** Phase 0 landed (`v0.1.0` released 2026-05-26); Phase 1 (runtime `version` package) **declined** per maintainer call (YAGNI — git tag is the authoritative version source; runtime introspection is a deferred follow-up if a consumer asks); Phase 2 (release GitHub Action) + Phase 3 (`v1.0.0` ceremony) remain open
+**Status:** **Landed 2026-05-26.** Phase 0 (policy docs + first tag at `v0.1.0`) + Phase 2 (release GitHub Action) shipped. Phase 1 (runtime `version` package) **declined** per maintainer call (YAGNI — git tag is the authoritative source). Phase 3 (`v1.0.0` ceremony) **descoped from this plan** — it will be drafted as a separate plan when the REQ registry sweep is close to ready.
 **Owner:** SDK maintainers
 **Covers:** REQ-004 (semantic versioning), REQ-001 (module path); informs [`CHANGELOG.md`](../../CHANGELOG.md), [`docs/ci.md`](../ci.md), [`docs/releases.md`](../releases.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`SECURITY.md`](../../SECURITY.md)
 **Probes:** — (release process; no PROBE-NNN)
-**Implementation:** Phase 0 **landed** (policy docs + first tag at `v0.1.0`); Phase 1 runtime package **declined**; Phases 2–3 planned
+**Implementation:** Phase 0 **landed** (policy docs + `v0.1.0` tag); Phase 1 runtime package **declined**; Phase 2 **landed** ([`.github/workflows/release.yml`](../../.github/workflows/release.yml) + [`scripts/release-notes.sh`](../../scripts/release-notes.sh)); Phase 3 descoped (separate plan when applicable)
 **Depends on:** [`docs/ci.md`](../ci.md); [`docs/specifications/packaging.md`](../specifications/packaging.md); [`docs/specifications/module-layout.md`](../specifications/module-layout.md) § Versioning
 **Defers:** openEHR REST spec version (REQ-050), BMM file pins (REQ-041) as module semver — those ship as **compatibility metadata** per release, not as the Go tag itself
 
@@ -211,29 +211,30 @@ func String() string
 
 **Definition of done:** `go list -m -versions` resolves; `version.Version` matches tag.
 
-### Phase 2 — GitHub Actions release workflow
+### Phase 2 — GitHub Actions release workflow ✅ landed 2026-05-26
 
-**Tasks:**
+**Scope adjusted to no-version-package reality** (Phase 1 declined): no `version/version.go` to stamp, no `scripts/release-stamp`. The workflow + helper script ship the human narrative + auto-generated compatibility metadata instead.
 
-1. `.github/workflows/release.yml` on `push` tags matching `v*`:
-   - Verify tag is on a commit that passed CI (optional: check status API)
-   - Run `make ci`
-   - Run `scripts/release-stamp` with tag version
-   - Fail if `version/version.go` not committed on release branch (or auto-commit bot — prefer **manual** stamp PR before tag)
-2. `workflow_dispatch` dry-run: print would-be `version.String()` and CHANGELOG excerpt.
-3. Optional: `govulncheck` before tag (align with `docs/ci.md` future work).
+**Landed deliverables:**
 
-**Definition of done:** Pushing tag runs verification; humans still decide when to tag.
+1. [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — triggered by `push` of tags matching `v*`. Job:
+   - Validates tag shape (`v<major>.<minor>.<patch>[-pre]`).
+   - Re-runs `make ci` on the tagged commit (full PR gate: fmt-check, mod-tidy-check, codegen-verify, vet, spec-check, test, lint, build).
+   - Builds release notes via `scripts/release-notes.sh`.
+   - Creates a **draft** GitHub Release (humans publish manually — matches "humans still decide" from the original DoD).
+2. [`scripts/release-notes.sh`](../../scripts/release-notes.sh) — extracts the matching `## [X.Y.Z]` block from `CHANGELOG.md` and appends a compatibility table sourced from `go.mod` (Go minimum), `resources/bmm/*.bmm.json` (BMM pins), `git rev-parse --short HEAD` (revision), and the REQ-050 REST pin. Exits non-zero if the CHANGELOG section is missing.
+3. `workflow_dispatch` dry-run input: take a `tag` parameter, run the same verification and notes generation, upload notes as an artifact, but skip the `gh release create` step. Lets a maintainer preview a future tag's notes before pushing.
 
-### Phase 3 — v1.0.0 ceremony
+**Deferred to a later iteration:**
 
-**Tasks:**
+- `govulncheck` step (track separately when the rest of `docs/ci.md` adopts it; keep release workflow lean for now).
+- Tag signing (Sigstore / GPG) — see § Open decisions row 4; nice-to-have for `v1.0.0`.
 
-1. REQ registry sweep: move landed REQs to `Status: Stable` in specs.
-2. PROBE ratification vs PHP SDK + live deployment runbook.
-3. Promote CHANGELOG to full Added/Changed/Fixed/Removed.
-4. Tag **`v1.0.0`**; announce API stability promise (no breaking changes without major bump).
-5. ADR if needed: “v1.0.0 scope boundary” (what is in vs deferred `cadasto/` extras).
+**Verification:** local dry-run already exercised — `bash scripts/release-notes.sh 0.1.0` produces a well-formed notes file with the auto-generated compatibility table. The workflow itself will be exercised on the next tag push (`v0.2.0` or `v0.1.1`).
+
+### Phase 3 — v1.0.0 ceremony — **descoped from this plan**
+
+The `v1.0.0` cut is out of scope for the versioning-strategy plan. When the REQ registry sweep + PROBE parity with the PHP SDK + a live deployment dry-run get within reach, a dedicated plan will be drafted (`docs/plans/YYYY-MM-DD-v1-ceremony.md`). Until then, `v0.x` minors are the release vehicle and the Phase 2 workflow already handles them. The `v1.0.0` gate criteria themselves remain documented in [`docs/specifications/module-layout.md` § Versioning](../specifications/module-layout.md#versioning) and [`docs/releases.md` § `v1.0.0` gate](../releases.md#v100-gate) — both are normative; this plan does not duplicate them.
 
 ---
 
