@@ -10,6 +10,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
@@ -156,6 +157,11 @@ func (g *generator) shouldVisit(attr *templatecompile.CompiledAttribute) bool {
 // materialiseSingle synthesises and attaches one child under a
 // C_SINGLE_ATTRIBUTE. For OPT alternatives (multiple children) the
 // first wins — same convention validation uses for matchSingleAlternative.
+//
+// Implicit BMM-mandatory attributes (no OPT children) get a default
+// RM value materialised from the attribute's BMM type so the
+// resulting tree satisfies REQ-102 v2's "required attribute absent"
+// check without the OPT pinning structure for every BMM mandatory.
 func (g *generator) materialiseSingle(
 	optNode *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -163,10 +169,12 @@ func (g *generator) materialiseSingle(
 ) error {
 	children := attr.Children()
 	if len(children) == 0 {
-		// Implicit / OPT-silent attribute — nothing to descend into.
-		// Required implicits (e.g. CODE_PHRASE.terminology_id) get
-		// filled by the root-type-specific defaults pass.
-		return nil
+		// Implicit / OPT-silent attribute. When the attribute carries
+		// a BMM-resolved RM type, materialise a default child of that
+		// type so REQ-102 v2's required-attribute check passes; root-
+		// type-specific defaults (composition.language, .territory,
+		// .start_time) overwrite the placeholder afterwards.
+		return g.materialiseImplicitSingle(optNode, attr, parentRM)
 	}
 	child := children[0]
 	rmChild, err := g.makeChild(child)
@@ -182,10 +190,149 @@ func (g *generator) materialiseSingle(
 	return nil
 }
 
+// materialiseImplicitSingle creates a default value for a
+// BMM-mandatory single attribute the OPT did not pin. The default
+// is a fresh zero-value RM instance of the attribute's BMM type;
+// the post-walk defaults pass (applyCompositionDefaults etc.) fills
+// in well-known fields (e.g. CODE_PHRASE.terminology_id). String-
+// typed BMM attributes (e.g. DV_TEXT.value) go through a separate
+// primitive-default path because they don't belong in typereg.
+//
+// Composition-level fields the post-walk defaults pass owns
+// (language, territory, composer, category, context) are skipped
+// here so user-supplied Options values are not clobbered with a
+// placeholder.
+func (g *generator) materialiseImplicitSingle(
+	optNode *templatecompile.CompiledNode,
+	attr *templatecompile.CompiledAttribute,
+	parentRM any,
+) error {
+	if optNode.RMTypeName() == "COMPOSITION" {
+		switch attr.Name() {
+		case "language", "territory", "composer", "category", "context":
+			return nil
+		}
+	}
+	rmType := attr.RMTypeName()
+	if rmType == "" {
+		return nil
+	}
+	if rmType == "String" {
+		// BMM String → a literal placeholder string. The rmwrite
+		// dispatcher routes "value" / "code_string" / etc. to the
+		// matching field; for everything else the silent best-effort
+		// attach is acceptable.
+		_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), "example")
+		return nil
+	}
+	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	if err != nil {
+		// Unknown RM type — silently skip; the OPT is mis-modelled or
+		// the attribute is outside the current registry, both of
+		// which the validator will flag.
+		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	// Stamp documented sentinel values on DV primitives so the
+	// validator's "required attribute absent" check passes for
+	// BMM-mandatory implicit attrs the OPT did not constrain.
+	g.populatePrimitiveDefault(rmChild)
+	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	// Best-effort attach; if the slot rejects the default (e.g. type
+	// mismatch on a polymorphic attr), let downstream defaults
+	// (applyCompositionDefaults) own the field.
+	_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
+	return nil
+}
+
+// populateBMMRequiredAttrs walks the BMM-required attribute set of
+// the supplied RM value's type and materialises a default value for
+// each. Used when the OPT did not constrain the attribute but the
+// BMM marks it mandatory — keeps the resulting tree REQ-102 v2
+// "required attribute absent" clean.
+//
+// `parentRMType` is the RM class name of `parent` (typereg-style,
+// e.g. "ITEM_TREE"). Recursion bottoms out on primitive RM types
+// (DataValue concretes, CODE_PHRASE) and on cycles via a
+// visited-type ceiling depth.
+func (g *generator) populateBMMRequiredAttrs(parent any, parentRMType string, depth int) {
+	const maxDepth = 6
+	if depth >= maxDepth || parent == nil || parentRMType == "" {
+		return
+	}
+	for _, attrName := range rminfo.Default.RequiredAttributes(parentRMType) {
+		// Skip identity / link metadata we already stamped or never
+		// validate as "required".
+		switch attrName {
+		case "archetype_node_id", "name", "uid", "archetype_details",
+			"links", "feeder_audit":
+			continue
+		}
+		rmType, ok := rminfo.Default.AttributeRMType(parentRMType, attrName)
+		if !ok || rmType == "" {
+			continue
+		}
+		isContainer, _ := rminfo.Default.IsContainer(parentRMType, attrName)
+		if rmType == "String" {
+			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, "example")
+			continue
+		}
+		concrete := concreteFor(rmType)
+		rmChild, err := rmwrite.NewRM(concrete)
+		if err != nil {
+			continue
+		}
+		g.populatePrimitiveDefault(rmChild)
+		// Recurse so nested BMM-required attrs (e.g. CODE_PHRASE
+		// inside DV_CODED_TEXT) get filled.
+		g.populateBMMRequiredAttrs(rmChild, concrete, depth+1)
+		if isContainer {
+			_ = rmwrite.AppendMultiple(parent, parentRMType, attrName, rmChild)
+		} else {
+			_ = rmwrite.EnsureSingle(parent, parentRMType, attrName, rmChild)
+		}
+	}
+}
+
+// populatePrimitiveDefault stamps a minimal-valid sentinel on a
+// freshly-built DV value so its primary "value" channel is
+// non-empty. Mirrors the REQ-103 ExampleValue sentinels for the
+// unbounded cases. RM types that carry no primary value (CLUSTER,
+// ELEMENT, party proxies) silently no-op.
+func (g *generator) populatePrimitiveDefault(rmValue any) {
+	switch v := rmValue.(type) {
+	case *rm.DVText:
+		v.Value = "example"
+	case *rm.DVCodedText:
+		v.Value = "example"
+		v.DefiningCode = rm.CodePhrase{
+			CodeString:    "at0000",
+			TerminologyID: rm.TerminologyID{Value: "local"},
+		}
+	case *rm.CodePhrase:
+		v.CodeString = "at0000"
+		v.TerminologyID = rm.TerminologyID{Value: "local"}
+	case *rm.DVDate:
+		v.Value = "2020-01-01"
+	case *rm.DVTime:
+		v.Value = "12:00:00"
+	case *rm.DVDateTime:
+		v.Value = g.opts.Now.Format("2006-01-02T15:04:05Z07:00")
+	case *rm.DVDuration:
+		v.Value = "P0D"
+	case *rm.DVBoolean:
+		v.Value = true
+	case *rm.DVCount:
+		v.Magnitude = 0
+	case *rm.DVQuantity:
+		// Leave zero — the OPT primitive constraint may further pin.
+	}
+}
+
 // materialiseMultiple synthesises and appends children under a
-// C_MULTIPLE_ATTRIBUTE. Count = lower bound when set, else 1 (so
-// every multi-valued attribute carries at least one filler — the
-// "structurally complete" Minimal contract).
+// C_MULTIPLE_ATTRIBUTE. Per-child counts honour each OPT child's
+// occurrences.lower (default 1) and the overall attribute's
+// cardinality.upper (default unbounded). The synthesised count
+// never exceeds the OPT-declared upper bound.
 func (g *generator) materialiseMultiple(
 	optNode *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -193,31 +340,39 @@ func (g *generator) materialiseMultiple(
 ) error {
 	children := attr.Children()
 	if len(children) == 0 {
-		return nil
+		// Implicit / OPT-silent multi-valued attribute. Synthesise one
+		// default child of the BMM-resolved element type so the
+		// validator's required-attribute / cardinality.lower check
+		// passes; downstream consumers (REQ-101 Builder) overwrite.
+		return g.materialiseImplicitMultiple(optNode, attr, parentRM)
 	}
-	count := 1
-	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
-		if cm.Lower() > 0 {
-			count = cm.Lower()
-		}
+	upperBound := -1 // -1 == unbounded
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.UpperUnbounded() {
+		upperBound = cm.Upper()
 	}
-	// Per-OPT-child occurrences lower bound takes precedence when
-	// declared — generate enough children that the smallest
-	// per-child occurrence count is satisfied.
+	total := 0
 	for _, child := range children {
+		// Slots are caller-filled (REQ-104 will surface a grammar);
+		// the synthesiser does not invent archetype roots to fill
+		// them and instead leaves the count to satisfy the slot's
+		// occurrences.lower (often 0 — most slots are optional).
+		if child.IsSlot() {
+			continue
+		}
 		childCount := 1
 		if occ := child.Occurrences(); occ != nil && !occ.LowerUnbounded() {
 			if occ.Lower() > 0 {
 				childCount = occ.Lower()
 			}
-		}
-		// Multiple-attribute lower bound overrides the per-child when
-		// larger; this matches the "fill to lower" rule for the
-		// attribute as a whole.
-		if count > childCount {
-			childCount = count
+			// occ.Lower()==0 → still produce one fill so the
+			// resulting tree carries every OPT-pinned archetype-root
+			// child at least once. Drops to a per-child loop body of
+			// `1` which is the minimal-yet-complete contract.
 		}
 		for i := 0; i < childCount; i++ {
+			if upperBound >= 0 && total >= upperBound {
+				return nil
+			}
 			rmChild, err := g.makeChild(child)
 			if err != nil {
 				return err
@@ -228,9 +383,122 @@ func (g *generator) materialiseMultiple(
 			if err := rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
 				return fmt.Errorf("append %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 			}
+			total++
+		}
+	}
+	// Top-up to satisfy the attribute's overall lower bound when
+	// nothing was appended (e.g. all OPT children had occurrence
+	// lower 0 under Example with no top-level cardinality block).
+	// When every OPT child is a slot we synthesise a slot-shaped
+	// fill: an RM value of the slot's RMTypeName stamped with a
+	// matching archetype id ("openEHR-EHR-<RMType>.example.v1"),
+	// which satisfies the validator's RM-type-prefix slotFit
+	// heuristic. REQ-104 slot grammar parsing replaces this when it
+	// lands.
+	if needed := remainingLowerNeeded(attr, total); needed > 0 {
+		seed := firstNonSlot(children)
+		if seed == nil && len(children) > 0 {
+			seed = children[0]
+		}
+		if seed == nil {
+			return nil
+		}
+		for needed > 0 && (upperBound < 0 || total < upperBound) {
+			rmChild, err := g.makeChild(seed)
+			if err != nil {
+				return err
+			}
+			if seed.IsSlot() {
+				g.stampSlotFill(rmChild, seed.RMTypeName())
+			}
+			if err := g.walkNode(seed, rmChild); err != nil {
+				return err
+			}
+			if err := rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild); err != nil {
+				// Silent skip — the BMM-fallback child may not satisfy
+				// the OPT-pinned attribute slot (e.g. an ELEMENT
+				// fallback into ITEM_TREE.items where the attribute
+				// expects an Item interface but the rmwrite check
+				// finds a type mismatch). Stop top-up gracefully so
+				// the caller (REQ-101 builder) can fill the slot
+				// later.
+				return nil //nolint:nilerr // intentional: defer to validator
+			}
+			total++
+			needed--
 		}
 	}
 	return nil
+}
+
+// stampSlotFill overrides the archetype_node_id and archetype_details
+// on a freshly-constructed RM value so it satisfies the validator's
+// RM-type-prefix slotFit heuristic
+// ("openEHR-EHR-<RMType>.example.v1"). A v1 stop-gap until REQ-104
+// supplies a parsed slot grammar — synthesiser picks a synthetic
+// archetype id that the validator accepts as a legitimate fill.
+func (g *generator) stampSlotFill(rmValue any, slotRMType string) {
+	archetypeID := "openEHR-EHR-" + slotRMType + ".example.v1"
+	ad := &rm.Archetyped{
+		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
+		RMVersion:   "1.1.0",
+	}
+	applyLocatableIdentity(rmValue, archetypeID, slotRMType, ad)
+}
+
+// firstNonSlot returns the first OPT child that is not a slot, or
+// nil when every child is a slot.
+func firstNonSlot(children []*templatecompile.CompiledNode) *templatecompile.CompiledNode {
+	for _, c := range children {
+		if !c.IsSlot() {
+			return c
+		}
+	}
+	return nil
+}
+
+// materialiseImplicitMultiple creates one default child for a
+// BMM-mandatory multi-valued attribute the OPT did not pin. Uses
+// the attribute's BMM element type via [concreteFor]; silently no-op
+// when the type is outside the typereg registry — the validator
+// will flag it.
+func (g *generator) materialiseImplicitMultiple(
+	optNode *templatecompile.CompiledNode,
+	attr *templatecompile.CompiledAttribute,
+	parentRM any,
+) error {
+	rmType := attr.RMTypeName()
+	if rmType == "" {
+		return nil
+	}
+	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	if err != nil {
+		return nil //nolint:nilerr // intentional: defer to validator
+	}
+	g.populatePrimitiveDefault(rmChild)
+	g.populateBMMRequiredAttrs(rmChild, concreteFor(rmType), 0)
+	_ = rmwrite.AppendMultiple(parentRM, optNode.RMTypeName(), attr.Name(), rmChild)
+	return nil
+}
+
+// remainingLowerNeeded returns the count still required to satisfy
+// the attribute's lower bound. Combines cardinality.lower (when
+// present) with the existence ≥ 1 requirement — REQ-102 v2 flags
+// an empty multi-valued attribute as "required" whenever existence
+// pins lower ≥ 1, regardless of cardinality.lower (cardinality and
+// existence are orthogonal in AOM 1.4).
+func remainingLowerNeeded(attr *templatecompile.CompiledAttribute, current int) int {
+	low := 0
+	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
+		low = cm.Lower()
+	}
+	if isRequired(attr) && low == 0 {
+		low = 1
+	}
+	if current >= low {
+		return 0
+	}
+	return low - current
 }
 
 // makeChild constructs a fresh RM instance for the OPT child's
