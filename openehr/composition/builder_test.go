@@ -225,6 +225,13 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 	if !errors.Is(err, composition.ErrUnknownPath) {
 		t.Errorf("expected ErrUnknownPath, got %v", err)
 	}
+	// PR #19 deferred suggestion: the error message should carry the
+	// path string AND the template-side cause for callers diagnosing
+	// from logs. Wrapping NodeAt's typed cause was added in the
+	// follow-up; pin its diagnostic content here.
+	if msg := err.Error(); !contains(msg, "/no/such/path") {
+		t.Errorf("error missing path string: %v", err)
+	}
 }
 
 // TestBuilder_Build_AggregatesErrors confirms that two bad Set calls

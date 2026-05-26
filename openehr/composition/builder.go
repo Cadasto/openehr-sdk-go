@@ -86,7 +86,11 @@ func (b *Builder) Set(path string, v any) error {
 	}
 	node, err := b.compiled.NodeAt(path)
 	if err != nil {
-		wrapped := fmt.Errorf("%w: %s", ErrUnknownPath, path)
+		// Wrap NodeAt's typed cause so callers that errors.Is against
+		// the template-side sentinels (ErrPathSyntax, ErrPathNotFound)
+		// get the precise reason. Top-level remains ErrUnknownPath for
+		// the public API contract.
+		wrapped := fmt.Errorf("%w: %s: %v", ErrUnknownPath, path, err)
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
@@ -214,8 +218,11 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 		// should walk to that child's index and overwrite. Phase 2
 		// scope: only leaf-DV assignments are guaranteed, multi-attr
 		// container assignment is a follow-up. Return a descriptive
-		// error so the caller knows this is an intentional v1 gap.
-		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s)", ErrInvalidPath, p.path)
+		// error so the caller knows this is an intentional v1 gap;
+		// the leaf-DV path (extending the path with .value or
+		// .magnitude / .units for DV_QUANTITY) covers the common
+		// authoring case end-to-end today.
+		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s) — use a leaf path (e.g. extend with /value or /magnitude for DV_QUANTITY) to address the primitive directly", ErrInvalidPath, p.path)
 	}
 	return nil
 }
