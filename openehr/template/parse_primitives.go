@@ -14,12 +14,19 @@ import (
 // existence / occurrences as integer cardinalities) — primitive
 // ranges are float-typed and carry inclusivity flags.
 type xmlNumericInterval struct {
-	LowerIncluded  *bool   `xml:"lower_included"`
-	UpperIncluded  *bool   `xml:"upper_included"`
-	LowerUnbounded bool    `xml:"lower_unbounded"`
-	UpperUnbounded bool    `xml:"upper_unbounded"`
-	Lower          float64 `xml:"lower"`
-	Upper          float64 `xml:"upper"`
+	LowerIncluded  *bool `xml:"lower_included"`
+	UpperIncluded  *bool `xml:"upper_included"`
+	LowerUnbounded bool  `xml:"lower_unbounded"`
+	UpperUnbounded bool  `xml:"upper_unbounded"`
+	// Lower / Upper are decoded as string and parsed to float lazily
+	// in numericRange. AOM 1.4 reuses the same `<range>` element name
+	// for both numeric ranges (C_INTEGER / C_REAL / C_DV_QUANTITY)
+	// and temporal ranges (C_DURATION / C_DATE / etc.); the latter
+	// carry ISO 8601 strings (e.g. `PT0S`) that strconv.ParseFloat
+	// cannot read. Lazy parse keeps decode infallible regardless of
+	// which xsi:type owns the range.
+	Lower string `xml:"lower"`
+	Upper string `xml:"upper"`
 }
 
 // xmlPrimitiveListItem captures one <list> entry inside a primitive
@@ -82,6 +89,20 @@ func buildPrimitive(o *xmlCObject, strict bool) (constraints.PrimitiveConstraint
 		return buildDvQuantity(o), nil
 	case "C_DV_ORDINAL":
 		return buildDvOrdinal(o), nil
+	case "C_PRIMITIVE_OBJECT":
+		// The wrapper carries the AOM 1.4 primitive short name on
+		// `rm_type_name` (DURATION / DATE / BOOLEAN / etc.); the
+		// inner `<item xsi:type="C_*">` carries the actual typed
+		// constraint. Recurse on Item — when missing under strict
+		// mode, surface as a malformed-OPT error rather than
+		// silently dropping the leaf constraint.
+		if o.Item == nil {
+			if strict {
+				return nil, fmt.Errorf("%w: C_PRIMITIVE_OBJECT for %q has no <item> child", ErrInvalidOPT, o.RMTypeName)
+			}
+			return nil, nil
+		}
+		return buildPrimitive(o.Item, strict)
 	}
 	return nil, nil
 }
@@ -224,18 +245,36 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 
 // numericRange folds a wire numeric interval into the public range
 // shape, defaulting LowerIncluded / UpperIncluded to true when the
-// OPT omits them (AOM convention).
+// OPT omits them (AOM convention). xmlNumericInterval.Lower / Upper
+// are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
+// and temporal types); parsed to float64 lazily here. Unparseable
+// bounds — e.g. an ISO 8601 string in a temporal-range context — fall
+// through as the unbounded sentinel on that side; numeric constraint
+// builders only call this function from numeric xsi:type branches,
+// so the temporal case never reaches numericRange in practice.
 func numericRange(i *xmlNumericInterval) constraints.NumericRange {
 	if i == nil {
 		return constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}
 	}
 	r := constraints.NumericRange{
-		Lower:          i.Lower,
-		Upper:          i.Upper,
 		LowerUnbounded: i.LowerUnbounded,
 		UpperUnbounded: i.UpperUnbounded,
 		LowerInclusive: i.LowerIncluded == nil || *i.LowerIncluded,
 		UpperInclusive: i.UpperIncluded == nil || *i.UpperIncluded,
+	}
+	if !r.LowerUnbounded {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {
+			r.Lower = f
+		} else {
+			r.LowerUnbounded = true
+		}
+	}
+	if !r.UpperUnbounded {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Upper), 64); err == nil {
+			r.Upper = f
+		} else {
+			r.UpperUnbounded = true
+		}
 	}
 	return r
 }

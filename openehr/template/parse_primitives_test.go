@@ -521,6 +521,104 @@ func TestParse_LeafComplexObject_NoConstraint(t *testing.T) {
 // This test pins the recovery: a C_PRIMITIVE_OBJECT(DURATION) with
 // an inner C_DURATION pattern must compile to a typed CDuration with
 // the pattern preserved.
+// TestParse_CPrimitiveObject_Coverage exercises the C_PRIMITIVE_OBJECT
+// recursion across every primitive wrapper the AOM 1.4 OPTs in the
+// wild use. The wrapper carries the primitive short name on
+// rm_type_name; the inner <item xsi:type="C_*"> carries the typed
+// constraint that the parser must thread through.
+func TestParse_CPrimitiveObject_Coverage(t *testing.T) {
+	cases := []struct {
+		name   string
+		rmType string
+		inner  string
+		assert func(t *testing.T, p constraints.PrimitiveConstraint)
+	}{
+		{
+			name:   "DATE/pattern",
+			rmType: "DATE",
+			inner:  `<item xsi:type="C_DATE"><pattern>YYYY-MM-??</pattern></item>`,
+			assert: func(t *testing.T, p constraints.PrimitiveConstraint) {
+				cd, ok := p.(constraints.CDate)
+				if !ok {
+					t.Fatalf("got %T, want CDate", p)
+				}
+				if cd.Pattern != "YYYY-MM-??" {
+					t.Errorf("Pattern = %q, want YYYY-MM-??", cd.Pattern)
+				}
+			},
+		},
+		{
+			name:   "TIME/pattern",
+			rmType: "TIME",
+			inner:  `<item xsi:type="C_TIME"><pattern>HH:MM:SS</pattern></item>`,
+			assert: func(t *testing.T, p constraints.PrimitiveConstraint) {
+				ct, ok := p.(constraints.CTime)
+				if !ok {
+					t.Fatalf("got %T, want CTime", p)
+				}
+				if ct.Pattern != "HH:MM:SS" {
+					t.Errorf("Pattern = %q, want HH:MM:SS", ct.Pattern)
+				}
+			},
+		},
+		{
+			name:   "DATE_TIME/pattern",
+			rmType: "DATE_TIME",
+			inner:  `<item xsi:type="C_DATE_TIME"><pattern>YYYY-MM-DDTHH:MM:SS</pattern></item>`,
+			assert: func(t *testing.T, p constraints.PrimitiveConstraint) {
+				cdt, ok := p.(constraints.CDateTime)
+				if !ok {
+					t.Fatalf("got %T, want CDateTime", p)
+				}
+				if cdt.Pattern != "YYYY-MM-DDTHH:MM:SS" {
+					t.Errorf("Pattern = %q, want YYYY-MM-DDTHH:MM:SS", cdt.Pattern)
+				}
+			},
+		},
+		{
+			name:   "BOOLEAN/true-only",
+			rmType: "BOOLEAN",
+			inner:  `<item xsi:type="C_BOOLEAN"><true_valid>true</true_valid><false_valid>false</false_valid></item>`,
+			assert: func(t *testing.T, p constraints.PrimitiveConstraint) {
+				cb, ok := p.(constraints.CBoolean)
+				if !ok {
+					t.Fatalf("got %T, want CBoolean", p)
+				}
+				if !cb.TrueValid || cb.FalseValid {
+					t.Errorf("CBoolean = %+v, want {TrueValid:true FalseValid:false}", cb)
+				}
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl := parseOPTWithChild(t, `<children xsi:type="C_PRIMITIVE_OBJECT">
+				<rm_type_name>`+tc.rmType+`</rm_type_name>
+				<node_id/>
+				`+tc.inner+`
+			</children>`)
+			p := firstChildPrimitive(t, tmpl)
+			if p == nil {
+				t.Fatalf("PrimitiveConstraint() = nil for %s wrapper", tc.rmType)
+			}
+			tc.assert(t, p)
+		})
+	}
+}
+
+// TestParse_CPrimitiveObject_StrictMissingItem confirms strict
+// parsing surfaces a malformed C_PRIMITIVE_OBJECT (no inner <item>)
+// rather than silently dropping it.
+func TestParse_CPrimitiveObject_StrictMissingItem(t *testing.T) {
+	body := strings.Replace(primitiveOPTTemplate, "%s", `<children xsi:type="C_PRIMITIVE_OBJECT">
+		<rm_type_name>DURATION</rm_type_name>
+		<node_id/>
+	</children>`, 1)
+	if _, err := template.ParseOPTStrict(strings.NewReader(body)); err == nil {
+		t.Error("ParseOPTStrict on C_PRIMITIVE_OBJECT without <item> should fail")
+	}
+}
+
 func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_PRIMITIVE_OBJECT">
 		<rm_type_name>DURATION</rm_type_name>
