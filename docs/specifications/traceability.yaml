@@ -400,8 +400,16 @@ requirements:
     title: Generic OPT-driven composition builder
     canonical: docs/specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder
     status: draft
-    implementation: planned  # Phase 0 — spec landed; Phases 1-2 follow in this branch
+    implementation: landed  # Phases 0-2 landed; per-template typed builder is a follow-up
+    packages:
+      - openehr/composition
+      - testkit/probes/composition
     probes: [PROBE-023]
+    tests:
+      - openehr/composition/builder_test.go
+      - openehr/composition/imports_test.go
+      - testkit/probes/composition/probe_023_builder_round_trip.go
+      - testkit/probes/composition/probes_test.go
     plans:
       - docs/plans/2026-05-21-composition-builder.md
 
