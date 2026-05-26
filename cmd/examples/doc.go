@@ -14,4 +14,5 @@
 //   - cmd/examples/validate-from-json     — canjson + OPT validate (REQ-052, REQ-102)
 //   - cmd/examples/primitive-validate     — primitive constraints (REQ-103)
 //   - cmd/examples/ehr_create           — REST EHR create (transport + client)
+//   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
 package examples

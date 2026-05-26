@@ -18,6 +18,11 @@ type CDate struct {
 
 func (CDate) isPrimitive() {}
 
+// ExampleValue returns "2020-01-01" — the documented sentinel
+// satisfying the ISO 8601 full-date shape Validate accepts. REQ-107.
+// AOM partial-pattern enforcement is deferred per REQ-103.
+func (CDate) ExampleValue() any { return "2020-01-01" }
+
 // Validate accepts a Go string. The value MUST parse as an ISO 8601
 // date in one of the three partial shapes (yyyy-mm-dd, yyyy-mm,
 // yyyy). Pattern enforcement against AOM partial-date syntax is
@@ -43,6 +48,10 @@ type CTime struct {
 
 func (CTime) isPrimitive() {}
 
+// ExampleValue returns "12:00:00" — the documented sentinel
+// satisfying the ISO 8601 hh:mm:ss shape Validate accepts. REQ-107.
+func (CTime) ExampleValue() any { return "12:00:00" }
+
 // Validate accepts a Go string parsing as ISO 8601 time, optionally
 // with trailing fractional seconds. Pattern enforcement deferred.
 func (c CTime) Validate(value any) []Violation {
@@ -65,6 +74,10 @@ type CDateTime struct {
 }
 
 func (CDateTime) isPrimitive() {}
+
+// ExampleValue returns "2020-01-01T12:00:00Z" — the documented
+// sentinel satisfying the RFC 3339 shape Validate accepts. REQ-107.
+func (CDateTime) ExampleValue() any { return "2020-01-01T12:00:00Z" }
 
 // Validate accepts a Go string that parses under RFC 3339 (the ISO
 // 8601 superset openEHR mandates) or its date-only / partial-time
@@ -93,6 +106,10 @@ type CDuration struct {
 }
 
 func (CDuration) isPrimitive() {}
+
+// ExampleValue returns "P0D" — the documented sentinel satisfying
+// the ISO 8601 duration shape Validate accepts. REQ-107.
+func (CDuration) ExampleValue() any { return "P0D" }
 
 var durationRe = regexp.MustCompile(`^P(?:\d+Y)?(?:\d+M)?(?:\d+W)?(?:\d+D)?(?:T(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?)?$`)
 

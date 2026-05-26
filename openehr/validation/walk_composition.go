@@ -625,4 +625,14 @@ var bmmSubtypes = map[string][]string{
 		"DV_DATE_TIME", "DV_DURATION",
 		"DV_IDENTIFIER", "DV_URI", "DV_EHR_URI",
 	},
+	// AOM 1.4 primitive short names (used under C_PRIMITIVE_OBJECT)
+	// admit the canonical DV wrapper carrying the primitive value.
+	// Lockstep with instance.concreteFor — surfaced by clinical_note.opt
+	// where DURATION appears as the rm_type_name of a primitive-
+	// constrained ELEMENT.value child.
+	"DURATION":  {"DV_DURATION"},
+	"DATE":      {"DV_DATE"},
+	"TIME":      {"DV_TIME"},
+	"DATE_TIME": {"DV_DATE_TIME"},
+	"BOOLEAN":   {"DV_BOOLEAN"},
 }

@@ -368,10 +368,33 @@ requirements:
     probes: [PROBE-024]
     tests:
       - openehr/template/constraints/constraints_test.go
+      - openehr/template/constraints/example_test.go
       - openehr/template/parse_primitives_test.go
       - testkit/probes/template/probes_test.go
     plans:
       - docs/plans/2026-05-22-template-req100-followups.md
+
+  - id: REQ-107
+    title: Template-driven RM instance example generator
+    canonical: docs/specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator
+    status: draft
+    implementation: landed  # Phases 0-3 landed; Phase 4 (REQ-101 integration) is follow-up
+    packages:
+      - openehr/template/constraints
+      - openehr/instance
+      - internal/templateinstance/rmwrite
+      - testkit/probes/instance
+    probes: [PROBE-027]
+    tests:
+      - openehr/template/constraints/example_test.go
+      - openehr/instance/instance_test.go
+      - openehr/instance/imports_test.go
+      - internal/templateinstance/rmwrite/write_test.go
+      - testkit/probes/instance/probe_027_generated_validates.go
+      - testkit/probes/instance/probes_test.go
+      - cmd/examples/generate-example/main.go
+    plans:
+      - docs/plans/2026-05-24-template-instance-example-generator.md
 
   - id: REQ-102
     title: Composition validation
