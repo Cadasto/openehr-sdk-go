@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
-**Implementation:** partial — OPT parser (REQ-100), compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, **REQ-102 composition validation** landed; composition builder (REQ-101), AQL builders open; demographic/AQL validators still planned (umbrella validation plan)
+**Implementation:** partial — landed: OPT parser (REQ-100) including the C_PRIMITIVE_OBJECT inner-`<item>` wire parser, compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, REQ-102 composition validation, REQ-107 template-driven instance generator (with full PROBE-023 unmarshal round-trip), REQ-101 composition builder; open: AQL builders ([plan](2026-05-21-aql-builders.md)); demographic/AQL validators still planned (umbrella validation plan)
 **Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
 **Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
 
@@ -19,11 +19,12 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 
 | Order | Plan | Package | Blocks |
 |---|---|---|---|
-| 1 | [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation |
-| 2 | [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) | `openehr/instance/` (proposed) | composition builder, tests |
-| 3 | [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) | `openehr/composition/` | validation (partial); depends on REQ-107 engine |
-| 4 | [`2026-05-21-validation.md`](archive/2026-05-21-validation.md) | `openehr/validation/` | — |
-| 5 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | — |
+| 1 | [`archive/2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation (landed) |
+| 2 | [`archive/2026-05-24-template-instance-example-generator.md`](archive/2026-05-24-template-instance-example-generator.md) | `openehr/instance/` | composition builder, tests (landed) |
+| 3 | [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md) | `openehr/composition/` | (landed) |
+| 4 | [`archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) + [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) | `openehr/validation/` | (landed for composition; demographic / AQL lint still planned) |
+| 5 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | open |
+| 6 | [`archive/2026-05-26-c-primitive-object-wire-parser.md`](archive/2026-05-26-c-primitive-object-wire-parser.md) | `openehr/template/` parser + `openehr/instance/` UID emission | (landed) |
 
 Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).
 

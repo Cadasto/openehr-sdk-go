@@ -12,7 +12,7 @@ import (
 // archetypeDetails is non-nil only for archetype-root pins and the
 // template root. Non-LOCATABLE RM types (DV*, EventContext) silently
 // no-op — they carry neither archetype_node_id nor name.
-func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped) {
+func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	switch v := rmValue.(type) {
 	case *rm.Composition:
 		v.ArchetypeNodeID = nodeID
@@ -21,7 +21,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.Observation:
@@ -31,7 +31,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.Evaluation:
@@ -41,7 +41,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.Instruction:
@@ -51,7 +51,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.Action:
@@ -61,7 +61,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.AdminEntry:
@@ -71,7 +71,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.GenericEntry:
@@ -81,7 +81,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 			v.ArchetypeDetails = archetypeDetails
 		}
 		if v.UID == nil {
-			id := newHierObjectID()
+			id := uidSource()
 			v.UID = id
 		}
 	case *rm.Section:

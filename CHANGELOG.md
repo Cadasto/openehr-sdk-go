@@ -10,7 +10,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
-— nothing yet —
+- **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — `openehr/template/parse.go` now extracts the inner `<item xsi:type="C_*">` of `C_PRIMITIVE_OBJECT` wrappers (AOM 1.4 primitive short names like DURATION / DATE / BOOLEAN flow through as typed constraints); `openehr/instance/newHierObjectID()` returns `*rm.HierObjectID` so canjson's polymorphic dispatch emits `_type:"HIER_OBJECT_ID"` on `Composition.uid`; new `Options.UIDSource` test-determinism seam; PROBE-023 widened to the full `Marshal → Unmarshal → re-marshal` round-trip its normative wording always promised. [archive](docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md).
 
 ## [0.1.0] - 2026-05-26
 
@@ -39,7 +39,6 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 ### Known follow-ups (not landed)
 
 - [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
-- [C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission](docs/plans/2026-05-26-c-primitive-object-wire-parser.md) — widens PROBE-023 to full unmarshal round-trip.
 - [Contribution submission shape](docs/plans/2026-05-26-contribution-submission-shape.md) — SDK-GAP-10; `contribution.Commit` request body must use the ITS-REST `Contribution_create` (inline `data: T`) shape, not the persisted `OBJECT_REF` shape.
 - AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
 - Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.

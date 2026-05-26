@@ -351,10 +351,11 @@ const (
 
 type Options struct {
     Policy    Policy
-    Language  string         // ISO 639-1; defaults from Compiled.Language()
-    Territory string         // for COMPOSITION roots
-    Composer  rm.PartyProxy  // required when root is COMPOSITION
-    Now       time.Time      // clock for EVENT / context times
+    Language  string                       // ISO 639-1; defaults from Compiled.Language()
+    Territory string                       // for COMPOSITION roots
+    Composer  rm.PartyProxy                // required when root is COMPOSITION
+    Now       time.Time                    // clock for EVENT / context times
+    UIDSource func() *rm.HierObjectID      // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
 }
 
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error)
@@ -375,7 +376,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt`; `cmd/examples/generate-example/` worked example. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) is tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md) and lands on its own branch. Two known v1 stop-gaps — slot-fill archetype-id stamping (awaits REQ-104 grammar) and `C_PRIMITIVE_OBJECT` inner-`<item>` extraction (awaits the [wire-parser plan](../plans/2026-05-26-c-primitive-object-wire-parser.md)) — surface in spec rather than code today; the synthesizer falls through to documented sentinels in both cases.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt`; `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). One known v1 stop-gap remains: slot-fill archetype-id stamping (awaits REQ-104 grammar) — synthesiser stamps `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
 
 ### Out of scope
 
@@ -437,5 +438,5 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 `openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
 
 - **Lives in:** [`openehr/composition/`](../../openehr/composition/)
-- **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → marshal-fragment parity at key paths (v1; full unmarshal round-trip lands once the UID emission path in `openehr/instance` is fixed).
+- **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal round-trip preserves values at key paths.
 

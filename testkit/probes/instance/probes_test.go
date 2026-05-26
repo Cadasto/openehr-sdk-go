@@ -55,15 +55,15 @@ func TestProbe027VitalSignsPasses(t *testing.T) {
 	}
 }
 
-// TestProbe027ClinicalNotePasses pins the PR #18 re-review:
-// clinical_note.opt uses the AOM 1.4 primitive-short-name shape
-// (DV_DURATION → value → DURATION) which previously broke the
-// generator's attach path. With the materialiseSingle fix in this
-// follow-up, generate + validate round-trips clean. The
-// C_PRIMITIVE_OBJECT inner-`<item>` parser gap (REQ-100, tracked
-// separately) means the constraint is dropped at parse — the
-// populatePrimitiveDefault sentinel ("P0D") satisfies the
-// validator, so PROBE-027 passes on the second vendored fixture.
+// TestProbe027ClinicalNotePasses pins the constraint-driven path on
+// the second vendored fixture: clinical_note.opt uses the AOM 1.4
+// primitive-short-name shape (DV_DURATION → value → C_PRIMITIVE_OBJECT
+// → DURATION → C_DURATION). The C_PRIMITIVE_OBJECT inner-`<item>`
+// extraction lands the CDuration constraint on the compiled tree;
+// the synthesiser routes via applyPrimitiveExample(child, parentDV)
+// so the DV wrapper's primary value channel ("P0D" for CDuration's
+// ExampleValue) lands BEFORE validation runs. PROBE-027 round-trips
+// clean on both vendored OPTs.
 func TestProbe027ClinicalNotePasses(t *testing.T) {
 	c := compileFixture(t, "clinical_note.opt")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{

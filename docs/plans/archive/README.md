@@ -14,3 +14,4 @@ Plans moved here when **implementation is landed** or the document is **supersed
 | [2026-05-24-composition-validation-template-driven.md](2026-05-24-composition-validation-template-driven.md) | REQ-102 `ValidateComposition` landed |
 | [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | REQ-101 `composition.NewSkeleton` + `Builder.Set/Build` landed (PRs #19 + #20) |
 | [2026-05-24-template-instance-example-generator.md](2026-05-24-template-instance-example-generator.md) | REQ-107 `instance.Generate` + `rmwrite` + PROBE-027 landed (PRs #18 + #20) |
+| [2026-05-26-c-primitive-object-wire-parser.md](2026-05-26-c-primitive-object-wire-parser.md) | C_PRIMITIVE_OBJECT inner-`<item>` extraction (REQ-100) + `newHierObjectID() *rm.HierObjectID` + `Options.UIDSource` (REQ-107) + PROBE-023 widened to full unmarshal round-trip (REQ-101) — landed via the wire-parser PR |

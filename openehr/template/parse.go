@@ -217,6 +217,12 @@ type xmlCObject struct {
 	Property         *xmlCodePhraseRef      `xml:"property"`
 	TerminologyID    *xmlValueWrapper       `xml:"terminology_id"`
 	CodeList         []string               `xml:"code_list"`
+	// Item is the inner constraint of a C_PRIMITIVE_OBJECT wrapper.
+	// Populated only when Type == "C_PRIMITIVE_OBJECT"; the inner
+	// element carries its own xsi:type (`C_BOOLEAN`, `C_INTEGER`,
+	// `C_DURATION`, …). buildPrimitive recurses into Item when the
+	// wrapper is named. Empty for all other shapes.
+	Item *xmlCObject `xml:"item"`
 }
 
 // xmlTermDefSection is one <term_definitions code="..."> block on a

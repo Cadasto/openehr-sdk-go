@@ -57,6 +57,15 @@ type Options struct {
 	// Generate so callers that don't pin the clock get a sensible
 	// default; tests pin it for determinism.
 	Now time.Time
+
+	// UIDSource is the optional generator for LOCATABLE.uid values.
+	// Each LOCATABLE root that openEHR requires a uid on (Composition,
+	// Observation, Evaluation, Instruction, Action, AdminEntry,
+	// GenericEntry) calls UIDSource once during synthesis. Nil falls
+	// back to a random RFC 4122 v4 UUID via crypto/rand. Tests pin a
+	// counter or named-seed source for deterministic UIDs in golden
+	// fixtures.
+	UIDSource func() *rm.HierObjectID
 }
 
 // ErrTerritoryRequired signals that a COMPOSITION-root template
