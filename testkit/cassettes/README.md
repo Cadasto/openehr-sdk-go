@@ -14,8 +14,7 @@ require any sibling repo to be cloned (REQ-082).
 
 ### `canonical_json/`
 
-Source: `openehr-cdr` (formerly `openehr-go-poc`) repository,
-`cmd/benchmark/internal/fixtures/compositions/`.
+Vendored canonical JSON compositions from the reference CDR load harness (internal snapshot, May 2026). Upstream layout and refresh steps stay in the private consumer checkout — not documented here.
 
 | File | Notes |
 |---|---|
@@ -23,18 +22,6 @@ Source: `openehr-cdr` (formerly `openehr-go-poc`) repository,
 | `BMI.json` | Multi-event observation with HISTORY and ITEM_TREE protocol. |
 | `clinical_note.json` | EVALUATION-bearing Composition. |
 | `vital_signs.json` | OBSERVATION with multiple data points and reference ranges. |
-
-Source commit: `0781322c60d3ae2bfcd8f0863cfe0d69c5753a61` (May 2026).
-
-### Refresh command
-
-```sh
-# from the SDK root
-cp /src/cadasto/openehr-cdr/cmd/benchmark/internal/fixtures/compositions/{body_weight,BMI,clinical_note,vital_signs}.json \
-  testkit/cassettes/canonical_json/
-```
-
-Update the source commit above after refreshing.
 
 ## Conventions
 

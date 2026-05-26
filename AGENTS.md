@@ -28,7 +28,7 @@ Related Cadasto proposals (referred to by role, not by identifier):
 - **Cadasto authorization-server design** — the SDK consumes its outcome via `auth/`.
 - **Cadasto SMART-on-openEHR decision** — the basis for `auth/smart/` and `smart/`.
 
-Local sibling for extraction work: the `openehr-cdr` repo (cloned under `/src/cadasto/`). Its benchmark CLI is the SDK's first consumer.
+Local reference CDR (private; cloned under `/src/cadasto/` alongside this SDK). Its load-test harness is the first consumer.
 
 ## Documentation
 
@@ -43,6 +43,8 @@ Reading order for any contributor or agent:
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (0001–0005 Accepted) |
 | 6 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
+| 8 | [docs/releases.md](docs/releases.md) | Version policy, tag checklist, `v1.0.0` gate |
+| 9 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 
 **Normative vs narrative.** `docs/specifications/` carries RFC-2119 statements that code, plans, and tests are measured against. `docs/architecture.md` carries the design narrative. If they disagree, `docs/specifications/` wins.
 
@@ -148,7 +150,7 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 
 ## Status and active scope
 
-Current landed-vs-planned phases live in [docs/roadmap.md](docs/roadmap.md). Sequencing is informed by the openehr-cdr extraction (STRAND-01 in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
+Current landed-vs-planned phases live in [docs/roadmap.md](docs/roadmap.md). Sequencing is informed by reference-CDR extraction (STRAND-01 in [`docs/specifications/research-strands.md`](docs/specifications/research-strands.md)) — the existing CDR HTTP layer and RM mapping are the first source.
 
 ## Do not touch (yet)
 
@@ -161,4 +163,4 @@ Current landed-vs-planned phases live in [docs/roadmap.md](docs/roadmap.md). Seq
 ## Cross-references
 
 - Cadasto architecture (private) — source of truth for SDK and platform proposals. Linked by role, not by path.
-- Sibling repos cloned under `/src/cadasto/`: `openehr-cdr`, `openehr-bmm`, `openehr-assistant-mcp`, `openehr-assistant-plugin` (plus an internal Cadasto architecture repo, referenced by role above rather than by path).
+- Sibling repos cloned under `/src/cadasto/`: reference CDR (private), `openehr-bmm`, `openehr-assistant-mcp`, `openehr-assistant-plugin` (plus an internal Cadasto architecture repo, referenced by role above rather than by path).

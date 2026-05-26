@@ -26,7 +26,7 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
    - For openEHR RM type shapes, prefer **MCP `type_specification_get`** over inferring.
    - For terminology codes, prefer **MCP `terminology_resolve`** — never hardcode a numeric literal without verifying.
    - For ITS-REST envelope semantics, use the **openehr-assistant** skills (see table below) and the spec MD twin (see `guide_get(category="howto", name="spec-lookup")`).
-   - For RM mapping during CDR extraction, cross-check against the sibling `openehr-cdr` repo's structures — but do not blindly port; the SDK has stricter boundary rules.
+   - For RM mapping during CDR extraction, cross-check against the private reference CDR codebase — but do not blindly port; the SDK has stricter boundary rules.
 5. **Build** before claiming done: `make ci` (includes `make spec-check`). See [ci.md](ci.md) for what GitHub runs on every PR.
 
 ## Editing rules
@@ -85,7 +85,7 @@ PostToolUse hook in [`.claude/settings.json`](../.claude/settings.json):
 | Repo | Why it matters |
 |---|---|
 | `architecture/` (private) | Source of truth for the SDK Specification proposal and related decisions |
-| `openehr-cdr/` | First SDK consumer — CDR extraction target |
+| Reference CDR (private) | First SDK consumer — CDR extraction target |
 | `openehr-bmm/` | BMM dictionaries (fallback when MCP is unavailable) |
 | `openehr-assistant-mcp/`, `openehr-assistant-plugin/` | MCP server / Claude Code skill plugin powering the `openehr-assistant:*` skills |
 

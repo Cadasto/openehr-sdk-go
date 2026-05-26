@@ -207,7 +207,7 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 - openEHR RM XSDs — normative element shape (pin release alongside BMM in `resources/bmm/README.md`)
 - Pinned BMM: same as JSON plan
 - Golden inputs: `testkit/cassettes/canonical_xml/`; cross-format source graphs from `testkit/cassettes/canonical_json/`
-- Sibling reference (provenance only): `openehr-cdr` `cmd/benchmark/internal/fixtures/templates/` for `xsi:type` examples in OPT XML
+- Sibling reference (provenance only): reference CDR harness templates for `xsi:type` examples in OPT XML
 
 ## Out-of-band considerations
 

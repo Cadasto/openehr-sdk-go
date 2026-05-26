@@ -80,7 +80,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
 2. **Vendor golden fixtures** into this repo (REQ-082 cassette independence):
-   - Copy a minimal set from `openehr-cdr` `cmd/benchmark/internal/fixtures/compositions/` → `testkit/cassettes/canonical_json/` (or `openehr/serialize/canjson/testdata/`).
+   - Copy a minimal set of canonical JSON compositions from the reference CDR harness into `testkit/cassettes/canonical_json/` (or `openehr/serialize/canjson/testdata/`).
    - Record provenance in `testkit/cassettes/README.md` (source commit, refresh command).
    - CI MUST NOT depend on the sibling repo being cloned.
 3. **Add `openehr/serialize/internal/poly`** — unexported helpers:
@@ -246,7 +246,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 - openEHR ITS-REST — [Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.md) (canonical JSON role, `_type` discriminator)
 - Pinned BMM: [`resources/bmm/openehr_rm_1.2.0.bmm.json`](../../resources/bmm/openehr_rm_1.2.0.bmm.json), [`resources/bmm/openehr_base_1.3.0.bmm.json`](../../resources/bmm/openehr_base_1.3.0.bmm.json)
-- Golden inputs: `testkit/cassettes/canonical_json/` (vendored from openehr-cdr; provenance in README)
+- Golden inputs: `testkit/cassettes/canonical_json/` (vendored from reference CDR; provenance in README)
 - Cross-format tests: shared with [canonical XML plan](2026-05-15-canonical-xml-serialization.md)
 
 ## Out-of-band considerations

@@ -78,10 +78,11 @@ Also enable **Require branches to be up to date before merging** when PR volume 
 |---|---|
 | `govulncheck ./...` | Before v1.0.0 or when non-stdlib deps land |
 | Conformance probe runner (`testkit/probes/…`) | Dedicated job when live-backend modes are needed |
-| Release on tag | When versioned module publishes are routine |
+| Release on tag | When versioned module publishes are routine — release process documented in [docs/releases.md](releases.md) |
 
 ## See also
 
+- [docs/releases.md](releases.md) — version policy, tag checklist, `v1.0.0` gate
 - [docs/ai-workflow.md](ai-workflow.md) — agent pre-merge checklist
 - [resources/README.md](../resources/README.md) — BMM pin and update procedure
 - [docs/specifications/conformance.md](../docs/specifications/conformance.md) — PROBE-NNN definitions (tests run via `make test` today)

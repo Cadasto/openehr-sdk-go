@@ -1,11 +1,11 @@
 # Plan — Versioning and release strategy
 
 **Date:** 2026-05-25
-**Status:** Draft
+**Status:** Phase 0 landed (`v0.1.0` released 2026-05-26); Phase 1 (runtime `version` package) **declined** per maintainer call (YAGNI — git tag is the authoritative version source; runtime introspection is a deferred follow-up if a consumer asks); Phase 2 (release GitHub Action) + Phase 3 (`v1.0.0` ceremony) remain open
 **Owner:** SDK maintainers
-**Covers:** REQ-004 (semantic versioning), REQ-001 (module path); informs CHANGELOG, CI, and consumer docs
+**Covers:** REQ-004 (semantic versioning), REQ-001 (module path); informs [`CHANGELOG.md`](../../CHANGELOG.md), [`docs/ci.md`](../ci.md), [`docs/releases.md`](../releases.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`SECURITY.md`](../../SECURITY.md)
 **Probes:** — (release process; no PROBE-NNN)
-**Implementation:** planned
+**Implementation:** Phase 0 **landed** (policy docs + first tag at `v0.1.0`); Phase 1 runtime package **declined**; Phases 2–3 planned
 **Depends on:** [`docs/ci.md`](../ci.md); [`docs/specifications/packaging.md`](../specifications/packaging.md); [`docs/specifications/module-layout.md`](../specifications/module-layout.md) § Versioning
 **Defers:** openEHR REST spec version (REQ-050), BMM file pins (REQ-041) as module semver — those ship as **compatibility metadata** per release, not as the Go tag itself
 

@@ -11,7 +11,7 @@
 
 ## Goal
 
-Close [SDK-GAP-10](https://github.com/Cadasto/openehr-go-poc/blob/main/docs/sdk-gap-drafts/SDK-GAP-10-contribution-commit-submission-shape.md) — symmetric to the SDK-GAP-09 fix for `composition.Save/Update`. The openEHR ITS-REST `POST /ehr/{ehr_id}/contribution` endpoint expects a `Contribution_create` payload whose `versions[]` carries the **inline** `ORIGINAL_VERSION<T>` (with `data: T` for `T ∈ {Composition, EHRStatus, Folder, EHRAccess}`), not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
+Close **SDK-GAP-10** — symmetric to the SDK-GAP-09 fix for `composition.Save/Update`. The openEHR ITS-REST `POST /ehr/{ehr_id}/contribution` endpoint expects a `Contribution_create` payload whose `versions[]` carries the **inline** `ORIGINAL_VERSION<T>` (with `data: T` for `T ∈ {Composition, EHRStatus, Folder, EHRAccess}`), not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
 
 ## Out of scope
 
@@ -113,22 +113,22 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
 
 ### Phase 3 — Consumer alignment + survey
 
-**Outcome:** SDK consumers (openehr-cdr benchmark, integration tests) migrated; spec ambiguity caveat resolved.
+**Outcome:** SDK consumers (reference CDR load harness, integration tests) migrated; spec ambiguity caveat resolved.
 
 **Tasks:**
 
-1. **openehr-cdr round-trip test** that currently bypasses `contribution.Commit` via a hand-rolled `postContribution` helper ([`tests/integration/sdk_roundtrip_test.go`](https://github.com/Cadasto/openehr-go-poc/blob/main/tests/integration/sdk_roundtrip_test.go)) can be migrated to use the new `Submission` type. Coordinate the consumer-side switch in their plan.
+1. **Consumer round-trip coverage** that currently bypasses `contribution.Commit` via a hand-rolled helper can be migrated to use the new `Submission` type. Coordinate the switch in the private consumer checkout.
 2. **Cross-SDK survey** — ehrbase, Better, Ocean, DIPS. If any major implementation accepts only the persisted shape, this gap escalates to "spec ambiguity" per the GAP-10 acceptance criteria. Expectation: the spec is explicit; survey confirms uniform implementation of `Contribution_create`.
 3. **CHANGELOG** entry: add to the REST-clients bullet (mirrors SDK-GAP-09's CHANGELOG note).
 
 **Definition of done:**
 
-- openehr-cdr integration tests use `contribution.Commit(ctx, c, ehrID, &Submission{...})` without falling back to a private helper.
+- Consumer integration tests use `contribution.Commit(ctx, c, ehrID, &Submission{...})` without falling back to a private helper.
 - Cross-SDK survey results recorded in this plan or its archive entry.
 
 ## Cross-references
 
-- [SDK-GAP-10 draft](https://github.com/Cadasto/openehr-go-poc/blob/main/docs/sdk-gap-drafts/SDK-GAP-10-contribution-commit-submission-shape.md) — consumer report.
+- SDK-GAP-10 — consumer gap report (private; not linked from this repo).
 - [SDK-GAP-09 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) — symmetric **response**-side fix; landed.
 - [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) §Phase 4 — original contribution surface; this plan is the corrective.
 - ITS-REST OpenAPI: `Contribution_create` schema definition.
@@ -142,6 +142,6 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
 | Phase 1 — round-trip unit tests | |
 | Phase 2 — PROBE-072 implementation + cassette | |
 | Phase 2 — REQ.md + traceability + conformance updates | |
-| Phase 3 — openehr-cdr migration | |
+| Phase 3 — consumer migration | |
 | Phase 3 — cross-SDK survey results recorded | |
 | `make ci` green | |

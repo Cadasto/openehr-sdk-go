@@ -28,8 +28,6 @@ import (
 // POST arm — preconditions reflect deployments that don't expose a
 // preconfigured family for the test caller. A pass requires the POST
 // arm at minimum; when both inputs are present, both arms must succeed.
-//
-// [SDK-GAP-09]: https://github.com/Cadasto/openehr-go-poc/blob/main/docs/sdk-gap-drafts/SDK-GAP-09-composition-save-update-spec-mismatch.md
 func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition) (Result, error) {
 	r := Result{Probe: "PROBE-071"}
 	if c == nil || ehrID == "" || comp == nil {

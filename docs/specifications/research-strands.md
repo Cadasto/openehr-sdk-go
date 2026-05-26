@@ -15,11 +15,11 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
-## STRAND-01 — Extraction from openehr-cdr
+## STRAND-01 — Extraction from reference CDR
 
 **Status:** Open.
 
-**Question:** Which parts of the existing openehr-cdr Go codebase (HTTP wrapper, RM mapping, auth scaffolding, benchmark utilities) move to the SDK, and which remain bespoke in the benchmark `cmd/`?
+**Question:** Which parts of the existing reference CDR Go codebase (HTTP wrapper, RM mapping, auth scaffolding, load-test utilities) move to the SDK, and which remain bespoke in the consumer harness?
 
 **Why it's open:** the cdr code is hand-grown for a server-side use case. Some primitives generalise to a client SDK; others (e.g. PostgreSQL connection pooling, archive triggers, tenant routing) are server-only and stay. The boundary is non-trivial.
 
@@ -195,7 +195,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 | Strand | Title | Status | Affects |
 |---|---|---|---|
-| [STRAND-01](#strand-01--extraction-from-openehr-cdr) | Extraction from openehr-cdr | Open | REQ-001..014; Phase 1 |
+| [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | Open | REQ-001..014; Phase 1 |
 | [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | Open | REQ-050; cross-SDK |
 | [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | Open | REQ-021..023 |
 | [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | REQ-024, REQ-040, REQ-052..053 |

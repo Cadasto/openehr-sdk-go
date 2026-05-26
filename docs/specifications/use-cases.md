@@ -78,7 +78,7 @@ These consumers **MUST NOT** be forced to import `transport/`, `auth/`, or `smar
 
 ## POC extraction scope
 
-The path to v1 starts with extracting the SDK from the **openehr-cdr** repo's existing benchmark code. The POC milestones, in order:
+The path to v1 starts with extracting the SDK from the reference CDR load harness. The POC milestones, in order:
 
 1. **Inventory the CDR's HTTP layer, RM mapping, benchmark scaffolding.** Decide per file what moves to the SDK vs what stays bespoke in `cmd/benchmark`. Result: an extraction map.
 2. **Extract a first SDK skeleton.** Covers `auth/` (TokenSource interface + a stub `clientcreds` provider for benchmark use), `transport/` (HTTP wrapper), `openehr/rm/` (the RM types the benchmark touches), `openehr/client/ehr/` (EHR + EHR_STATUS endpoints).

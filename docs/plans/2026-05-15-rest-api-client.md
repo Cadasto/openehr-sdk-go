@@ -19,7 +19,7 @@
 | 6 — Definition API | templates, stored queries | **Done** (ADL 1.4 templates + stored AQL CRUD; PROBE-067) |
 | 7 — Demographic API | `openehr/client/demographic/` | **Open** (`doc.go` only) |
 | 8 — Admin API | `openehr/client/admin/` ITS-REST housekeeping | **Done** (REQ-099; PROBE-070) |
-| 9 — CDR benchmark (STRAND-01) | migrate openehr-cdr benchmark | Open |
+| 9 — CDR benchmark (STRAND-01) | migrate reference CDR load harness | Open |
 
 ## Goal
 
@@ -388,7 +388,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 ### Phase 9 — CDR-extraction milestone (closes STRAND-01)
 
-**Outcome:** The existing CDR benchmark (`cadasto/openehr-cdr/cmd/benchmark`) runs via this SDK with no measurable percentile regression vs the current raw-HTTP baseline.
+**Outcome:** The reference CDR load harness runs via this SDK with no measurable percentile regression vs the current raw-HTTP baseline.
 
 **Tasks:**
 

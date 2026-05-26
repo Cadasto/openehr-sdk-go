@@ -2,23 +2,45 @@
 
 All notable changes to `github.com/cadasto/openehr-sdk-go` are recorded here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — release policy in [`docs/releases.md`](docs/releases.md).
 
-Pre-1.0: nothing has been released as a tagged version yet, so only `### Added` is in use. Internal renames, fix-ups, and dropped experiments are folded into the relevant Added bullet (or omitted) rather than carried as separate `### Changed` / `### Fixed` / `### Removed` entries.
-
-Entries under `## [Unreleased]` are **short and high-level**: one-line bullets naming the artefact class and scope. Detail belongs in commit messages and PR bodies — see [`AGENTS.md`](AGENTS.md#changelogmd).
+Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dropped experiments fold into the relevant Added bullet (or are omitted) rather than carry separate `### Changed` / `### Fixed` / `### Removed` entries. Bullets are **short and high-level** (artefact class + scope + key REQs/probes) — detail belongs in commit messages and PR bodies (see [`AGENTS.md § CHANGELOG.md`](AGENTS.md#changelogmd)).
 
 ## [Unreleased]
 
 ### Added
 
-- **Specs and scaffolding** — module layout, Makefile/Docker toolchain, AI docs, CI; SDD tree (`docs/specifications/` REQ / PROBE / STRAND, `traceability.yaml`, `make spec-check`); plans under `docs/plans/`; implementation [roadmap](docs/roadmap.md); ADRs 0001–0005.
-- **BMM and codegen** — pinned BMM corpus (`resources/bmm/`); BMM loader (`openehr/bmm/`); generated RM + AOM 1.4 types with type registry; `bmmgen` / `bmmdiff` tooling + drift workflow; BMM-driven RM structural lookup at `openehr/rm/rminfo/`.
-- **Serialization** — canonical JSON codec (`openehr/serialize/canjson/`); canonical XML codec (`openehr/serialize/canxml/`) with `xsi:type` polymorphic dispatch and cross-format JSON↔XML invariant; vendored ehrbase RM cassettes under `testkit/cassettes/canonical_{json,xml}/ehrbase/`.
-- **Transport and auth** — `transport/` with openEHR headers, retry (`NoRetry` sentinel, REQ-096), OTel, error envelope mapping, request-level `Observer` (REQ-098), `Client.HTTPClient()` accessor (REQ-021); auth providers `auth/{clientcreds,jwtbearer,basic,smart}` (REQ-061..063, REQ-069); SMART platform integration with JWKS-validated ID-tokens (REQ-064, REQ-067); service discovery (`smart/discovery/`).
-- **REST clients** — System; EHR read/write (composition, ehrstatus, directory, contribution, item-tags, REQ-059); Definition ADL 1.4 templates + stored AQL CRUD (REQ-057); AQL Query (`openehr/client/query/`, `openehr/aql/`, REQ-055); Admin housekeeping (`openehr/client/admin/`, REQ-099). `composition.Save` / `composition.Update` (and the equivalent `directory.*` writes) decode their `Prefer: return=representation` response body as a bare `*rm.Composition` / `*rm.Folder` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` / `201_directory` schemas (SDK-GAP-09) — the `ORIGINAL_VERSION` envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}`.
-- **Clinical modeling foundation** (REQ-100 + follow-up Phases 1–6, [ADR 0005](docs/adr/0005-compiled-template-foundation.md)) — ADL 1.4 OPT parser at `openehr/template/` with sealed `Node` taxonomy, path utilities, strict-mode entry points, OPT provenance and ontology capture; compiled walker-friendly tree at `internal/templatecompile/` with cached AQL paths, O(1) indexes, implicit RM-mandatory attribute injection, per-archetype-root term scope; visitor abstraction at `internal/templatecompile/walk/` (`Walk` / `WalkSubtree` / `SkipSubtree` + `templatedump` reference visitors).
-- **REQ-103 primitive constraints** (`openehr/template/constraints/`, follow-up Phase 6) — sealed `PrimitiveConstraint` interface with one Go type per ADL 1.4 OPT primitive (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` taxonomy; pure `Validate(value any)`; wire-parse extension threaded through to `CompiledNode.PrimitiveConstraint()`. REQ-107 Phases 0–3 extend every primitive with `ExampleValue() any` and add the template-driven RM instance synthesiser (`openehr/instance/`, `internal/templateinstance/rmwrite/`, `testkit/probes/instance/` + PROBE-027) plus the `cmd/examples/generate-example/` worked example. REQ-101 Phases 0–2 layer the composition-specific authoring API (`openehr/composition/` — `NewSkeleton`, `Builder.Set` / `SetText` / `SetQuantity` / `SetCodedText`, `TemplateID`) over the REQ-107 engine, plus PROBE-023 (`testkit/probes/composition/`). PR #20 follow-up landed the C_PRIMITIVE_OBJECT generator-side fix (`materialiseSingle` recognises AOM 1.4 primitive short names — `DURATION`/`DATE`/`TIME`/`DATE_TIME`/`BOOLEAN`); extended PROBE-027 to `clinical_note.opt`; filled the `EVENT_CONTEXT` `start_time` + `setting` gap in `openehr/validation/rmread`; tightened `Builder.Set` to wrap `templatecompile.NodeAt`'s typed cause via multi-`%w`; mirrored `populatePrimitiveDefault` into `materialiseMultiple`; documented `Builder.Build` idempotence. The remaining `C_PRIMITIVE_OBJECT.<item>` wire-parser extraction and `newHierObjectID` pointer emission are tracked in [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`](docs/plans/2026-05-26-c-primitive-object-wire-parser.md).
-- **Cadasto health probes** (`cadasto/admin/`, SDK-GAP-07) — `Live` / `Ready` deployment-level probes with typed per-probe path overrides and `transport` sentinel error mapping; deliberately bypasses `transport.Do`.
-- **Conformance probes** (`testkit/probes/`) — versioned-write (010–013, **PROBE-071** for the SDK-GAP-09 bare-body POST/PUT response shape), definition, query, serialize (030–031, 033–034), discovery (040–041), admin (PROBE-070), OPT path resolution (PROBE-022), primitive constraint validate (PROBE-024), composition validate (PROBE-025, PROBE-026), generator round-trip (PROBE-027).
-- **Worked examples** (`cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse,generate-example}`) — canjson, JSON↔XML round-trip, end-to-end EHR creation against httptest, local OPT path resolution, OPT → RM instance synthesis emitting canonical JSON.
+— nothing yet —
+
+## [0.1.0] - 2026-05-26
+
+First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0-development client family + auth + discovery + canonical codecs + the ADL 1.4 template / validation / instance / composition stack. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — pin to the exact tag.
+
+### Added
+
+- **Module scaffolding and process** — module layout, Makefile/Docker toolchain, AI workflow docs, GitHub Actions CI (REQ-001..005); SDD tree at [`docs/specifications/`](docs/specifications/) with REQ/PROBE/STRAND registry, machine-readable [`traceability.yaml`](docs/specifications/traceability.yaml), and `make spec-check` enforcement; implementation plans under [`docs/plans/`](docs/plans/); [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`docs/releases.md`](docs/releases.md); ADRs [0001–0005](docs/adr/).
+- **BMM and codegen** — pinned BMM corpus (`resources/bmm/openehr_base_1.3.0`, `openehr_rm_1.2.0`, `openehr_am_1.4.0`, `openehr_am_2.4.0`, `openehr_lang_1.1.0`, `openehr_term_3.1.0`); BMM loader (REQ-045); generated RM + AOM 1.4 types with `typereg` (REQ-040..047); `bmmgen` + `bmmdiff` tooling + weekly drift workflow ([ADR 0001](docs/adr/0001-bmm-version-bump-runbook.md)); BMM-driven RM structural lookup at `openehr/rm/rminfo/`.
+- **Serialization** — canonical JSON (REQ-052) and canonical XML (REQ-056) codecs with `xsi:type` polymorphic dispatch and cross-format JSON↔XML invariant; vendored ehrbase RM cassettes under `testkit/cassettes/canonical_{json,xml}/`.
+- **Transport, auth, discovery** — `transport/` with openEHR custom-header family (REQ-059), retry policy (REQ-091, `NoRetry` sentinel), OTel hooks (REQ-090), structured error envelope mapping (REQ-093), `Prefer` negotiation (REQ-094), `Idempotency-Key` (REQ-097), request `Observer` (REQ-098); auth providers `auth/{clientcreds,jwtbearer,basic,smart}` (REQ-060..063, REQ-069); SMART-on-openEHR with JWKS-validated ID tokens (REQ-064, REQ-067); service discovery (`smart/discovery/`, REQ-070..072).
+- **REST clients** — System; EHR read/write (`composition`, `ehrstatus`, `directory`, `contribution`, `itemtags`, REQ-050..057, REQ-059); Definition (ADL 1.4 templates + stored AQL CRUD, REQ-057); AQL Query (`openehr/client/query/`, `openehr/aql/`, REQ-055); Admin (`openehr/client/admin/`, REQ-099). Composition + directory writes decode `Prefer: return=representation` bodies as bare RM types per the ITS-REST schemas (SDK-GAP-09) — the `ORIGINAL_VERSION` envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}`.
+- **Clinical modeling** — OPT parser at `openehr/template/` (REQ-100); compiled walker-friendly tree at `internal/templatecompile/` ([ADR 0005](docs/adr/0005-compiled-template-foundation.md)); primitive constraints at `openehr/template/constraints/` (REQ-103) with `Validate(value any)` + `ExampleValue() any`; template-driven composition validator at `openehr/validation/` (REQ-102); template-driven RM instance generator at `openehr/instance/` + `internal/templateinstance/rmwrite/` (REQ-107); generic OPT-driven composition builder at `openehr/composition/` (REQ-101).
+- **Cadasto extras** — `cadasto/admin/` Live / Ready deployment health probes (SDK-GAP-07).
+- **Conformance probes** (`testkit/probes/`) — versioned writes (PROBE-010..013, PROBE-071), definition (PROBE-067), serialize (PROBE-030/031, PROBE-033/034), discovery (PROBE-040/041), admin (PROBE-070), OPT path resolution (PROBE-022), primitive constraint validate (PROBE-024), composition validate (PROBE-025/026), instance generator round-trip on `vital_signs.opt` + `clinical_note.opt` (PROBE-027), composition builder marshal-fragment parity (PROBE-023).
+- **Worked examples** under `cmd/examples/` — `canonical_json`, `canxml_roundtrip`, `ehr_create`, `opt-parse`, `validate-composition`, `validate-from-json`, `primitive-validate`, `generate-example`.
+
+### Compatibility
+
+| Concept | Value |
+|---|---|
+| Go toolchain (minimum) | `1.25.0` |
+| openEHR REST | `1.1.0-development` |
+| BMM corpus | `openehr_base_1.3.0`, `openehr_rm_1.2.0`, `openehr_am_1.4.0`, `openehr_am_2.4.0`, `openehr_lang_1.1.0`, `openehr_term_3.1.0` |
+
+### Known follow-ups (not landed)
+
+- [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
+- [C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission](docs/plans/2026-05-26-c-primitive-object-wire-parser.md) — widens PROBE-023 to full unmarshal round-trip.
+- [Contribution submission shape](docs/plans/2026-05-26-contribution-submission-shape.md) — SDK-GAP-10; `contribution.Commit` request body must use the ITS-REST `Contribution_create` (inline `data: T`) shape, not the persisted `OBJECT_REF` shape.
+- AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
+- Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.
+- CDR benchmark migration ([plan §Phase 9](docs/plans/2026-05-15-rest-api-client.md), STRAND-01).

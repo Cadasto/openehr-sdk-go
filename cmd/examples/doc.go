@@ -1,7 +1,7 @@
 // Package examples hosts worked, runnable example programs for each
 // named SDK use case (benchmark, seeder, MCP server, federator).
 //
-// Production consumers (the openehr-cdr benchmark, the
+// Production consumers (the reference CDR load harness, the
 // soon-to-exist federator, etc.) live in their own repos — examples
 // here are reference shapes only.
 //
