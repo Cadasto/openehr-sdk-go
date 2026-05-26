@@ -225,6 +225,22 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 	if !errors.Is(err, composition.ErrUnknownPath) {
 		t.Errorf("expected ErrUnknownPath, got %v", err)
 	}
+	// PR #19 deferred suggestion: the error message should carry the
+	// path string AND the template-side cause for callers diagnosing
+	// from logs. Wrapping NodeAt's typed cause was added in the
+	// follow-up; pin its diagnostic content here.
+	if msg := err.Error(); !contains(msg, "/no/such/path") {
+		t.Errorf("error missing path string: %v", err)
+	}
+	// PR #20 re-review (Important 1): the multi-%w wrap means
+	// errors.Is reaches the templatecompile sentinel too — the
+	// compiled-path API uses its own ErrPathNotFound distinct from
+	// template.ErrPathNotFound by design (see
+	// internal/templatecompile/compiled.go). Pin it so a future
+	// refactor that drops the inner %w surfaces here.
+	if !errors.Is(err, templatecompile.ErrPathNotFound) {
+		t.Errorf("expected errors.Is to reach templatecompile.ErrPathNotFound, got %v", err)
+	}
 }
 
 // TestBuilder_Build_AggregatesErrors confirms that two bad Set calls

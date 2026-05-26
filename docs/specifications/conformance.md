@@ -239,7 +239,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
 - **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against `vital_signs.opt` for both Minimal and Example policies; v1 stop-gap synthesises slot fills with `openEHR-EHR-<RMType>.example.v1` archetype ids matching the validator's RM-type-prefix `slotFitsArchetypeID` heuristic until REQ-104 supplies a parsed slot grammar.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. v1 stop-gaps: slot fills synthesise `openEHR-EHR-<RMType>.example.v1` archetype ids matching the validator's RM-type-prefix `slotFitsArchetypeID` heuristic (until REQ-104 supplies a parsed slot grammar); AOM 1.4 primitive short names (DURATION / DATE / …) under DV scalar wrappers stamp the documented `populatePrimitiveDefault` sentinel because the wire parser drops `C_PRIMITIVE_OBJECT.<item>` inner constraints (tracked in [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`](../plans/2026-05-26-c-primitive-object-wire-parser.md)).
 - **Satisfies:** REQ-107.
 
 ### Canonical JSON and formats

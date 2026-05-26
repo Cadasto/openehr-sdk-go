@@ -86,7 +86,15 @@ func (b *Builder) Set(path string, v any) error {
 	}
 	node, err := b.compiled.NodeAt(path)
 	if err != nil {
-		wrapped := fmt.Errorf("%w: %s", ErrUnknownPath, path)
+		// Wrap the compiled-template NodeAt cause via the multi-%w
+		// form (Go 1.20+) so in-tree callers can errors.Is against
+		// ErrUnknownPath AND against the inner templatecompile
+		// sentinel (currently templatecompile.ErrPathNotFound — kept
+		// distinct from the wire-parser's template.ErrPathNotFound by
+		// design; see internal/templatecompile/compiled.go) on the
+		// same error. The public API contract surface is unchanged:
+		// external callers errors.Is against ErrUnknownPath.
+		wrapped := fmt.Errorf("%w: %s: %w", ErrUnknownPath, path, err)
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
@@ -214,8 +222,11 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 		// should walk to that child's index and overwrite. Phase 2
 		// scope: only leaf-DV assignments are guaranteed, multi-attr
 		// container assignment is a follow-up. Return a descriptive
-		// error so the caller knows this is an intentional v1 gap.
-		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s)", ErrInvalidPath, p.path)
+		// error so the caller knows this is an intentional v1 gap;
+		// the leaf-DV path (extending the path with .value or
+		// .magnitude / .units for DV_QUANTITY) covers the common
+		// authoring case end-to-end today.
+		return fmt.Errorf("%w: multi-attribute container assignment not supported in v1 (path: %s) — use a leaf path (e.g. extend with /value or /magnitude for DV_QUANTITY) to address the primitive directly", ErrInvalidPath, p.path)
 	}
 	return nil
 }

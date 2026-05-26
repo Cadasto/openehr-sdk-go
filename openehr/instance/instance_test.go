@@ -220,6 +220,94 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 	return nil
 }
 
+// TestGenerateClinicalNoteMinimal pins the PR #18 re-review finding:
+// clinical_note.opt uses the AOM 1.4 primitive-short-name shape
+// (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
+// Before the materialiseSingle / isAOMPrimitiveShortName fix, the
+// generator tried to attach a fresh *DVDuration to the parent DV's
+// .value (a String slot) and failed; this regression keeps the
+// generator end-to-end on the second vendored OPT fixture.
+//
+// The leaf primitive constraint itself is still dropped at parse
+// time (REQ-100 wire-parser gap on C_PRIMITIVE_OBJECT, tracked
+// separately) — so we assert the documented sentinel "P0D" landed,
+// not a constraint-derived value.
+func TestGenerateClinicalNoteMinimal(t *testing.T) {
+	c := compileFixture(t, "clinical_note.opt")
+	name := "Test Composer"
+	out, err := instance.Generate(context.Background(), c, instance.Options{
+		Policy:    instance.Minimal,
+		Territory: "NL",
+		Composer:  &rm.PartyIdentified{Name: &name},
+	})
+	if err != nil {
+		t.Fatalf("Generate clinical_note.opt: %v", err)
+	}
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("AsComposition: %v", err)
+	}
+	dur := findFirstDVDuration(comp)
+	if dur == nil {
+		t.Fatal("no DV_DURATION found in synthesised clinical_note tree")
+	}
+	if dur.Value != "P0D" {
+		t.Errorf("DV_DURATION.value = %q, want %q (default sentinel)", dur.Value, "P0D")
+	}
+}
+
+// findFirstDVDuration walks a Composition's content depth-first
+// looking for a DV_DURATION leaf in any ELEMENT.value. Returns the
+// first match or nil. REQ-024: closed dispatch on the RM types the
+// clinical_note.opt subtree traverses (CLUSTER + ELEMENT).
+func findFirstDVDuration(comp *rm.Composition) *rm.DVDuration {
+	for _, c := range comp.Content {
+		if d := findInContent(c); d != nil {
+			return d
+		}
+	}
+	return nil
+}
+
+func findInContent(c rm.ContentItem) *rm.DVDuration {
+	switch v := c.(type) {
+	case *rm.Instruction:
+		for _, a := range v.Activities {
+			tree, ok := a.Description.(*rm.ItemTree)
+			if !ok {
+				continue
+			}
+			if d := findInItemTree(tree); d != nil {
+				return d
+			}
+		}
+	}
+	return nil
+}
+
+func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
+	if t == nil {
+		return nil
+	}
+	for _, it := range t.Items {
+		switch e := it.(type) {
+		case *rm.Element:
+			if d, ok := e.Value.(*rm.DVDuration); ok {
+				return d
+			}
+		case *rm.Cluster:
+			for _, inner := range e.Items {
+				if el, ok := inner.(*rm.Element); ok {
+					if d, ok := el.Value.(*rm.DVDuration); ok {
+						return d
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func TestPolicyString(t *testing.T) {
 	if instance.Minimal.String() != "minimal" {
 		t.Error("Minimal.String() != minimal")

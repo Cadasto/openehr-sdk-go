@@ -375,7 +375,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / typed accessors for the closed root set; PROBE-027 implemented (Sandbox); `cmd/examples/generate-example/` worked example. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) is tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md) and lands on its own branch.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt`; `cmd/examples/generate-example/` worked example. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) is tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md) and lands on its own branch. Two known v1 stop-gaps — slot-fill archetype-id stamping (awaits REQ-104 grammar) and `C_PRIMITIVE_OBJECT` inner-`<item>` extraction (awaits the [wire-parser plan](../plans/2026-05-26-c-primitive-object-wire-parser.md)) — surface in spec rather than code today; the synthesizer falls through to documented sentinels in both cases.
 
 ### Out of scope
 

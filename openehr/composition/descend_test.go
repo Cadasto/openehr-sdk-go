@@ -36,6 +36,30 @@ func TestDescendOne_PredicateMismatchErrors(t *testing.T) {
 	if !errors.Is(err, ErrInvalidPath) {
 		t.Errorf("expected ErrInvalidPath on predicate mismatch, got %v", err)
 	}
+	// PR #19 review optional nit: assert the diagnostic carries the
+	// requested predicate AND the actual sibling ids so callers can
+	// debug from a single error line. Exercises siblingIDs output.
+	msg := err.Error()
+	if !descendContains(msg, "openEHR-EHR-OBSERVATION.blood_pressure.v1") {
+		t.Errorf("error missing requested predicate: %v", err)
+	}
+	if !descendContains(msg, "openEHR-EHR-OBSERVATION.heart_rate.v1") || !descendContains(msg, "openEHR-EHR-OBSERVATION.respiration.v1") {
+		t.Errorf("error missing one of the sibling ids: %v", err)
+	}
+}
+
+// descendContains is a local micro-helper to keep this internal
+// test self-contained (no strings.Contains import).
+func descendContains(haystack, needle string) bool {
+	if len(needle) > len(haystack) {
+		return false
+	}
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
 }
 
 // TestDescendOne_PredicateMatchSucceeds is the positive twin — when

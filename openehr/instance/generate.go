@@ -180,10 +180,35 @@ func (g *generator) materialiseSingle(
 		return g.materialiseImplicitSingle(optNode, attr, parentRM)
 	}
 	child := children[0]
+	// AOM 1.4 primitive short name (DURATION, DATE, BOOLEAN, …)
+	// under a BMM-primitive attribute (e.g. DV_DURATION.value): the
+	// parent is itself the DV wrapper; populatePrimitiveDefault has
+	// already stamped its primary value channel. A nested DV
+	// materialised via makeChild would be attached to .value (a
+	// String slot) and fail. When the leaf carries a parsed
+	// primitive constraint (REQ-107 happy path), use its ExampleValue
+	// to override the default sentinel on the parent. When the
+	// constraint is absent (REQ-100 wire-parser gap on
+	// C_PRIMITIVE_OBJECT — tracked separately), the default holds.
+	if isAOMPrimitiveShortName(child.RMTypeName()) {
+		if pc := child.PrimitiveConstraint(); pc != nil {
+			return g.applyPrimitiveExample(child, parentRM, pc)
+		}
+		return nil
+	}
 	rmChild, err := g.makeChild(child)
 	if err != nil {
 		return err
 	}
+	// Stamp default primitive values BEFORE descending. When the
+	// child is a DV scalar wrapper (DV_DURATION, DV_DATE, …) and the
+	// OPT pinned a value attribute whose primitive constraint the
+	// wire parser dropped (REQ-100 C_PRIMITIVE_OBJECT gap),
+	// populatePrimitiveDefault gives the wrapper a non-empty
+	// canonical-JSON shape (`"value":"P0D"`, etc.). When the
+	// constraint is present, applyPrimitiveExample inside walkNode
+	// will overwrite the default. No-op for non-primitive wrappers.
+	g.populatePrimitiveDefault(rmChild)
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
@@ -191,6 +216,19 @@ func (g *generator) materialiseSingle(
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
+}
+
+// isAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
+// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
+// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
+// BMM-typed primitive attributes (e.g. DV_DURATION.value). REQ-024:
+// closed switch, no reflection.
+func isAOMPrimitiveShortName(s string) bool {
+	switch s {
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
+		return true
+	}
+	return false
 }
 
 // materialiseImplicitSingle creates a default value for a
@@ -380,6 +418,12 @@ func (g *generator) materialiseMultiple(
 			if err != nil {
 				return err
 			}
+			// Mirror materialiseSingle: stamp default primitive values
+			// before walkNode descends so DV scalar wrappers in a
+			// multi-attribute slot also carry a non-empty canonical-
+			// JSON shape under the wire-parser primitive-constraint
+			// gap. No-op for non-primitive RM children.
+			g.populatePrimitiveDefault(rmChild)
 			if err := g.walkNode(child, rmChild); err != nil {
 				return err
 			}

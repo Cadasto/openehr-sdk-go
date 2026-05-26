@@ -135,6 +135,41 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 			t.Fatalf("len(Items) = %d, want 1", len(cl.Items))
 		}
 	})
+	// PR #18 review deferred suggestion: rmwrite dispatch arms not
+	// exercised by the vital_signs fixture. Section and Instruction
+	// carry nested-content lists used by clinical_note.opt + future
+	// OPTs; pin them here so future churn against typereg / RM
+	// codegen does not silently break the dispatcher.
+	t.Run("Section.items", func(t *testing.T) {
+		s := &rm.Section{}
+		obs := &rm.Observation{ArchetypeNodeID: "openEHR-EHR-OBSERVATION.encounter.v1"}
+		if err := AppendMultiple(s, "SECTION", "items", obs); err != nil {
+			t.Fatalf("AppendMultiple: %v", err)
+		}
+		if len(s.Items) != 1 {
+			t.Fatalf("len(Items) = %d, want 1", len(s.Items))
+		}
+	})
+	t.Run("Instruction.activities", func(t *testing.T) {
+		i := &rm.Instruction{}
+		act := &rm.Activity{ArchetypeNodeID: "at0001"}
+		if err := AppendMultiple(i, "INSTRUCTION", "activities", act); err != nil {
+			t.Fatalf("AppendMultiple: %v", err)
+		}
+		if len(i.Activities) != 1 {
+			t.Fatalf("len(Activities) = %d, want 1", len(i.Activities))
+		}
+	})
+	t.Run("ItemTable.rows", func(t *testing.T) {
+		tab := &rm.ItemTable{}
+		cl := &rm.Cluster{ArchetypeNodeID: "at0007"}
+		if err := AppendMultiple(tab, "ITEM_TABLE", "rows", cl); err != nil {
+			t.Fatalf("AppendMultiple: %v", err)
+		}
+		if len(tab.Rows) != 1 {
+			t.Fatalf("len(Rows) = %d, want 1", len(tab.Rows))
+		}
+	})
 }
 
 // TestEnsureSingleDVTemporal pins the writers for the AOM 1.4
