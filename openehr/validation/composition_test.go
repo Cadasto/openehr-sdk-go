@@ -2,7 +2,6 @@ package validation_test
 
 import (
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // REQ-102 v2 — a structurally complete composition against
@@ -18,7 +18,7 @@ import (
 // non-empty with a known archetype id, identity matches at the
 // composition root.
 func TestValidateComposition_Valid(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	r := validation.ValidateComposition(comp, c)
 	if !r.OK {
@@ -34,7 +34,7 @@ func TestValidateComposition_Valid(t *testing.T) {
 // channel — wiping it makes both DefiningCode and Value empty,
 // which rmread reports as ok=false.
 func TestValidateComposition_RequiredCategory(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Category = rm.DVCodedText{}
 	r := validation.ValidateComposition(comp, c)
@@ -61,7 +61,7 @@ func TestValidateComposition_RequiredCategory(t *testing.T) {
 // REQ-102 v2 — nil Composer surfaces required at /composer.
 // Composer is a PartyProxy interface; rmread returns ok=false on nil.
 func TestValidateComposition_RequiredComposer(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Composer = nil
 	r := validation.ValidateComposition(comp, c)
@@ -73,7 +73,7 @@ func TestValidateComposition_RequiredComposer(t *testing.T) {
 // REQ-102 v2 — zero-valued Language / Territory each emit one
 // required issue at their respective paths.
 func TestValidateComposition_RequiredLanguageTerritory(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Language = rm.CodePhrase{}
 	comp.Territory = rm.CodePhrase{}
@@ -91,7 +91,7 @@ func TestValidateComposition_RequiredLanguageTerritory(t *testing.T) {
 // slot_fill at the offending /content[id] path. Uses an archetype
 // id outside vital_signs.opt's declared root set.
 func TestValidateComposition_SlotFillUnknownArchetype(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Content = []rm.ContentItem{
 		&rm.Observation{
@@ -110,7 +110,7 @@ func TestValidateComposition_SlotFillUnknownArchetype(t *testing.T) {
 // REQ-102 v2 — nil composition argument surfaces a global
 // nil_composition issue (no panic).
 func TestValidateComposition_NilComposition(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	r := validation.ValidateComposition(nil, c)
 	if r.OK || !containsCode(r.Issues, "nil_composition") {
 		t.Errorf("expected nil_composition issue, got %+v", r.Issues)
@@ -143,7 +143,7 @@ func TestSeverity_String(t *testing.T) {
 // REQ-102 v2 — Result.Issues is never nil after a validator call
 // (even when OK is true).
 func TestValidateComposition_IssuesNeverNilOnSuccess(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	r := validation.ValidateComposition(comp, c)
 	if !r.OK {
@@ -164,7 +164,7 @@ func TestValidateComposition_IssuesNeverNilOnSuccess(t *testing.T) {
 // COMPOSITION /content slot: build an Evaluation where the slot
 // expects an Observation.
 func TestValidateComposition_RMTypeMismatch(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	// The /content slot accepts archetype-id pins; assigning the
 	// blood_pressure archetype id to an Evaluation tricks the
@@ -189,7 +189,7 @@ func TestValidateComposition_RMTypeMismatch(t *testing.T) {
 // level). Tests the identity-check branch when the matched OPT
 // child has an ArchetypeID pinned.
 func TestValidateComposition_ArchetypeIDMismatch(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	// vital_signs.opt has a body_temperature archetype root under
 	// /content. An Observation whose archetype_node_id pretends to
@@ -221,7 +221,7 @@ func TestValidateComposition_ArchetypeIDMismatch(t *testing.T) {
 // where the OPT pins existence ≥ 1) surfaces a `required` issue
 // at /content[…]/data/events.
 func TestValidateComposition_EmptyEvents(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	obs.Data.Events = nil
@@ -246,7 +246,7 @@ func TestValidateComposition_EmptyEvents(t *testing.T) {
 // element's /value path. Confirms the walker reaches ELEMENT
 // leaves and existence is checked there.
 func TestValidateComposition_NilElementValue(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -263,7 +263,7 @@ func TestValidateComposition_NilElementValue(t *testing.T) {
 // primitive_out_of_range at the element's /value path. vital_signs.opt
 // pins the systolic DV_QUANTITY range upper at 1000 mm[Hg].
 func TestValidateComposition_PrimitiveOutOfRange(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -289,7 +289,7 @@ func TestValidateComposition_PrimitiveOutOfRange(t *testing.T) {
 // REQ-102 v2 Phase 3 — DV_QUANTITY units not in the OPT-allowed
 // list trigger primitive_unit_unknown.
 func TestValidateComposition_PrimitiveUnitsUnknown(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -309,7 +309,7 @@ func TestValidateComposition_PrimitiveUnitsUnknown(t *testing.T) {
 // list surfaces a primitive_not_in_list issue at
 // /category/defining_code.
 func TestValidateComposition_PrimitiveCategoryNotInList(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Category.DefiningCode = rm.CodePhrase{
 		TerminologyID: rm.TerminologyID{Value: "openehr"},
@@ -336,7 +336,7 @@ func TestValidateComposition_PrimitiveCategoryNotInList(t *testing.T) {
 // (empty items slice on the ITEM_LIST) surfaces a `required`
 // issue at /content[…]/data/events[at0006]/data/items.
 func TestValidateComposition_MissingSystolic(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -470,7 +470,7 @@ func TestValidateComposition_AlternativeMismatch_Negative(t *testing.T) {
 // panic. The walker must treat typed-nil as "value absent" and
 // surface a `required` issue when the OPT pins existence ≥ 1.
 func TestValidateComposition_TypedNilDataValueNoPanic(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -492,7 +492,7 @@ func TestValidateComposition_TypedNilDataValueNoPanic(t *testing.T) {
 // panic. Same Go interface footgun as Element.Value but on multi-
 // valued interface slices: (*rm.Observation)(nil) in content[].
 func TestValidateComposition_TypedNilContentItemNoPanic(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	comp.Content = []rm.ContentItem{(*rm.Observation)(nil)}
 	defer func() {
@@ -511,7 +511,7 @@ func TestValidateComposition_TypedNilContentItemNoPanic(t *testing.T) {
 
 // REQ-102 v2 — typed-nil Event in History.Events MUST NOT panic.
 func TestValidateComposition_TypedNilEventNoPanic(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	obs.Data.Events = []rm.Event{(*rm.PointEvent[rm.ItemStructure])(nil)}
@@ -530,7 +530,7 @@ func TestValidateComposition_TypedNilEventNoPanic(t *testing.T) {
 // systolic ELEMENT (at0004) at 0..1; duplicating it fires
 // `cardinality` at the child path.
 func TestValidateComposition_DuplicateSystolicOccurrences(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -559,7 +559,7 @@ func TestValidateComposition_DuplicateSystolicOccurrences(t *testing.T) {
 // Mutating the RM ItemList's archetype_node_id to at9999 fires
 // node_id_mismatch at the matched node.
 func TestValidateComposition_NestedNodeIDMismatch(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -579,7 +579,7 @@ func TestValidateComposition_NestedNodeIDMismatch(t *testing.T) {
 // for an IntervalEvent over the same data and confirm out-of-range
 // systolic still surfaces through the IntervalEvent code path.
 func TestValidateComposition_IntervalEventDispatch(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -611,7 +611,7 @@ func TestValidateComposition_IntervalEventDispatch(t *testing.T) {
 // MUST NOT panic on the empty Section.Items case, and the slot-fit
 // failure is the ONLY issue at that path.
 func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	comp := validVitalSignsComposition()
 	// Replace Content with an unrelated Section so the slot-fit
 	// machinery is exercised; Items is nil to exercise the
@@ -748,7 +748,7 @@ func validBloodPressureObservation() *rm.Observation {
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(filepath.Join("..", "template", "testdata", fixture))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
 		t.Fatalf("ParseFile(%s): %v", fixture, err)
 	}

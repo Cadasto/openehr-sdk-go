@@ -4,50 +4,31 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// cassetteDir resolves the vendored cassette directory relative to
-// this test file's package — testkit/cassettes/canonical_json/
-// sibling of openehr/.
-const cassetteDir = "../../../testkit/cassettes/canonical_json"
-
-// listCassettes returns the vendored cassette paths (relative to
-// [cassetteDir]). Recurses one level so vendored upstream sets
-// (e.g. `ehrbase/`) are exercised alongside the SDK's own fixtures.
-func listCassettes(t *testing.T) []string {
+// listCassettes returns vendored composition JSON paths relative to
+// testkit/cassettes (via testkit/fixtures discovery).
+func listCassettes(t *testing.T) []fixtures.CompositionJSONRel {
 	t.Helper()
-	entries, err := os.ReadDir(cassetteDir)
+	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		t.Fatalf("read cassette dir %q: %v", cassetteDir, err)
+		t.Fatalf("list cassettes: %v", err)
 	}
-	var out []string
-	for _, e := range entries {
-		if e.IsDir() {
-			subdir := filepath.Join(cassetteDir, e.Name())
-			subEntries, err := os.ReadDir(subdir)
-			if err != nil {
-				t.Fatalf("read sub-cassette dir %q: %v", subdir, err)
-			}
-			for _, se := range subEntries {
-				if se.IsDir() || filepath.Ext(se.Name()) != ".json" {
-					continue
-				}
-				out = append(out, filepath.Join(e.Name(), se.Name()))
-			}
-			continue
-		}
-		if filepath.Ext(e.Name()) != ".json" {
-			continue
-		}
-		out = append(out, e.Name())
+	return rels
+}
+
+func cassetteFactory(t *testing.T, rel fixtures.CompositionJSONRel) func() any {
+	t.Helper()
+	f, ok := fixtures.FactoryForJSONRel(rel)
+	if !ok {
+		t.Fatalf("no factory for %s (_type %s)", rel.Rel, fixtures.FactoryHintForRel(rel.Rel))
 	}
-	return out
+	return f
 }
 
 // TestRoundTripStableSimpleValues — decode → encode → decode → encode
@@ -159,13 +140,13 @@ func TestRoundTripStructuralEquivalence(t *testing.T) {
 // ehrbase/) include EHR_STATUS and FOLDER, so the target factory is
 // selected per cassette path.
 func TestRoundTripCassettes(t *testing.T) {
-	for _, name := range listCassettes(t) {
-		t.Run(name, func(t *testing.T) {
-			raw, err := os.ReadFile(filepath.Join(cassetteDir, name))
+	for _, rel := range listCassettes(t) {
+		t.Run(rel.Rel, func(t *testing.T) {
+			raw, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 			if err != nil {
 				t.Fatalf("read cassette: %v", err)
 			}
-			factory := cassetteFactory(name)
+			factory := cassetteFactory(t, rel)
 			v1 := factory()
 			if err := canjson.Unmarshal(raw, v1); err != nil {
 				t.Fatalf("first Unmarshal: %v", err)
@@ -183,24 +164,9 @@ func TestRoundTripCassettes(t *testing.T) {
 				t.Fatalf("second Marshal: %v", err)
 			}
 			if !bytes.Equal(b1, b2) {
-				t.Errorf("round-trip not byte-stable for %s:\n--- b1 ---\n%s\n--- b2 ---\n%s", name, b1, b2)
+				t.Errorf("round-trip not byte-stable for %s:\n--- b1 ---\n%s\n--- b2 ---\n%s", rel.Rel, b1, b2)
 			}
 		})
-	}
-}
-
-// cassetteFactory picks the target RM type for a cassette path. Path
-// shape (subdir or filename) carries the hint — `ehr_status` →
-// EHRStatus, `folder` → Folder, everything else → Composition.
-func cassetteFactory(path string) func() any {
-	base := strings.ToLower(filepath.Base(path))
-	switch {
-	case strings.Contains(base, "ehr_status"):
-		return func() any { return new(rm.EHRStatus) }
-	case strings.Contains(base, "folder"):
-		return func() any { return new(rm.Folder) }
-	default:
-		return func() any { return new(rm.Composition) }
 	}
 }
 

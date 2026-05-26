@@ -24,12 +24,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -70,12 +70,7 @@ func resolveOPTPath(args []string) string {
 	if len(args) > 0 {
 		return args[0]
 	}
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("cannot locate example source path")
-	}
-	repoRoot := filepath.Join(filepath.Dir(here), "..", "..", "..")
-	return filepath.Join(repoRoot, "openehr", "template", "testdata", "vital_signs.opt")
+	return fixtures.TemplateOptForName("vital_signs")
 }
 
 // exampleVitalSignsComposition is a minimal structurally-complete

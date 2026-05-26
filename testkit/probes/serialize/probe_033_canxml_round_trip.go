@@ -68,7 +68,7 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
 // PROBE-033 in sandbox mode. v1 sources XML from the encoder applied
 // to a small set of hand-built RM values (mirror of PROBE-030's leaf
 // set). Once vendored XML cassettes land under
-// `testkit/cassettes/canonical_xml/` they will be appended here in
+// `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` they will be appended here in
 // the same shape as PROBE-030 — same Composition graphs as the JSON
 // source-of-truth, validated by the cross-format invariant test in
 // `openehr/serialize/canxml/`.

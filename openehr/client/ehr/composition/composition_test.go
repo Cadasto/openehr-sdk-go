@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -43,17 +42,12 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-// readCompositionCassette returns one of the vendored canonical-JSON
-// composition cassettes from testkit/cassettes/canonical_json/.
-// Composition reads exercise full RM round-trip through canjson, so
-// the same fixtures used by PROBE-030 cover Phase 3 read paths.
+// readCompositionCassette returns the vendored body_weight composition JSON.
 func readCompositionCassette(t *testing.T) []byte {
 	t.Helper()
-	_, src, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "..", "testkit", "cassettes", "canonical_json", "body_weight.json")
-	b, err := os.ReadFile(path)
+	b, err := os.ReadFile(fixtures.CompositionJSON("body_weight"))
 	if err != nil {
-		t.Fatalf("read cassette %q: %v", path, err)
+		t.Fatalf("read cassette: %v", err)
 	}
 	return b
 }

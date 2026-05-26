@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -13,23 +11,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-// optPath resolves a vendored OPT fixture path relative to this test
-// file so `go test` works from any cwd.
-func optPath(t *testing.T, name string) string {
-	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot resolve test source path")
-	}
-	root := filepath.Join(filepath.Dir(here), "..", "..", "openehr", "template", "testdata")
-	return filepath.Join(root, name)
-}
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(optPath(t, name))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
 	if err != nil {
 		t.Fatalf("ParseFile %s: %v", name, err)
 	}
@@ -58,7 +45,7 @@ const diastolicPath = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/
 // COMPOSITION with category, language, territory, composer, and a
 // non-empty content slice.
 func TestNewSkeleton_vitalSigns(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	comp, err := composition.NewSkeleton(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -89,7 +76,7 @@ func TestNewSkeleton_vitalSigns(t *testing.T) {
 // TestNewSkeleton_requiresComposer asserts that omitting WithComposer
 // surfaces instance.ErrComposerRequired (wrapped).
 func TestNewSkeleton_requiresComposer(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	_, err := composition.NewSkeleton(context.Background(), c,
 		composition.WithTerritory("NL"),
 	)
@@ -103,7 +90,7 @@ func TestNewSkeleton_requiresComposer(t *testing.T) {
 // systolic and diastolic DV_QUANTITY paths, Build, marshal via
 // canjson, and confirm the magnitude / units survive the round-trip.
 func TestBuilder_SetQuantity_systolic(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -164,7 +151,7 @@ func TestBuilder_SetQuantity_systolic(t *testing.T) {
 // on an OPT that does — vital_signs systolic is the canonical
 // DV_QUANTITY case for SetQuantity).
 func TestBuilder_SetText_typeMismatch(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -180,7 +167,7 @@ func TestBuilder_SetText_typeMismatch(t *testing.T) {
 // TestBuilder_SetCodedText_typeMismatch confirms SetCodedText's
 // wrap surfaces ErrTypeMismatch on a non-DV_CODED_TEXT path.
 func TestBuilder_SetCodedText_typeMismatch(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -196,7 +183,7 @@ func TestBuilder_SetCodedText_typeMismatch(t *testing.T) {
 // TestBuilder_Set_typeMismatch asserts ErrTypeMismatch when a
 // *rm.DVText is supplied at a DV_QUANTITY path.
 func TestBuilder_Set_typeMismatch(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -213,7 +200,7 @@ func TestBuilder_Set_typeMismatch(t *testing.T) {
 // TestBuilder_Set_unknownPath asserts ErrUnknownPath for a path the
 // OPT does not contain.
 func TestBuilder_Set_unknownPath(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -247,7 +234,7 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 // + one good Set surface as a single joined error from Build, with
 // each per-path failure recoverable via errors.Is.
 func TestBuilder_Build_AggregatesErrors(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -280,7 +267,7 @@ func TestBuilder_Build_AggregatesErrors(t *testing.T) {
 // Build are not replayed (PR #19 review suggestion: drain state
 // between Build passes for chained authoring).
 func TestBuilder_Build_Idempotent(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),
@@ -313,7 +300,7 @@ func contains(haystack, needle string) bool {
 // TestBuilder_TemplateID asserts Builder.TemplateID matches the
 // compiled template's id.
 func TestBuilder_TemplateID(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	b, err := composition.NewBuilder(context.Background(), c,
 		composition.WithTerritory("NL"),
 		composition.WithComposer(testComposer()),

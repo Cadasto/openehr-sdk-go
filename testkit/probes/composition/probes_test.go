@@ -2,8 +2,6 @@ package compositionprobes_test
 
 import (
 	"context"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -11,21 +9,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	compositionprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/composition"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-func optPath(t *testing.T, name string) string {
-	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot resolve test source path")
-	}
-	root := filepath.Join(filepath.Dir(here), "..", "..", "..", "openehr", "template", "testdata")
-	return filepath.Join(root, name)
-}
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(optPath(t, name))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
 	if err != nil {
 		t.Fatalf("ParseFile %s: %v", name, err)
 	}
@@ -45,7 +34,7 @@ func testComposer() *rm.PartyIdentified {
 // flow: NewBuilder over vital_signs.opt → SetQuantity at systolic
 // and diastolic → Build → canjson.Marshal → fragments present.
 func TestProbe023VitalSignsPasses(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	systolic := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value"
 	diastolic := "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0005]/value"
 	r, err := compositionprobes.Probe023BuilderRoundTrip(
@@ -95,7 +84,7 @@ func TestProbe023NilCompiledFails(t *testing.T) {
 // TestProbe023MissingComposerFails confirms the underlying
 // NewBuilder enforcement is propagated through the probe.
 func TestProbe023MissingComposerFails(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	r, err := compositionprobes.Probe023BuilderRoundTrip(
 		context.Background(),
 		c,

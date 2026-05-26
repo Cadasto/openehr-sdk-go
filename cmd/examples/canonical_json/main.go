@@ -11,10 +11,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -36,11 +36,7 @@ func main() {
 // file so `go run ./cmd/examples/canonical_json` works regardless of
 // CWD. Mirror of the pattern in canjson/roundtrip_test.go.
 func cassettePath() string {
-	_, src, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("runtime.Caller(0) failed — cannot resolve cassette path")
-	}
-	return filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "canonical_json", "body_weight.json")
+	return fixtures.CompositionJSON("body_weight")
 }
 
 func loadCassette() []byte {

@@ -2,12 +2,11 @@ package templateprobes_test
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // PROBE-022 — fixture-driven assertion that the OPT parser resolves
@@ -15,7 +14,7 @@ import (
 // roots) archetype ids. Uses the vital_signs.opt fixture vendored
 // under openehr/template/testdata/.
 func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	assertions := []probes.PathAssertion{
 		{Path: "/", WantRMType: "COMPOSITION", WantNodeID: "at0000"},
 		{Path: "/category", WantRMType: "DV_CODED_TEXT"},
@@ -48,7 +47,7 @@ func TestProbe022OPTPathResolution_VitalSigns(t *testing.T) {
 // PROBE-022 — second fixture body (clinical_notes.v0). Confirms the
 // probe runs against structurally distinct OPTs, not just one.
 func TestProbe022OPTPathResolution_ClinicalNote(t *testing.T) {
-	body := loadFixture(t, "clinical_note.opt")
+	body := loadFixture(t, "clinical_note")
 	assertions := []probes.PathAssertion{
 		{Path: "/", WantRMType: "COMPOSITION"},
 		{
@@ -74,7 +73,7 @@ func TestProbe022OPTPathResolution_ClinicalNote(t *testing.T) {
 // genuinely does not exist passes regardless of the positive wants.
 // Documents the precedence rule for harness authors.
 func TestPathAssertion_PrecedenceContradiction(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	r, err := probes.Probe022OPTPathResolution(body, []probes.PathAssertion{
 		{Path: "/no_such_attribute", ExpectNotFound: true, WantRMType: "DV_TEXT"},
 	})
@@ -104,7 +103,7 @@ func TestProbe022OPTPathResolution_InvalidOPT(t *testing.T) {
 // PROBE-022 — caller misuse (empty assertions) is a Go error, not a
 // probe failure; harnesses MUST not silently pass an empty list.
 func TestProbe022OPTPathResolution_RejectsEmptyAssertions(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	_, err := probes.Probe022OPTPathResolution(body, nil)
 	if err == nil {
 		t.Fatal("expected Go error for nil assertions")
@@ -115,7 +114,7 @@ func TestProbe022OPTPathResolution_RejectsEmptyAssertions(t *testing.T) {
 // specifically, not by any error type. Self-review finding #1 from
 // PR #10 multi-agent review.
 func TestProbe022OPTPathResolution_ExpectNotFoundRequiresSentinel(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	// A syntactically invalid path triggers ParsePath (ErrPathSyntax)
 	// before NodeAt; the probe MUST report this as a parse failure,
 	// not silently accept it as "not found".
@@ -219,15 +218,9 @@ const syntheticDvQuantityOPT = `<?xml version="1.0" encoding="UTF-8"?>
 
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot locate test source path")
-	}
-	repoRoot := filepath.Join(filepath.Dir(here), "..", "..", "..")
-	path := filepath.Join(repoRoot, "openehr", "template", "testdata", name)
-	body, err := os.ReadFile(path) //nolint:gosec // fixture path is test-controlled
+	body, err := os.ReadFile(fixtures.TemplateOptForName(name)) //nolint:gosec // fixture path is test-controlled
 	if err != nil {
-		t.Fatalf("read fixture %s: %v", path, err)
+		t.Fatalf("read fixture %s: %v", name, err)
 	}
 	return body
 }

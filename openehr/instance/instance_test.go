@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -14,19 +12,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-// optPath resolves a vendored OPT path relative to this test file
-// so `go test` works from any cwd.
-func optPath(t *testing.T, name string) string {
-	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot resolve test source path")
-	}
-	root := filepath.Join(filepath.Dir(here), "..", "..", "openehr", "template", "testdata")
-	return filepath.Join(root, name)
-}
 
 // testComposer returns a stable *rm.PartyIdentified test fixture.
 // The Name field is *string in the generated RM, so callers can't
@@ -38,7 +25,7 @@ func testComposer() *rm.PartyIdentified {
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(optPath(t, name))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
 	if err != nil {
 		t.Fatalf("ParseFile %s: %v", name, err)
 	}
@@ -57,7 +44,7 @@ func TestGenerateNilCompiled(t *testing.T) {
 }
 
 func TestGenerateCompositionRequiresOptions(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	if _, err := instance.Generate(context.Background(), c, instance.Options{}); !errors.Is(err, instance.ErrComposerRequired) {
 		t.Errorf("missing composer: want ErrComposerRequired, got %v", err)
 	}
@@ -68,7 +55,7 @@ func TestGenerateCompositionRequiresOptions(t *testing.T) {
 }
 
 func TestGenerateVitalSignsMinimal(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Minimal,
 		Territory: "NL",
@@ -116,7 +103,7 @@ func TestGenerateVitalSignsMinimal(t *testing.T) {
 }
 
 func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Example,
 		Territory: "NL",
@@ -236,7 +223,7 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // pre-Phase-1 fallback, so the asserted value is stable across
 // the two regression scopes.
 func TestGenerateClinicalNoteMinimal(t *testing.T) {
-	c := compileFixture(t, "clinical_note.opt")
+	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Minimal,
@@ -323,7 +310,7 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 // Phase 2 of the plan landed `newHierObjectID()` returning
 // `*rm.HierObjectID`; this is now the regression gate.
 func TestGenerateUIDCarriesType(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Minimal,

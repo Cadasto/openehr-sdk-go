@@ -18,13 +18,10 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
-	"sort"
-	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Result captures the outcome of a probe invocation. Status is
@@ -101,7 +98,7 @@ func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 // Go and PHP produce byte-equal results across this set when fed the
 // same shared cassettes (REQ-081). The set spans leaf RM values and
 // full composition cassettes vendored under
-// `testkit/cassettes/canonical_json/`. The Event/History polymorphism
+// `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`. The Event/History polymorphism
 // that initially blocked composition round-trip is resolved in ADR
 // 0003 (docs/adr/0003-rm-event-polymorphism.md).
 //
@@ -154,78 +151,33 @@ type Probe030Input struct {
 // probes outside of `go test`.
 //
 // Discovery walks one level deep so vendored upstream sets (e.g.
-// `canonical_json/ehrbase/`) are exercised alongside the SDK's own
+// `rm/` ehrbase samples) are exercised alongside the SDK's own
 // fixtures. Each input's target RM type is picked via
 // [factoryForCassette] using filename hints — `ehr_status` → EHR_STATUS,
 // `folder` → FOLDER, otherwise COMPOSITION. Without per-cassette
 // dispatch the EHR_STATUS / FOLDER ehrbase cassettes would fail with
 // `typereg: decoded type does not satisfy target` on first decode.
 func loadCassetteInputs() ([]Probe030Input, error) {
-	_, src, _, ok := runtime.Caller(0)
-	if !ok {
-		return nil, fmt.Errorf("PROBE-030: cannot resolve cassette directory: runtime.Caller failed")
-	}
-	root := filepath.Join(filepath.Dir(src), "..", "..", "cassettes", "canonical_json")
-	entries, err := os.ReadDir(root)
+	rels, err := fixtures.ListCompositionJSON()
 	if err != nil {
-		return nil, fmt.Errorf("PROBE-030: read cassette dir %q: %w", root, err)
+		return nil, fmt.Errorf("PROBE-030: list cassettes: %w", err)
 	}
-	// rels collects `<file>` for top-level cassettes and
-	// `<subdir>/<file>` for one level of vendored upstream sets.
-	// Paths use the platform-agnostic forward-slash form so subtest
-	// names stay stable across OSes; reads convert to native paths.
-	var rels []string
-	for _, e := range entries {
-		if e.IsDir() {
-			subdir := filepath.Join(root, e.Name())
-			subEntries, err := os.ReadDir(subdir)
-			if err != nil {
-				return nil, fmt.Errorf("PROBE-030: read sub-cassette dir %q: %w", subdir, err)
-			}
-			for _, se := range subEntries {
-				if se.IsDir() || filepath.Ext(se.Name()) != ".json" {
-					continue
-				}
-				rels = append(rels, e.Name()+"/"+se.Name())
-			}
-			continue
-		}
-		if filepath.Ext(e.Name()) != ".json" {
-			continue
-		}
-		rels = append(rels, e.Name())
-	}
-	sort.Strings(rels)
 	out := make([]Probe030Input, 0, len(rels))
 	for _, rel := range rels {
-		body, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+		body, err := os.ReadFile(fixtures.ResolveCompositionJSON(rel))
 		if err != nil {
-			return nil, fmt.Errorf("PROBE-030: read cassette %q: %w", rel, err)
+			return nil, fmt.Errorf("PROBE-030: read cassette %q: %w", rel.Rel, err)
+		}
+		factory, ok := fixtures.FactoryForJSONRel(rel)
+		if !ok {
+			continue
 		}
 		out = append(out, Probe030Input{
-			Name:    "cassette:" + rel,
+			Name:    "cassette:" + rel.Rel,
 			Body:    body,
-			Factory: factoryForCassette(rel),
+			Factory: factory,
 		})
 	}
 	return out, nil
 }
 
-// factoryForCassette returns the target RM-type factory matching a
-// cassette path. The SDK's own canonical_json cassettes are all
-// COMPOSITION; vendored upstream sets (e.g. ehrbase) add EHR_STATUS
-// and FOLDER. Hint is filename-based, mirroring the canonical
-// dispatch in `openehr/serialize/canjson/roundtrip_test.go`
-// `cassetteFactory` and `openehr/serialize/canxml/crossformat_test.go`
-// `factoryForCassette`.
-func factoryForCassette(path string) func() any {
-	base := strings.ToLower(filepath.Base(path))
-	switch {
-	case strings.Contains(base, "ehr_status"):
-		return func() any { return new(rm.EHRStatus) }
-	case strings.Contains(base, "folder"):
-		return func() any { return new(rm.Folder) }
-	default:
-		return func() any { return new(rm.Composition) }
-	}
-}

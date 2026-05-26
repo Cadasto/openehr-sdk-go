@@ -2,8 +2,6 @@ package instanceprobes_test
 
 import (
 	"context"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -11,21 +9,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	instanceprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/instance"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
-
-func optPath(t *testing.T, name string) string {
-	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot resolve test source path")
-	}
-	root := filepath.Join(filepath.Dir(here), "..", "..", "..", "openehr", "template", "testdata")
-	return filepath.Join(root, name)
-}
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(optPath(t, name))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(name))
 	if err != nil {
 		t.Fatalf("ParseFile %s: %v", name, err)
 	}
@@ -42,7 +31,7 @@ func testComposer() *rm.PartyIdentified {
 }
 
 func TestProbe027VitalSignsPasses(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
 		Territory: "NL",
 		Composer:  testComposer(),
@@ -65,7 +54,7 @@ func TestProbe027VitalSignsPasses(t *testing.T) {
 // ExampleValue) lands BEFORE validation runs. PROBE-027 round-trips
 // clean on both vendored OPTs.
 func TestProbe027ClinicalNotePasses(t *testing.T) {
-	c := compileFixture(t, "clinical_note.opt")
+	c := compileFixture(t, "clinical_note")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
 		Territory: "NL",
 		Composer:  testComposer(),
@@ -86,7 +75,7 @@ func TestProbe027NilCompiledFails(t *testing.T) {
 }
 
 func TestProbe027MissingTerritoryFails(t *testing.T) {
-	c := compileFixture(t, "vital_signs.opt")
+	c := compileFixture(t, "vital_signs")
 	r, err := instanceprobes.Probe027GeneratedValidates(context.Background(), c, instance.Options{
 		Composer: testComposer(),
 	})

@@ -15,6 +15,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -81,7 +82,7 @@ func injectPartySelf(v any) {
 }
 
 func validateAgainstVitalSigns(comp *rm.Composition) validation.Result {
-	opt, err := template.ParseFile("../../../openehr/template/testdata/vital_signs.opt")
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		panic(err)
 	}

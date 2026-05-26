@@ -2,12 +2,13 @@ package canxml_test
 
 import (
 	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // loadCompositionFromJSON resolves a JSON cassette and decodes it
@@ -18,7 +19,7 @@ import (
 // extended bench runs (`-bench=BenchmarkAll`).
 func loadCompositionFromJSON(b *testing.B, name string) *rm.Composition {
 	b.Helper()
-	path := filepath.Join("../../../testkit/cassettes/canonical_json", name)
+	path := fixtures.CompositionJSON(fixtures.TemplateSlug(strings.TrimSuffix(name, ".json")))
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		b.Fatalf("read cassette %q: %v", path, err)

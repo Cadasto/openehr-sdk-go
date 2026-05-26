@@ -12,12 +12,10 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
-
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -65,11 +63,7 @@ func main() {
 }
 
 func loadCassette() []byte {
-	_, src, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("runtime.Caller(0) failed")
-	}
-	path := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "canonical_json", "body_weight.json")
+	path := fixtures.CompositionJSON("body_weight")
 	b, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatalf("read cassette: %v", err)
