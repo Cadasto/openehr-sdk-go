@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status: v0 preview](https://img.shields.io/badge/status-v0--preview-orange)](docs/roadmap.md)
 
-First-party **Go SDK for openEHR** — covers openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT parsing with typed primitive constraints (REQ-100 / REQ-103), and SMART-on-openEHR auth, with Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) shipped in the same module for v1. (OET / ADL 2 are out of v1 scope.)
+First-party **Go SDK for openEHR** — covers openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT parsing with typed primitive constraints (REQ-100 / REQ-103), template-driven composition validation (REQ-102), template-driven RM instance synthesis (REQ-107), an OPT-driven composition builder (REQ-101), and SMART-on-openEHR auth, with Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care aggregates) shipped in the same module for v1. (OET / ADL 2 are out of v1 scope.)
 
 > **Status:** early implementation (v0 preview) — see [`docs/roadmap.md`](docs/roadmap.md) for the landed-vs-planned matrix.
 

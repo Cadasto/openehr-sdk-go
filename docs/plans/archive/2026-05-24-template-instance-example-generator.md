@@ -1,12 +1,12 @@
 # Plan — Template-driven RM instance example generator
 
 **Date:** 2026-05-24
-**Status:** Draft
+**Status:** Landed (PRs #18 + #20)
 **Owner:** SDK maintainers
-**Covers:** REQ-013, REQ-024, REQ-030–033, REQ-040; proposed **REQ-107** (generic OPT → RM instance synthesis)
-**Probes:** proposed **PROBE-027** (generate example → `validation.ValidateComposition` passes on same OPT); optional **PROBE-028** (canonical JSON round-trip via `canjson` in tests only)
-**Implementation:** not started
-**Depends on:** [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103); [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) (shared template-driven walk + `rmread`/`rmwrite` — implement together or immediately after); [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) (REQ-101 — composition authoring API; consumes this engine)
+**Covers:** REQ-013, REQ-024, REQ-030–033, REQ-040; **REQ-107** (generic OPT → RM instance synthesis)
+**Probes:** **PROBE-027** (Implemented Sandbox — generate → `validation.ValidateComposition` on `vital_signs.opt` + `clinical_note.opt`)
+**Implementation:** landed (Phases 0–3: spec + `ExampleValue()` + `rmwrite` + `instance.Generate` + non-composition accessors + PROBE-027; Phase 4 REQ-101 integration covered in [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md))
+**Depends on:** [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103); [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) (shared template-driven walk + `rmread`/`rmwrite`); [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md) (REQ-101 — composition authoring API; consumes this engine). Follow-up: [`2026-05-26-c-primitive-object-wire-parser.md`](2026-05-26-c-primitive-object-wire-parser.md) covers the `C_PRIMITIVE_OBJECT.<item>` parser gap + UID emission needed to widen PROBE-023 to full round-trip.
 **Defers:** Per-template generated Go structs; FLAT/STRUCTURED export; OET authoring; runtime federated slot-fill repository; clinically realistic synthetic data (FHIR Synthea-style); multi-language term translation
 
 ## Goal

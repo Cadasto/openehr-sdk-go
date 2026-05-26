@@ -18,13 +18,11 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 |---|---|---|
 | [2026-05-21-phase-2-clinical-building-blocks.md](2026-05-21-phase-2-clinical-building-blocks.md) | Umbrella — sequencing and dependency rules | REQ-013, REQ-014 |
 | [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) | REQ-100 hardening, compiled template, REQ-103–105 (Phases 7+ open) | REQ-100, REQ-103; PROBE-022, PROBE-024 |
-| [2026-05-24-template-instance-example-generator.md](2026-05-24-template-instance-example-generator.md) | OPT → RM instance synthesis (`openehr/instance/` proposed) | proposed REQ-107; PROBE-027 (proposed) |
 | [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md) | WebTemplate JSON export (deferred) | proposed REQ-106 |
-| [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | `openehr/composition/` builder (consumes REQ-107 engine) | REQ-101 (proposed) |
-| [2026-05-26-c-primitive-object-wire-parser.md](2026-05-26-c-primitive-object-wire-parser.md) | C_PRIMITIVE_OBJECT inner-item parsing + REQ-107 UID emission (**not landed**) | REQ-100, REQ-107, REQ-101; PROBE-023 widening, PROBE-027 extension |
+| [2026-05-26-c-primitive-object-wire-parser.md](2026-05-26-c-primitive-object-wire-parser.md) | C_PRIMITIVE_OBJECT inner-item parsing + REQ-107 UID emission (Phases 1–2 **not landed**; PR #20 follow-up landed PROBE-027 extension) | REQ-100, REQ-107, REQ-101; PROBE-023 widening, PROBE-027 extension |
 | [2026-05-21-aql-builders.md](2026-05-21-aql-builders.md) | AQL struct + verb builders | REQ-055; PROBE-020, PROBE-021 |
 
-**Landed (archived):** OPT parser, composition validation (REQ-102), BMM codegen, canonical JSON/XML — see [archive/](archive/README.md). **Remaining validation scope** (demographic, AQL lint) is noted in the archived [umbrella validation plan](archive/2026-05-21-validation.md) and tracked under the Phase 2 umbrella.
+**Landed (archived):** OPT parser, composition validation (REQ-102), composition builder (REQ-101), template-driven instance generator (REQ-107), BMM codegen, canonical JSON/XML — see [archive/](archive/README.md). **Remaining validation scope** (demographic, AQL lint) is noted in the archived [umbrella validation plan](archive/2026-05-21-validation.md) and tracked under the Phase 2 umbrella.
 
 ## Header convention (load-bearing)
 

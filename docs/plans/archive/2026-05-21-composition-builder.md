@@ -1,11 +1,11 @@
 # Plan — Generic OPT-driven Composition builder
 
 **Date:** 2026-05-21 (research-updated 2026-05-22)
-**Status:** Draft
+**Status:** Landed (PRs #19 + #20)
 **Owner:** SDK maintainers
-**Covers:** REQ-013, REQ-024, REQ-030–033; proposed **REQ-101** (generic composition builder)
-**Probes:** PROBE-023 (proposed — build + canonical JSON round-trip via `canjson`, not serialize import in builder)
-**Implementation:** planned
+**Covers:** REQ-013, REQ-024, REQ-030–033; **REQ-101** (generic composition builder)
+**Probes:** PROBE-023 (Implemented Sandbox — build + canjson marshal-fragment parity v1; full unmarshal round-trip lands with [`2026-05-26-c-primitive-object-wire-parser.md`](2026-05-26-c-primitive-object-wire-parser.md) Phase 2)
+**Implementation:** landed (Phases 0–2: spec + `NewSkeleton` + `Builder.Set/Build`; per-template typed builders deferred to OET-authoring plan)
 **Depends on:** [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 (compiled template + RMInfoLookup + walker); [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) (proposed REQ-107 — skeleton engine); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Per-template generated Go structs; FLAT/STRUCTURED ingest (REQ-053); automatic `EVENT` timing population beyond documented defaults; OET-driven authoring builder
 

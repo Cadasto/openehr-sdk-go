@@ -12,3 +12,5 @@ Plans moved here when **implementation is landed** or the document is **supersed
 | [2026-05-21-template-parser.md](archive/2026-05-21-template-parser.md) | REQ-100 initial delivery landed |
 | [2026-05-21-validation.md](archive/2026-05-21-validation.md) | Umbrella superseded for composition; demographic/AQL scope still **planned** (track in [Phase 2 umbrella](../2026-05-21-phase-2-clinical-building-blocks.md)) |
 | [2026-05-24-composition-validation-template-driven.md](2026-05-24-composition-validation-template-driven.md) | REQ-102 `ValidateComposition` landed |
+| [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | REQ-101 `composition.NewSkeleton` + `Builder.Set/Build` landed (PRs #19 + #20) |
+| [2026-05-24-template-instance-example-generator.md](2026-05-24-template-instance-example-generator.md) | REQ-107 `instance.Generate` + `rmwrite` + PROBE-027 landed (PRs #18 + #20) |
