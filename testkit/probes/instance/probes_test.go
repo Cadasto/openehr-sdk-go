@@ -8,8 +8,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	instanceprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/instance"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	instanceprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/instance"
 )
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {

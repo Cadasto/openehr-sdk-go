@@ -25,9 +25,9 @@ var compositionJSONExcluded = map[string]bool{
 	"TestPerson.v2":    true, // PERSON / PARTY_IDENTITY DV_CODED_TEXT
 	// Robot / ehrbase Test_dv_interval_* — DV_INTERVAL[T] over DV_ORDERED (SDK-GAP-11).
 	"Test_dv_interval_dv_count_lower_upper_constraint.v0":    true,
-	"Test_dv_interval_dv_count_open_constraint.v0":         true,
+	"Test_dv_interval_dv_count_open_constraint.v0":           true,
 	"Test_dv_interval_dv_quantity_lower_upper_constraint.v0": true,
-	"Test_dv_interval_dv_quantity_open_constraint.v0":      true,
+	"Test_dv_interval_dv_quantity_open_constraint.v0":        true,
 }
 
 // rmJSONExcluded rm/*.json stems omitted from [ListCompositionJSON] (codec or wire gaps).

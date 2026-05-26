@@ -13,11 +13,11 @@ import (
 // inline-data shape either way.
 func TestRobotSubmissionCassettes_WireShape(t *testing.T) {
 	cases := []struct {
-		name       string
-		stem       string
-		wantVers   int
-		minVers    bool // when wantVers is 0, assert len>=1 unless wantEmpty
-		wantEmpty  bool
+		name      string
+		stem      string
+		wantVers  int
+		minVers   bool // when wantVers is 0, assert len>=1 unless wantEmpty
+		wantEmpty bool
 	}{
 		{
 			name:     "minimal_evaluation",
@@ -35,9 +35,9 @@ func TestRobotSubmissionCassettes_WireShape(t *testing.T) {
 			wantVers: 1,
 		},
 		{
-			name:     "composition_and_folder",
-			stem:     "contributions_valid_minimal_contribution.create_composition.create_folder",
-			minVers:  true,
+			name:    "composition_and_folder",
+			stem:    "contributions_valid_minimal_contribution.create_composition.create_folder",
+			minVers: true,
 		},
 		{
 			name:     "folder_creation",

@@ -26,10 +26,10 @@ func CassettesRoot() string {
 	return filepath.Clean(filepath.Join(filepath.Dir(here), "..", "cassettes"))
 }
 
-func templatesDir() string  { return filepath.Join(CassettesRoot(), "templates") }
+func templatesDir() string    { return filepath.Join(CassettesRoot(), "templates") }
 func compositionsDir() string { return filepath.Join(CassettesRoot(), "compositions") }
-func rmDir() string            { return filepath.Join(CassettesRoot(), "rm") }
-func submissionsDir() string { return filepath.Join(CassettesRoot(), "submissions") }
+func rmDir() string           { return filepath.Join(CassettesRoot(), "rm") }
+func submissionsDir() string  { return filepath.Join(CassettesRoot(), "submissions") }
 
 // TemplateOpt returns testkit/cassettes/templates/{template-id}.opt.
 func TemplateOpt(templateID string) string {

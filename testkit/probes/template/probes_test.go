@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
-	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/template"
 )
 
 // PROBE-022 — fixture-driven assertion that the OPT parser resolves

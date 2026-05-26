@@ -180,4 +180,3 @@ func loadCassetteInputs() ([]Probe030Input, error) {
 	}
 	return out, nil
 }
-

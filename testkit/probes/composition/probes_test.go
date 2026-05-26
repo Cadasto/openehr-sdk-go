@@ -8,8 +8,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
-	compositionprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/composition"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	compositionprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/composition"
 )
 
 func compileFixture(t *testing.T, name string) *templatecompile.Compiled {

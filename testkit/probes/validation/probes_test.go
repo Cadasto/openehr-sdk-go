@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/validation"
 )
 
 // PROBE-025 — positive case. A structurally-complete blood-pressure
