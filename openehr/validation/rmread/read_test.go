@@ -56,6 +56,43 @@ func TestReadSingle_PresentValues(t *testing.T) {
 
 // REQ-102 v2 Phase 1 — empty / nil attributes report `ok=false` so
 // the structural walker can flag a `required` issue.
+// TestReadSingle_EventContextMandatory pins the PR #20 re-review fix:
+// readEventContextSingle was missing cases for the two BMM-mandatory
+// attributes (start_time DV_DATE_TIME, setting DV_CODED_TEXT). Without
+// these, REQ-102 v2's required-attribute check fired false positives
+// when an OPT constrained either (clinical_note.opt surfaced this).
+// Present iff the primary channel is non-empty — matches the
+// convention used by readHistorySingle / readActivitySingle.
+func TestReadSingle_EventContextMandatory(t *testing.T) {
+	t.Run("absent", func(t *testing.T) {
+		empty := &rm.EventContext{}
+		if _, ok := rmread.ReadSingle(empty, "EVENT_CONTEXT", "start_time"); ok {
+			t.Error("ReadSingle(empty, start_time) ok=true, want false")
+		}
+		if _, ok := rmread.ReadSingle(empty, "EVENT_CONTEXT", "setting"); ok {
+			t.Error("ReadSingle(empty, setting) ok=true, want false")
+		}
+	})
+	t.Run("present", func(t *testing.T) {
+		populated := &rm.EventContext{
+			StartTime: rm.DVDateTime{Value: "2026-05-26T12:00:00Z"},
+			Setting: rm.DVCodedText{
+				DVText: rm.DVText{Value: "other care"},
+				DefiningCode: rm.CodePhrase{
+					CodeString:    "238",
+					TerminologyID: rm.TerminologyID{Value: "openehr"},
+				},
+			},
+		}
+		if _, ok := rmread.ReadSingle(populated, "EVENT_CONTEXT", "start_time"); !ok {
+			t.Error("ReadSingle(populated, start_time) ok=false, want true")
+		}
+		if _, ok := rmread.ReadSingle(populated, "EVENT_CONTEXT", "setting"); !ok {
+			t.Error("ReadSingle(populated, setting) ok=false, want true")
+		}
+	})
+}
+
 func TestReadSingle_AbsentValues(t *testing.T) {
 	empty := &rm.Composition{}
 

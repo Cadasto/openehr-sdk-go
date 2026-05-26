@@ -418,6 +418,12 @@ func (g *generator) materialiseMultiple(
 			if err != nil {
 				return err
 			}
+			// Mirror materialiseSingle: stamp default primitive values
+			// before walkNode descends so DV scalar wrappers in a
+			// multi-attribute slot also carry a non-empty canonical-
+			// JSON shape under the wire-parser primitive-constraint
+			// gap. No-op for non-primitive RM children.
+			g.populatePrimitiveDefault(rmChild)
 			if err := g.walkNode(child, rmChild); err != nil {
 				return err
 			}

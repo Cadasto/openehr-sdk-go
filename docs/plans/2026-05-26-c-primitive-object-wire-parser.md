@@ -6,7 +6,7 @@
 **Covers:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (wire parser), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance synthesiser UID emission), [REQ-101](../specifications/clinical-modeling.md#req-101) (PROBE-023 widening)
 **Probes:** PROBE-023 (widening to full unmarshal round-trip), PROBE-027 (extension to `clinical_note.opt` — **landed in PR #20**)
 **Implementation:** **partial** — PR #20 landed the generator-side `materialiseSingle` AOM-short-name fix + EVENT_CONTEXT rmread gap + PROBE-027 on `clinical_note.opt`. Wire-parser inner-`<item>` extraction and REQ-107 UID emission **not landed** yet (keep PROBE-023 at "marshal-fragment parity (v1)" until those close).
-**Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18 merged); REQ-101 Phases 0–2 (PR #19 merged); PR #20 generator-side fix (in review)
+**Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18 merged); REQ-101 Phases 0–2 (PR #19 merged); PR #20 generator-side fix (in review — flip to "merged" when this PR lands)
 **Defers:** REQ-104 slot-assertion grammar (separate plan); broader AOM 1.4 primitive coverage beyond the closed REQ-103 set
 
 ## Goal

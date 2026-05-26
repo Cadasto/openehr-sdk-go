@@ -86,11 +86,15 @@ func (b *Builder) Set(path string, v any) error {
 	}
 	node, err := b.compiled.NodeAt(path)
 	if err != nil {
-		// Wrap NodeAt's typed cause so callers that errors.Is against
-		// the template-side sentinels (ErrPathSyntax, ErrPathNotFound)
-		// get the precise reason. Top-level remains ErrUnknownPath for
-		// the public API contract.
-		wrapped := fmt.Errorf("%w: %s: %v", ErrUnknownPath, path, err)
+		// Wrap the compiled-template NodeAt cause via the multi-%w
+		// form (Go 1.20+) so in-tree callers can errors.Is against
+		// ErrUnknownPath AND against the inner templatecompile
+		// sentinel (currently templatecompile.ErrPathNotFound — kept
+		// distinct from the wire-parser's template.ErrPathNotFound by
+		// design; see internal/templatecompile/compiled.go) on the
+		// same error. The public API contract surface is unchanged:
+		// external callers errors.Is against ErrUnknownPath.
+		wrapped := fmt.Errorf("%w: %s: %w", ErrUnknownPath, path, err)
 		b.errs = append(b.errs, wrapped)
 		return wrapped
 	}
