@@ -327,7 +327,7 @@ This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-temp
 
 ## REQ-107 — Template-driven RM instance example generator
 
-**Status:** Draft (Phase 0 landed).
+**Status:** Draft (Phases 0–3 landed).
 
 The SDK **MUST** ship a template-authoritative RM instance synthesiser at `openehr/instance/`: given a compiled OPT, produce a conformant RM object graph whose structure and primitive leaves satisfy the same template-driven contract REQ-102 validates against. The generator is the inverse of validation v2 — same compiled-OPT walk, opposite direction (`rmwrite` instead of `rmread`).
 
@@ -375,7 +375,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phase 0 landed: `ExampleValue()` on every `PrimitiveConstraint`; spec; PROBE-027 stub; this REQ row. Phases 1–4 (rmwrite + RM construction table, core synthesiser walk, non-composition roots + PROBE-027, REQ-101 integration) are out of scope for this phase and tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md).
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / typed accessors for the closed root set; PROBE-027 implemented (Sandbox); `cmd/examples/generate-example/` worked example. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) is tracked in [`docs/plans/2026-05-24-template-instance-example-generator.md`](../plans/2026-05-24-template-instance-example-generator.md) and lands on its own branch.
 
 ### Out of scope
 

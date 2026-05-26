@@ -7,10 +7,11 @@
 //
 // The public entry point is [Generate]:
 //
+//	name := "Test"
 //	out, err := instance.Generate(ctx, compiled, instance.Options{
 //	    Policy:    instance.Minimal,
 //	    Territory: "NL",
-//	    Composer:  &rm.PartyIdentified{Name: "Test"},
+//	    Composer:  &rm.PartyIdentified{Name: &name},
 //	})
 //
 // Typed accessors ([AsComposition], [AsObservation], …) cast the

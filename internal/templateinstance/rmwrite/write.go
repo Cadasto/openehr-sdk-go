@@ -71,6 +71,16 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 		return writeDVTextSingle(p, attrName, child)
 	case *rm.DVCodedText:
 		return writeDVCodedTextSingle(p, attrName, child)
+	case *rm.DVDate:
+		return writeDVTemporalValueSingle("DV_DATE", attrName, child, func(s string) { p.Value = s })
+	case *rm.DVTime:
+		return writeDVTemporalValueSingle("DV_TIME", attrName, child, func(s string) { p.Value = s })
+	case *rm.DVDateTime:
+		return writeDVTemporalValueSingle("DV_DATE_TIME", attrName, child, func(s string) { p.Value = s })
+	case *rm.DVDuration:
+		return writeDVTemporalValueSingle("DV_DURATION", attrName, child, func(s string) { p.Value = s })
+	case *rm.DVBoolean:
+		return writeDVBooleanSingle(p, attrName, child)
 	case *rm.CodePhrase:
 		return writeCodePhraseSingle(p, attrName, child)
 	}
@@ -848,6 +858,38 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 }
 
 // --- DataValue navigations ----------------------------------------------
+
+// writeDVTemporalValueSingle handles `value` on DV_DATE / DV_TIME /
+// DV_DATE_TIME / DV_DURATION — all carry an ISO 8601 string. The
+// setter closure binds the concrete RM field; rmType names the wire
+// shape for the mismatch detail. AOM 1.4 primitive short names
+// (DURATION, DATE, ...) materialise as these wrappers via
+// instance.concreteFor.
+func writeDVTemporalValueSingle(rmType, attr string, child any, set func(string)) error {
+	if attr != "value" {
+		return fmt.Errorf("%w: %s has no single attr %q", ErrUnknownAttribute, rmType, attr)
+	}
+	v, ok := child.(string)
+	if !ok {
+		return mismatch(attr, child, "String")
+	}
+	set(v)
+	return nil
+}
+
+// writeDVBooleanSingle handles `value` on DV_BOOLEAN. Parallels the
+// temporal writers; primitive type is bool, not string.
+func writeDVBooleanSingle(b *rm.DVBoolean, attr string, child any) error {
+	if attr != "value" {
+		return fmt.Errorf("%w: *rm.DVBoolean has no single attr %q", ErrUnknownAttribute, attr)
+	}
+	v, ok := child.(bool)
+	if !ok {
+		return mismatch(attr, child, "Boolean")
+	}
+	b.Value = v
+	return nil
+}
 
 func writeDVTextSingle(t *rm.DVText, attr string, child any) error {
 	switch attr {

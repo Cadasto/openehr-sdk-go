@@ -137,6 +137,47 @@ func TestAppendMultipleVitalSignsCoverage(t *testing.T) {
 	})
 }
 
+// TestEnsureSingleDVTemporal pins the writers for the AOM 1.4
+// primitive short-name path (DURATION / DATE / TIME / DATE_TIME)
+// surfaced by clinical_note.opt — each materialises as the matching
+// DV wrapper, and the primitive ISO 8601 string is set via .value.
+func TestEnsureSingleDVTemporal(t *testing.T) {
+	cases := []struct {
+		name string
+		ctor func() any
+		want string
+		get  func(any) string
+	}{
+		{"DV_DATE", func() any { return &rm.DVDate{} }, "2020-01-01", func(v any) string { return v.(*rm.DVDate).Value }},
+		{"DV_TIME", func() any { return &rm.DVTime{} }, "12:00:00", func(v any) string { return v.(*rm.DVTime).Value }},
+		{"DV_DATE_TIME", func() any { return &rm.DVDateTime{} }, "2020-01-01T12:00:00Z", func(v any) string { return v.(*rm.DVDateTime).Value }},
+		{"DV_DURATION", func() any { return &rm.DVDuration{} }, "P0D", func(v any) string { return v.(*rm.DVDuration).Value }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := tc.ctor()
+			if err := EnsureSingle(p, tc.name, "value", tc.want); err != nil {
+				t.Fatalf("EnsureSingle: %v", err)
+			}
+			if got := tc.get(p); got != tc.want {
+				t.Errorf("value = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestEnsureSingleDVBoolean pins the DV_BOOLEAN writer parallel to
+// the temporal set — bool primitive, not string.
+func TestEnsureSingleDVBoolean(t *testing.T) {
+	b := &rm.DVBoolean{}
+	if err := EnsureSingle(b, "DV_BOOLEAN", "value", true); err != nil {
+		t.Fatalf("EnsureSingle: %v", err)
+	}
+	if !b.Value {
+		t.Errorf("Value = %v, want true", b.Value)
+	}
+}
+
 func TestEnsureSingleUnknownParent(t *testing.T) {
 	err := EnsureSingle(struct{}{}, "FOO", "bar", "baz")
 	if !errors.Is(err, ErrUnknownAttribute) {

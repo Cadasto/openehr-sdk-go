@@ -23,7 +23,10 @@ import (
 // PrimitiveConstraint.ExampleValue. The returned root is typed as
 // any — use [AsComposition], [AsObservation], etc. for the concrete
 // access path.
-func Generate(_ context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
+func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if c == nil || c.Root() == nil {
 		return nil, ErrNilCompiled
 	}
@@ -524,6 +527,13 @@ func (g *generator) makeChild(child *templatecompile.CompiledNode) (any, error) 
 // bmmSubtypes "first concrete" pick — POINT_EVENT for EVENT,
 // ITEM_TREE for ITEM_STRUCTURE, ELEMENT for ITEM, etc. Concrete RM
 // types pass through unchanged.
+//
+// AOM 1.4 primitive short names (DURATION, DATE, TIME, DATE_TIME,
+// BOOLEAN) appear under C_PRIMITIVE_OBJECT in some OPTs where the
+// modeller constrains the primitive directly rather than its DV
+// wrapper. The generator materialises the canonical DV wrapper for
+// each; the validator's bmmSubtypes carries the lockstep admission
+// rule so checkRMType does not reject the substitute.
 func concreteFor(rmType string) string {
 	switch rmType {
 	case "EVENT":
@@ -542,6 +552,17 @@ func concreteFor(rmType string) string {
 		return "CLUSTER"
 	case "PARTY_PROXY":
 		return "PARTY_IDENTIFIED"
+	// AOM 1.4 primitive short names → canonical DV wrapper.
+	case "DURATION":
+		return "DV_DURATION"
+	case "DATE":
+		return "DV_DATE"
+	case "TIME":
+		return "DV_TIME"
+	case "DATE_TIME":
+		return "DV_DATE_TIME"
+	case "BOOLEAN":
+		return "DV_BOOLEAN"
 	}
 	return rmType
 }

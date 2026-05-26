@@ -32,6 +32,13 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 			Range: constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true, UpperInclusive: true},
 			List:  []int64{2, 4, 6},
 		}},
+		// REQ-107 invariant: when List and Range disagree on the first
+		// list entry, ExampleValue picks a member that satisfies both
+		// (Validate enforces both membership AND range containment).
+		{"CInteger/list-with-out-of-range-leading", constraints.CInteger{
+			Range: constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true, UpperInclusive: true},
+			List:  []int64{100, 5, 200},
+		}},
 		{"CInteger/unbounded", constraints.CInteger{}},
 
 		// CReal — list, inclusive range, exclusive lower range.
@@ -41,6 +48,11 @@ func TestPrimitiveConstraint_ExampleValueValidates(t *testing.T) {
 		}},
 		{"CReal/range-exclusive-lower", constraints.CReal{
 			Range: constraints.NumericRange{Lower: 0, Upper: 100, UpperInclusive: true},
+		}},
+		// REQ-107 invariant: same list/range disagreement pattern as CInteger.
+		{"CReal/list-with-out-of-range-leading", constraints.CReal{
+			Range: constraints.NumericRange{Lower: 0, Upper: 10, LowerInclusive: true, UpperInclusive: true},
+			List:  []float64{99.9, 5.5, 200.0},
 		}},
 		{"CReal/unbounded", constraints.CReal{}},
 
