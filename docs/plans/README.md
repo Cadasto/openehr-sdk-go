@@ -10,7 +10,6 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 |---|---|---|
 | [2026-05-15-rest-api-client.md](2026-05-15-rest-api-client.md) | openEHR REST 1.1.0-development typed client family | REQ-050..057, REQ-013..026, REQ-060..072, REQ-090..092; PROBE-010..013, PROBE-040..049; STRAND-01 |
 | [2026-05-25-req094-prefer-followups.md](2026-05-25-req094-prefer-followups.md) | REQ-094 write-path gaps (**not landed**) | REQ-094; PROBE-065 |
-| [2026-05-26-contribution-submission-shape.md](2026-05-26-contribution-submission-shape.md) | `contribution.Commit` request body must be `Contribution_create` (inline `data`, not `OBJECT_REF`) — **not landed** (SDK-GAP-10) | REQ-050; PROBE-072 (proposed) |
 
 ### Phase 2 — clinical building blocks (in flight)
 

@@ -20,7 +20,7 @@ import (
 // COMPOSITION) — see [docs/specifications/conformance.md] PROBE-071 /
 // PROBE-072.
 //
-// SDK-GAP-10. Plan: docs/plans/2026-05-26-contribution-submission-shape.md.
+// SDK-GAP-10. Plan: docs/plans/archive/2026-05-26-contribution-submission-shape.md.
 type Submission struct {
 	// Audit is the AUDIT_DETAILS envelope applied to the whole batch
 	// (REQ-059). Carried inside the body — there is no separate
