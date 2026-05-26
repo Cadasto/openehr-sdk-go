@@ -28,8 +28,10 @@ type Submission struct {
 	Audit rm.AuditDetails
 	// Versions is the closed type-set of inline-data versions to commit.
 	// Each element MUST be a *rm.OriginalVersion[T] or
-	// *rm.ImportedVersion[T] for T in {*rm.Composition, *rm.EHRStatus,
-	// *rm.Folder, *rm.EHRAccess}. Validate() rejects any other shape.
+	// *rm.ImportedVersion[T] for T in {rm.Composition, rm.EHRStatus,
+	// rm.Folder, rm.EHRAccess}. Validate enforces this via an explicit
+	// type-switch over the 8 concrete generic instantiations (no
+	// reflection per REQ-024); the slice must also be non-empty.
 	Versions []CommitVersion
 }
 
@@ -43,19 +45,38 @@ type CommitVersion interface {
 	BMMName() string
 }
 
-// Validate enforces the closed type-set: every CommitVersion's BMMName
-// must be "ORIGINAL_VERSION" or "IMPORTED_VERSION". Called automatically
-// by MarshalJSON; callers MAY invoke it earlier to surface a typed error
+// Validate enforces the documented closed type-set: each
+// Submission.Versions[i] must be a *rm.OriginalVersion[T] or
+// *rm.ImportedVersion[T] for T ∈ {rm.Composition, rm.EHRStatus,
+// rm.Folder, rm.EHRAccess} — the four versionable types in the
+// ITS-REST `Contribution_create` schema. A non-empty Versions slice is
+// also required (the spec rejects an empty contribution).
+//
+// Implemented as an explicit type-switch over the 8 concrete generic
+// instantiations (no reflection per REQ-024). Other types satisfying
+// the CommitVersion method set are rejected with a typed error naming
+// the BMMName for caller diagnostics. Called automatically by
+// MarshalJSON; callers MAY invoke it earlier to surface a typed error
 // without paying for marshalling.
 func (s *Submission) Validate() error {
+	if len(s.Versions) == 0 {
+		return fmt.Errorf("Submission.Versions: empty (Contribution_create requires at least one version)")
+	}
 	for i, v := range s.Versions {
 		if v == nil {
 			return fmt.Errorf("Submission.Versions[%d] is nil", i)
 		}
-		switch v.BMMName() {
-		case "ORIGINAL_VERSION", "IMPORTED_VERSION":
+		switch v.(type) {
+		case *rm.OriginalVersion[rm.Composition],
+			*rm.OriginalVersion[rm.EHRStatus],
+			*rm.OriginalVersion[rm.Folder],
+			*rm.OriginalVersion[rm.EHRAccess],
+			*rm.ImportedVersion[rm.Composition],
+			*rm.ImportedVersion[rm.EHRStatus],
+			*rm.ImportedVersion[rm.Folder],
+			*rm.ImportedVersion[rm.EHRAccess]:
 		default:
-			return fmt.Errorf("Submission.Versions[%d] BMMName=%q (must be ORIGINAL_VERSION or IMPORTED_VERSION)", i, v.BMMName())
+			return fmt.Errorf("Submission.Versions[%d] is %T (BMMName=%q); want *rm.OriginalVersion[T] or *rm.ImportedVersion[T] for T in {Composition, EHRStatus, Folder, EHRAccess}", i, v, v.BMMName())
 		}
 	}
 	return nil

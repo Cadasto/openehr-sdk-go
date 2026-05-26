@@ -17,6 +17,45 @@ type fakeNonVersion struct{}
 func (fakeNonVersion) MarshalJSON() ([]byte, error) { return []byte(`{"_type":"WRONG"}`), nil }
 func (fakeNonVersion) BMMName() string              { return "WRONG_TYPE" }
 
+// newImportedVersion builds a minimal IMPORTED_VERSION<COMPOSITION> for
+// the closed-set tests. ImportedVersion wraps an OriginalVersion under
+// `Item`; both halves carry the spec-mandated discriminators.
+func newImportedVersion() *rm.ImportedVersion[rm.Composition] {
+	inner := newOriginalVersion()
+	innerAny := rm.OriginalVersion[any]{
+		Version:        rm.Version[any]{CommitAudit: inner.CommitAudit},
+		UID:            inner.UID,
+		LifecycleState: inner.LifecycleState,
+	}
+	return &rm.ImportedVersion[rm.Composition]{
+		Version: rm.Version[rm.Composition]{CommitAudit: inner.CommitAudit},
+		Item:    innerAny,
+	}
+}
+
+// newOriginalVersionFolder / newOriginalVersionEHRAccess cover the two
+// remaining versionable T's in the closed set so the type-switch is
+// exercised for every documented case.
+func newOriginalVersionFolder() *rm.OriginalVersion[rm.Folder] {
+	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
+	return &rm.OriginalVersion[rm.Folder]{
+		Version:        rm.Version[rm.Folder]{CommitAudit: *newAudit()},
+		UID:            rm.ObjectVersionID{Value: "3::cdr.example::1"},
+		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+		Data:           &folder,
+	}
+}
+
+func newOriginalVersionEHRAccess() *rm.OriginalVersion[rm.EHRAccess] {
+	access := rm.EHRAccess{}
+	return &rm.OriginalVersion[rm.EHRAccess]{
+		Version:        rm.Version[rm.EHRAccess]{CommitAudit: *newAudit()},
+		UID:            rm.ObjectVersionID{Value: "4::cdr.example::1"},
+		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+		Data:           &access,
+	}
+}
+
 func TestSubmissionValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -24,10 +63,33 @@ func TestSubmissionValidate(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "ORIGINAL_VERSION ok",
+			name: "ORIGINAL_VERSION<Composition> ok",
 			sub: &contribution.Submission{
 				Versions: []contribution.CommitVersion{newOriginalVersion()},
 			},
+		},
+		{
+			name: "ORIGINAL_VERSION<Folder> ok",
+			sub: &contribution.Submission{
+				Versions: []contribution.CommitVersion{newOriginalVersionFolder()},
+			},
+		},
+		{
+			name: "ORIGINAL_VERSION<EHRAccess> ok",
+			sub: &contribution.Submission{
+				Versions: []contribution.CommitVersion{newOriginalVersionEHRAccess()},
+			},
+		},
+		{
+			name: "IMPORTED_VERSION<Composition> ok",
+			sub: &contribution.Submission{
+				Versions: []contribution.CommitVersion{newImportedVersion()},
+			},
+		},
+		{
+			name:    "rejects empty Versions",
+			sub:     &contribution.Submission{},
+			wantErr: "empty",
 		},
 		{
 			name: "rejects nil element",
@@ -37,11 +99,28 @@ func TestSubmissionValidate(t *testing.T) {
 			wantErr: "is nil",
 		},
 		{
-			name: "rejects non-version type",
+			name: "rejects non-version type (wrong wrapper)",
 			sub: &contribution.Submission{
 				Versions: []contribution.CommitVersion{fakeNonVersion{}},
 			},
 			wantErr: `BMMName="WRONG_TYPE"`,
+		},
+		{
+			name: "rejects OriginalVersion[T] with non-versionable T",
+			sub: &contribution.Submission{
+				// rm.PartyIdentified is NOT in the spec's
+				// Contribution_create closed set — the wrapper's
+				// BMMName is ORIGINAL_VERSION but the concrete
+				// generic instantiation is rejected.
+				Versions: []contribution.CommitVersion{
+					&rm.OriginalVersion[rm.PartyIdentified]{
+						Version:        rm.Version[rm.PartyIdentified]{CommitAudit: *newAudit()},
+						UID:            rm.ObjectVersionID{Value: "x::cdr.example::1"},
+						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+					},
+				},
+			},
+			wantErr: "OriginalVersion[",
 		},
 	}
 	for _, tc := range tests {
