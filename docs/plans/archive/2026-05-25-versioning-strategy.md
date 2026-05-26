@@ -3,10 +3,10 @@
 **Date:** 2026-05-25
 **Status:** **Landed 2026-05-26.** Phase 0 (policy docs + first tag at `v0.1.0`) + Phase 2 (release GitHub Action) shipped. Phase 1 (runtime `version` package) **declined** per maintainer call (YAGNI — git tag is the authoritative source). Phase 3 (`v1.0.0` ceremony) **descoped from this plan** — it will be drafted as a separate plan when the REQ registry sweep is close to ready.
 **Owner:** SDK maintainers
-**Covers:** REQ-004 (semantic versioning), REQ-001 (module path); informs [`CHANGELOG.md`](../../CHANGELOG.md), [`docs/ci.md`](../ci.md), [`docs/releases.md`](../releases.md), [`CONTRIBUTING.md`](../../CONTRIBUTING.md), [`SECURITY.md`](../../SECURITY.md)
+**Covers:** REQ-004 (semantic versioning), REQ-001 (module path); informs [`CHANGELOG.md`](../../../CHANGELOG.md), [`docs/ci.md`](../../ci.md), [`docs/releases.md`](../../releases.md), [`CONTRIBUTING.md`](../../../CONTRIBUTING.md), [`SECURITY.md`](../../../SECURITY.md)
 **Probes:** — (release process; no PROBE-NNN)
-**Implementation:** Phase 0 **landed** (policy docs + `v0.1.0` tag); Phase 1 runtime package **declined**; Phase 2 **landed** ([`.github/workflows/release.yml`](../../.github/workflows/release.yml) + [`scripts/release-notes.sh`](../../scripts/release-notes.sh)); Phase 3 descoped (separate plan when applicable)
-**Depends on:** [`docs/ci.md`](../ci.md); [`docs/specifications/packaging.md`](../specifications/packaging.md); [`docs/specifications/module-layout.md`](../specifications/module-layout.md) § Versioning
+**Implementation:** Phase 0 **landed** (policy docs + `v0.1.0` tag); Phase 1 runtime package **declined**; Phase 2 **landed** ([`.github/workflows/release.yml`](../../../.github/workflows/release.yml) + [`scripts/release-notes.sh`](../../../scripts/release-notes.sh)); Phase 3 descoped (separate plan when applicable)
+**Depends on:** [`docs/ci.md`](../../ci.md); [`docs/specifications/packaging.md`](../../specifications/packaging.md); [`docs/specifications/module-layout.md`](../../specifications/module-layout.md) § Versioning
 **Defers:** openEHR REST spec version (REQ-050), BMM file pins (REQ-041) as module semver — those ship as **compatibility metadata** per release, not as the Go tag itself
 
 ## Goal
@@ -24,7 +24,7 @@ The repo carries **four different “version” concepts**. Conflating them caus
 | **A. Go module semver** | Public API + wire behaviour consumers depend on | *No tag yet* (`[Unreleased]` only) | Every release tag `vX.Y.Z` |
 | **B. Go toolchain** | Minimum Go compiler | `go 1.25.0` in `go.mod` | N-1 policy (REQ-002); bump in **minor** when raised |
 | **C. openEHR wire contract** | REST / ITS behaviour | `1.1.0-development` (REQ-050) | Discovery mismatch fails fast; not the module tag |
-| **D. BMM / codegen corpus** | Generated RM/AOM shapes | `openehr_rm_1.2.0`, `openehr_base_1.3.0`, … | BMM bump per [ADR 0001](../adr/0001-bmm-version-bump-runbook.md); may force **minor** if generated types change |
+| **D. BMM / codegen corpus** | Generated RM/AOM shapes | `openehr_rm_1.2.0`, `openehr_base_1.3.0`, … | BMM bump per [ADR 0001](../../adr/0001-bmm-version-bump-runbook.md); may force **minor** if generated types change |
 
 **Recommendation:** Tag and changelog track **A** only. Embed **B–D** as **compatibility metadata** shipped with each release (see § Stamping).
 
@@ -32,7 +32,7 @@ The repo carries **four different “version” concepts**. Conflating them caus
 
 ## Strategic choice: stay on `v0.x` until the v1.0.0 gate
 
-Normative gate from [`docs/specifications/module-layout.md` § Versioning](../specifications/module-layout.md#versioning):
+Normative gate from [`docs/specifications/module-layout.md` § Versioning](../../specifications/module-layout.md#versioning):
 
 `v1.0.0` when:
 
@@ -166,7 +166,7 @@ func String() string
 ### 5. Spec / roadmap alignment (not semver)
 
 - Do **not** encode SDK semver in `docs/specifications/` (operational, not wire contract).
-- Update [`docs/roadmap.md`](../roadmap.md) milestone when cutting `v0.1.0` / `v1.0.0`.
+- Update [`docs/roadmap.md`](../../roadmap.md) milestone when cutting `v0.1.0` / `v1.0.0`.
 
 ---
 
@@ -189,9 +189,9 @@ func String() string
 
 **Tasks:**
 
-1. Add [`docs/releases.md`](../releases.md) — semver rules, `v0.x` break policy, consumer pinning examples, v1.0.0 checklist link.
-2. Link from [`README.md`](../README.md), [`AGENTS.md`](../AGENTS.md), [`docs/ci.md`](../ci.md).
-3. Add row to [`docs/specifications/traceability.yaml`](../specifications/traceability.yaml) if a REQ for release stamping is desired (optional **REQ-107** “Release metadata package”).
+1. Add [`docs/releases.md`](../../releases.md) — semver rules, `v0.x` break policy, consumer pinning examples, v1.0.0 checklist link.
+2. Link from [`README.md`](../../README.md), [`AGENTS.md`](../../AGENTS.md), [`docs/ci.md`](../../ci.md).
+3. Add row to [`docs/specifications/traceability.yaml`](../../specifications/traceability.yaml) if a REQ for release stamping is desired (optional **REQ-107** “Release metadata package”).
 
 **Definition of done:** Contributors know when to bump what without reading this plan.
 
@@ -217,12 +217,12 @@ func String() string
 
 **Landed deliverables:**
 
-1. [`.github/workflows/release.yml`](../../.github/workflows/release.yml) — triggered by `push` of tags matching `v*`. Job:
+1. [`.github/workflows/release.yml`](../../../.github/workflows/release.yml) — triggered by `push` of tags matching `v*`. Job:
    - Validates tag shape (`v<major>.<minor>.<patch>[-pre]`).
    - Re-runs `make ci` on the tagged commit (full PR gate: fmt-check, mod-tidy-check, codegen-verify, vet, spec-check, test, lint, build).
    - Builds release notes via `scripts/release-notes.sh`.
    - Creates a **draft** GitHub Release (humans publish manually — matches "humans still decide" from the original DoD).
-2. [`scripts/release-notes.sh`](../../scripts/release-notes.sh) — extracts the matching `## [X.Y.Z]` block from `CHANGELOG.md` and appends a compatibility table sourced from `go.mod` (Go minimum), `resources/bmm/*.bmm.json` (BMM pins), `git rev-parse --short HEAD` (revision), and the REQ-050 REST pin. Exits non-zero if the CHANGELOG section is missing.
+2. [`scripts/release-notes.sh`](../../../scripts/release-notes.sh) — extracts the matching `## [X.Y.Z]` block from `CHANGELOG.md` and appends a compatibility table sourced from `go.mod` (Go minimum), `resources/bmm/*.bmm.json` (BMM pins), `git rev-parse --short HEAD` (revision), and the REQ-050 REST pin. Exits non-zero if the CHANGELOG section is missing.
 3. `workflow_dispatch` dry-run input: take a `tag` parameter, run the same verification and notes generation, upload notes as an artifact, but skip the `gh release create` step. Lets a maintainer preview a future tag's notes before pushing.
 
 **Deferred to a later iteration:**
@@ -234,7 +234,7 @@ func String() string
 
 ### Phase 3 — v1.0.0 ceremony — **descoped from this plan**
 
-The `v1.0.0` cut is out of scope for the versioning-strategy plan. When the REQ registry sweep + PROBE parity with the PHP SDK + a live deployment dry-run get within reach, a dedicated plan will be drafted (`docs/plans/YYYY-MM-DD-v1-ceremony.md`). Until then, `v0.x` minors are the release vehicle and the Phase 2 workflow already handles them. The `v1.0.0` gate criteria themselves remain documented in [`docs/specifications/module-layout.md` § Versioning](../specifications/module-layout.md#versioning) and [`docs/releases.md` § `v1.0.0` gate](../releases.md#v100-gate) — both are normative; this plan does not duplicate them.
+The `v1.0.0` cut is out of scope for the versioning-strategy plan. When the REQ registry sweep + PROBE parity with the PHP SDK + a live deployment dry-run get within reach, a dedicated plan will be drafted (`docs/plans/YYYY-MM-DD-v1-ceremony.md`). Until then, `v0.x` minors are the release vehicle and the Phase 2 workflow already handles them. The `v1.0.0` gate criteria themselves remain documented in [`docs/specifications/module-layout.md` § Versioning](../../specifications/module-layout.md#versioning) and [`docs/releases.md` § `v1.0.0` gate](../../releases.md#v100-gate) — both are normative; this plan does not duplicate them.
 
 ---
 
@@ -297,9 +297,9 @@ Per REQ-001 and STRAND-08:
 
 ## References
 
-- [REQ-004](../specifications/packaging.md) — semantic versioning
-- [module-layout.md § Versioning](../specifications/module-layout.md#versioning) — bump matrix, v1.0.0 gates
-- [CHANGELOG.md](../../CHANGELOG.md) — pre-1.0 policy
-- [docs/ci.md](../ci.md) — quality gate before tag
-- [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — BMM bumps vs codegen
+- [REQ-004](../../specifications/packaging.md) — semantic versioning
+- [module-layout.md § Versioning](../../specifications/module-layout.md#versioning) — bump matrix, v1.0.0 gates
+- [CHANGELOG.md](../../../CHANGELOG.md) — pre-1.0 policy
+- [docs/ci.md](../../ci.md) — quality gate before tag
+- [ADR 0001](../../adr/0001-bmm-version-bump-runbook.md) — BMM bumps vs codegen
 - Go modules: [Module version numbering](https://go.dev/doc/modules/version-numbers)

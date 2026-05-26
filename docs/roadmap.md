@@ -138,7 +138,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 |---------|--------|-------|
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
-| Release / semver strategy | **Planned** | — | [plan](plans/2026-05-25-versioning-strategy.md) — pre-`v0.1.0` tagging, compatibility metadata |
+| Release / semver strategy | **Landed (2026-05-26)** | `v0.1.0` tag; [`release.yml`](../.github/workflows/release.yml) | [archived plan](plans/archive/2026-05-25-versioning-strategy.md) — policy docs + tag-driven release workflow; `v1.0.0` ceremony tracked separately |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
 | Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse,validate-composition,validate-from-json,primitive-validate}` |
 

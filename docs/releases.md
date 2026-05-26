@@ -1,6 +1,6 @@
 # Releases
 
-How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Companion to the [versioning-strategy plan](plans/2026-05-25-versioning-strategy.md) (normative reasoning) and [`docs/ci.md`](ci.md) (quality gate before tag).
+How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Companion to the [versioning-strategy plan](plans/archive/2026-05-25-versioning-strategy.md) (archived; landed reasoning) and [`docs/ci.md`](ci.md) (quality gate before tag).
 
 ## Versioning policy
 
@@ -138,5 +138,5 @@ The Cadasto platform itself versions independently; the openEHR REST `spec_versi
 - [`CHANGELOG.md`](../CHANGELOG.md) — pre-1.0 policy
 - [`docs/ci.md`](ci.md) — quality gate before tag
 - [ADR 0001](adr/0001-bmm-version-bump-runbook.md) — BMM bumps vs codegen
-- [`docs/plans/2026-05-25-versioning-strategy.md`](plans/2026-05-25-versioning-strategy.md) — full plan
+- [`docs/plans/archive/2026-05-25-versioning-strategy.md`](plans/archive/2026-05-25-versioning-strategy.md) — full plan (archived)
 - Go modules: [Module version numbering](https://go.dev/doc/modules/version-numbers)

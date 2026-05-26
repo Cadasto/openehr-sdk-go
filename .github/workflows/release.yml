@@ -8,7 +8,7 @@
 # offers a dry-run that prints the would-be release notes without creating
 # anything (useful before pushing the tag).
 #
-# Policy: docs/releases.md. Plan: docs/plans/2026-05-25-versioning-strategy.md.
+# Policy: docs/releases.md. Plan: docs/plans/archive/2026-05-25-versioning-strategy.md.
 
 name: Release
 
