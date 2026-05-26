@@ -509,3 +509,32 @@ func TestParse_LeafComplexObject_NoConstraint(t *testing.T) {
 		t.Errorf("PrimitiveConstraint() = %T, want nil for C_COMPLEX_OBJECT", p)
 	}
 }
+
+// REQ-100 wire-parser — C_PRIMITIVE_OBJECT wraps a primitive
+// constraint under an `<item>` element. The wrapper carries the
+// AOM 1.4 primitive short name on `rm_type_name` (e.g. DURATION);
+// the inner `<item xsi:type="C_*">` carries the actual constraint.
+// Before the [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`]
+// fix the parser dropped the inner item, leaving
+// PrimitiveConstraint() = nil on the compiled node.
+//
+// This test pins the recovery: a C_PRIMITIVE_OBJECT(DURATION) with
+// an inner C_DURATION pattern must compile to a typed CDuration with
+// the pattern preserved.
+func TestParse_CPrimitiveObject_Duration(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_PRIMITIVE_OBJECT">
+		<rm_type_name>DURATION</rm_type_name>
+		<node_id/>
+		<item xsi:type="C_DURATION">
+			<pattern>PThhHmmM</pattern>
+		</item>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	cd, ok := p.(constraints.CDuration)
+	if !ok {
+		t.Fatalf("PrimitiveConstraint() = %T, want constraints.CDuration", p)
+	}
+	if cd.Pattern != "PThhHmmM" {
+		t.Errorf("CDuration.Pattern = %q, want PThhHmmM", cd.Pattern)
+	}
+}

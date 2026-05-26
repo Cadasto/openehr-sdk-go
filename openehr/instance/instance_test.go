@@ -1,6 +1,7 @@
 package instance_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
 
@@ -306,6 +308,73 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 		}
 	}
 	return nil
+}
+
+// TestGenerateUIDCarriesType pins the PR #20 re-review deferral:
+// canjson's polymorphic dispatch on Composition.uid (an interface
+// `UIDBasedID` whose concrete should be HierObjectID) requires a
+// pointer receiver path. Before the
+// [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`] Phase 2
+// fix, `newHierObjectID()` returned a value, and canjson emitted
+// `uid` WITHOUT a `_type` discriminator — breaking the unmarshal
+// round-trip PROBE-023's spec wording promised.
+//
+// This test fails today; flips green when Phase 2 lands.
+func TestGenerateUIDCarriesType(t *testing.T) {
+	c := compileFixture(t, "vital_signs.opt")
+	name := "Test Composer"
+	out, err := instance.Generate(context.Background(), c, instance.Options{
+		Policy:    instance.Minimal,
+		Territory: "NL",
+		Composer:  &rm.PartyIdentified{Name: &name},
+	})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("AsComposition: %v", err)
+	}
+	b, err := canjson.Marshal(comp)
+	if err != nil {
+		t.Fatalf("canjson.Marshal: %v", err)
+	}
+	// The uid field must carry `_type:"HIER_OBJECT_ID"` so that
+	// canjson.Unmarshal can resolve the polymorphic UIDBasedID
+	// interface. The string-contains assertion is stable against
+	// canjson's field-order convention.
+	if !bytes.Contains(b, []byte(`"uid":{"_type":"HIER_OBJECT_ID"`)) {
+		t.Errorf("canjson(Composition).uid missing _type discriminator; got: %s", uidSlice(b))
+	}
+}
+
+// uidSlice returns the canjson `uid` object substring for the
+// failing-test diagnostic, without quoting the whole composition.
+func uidSlice(b []byte) string {
+	const k = `"uid":`
+	i := bytes.Index(b, []byte(k))
+	if i < 0 {
+		return "<uid not present>"
+	}
+	rest := b[i+len(k):]
+	// Walk a balanced { … } object — small handwritten scanner so
+	// the test does not pull in an extra dependency.
+	if len(rest) == 0 || rest[0] != '{' {
+		return string(rest[:min(64, len(rest))])
+	}
+	depth := 0
+	for j := 0; j < len(rest); j++ {
+		switch rest[j] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return string(rest[:j+1])
+			}
+		}
+	}
+	return string(rest[:min(128, len(rest))])
 }
 
 func TestPolicyString(t *testing.T) {
