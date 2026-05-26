@@ -426,6 +426,19 @@ func readActivitySingle(a *rm.Activity, attr string) (any, bool) {
 
 func readEventContextSingle(c *rm.EventContext, attr string) (any, bool) {
 	switch attr {
+	case "start_time":
+		// DV_DATE_TIME — BMM-mandatory; present iff non-empty value.
+		if c.StartTime.Value == "" {
+			return c.StartTime, false
+		}
+		return c.StartTime, true
+	case "setting":
+		// DV_CODED_TEXT — BMM-mandatory; present iff defining_code
+		// carries a code_string OR the surface value is non-empty.
+		if c.Setting.DefiningCode.CodeString == "" && c.Setting.Value == "" {
+			return c.Setting, false
+		}
+		return c.Setting, true
 	case "end_time":
 		return ptrPresent(c.EndTime)
 	case "location":

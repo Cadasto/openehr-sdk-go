@@ -1,12 +1,12 @@
 # Plan — C_PRIMITIVE_OBJECT wire-parser + REQ-107 UID emission
 
 **Date:** 2026-05-26
-**Status:** Draft
+**Status:** Draft (generator-side AOM-short-name fix landed in PR #20; remaining scope is the wire-parser fix + UID emission fix)
 **Owner:** SDK maintainers
 **Covers:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (wire parser), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance synthesiser UID emission), [REQ-101](../specifications/clinical-modeling.md#req-101) (PROBE-023 widening)
-**Probes:** PROBE-023 (widening to full unmarshal round-trip), PROBE-027 (extension to `clinical_note.opt`)
-**Implementation:** **not landed** — keep PROBE-023 at "marshal-fragment parity (v1)" and PROBE-027 at "vital_signs.opt only" until this plan closes
-**Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18); REQ-101 Phases 0–2 (PR #19)
+**Probes:** PROBE-023 (widening to full unmarshal round-trip), PROBE-027 (extension to `clinical_note.opt` — **landed in PR #20**)
+**Implementation:** **partial** — PR #20 landed the generator-side `materialiseSingle` AOM-short-name fix + EVENT_CONTEXT rmread gap + PROBE-027 on `clinical_note.opt`. Wire-parser inner-`<item>` extraction and REQ-107 UID emission **not landed** yet (keep PROBE-023 at "marshal-fragment parity (v1)" until those close).
+**Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18 merged); REQ-101 Phases 0–2 (PR #19 merged); PR #20 generator-side fix (in review)
 **Defers:** REQ-104 slot-assertion grammar (separate plan); broader AOM 1.4 primitive coverage beyond the closed REQ-103 set
 
 ## Goal
@@ -108,7 +108,7 @@ if v.UID == nil {
 2. **`buildPrimitive` dispatch** — add a `case "C_PRIMITIVE_OBJECT":` branch that delegates to `buildPrimitive(o.Item, strict)` when `o.Item != nil`. Return nil when missing (lenient mode) or `ErrInvalidOPT` when strict (the wrapper without an `<item>` is malformed).
 3. **`buildComplexObject` flow** — confirm that when the wrapper carries an inner C_DURATION, the resulting `*ComplexObject` has `rm_type_name = "DURATION"` (from the wrapper) AND `primitive: constraints.CDuration{...}` (from the inner item). The walker then routes to the primitive-leaf branch.
 4. **Tests** — the Phase 0 failing test goes green; add positive coverage for the other AOM 1.4 primitive wrappers that real OPTs use (`C_DATE`, `C_DATE_TIME`, `C_TIME`, `C_BOOLEAN` under C_PRIMITIVE_OBJECT). Match the pattern in `parse_primitives_test.go`.
-5. **Validator round-trip** — extend PROBE-027 to run on `clinical_note.opt` (move from "vital_signs.opt only" to a fixture table).
+5. **Validator round-trip** — extend PROBE-027 to run on `clinical_note.opt` (move from "vital_signs.opt only" to a fixture table). **Landed in PR #20** — `TestProbe027ClinicalNotePasses` passes via the generator-side `materialiseSingle` AOM-short-name fix + the EVENT_CONTEXT rmread gap fix. The default sentinel ("P0D" / etc.) satisfies the validator because the OPT-pinned constraint is dropped at parse time and the validator falls back to "is the attribute present at all". Once the wire-parser fix lands, the **constraint** flows through too and PROBE-027 stops depending on the sentinel fallback.
 
 **Definition of done:**
 

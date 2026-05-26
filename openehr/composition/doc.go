@@ -21,6 +21,16 @@
 // out of v1 scope; they belong in the consuming project or behind an
 // OET-driven authoring plan.
 //
+// # Build lifecycle
+//
+// [Builder.Build] is repeatable: each invocation consumes the
+// accumulated [Builder.Set] queue and any prior errors, so a
+// subsequent Build with no intervening Set returns the same in-place
+// skeleton with a nil error. Successful assignments from a failed
+// Build are NOT replayed on the next invocation (the mutation has
+// already happened in place). Pattern: Set → Build → inspect error
+// → fix offending Sets → Build again.
+//
 // # REQ-013 building-block independence
 //
 // This package imports openehr/rm, openehr/rm/typereg,
