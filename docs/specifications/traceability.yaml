@@ -149,7 +149,12 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin]
-    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    plans: [docs/plans/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md]
+    probes: [PROBE-072]
+    tests:
+      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
+      - openehr/client/ehr/contribution/contribution_test.go
+      - openehr/client/ehr/contribution/submission_test.go
 
   - id: REQ-054
     title: Optimistic concurrency

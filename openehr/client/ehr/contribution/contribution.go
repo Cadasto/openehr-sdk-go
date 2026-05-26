@@ -31,21 +31,29 @@ func WithPrefer(p transport.Prefer) CommitOption {
 }
 
 // Commit posts a multi-version Contribution to ehrID. The audit
-// envelope is carried inside the Contribution body (REQ-059); unlike
+// envelope is carried inside the Submission body (REQ-059); unlike
 // per-resource writes there is no separate `openehr-audit-details`
 // header.
 //
-// Wire: POST /ehr/{ehr_id}/contribution.
+// Wire: POST /ehr/{ehr_id}/contribution. Request body is the
+// ITS-REST `Contribution_create` schema — `{audit, versions[]}` with
+// each `versions[i]` an inline `ORIGINAL_VERSION<T>` or
+// `IMPORTED_VERSION<T>` (SDK-GAP-10 / PROBE-072), NOT the persisted
+// `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`. The
+// response decodes as `*rm.Contribution` (persisted shape, returned
+// under `Prefer: return=representation`).
 //
-// The Contribution's UID field MAY be unset — the server assigns it
-// on success. Concurrency failures within the batch surface as
+// Concurrency failures within the batch surface as
 // [transport.ErrVersionConflict].
-func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, batch *rm.Contribution, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("contribution.Commit: %w: empty EHRID", transport.ErrInvalidConfig)
 	}
 	if batch == nil {
-		return nil, nil, fmt.Errorf("contribution.Commit: %w: nil Contribution", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("contribution.Commit: %w: nil Submission", transport.ErrInvalidConfig)
+	}
+	if err := batch.Validate(); err != nil {
+		return nil, nil, fmt.Errorf("contribution.Commit: %w: %v", transport.ErrInvalidConfig, err)
 	}
 	cfg := commitConfig{prefer: transport.PreferMinimal}
 	for _, o := range opts {
@@ -82,7 +90,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 
 // Repository mirrors the package functions for DI seams.
 type Repository interface {
-	Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *rm.Contribution, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
+	Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -90,6 +98,6 @@ func NewRepository(c *transport.Client) Repository { return &repository{c: c} }
 
 type repository struct{ c *transport.Client }
 
-func (r *repository) Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *rm.Contribution, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+func (r *repository) Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	return Commit(ctx, r.c, ehrID, batch, opts...)
 }

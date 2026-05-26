@@ -1,13 +1,13 @@
 # Plan — `contribution.Commit` submission-shape fix
 
 **Date:** 2026-05-26
-**Status:** Draft
+**Status:** **Landed 2026-05-26.** Phase 0 (PROBE-072 reservation + skip stub), Phase 1 (`contribution.Submission` type + `Commit` signature change + unit tests), and Phase 2 (PROBE-072 implementation + traceability) all shipped on branch `feat/req050-contribution-submission-shape`. Phase 3 cross-SDK survey deferred — to be picked up if a non-conforming CDR is encountered.
 **Owner:** SDK maintainers
-**Covers:** [REQ-050](../specifications/wire.md#req-050), [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation), [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source); proposed addendum to REQ-059
-**Probes:** new — proposed **PROBE-072** (contribution submission body matches `Contribution_create`)
-**Implementation:** **not landed** — `contribution.Commit` currently serialises the **persisted** shape (`versions: []OBJECT_REF`) and is rejected by every spec-conformant CDR
+**Covers:** [REQ-050](../../specifications/wire.md#req-050), [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation), [REQ-095](../../specifications/wire.md#req-095) (OpenAPI authoritative source); proposed addendum to REQ-059
+**Probes:** **PROBE-072** — Implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../../testkit/probes/versioned/probe_072_contribution_submission_shape.go)
+**Implementation:** **landed** — `contribution.Commit` takes `*contribution.Submission` whose `Versions` are inline `ORIGINAL_VERSION<T>` / `IMPORTED_VERSION<T>`; response decode (persisted `*rm.Contribution`) unchanged. Unit pin `TestCommitSubmissionShape` + PROBE-072 cover the wire-shape assertion.
 **Depends on:** [SDK-GAP-09 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) (bare-response decode contract — already landed); ITS-REST OpenAPI [`ehr-html.openapi.yaml`](https://github.com/openEHR/specifications-ITS-REST/blob/master/computable/OAS/ehr-html.openapi.yaml) §`Contribution_create`
-**Defers:** SMART-on-openEHR token forwarding for multi-version commits (orthogonal)
+**Defers:** SMART-on-openEHR token forwarding for multi-version commits (orthogonal); cross-SDK Sandbox-vs-Live conformance survey (Phase 3 — pick up if a CDR rejects `Contribution_create`)
 
 ## Goal
 
@@ -22,7 +22,7 @@ Close **SDK-GAP-10** — symmetric to the SDK-GAP-09 fix for `composition.Save/U
 
 ## Problem in detail
 
-Current state in [`openehr/client/ehr/contribution/contribution.go`](../../openehr/client/ehr/contribution/contribution.go):
+Current state in [`openehr/client/ehr/contribution/contribution.go`](../../../openehr/client/ehr/contribution/contribution.go):
 
 ```go
 func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,

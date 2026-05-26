@@ -12,6 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 - **C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission** — AOM 1.4 primitive short-name wrappers now flow through; `Composition.uid` emits `_type:"HIER_OBJECT_ID"`; PROBE-023 widened to full round-trip. [archive](docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md).
 - **GitHub repo hygiene + release workflow** — issue / PR templates, refined `CONTRIBUTING.md` / `SECURITY.md`; tag-driven [`release.yml`](.github/workflows/release.yml) re-runs `make ci` and drafts a GitHub Release with auto-generated compatibility table.
+- **Contribution submission shape (SDK-GAP-10)** — `contribution.Commit` now takes [`*Submission`](openehr/client/ehr/contribution/submission.go) (ITS-REST `Contribution_create`: inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`), not the persisted `*rm.Contribution`. Breaking change; no in-tree callers. PROBE-072.
 
 ## [0.1.0] - 2026-05-26
 
@@ -40,7 +41,6 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 ### Known follow-ups (not landed)
 
 - [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
-- [Contribution submission shape](docs/plans/2026-05-26-contribution-submission-shape.md) — SDK-GAP-10; `contribution.Commit` request body must use the ITS-REST `Contribution_create` (inline `data: T`) shape, not the persisted `OBJECT_REF` shape.
 - AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
 - Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.
 - CDR benchmark migration ([plan §Phase 9](docs/plans/2026-05-15-rest-api-client.md), STRAND-01).

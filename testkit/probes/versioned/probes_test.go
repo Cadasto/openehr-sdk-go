@@ -2,11 +2,13 @@ package versionedprobes_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/versioned"
@@ -224,6 +226,82 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 	}
 	if r.Status != "fail" {
 		t.Errorf("PROBE-071 PUT-OV-envelope status = %q (expected fail, detail: %s)", r.Status, r.Detail)
+	}
+}
+
+// newOriginalVersionFixture builds a minimal ORIGINAL_VERSION<COMPOSITION>
+// for the PROBE-072 server fakes — the probe doesn't care about clinical
+// content, only the wire shape, so ArchetypeNodeID is the only Composition
+// field set.
+func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
+	name := "alice"
+	audit := rm.AuditDetails{
+		SystemID:  "cdr.example",
+		Committer: rm.PartyIdentified{Name: &name},
+		ChangeType: rm.DVCodedText{
+			DVText:       rm.DVText{Value: "creation"},
+			DefiningCode: rm.CodePhrase{CodeString: "249"},
+		},
+		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
+	}
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	return &rm.OriginalVersion[rm.Composition]{
+		Version:        rm.Version[rm.Composition]{CommitAudit: audit},
+		UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
+		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+		Data:           &comp,
+	}
+}
+
+func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
+	var capturedBody []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		capturedBody = b
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	ov := newOriginalVersionFixture()
+	sub := &contribution.Submission{
+		Audit:    ov.CommitAudit,
+		Versions: []contribution.CommitVersion{ov},
+	}
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-072 status = %q detail=%q", r.Status, r.Detail)
+	}
+}
+
+func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
+	// Server fake reads (and ignores) the real Commit request body and
+	// plants the regression-shape — a persisted rm.Contribution with
+	// versions[] of OBJECT_REF — into the captured slot. The probe
+	// inspects *capturedBody, so it sees the planted body and MUST
+	// flag the SDK-GAP-10 regression.
+	planted := []byte(`{"_type":"CONTRIBUTION","audit":{"_type":"AUDIT_DETAILS","system_id":"x"},"versions":[{"_type":"OBJECT_REF","id":{"_type":"OBJECT_VERSION_ID","value":"1::x::1"}}]}`)
+	var captured []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		captured = planted
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	ov := newOriginalVersionFixture()
+	sub := &contribution.Submission{
+		Audit:    ov.CommitAudit,
+		Versions: []contribution.CommitVersion{ov},
+	}
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("PROBE-072 status = %q (expected fail for OBJECT_REF body, detail=%q)", r.Status, r.Detail)
 	}
 }
 
