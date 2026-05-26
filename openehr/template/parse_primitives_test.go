@@ -549,22 +549,13 @@ func TestParse_LeafComplexObject_NoConstraint(t *testing.T) {
 	}
 }
 
-// REQ-100 wire-parser — C_PRIMITIVE_OBJECT wraps a primitive
-// constraint under an `<item>` element. The wrapper carries the
-// AOM 1.4 primitive short name on `rm_type_name` (e.g. DURATION);
-// the inner `<item xsi:type="C_*">` carries the actual constraint.
-// Before the [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`]
-// fix the parser dropped the inner item, leaving
-// PrimitiveConstraint() = nil on the compiled node.
-//
-// This test pins the recovery: a C_PRIMITIVE_OBJECT(DURATION) with
-// an inner C_DURATION pattern must compile to a typed CDuration with
-// the pattern preserved.
 // TestParse_CPrimitiveObject_Coverage exercises the C_PRIMITIVE_OBJECT
 // recursion across every primitive wrapper the AOM 1.4 OPTs in the
 // wild use. The wrapper carries the primitive short name on
 // rm_type_name; the inner <item xsi:type="C_*"> carries the typed
-// constraint that the parser must thread through.
+// constraint that the parser must thread through. See [REQ-100
+// wire-parser plan](../../docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md)
+// for the full landed scope.
 func TestParse_CPrimitiveObject_Coverage(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -658,6 +649,13 @@ func TestParse_CPrimitiveObject_StrictMissingItem(t *testing.T) {
 	}
 }
 
+// TestParse_CPrimitiveObject_Duration is the focused phase-0 regression
+// gate for the C_PRIMITIVE_OBJECT inner-`<item>` extraction (now
+// landed via the [archived wire-parser
+// plan](../../docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md)).
+// Pre-fix the parser dropped the inner item, leaving
+// PrimitiveConstraint() = nil; the test pins a typed CDuration with
+// its inner-`<pattern>` preserved.
 func TestParse_CPrimitiveObject_Duration(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_PRIMITIVE_OBJECT">
 		<rm_type_name>DURATION</rm_type_name>
