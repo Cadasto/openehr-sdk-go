@@ -10,6 +10,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+- **Testkit cassettes** — ehrbase Robot fixtures (minimal-entry, `Test_dv_*`, EHR_STATUS, FOLDER, persistent compositions, CONTRIBUTION submissions) under `testkit/cassettes/` with `fixtures.SubmissionJSON` and `scripts/ingest-robot-cassettes.sh`.
+
 ## [0.2.0] - 2026-05-26
 
 Second `v0.x` minor — Contribution write path lands the spec request shape, AOM 1.4 primitive wrappers now flow through, and the release-tooling is fully wired (tag-driven workflow + auto-compatibility table). Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — `contribution.Commit`'s signature change is the only one this cycle and has no in-tree callers.
