@@ -230,10 +230,11 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // .value (a String slot) and failed; this regression keeps the
 // generator end-to-end on the second vendored OPT fixture.
 //
-// The leaf primitive constraint itself is still dropped at parse
-// time (REQ-100 wire-parser gap on C_PRIMITIVE_OBJECT, tracked
-// separately) — so we assert the documented sentinel "P0D" landed,
-// not a constraint-derived value.
+// The leaf primitive constraint flows through the parser via the
+// C_PRIMITIVE_OBJECT inner-`<item>` extraction; CDuration's
+// ExampleValue happens to return the same "P0D" sentinel as the
+// pre-Phase-1 fallback, so the asserted value is stable across
+// the two regression scopes.
 func TestGenerateClinicalNoteMinimal(t *testing.T) {
 	c := compileFixture(t, "clinical_note.opt")
 	name := "Test Composer"
@@ -314,7 +315,7 @@ func findInItemTree(t *rm.ItemTree) *rm.DVDuration {
 // canjson's polymorphic dispatch on Composition.uid (an interface
 // `UIDBasedID` whose concrete should be HierObjectID) requires a
 // pointer receiver path. Before the
-// [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`] Phase 2
+// [`docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md`] Phase 2
 // fix, `newHierObjectID()` returned a value, and canjson emitted
 // `uid` WITHOUT a `_type` discriminator — breaking the unmarshal
 // round-trip PROBE-023's spec wording promised.

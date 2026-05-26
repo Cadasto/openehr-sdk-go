@@ -37,12 +37,12 @@ type Assignment struct {
 // canjson.Marshal, canjson.Unmarshal back into a fresh *rm.Composition,
 // re-marshal, and verify every fragment in every Assignment appears in
 // BOTH the first marshal AND the post-unmarshal re-marshal — the
-// stricter parity REQ-101 + PROBE-023 promised once the REQ-107 UID
-// emission is fixed (Phase 2 of
-// [`docs/plans/2026-05-26-c-primitive-object-wire-parser.md`]). The
-// probe is sandbox-only (no transport dependency); cross-SDK parity
-// means another implementation of REQ-101 against the same OPT +
-// assignments MUST produce the same pass outcome.
+// REQ-101 + PROBE-023 normative round-trip (REQ-107 UID emission
+// landed via the archived
+// [`docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md`]).
+// The probe is sandbox-only (no transport dependency); cross-SDK
+// parity means another implementation of REQ-101 against the same
+// OPT + assignments MUST produce the same pass outcome.
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) {
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {

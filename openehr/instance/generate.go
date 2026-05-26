@@ -196,10 +196,12 @@ func (g *generator) materialiseSingle(
 	// already stamped its primary value channel. A nested DV
 	// materialised via makeChild would be attached to .value (a
 	// String slot) and fail. When the leaf carries a parsed
-	// primitive constraint (REQ-107 happy path), use its ExampleValue
-	// to override the default sentinel on the parent. When the
-	// constraint is absent (REQ-100 wire-parser gap on
-	// C_PRIMITIVE_OBJECT — tracked separately), the default holds.
+	// primitive constraint (the REQ-107 + C_PRIMITIVE_OBJECT
+	// wire-parser happy path), use its ExampleValue to override the
+	// default sentinel on the parent. When the constraint is absent
+	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
+	// omitted, or an unknown xsi:type the parser admitted leniently),
+	// the populatePrimitiveDefault sentinel holds.
 	if isAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
 			return g.applyPrimitiveExample(child, parentRM, pc)
@@ -211,13 +213,12 @@ func (g *generator) materialiseSingle(
 		return err
 	}
 	// Stamp default primitive values BEFORE descending. When the
-	// child is a DV scalar wrapper (DV_DURATION, DV_DATE, …) and the
-	// OPT pinned a value attribute whose primitive constraint the
-	// wire parser dropped (REQ-100 C_PRIMITIVE_OBJECT gap),
+	// child is a DV scalar wrapper (DV_DURATION, DV_DATE, …),
 	// populatePrimitiveDefault gives the wrapper a non-empty
-	// canonical-JSON shape (`"value":"P0D"`, etc.). When the
-	// constraint is present, applyPrimitiveExample inside walkNode
-	// will overwrite the default. No-op for non-primitive wrappers.
+	// canonical-JSON shape (`"value":"P0D"`, etc.) as a safe fallback
+	// when the OPT does not pin a leaf primitive constraint. When a
+	// constraint IS present, applyPrimitiveExample inside walkNode
+	// overwrites the default. No-op for non-primitive wrappers.
 	g.populatePrimitiveDefault(rmChild)
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err

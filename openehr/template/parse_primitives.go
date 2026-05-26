@@ -126,7 +126,11 @@ func buildBoolean(o *xmlCObject) constraints.CBoolean {
 }
 
 func buildInteger(o *xmlCObject, strict bool) (constraints.CInteger, error) {
-	c := constraints.CInteger{Range: numericRange(o.Range)}
+	rng, err := numericRange(o.Range, strict, "C_INTEGER")
+	if err != nil {
+		return constraints.CInteger{}, err
+	}
+	c := constraints.CInteger{Range: rng}
 	for i, item := range o.PrimitiveList {
 		text := strings.TrimSpace(item.Text)
 		n, err := strconv.ParseInt(text, 10, 64)
@@ -148,7 +152,11 @@ func buildInteger(o *xmlCObject, strict bool) (constraints.CInteger, error) {
 }
 
 func buildReal(o *xmlCObject, strict bool) (constraints.CReal, error) {
-	c := constraints.CReal{Range: numericRange(o.Range)}
+	rng, err := numericRange(o.Range, strict, "C_REAL")
+	if err != nil {
+		return constraints.CReal{}, err
+	}
+	c := constraints.CReal{Range: rng}
 	for i, item := range o.PrimitiveList {
 		text := strings.TrimSpace(item.Text)
 		f, err := strconv.ParseFloat(text, 64)
@@ -212,10 +220,16 @@ func buildDvQuantity(o *xmlCObject) constraints.DvQuantity {
 		}
 	}
 	for _, item := range o.PrimitiveList {
+		// DV_QUANTITY stays lenient on magnitude / precision bounds —
+		// scope of the strict numericRange path is C_INTEGER / C_REAL
+		// (the primary numeric scalar types). Tightening DV_QUANTITY
+		// would require threading strict through buildDvQuantity.
+		mag, _ := numericRange(item.Magnitude, false, "DV_QUANTITY.magnitude")
+		prec, _ := numericRange(item.Precision, false, "DV_QUANTITY.precision")
 		unit := constraints.QuantityUnit{
 			Units:     strings.TrimSpace(item.Units),
-			Magnitude: numericRange(item.Magnitude),
-			Precision: numericRange(item.Precision),
+			Magnitude: mag,
+			Precision: prec,
 		}
 		if unit.Units == "" && !unit.Magnitude.IsBounded() && !unit.Precision.IsBounded() {
 			continue
@@ -247,14 +261,16 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 // shape, defaulting LowerIncluded / UpperIncluded to true when the
 // OPT omits them (AOM convention). xmlNumericInterval.Lower / Upper
 // are decoded as strings (AOM 1.4 reuses `<range>` for both numeric
-// and temporal types); parsed to float64 lazily here. Unparseable
-// bounds — e.g. an ISO 8601 string in a temporal-range context — fall
-// through as the unbounded sentinel on that side; numeric constraint
-// builders only call this function from numeric xsi:type branches,
-// so the temporal case never reaches numericRange in practice.
-func numericRange(i *xmlNumericInterval) constraints.NumericRange {
+// and temporal types); parsed to float64 lazily here.
+//
+// In lenient mode an unparseable bound falls through as the unbounded
+// sentinel on that side (forward-compat, mirrors the list-item path).
+// In strict mode an unparseable bound surfaces as ErrInvalidOPT —
+// the same split buildInteger / buildReal already apply to list
+// items. ctx names the constraint type for the diagnostic.
+func numericRange(i *xmlNumericInterval, strict bool, ctx string) (constraints.NumericRange, error) {
 	if i == nil {
-		return constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}
+		return constraints.NumericRange{LowerUnbounded: true, UpperUnbounded: true}, nil
 	}
 	r := constraints.NumericRange{
 		LowerUnbounded: i.LowerUnbounded,
@@ -265,6 +281,8 @@ func numericRange(i *xmlNumericInterval) constraints.NumericRange {
 	if !r.LowerUnbounded {
 		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Lower), 64); err == nil {
 			r.Lower = f
+		} else if strict {
+			return r, fmt.Errorf("%w: %s range.lower=%q is not a valid number", ErrInvalidOPT, ctx, i.Lower)
 		} else {
 			r.LowerUnbounded = true
 		}
@@ -272,11 +290,13 @@ func numericRange(i *xmlNumericInterval) constraints.NumericRange {
 	if !r.UpperUnbounded {
 		if f, err := strconv.ParseFloat(strings.TrimSpace(i.Upper), 64); err == nil {
 			r.Upper = f
+		} else if strict {
+			return r, fmt.Errorf("%w: %s range.upper=%q is not a valid number", ErrInvalidOPT, ctx, i.Upper)
 		} else {
 			r.UpperUnbounded = true
 		}
 	}
-	return r
+	return r, nil
 }
 
 // parseBool reads the AOM XSD-style boolean strings ("true" /

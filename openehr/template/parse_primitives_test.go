@@ -262,6 +262,45 @@ func TestParse_PrimitiveList_StrictRejectsMalformed(t *testing.T) {
 	}
 }
 
+// TestParse_NumericRange_StrictRejectsMalformedBounds confirms the
+// review-driven hardening: a C_INTEGER / C_REAL with bounded XML
+// (lower_unbounded=false) but an unparseable numeric bound surfaces
+// as ErrInvalidOPT under ParseOPTStrict, while lenient mode falls
+// through to the unbounded sentinel. Mirrors the list-item
+// strict/lenient split that already applies to C_INTEGER / C_REAL.
+func TestParse_NumericRange_StrictRejectsMalformedBounds(t *testing.T) {
+	body := `<children xsi:type="C_INTEGER">
+		<rm_type_name>INTEGER</rm_type_name>
+		<node_id />
+		<range>
+			<lower_included>true</lower_included>
+			<upper_included>true</upper_included>
+			<lower_unbounded>false</lower_unbounded>
+			<upper_unbounded>false</upper_unbounded>
+			<lower>not-a-number</lower>
+			<upper>100</upper>
+		</range>
+	</children>`
+	t.Run("lenient_falls_through_to_unbounded", func(t *testing.T) {
+		tmpl := parseOPTWithChild(t, body)
+		p := firstChildPrimitive(t, tmpl)
+		ci, ok := p.(constraints.CInteger)
+		if !ok {
+			t.Fatalf("want CInteger, got %T", p)
+		}
+		if !ci.Range.LowerUnbounded {
+			t.Errorf("lenient mode should mark malformed lower as Unbounded; Range = %s", ci.Range)
+		}
+	})
+	t.Run("strict_rejects", func(t *testing.T) {
+		full := strings.Replace(primitiveOPTTemplate, "%s", body, 1)
+		_, err := template.ParseOPTStrict(strings.NewReader(full))
+		if !errors.Is(err, template.ErrInvalidOPT) {
+			t.Errorf("ParseOPTStrict err = %v, want errors.Is(err, ErrInvalidOPT)", err)
+		}
+	})
+}
+
 func TestParse_CString(t *testing.T) {
 	tmpl := parseOPTWithChild(t, `<children xsi:type="C_STRING">
 		<rm_type_name>STRING</rm_type_name>
