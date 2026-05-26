@@ -1,0 +1,422 @@
+{
+	"_type": "CONTRIBUTION",
+	"versions": [
+		{
+			"_type": "ORIGINAL_VERSION",
+			"commit_audit": {
+				"_type": "AUDIT_DETAILS",
+				"system_id": "test-system-id",
+				"committer": {
+					"_type": "PARTY_IDENTIFIED",
+					"name": "<optional name of the committer>",
+					"external_ref": {
+						"id": {
+							"_type": "GENERIC_ID",
+							"value": "<OBJECT_ID>",
+							"scheme": "<ID SCHEME NAME>"
+						},
+						"namespace": "demographic",
+						"type": "PERSON"
+					}
+				},
+				"change_type": {
+					"value": "creation",
+					"defining_code": {
+						"terminology_id": {
+							"value": "openehr"
+						},
+						"code_string": "249"
+					}
+				},
+				"description": {
+					"value": "<optional audit description>"
+				}
+			},
+			"data": {
+				"_type": "COMPOSITION",
+				"name": {
+					"_type": "DV_TEXT",
+					"value": "teminology_test.ehrbase.org.v1"
+				},
+				"archetype_details": {
+					"archetype_id": {
+						"value": "openEHR-EHR-COMPOSITION.report.v1"
+					},
+					"template_id": {
+						"value": "teminology_test.ehrbase.org.v1"
+					},
+					"rm_version": "1.0.4"
+				},
+				"language": {
+					"_type": "CODE_PHRASE",
+					"terminology_id": {
+						"_type": "TERMINOLOGY_ID",
+						"value": "ISO_639-1"
+					},
+					"code_string": "en"
+				},
+				"territory": {
+					"_type": "CODE_PHRASE",
+					"terminology_id": {
+						"_type": "TERMINOLOGY_ID",
+						"value": "ISO_3166-1"
+					},
+					"code_string": "DE"
+				},
+				"category": {
+					"_type": "DV_CODED_TEXT",
+					"value": "event",
+					"defining_code": {
+						"_type": "CODE_PHRASE",
+						"terminology_id": {
+							"_type": "TERMINOLOGY_ID",
+							"value": "openehr"
+						},
+						"code_string": "433"
+					}
+				},
+				"composer": {
+					"_type": "PARTY_IDENTIFIED",
+					"name": "composer test value"
+				},
+				"context": {
+					"_type": "EVENT_CONTEXT",
+					"start_time": {
+						"_type": "DV_DATE_TIME",
+						"value": "2022-02-03T04:05:06"
+					},
+					"end_time": {
+						"_type": "DV_DATE_TIME",
+						"value": "2022-02-03T04:05:06"
+					},
+					"setting": {
+						"_type": "DV_CODED_TEXT",
+						"value": "home",
+						"defining_code": {
+							"_type": "CODE_PHRASE",
+							"terminology_id": {
+								"_type": "TERMINOLOGY_ID",
+								"value": "openehr"
+							},
+							"code_string": "225"
+						}
+					},
+					"other_context": {
+						"_type": "ITEM_TREE",
+						"name": {
+							"_type": "DV_TEXT",
+							"value": "Tree"
+						},
+						"items": [
+							{
+								"_type": "ELEMENT",
+								"name": {
+									"_type": "DV_TEXT",
+									"value": "Report ID"
+								},
+								"value": {
+									"_type": "DV_TEXT",
+									"value": "Lorem ipsum"
+								},
+								"archetype_node_id": "at0002"
+							},
+							{
+								"_type": "ELEMENT",
+								"name": {
+									"_type": "DV_TEXT",
+									"value": "Status"
+								},
+								"value": {
+									"_type": "DV_TEXT",
+									"value": "Lorem ipsum"
+								},
+								"archetype_node_id": "at0005"
+							}
+						],
+						"archetype_node_id": "at0001"
+					},
+					"health_care_facility": {
+						"_type": "PARTY_IDENTIFIED",
+						"name": "DOE, John"
+					}
+				},
+				"content": [
+					{
+						"_type": "OBSERVATION",
+						"name": {
+							"_type": "DV_TEXT",
+							"value": "teminology_test"
+						},
+						"archetype_details": {
+							"archetype_id": {
+								"value": "openEHR-EHR-OBSERVATION.teminology_test.v0"
+							},
+							"rm_version": "1.0.4"
+						},
+						"language": {
+							"_type": "CODE_PHRASE",
+							"terminology_id": {
+								"_type": "TERMINOLOGY_ID",
+								"value": "ISO_639-1"
+							},
+							"code_string": "en"
+						},
+						"encoding": {
+							"_type": "CODE_PHRASE",
+							"terminology_id": {
+								"_type": "TERMINOLOGY_ID",
+								"value": "IANA_character-sets"
+							},
+							"code_string": "ISO-10646-UTF-1"
+						},
+						"workflow_id": {
+							"_type": "OBJECT_REF",
+							"namespace": "unknown",
+							"type": "ANY",
+							"id": {
+								"_type": "GENERIC_ID",
+								"value": "9ca1254b-2794-3529-9d58-6fe15303ecbf",
+								"scheme": "scheme"
+							}
+						},
+						"subject": {
+							"_type": "PARTY_SELF"
+						},
+						"provider": {
+							"_type": "PARTY_SELF"
+						},
+						"guideline_id": {
+							"_type": "OBJECT_REF",
+							"namespace": "unknown",
+							"type": "ANY",
+							"id": {
+								"_type": "GENERIC_ID",
+								"value": "fe837b7f-a54f-3b04-a096-b1874c9faeb5",
+								"scheme": "scheme"
+							}
+						},
+						"data": {
+							"name": {
+								"_type": "DV_TEXT",
+								"value": "History"
+							},
+							"origin": {
+								"_type": "DV_DATE_TIME",
+								"value": "2022-02-03T04:05:06"
+							},
+							"period": {
+								"_type": "DV_DURATION",
+								"value": "PT0S"
+							},
+							"duration": {
+								"_type": "DV_DURATION",
+								"value": "PT0S"
+							},
+							"events": [
+								{
+									"_type": "INTERVAL_EVENT",
+									"name": {
+										"_type": "DV_TEXT",
+										"value": "Any event"
+									},
+									"time": {
+										"_type": "DV_DATE_TIME",
+										"value": "2022-02-03T04:05:06"
+									},
+									"data": {
+										"_type": "ITEM_TREE",
+										"name": {
+											"_type": "DV_TEXT",
+											"value": "Tree"
+										},
+										"items": [
+											{
+												"_type": "ELEMENT",
+												"name": {
+													"_type": "DV_TEXT",
+													"value": "Mesioclusal"
+												},
+												"value": {
+													"_type": "DV_CODED_TEXT",
+													"value": "The Mesioclusal surfaces of a tooth.",
+													"defining_code": {
+														"_type": "CODE_PHRASE",
+														"terminology_id": {
+															"_type": "TERMINOLOGY_ID",
+															"value": "http://terminology.hl7.org/CodeSystem/FDI-surface"
+														},
+														"code_string": "MO"
+													}
+												},
+												"archetype_node_id": "at0004"
+											}
+										],
+										"archetype_node_id": "at0003"
+									},
+									"width": {
+										"_type": "DV_DURATION",
+										"value": "PT42H"
+									},
+									"math_function": {
+										"_type": "DV_CODED_TEXT",
+										"value": "minimum",
+										"defining_code": {
+											"_type": "CODE_PHRASE",
+											"terminology_id": {
+												"_type": "TERMINOLOGY_ID",
+												"value": "openehr"
+											},
+											"code_string": "145"
+										}
+									},
+									"archetype_node_id": "at0002"
+								},
+								{
+									"_type": "POINT_EVENT",
+									"name": {
+										"_type": "DV_TEXT",
+										"value": "Any event"
+									},
+									"time": {
+										"_type": "DV_DATE_TIME",
+										"value": "2022-02-03T04:05:06"
+									},
+									"data": {
+										"_type": "ITEM_TREE",
+										"name": {
+											"_type": "DV_TEXT",
+											"value": "Tree"
+										},
+										"items": [
+											{
+												"_type": "ELEMENT",
+												"name": {
+													"_type": "DV_TEXT",
+													"value": "Mesioclusal"
+												},
+												"value": {
+													"_type": "DV_CODED_TEXT",
+													"value": "The Mesioclusal surfaces of a tooth.",
+													"defining_code": {
+														"_type": "CODE_PHRASE",
+														"terminology_id": {
+															"_type": "TERMINOLOGY_ID",
+															"value": "http://terminology.hl7.org/CodeSystem/FDI-surface"
+														},
+														"code_string": "MO"
+													}
+												},
+												"archetype_node_id": "at0004"
+											}
+										],
+										"archetype_node_id": "at0003"
+									},
+									"archetype_node_id": "at0002"
+								},
+								{
+									"_type": "INTERVAL_EVENT",
+									"name": {
+										"_type": "DV_TEXT",
+										"value": "Any event"
+									},
+									"time": {
+										"_type": "DV_DATE_TIME",
+										"value": "2022-02-03T04:05:06"
+									},
+									"data": {
+										"_type": "ITEM_TREE",
+										"name": {
+											"_type": "DV_TEXT",
+											"value": "Tree"
+										},
+										"items": [
+											{
+												"_type": "ELEMENT",
+												"name": {
+													"_type": "DV_TEXT",
+													"value": "Mesioclusal"
+												},
+												"value": {
+													"_type": "DV_CODED_TEXT",
+													"value": "The Mesioclusal surfaces of a tooth.",
+													"defining_code": {
+														"_type": "CODE_PHRASE",
+														"terminology_id": {
+															"_type": "TERMINOLOGY_ID",
+															"value": "http://terminology.hl7.org/CodeSystem/FDI-surface"
+														},
+														"code_string": "MO"
+													}
+												},
+												"archetype_node_id": "at0004"
+											}
+										],
+										"archetype_node_id": "at0003"
+									},
+									"width": {
+										"_type": "DV_DURATION",
+										"value": "PT42H"
+									},
+									"math_function": {
+										"_type": "DV_CODED_TEXT",
+										"value": "minimum",
+										"defining_code": {
+											"_type": "CODE_PHRASE",
+											"terminology_id": {
+												"_type": "TERMINOLOGY_ID",
+												"value": "openehr"
+											},
+											"code_string": "145"
+										}
+									},
+									"archetype_node_id": "at0002"
+								}
+							],
+							"archetype_node_id": "at0001"
+						},
+						"archetype_node_id": "openEHR-EHR-OBSERVATION.teminology_test.v0"
+					}
+				],
+				"archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1"
+			},
+			"lifecycle_state": {
+				"value": "complete",
+				"defining_code": {
+					"terminology_id": {
+						"value": "openehr"
+					},
+					"code_string": "532"
+				}
+			}
+		}
+	],
+	"audit": {
+		"_type": "AUDIT_DETAILS",
+		"system_id": "test-system-id",
+		"committer": {
+			"_type": "PARTY_IDENTIFIED",
+			"name": "<optional name of the committer>",
+			"external_ref": {
+				"id": {
+					"_type": "GENERIC_ID",
+					"value": "<OBJECT_ID>",
+					"scheme": "<ID SCHEME NAME>"
+				},
+				"namespace": "demographic",
+				"type": "PERSON"
+			}
+		},
+		"change_type": {
+			"value": "creation",
+			"defining_code": {
+				"terminology_id": {
+					"value": "openehr"
+				},
+				"code_string": "249"
+			}
+		},
+		"description": {
+			"value": "<optional audit description>"
+		}
+	}
+}

@@ -1,0 +1,1739 @@
+{
+    "_type": "COMPOSITION",
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.encounter.v1",
+    "name": {
+        "value": "Encounter"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.encounter.v1"
+        },
+        "template_id": {
+            "value": "Demonstration.v1"
+        },
+        "rm_version": "1.1.0"
+    },
+    "language": {
+        "terminology_id": {
+            "value": "ISO_639-1"
+        },
+        "code_string": "en"
+    },
+    "territory": {
+        "terminology_id": {
+            "value": "ISO_3166-1"
+        },
+        "code_string": "NL"
+    },
+    "category": {
+        "value": "event",
+        "defining_code": {
+            "terminology_id": {
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_SELF"
+    },
+    "context": {
+        "start_time": {
+            "value": "2026-05-23T09:05:17"
+        },
+        "setting": {
+            "value": "other care",
+            "defining_code": {
+                "terminology_id": {
+                    "value": "openehr"
+                },
+                "code_string": "238"
+            }
+        },
+        "other_context": {
+            "_type": "ITEM_TREE",
+            "archetype_node_id": "at0001",
+            "name": {
+                "value": "Tree"
+            }
+        }
+    },
+    "content": [
+        {
+            "_type": "OBSERVATION",
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.demo.v1",
+            "name": {
+                "value": "Demonstration"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.demo.v1"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "protocol": {
+                "_type": "ITEM_TREE",
+                "archetype_node_id": "at0036",
+                "name": {
+                    "value": "Tree"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0037",
+                        "name": {
+                            "value": "Protocol - Definition"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "vpr nbxztf ajezsp undygc diaufxk"
+                        }
+                    }
+                ]
+            },
+            "data": {
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Event Series"
+                },
+                "origin": {
+                    "value": "2026-05-26T07:05:17"
+                },
+                "events": [
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Any Event"
+                        },
+                        "time": {
+                            "value": "2026-05-22T09:05:17"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0032",
+                                    "name": {
+                                        "value": "Data - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "xtbdfz wnfzsk awjtsup lwqv miucz"
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Heading1"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0005",
+                                            "name": {
+                                                "value": "Free Text or Coded"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "gev tnuyb tqp bwnuos ewjmsu"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0006",
+                                            "name": {
+                                                "value": "Text That Uses Internal Codes"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "Reclining",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "local"
+                                                    },
+                                                    "code_string": "at0008"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0011",
+                                            "name": {
+                                                "value": "Text That is Sourced From an External Terminology"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "uyn vns gpxdmif yshrovt dfvyuzp",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "external"
+                                                    },
+                                                    "code_string": "code-6a160cb12c601"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0012",
+                                            "name": {
+                                                "value": "Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 23,
+                                                "units": "cm",
+                                                "precision": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0023",
+                                            "name": {
+                                                "value": "Interval of Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 30,
+                                                    "units": "cm"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 12.25,
+                                                    "units": "cm"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0013",
+                                            "name": {
+                                                "value": "Count"
+                                            },
+                                            "value": {
+                                                "_type": "DV_COUNT",
+                                                "magnitude": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0022",
+                                            "name": {
+                                                "value": "Interval of Integer"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 10
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 7
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0028",
+                                            "name": {
+                                                "value": "Proportion"
+                                            },
+                                            "value": {
+                                                "_type": "DV_PROPORTION",
+                                                "numerator": 9.5,
+                                                "denominator": 1.9,
+                                                "type": 0
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0014",
+                                            "name": {
+                                                "value": "Date/Time"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DATE_TIME",
+                                                "value": "2026-05-20T10:05:17"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0024",
+                                            "name": {
+                                                "value": "Interval of Date"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-26T01:05:17"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-22T04:05:17"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0021",
+                                            "name": {
+                                                "value": "Duration"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DURATION",
+                                                "value": "P5Y4M4D"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0015",
+                                            "name": {
+                                                "value": "Ordinal"
+                                            },
+                                            "value": {
+                                                "_type": "DV_ORDINAL",
+                                                "value": 1,
+                                                "symbol": {
+                                                    "value": "Slight pain",
+                                                    "defining_code": {
+                                                        "terminology_id": {
+                                                            "value": "local"
+                                                        },
+                                                        "code_string": "at0039"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0016",
+                                            "name": {
+                                                "value": "Boolean"
+                                            },
+                                            "value": {
+                                                "_type": "DV_BOOLEAN",
+                                                "value": true
+                                            },
+                                            "null_flavour": {
+                                                "value": "not applicable",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "openehr"
+                                                    },
+                                                    "code_string": "273"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0017",
+                                            "name": {
+                                                "value": "Any"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "fpuzktb ckoabghl hgnekwf ptu jfl"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0025",
+                                            "name": {
+                                                "value": "Choice"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 10.333333333333,
+                                                "units": "g"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0026",
+                                            "name": {
+                                                "value": "Multimedia"
+                                            },
+                                            "value": {
+                                                "_type": "DV_MULTIMEDIA",
+                                                "size": 37,
+                                                "data": "b3R1eXcgZ2RwaWxrIGtyZ211aCBuYXp1bHhzZyB4b2hycHlheg==",
+                                                "media_type": {
+                                                    "terminology_id": {
+                                                        "value": "IANA_media-types"
+                                                    },
+                                                    "code_string": "audio/G726-24"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0027",
+                                            "name": {
+                                                "value": "URI - resource identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_URI",
+                                                "value": "https://a6ao4mlq9xy.local"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0044",
+                                            "name": {
+                                                "value": "Identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_IDENTIFIER",
+                                                "issuer": "issuer-6a160cb1300bd",
+                                                "assigner": "assigner-6a160cb1300ca",
+                                                "id": "id-6a160cb1300b1",
+                                                "type": "type-6a160cb1300d3"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0030",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0031",
+                                    "name": {
+                                        "value": "State - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "hfg qenocdpy lvk zxdoaeki oyi"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0033",
+                        "name": {
+                            "value": "Named Point In Time"
+                        },
+                        "time": {
+                            "value": "2026-05-23T11:05:17"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0032",
+                                    "name": {
+                                        "value": "Data - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "smjqxlzw xrikn ewmx yzghde jbcu"
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Heading1"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0005",
+                                            "name": {
+                                                "value": "Free Text or Coded"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "hgtzjlom ousp qlmgfw znx ret"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0006",
+                                            "name": {
+                                                "value": "Text That Uses Internal Codes"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "Standing",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "local"
+                                                    },
+                                                    "code_string": "at0010"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0011",
+                                            "name": {
+                                                "value": "Text That is Sourced From an External Terminology"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "wncve zlpjb aeh qdyklc clkaq",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "external"
+                                                    },
+                                                    "code_string": "code-6a160cb131611"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0012",
+                                            "name": {
+                                                "value": "Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 18,
+                                                "units": "cm",
+                                                "precision": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0023",
+                                            "name": {
+                                                "value": "Interval of Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 14,
+                                                    "units": "cm"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 9.1111111111111,
+                                                    "units": "cm"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0013",
+                                            "name": {
+                                                "value": "Count"
+                                            },
+                                            "value": {
+                                                "_type": "DV_COUNT",
+                                                "magnitude": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0022",
+                                            "name": {
+                                                "value": "Interval of Integer"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 67
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 29
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0028",
+                                            "name": {
+                                                "value": "Proportion"
+                                            },
+                                            "value": {
+                                                "_type": "DV_PROPORTION",
+                                                "numerator": 5.8,
+                                                "denominator": 9.3333333333333,
+                                                "type": 3
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0014",
+                                            "name": {
+                                                "value": "Date/Time"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DATE_TIME",
+                                                "value": "2026-05-22T06:05:17"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0024",
+                                            "name": {
+                                                "value": "Interval of Date"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-24T03:05:17"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-22T01:05:17"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0021",
+                                            "name": {
+                                                "value": "Duration"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DURATION",
+                                                "value": "P4Y5M5D"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0015",
+                                            "name": {
+                                                "value": "Ordinal"
+                                            },
+                                            "value": {
+                                                "_type": "DV_ORDINAL",
+                                                "value": 2,
+                                                "symbol": {
+                                                    "value": "Mild pain",
+                                                    "defining_code": {
+                                                        "terminology_id": {
+                                                            "value": "local"
+                                                        },
+                                                        "code_string": "at0040"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0016",
+                                            "name": {
+                                                "value": "Boolean"
+                                            },
+                                            "value": {
+                                                "_type": "DV_BOOLEAN",
+                                                "value": true
+                                            },
+                                            "null_flavour": {
+                                                "value": "unknown",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "openehr"
+                                                    },
+                                                    "code_string": "253"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0017",
+                                            "name": {
+                                                "value": "Any"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "sxguyom axqbu hvqkenfb mxtp gyhbztao"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0025",
+                                            "name": {
+                                                "value": "Choice"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 10.142857142857,
+                                                "units": "g"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0026",
+                                            "name": {
+                                                "value": "Multimedia"
+                                            },
+                                            "value": {
+                                                "_type": "DV_MULTIMEDIA",
+                                                "size": 36,
+                                                "data": "YmtycXcgZ3Z6Y3dkZiBodnplYyB0c2JnbXdkIHVnZnh2a3Fk",
+                                                "media_type": {
+                                                    "terminology_id": {
+                                                        "value": "IANA_media-types"
+                                                    },
+                                                    "code_string": "video/BT656"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0027",
+                                            "name": {
+                                                "value": "URI - resource identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_URI",
+                                                "value": "https://a8qekzls4d0.local"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0044",
+                                            "name": {
+                                                "value": "Identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_IDENTIFIER",
+                                                "issuer": "issuer-6a160cb13416a",
+                                                "assigner": "assigner-6a160cb13417b",
+                                                "id": "id-6a160cb13415d",
+                                                "type": "type-6a160cb13418d"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0030",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0031",
+                                    "name": {
+                                        "value": "State - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "rjzmaon jfhc usz kdjcwi gyij"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "INTERVAL_EVENT",
+                        "archetype_node_id": "at0034",
+                        "name": {
+                            "value": "Named Interval"
+                        },
+                        "time": {
+                            "value": "2026-05-25T03:05:17"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0032",
+                                    "name": {
+                                        "value": "Data - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "gakbmt yhfipk lwpheo fiyo oqe"
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Heading1"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0005",
+                                            "name": {
+                                                "value": "Free Text or Coded"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "pxbegil jqyledo fzplnxyc aon znj"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0006",
+                                            "name": {
+                                                "value": "Text That Uses Internal Codes"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "Lying",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "local"
+                                                    },
+                                                    "code_string": "at0007"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0011",
+                                            "name": {
+                                                "value": "Text That is Sourced From an External Terminology"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "vmq yqz qatcrx mrk tlkmwspn",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "external"
+                                                    },
+                                                    "code_string": "code-6a160cb135b61"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0012",
+                                            "name": {
+                                                "value": "Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 10,
+                                                "units": "cm",
+                                                "precision": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0023",
+                                            "name": {
+                                                "value": "Interval of Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 7.1,
+                                                    "units": "cm"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 15.333333333333,
+                                                    "units": "cm"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0013",
+                                            "name": {
+                                                "value": "Count"
+                                            },
+                                            "value": {
+                                                "_type": "DV_COUNT",
+                                                "magnitude": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0022",
+                                            "name": {
+                                                "value": "Interval of Integer"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 78
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 55
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0028",
+                                            "name": {
+                                                "value": "Proportion"
+                                            },
+                                            "value": {
+                                                "_type": "DV_PROPORTION",
+                                                "numerator": 9.8333333333333,
+                                                "denominator": 3.4,
+                                                "type": 0
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0014",
+                                            "name": {
+                                                "value": "Date/Time"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DATE_TIME",
+                                                "value": "2026-05-26T06:05:17"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0024",
+                                            "name": {
+                                                "value": "Interval of Date"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-20T06:05:17"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-24T04:05:17"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0021",
+                                            "name": {
+                                                "value": "Duration"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DURATION",
+                                                "value": "P4Y10M13D"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0015",
+                                            "name": {
+                                                "value": "Ordinal"
+                                            },
+                                            "value": {
+                                                "_type": "DV_ORDINAL",
+                                                "value": 0,
+                                                "symbol": {
+                                                    "value": "No pain",
+                                                    "defining_code": {
+                                                        "terminology_id": {
+                                                            "value": "local"
+                                                        },
+                                                        "code_string": "at0038"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0016",
+                                            "name": {
+                                                "value": "Boolean"
+                                            },
+                                            "value": {
+                                                "_type": "DV_BOOLEAN",
+                                                "value": false
+                                            },
+                                            "null_flavour": {
+                                                "value": "not applicable",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "openehr"
+                                                    },
+                                                    "code_string": "273"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0017",
+                                            "name": {
+                                                "value": "Any"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "kzyvcp clpm duj meiw xfaygil"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0025",
+                                            "name": {
+                                                "value": "Choice"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 30,
+                                                "units": "g"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0026",
+                                            "name": {
+                                                "value": "Multimedia"
+                                            },
+                                            "value": {
+                                                "_type": "DV_MULTIMEDIA",
+                                                "size": 32,
+                                                "data": "eW9laWFsIGt4dXRicCB4dmxoaSBxc2RnbWVsIG9raGo=",
+                                                "media_type": {
+                                                    "terminology_id": {
+                                                        "value": "IANA_media-types"
+                                                    },
+                                                    "code_string": "audio/LPC"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0027",
+                                            "name": {
+                                                "value": "URI - resource identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_URI",
+                                                "value": "https://ayp7zjdoemb.local"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0044",
+                                            "name": {
+                                                "value": "Identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_IDENTIFIER",
+                                                "issuer": "issuer-6a160cb138b80",
+                                                "assigner": "assigner-6a160cb138b8b",
+                                                "id": "id-6a160cb138b77",
+                                                "type": "type-6a160cb138b93"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0030",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0031",
+                                    "name": {
+                                        "value": "State - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "lyvuw irvpjd nhdtye hmitrp mensoqc"
+                                    }
+                                }
+                            ]
+                        },
+                        "width": {
+                            "value": "P2Y1M24D"
+                        },
+                        "math_function": {
+                            "value": "change",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "openehr"
+                                },
+                                "code_string": "147"
+                            }
+                        }
+                    },
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0035",
+                        "name": {
+                            "value": "Offset Point In Time"
+                        },
+                        "time": {
+                            "value": "2026-05-22T07:05:17"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0032",
+                                    "name": {
+                                        "value": "Data - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "tmnubi ifv cwraeds ckolv lumpchz"
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Heading1"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0005",
+                                            "name": {
+                                                "value": "Free Text or Coded"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "gdibexl qsoa pzydq hwou gviwn"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0006",
+                                            "name": {
+                                                "value": "Text That Uses Internal Codes"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "Lying",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "local"
+                                                    },
+                                                    "code_string": "at0007"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0011",
+                                            "name": {
+                                                "value": "Text That is Sourced From an External Terminology"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "zhrd wqtleoby nhdrsof dasf jplzwn",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "external"
+                                                    },
+                                                    "code_string": "code-6a160cb13a2bd"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0012",
+                                            "name": {
+                                                "value": "Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 60,
+                                                "units": "cm",
+                                                "precision": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0023",
+                                            "name": {
+                                                "value": "Interval of Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 20.666666666667,
+                                                    "units": "cm"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 4.9,
+                                                    "units": "cm"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0013",
+                                            "name": {
+                                                "value": "Count"
+                                            },
+                                            "value": {
+                                                "_type": "DV_COUNT",
+                                                "magnitude": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0022",
+                                            "name": {
+                                                "value": "Interval of Integer"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 41
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 42
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0028",
+                                            "name": {
+                                                "value": "Proportion"
+                                            },
+                                            "value": {
+                                                "_type": "DV_PROPORTION",
+                                                "numerator": 3.8,
+                                                "denominator": 2.2,
+                                                "type": 3
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0014",
+                                            "name": {
+                                                "value": "Date/Time"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DATE_TIME",
+                                                "value": "2026-05-25T12:05:17"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0024",
+                                            "name": {
+                                                "value": "Interval of Date"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-20T01:05:17"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-22T08:05:17"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0021",
+                                            "name": {
+                                                "value": "Duration"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DURATION",
+                                                "value": "P3Y1M5D"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0015",
+                                            "name": {
+                                                "value": "Ordinal"
+                                            },
+                                            "value": {
+                                                "_type": "DV_ORDINAL",
+                                                "value": 1,
+                                                "symbol": {
+                                                    "value": "Slight pain",
+                                                    "defining_code": {
+                                                        "terminology_id": {
+                                                            "value": "local"
+                                                        },
+                                                        "code_string": "at0039"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0016",
+                                            "name": {
+                                                "value": "Boolean"
+                                            },
+                                            "value": {
+                                                "_type": "DV_BOOLEAN",
+                                                "value": true
+                                            },
+                                            "null_flavour": {
+                                                "value": "unknown",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "openehr"
+                                                    },
+                                                    "code_string": "253"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0017",
+                                            "name": {
+                                                "value": "Any"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "osf lbmwzqxu pfjr nfqzmel qel"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0025",
+                                            "name": {
+                                                "value": "Choice"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 10,
+                                                "units": "g"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0026",
+                                            "name": {
+                                                "value": "Multimedia"
+                                            },
+                                            "value": {
+                                                "_type": "DV_MULTIMEDIA",
+                                                "size": 22,
+                                                "data": "c2x5b3AgZmdicSBlbGggaHhjIGpjYg==",
+                                                "media_type": {
+                                                    "terminology_id": {
+                                                        "value": "IANA_media-types"
+                                                    },
+                                                    "code_string": "audio/L20"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0027",
+                                            "name": {
+                                                "value": "URI - resource identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_URI",
+                                                "value": "https://aa0kctdqli4.local"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0044",
+                                            "name": {
+                                                "value": "Identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_IDENTIFIER",
+                                                "issuer": "issuer-6a160cb13cc0c",
+                                                "assigner": "assigner-6a160cb13cc16",
+                                                "id": "id-6a160cb13cc03",
+                                                "type": "type-6a160cb13cc1e"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Heading1"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0005",
+                                            "name": {
+                                                "value": "Free Text or Coded"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "hazsxlk lhxenwor dxto jter vtpxjf"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0006",
+                                            "name": {
+                                                "value": "Text That Uses Internal Codes"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "Lying",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "local"
+                                                    },
+                                                    "code_string": "at0007"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0011",
+                                            "name": {
+                                                "value": "Text That is Sourced From an External Terminology"
+                                            },
+                                            "value": {
+                                                "_type": "DV_CODED_TEXT",
+                                                "value": "amosnzct jgeuy yzdhxi cylmkos zbvd",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "external"
+                                                    },
+                                                    "code_string": "code-6a160cb13d862"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0012",
+                                            "name": {
+                                                "value": "Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 33,
+                                                "units": "cm",
+                                                "precision": 1
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0023",
+                                            "name": {
+                                                "value": "Interval of Quantity"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 11.25,
+                                                    "units": "cm"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_QUANTITY",
+                                                    "magnitude": 4,
+                                                    "units": "cm"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0013",
+                                            "name": {
+                                                "value": "Count"
+                                            },
+                                            "value": {
+                                                "_type": "DV_COUNT",
+                                                "magnitude": 0
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0022",
+                                            "name": {
+                                                "value": "Interval of Integer"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 71
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_COUNT",
+                                                    "magnitude": 77
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0028",
+                                            "name": {
+                                                "value": "Proportion"
+                                            },
+                                            "value": {
+                                                "_type": "DV_PROPORTION",
+                                                "numerator": 17,
+                                                "denominator": 8,
+                                                "type": 2
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0014",
+                                            "name": {
+                                                "value": "Date/Time"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DATE_TIME",
+                                                "value": "2026-05-20T10:05:17"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0024",
+                                            "name": {
+                                                "value": "Interval of Date"
+                                            },
+                                            "value": {
+                                                "_type": "DV_INTERVAL",
+                                                "lower": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-24T07:05:17"
+                                                },
+                                                "upper": {
+                                                    "_type": "DV_DATE_TIME",
+                                                    "value": "2026-05-25T08:05:17"
+                                                },
+                                                "lower_unbounded": false,
+                                                "upper_unbounded": false
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0021",
+                                            "name": {
+                                                "value": "Duration"
+                                            },
+                                            "value": {
+                                                "_type": "DV_DURATION",
+                                                "value": "P4Y1M29D"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0015",
+                                            "name": {
+                                                "value": "Ordinal"
+                                            },
+                                            "value": {
+                                                "_type": "DV_ORDINAL",
+                                                "value": 9,
+                                                "symbol": {
+                                                    "value": "Severe pain",
+                                                    "defining_code": {
+                                                        "terminology_id": {
+                                                            "value": "local"
+                                                        },
+                                                        "code_string": "at0042"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0016",
+                                            "name": {
+                                                "value": "Boolean"
+                                            },
+                                            "value": {
+                                                "_type": "DV_BOOLEAN",
+                                                "value": true
+                                            },
+                                            "null_flavour": {
+                                                "value": "not applicable",
+                                                "defining_code": {
+                                                    "terminology_id": {
+                                                        "value": "openehr"
+                                                    },
+                                                    "code_string": "273"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0017",
+                                            "name": {
+                                                "value": "Any"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "dcsl rpqtconk wfk lnjkyir xnhdvwe"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0025",
+                                            "name": {
+                                                "value": "Choice"
+                                            },
+                                            "value": {
+                                                "_type": "DV_QUANTITY",
+                                                "magnitude": 4.5,
+                                                "units": "g"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0026",
+                                            "name": {
+                                                "value": "Multimedia"
+                                            },
+                                            "value": {
+                                                "_type": "DV_MULTIMEDIA",
+                                                "size": 22,
+                                                "data": "Ymt3YWMga3BsIGVsdyB5a3cgZm16ZA==",
+                                                "media_type": {
+                                                    "terminology_id": {
+                                                        "value": "IANA_media-types"
+                                                    },
+                                                    "code_string": "text/calendar"
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0027",
+                                            "name": {
+                                                "value": "URI - resource identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_URI",
+                                                "value": "https://a6b7cyxo1lk.local"
+                                            }
+                                        },
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0044",
+                                            "name": {
+                                                "value": "Identifier"
+                                            },
+                                            "value": {
+                                                "_type": "DV_IDENTIFIER",
+                                                "issuer": "issuer-6a160cb140131",
+                                                "assigner": "assigner-6a160cb14013e",
+                                                "id": "id-6a160cb140122",
+                                                "type": "type-6a160cb140147"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0030",
+                            "name": {
+                                "value": "Tree"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0031",
+                                    "name": {
+                                        "value": "State - Definition"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "mnjqvcy wrdcqgts fhya jkhtecm uacsyl"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

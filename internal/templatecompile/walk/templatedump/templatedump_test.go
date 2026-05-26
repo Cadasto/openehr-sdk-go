@@ -1,7 +1,6 @@
 package templatedump_test
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -10,13 +9,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk/templatedump"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Phase 5 — PathCollector accumulates every visited node's AQL
 // path in pre-order. Spot-check the first entry is the root and a
 // known deep path appears.
 func TestPathCollector_GathersAllPaths(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	pc := &templatedump.PathCollector{}
 	if err := walk.Walk(c, pc); err != nil {
 		t.Fatalf("Walk: %v", err)
@@ -37,7 +37,7 @@ func TestPathCollector_GathersAllPaths(t *testing.T) {
 // line per visited node. Each line carries the AQL path and the
 // RM type name.
 func TestPrinter_RendersTree(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	out, err := templatedump.Dump(c, "  ")
 	if err != nil {
 		t.Fatalf("Dump: %v", err)
@@ -71,7 +71,7 @@ func TestPrinter_RendersTree(t *testing.T) {
 // would need a synthetic Compiled with a populated implicit attribute
 // (out of scope for Phase 5) to exercise.
 func TestPrinter_DoesNotPanicOnImplicitAttrs(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	out, err := templatedump.Dump(c, "  ")
 	if err != nil {
 		t.Fatalf("Dump: %v", err)
@@ -85,7 +85,7 @@ func TestPrinter_DoesNotPanicOnImplicitAttrs(t *testing.T) {
 // String() on the visitor returns the same output as Dump for the
 // same input + indent.
 func TestPrinter_StringAndDumpMatch(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	p := &templatedump.Printer{Indent: "  "}
 	if err := walk.Walk(c, p); err != nil {
@@ -102,7 +102,7 @@ func TestPrinter_StringAndDumpMatch(t *testing.T) {
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(filepath.Join("..", "..", "..", "..", "openehr", "template", "testdata", fixture))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
 		t.Fatalf("ParseFile(%s): %v", fixture, err)
 	}

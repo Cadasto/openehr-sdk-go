@@ -2,7 +2,6 @@ package templatecompile_test
 
 import (
 	"errors"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -12,12 +11,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Phase 4 — Compile turns a parsed OPT into a walker-friendly tree.
 // Spot-check identity propagation and root resolution.
 func TestCompile_Identity(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	if got, want := c.TemplateID(), "vital_signs"; got != want {
 		t.Errorf("TemplateID = %q, want %q", got, want)
 	}
@@ -25,7 +25,7 @@ func TestCompile_Identity(t *testing.T) {
 		t.Errorf("Concept = %q, want %q", got, want)
 	}
 	if c.UID() == "" {
-		t.Error("UID empty; expected non-empty for vital_signs.opt")
+		t.Error("UID empty; expected non-empty for vital_signs")
 	}
 	if got, want := c.Language(), "en"; got != want {
 		t.Errorf("Language = %q, want %q", got, want)
@@ -45,7 +45,7 @@ func TestCompile_Identity(t *testing.T) {
 // predicate; multiple attributes get a predicate from the child
 // (archetype id when *ArchetypeRoot, otherwise at-code).
 func TestCompile_AQLPaths(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	// /content[openEHR-EHR-OBSERVATION.blood_pressure.v1] — multiple
 	// attribute → archetype-id predicate.
@@ -75,7 +75,7 @@ func TestCompile_AQLPaths(t *testing.T) {
 // not wire tree-walk. Predicate-less "/content" on a multi-child
 // attribute resolves on the wire tree but is not indexed here.
 func TestCompiled_NodeAt_RejectsPredicatelessMultiChild(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	if _, err := c.NodeAt("/content"); !errors.Is(err, templatecompile.ErrPathNotFound) {
 		t.Fatalf("NodeAt(/content) = %v, want ErrPathNotFound (use full AQL path)", err)
 	}
@@ -85,11 +85,11 @@ func TestCompiled_NodeAt_RejectsPredicatelessMultiChild(t *testing.T) {
 // reverse lookups. Sanity: at least one entry for each well-known
 // term.
 func TestCompile_Indexes(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	obs := c.AllByRMType("OBSERVATION")
 	if len(obs) == 0 {
-		t.Error("AllByRMType(OBSERVATION) returned 0; vital_signs.opt has multiple OBSERVATION roots")
+		t.Error("AllByRMType(OBSERVATION) returned 0; vital_signs has multiple OBSERVATION roots")
 	}
 	at0000 := c.AllByNodeID("at0000")
 	if len(at0000) == 0 {
@@ -103,10 +103,10 @@ func TestCompile_Indexes(t *testing.T) {
 // as non-implicit but still flagged Required when the BMM mandates
 // them.
 func TestCompile_InjectsImplicitRMAttributes(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	root := c.Root()
 
-	// vital_signs.opt declares <attributes> for category and content
+	// vital_signs declares <attributes> for category and content
 	// only — see grep on rm_attribute_name in the fixture. composer,
 	// language, territory are RM-mandatory but OPT-silent, so they
 	// must be injected as implicit.
@@ -141,7 +141,7 @@ func TestCompile_InjectsImplicitRMAttributes(t *testing.T) {
 // emits only OPT-declared attributes. Useful for serialisation
 // round-trip and pure-OPT introspection.
 func TestCompile_SkipImplicitAttributes(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("..", "..", "openehr", "template", "testdata", "vital_signs.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestCompile_InvalidInput(t *testing.T) {
 // parent-walk lookup respects scope rather than colliding into a
 // single global map.
 func TestCompile_PerArchetypeRootTermScope(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	bp, err := c.NodeAt("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
 	if err != nil {
@@ -202,10 +202,10 @@ func TestCompile_PerArchetypeRootTermScope(t *testing.T) {
 
 // Phase 4 — term-binding flattening across all archetype roots.
 func TestCompile_FlattenTermBindings(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	bindings := c.TermBindings()
 	if len(bindings) == 0 {
-		t.Fatal("TermBindings empty; vital_signs.opt has SNOMED-CT bindings")
+		t.Fatal("TermBindings empty; vital_signs has SNOMED-CT bindings")
 	}
 	var hasSnomed bool
 	for _, b := range bindings {
@@ -223,7 +223,7 @@ func TestCompile_FlattenTermBindings(t *testing.T) {
 // a synthetic lookup with no mandatory attributes should skip
 // implicit injection entirely.
 func TestCompile_HonoursCustomLookup(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("..", "..", "openehr", "template", "testdata", "vital_signs.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
@@ -242,7 +242,7 @@ func TestCompile_HonoursCustomLookup(t *testing.T) {
 // Phase 4 — parent back-pointers wire up correctly: every non-root
 // CompiledNode has a non-nil Parent reachable via Attributes.
 func TestCompile_ParentBackPointers(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	root := c.Root()
 	if root.Parent() != nil {
 		t.Errorf("Root().Parent() = %p, want nil", root.Parent())
@@ -260,7 +260,7 @@ func TestCompile_ParentBackPointers(t *testing.T) {
 // Phase 4 — *Slot nodes survive compile as IsSlot=true leaves with
 // SlotIncludes preserved.
 func TestCompile_SlotsPreserved(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	var slots []*templatecompile.CompiledNode
 	for _, n := range c.AllByRMType("CLUSTER") {
 		if n.IsSlot() {
@@ -268,7 +268,7 @@ func TestCompile_SlotsPreserved(t *testing.T) {
 		}
 	}
 	if len(slots) == 0 {
-		// CLUSTER slots are common in vital_signs.opt; if none, the
+		// CLUSTER slots are common in vital_signs; if none, the
 		// compile collapsed something it shouldn't have.
 		t.Fatal("no CLUSTER *Slot nodes found in compiled tree")
 	}
@@ -446,12 +446,12 @@ func TestCompile_ChildMultiplicity(t *testing.T) {
 }
 
 // Phase 0 (REQ-102 v2) — Cardinality survives compilation through
-// a real fixture (vital_signs.opt /content is lower=0,
+// a real fixture (vital_signs /content is lower=0,
 // upper-unbounded per the OPT wire). The accessor must report the
 // same interval on the multi-valued attribute, and report nil on a
 // C_SINGLE_ATTRIBUTE sibling at the same root depth (/category).
 func TestCompile_ChildMultiplicity_FixtureRoundTrip(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	root := c.Root()
 	var content, category *templatecompile.CompiledAttribute
 	for _, a := range root.Attributes() {
@@ -540,15 +540,15 @@ func TestCompile_SingleAttributeAlternativesShareAQLPath(t *testing.T) {
 	}
 }
 
-func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
+func mustCompile(t *testing.T, slug string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(filepath.Join("..", "..", "openehr", "template", "testdata", fixture))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(slug))
 	if err != nil {
-		t.Fatalf("ParseFile(%s): %v", fixture, err)
+		t.Fatalf("ParseFile(%s): %v", slug, err)
 	}
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
-		t.Fatalf("Compile(%s): %v", fixture, err)
+		t.Fatalf("Compile(%s): %v", slug, err)
 	}
 	return c
 }

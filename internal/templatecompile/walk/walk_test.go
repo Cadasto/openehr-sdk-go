@@ -2,7 +2,6 @@ package walk_test
 
 import (
 	"errors"
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -10,13 +9,14 @@ import (
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile/walk"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Phase 5 — Walk visits every reachable node in depth-first order;
 // pre-order fires before children, post-order after. Sanity-checks
 // the pre/post order on a fixed fragment.
 func TestWalk_PrePostOrder(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	var trace []string
 	v := walk.VisitorFunc{
 		Pre: func(ctx *walk.Context) error {
@@ -66,7 +66,7 @@ func TestWalk_PrePostOrder(t *testing.T) {
 // Skip one specific archetype-root subtree and verify its descendants
 // are pruned while sibling archetype-root subtrees are still walked.
 func TestWalk_SkipSubtree(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	const skipped = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
 	const sibling = "/content[openEHR-EHR-OBSERVATION.heart_rate.v1]"
@@ -124,7 +124,7 @@ func TestWalk_SkipSubtree(t *testing.T) {
 
 // Phase 5 — a non-nil non-SkipSubtree error aborts the walk.
 func TestWalk_ErrorAborts(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	boom := errors.New("boom")
 	var visited int
 	err := walk.Walk(c, walk.VisitorFunc{
@@ -147,7 +147,7 @@ func TestWalk_ErrorAborts(t *testing.T) {
 // Phase 5 — Context.Parent / ParentAttribute / Depth are populated
 // consistently with the walk position.
 func TestWalk_ContextFields(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	var sawRoot, sawDeep bool
 	err := walk.Walk(c, walk.VisitorFunc{
@@ -194,7 +194,7 @@ func TestWalk_ContextFields(t *testing.T) {
 // node is visited at depth 0; descendants below it are visited.
 // Sibling subtrees outside the start are NOT visited.
 func TestWalkSubtree_StartsAtPath(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	const start = "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
 
 	var paths []string
@@ -224,7 +224,7 @@ func TestWalkSubtree_StartsAtPath(t *testing.T) {
 // Phase 5 — WalkSubtree returns ErrPathNotFound when the start
 // path does not resolve in the compiled tree.
 func TestWalkSubtree_UnknownPath(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	err := walk.WalkSubtree(c, "/no_such_path", walk.VisitorFunc{})
 	if !errors.Is(err, templatecompile.ErrPathNotFound) {
 		t.Errorf("got %v, want errors.Is(err, templatecompile.ErrPathNotFound)", err)
@@ -236,7 +236,7 @@ func TestWalk_NilInputs(t *testing.T) {
 	if err := walk.Walk(nil, walk.VisitorFunc{}); !errors.Is(err, walk.ErrInvalidInput) {
 		t.Errorf("Walk(nil compiled) = %v, want ErrInvalidInput", err)
 	}
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	if err := walk.Walk(c, nil); !errors.Is(err, walk.ErrInvalidInput) {
 		t.Errorf("Walk(nil visitor) = %v, want ErrInvalidInput", err)
 	}
@@ -253,7 +253,7 @@ func TestWalk_NilInputs(t *testing.T) {
 // tally to NumNodes catches subtree-pruning bugs that comparing the
 // walker against itself cannot.
 func TestWalk_VisitsEveryNode(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	var visited int
 	if err := walk.Walk(c, walk.VisitorFunc{
 		Pre: func(*walk.Context) error {
@@ -279,7 +279,7 @@ func TestWalk_VisitsEveryNode(t *testing.T) {
 // in vital_signs.opt and asserting (a) both hooks fire and (b) no
 // descendant of the slot's AQL path appears.
 func TestWalk_SlotLeafVisitedNoDescent(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 
 	var slotPath string
 	for _, n := range c.AllByRMType("CLUSTER") {
@@ -329,7 +329,7 @@ func TestWalk_SlotLeafVisitedNoDescent(t *testing.T) {
 // just as it does from PreHandle. Distinct from TestWalk_ErrorAborts
 // (which exercises the PreHandle path).
 func TestWalk_PostHandleErrorAborts(t *testing.T) {
-	c := mustCompile(t, "vital_signs.opt")
+	c := mustCompile(t, "vital_signs")
 	boom := errors.New("post-boom")
 	var preCount, postCount int
 	err := walk.Walk(c, walk.VisitorFunc{
@@ -358,7 +358,7 @@ func TestWalk_PostHandleErrorAborts(t *testing.T) {
 
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
-	opt, err := template.ParseFile(filepath.Join("..", "..", "..", "openehr", "template", "testdata", fixture))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
 	if err != nil {
 		t.Fatalf("ParseFile(%s): %v", fixture, err)
 	}

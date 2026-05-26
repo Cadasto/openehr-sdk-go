@@ -16,8 +16,8 @@
 //
 //	go run ./cmd/examples/opt-parse [path/to/template.opt]
 //
-// With no argument, the example uses the vital_signs.opt fixture
-// vendored under openehr/template/testdata/.
+// With no argument, the example uses the vital_signs template fixture
+// vendored under testkit/cassettes/templates/vital_signs.opt.
 package main
 
 import (
@@ -25,10 +25,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -119,13 +118,5 @@ func resolveOPTPath() string {
 	if len(os.Args) > 1 {
 		return os.Args[1]
 	}
-	// Default: locate the vendored vital_signs.opt fixture relative
-	// to this source file, so `go run ./cmd/examples/opt-parse` works
-	// from any working directory.
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("cannot locate example source path")
-	}
-	repoRoot := filepath.Join(filepath.Dir(here), "..", "..", "..")
-	return filepath.Join(repoRoot, "openehr", "template", "testdata", "vital_signs.opt")
+	return fixtures.TemplateOptForName("vital_signs")
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -239,8 +240,7 @@ func TestDeleteTemplateMethodNotAllowed(t *testing.T) {
 func TestExampleComposition(t *testing.T) {
 	var captured *http.Request
 	// Reuse the canonical-JSON body_weight cassette as the example.
-	_, src, _, _ := runtime.Caller(0)
-	composPath := filepath.Join(filepath.Dir(src), "..", "..", "..", "testkit", "cassettes", "canonical_json", "body_weight.json")
+	composPath := fixtures.CompositionJSON("body_weight")
 	body, err := os.ReadFile(composPath)
 	if err != nil {
 		t.Fatal(err)

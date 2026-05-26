@@ -1,0 +1,774 @@
+{
+    "_type": "COMPOSITION",
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.test_observation.v1",
+    "name": {
+        "value": "test_observation"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.test_observation.v1"
+        },
+        "template_id": {
+            "value": "test_template_rename_node_2"
+        },
+        "rm_version": "1.1.0"
+    },
+    "language": {
+        "terminology_id": {
+            "value": "ISO_639-1"
+        },
+        "code_string": "en"
+    },
+    "territory": {
+        "terminology_id": {
+            "value": "ISO_3166-1"
+        },
+        "code_string": "NL"
+    },
+    "category": {
+        "value": "event",
+        "defining_code": {
+            "terminology_id": {
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_SELF"
+    },
+    "content": [
+        {
+            "_type": "OBSERVATION",
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1",
+            "name": {
+                "value": "test_template_rename_node"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "data": {
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Event Series"
+                },
+                "origin": {
+                    "value": "2026-05-24T12:05:20"
+                },
+                "events": [
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Any event"
+                        },
+                        "time": {
+                            "value": "2026-05-24T06:05:20"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "List"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0010",
+                                    "name": {
+                                        "value": "Original_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "sna qfpg btvurmgf evlcxsi dxh"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0011",
+                                    "name": {
+                                        "value": "Text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "xateyw vumkde zqmo tnljhb bihjepk"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0012",
+                                    "name": {
+                                        "value": "Original_count"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 34
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0013",
+                                    "name": {
+                                        "value": "Count_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 84
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0014",
+                                    "name": {
+                                        "value": "Original_boolean"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": true
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0015",
+                                    "name": {
+                                        "value": "Boolean_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": false
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0016",
+                                    "name": {
+                                        "value": "Original_cluster"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0018",
+                                            "name": {
+                                                "value": "Original_inside_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "jmgyvxs trk diabjgq uls txfc"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0017",
+                                    "name": {
+                                        "value": "Cluster_is_changed"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0019",
+                                            "name": {
+                                                "value": "Should_is_in_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "whayrt ycpbhr hijmfp pyj ilhy"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0020",
+                                    "name": {
+                                        "value": "Original_quantity"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 14.333333333333,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0021",
+                                    "name": {
+                                        "value": "Quantity_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 17.6,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0023",
+                                    "name": {
+                                        "value": "Original_coded_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "vlredgp sied qdxtpow vgxrloc tds",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb41e5df"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0027",
+                                    "name": {
+                                        "value": "Coded_text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "scbf kscmiu ruz dncgzv yrdufba",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb41e7c2"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0028",
+                                    "name": {
+                                        "value": "Original_uri"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://av2p5tdobnz.local"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0029",
+                                    "name": {
+                                        "value": "Uri_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://atikguvhy5p.local"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "_type": "OBSERVATION",
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1",
+            "name": {
+                "value": "test_template_rename_node"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "data": {
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Event Series"
+                },
+                "origin": {
+                    "value": "2026-05-21T06:05:20"
+                },
+                "events": [
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Any event"
+                        },
+                        "time": {
+                            "value": "2026-05-25T05:05:20"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "List"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0010",
+                                    "name": {
+                                        "value": "Original_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "ihuzmt mlk dcta edorzht oiasr"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0011",
+                                    "name": {
+                                        "value": "Text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "hoesla nzgp uljgfkt aetk vtuepq"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0012",
+                                    "name": {
+                                        "value": "Original_count"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 35
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0013",
+                                    "name": {
+                                        "value": "Count_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 57
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0014",
+                                    "name": {
+                                        "value": "Original_boolean"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": false
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0015",
+                                    "name": {
+                                        "value": "Boolean_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": true
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0016",
+                                    "name": {
+                                        "value": "Original_cluster"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0018",
+                                            "name": {
+                                                "value": "Original_inside_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "mxsjgfkr xcz cfutvra uxri hsjwopr"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0017",
+                                    "name": {
+                                        "value": "Cluster_is_changed"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0019",
+                                            "name": {
+                                                "value": "Should_is_in_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "gwlhb ryaz hzmnq jpye qtzijxk"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0020",
+                                    "name": {
+                                        "value": "Original_quantity"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 9.8333333333333,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0021",
+                                    "name": {
+                                        "value": "Quantity_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 0.875,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0023",
+                                    "name": {
+                                        "value": "Original_coded_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "jldt fdhucnz ibkgce dfmc tghnfo",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb42083e"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0027",
+                                    "name": {
+                                        "value": "Coded_text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "hmdc ljauprf lgudjiem hrxm jrlpnf",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb420ac0"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0028",
+                                    "name": {
+                                        "value": "Original_uri"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://ax6smn7z42h.local"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0029",
+                                    "name": {
+                                        "value": "Uri_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://a8ljk0t6y9r.local"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "_type": "OBSERVATION",
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1",
+            "name": {
+                "value": "test_template_rename_node"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.test_template_rename_node.v1"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "en"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "data": {
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Event Series"
+                },
+                "origin": {
+                    "value": "2026-05-24T03:05:20"
+                },
+                "events": [
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Any event"
+                        },
+                        "time": {
+                            "value": "2026-05-25T01:05:20"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0003",
+                            "name": {
+                                "value": "List"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0010",
+                                    "name": {
+                                        "value": "Original_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "htrlv hfc goycprs tonqb ghqxpzb"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0011",
+                                    "name": {
+                                        "value": "Text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "lqnkzi cihoqz vqth ybew ahdqpru"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0012",
+                                    "name": {
+                                        "value": "Original_count"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 23
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0013",
+                                    "name": {
+                                        "value": "Count_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_COUNT",
+                                        "magnitude": 94
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0014",
+                                    "name": {
+                                        "value": "Original_boolean"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": false
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0015",
+                                    "name": {
+                                        "value": "Boolean_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_BOOLEAN",
+                                        "value": false
+                                    }
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0016",
+                                    "name": {
+                                        "value": "Original_cluster"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0018",
+                                            "name": {
+                                                "value": "Original_inside_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "dqg nqhp dsb atymw dhl"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "CLUSTER",
+                                    "archetype_node_id": "at0017",
+                                    "name": {
+                                        "value": "Cluster_is_changed"
+                                    },
+                                    "items": [
+                                        {
+                                            "_type": "ELEMENT",
+                                            "archetype_node_id": "at0019",
+                                            "name": {
+                                                "value": "Should_is_in_cluster"
+                                            },
+                                            "value": {
+                                                "_type": "DV_TEXT",
+                                                "value": "arokb bfwotjid lhwxzpq nxt iuo"
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0020",
+                                    "name": {
+                                        "value": "Original_quantity"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 12.25,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0021",
+                                    "name": {
+                                        "value": "Quantity_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 12.75,
+                                        "units": "cm/s"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0023",
+                                    "name": {
+                                        "value": "Original_coded_text"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "nxycjs iquhxv kxlys sjktnrqv fgohde",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb422da6"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0027",
+                                    "name": {
+                                        "value": "Coded_text_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "oqd mwfebxiz vzf ykx gcmihz",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "code-6a160cb422f52"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0028",
+                                    "name": {
+                                        "value": "Original_uri"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://af5yqe9w1c2.local"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0029",
+                                    "name": {
+                                        "value": "Uri_is_changed"
+                                    },
+                                    "value": {
+                                        "_type": "DV_URI",
+                                        "value": "https://a4kqw7ohbli.local"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

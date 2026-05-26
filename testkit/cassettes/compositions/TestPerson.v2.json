@@ -1,0 +1,1312 @@
+{
+    "_type": "PERSON",
+    "archetype_node_id": "openEHR-DEMOGRAPHIC-PERSON.person.v2",
+    "name": {
+        "value": "Persoon"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-DEMOGRAPHIC-PERSON.person.v2"
+        },
+        "template_id": {
+            "value": "TestPerson.v2"
+        },
+        "rm_version": "1.1.0"
+    },
+    "identities": [
+        {
+            "archetype_node_id": "openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2",
+            "name": {
+                "_type": "DV_CODED_TEXT",
+                "value": "Professionele of zakelijke naam",
+                "defining_code": {
+                    "terminology_id": {
+                        "value": "local"
+                    },
+                    "code_string": "at0025"
+                }
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-DEMOGRAPHIC-PARTY_IDENTITY.person_name.v2"
+                },
+                "rm_version": "1.1.0"
+            },
+            "details": {
+                "_type": "ITEM_TREE",
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Naam"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0004",
+                        "name": {
+                            "value": "Titel"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "lgysckf kvxo sftlpc fgm iospdk"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Voornaam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "waijvbts yieja dlnaekb crdsl wer"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2401",
+                        "name": {
+                            "value": "Initialen"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "dgsp unxmsci boi nuvf dsq"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2402",
+                        "name": {
+                            "value": "Roepnaam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "xeliyjhd uji tdsahbf njx uxcdzhkf"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2405",
+                        "name": {
+                            "value": "Voorvoegsel"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "hwjtpqo tklyro mylnzqo yseo duj"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0003",
+                        "name": {
+                            "value": "Achternaam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "woq msedu qrcay nrvhp ijqp"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2403",
+                        "name": {
+                            "value": "Partnernaam voorvoegsel"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "krzo foktumy ldcrjt ixh umxrsdah"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2404",
+                        "name": {
+                            "value": "Partnernaam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "yxci bzjl vkh jraux fdy"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0010",
+                        "name": {
+                            "value": "Volledige naam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "iueynz clra qgadk qlaj gbjdtkf"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2410",
+                        "name": {
+                            "value": "Voorkeursvolgorde van de naamdelen"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "full_name_assembly_order 298",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "full_name_assembly_order-298"
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ],
+    "contacts": [
+        {
+            "archetype_node_id": "at0003",
+            "name": {
+                "value": "Contacten"
+            },
+            "addresses": [
+                {
+                    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.address.v2",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "Onbekend/niet vermeld/onvoldoende beschreven",
+                        "defining_code": {
+                            "terminology_id": {
+                                "value": "local"
+                            },
+                            "code_string": "at0466"
+                        }
+                    },
+                    "archetype_details": {
+                        "archetype_id": {
+                            "value": "openEHR-DEMOGRAPHIC-ADDRESS.address.v2"
+                        },
+                        "rm_version": "1.1.0"
+                    },
+                    "details": {
+                        "_type": "ITEM_TREE",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "items": [
+                            {
+                                "_type": "CLUSTER",
+                                "archetype_node_id": "at0002",
+                                "name": {
+                                    "value": "Adres regel"
+                                },
+                                "items": [
+                                    {
+                                        "_type": "ELEMENT",
+                                        "archetype_node_id": "at0028",
+                                        "name": {
+                                            "value": "Straat"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "pbeyo vgm xnlora fsvdgtbc hdg"
+                                        }
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "archetype_node_id": "at0029",
+                                        "name": {
+                                            "value": "Huisnummer"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "rzkcjx net atlnij agbwvdo uhz"
+                                        }
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "archetype_node_id": "at2401",
+                                        "name": {
+                                            "value": "Huisnummerletter"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "zksfti eocsyl kuemyrj frylm wcou"
+                                        }
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "archetype_node_id": "at2402",
+                                        "name": {
+                                            "value": "Huisnummertoevoeging"
+                                        },
+                                        "value": {
+                                            "_type": "DV_TEXT",
+                                            "value": "osly elvfsunw brcqof qfmsr qjy"
+                                        }
+                                    },
+                                    {
+                                        "_type": "ELEMENT",
+                                        "archetype_node_id": "at2403",
+                                        "name": {
+                                            "value": "Aanduiding bij nummer"
+                                        },
+                                        "value": {
+                                            "_type": "DV_CODED_TEXT",
+                                            "value": "address_house_number_indication 391",
+                                            "defining_code": {
+                                                "terminology_id": {
+                                                    "value": "code24"
+                                                },
+                                                "code_string": "address_house_number_indication-391"
+                                            }
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0006",
+                                "name": {
+                                    "value": "Postcode"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "vtrph zjy jupx ewd abrz"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0007",
+                                "name": {
+                                    "value": "Woonplaats"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "urzsbm ivydozt fjd rco ghnkpa"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2404",
+                                "name": {
+                                    "value": "Gemeente"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "vgnxo upak ahjw vxzktils nlzrkwb"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0009",
+                                "name": {
+                                    "value": "Land"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "przgclei cpwajuov dhzkbt xvhfwcg xvdeolm",
+                                    "defining_code": {
+                                        "terminology_id": {
+                                            "value": "external"
+                                        },
+                                        "code_string": "code-6a160cb3ae13e"
+                                    }
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2499",
+                                "name": {
+                                    "value": "Opmerkingen"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "vxufyn yecxn sqk zqme qxlhujm"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "Fax",
+                        "defining_code": {
+                            "terminology_id": {
+                                "value": "local"
+                            },
+                            "code_string": "at0022"
+                        }
+                    },
+                    "archetype_details": {
+                        "archetype_id": {
+                            "value": "openEHR-DEMOGRAPHIC-ADDRESS.electronic_communication.v2"
+                        },
+                        "rm_version": "1.1.0"
+                    },
+                    "details": {
+                        "_type": "ITEM_TREE",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0003",
+                                "name": {
+                                    "value": "Gebruik"
+                                },
+                                "value": {
+                                    "_type": "DV_CODED_TEXT",
+                                    "value": "Persoonlijk",
+                                    "defining_code": {
+                                        "terminology_id": {
+                                            "value": "local"
+                                        },
+                                        "code_string": "at0030"
+                                    }
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at0007",
+                                "name": {
+                                    "value": "Gegeven"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "deurkg mnhvj kmtuc ypws omw"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2499",
+                                "name": {
+                                    "value": "Opmerkingen"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "dmakhlru uvyjgmiq nzaofm qiepja iju"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2498",
+                                "name": {
+                                    "value": "Sms notificaties"
+                                },
+                                "value": {
+                                    "_type": "DV_BOOLEAN",
+                                    "value": true
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "Zakelijk adres",
+                        "defining_code": {
+                            "terminology_id": {
+                                "value": "local"
+                            },
+                            "code_string": "at0461"
+                        }
+                    },
+                    "archetype_details": {
+                        "archetype_id": {
+                            "value": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2"
+                        },
+                        "rm_version": "1.1.0"
+                    },
+                    "details": {
+                        "_type": "ITEM_TREE",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2404",
+                                "name": {
+                                    "value": "Gemeente"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "jgz hcomngtu eoxn pvc scvegfw"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2499",
+                                "name": {
+                                    "value": "Opmerkingen"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "ancrg tqdbi havou azks uczbang"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2502",
+                                "name": {
+                                    "value": "time_validity"
+                                },
+                                "value": {
+                                    "_type": "DV_INTERVAL",
+                                    "lower": {
+                                        "_type": "DV_DATE",
+                                        "value": "20240722"
+                                    },
+                                    "upper": {
+                                        "_type": "DV_DATE",
+                                        "value": "20241023"
+                                    },
+                                    "lower_unbounded": false,
+                                    "upper_unbounded": false
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "Hoofdadres",
+                        "defining_code": {
+                            "terminology_id": {
+                                "value": "local"
+                            },
+                            "code_string": "at0464"
+                        }
+                    },
+                    "archetype_details": {
+                        "archetype_id": {
+                            "value": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2"
+                        },
+                        "rm_version": "1.1.0"
+                    },
+                    "details": {
+                        "_type": "ITEM_TREE",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2404",
+                                "name": {
+                                    "value": "Gemeente"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "cga ckg gcot msndwhv dqwrxp"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2499",
+                                "name": {
+                                    "value": "Opmerkingen"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "plhqxtu fqzdrtlu tlrbwgs vuzikenb rwsbmgj"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2502",
+                                "name": {
+                                    "value": "time_validity"
+                                },
+                                "value": {
+                                    "_type": "DV_INTERVAL",
+                                    "lower": {
+                                        "_type": "DV_DATE",
+                                        "value": "20250115"
+                                    },
+                                    "upper": {
+                                        "_type": "DV_DATE",
+                                        "value": "20251118"
+                                    },
+                                    "lower_unbounded": false,
+                                    "upper_unbounded": false
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2",
+                    "name": {
+                        "_type": "DV_CODED_TEXT",
+                        "value": "Hoofdadres",
+                        "defining_code": {
+                            "terminology_id": {
+                                "value": "local"
+                            },
+                            "code_string": "at0464"
+                        }
+                    },
+                    "archetype_details": {
+                        "archetype_id": {
+                            "value": "openEHR-DEMOGRAPHIC-ADDRESS.residence_principle.v2"
+                        },
+                        "rm_version": "1.1.0"
+                    },
+                    "details": {
+                        "_type": "ITEM_TREE",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "items": [
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2404",
+                                "name": {
+                                    "value": "Gemeente"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "cfdhzjx awq skonehp dngfto gocnwaid"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2499",
+                                "name": {
+                                    "value": "Opmerkingen"
+                                },
+                                "value": {
+                                    "_type": "DV_TEXT",
+                                    "value": "sbyhp xrsan gieqf rtno mnhupv"
+                                }
+                            },
+                            {
+                                "_type": "ELEMENT",
+                                "archetype_node_id": "at2502",
+                                "name": {
+                                    "value": "time_validity"
+                                },
+                                "value": {
+                                    "_type": "DV_INTERVAL",
+                                    "lower": {
+                                        "_type": "DV_DATE",
+                                        "value": "20250526"
+                                    },
+                                    "upper": {
+                                        "_type": "DV_DATE",
+                                        "value": "20250514"
+                                    },
+                                    "lower_unbounded": false,
+                                    "upper_unbounded": false
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    ],
+    "details": {
+        "_type": "ITEM_TREE",
+        "archetype_node_id": "openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2",
+        "name": {
+            "value": "Persoon data"
+        },
+        "archetype_details": {
+            "archetype_id": {
+                "value": "openEHR-DEMOGRAPHIC-ITEM_TREE.person_details.v2"
+            },
+            "rm_version": "1.1.0"
+        },
+        "items": [
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "Geboortegegevens"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0010",
+                        "name": {
+                            "value": "Geboortedatum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE",
+                            "value": "2026-04-19"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0012",
+                        "name": {
+                            "value": "Geboorteland"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "gntczxa dyiox duvyjmf ytkrvfaw djpfen",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "external"
+                                },
+                                "code_string": "code-6a160cb3a6733"
+                            }
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0014",
+                        "name": {
+                            "value": "Geboorteplaats"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "oatzsv yxve ruswth aubnde cktwi"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2401",
+                        "name": {
+                            "value": "Meerling"
+                        },
+                        "value": {
+                            "_type": "DV_BOOLEAN",
+                            "value": false
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "at0002",
+                "name": {
+                    "value": "Overlijdensgegevens"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0021",
+                        "name": {
+                            "value": "Overlijdensdatum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE",
+                            "value": "2026-03-08"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0031",
+                "name": {
+                    "value": "Geslacht"
+                },
+                "value": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "Ongedifferentieerd",
+                    "defining_code": {
+                        "terminology_id": {
+                            "value": "local"
+                        },
+                        "code_string": "at0312"
+                    }
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0033",
+                "name": {
+                    "value": "Burgerlijke staat"
+                },
+                "value": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "marital_status 733",
+                    "defining_code": {
+                        "terminology_id": {
+                            "value": "code24"
+                        },
+                        "code_string": "marital_status-733"
+                    }
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0034",
+                "name": {
+                    "value": "Etnische achtergrond"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "ibksv opneuhrf gjkyveso mhsyxpok aizbkyr"
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at2402",
+                "name": {
+                    "value": "Nationaliteit"
+                },
+                "value": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "nationalities 190",
+                    "defining_code": {
+                        "terminology_id": {
+                            "value": "code24"
+                        },
+                        "code_string": "nationalities-190"
+                    }
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at2403",
+                "name": {
+                    "value": "Levensovertuiging"
+                },
+                "value": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "life_stances 853",
+                    "defining_code": {
+                        "terminology_id": {
+                            "value": "code24"
+                        },
+                        "code_string": "life_stances-853"
+                    }
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0035",
+                "name": {
+                    "value": "Opmerkingen"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "whmxboug lpufoxt xjgepvta ndth rzospvf"
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at2400",
+                "name": {
+                    "value": "Overige gegevens"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "jateflmr fibvaqcz hfyndu qplakgtm ihdmv"
+                }
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2",
+                "name": {
+                    "value": "Persoon ID"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3a7ae8",
+                            "assigner": "assigner-6a160cb3a7af5",
+                            "id": "id-6a160cb3a7adc",
+                            "type": "type-6a160cb3a7aff"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0006",
+                        "name": {
+                            "value": "Time validity"
+                        },
+                        "value": {
+                            "_type": "DV_INTERVAL",
+                            "lower": {
+                                "_type": "DV_DATE",
+                                "value": "2026-05-09"
+                            },
+                            "upper": {
+                                "_type": "DV_DATE",
+                                "value": "2026-03-19"
+                            },
+                            "lower_unbounded": false,
+                            "upper_unbounded": false
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0007",
+                        "name": {
+                            "value": "Controle datum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE",
+                            "value": "2026-04-25"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2",
+                "name": {
+                    "value": "Persoon ID"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3a808e",
+                            "assigner": "assigner-6a160cb3a809a",
+                            "id": "id-6a160cb3a8084",
+                            "type": "type-6a160cb3a80a3"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0006",
+                        "name": {
+                            "value": "Time validity"
+                        },
+                        "value": {
+                            "_type": "DV_INTERVAL",
+                            "lower": {
+                                "_type": "DV_DATE",
+                                "value": "2026-05-18"
+                            },
+                            "upper": {
+                                "_type": "DV_DATE",
+                                "value": "2026-03-12"
+                            },
+                            "lower_unbounded": false,
+                            "upper_unbounded": false
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0007",
+                        "name": {
+                            "value": "Controle datum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE",
+                            "value": "2026-05-19"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2",
+                "name": {
+                    "value": "Persoon ID"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Gegevens"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3a85ca",
+                            "assigner": "assigner-6a160cb3a85d4",
+                            "id": "id-6a160cb3a85c2",
+                            "type": "type-6a160cb3a85dd"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0006",
+                        "name": {
+                            "value": "Time validity"
+                        },
+                        "value": {
+                            "_type": "DV_INTERVAL",
+                            "lower": {
+                                "_type": "DV_DATE",
+                                "value": "2026-04-04"
+                            },
+                            "upper": {
+                                "_type": "DV_DATE",
+                                "value": "2026-03-17"
+                            },
+                            "lower_unbounded": false,
+                            "upper_unbounded": false
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0007",
+                        "name": {
+                            "value": "Controle datum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE",
+                            "value": "2026-04-26"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2",
+                "name": {
+                    "value": "Afbeelding"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_multimedia.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Afbeelding gegevens"
+                        },
+                        "value": {
+                            "_type": "DV_MULTIMEDIA",
+                            "size": 31,
+                            "data": "eWVuenBoIHZxaiBxaGNrbG0gd2dqciBibmlqZHFmZw==",
+                            "media_type": {
+                                "terminology_id": {
+                                    "value": "openEHR"
+                                },
+                                "code_string": "425"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2",
+                "name": {
+                    "value": "Wettelijk identiteitsdocument (WID)"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_wid.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Document nummer"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "qrbje tsrma dutv oizqgus lfmogvn"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Type document"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "wid_document_type 656",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "wid_document_type-656"
+                            }
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0003",
+                        "name": {
+                            "value": "Geldig tot"
+                        },
+                        "value": {
+                            "_type": "DV_DATE_TIME",
+                            "value": "2026-05-22T04:05:19"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0004",
+                        "name": {
+                            "value": "Gecontroleerd op"
+                        },
+                        "value": {
+                            "_type": "DV_DATE_TIME",
+                            "value": "2026-05-20T12:05:19"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0005",
+                        "name": {
+                            "value": "Document in omloop"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "ja_nee_onbekend 351",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "ja_nee_onbekend-351"
+                            }
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0006",
+                        "name": {
+                            "value": "Bijlage"
+                        },
+                        "value": {
+                            "_type": "DV_MULTIMEDIA",
+                            "size": 33,
+                            "data": "andjbGRldm0gYWh3aWMgaXNrdHEgY2FrbSBobXppd2Zk",
+                            "media_type": {
+                                "terminology_id": {
+                                    "value": "openEHR"
+                                },
+                                "code_string": null
+                            }
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0007",
+                        "name": {
+                            "value": "Opmerkingen"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "pfa mqtce fganq wyedxg gvxk"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0008",
+                        "name": {
+                            "value": "Identiteit vastgesteld door"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3a9c3f",
+                            "assigner": "assigner-6a160cb3a9c4a",
+                            "id": "id-6a160cb3a9c34",
+                            "type": "type-6a160cb3a9c54"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0009",
+                        "name": {
+                            "value": "Identiteit vastgesteld op datum"
+                        },
+                        "value": {
+                            "_type": "DV_DATE_TIME",
+                            "value": "2026-05-24T12:05:19"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2",
+                "name": {
+                    "value": "Zorgverzekering"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.person_identifier_insurance.v2"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "value": "Alternatief UID"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3aa407",
+                            "assigner": "assigner-6a160cb3aa412",
+                            "id": "id-6a160cb3aa3f8",
+                            "type": "type-6a160cb3aa41b"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0002",
+                        "name": {
+                            "value": "Polisnummer"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3aa54b",
+                            "assigner": "assigner-6a160cb3aa558",
+                            "id": "id-6a160cb3aa542",
+                            "type": "type-6a160cb3aa562"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0003",
+                        "name": {
+                            "value": "Type"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "lxv bcleiwq oyi ljv zfsxtky"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0004",
+                        "name": {
+                            "value": "Datum van import"
+                        },
+                        "value": {
+                            "_type": "DV_DATE_TIME",
+                            "value": "2026-05-22T11:05:19"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0005",
+                        "name": {
+                            "value": "Pakket"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "jdi zcop onjiu wftkn gukyae",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "external"
+                                },
+                                "code_string": "code-6a160cb3aa943"
+                            }
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0006",
+                        "name": {
+                            "value": "Geldigheid"
+                        },
+                        "value": {
+                            "_type": "DV_INTERVAL",
+                            "lower": {
+                                "_type": "DV_DATE",
+                                "value": "20250619"
+                            },
+                            "upper": {
+                                "_type": "DV_DATE",
+                                "value": "20240213"
+                            },
+                            "lower_unbounded": false,
+                            "upper_unbounded": false
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0007",
+                        "name": {
+                            "value": "Zorgverzekeraar"
+                        },
+                        "value": {
+                            "_type": "DV_IDENTIFIER",
+                            "issuer": "issuer-6a160cb3aadbf",
+                            "assigner": "assigner-6a160cb3aadce",
+                            "id": "id-6a160cb3aadb4",
+                            "type": "type-6a160cb3aadd9"
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1",
+                "name": {
+                    "value": "Annotaties"
+                },
+                "archetype_details": {
+                    "archetype_id": {
+                        "value": "openEHR-DEMOGRAPHIC-CLUSTER.annotations.v1"
+                    },
+                    "rm_version": "1.1.0"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0001",
+                        "name": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "party_annotations 200",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "party_annotations-200"
+                            }
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "epuchb xwm iagyhtq hbfvngp phfjglm"
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+}

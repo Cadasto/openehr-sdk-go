@@ -1,0 +1,214 @@
+{
+    "_type": "COMPOSITION",
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.admin.v1",
+    "name": {
+        "value": "Admin"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.admin.v1"
+        },
+        "template_id": {
+            "value": "Episode.v2"
+        },
+        "rm_version": "1.1.0"
+    },
+    "language": {
+        "terminology_id": {
+            "value": "ISO_639-1"
+        },
+        "code_string": "nl"
+    },
+    "territory": {
+        "terminology_id": {
+            "value": "ISO_3166-1"
+        },
+        "code_string": "NL"
+    },
+    "category": {
+        "value": "event",
+        "defining_code": {
+            "terminology_id": {
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_SELF"
+    },
+    "context": {
+        "start_time": {
+            "value": "2026-05-22T07:05:17"
+        },
+        "setting": {
+            "value": "other care",
+            "defining_code": {
+                "terminology_id": {
+                    "value": "openehr"
+                },
+                "code_string": "238"
+            }
+        },
+        "other_context": {
+            "_type": "ITEM_TREE",
+            "archetype_node_id": "at0001",
+            "name": {
+                "value": "Tree"
+            }
+        }
+    },
+    "content": [
+        {
+            "_type": "ADMIN_ENTRY",
+            "archetype_node_id": "openEHR-EHR-ADMIN_ENTRY.episode.v2",
+            "name": {
+                "value": "Episode"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-ADMIN_ENTRY.episode.v2"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "nl"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "data": {
+                "_type": "ITEM_LIST",
+                "archetype_node_id": "at0001",
+                "name": {
+                    "value": "List"
+                },
+                "items": [
+                    {
+                        "archetype_node_id": "at0003",
+                        "name": {
+                            "value": "Id"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "hvir fcvi osdrlbxi mdkv bgaywx"
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0019",
+                        "name": {
+                            "value": "Naam"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "jogulnrv mweaypt saicoqu doxpz breqnt"
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0004",
+                        "name": {
+                            "value": "Actief"
+                        },
+                        "value": {
+                            "_type": "DV_BOOLEAN",
+                            "value": false
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0011",
+                        "name": {
+                            "value": "Urgentie"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "Regulier",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "local"
+                                },
+                                "code_string": "at0014"
+                            }
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0015",
+                        "name": {
+                            "value": "Zorgcircuit"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "care_circuit 907",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "care_circuit-907"
+                            }
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0016",
+                        "name": {
+                            "value": "Uitschrijfreden"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "unsubscribe_reason 608",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "unsubscribe_reason-608"
+                            }
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0017",
+                        "name": {
+                            "value": "Vervolgzorg"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "follow_up_care 337",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "follow_up_care-337"
+                            }
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0018",
+                        "name": {
+                            "value": "Vervolgzorg opmerking"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "rzpiebk kpzcawgn npveaz lbr avr"
+                        }
+                    },
+                    {
+                        "archetype_node_id": "at0010",
+                        "name": {
+                            "value": "Opmerking"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "pgjuq exrvstq pemgt hfnt ngfulx"
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

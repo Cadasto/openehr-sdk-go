@@ -1,0 +1,278 @@
+{
+    "_type": "COMPOSITION",
+    "archetype_node_id": "openEHR-EHR-COMPOSITION.encounter.v1",
+    "name": {
+        "value": "body_weight"
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-EHR-COMPOSITION.encounter.v1"
+        },
+        "template_id": {
+            "value": "body_weight"
+        },
+        "rm_version": "1.1.0"
+    },
+    "language": {
+        "terminology_id": {
+            "value": "ISO_639-1"
+        },
+        "code_string": "nl"
+    },
+    "territory": {
+        "terminology_id": {
+            "value": "ISO_3166-1"
+        },
+        "code_string": "NL"
+    },
+    "category": {
+        "value": "event",
+        "defining_code": {
+            "terminology_id": {
+                "value": "openehr"
+            },
+            "code_string": "433"
+        }
+    },
+    "composer": {
+        "_type": "PARTY_SELF"
+    },
+    "context": {
+        "start_time": {
+            "value": "2026-05-21T01:05:19"
+        },
+        "setting": {
+            "value": "other care",
+            "defining_code": {
+                "terminology_id": {
+                    "value": "openehr"
+                },
+                "code_string": "238"
+            }
+        },
+        "other_context": {
+            "_type": "ITEM_TREE",
+            "archetype_node_id": "at0001",
+            "name": {
+                "value": "Tree"
+            }
+        }
+    },
+    "content": [
+        {
+            "_type": "OBSERVATION",
+            "archetype_node_id": "openEHR-EHR-OBSERVATION.body_weight.v2",
+            "name": {
+                "value": "Lichaamsgewicht"
+            },
+            "archetype_details": {
+                "archetype_id": {
+                    "value": "openEHR-EHR-OBSERVATION.body_weight.v2"
+                },
+                "rm_version": "1.1.0"
+            },
+            "language": {
+                "terminology_id": {
+                    "value": "ISO_639-1"
+                },
+                "code_string": "nl"
+            },
+            "encoding": {
+                "terminology_id": {
+                    "value": "IANA_character-sets"
+                },
+                "code_string": "UTF-8"
+            },
+            "subject": {
+                "_type": "PARTY_SELF"
+            },
+            "protocol": {
+                "_type": "ITEM_TREE",
+                "archetype_node_id": "at0015",
+                "name": {
+                    "value": "*protocol structure(en)"
+                }
+            },
+            "data": {
+                "archetype_node_id": "at0002",
+                "name": {
+                    "value": "*history(en)"
+                },
+                "origin": {
+                    "value": "2026-05-24T09:05:19"
+                },
+                "events": [
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0003",
+                        "name": {
+                            "value": "Elke gebeurtenis"
+                        },
+                        "time": {
+                            "value": "2026-05-25T02:05:19"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0001",
+                            "name": {
+                                "value": "*Simple(en)"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Gewicht"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 572,
+                                        "units": "kg"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0024",
+                                    "name": {
+                                        "value": "Opmerking"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "dgbn lgp ecumnrqy rqat yrmipu"
+                                    }
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0008",
+                            "name": {
+                                "value": "*state structure(en)"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0009",
+                                    "name": {
+                                        "value": "Kleding"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "Luier",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "at0017"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0025",
+                                    "name": {
+                                        "value": "Be\u00efnvloedende factoren."
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "poue xdhvn xfvocpa qwmdubny cjnlhqy"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0025",
+                                    "name": {
+                                        "value": "Be\u00efnvloedende factoren."
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "nig aozl qyvz vgwre amf"
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "_type": "POINT_EVENT",
+                        "archetype_node_id": "at0026",
+                        "name": {
+                            "value": "Geboorte"
+                        },
+                        "time": {
+                            "value": "2026-05-25T03:05:19"
+                        },
+                        "data": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0001",
+                            "name": {
+                                "value": "*Simple(en)"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0004",
+                                    "name": {
+                                        "value": "Gewicht"
+                                    },
+                                    "value": {
+                                        "_type": "DV_QUANTITY",
+                                        "magnitude": 59,
+                                        "units": "kg"
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0024",
+                                    "name": {
+                                        "value": "Opmerking"
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "gwe dajw kgowivx fhnamd efjoxz"
+                                    }
+                                }
+                            ]
+                        },
+                        "state": {
+                            "_type": "ITEM_TREE",
+                            "archetype_node_id": "at0008",
+                            "name": {
+                                "value": "*state structure(en)"
+                            },
+                            "items": [
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0009",
+                                    "name": {
+                                        "value": "Kleding"
+                                    },
+                                    "value": {
+                                        "_type": "DV_CODED_TEXT",
+                                        "value": "Lichte kleding/ondergoed",
+                                        "defining_code": {
+                                            "terminology_id": {
+                                                "value": "local"
+                                            },
+                                            "code_string": "at0011"
+                                        }
+                                    }
+                                },
+                                {
+                                    "_type": "ELEMENT",
+                                    "archetype_node_id": "at0025",
+                                    "name": {
+                                        "value": "Be\u00efnvloedende factoren."
+                                    },
+                                    "value": {
+                                        "_type": "DV_TEXT",
+                                        "value": "qwtgver dqjzyxb wrnscjhg zrvlytaq sckje"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]
+}

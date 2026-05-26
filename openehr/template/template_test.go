@@ -11,11 +11,12 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // REQ-100 — parse a real vendored OPT and assert wrapper identity.
 func TestParseFile_VitalSigns_Identity(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("testdata", "vital_signs.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
@@ -55,7 +56,7 @@ func TestParseFile_VitalSigns_Identity(t *testing.T) {
 // REQ-100 — the second fixture exercises a different concept; basic
 // identity check confirms parse succeeds on a structurally distinct OPT.
 func TestParseFile_ClinicalNote_Identity(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("testdata", "clinical_note.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("clinical_note"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestParseFile_ClinicalNote_Identity(t *testing.T) {
 // REQ-100 — ParseFile MUST reject non-.opt paths with ErrNotOPTFile
 // without opening the file.
 func TestParseFile_RejectsNonOPTSuffix(t *testing.T) {
-	_, err := template.ParseFile(filepath.Join("testdata", "README.md"))
+	_, err := template.ParseFile(filepath.Join(fixtures.CassettesRoot(), "README.md"))
 	if !errors.Is(err, template.ErrNotOPTFile) {
 		t.Fatalf("got %v, want ErrNotOPTFile", err)
 	}
@@ -80,7 +81,7 @@ func TestParseFile_RejectsNonOPTSuffix(t *testing.T) {
 // classify with errors.Is(err, fs.ErrNotExist). Self-review finding
 // #2 from PR #10 multi-agent review.
 func TestParseFile_MissingFileWrapsFSError(t *testing.T) {
-	_, err := template.ParseFile(filepath.Join("testdata", "does_not_exist.opt"))
+	_, err := template.ParseFile(fixtures.TemplateOptForName("does_not_exist"))
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -128,7 +129,7 @@ func TestParseOPT_AcceptsBOM(t *testing.T) {
 	// vital_signs.opt already ships with a BOM. Dual-prove BOM handling:
 	// (a) the on-disk fixture parses, and (b) a synthetic minimal OPT
 	// with an injected BOM also parses.
-	fixturePath := filepath.Join("testdata", "vital_signs.opt")
+	fixturePath := fixtures.TemplateOptForName("vital_signs")
 	body, err := os.ReadFile(fixturePath)
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
@@ -226,7 +227,7 @@ func TestParseOPT_NonTemplateRoot(t *testing.T) {
 // REQ-100 — ParseFile's .opt suffix check is case-insensitive, so
 // authoring tools that emit upper-case extensions are accepted.
 func TestParseFile_CaseInsensitiveExtension(t *testing.T) {
-	src := filepath.Join("testdata", "vital_signs.opt")
+	src := fixtures.TemplateOptForName("vital_signs")
 	body, err := os.ReadFile(src)
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
@@ -338,7 +339,7 @@ func TestParseOPTStrict_AdmitsBareUnknownChild(t *testing.T) {
 // block. Both vendored fixtures carry one; assert at least the
 // lifecycle_state round-trips.
 func TestOperationalTemplate_DescriptionCaptured(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("testdata", "clinical_note.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("clinical_note"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}

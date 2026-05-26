@@ -9,4 +9,8 @@
 // Conformance probes are the cross-SDK contract with the PHP SDK:
 // defined once, implemented in each language, exercised against
 // sandbox, recorded cassette, or a live deployment.
+//
+// Vendored fixtures live under testkit/cassettes/ (templates/,
+// compositions/, rm/, its_rest/). Provenance is indexed by vendor in
+// testkit/cassettes/README.md. Resolve paths via testkit/fixtures.
 package testkit

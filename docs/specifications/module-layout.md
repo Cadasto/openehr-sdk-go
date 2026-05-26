@@ -53,7 +53,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `smart/` | Application-level SMART AppContext (patient, user, encounter, launch parameters) and App Registration helpers. Distinct from `auth/smart` (OAuth2 flow). |
 | `smart/discovery/` | Service catalog resolver. |
 | `sandbox/` | In-memory and recorded-fixture transports implementing the same client interfaces as the production REST clients. |
-| `testkit/` | Test doubles, fluent builders, clock abstraction, JWKS fixture, recorder/replay, conformance-probe runner. Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
+| `testkit/` | Test doubles, fluent builders, clock abstraction, JWKS fixture, recorder/replay, conformance-probe runner. Vendored cross-SDK bytes under `testkit/cassettes/` (`templates/`, `compositions/`, `rm/`, `its_rest/`); path resolution in `testkit/fixtures/`. Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
 
 ### Cadasto extras
 
