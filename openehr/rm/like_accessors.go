@@ -35,26 +35,17 @@ package rm
 //   `openehr/serialize/canjson/polymorphic_decode_test.go`.
 
 // DVTextValueOf returns the `value` rendition of any DV_TEXT subtype.
-// Returns "" when the interface is nil. Concrete dispatch is a closed
-// type-switch — no reflection (REQ-024).
+// Returns "" when the interface is nil.
+//
+// Compat shim: prefer `v.GetValue()` directly — that method now lives
+// on [DVTextLike] (see openehr/rm/like_interfaces.go). This helper
+// stays for callers migrating off the pre-Phase-1 closed type-switch
+// pattern.
 func DVTextValueOf(v DVTextLike) string {
-	switch t := v.(type) {
-	case *DVText:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVText:
-		return t.Value
-	case *DVCodedText:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVCodedText:
-		return t.Value
+	if v == nil {
+		return ""
 	}
-	return ""
+	return v.GetValue()
 }
 
 // AsDVText returns the DVText payload of v (the parent struct
