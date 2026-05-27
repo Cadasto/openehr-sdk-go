@@ -199,3 +199,59 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
 	}
 }
+
+// DecodeAsOrDefault is the polySingleNarrow (SDK-GAP-11) XML
+// counterpart of [DecodeAs]. When the element carries an `xsi:type`,
+// dispatch goes through [typereg.Default] exactly like DecodeAs.
+// When `xsi:type` is absent, the supplied defaultCtor instantiates
+// the declared parent type and dec.DecodeElement populates it —
+// preserving openEHR canonical XML where the static field type fixes
+// the concrete subtype.
+func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
+	var zero T
+	typeName, err := XSITypeOf(start)
+	if err != nil {
+		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
+	}
+	var v any
+	if typeName == "" {
+		if defaultCtor == nil {
+			return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
+		}
+		v = defaultCtor()
+		if err := dec.DecodeElement(v, &start); err != nil {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Inner: fmt.Errorf("canxml: %w", err),
+			}
+		}
+	} else {
+		ctor, ok := typereg.Default.Lookup(typeName)
+		if !ok {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Type:  typeName,
+				Inner: fmt.Errorf("canxml: %q: %w", typeName, typereg.ErrUnknownType),
+			}
+		}
+		v = ctor()
+		if err := dec.DecodeElement(v, &start); err != nil {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Type:  typeName,
+				Inner: fmt.Errorf("canxml: %w", err),
+			}
+		}
+	}
+	if t, ok := v.(T); ok {
+		return t, nil
+	}
+	if pt, ok := v.(*T); ok && pt != nil {
+		return *pt, nil
+	}
+	return zero, &DecodeError{
+		Path:  "/" + start.Name.Local,
+		Type:  typeName,
+		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
+	}
+}

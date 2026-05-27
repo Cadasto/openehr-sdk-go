@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -90,12 +91,10 @@ func (f *FeederAudit) UnmarshalJSON(data []byte) error {
 type FeederAuditDetailsJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// SystemID Identifier of the system which handled the information item. This is the IT system owned by the organisation legally responsible for handling the data, and at which the data were previously created or passed by an earlier system.
-	SystemID string `json:"system_id"`
-	// Location Identifier of the particular site/facility within an organisation which handled the item. For computability, this identifier needs to be e.g. a PKI identifier which can be included in the identifier list of the `PARTY_IDENTIFIED` object.
-	Location *PartyIdentified `json:"location,omitempty"`
-	Subject  json.RawMessage  `json:"subject,omitempty"` // polymorphic PartyProxy
-	// Provider Optional provider(s) who created, committed, forwarded or otherwise handled the item.
-	Provider *PartyIdentified `json:"provider,omitempty"`
+	SystemID string          `json:"system_id"`
+	Location json.RawMessage `json:"location,omitempty"` // polymorphic PartyIdentifiedLike
+	Subject  json.RawMessage `json:"subject,omitempty"`  // polymorphic PartyProxy
+	Provider json.RawMessage `json:"provider,omitempty"` // polymorphic PartyIdentifiedLike
 	// Time Time of handling the item. For an originating system, this will be time of creation, for an intermediate feeder system, this will be a time of accession or other time of handling, where available.
 	Time *DVDateTime `json:"time,omitempty"`
 	// VersionID Any identifier used in the system such as  "interim" ,  "final" , or numeric versions if available.
@@ -120,7 +119,22 @@ func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
 		}
 	}
 	f.SystemID = aux.SystemID
-	f.Location = aux.Location
+	if len(aux.Location) > 0 && string(aux.Location) != "null" {
+		dv, err := typereg.DecodeAs[PartyIdentifiedLike](aux.Location)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def PartyIdentified
+				if jerr := json.Unmarshal(aux.Location, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/location", Inner: jerr}
+				}
+				f.Location = &def
+			} else {
+				return &typereg.DecodeError{Path: "/location", Inner: err}
+			}
+		} else {
+			f.Location = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -128,7 +142,22 @@ func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
 		}
 		f.Subject = dv
 	}
-	f.Provider = aux.Provider
+	if len(aux.Provider) > 0 && string(aux.Provider) != "null" {
+		dv, err := typereg.DecodeAs[PartyIdentifiedLike](aux.Provider)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def PartyIdentified
+				if jerr := json.Unmarshal(aux.Provider, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/provider", Inner: jerr}
+				}
+				f.Provider = &def
+			} else {
+				return &typereg.DecodeError{Path: "/provider", Inner: err}
+			}
+		} else {
+			f.Provider = dv
+		}
+	}
 	f.Time = aux.Time
 	f.VersionID = aux.VersionID
 	if len(aux.OtherDetails) > 0 && string(aux.OtherDetails) != "null" {
@@ -142,11 +171,9 @@ func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
 }
 
 type LinkJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DVText `json:"meaning"`
-	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DVText `json:"type"`
+	Class   string          `json:"_type"`
+	Meaning json.RawMessage `json:"meaning"` // polymorphic DVTextLike
+	Type    json.RawMessage `json:"type"`    // polymorphic DVTextLike
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 }
@@ -167,8 +194,38 @@ func (l *Link) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "LINK", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	l.Meaning = aux.Meaning
-	l.Type = aux.Type
+	if len(aux.Meaning) > 0 && string(aux.Meaning) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Meaning)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Meaning, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/meaning", Inner: jerr}
+				}
+				l.Meaning = &def
+			} else {
+				return &typereg.DecodeError{Path: "/meaning", Inner: err}
+			}
+		} else {
+			l.Meaning = dv
+		}
+	}
+	if len(aux.Type) > 0 && string(aux.Type) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Type)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Type, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/type", Inner: jerr}
+				}
+				l.Type = &def
+			} else {
+				return &typereg.DecodeError{Path: "/type", Inner: err}
+			}
+		} else {
+			l.Type = dv
+		}
+	}
 	l.Target = aux.Target
 	return nil
 }

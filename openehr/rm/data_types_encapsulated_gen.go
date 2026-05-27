@@ -37,7 +37,7 @@ type DVMultimedia struct {
 	// Thumbnail The thumbnail for this item, if one exists; mainly for graphics formats.
 	Thumbnail *DVMultimedia `json:"thumbnail,omitempty"`
 	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
-	URI *DVURI `json:"uri,omitempty"`
+	URI DVURILike `json:"uri,omitempty"`
 }
 
 // HasIntegrityCheck Computed from the value of the `_integrity_check_algorithm_` attribute: True if an integrity check has been computed.

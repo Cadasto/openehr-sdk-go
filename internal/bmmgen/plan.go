@@ -82,6 +82,15 @@ type Plan struct {
 	// are listed here; cross-target marker emission is the consumer's
 	// responsibility (none today).
 	AbstractDescendants map[string][]string
+	// ConcreteSubtypes maps each NON-abstract BMM class that has at
+	// least one descendant to the sorted list of its descendant BMM
+	// names. Drives the SDK-GAP-11 narrow-interface emission
+	// (`<GoName>Like`): the openEHR RM permits Liskov substitution at
+	// every concrete-typed slot, so a property declared as DV_TEXT may
+	// admit DV_CODED_TEXT etc. The narrow Go interface lifts those
+	// slots so canjson / canxml dispatch via typereg keeps subtype
+	// payloads lossless through decode→re-marshal round-trips.
+	ConcreteSubtypes map[string][]string
 	// Notes collects human-readable warnings/skips encountered during
 	// planning. The CLI prints them in verbose mode and the DONE
 	// report should mention any non-empty entries.
@@ -138,6 +147,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 		Schema:              schema,
 		Classes:             make(map[string]*PlannedClass),
 		AbstractDescendants: make(map[string][]string),
+		ConcreteSubtypes:    make(map[string][]string),
 		CyclicSingleProps:   make(map[string]map[string]bool),
 	}
 
@@ -285,6 +295,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 	}
 
 	computeAbstractDescendants(p)
+	computeConcreteSubtypes(p)
 	computeCyclicSingleProps(p)
 	return p, nil
 }
@@ -549,6 +560,124 @@ func computeAbstractDescendants(p *Plan) {
 			queue = append(queue, children[next]...)
 		}
 		sort.Strings(p.AbstractDescendants[pc.BMMName])
+	}
+}
+
+// collectReferencedPropertyTypes returns the set of BMM class names
+// that appear as the declared type of at least one property anywhere
+// in the plan. Includes both single-property type names and the
+// element types of container / generic properties (each level of
+// nesting unwrapped). Drives the SDK-GAP-11 narrow-interface filter.
+func collectReferencedPropertyTypes(p *Plan) map[string]bool {
+	out := map[string]bool{}
+	addContainer := func(td *bmm.ContainerType) {
+		if td == nil || td.TypeDef == nil {
+			return
+		}
+		switch inner := td.TypeDef.(type) {
+		case *bmm.SimpleType:
+			out[inner.TypeName] = true
+		case *bmm.GenericType:
+			out[inner.RootType] = true
+		}
+	}
+	for _, pc := range p.Classes {
+		sc, isSimple := pc.Class.(*bmm.SimpleClass)
+		if !isSimple {
+			continue
+		}
+		for _, prop := range sc.Properties {
+			switch pp := prop.(type) {
+			case *bmm.SingleProperty:
+				out[pp.TypeName] = true
+			case *bmm.ContainerProperty:
+				addContainer(pp.TypeDef)
+			case *bmm.GenericProperty:
+				if pp.TypeDef != nil {
+					out[pp.TypeDef.RootType] = true
+				}
+			}
+		}
+	}
+	return out
+}
+
+// computeConcreteSubtypes populates p.ConcreteSubtypes. Mirror of
+// computeAbstractDescendants but keyed on NON-abstract SimpleClasses
+// that (a) have at least one concrete descendant AND (b) are actually
+// referenced as a property type somewhere in the schema — the
+// SDK-GAP-11 narrow-interface driver. Each entry maps the parent's
+// BMM name to the sorted list of all transitive concrete SimpleClass
+// descendants.
+//
+// The "referenced as a property type" filter is what keeps the
+// narrow-interface emission focused: openEHR's BMM has a deep
+// bookkeeping hierarchy (BASIC_DEFINITIONS, OPENEHR_DEFINITIONS, …)
+// whose descendants span the entire data-types package, but those
+// roots are never the declared type of any property — they would
+// produce huge, useless `*Like` interfaces.
+func computeConcreteSubtypes(p *Plan) {
+	children := map[string][]string{}
+	for _, pc := range p.Classes {
+		for _, anc := range pc.Class.Ancestors() {
+			children[anc] = append(children[anc], pc.BMMName)
+		}
+	}
+	for _, list := range children {
+		sort.Strings(list)
+	}
+	// Set of class names that appear as the declared type of at least
+	// one property somewhere in the plan.
+	referencedTypes := collectReferencedPropertyTypes(p)
+	for _, pc := range p.Classes {
+		if !isConcreteForRegistry(pc) {
+			continue
+		}
+		sc, _ := pc.Class.(*bmm.SimpleClass)
+		if pc.External || sc.IsGeneric() {
+			continue
+		}
+		if !referencedTypes[pc.BMMName] {
+			// Parent class is never used as a property type — no slot
+			// can carry a substituted subtype, so no narrow interface
+			// is needed.
+			continue
+		}
+		if _, hasKids := children[pc.BMMName]; !hasKids {
+			continue
+		}
+		seen := map[string]bool{}
+		queue := append([]string{}, children[pc.BMMName]...)
+		for len(queue) > 0 {
+			next := queue[0]
+			queue = queue[1:]
+			if seen[next] {
+				continue
+			}
+			seen[next] = true
+			child, ok := p.Classes[next]
+			if !ok {
+				continue
+			}
+			if child.External {
+				continue
+			}
+			// Only concrete SimpleClass descendants take a marker
+			// method — abstract intermediates stay interface-only, and
+			// enums / P_BMM_INTERFACE leaves cannot receive value
+			// receivers.
+			cc, isSimple := child.Class.(*bmm.SimpleClass)
+			if isSimple && !cc.IsAbstract() {
+				p.ConcreteSubtypes[pc.BMMName] = append(p.ConcreteSubtypes[pc.BMMName], next)
+			}
+			queue = append(queue, children[next]...)
+		}
+		sort.Strings(p.ConcreteSubtypes[pc.BMMName])
+		// If no concrete descendants survived the filter, drop the
+		// parent so emitNarrowInterface skips it.
+		if len(p.ConcreteSubtypes[pc.BMMName]) == 0 {
+			delete(p.ConcreteSubtypes, pc.BMMName)
+		}
 	}
 }
 

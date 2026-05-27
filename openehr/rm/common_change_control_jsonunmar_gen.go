@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -15,11 +16,9 @@ import (
 type ContributionJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier for this Contribution.
-	UID HierObjectID `json:"uid"`
-	// Versions Set of references to Versions causing changes to this EHR. Each contribution contains a list of versions, which may include paths pointing to any number of versionable items, i.e. items of types such as `COMPOSITION` and `FOLDER`.
-	Versions []ObjectRef `json:"versions"`
-	// Audit Audit trail corresponding to the committal of this Contribution.
-	Audit AuditDetails `json:"audit"`
+	UID      HierObjectID      `json:"uid"`
+	Versions []json.RawMessage `json:"versions"` // polymorphic []ObjectRefLike
+	Audit    json.RawMessage   `json:"audit"`    // polymorphic AuditDetailsLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into Contribution.
@@ -39,19 +38,53 @@ func (c *Contribution) UnmarshalJSON(data []byte) error {
 		}
 	}
 	c.UID = aux.UID
-	c.Versions = aux.Versions
-	c.Audit = aux.Audit
+	if aux.Versions != nil {
+		c.Versions = make([]ObjectRefLike, len(aux.Versions))
+		for idx, raw := range aux.Versions {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/versions/%d", idx), Inner: jerr}
+					}
+					c.Versions[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/versions/%d", idx), Inner: err}
+				}
+			} else {
+				c.Versions[idx] = dv
+			}
+		}
+	}
+	if len(aux.Audit) > 0 && string(aux.Audit) != "null" {
+		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.Audit)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def AuditDetails
+				if jerr := json.Unmarshal(aux.Audit, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/audit", Inner: jerr}
+				}
+				c.Audit = &def
+			} else {
+				return &typereg.DecodeError{Path: "/audit", Inner: err}
+			}
+		} else {
+			c.Audit = dv
+		}
+	}
 	return nil
 }
 
 type ImportedVersionJSONUnmarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Contribution Contribution in which this version was added.
-	Contribution ObjectRef `json:"contribution"`
+	Class        string          `json:"_type"`
+	Contribution json.RawMessage `json:"contribution"` // polymorphic ObjectRefLike
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature *string `json:"signature,omitempty"`
-	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetails `json:"commit_audit"`
+	Signature   *string         `json:"signature,omitempty"`
+	CommitAudit json.RawMessage `json:"commit_audit"` // polymorphic AuditDetailsLike
 	// Item The `ORIGINAL_VERSION` object that was imported.
 	Item OriginalVersion[any] `json:"item"`
 }
@@ -72,21 +105,49 @@ func (i *ImportedVersion[T]) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "IMPORTED_VERSION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	i.Contribution = aux.Contribution
+	if len(aux.Contribution) > 0 && string(aux.Contribution) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.Contribution)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.Contribution, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/contribution", Inner: jerr}
+				}
+				i.Contribution = &def
+			} else {
+				return &typereg.DecodeError{Path: "/contribution", Inner: err}
+			}
+		} else {
+			i.Contribution = dv
+		}
+	}
 	i.Signature = aux.Signature
-	i.CommitAudit = aux.CommitAudit
+	if len(aux.CommitAudit) > 0 && string(aux.CommitAudit) != "null" {
+		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.CommitAudit)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def AuditDetails
+				if jerr := json.Unmarshal(aux.CommitAudit, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/commit_audit", Inner: jerr}
+				}
+				i.CommitAudit = &def
+			} else {
+				return &typereg.DecodeError{Path: "/commit_audit", Inner: err}
+			}
+		} else {
+			i.CommitAudit = dv
+		}
+	}
 	i.Item = aux.Item
 	return nil
 }
 
 type OriginalVersionJSONUnmarshaller[T any] struct {
-	Class string `json:"_type"`
-	// Contribution Contribution in which this version was added.
-	Contribution ObjectRef `json:"contribution"`
+	Class        string          `json:"_type"`
+	Contribution json.RawMessage `json:"contribution"` // polymorphic ObjectRefLike
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
-	Signature *string `json:"signature,omitempty"`
-	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetails `json:"commit_audit"`
+	Signature   *string         `json:"signature,omitempty"`
+	CommitAudit json.RawMessage `json:"commit_audit"` // polymorphic AuditDetailsLike
 	// UID Stored version of inheritance precursor.
 	UID ObjectVersionID `json:"uid"`
 	// PrecedingVersionUID Stored version of inheritance precursor.
@@ -117,9 +178,39 @@ func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORIGINAL_VERSION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	o.Contribution = aux.Contribution
+	if len(aux.Contribution) > 0 && string(aux.Contribution) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.Contribution)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.Contribution, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/contribution", Inner: jerr}
+				}
+				o.Contribution = &def
+			} else {
+				return &typereg.DecodeError{Path: "/contribution", Inner: err}
+			}
+		} else {
+			o.Contribution = dv
+		}
+	}
 	o.Signature = aux.Signature
-	o.CommitAudit = aux.CommitAudit
+	if len(aux.CommitAudit) > 0 && string(aux.CommitAudit) != "null" {
+		dv, err := typereg.DecodeAs[AuditDetailsLike](aux.CommitAudit)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def AuditDetails
+				if jerr := json.Unmarshal(aux.CommitAudit, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/commit_audit", Inner: jerr}
+				}
+				o.CommitAudit = &def
+			} else {
+				return &typereg.DecodeError{Path: "/commit_audit", Inner: err}
+			}
+		} else {
+			o.CommitAudit = dv
+		}
+	}
 	o.UID = aux.UID
 	o.PrecedingVersionUID = aux.PrecedingVersionUID
 	o.OtherInputVersionUids = aux.OtherInputVersionUids
@@ -132,9 +223,8 @@ func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
 type VersionedObjectJSONUnmarshaller[T any] struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -156,7 +246,22 @@ func (v *VersionedObject[T]) UnmarshalJSON(data []byte) error {
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }

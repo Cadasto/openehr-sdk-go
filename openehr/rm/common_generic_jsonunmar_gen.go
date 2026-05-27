@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -19,18 +20,16 @@ type AttestationJSONUnmarshaller struct {
 	// TimeCommitted Time of committal of the item.
 	TimeCommitted DVDateTime `json:"time_committed"`
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
-	ChangeType DVCodedText `json:"change_type"`
-	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description *DVText         `json:"description,omitempty"`
-	Committer   json.RawMessage `json:"committer"` // polymorphic PartyProxy
+	ChangeType  DVCodedText     `json:"change_type"`
+	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
+	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
 	// AttestedView Optional visual representation of content attested e.g. screen image.
 	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
 	// Proof Proof of attestation.
 	Proof *string `json:"proof,omitempty"`
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
-	Items []DVEHRURI `json:"items,omitempty"`
-	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason DVText `json:"reason"`
+	Items  []DVEHRURI      `json:"items,omitempty"`
+	Reason json.RawMessage `json:"reason"` // polymorphic DVTextLike
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
@@ -54,7 +53,22 @@ func (a *Attestation) UnmarshalJSON(data []byte) error {
 	a.SystemID = aux.SystemID
 	a.TimeCommitted = aux.TimeCommitted
 	a.ChangeType = aux.ChangeType
-	a.Description = aux.Description
+	if len(aux.Description) > 0 && string(aux.Description) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/description", Inner: jerr}
+				}
+				a.Description = &def
+			} else {
+				return &typereg.DecodeError{Path: "/description", Inner: err}
+			}
+		} else {
+			a.Description = dv
+		}
+	}
 	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
 		if err != nil {
@@ -65,7 +79,22 @@ func (a *Attestation) UnmarshalJSON(data []byte) error {
 	a.AttestedView = aux.AttestedView
 	a.Proof = aux.Proof
 	a.Items = aux.Items
-	a.Reason = aux.Reason
+	if len(aux.Reason) > 0 && string(aux.Reason) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Reason)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Reason, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/reason", Inner: jerr}
+				}
+				a.Reason = &def
+			} else {
+				return &typereg.DecodeError{Path: "/reason", Inner: err}
+			}
+		} else {
+			a.Reason = dv
+		}
+	}
 	a.IsPending = aux.IsPending
 	return nil
 }
@@ -77,10 +106,9 @@ type AuditDetailsJSONUnmarshaller struct {
 	// TimeCommitted Time of committal of the item.
 	TimeCommitted DVDateTime `json:"time_committed"`
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
-	ChangeType DVCodedText `json:"change_type"`
-	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description *DVText         `json:"description,omitempty"`
-	Committer   json.RawMessage `json:"committer"` // polymorphic PartyProxy
+	ChangeType  DVCodedText     `json:"change_type"`
+	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
+	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into AuditDetails.
@@ -102,7 +130,22 @@ func (a *AuditDetails) UnmarshalJSON(data []byte) error {
 	a.SystemID = aux.SystemID
 	a.TimeCommitted = aux.TimeCommitted
 	a.ChangeType = aux.ChangeType
-	a.Description = aux.Description
+	if len(aux.Description) > 0 && string(aux.Description) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/description", Inner: jerr}
+				}
+				a.Description = &def
+			} else {
+				return &typereg.DecodeError{Path: "/description", Inner: err}
+			}
+		} else {
+			a.Description = dv
+		}
+	}
 	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
 		if err != nil {
@@ -114,9 +157,8 @@ func (a *AuditDetails) UnmarshalJSON(data []byte) error {
 }
 
 type ParticipationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
-	Function DVText `json:"function"`
+	Class    string          `json:"_type"`
+	Function json.RawMessage `json:"function"` // polymorphic DVTextLike
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
 	Mode      *DVCodedText    `json:"mode,omitempty"`
 	Performer json.RawMessage `json:"performer"` // polymorphic PartyProxy
@@ -140,7 +182,22 @@ func (p *Participation) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTICIPATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	p.Function = aux.Function
+	if len(aux.Function) > 0 && string(aux.Function) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Function)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Function, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/function", Inner: jerr}
+				}
+				p.Function = &def
+			} else {
+				return &typereg.DecodeError{Path: "/function", Inner: err}
+			}
+		} else {
+			p.Function = dv
+		}
+	}
 	p.Mode = aux.Mode
 	if len(aux.Performer) > 0 && string(aux.Performer) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Performer)
@@ -275,9 +332,8 @@ func (r *RevisionHistory) UnmarshalJSON(data []byte) error {
 type RevisionHistoryItemJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// VersionID Version identifier for this revision.
-	VersionID ObjectVersionID `json:"version_id"`
-	// Audits The audits for this revision; there will always be at least one commit audit (which may itself be an `ATTESTATION`), there may also be further attestations.
-	Audits []AuditDetails `json:"audits"`
+	VersionID ObjectVersionID   `json:"version_id"`
+	Audits    []json.RawMessage `json:"audits"` // polymorphic []AuditDetailsLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into RevisionHistoryItem.
@@ -297,6 +353,27 @@ func (r *RevisionHistoryItem) UnmarshalJSON(data []byte) error {
 		}
 	}
 	r.VersionID = aux.VersionID
-	r.Audits = aux.Audits
+	if aux.Audits != nil {
+		r.Audits = make([]AuditDetailsLike, len(aux.Audits))
+		for idx, raw := range aux.Audits {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[AuditDetailsLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def AuditDetails
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: jerr}
+					}
+					r.Audits[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: err}
+				}
+			} else {
+				r.Audits[idx] = dv
+			}
+		}
+	}
 	return nil
 }

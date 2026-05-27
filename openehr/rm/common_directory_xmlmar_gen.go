@@ -32,8 +32,10 @@ func (f *Folder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&f.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if f.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", f.Name); err != nil {
+			return err
+		}
 	}
 	if f.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", f.UID); err != nil {
@@ -55,8 +57,11 @@ func (f *Folder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	for _idx := range f.Items {
-		if err := _e.EncodeElement(&f.Items[_idx], xml.StartElement{Name: xml.Name{Local: "items"}}); err != nil {
+	for _, _item := range f.Items {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "items", _item); err != nil {
 			return err
 		}
 	}
@@ -99,8 +104,10 @@ func (v *VersionedFolder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) e
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err

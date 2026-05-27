@@ -48,8 +48,8 @@ func (d *DVMultimedia) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				d.AlternateText = &_v
 			case "uri":
-				_v := new(DVURI)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVURILike](_dec, _t, func() any { return new(DVURI) })
+				if _err != nil {
 					return _err
 				}
 				d.URI = _v

@@ -72,7 +72,7 @@ func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		return err
 	}
 	if d.Hyperlink != nil {
-		if err := _e.EncodeElement(d.Hyperlink, xml.StartElement{Name: xml.Name{Local: "hyperlink"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "hyperlink", d.Hyperlink); err != nil {
 			return err
 		}
 	}
@@ -125,8 +125,11 @@ func (d *DVParagraph) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	for _idx := range d.Items {
-		if err := _e.EncodeElement(&d.Items[_idx], xml.StartElement{Name: xml.Name{Local: "items"}}); err != nil {
+	for _, _item := range d.Items {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "items", _item); err != nil {
 			return err
 		}
 	}
@@ -160,7 +163,7 @@ func (d *DVText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if d.Hyperlink != nil {
-		if err := _e.EncodeElement(d.Hyperlink, xml.StartElement{Name: xml.Name{Local: "hyperlink"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "hyperlink", d.Hyperlink); err != nil {
 			return err
 		}
 	}

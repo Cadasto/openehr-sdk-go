@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -13,9 +14,8 @@ import (
 // BMM package: org.openehr.rm.composition — canonical-JSON UnmarshalJSON companions
 
 type CompositionJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -61,7 +61,22 @@ func (c *Composition) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "COMPOSITION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	c.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				c.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			c.Name = dv
+		}
+	}
 	c.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -109,10 +124,9 @@ type EventContextJSONUnmarshaller struct {
 	// Location The actual location where the session occurred, e.g. 'microbiology lab 2', 'home', 'ward A3'  and so on.
 	Location *string `json:"location,omitempty"`
 	// Setting The setting in which the clinical session took place. Coded using the openEHR Terminology,  setting  group.
-	Setting      DVCodedText     `json:"setting"`
-	OtherContext json.RawMessage `json:"other_context,omitempty"` // polymorphic ItemStructure
-	// HealthCareFacility The health care facility under whose care the event took place. This is the most specific workgroup or delivery unit within a care delivery enterprise that has an official identifier in the health system, and can be used to ensure medico-legal accountability.
-	HealthCareFacility *PartyIdentified `json:"health_care_facility,omitempty"`
+	Setting            DVCodedText     `json:"setting"`
+	OtherContext       json.RawMessage `json:"other_context,omitempty"`        // polymorphic ItemStructure
+	HealthCareFacility json.RawMessage `json:"health_care_facility,omitempty"` // polymorphic PartyIdentifiedLike
 	// Participations Parties involved in the healthcare event. These would normally include the physician(s) and often the patient (but not the latter if the clinical session is a pathology test for example).
 	Participations []Participation `json:"participations,omitempty"`
 }
@@ -144,7 +158,22 @@ func (e *EventContext) UnmarshalJSON(data []byte) error {
 		}
 		e.OtherContext = dv
 	}
-	e.HealthCareFacility = aux.HealthCareFacility
+	if len(aux.HealthCareFacility) > 0 && string(aux.HealthCareFacility) != "null" {
+		dv, err := typereg.DecodeAs[PartyIdentifiedLike](aux.HealthCareFacility)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def PartyIdentified
+				if jerr := json.Unmarshal(aux.HealthCareFacility, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/health_care_facility", Inner: jerr}
+				}
+				e.HealthCareFacility = &def
+			} else {
+				return &typereg.DecodeError{Path: "/health_care_facility", Inner: err}
+			}
+		} else {
+			e.HealthCareFacility = dv
+		}
+	}
 	e.Participations = aux.Participations
 	return nil
 }

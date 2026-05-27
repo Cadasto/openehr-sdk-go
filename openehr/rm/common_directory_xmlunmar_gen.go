@@ -36,9 +36,11 @@ func (f *Folder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&f.Name, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
+				if _err != nil {
 					return _err
 				}
+				f.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&f.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -68,8 +70,8 @@ func (f *Folder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				f.FeederAudit = _v
 			case "items":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				f.Items = append(f.Items, _v)
@@ -117,9 +119,11 @@ func (v *VersionedFolder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElemen
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err

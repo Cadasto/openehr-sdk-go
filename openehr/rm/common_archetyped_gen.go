@@ -34,11 +34,11 @@ type FeederAudit struct {
 // FeederAuditDetails Audit details for any system in a feeder system chain. Audit details here means the general notion of who/where/when the information item to which the audit is attached was created. None of the attributes is defined as mandatory, however, in different scenarios, various combinations of attributes will usually be mandatory. This can be controlled by specifying feeder audit details in legacy archetypes.
 type FeederAuditDetails struct {
 	// Location Identifier of the particular site/facility within an organisation which handled the item. For computability, this identifier needs to be e.g. a PKI identifier which can be included in the identifier list of the `PARTY_IDENTIFIED` object.
-	Location *PartyIdentified `json:"location,omitempty"`
+	Location PartyIdentifiedLike `json:"location,omitempty"`
 	// OtherDetails Optional attribute to carry any custom meta-data. May be archetyped.
 	OtherDetails ItemStructure `json:"other_details,omitempty"`
 	// Provider Optional provider(s) who created, committed, forwarded or otherwise handled the item.
-	Provider *PartyIdentified `json:"provider,omitempty"`
+	Provider PartyIdentifiedLike `json:"provider,omitempty"`
 	// Subject Identifiers for subject of the received information item.
 	Subject PartyProxy `json:"subject,omitempty"`
 	// SystemID Identifier of the system which handled the information item. This is the IT system owned by the organisation legally responsible for handling the data, and at which the data were previously created or passed by an earlier system.
@@ -56,11 +56,11 @@ type FeederAuditDetails struct {
 // Links should be between archetyped structures only, i.e. between objects representing complete domain concepts because relationships between sub-elements of whole concepts are not necessarily meaningful, and may be downright confusing. Sensible links only exist between whole `ENTRYs`, `SECTIONs`, `COMPOSITIONs` and so on.
 type Link struct {
 	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DVText `json:"meaning"`
+	Meaning DVTextLike `json:"meaning"`
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DVText `json:"type"`
+	Type DVTextLike `json:"type"`
 }
 
 // Locatable Root class of all information model classes that can be archetyped. Most classes in the openEHR reference model inherit from the `LOCATABLE` class, which defines the idea of  locatability in an archetyped structure. `LOCATABLE` defines a runtime name and an `_archetype_node_id_`.
@@ -131,157 +131,157 @@ func (Role) isLocatable() {}
 func (Section) isLocatable() {}
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (a *Action) Concept() DVText {
+func (a *Action) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (a *Activity) Concept() DVText {
+func (a *Activity) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (a *Address) Concept() DVText {
+func (a *Address) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (a *AdminEntry) Concept() DVText {
+func (a *AdminEntry) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (a *Agent) Concept() DVText {
+func (a *Agent) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (c *Capability) Concept() DVText {
+func (c *Capability) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (c *Cluster) Concept() DVText {
+func (c *Cluster) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (c *Composition) Concept() DVText {
+func (c *Composition) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (c *Contact) Concept() DVText {
+func (c *Contact) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (e *EHRAccess) Concept() DVText {
+func (e *EHRAccess) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (e *EHRStatus) Concept() DVText {
+func (e *EHRStatus) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (e *Element) Concept() DVText {
+func (e *Element) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (e *Evaluation) Concept() DVText {
+func (e *Evaluation) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (f *Folder) Concept() DVText {
+func (f *Folder) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (g *GenericEntry) Concept() DVText {
+func (g *GenericEntry) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (g *Group) Concept() DVText {
+func (g *Group) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (h *History[T]) Concept() DVText {
+func (h *History[T]) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *Instruction) Concept() DVText {
+func (i *Instruction) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *IntervalEvent[T]) Concept() DVText {
+func (i *IntervalEvent[T]) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *ItemList) Concept() DVText {
+func (i *ItemList) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *ItemSingle) Concept() DVText {
+func (i *ItemSingle) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *ItemTable) Concept() DVText {
+func (i *ItemTable) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (i *ItemTree) Concept() DVText {
+func (i *ItemTree) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (o *Observation) Concept() DVText {
+func (o *Observation) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (o *Organisation) Concept() DVText {
+func (o *Organisation) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (p *PartyIdentity) Concept() DVText {
+func (p *PartyIdentity) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (p *PartyRelationship) Concept() DVText {
+func (p *PartyRelationship) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (p *Person) Concept() DVText {
+func (p *Person) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (p *PointEvent[T]) Concept() DVText {
+func (p *PointEvent[T]) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (r *Role) Concept() DVText {
+func (r *Role) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
-func (s *Section) Concept() DVText {
+func (s *Section) Concept() DVTextLike {
 	panic("not implemented: LOCATABLE.concept — implement in a non-generated file")
 }
 

@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -340,9 +341,8 @@ func (d *DVScale) UnmarshalJSON(data []byte) error {
 }
 
 type ReferenceRangeJSONUnmarshaller[T DVOrdered] struct {
-	Class string `json:"_type"`
-	// Meaning Term whose value indicates the meaning of this range, e.g.  normal,  critical,  therapeutic  etc.
-	Meaning DVText `json:"meaning"`
+	Class   string          `json:"_type"`
+	Meaning json.RawMessage `json:"meaning"` // polymorphic DVTextLike
 	// Range The data range for this meaning, e.g. critical  etc.
 	Range DVInterval[DVOrdered] `json:"range"`
 }
@@ -363,7 +363,22 @@ func (r *ReferenceRange[T]) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REFERENCE_RANGE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	r.Meaning = aux.Meaning
+	if len(aux.Meaning) > 0 && string(aux.Meaning) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Meaning)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Meaning, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/meaning", Inner: jerr}
+				}
+				r.Meaning = &def
+			} else {
+				return &typereg.DecodeError{Path: "/meaning", Inner: err}
+			}
+		} else {
+			r.Meaning = dv
+		}
+	}
 	r.Range = aux.Range
 	return nil
 }

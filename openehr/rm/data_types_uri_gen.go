@@ -18,6 +18,18 @@ type DVURI struct {
 	Value string `json:"value"`
 }
 
+// DVURILike is the SDK-GAP-11 narrow polymorphic interface for DVURI.
+// Concrete-typed RM slots declared as DV_URI admit Liskov substitution
+// by any descendant per the openEHR RM; the wire decoder dispatches
+// via typereg using this interface so subtype payloads survive the
+// decode → re-marshal round-trip without field loss.
+type DVURILike interface {
+	isDVURILike()
+}
+
+func (DVURI) isDVURILike()    {}
+func (DVEHRURI) isDVURILike() {}
+
 // FragmentID A part of, a  fragment  or  a  sub-function  within  an object. Allows references to sub-parts of objects, such as a certain line and character  position  in  a  text object. The  syntax  and semantics are defined by the application responsible for the object.
 func (d *DVURI) FragmentID() string {
 	panic("not implemented: DV_URI.fragment_id — implement in a non-generated file")

@@ -18,7 +18,7 @@ type ItemTagJSONMarshaller struct {
 	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
 	TargetPath *string `json:"target_path,omitempty"`
 	// OwnerID Identifier of owner object, such as EHR.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for ItemTag with `_type`

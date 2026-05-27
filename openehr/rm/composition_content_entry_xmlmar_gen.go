@@ -38,7 +38,7 @@ func (a *Action) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if a.GuidelineID != nil {
-		if err := _e.EncodeElement(a.GuidelineID, xml.StartElement{Name: xml.Name{Local: "guideline_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "guideline_id", a.GuidelineID); err != nil {
 			return err
 		}
 	}
@@ -54,7 +54,7 @@ func (a *Action) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		}
 	}
 	if a.WorkflowID != nil {
-		if err := _e.EncodeElement(a.WorkflowID, xml.StartElement{Name: xml.Name{Local: "workflow_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "workflow_id", a.WorkflowID); err != nil {
 			return err
 		}
 	}
@@ -68,8 +68,10 @@ func (a *Action) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if a.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", a.Name); err != nil {
+			return err
+		}
 	}
 	if a.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", a.UID); err != nil {
@@ -134,8 +136,10 @@ func (a *Activity) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&a.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if a.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", a.Name); err != nil {
+			return err
+		}
 	}
 	if a.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", a.UID); err != nil {
@@ -209,7 +213,7 @@ func (a *AdminEntry) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if a.WorkflowID != nil {
-		if err := _e.EncodeElement(a.WorkflowID, xml.StartElement{Name: xml.Name{Local: "workflow_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "workflow_id", a.WorkflowID); err != nil {
 			return err
 		}
 	}
@@ -223,8 +227,10 @@ func (a *AdminEntry) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if a.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", a.Name); err != nil {
+			return err
+		}
 	}
 	if a.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", a.UID); err != nil {
@@ -284,7 +290,7 @@ func (e *Evaluation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if e.GuidelineID != nil {
-		if err := _e.EncodeElement(e.GuidelineID, xml.StartElement{Name: xml.Name{Local: "guideline_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "guideline_id", e.GuidelineID); err != nil {
 			return err
 		}
 	}
@@ -300,7 +306,7 @@ func (e *Evaluation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 		}
 	}
 	if e.WorkflowID != nil {
-		if err := _e.EncodeElement(e.WorkflowID, xml.StartElement{Name: xml.Name{Local: "workflow_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "workflow_id", e.WorkflowID); err != nil {
 			return err
 		}
 	}
@@ -314,8 +320,10 @@ func (e *Evaluation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&e.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if e.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", e.Name); err != nil {
+			return err
+		}
 	}
 	if e.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", e.UID); err != nil {
@@ -375,7 +383,7 @@ func (i *Instruction) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if i.GuidelineID != nil {
-		if err := _e.EncodeElement(i.GuidelineID, xml.StartElement{Name: xml.Name{Local: "guideline_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "guideline_id", i.GuidelineID); err != nil {
 			return err
 		}
 	}
@@ -391,7 +399,7 @@ func (i *Instruction) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if i.WorkflowID != nil {
-		if err := _e.EncodeElement(i.WorkflowID, xml.StartElement{Name: xml.Name{Local: "workflow_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "workflow_id", i.WorkflowID); err != nil {
 			return err
 		}
 	}
@@ -405,8 +413,10 @@ func (i *Instruction) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if i.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", i.Name); err != nil {
+			return err
+		}
 	}
 	if i.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", i.UID); err != nil {
@@ -428,8 +438,10 @@ func (i *Instruction) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.Narrative, xml.StartElement{Name: xml.Name{Local: "narrative"}}); err != nil {
-		return err
+	if i.Narrative != nil {
+		if err := canxml.EncodePoly(_e, "narrative", i.Narrative); err != nil {
+			return err
+		}
 	}
 	if i.ExpiryTime != nil {
 		if err := _e.EncodeElement(i.ExpiryTime, xml.StartElement{Name: xml.Name{Local: "expiry_time"}}); err != nil {
@@ -522,8 +534,11 @@ func (i *IsmTransition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 			return err
 		}
 	}
-	for _idx := range i.Reason {
-		if err := _e.EncodeElement(&i.Reason[_idx], xml.StartElement{Name: xml.Name{Local: "reason"}}); err != nil {
+	for _, _item := range i.Reason {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "reason", _item); err != nil {
 			return err
 		}
 	}
@@ -560,7 +575,7 @@ func (o *Observation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if o.GuidelineID != nil {
-		if err := _e.EncodeElement(o.GuidelineID, xml.StartElement{Name: xml.Name{Local: "guideline_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "guideline_id", o.GuidelineID); err != nil {
 			return err
 		}
 	}
@@ -576,7 +591,7 @@ func (o *Observation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		}
 	}
 	if o.WorkflowID != nil {
-		if err := _e.EncodeElement(o.WorkflowID, xml.StartElement{Name: xml.Name{Local: "workflow_id"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "workflow_id", o.WorkflowID); err != nil {
 			return err
 		}
 	}
@@ -590,8 +605,10 @@ func (o *Observation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&o.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if o.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", o.Name); err != nil {
+			return err
+		}
 	}
 	if o.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", o.UID); err != nil {

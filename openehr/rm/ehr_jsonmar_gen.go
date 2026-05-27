@@ -16,21 +16,21 @@ type EHRJSONMarshaller struct {
 	// NOTE: is is strongly recommended that a UUID always be used for this field.
 	EHRID HierObjectID `json:"ehr_id"`
 	// Contributions List of contributions causing changes to this EHR. Each contribution contains a list of versions, which may include references to any number of `VERSION` instances, i.e. items of type `VERSIONED_COMPOSITION` and `VERSIONED_FOLDER`.
-	Contributions []ObjectRef `json:"contributions,omitempty"`
+	Contributions []ObjectRefLike `json:"contributions,omitempty"`
 	// EHRStatus Reference to `EHR_STATUS` object for this EHR.
-	EHRStatus ObjectRef `json:"ehr_status"`
+	EHRStatus ObjectRefLike `json:"ehr_status"`
 	// EHRAccess Reference to `EHR_ACCESS` object for this EHR.
-	EHRAccess ObjectRef `json:"ehr_access"`
+	EHRAccess ObjectRefLike `json:"ehr_access"`
 	// Compositions Master list of all Versioned Composition references in this EHR.
-	Compositions []ObjectRef `json:"compositions,omitempty"`
+	Compositions []ObjectRefLike `json:"compositions,omitempty"`
 	// Directory Optional directory structure for this EHR. If present, this is a reference to the first member of `_folders_`.
-	Directory *ObjectRef `json:"directory,omitempty"`
+	Directory ObjectRefLike `json:"directory,omitempty"`
 	// TimeCreated Time of creation of the EHR.
 	TimeCreated DVDateTime `json:"time_created"`
 	// Folders Optional additional Folder structures for this EHR. If set, the `_directory_` attribute refers to the first member.
-	Folders []ObjectRef `json:"folders,omitempty"`
+	Folders []ObjectRefLike `json:"folders,omitempty"`
 	// Tags Optional list of tags associated with this EHR. Tag `_target_` values can only be within the same EHR.
-	Tags []ObjectRef `json:"tags,omitempty"`
+	Tags []ObjectRefLike `json:"tags,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for EHR with `_type`
@@ -57,7 +57,7 @@ func (e *EHR) MarshalJSON() ([]byte, error) {
 type EHRAccessJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -95,7 +95,7 @@ func (e *EHRAccess) MarshalJSON() ([]byte, error) {
 type EHRStatusJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -144,7 +144,7 @@ type VersionedCompositionJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -168,7 +168,7 @@ type VersionedEHRAccessJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -192,7 +192,7 @@ type VersionedEHRStatusJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }

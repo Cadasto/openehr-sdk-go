@@ -32,8 +32,10 @@ func (c *Composition) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&c.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if c.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", c.Name); err != nil {
+			return err
+		}
 	}
 	if c.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", c.UID); err != nil {
@@ -130,7 +132,7 @@ func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if e.HealthCareFacility != nil {
-		if err := _e.EncodeElement(e.HealthCareFacility, xml.StartElement{Name: xml.Name{Local: "health_care_facility"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "health_care_facility", e.HealthCareFacility); err != nil {
 			return err
 		}
 	}

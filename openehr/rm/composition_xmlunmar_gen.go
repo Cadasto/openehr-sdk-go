@@ -36,9 +36,11 @@ func (c *Composition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&c.Name, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
+				if _err != nil {
 					return _err
 				}
+				c.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&c.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -151,8 +153,8 @@ func (e *EventContext) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				e.OtherContext = _v
 			case "health_care_facility":
-				_v := new(PartyIdentified)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[PartyIdentifiedLike](_dec, _t, func() any { return new(PartyIdentified) })
+				if _err != nil {
 					return _err
 				}
 				e.HealthCareFacility = _v

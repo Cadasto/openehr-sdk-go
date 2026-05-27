@@ -215,7 +215,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
-		if kind == polySingle {
+		if kind == polySingle || kind == polySingleNarrow {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
 		}
 		isClass := !isPrimitive(p.TypeName)
@@ -255,7 +255,7 @@ func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, e
 
 	case *bmm.ContainerProperty:
 		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
-		if kind == polySlice {
+		if kind == polySlice || kind == polySliceNarrow {
 			return marshalXMLPolySlice(recv, goField, elemName), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
