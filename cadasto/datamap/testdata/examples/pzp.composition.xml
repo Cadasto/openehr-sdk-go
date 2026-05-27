@@ -1,0 +1,627 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COMPOSITION xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="COMPOSITION" archetype_node_id="openEHR-EHR-COMPOSITION.advance_care.v0">
+  <name>
+    <value>Proactieve Zorgplanning</value>
+  </name>
+  <uid xsi:type="OBJECT_VERSION_ID">
+    <value>d770e1da-9e23-4835-91d9-366a92bde90a::TESTBASE24000001::9</value>
+  </uid>
+  <archetype_details>
+    <archetype_id>
+      <value>openEHR-EHR-COMPOSITION.advance_care.v0</value>
+    </archetype_id>
+    <template_id>
+      <value>Proactieve Zorgplanning::61cbd216-c406-3787-8981-e58f0f1a69f4</value>
+    </template_id>
+    <rm_version>1.0.2</rm_version>
+  </archetype_details>
+  <language>
+    <terminology_id>
+      <value>ISO_639-1</value>
+    </terminology_id>
+    <code_string>nl</code_string>
+  </language>
+  <territory>
+    <terminology_id>
+      <value>ISO_3166-1</value>
+    </terminology_id>
+    <code_string>NL</code_string>
+  </territory>
+  <category>
+    <value>persistent</value>
+    <defining_code>
+      <terminology_id>
+        <value>openehr</value>
+      </terminology_id>
+      <code_string>431</code_string>
+    </defining_code>
+  </category>
+  <composer xsi:type="PARTY_IDENTIFIED">
+    <external_ref>
+      <id xsi:type="HIER_OBJECT_ID">
+        <value>078fae67-4fe5-44ee-89b7-a2ba05c44c84</value>
+      </id>
+      <namespace>TESTBASE24000001</namespace>
+      <type>PERSON</type>
+    </external_ref>
+    <name>Code24 Medewerker</name>
+  </composer>
+  <context>
+    <start_time>
+      <value>20260205T140806,000+0100</value>
+    </start_time>
+    <setting>
+      <value>other care</value>
+      <defining_code>
+        <terminology_id>
+          <value>openehr</value>
+        </terminology_id>
+        <code_string>238</code_string>
+      </defining_code>
+    </setting>
+    <other_context archetype_node_id="at0003" xsi:type="ITEM_TREE">
+      <name>
+        <value>Structuur</value>
+      </name>
+      <items archetype_node_id="openEHR-EHR-CLUSTER.pzp_conversation.v1" xsi:type="CLUSTER">
+        <name>
+          <value>PZP gesprek</value>
+        </name>
+        <archetype_details>
+          <archetype_id>
+            <value>openEHR-EHR-CLUSTER.pzp_conversation.v1</value>
+          </archetype_id>
+          <rm_version>1.0.2</rm_version>
+        </archetype_details>
+        <items archetype_node_id="at0001" xsi:type="ELEMENT">
+          <name>
+            <value>Type gesprek</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Eerste gesprek</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at1001</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0002" xsi:type="ELEMENT">
+          <name>
+            <value>Aanleiding gesprek</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Patiënt wil tijdig spreken over toekomstige zorg en behandelgrenzen.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0003" xsi:type="ELEMENT">
+          <name>
+            <value>Relatie met eerder PZP-gesprek</value>
+          </name>
+          <value xsi:type="DV_IDENTIFIER">
+            <issuer/>
+            <assigner/>
+            <id/>
+            <type/>
+          </value>
+        </items>
+        <items archetype_node_id="at0004" xsi:type="ELEMENT">
+          <name>
+            <value>Processtatus</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Vastgelegd</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at2002</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0005" xsi:type="ELEMENT">
+          <name>
+            <value>Datum laatste bevestiging</value>
+          </name>
+          <value xsi:type="DV_DATE">
+            <value>20260205</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0006" xsi:type="ELEMENT">
+          <name>
+            <value>Toelichting</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Eerste proactieve zorgplanningsgesprek gevoerd op initiatief van patiënt. Gesprek gevoerd in aanwezigheid van dochter.</value>
+          </value>
+        </items>
+      </items>
+    </other_context>
+  </context>
+  <content archetype_node_id="openEHR-EHR-EVALUATION.advance_care_directive.v2" xsi:type="EVALUATION">
+    <name>
+      <value>Wilsverklaring</value>
+    </name>
+    <archetype_details>
+      <archetype_id>
+        <value>openEHR-EHR-EVALUATION.advance_care_directive.v2</value>
+      </archetype_id>
+      <rm_version>1.0.2</rm_version>
+    </archetype_details>
+    <language>
+      <terminology_id>
+        <value>ISO_639-1</value>
+      </terminology_id>
+      <code_string>nl</code_string>
+    </language>
+    <encoding>
+      <terminology_id>
+        <value>IANA_character-sets</value>
+      </terminology_id>
+      <code_string>UTF-8</code_string>
+    </encoding>
+    <subject xsi:type="PARTY_SELF"/>
+    <protocol archetype_node_id="at0010" xsi:type="ITEM_TREE">
+      <name>
+        <value>Item tree</value>
+      </name>
+      <items archetype_node_id="at0053" xsi:type="ELEMENT">
+        <name>
+          <value>Geldigheid start</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value>20251203T134500,000+0100</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0054" xsi:type="ELEMENT">
+        <name>
+          <value>Geldigheid eind</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value/>
+        </value>
+      </items>
+      <items archetype_node_id="at0056" xsi:type="ELEMENT">
+        <name>
+          <value>Revisie verloop datum</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value>20260213T143000,000+0100</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0055" xsi:type="ELEMENT">
+        <name>
+          <value>Laatst geüpdatet</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value>20260205T141500,000+0100</value>
+        </value>
+      </items>
+      <items archetype_node_id="openEHR-EHR-CLUSTER.person.v1" xsi:type="CLUSTER">
+        <name>
+          <value>Persoon</value>
+        </name>
+        <archetype_details>
+          <archetype_id>
+            <value>openEHR-EHR-CLUSTER.person.v1</value>
+          </archetype_id>
+          <rm_version>1.0.2</rm_version>
+        </archetype_details>
+        <items archetype_node_id="at0001" xsi:type="ELEMENT">
+          <name>
+            <value>Naam</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+        <items archetype_node_id="at0011" xsi:type="ELEMENT">
+          <name>
+            <value>Label</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+        <items archetype_node_id="at0003" xsi:type="ELEMENT">
+          <name>
+            <value>Identificatie</value>
+          </name>
+          <value xsi:type="DV_IDENTIFIER">
+            <issuer/>
+            <assigner/>
+            <id/>
+            <type/>
+          </value>
+        </items>
+        <items archetype_node_id="at0004" xsi:type="ELEMENT">
+          <name>
+            <value>Rol</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+        <items archetype_node_id="at0010" xsi:type="ELEMENT">
+          <name>
+            <value>Opmerking</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+      </items>
+      <items archetype_node_id="at0027" xsi:type="ELEMENT">
+        <name>
+          <value>Mandaat</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Dochter is eerste contactpersoon en betrokken bij besluitvorming. Geen formeel wettelijk vertegenwoordiger.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0058" xsi:type="CLUSTER">
+        <name>
+          <value>Verklaring locatie</value>
+        </name>
+        <items archetype_node_id="at0030" xsi:type="ELEMENT">
+          <name>
+            <value>Locatie</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+      </items>
+    </protocol>
+    <data xsi:type="ITEM_TREE" archetype_node_id="at0001">
+      <name>
+        <value>Item tree</value>
+      </name>
+      <items archetype_node_id="at0005" xsi:type="ELEMENT">
+        <name>
+          <value>Type verklaring</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Proactieve zorgplanning (PZP)</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0004" xsi:type="ELEMENT">
+        <name>
+          <value>Status</value>
+        </name>
+        <value xsi:type="DV_CODED_TEXT">
+          <value>Aanwezig</value>
+          <defining_code>
+            <terminology_id>
+              <value>local</value>
+            </terminology_id>
+            <code_string>at0044</code_string>
+          </defining_code>
+        </value>
+      </items>
+      <items archetype_node_id="at0006" xsi:type="ELEMENT">
+        <name>
+          <value>Beschrijving</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>PZP-afspraken vastgelegd naar aanleiding van gesprek met patiënt en naaste.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0007" xsi:type="ELEMENT">
+        <name>
+          <value>Conditie</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Van toepassing bij verdere achteruitgang of acute verslechtering.</value>
+        </value>
+      </items>
+      <items archetype_node_id="openEHR-EHR-CLUSTER.values_and_goals.v1" xsi:type="CLUSTER">
+        <name>
+          <value>Waarden en doelen</value>
+        </name>
+        <archetype_details>
+          <archetype_id>
+            <value>openEHR-EHR-CLUSTER.values_and_goals.v1</value>
+          </archetype_id>
+          <rm_version>1.0.2</rm_version>
+        </archetype_details>
+        <items archetype_node_id="at0001" xsi:type="ELEMENT">
+          <name>
+            <value>Wat is belangrijk voor de patiënt</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Zelfstandigheid behouden en zo min mogelijk lijden.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0002" xsi:type="ELEMENT">
+          <name>
+            <value>Persoonlijke waarden</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Waardigheid, regie over eigen leven, geen onnodige medische belasting.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0003" xsi:type="ELEMENT">
+          <name>
+            <value>Levensdoelen</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Zolang mogelijk thuis blijven wonen en tijd doorbrengen met familie.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0004" xsi:type="ELEMENT">
+          <name>
+            <value>Zingevingsaspecten</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Familie en rust zijn belangrijker dan levensverlenging.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0005" xsi:type="ELEMENT">
+          <name>
+            <value>Narratieve toelichting</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Patiënt geeft aan dat kwaliteit van leven belangrijker is dan lengte van leven. Hij wil niet dat behandelingen het lijden verlengen zonder perspectief.</value>
+          </value>
+        </items>
+      </items>
+      <items archetype_node_id="at0038" xsi:type="ELEMENT">
+        <name>
+          <value>Opmerking</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Afspraken sluiten aan bij eerder gevoerde gesprekken met huisarts.</value>
+        </value>
+      </items>
+    </data>
+  </content>
+  <content archetype_node_id="openEHR-EHR-EVALUATION.advance_intervention_decisions.v1" xsi:type="EVALUATION">
+    <name>
+      <value>Behandelgrenzen</value>
+    </name>
+    <archetype_details>
+      <archetype_id>
+        <value>openEHR-EHR-EVALUATION.advance_intervention_decisions.v1</value>
+      </archetype_id>
+      <rm_version>1.0.2</rm_version>
+    </archetype_details>
+    <language>
+      <terminology_id>
+        <value>ISO_639-1</value>
+      </terminology_id>
+      <code_string>nl</code_string>
+    </language>
+    <encoding>
+      <terminology_id>
+        <value>IANA_character-sets</value>
+      </terminology_id>
+      <code_string>UTF-8</code_string>
+    </encoding>
+    <subject xsi:type="PARTY_SELF"/>
+    <protocol archetype_node_id="at0045" xsi:type="ITEM_TREE">
+      <name>
+        <value>Structuur</value>
+      </name>
+      <items archetype_node_id="at0046" xsi:type="ELEMENT">
+        <name>
+          <value>Laatst bijgewerkt</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value>20260203T133000,000+0100</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0047" xsi:type="ELEMENT">
+        <name>
+          <value>Geldig vanaf</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value/>
+        </value>
+      </items>
+      <items archetype_node_id="at0048" xsi:type="ELEMENT">
+        <name>
+          <value>Geldig tot</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value/>
+        </value>
+      </items>
+      <items archetype_node_id="at0049" xsi:type="ELEMENT">
+        <name>
+          <value>Herziening gepland</value>
+        </name>
+        <value xsi:type="DV_DATE_TIME">
+          <value>20260416T133000,000+0200</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0050" xsi:type="ELEMENT">
+        <name>
+          <value>Grondslag</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Gezamenlijke besluitvorming tussen patiënt, dochter en behandelend arts. Conform KNMG-richtlijn en PZP-handreiking.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0052" xsi:type="CLUSTER">
+        <name>
+          <value>Documentlocatie</value>
+        </name>
+        <items archetype_node_id="at0053" xsi:type="ELEMENT">
+          <name>
+            <value>Locatie</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+      </items>
+    </protocol>
+    <data xsi:type="ITEM_TREE" archetype_node_id="at0001">
+      <name>
+        <value>Structuur</value>
+      </name>
+      <items archetype_node_id="at0002" xsi:type="ELEMENT">
+        <name>
+          <value>Intentie van zorg</value>
+        </name>
+        <value xsi:type="DV_CODED_TEXT">
+          <value>Ondersteunend / palliatief</value>
+          <defining_code>
+            <terminology_id>
+              <value>local</value>
+            </terminology_id>
+            <code_string>at0005</code_string>
+          </defining_code>
+        </value>
+      </items>
+      <items archetype_node_id="at0056" xsi:type="ELEMENT">
+        <name>
+          <value>Onderbouwing</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Gevorderd hartfalen en COPD met beperkte belastbaarheid. Curatieve behandeling niet realistisch.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0008" xsi:type="ELEMENT">
+        <name>
+          <value>Toelichting behandelgrenzen</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Focus op comfort, symptoombestrijding en kwaliteit van leven. Ziekenhuisopnames alleen bij duidelijke meerwaarde.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0009" xsi:type="ELEMENT">
+        <name>
+          <value>Reanimatiebesluit</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Patiënt wil tijdig spreken over toekomstige zorg en behandelgrenzen.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0014" xsi:type="CLUSTER">
+        <name>
+          <value>Per interventie</value>
+        </name>
+        <items archetype_node_id="at0015" xsi:type="ELEMENT">
+          <name>
+            <value>Interventie</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Bloedproducten</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at0028</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0034" xsi:type="ELEMENT">
+          <name>
+            <value>Besluit</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Niet aanbevolen</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at0037</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0039" xsi:type="ELEMENT">
+          <name>
+            <value>Voorwaarde</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>nvt</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0040" xsi:type="ELEMENT">
+          <name>
+            <value>Toelichting</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value/>
+          </value>
+        </items>
+      </items>
+      <items archetype_node_id="at0014" xsi:type="CLUSTER">
+        <name>
+          <value>Per interventie</value>
+        </name>
+        <items archetype_node_id="at0015" xsi:type="ELEMENT">
+          <name>
+            <value>Interventie</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Overplaatsing naar ziekenhuis</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at0032</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0034" xsi:type="ELEMENT">
+          <name>
+            <value>Besluit</value>
+          </name>
+          <value xsi:type="DV_CODED_TEXT">
+            <value>Niet aanbevolen</value>
+            <defining_code>
+              <terminology_id>
+                <value>local</value>
+              </terminology_id>
+              <code_string>at0037</code_string>
+            </defining_code>
+          </value>
+        </items>
+        <items archetype_node_id="at0039" xsi:type="ELEMENT">
+          <name>
+            <value>Voorwaarde</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Alleen bij behandelbare oorzaak met kans op duidelijk herstel.</value>
+          </value>
+        </items>
+        <items archetype_node_id="at0040" xsi:type="ELEMENT">
+          <name>
+            <value>Toelichting</value>
+          </name>
+          <value xsi:type="DV_TEXT">
+            <value>Voorkeur voor behandeling in thuissituatie of hospice.</value>
+          </value>
+        </items>
+      </items>
+      <items archetype_node_id="at0042" xsi:type="ELEMENT">
+        <name>
+          <value>Patiënt geïnformeerd</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Ja, patiënt begrijpt en onderschrijft de gemaakte afspraken.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0043" xsi:type="ELEMENT">
+        <name>
+          <value>Naasten geïnformeerd</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Dochter aanwezig bij gesprek en akkoord met vastgelegde afspraken.</value>
+        </value>
+      </items>
+      <items archetype_node_id="at0044" xsi:type="ELEMENT">
+        <name>
+          <value>Algemene toelichting</value>
+        </name>
+        <value xsi:type="DV_TEXT">
+          <value>Gesprek in rustige setting gevoerd. Afspraken worden gedeeld met huisarts en wijkverpleging.</value>
+        </value>
+      </items>
+    </data>
+  </content>
+</COMPOSITION>

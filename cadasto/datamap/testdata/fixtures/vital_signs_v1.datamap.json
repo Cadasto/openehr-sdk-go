@@ -1,0 +1,54 @@
+{
+  "templateId": "vital_signs_v1",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "encounter": {
+        "events": [
+          {
+            "at0002|Any event": "2026-02-01T09:30:00Z",
+            "at0004|Tensie pols": {
+              "at0005|Datum": "2026-02-01T09:30:00Z",
+              "at0006|Systolisch": 120,
+              "at0007|Diastolisch": 80,
+              "at0008|Polsslag": 72,
+              "at0009|Houding": "at0011"
+            },
+            "at0013|Lengte gewicht": {
+              "at0014|Datum": "2026-02-01T09:30:00Z",
+              "at0015|Lengte": 175,
+              "at0016|Gewicht": 70,
+              "at0017|BMI": 22.9,
+              "at0018|Taille": 85
+            },
+            "at0019|Temperatuur": {
+              "at0020|Datum": "2026-02-01T09:30:00Z",
+              "at0021|Temperatuur": 37.2,
+              "at0046|Soort meting": "at0047"
+            },
+            "at0022|Defecatie": {
+              "at0023|Datum": "2026-02-01T09:30:00Z",
+              "at0024|Deflijst": "at0031"
+            },
+            "at0033|Bloedsuiker": {
+              "at0034|Datum": "2026-02-01T09:30:00Z",
+              "at0036|Waarde": 6.1,
+              "at0035|Opmerkingen": "Nuchter"
+            },
+            "at0037|Antistolling": {
+              "at0038|Datum": "2026-02-01T09:30:00Z",
+              "at0039|TT in INR": 2.4,
+              "at0041|Dosering Sintrommitis": 1.5,
+              "at0040|Opmerkingen": "Controle",
+              "at0045|Volgende TT": "2026-02-15"
+            },
+            "at0042|Saturatie (O2)": {
+              "at0043|Datum": "2026-02-01T09:30:00Z",
+              "at0044|Saturatie": 98
+            }
+          }
+        ]
+      }
+    }
+  }
+}

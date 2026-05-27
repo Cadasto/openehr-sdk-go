@@ -1,0 +1,145 @@
+{
+    "template_id": "Proactieve Zorgplanning",
+    "context": {
+        "start_time": null,
+        "other_context": {
+            "openEHR-EHR-CLUSTER.pzp_conversation.v1|PZP gesprek": {
+                "at0001|Gecodeerde tekst": {
+                    "code": null,
+                    "value": null,
+                    "terminology": "local"
+                },
+                "at0002|Gebeurteniscontext": {
+                    "value": null,
+                    "language": "nl"
+                },
+                "at0003|Structuur": {
+                    "value": null
+                },
+                "at0004|Uitbreiding": {
+                    "code": null,
+                    "value": null,
+                    "terminology": "local"
+                },
+                "at0005|Ondersteunend / palliatief": {
+                    "value": null
+                },
+                "at0006|Terminaal": {
+                    "value": null,
+                    "language": "nl"
+                }
+            }
+        }
+    },
+    "content": {
+        "openEHR-EHR-EVALUATION.advance_care_directive.v2|Wilsverklaring": {
+            "at0005|Ondersteunend / palliatief": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0004|Uitbreiding": {
+                "code": null,
+                "value": null,
+                "terminology": "local"
+            },
+            "at0006|Terminaal": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0007|Onbekend": [
+                {
+                    "value": null,
+                    "language": "nl"
+                }
+            ],
+            "openEHR-EHR-CLUSTER.values_and_goals.v1|Waarden en doelen": {
+                "at0001|Gecodeerde tekst": {
+                    "value": null,
+                    "language": "nl"
+                },
+                "at0002|Gebeurteniscontext": [
+                    {
+                        "value": null,
+                        "language": "nl"
+                    }
+                ],
+                "at0003|Structuur": [
+                    {
+                        "value": null,
+                        "language": "nl"
+                    }
+                ],
+                "at0004|Uitbreiding": {
+                    "value": null,
+                    "language": "nl"
+                },
+                "at0005|Ondersteunend / palliatief": {
+                    "value": null,
+                    "language": "nl"
+                }
+            },
+            "at0038|Onbekend": {
+                "value": null,
+                "language": "nl"
+            }
+        },
+        "openEHR-EHR-EVALUATION.advance_intervention_decisions.v1|Behandelgrenzen": {
+            "at0002|Gebeurteniscontext": {
+                "code": null,
+                "value": null,
+                "terminology": "local"
+            },
+            "at0056|Onderbouwing": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0008|Toelichting behandelgrenzen": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0009|Reanimatiebesluit": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0014|Per interventie": [
+                {
+                    "at0015|Interventie": {
+                        "code": null,
+                        "value": null,
+                        "terminology": "local"
+                    },
+                    "at0034|Besluit": {
+                        "code": null,
+                        "value": null,
+                        "terminology": "local"
+                    },
+                    "at0039|Voorwaarde": [
+                        {
+                            "value": null,
+                            "language": "nl"
+                        }
+                    ],
+                    "at0040|Toelichting": {
+                        "value": null,
+                        "language": "nl"
+                    }
+                }
+            ],
+            "at0041|Aanvullende details": [
+                []
+            ],
+            "at0042|Patient geinformeerd": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0043|Naasten geinformeerd": {
+                "value": null,
+                "language": "nl"
+            },
+            "at0044|Algemene toelichting": {
+                "value": null,
+                "language": "nl"
+            }
+        }
+    }
+}

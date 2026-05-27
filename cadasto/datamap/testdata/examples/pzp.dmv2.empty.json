@@ -1,0 +1,60 @@
+{
+    "template_id": "Proactieve Zorgplanning",
+    "context": {
+        "start_time": null,
+        "other_context": {
+            "openEHR-EHR-CLUSTER.pzp_conversation.v1|PZP gesprek": {
+                "at0001|Gecodeerde tekst": null,
+                "at0002|Gebeurteniscontext": null,
+                "at0003|Structuur": null,
+                "at0004|Uitbreiding": null,
+                "at0005|Ondersteunend / palliatief": null,
+                "at0006|Terminaal": null
+            }
+        }
+    },
+    "content": {
+        "openEHR-EHR-EVALUATION.advance_care_directive.v2|Wilsverklaring": {
+            "at0005|Ondersteunend / palliatief": null,
+            "at0004|Uitbreiding": null,
+            "at0006|Terminaal": null,
+            "at0007|Onbekend": [
+                null
+            ],
+            "openEHR-EHR-CLUSTER.values_and_goals.v1|Waarden en doelen": {
+                "at0001|Gecodeerde tekst": null,
+                "at0002|Gebeurteniscontext": [
+                    null
+                ],
+                "at0003|Structuur": [
+                    null
+                ],
+                "at0004|Uitbreiding": null,
+                "at0005|Ondersteunend / palliatief": null
+            },
+            "at0038|Onbekend": null
+        },
+        "openEHR-EHR-EVALUATION.advance_intervention_decisions.v1|Behandelgrenzen": {
+            "at0002|Gebeurteniscontext": null,
+            "at0056|Onderbouwing": null,
+            "at0008|Toelichting behandelgrenzen": null,
+            "at0009|Reanimatiebesluit": null,
+            "at0014|Per interventie": [
+                {
+                    "at0015|Interventie": null,
+                    "at0034|Besluit": null,
+                    "at0039|Voorwaarde": [
+                        null
+                    ],
+                    "at0040|Toelichting": null
+                }
+            ],
+            "at0041|Aanvullende details": [
+                []
+            ],
+            "at0042|Patient geinformeerd": null,
+            "at0043|Naasten geinformeerd": null,
+            "at0044|Algemene toelichting": null
+        }
+    }
+}

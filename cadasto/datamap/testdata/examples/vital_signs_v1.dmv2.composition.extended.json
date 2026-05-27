@@ -1,0 +1,28 @@
+{
+    "template_id": "vital_signs.v1::d0ed9069-6b66-3c46-9516-15674e8d55cc",
+    "uid": "62485d37-9c54-4230-9036-9e0330d17369",
+    "vuid": "62485d37-9c54-4230-9036-9e0330d17369::TESTBASE24000001::1",
+    "composer": "Code24 Medewerker",
+    "language": "nl",
+    "territory": "NL",
+    "context": {
+        "start_time": "20260211T153527,000+0100",
+        "setting": "238|other care|"
+    },
+    "content": {
+        "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+            "events": [
+                {
+                    "at0002|Any event": null,
+                    "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+                        "at0043|Datum": null,
+                        "at0044|Saturatie": {
+                            "magnitude": 97,
+                            "unit": "%"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

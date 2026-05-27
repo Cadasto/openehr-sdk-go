@@ -1,0 +1,111 @@
+{
+    "template_id": "vital_signs.v1::d0ed9069-6b66-3c46-9516-15674e8d55cc",
+    "uid": "62485d37-9c54-4230-9036-9e0330d17369",
+    "vuid": "62485d37-9c54-4230-9036-9e0330d17369::TESTBASE24000001::1",
+    "composer": "Code24 Medewerker",
+    "context": {
+        "start_time": "20260211T153527,000+0100"
+    },
+    "content": {
+        "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+            "events": [
+                {
+                    "at0002|Any event": "2026-02-11T15:35:27+01:00",
+                    "at0004|Tensie pols": {
+                        "at0005|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0006|Systolisch": 120,
+                        "_at0006|Systolisch": {
+                            "unit": "mm[Hg]"
+                        },
+                        "at0007|Diastolisch": 20,
+                        "_at0007|Diastolisch": {
+                            "unit": "mm[Hg]"
+                        },
+                        "at0008|Polsslag": 60,
+                        "_at0008|Polsslag": {
+                            "unit": "/min"
+                        },
+                        "at0009|Houding": "liggend",
+                        "_at0009|Houding": {
+                            "code": "at0010",
+                            "terminology": "local"
+                        }
+                    },
+                    "at0013|Lengte gewicht": {
+                        "at0014|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0015|Lengte": 198,
+                        "_at0015|Lengte": {
+                            "unit": "cm"
+                        },
+                        "at0016|Gewicht": 87.5,
+                        "_at0016|Gewicht": {
+                            "unit": "kg"
+                        },
+                        "at0017|BMI": 22.3,
+                        "_at0017|BMI": {
+                            "unit": "kg/m2"
+                        },
+                        "at0018|Taille": 40,
+                        "_at0018|Taille": {
+                            "unit": "cm"
+                        }
+                    },
+                    "at0019|Temperatuur": {
+                        "at0020|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0021|Temperatuur": 37,
+                        "_at0021|Temperatuur": {
+                            "unit": "°C"
+                        },
+                        "at0046|Soort meting": "Axillair (oksel)",
+                        "_at0046|Soort meting": {
+                            "code": "at0049",
+                            "terminology": "local"
+                        }
+                    },
+                    "at0022|Defecatie": {
+                        "at0023|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0024|Deflijst": "Nee",
+                        "_at0024|Deflijst": {
+                            "code": "at0031",
+                            "terminology": "local"
+                        }
+                    },
+                    "at0033|Bloedsuiker": {
+                        "at0034|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0036|Waarde": 5,
+                        "_at0036|Waarde": {
+                            "unit": "mmol/l"
+                        },
+                        "at0035|Opmerkingen": "Dit is prima",
+                        "_at0035|Opmerkingen": {
+                            "language": "nl"
+                        }
+                    },
+                    "at0037|Antistolling": {
+                        "at0038|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0039|TT in INR": 1.16,
+                        "_at0039|TT in INR": {
+                            "unit": "µg"
+                        },
+                        "at0041|Dosering Sintrommitis": 27,
+                        "_at0041|Dosering Sintrommitis": {
+                            "unit": "mg"
+                        },
+                        "at0040|Opmerkingen": "Kan beter",
+                        "_at0040|Opmerkingen": {
+                            "language": "nl"
+                        },
+                        "at0045|Volgende TT": "20260226"
+                    },
+                    "at0042|Saturatie (O2)": {
+                        "at0043|Datum": "2026-02-11T15:35:27+01:00",
+                        "at0044|Saturatie": 97,
+                        "_at0044|Saturatie": {
+                            "unit": "%"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

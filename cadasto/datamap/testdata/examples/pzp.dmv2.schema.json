@@ -1,0 +1,1512 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Proactieve Zorgplanning DMv2 datamap",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "content"
+    ],
+    "properties": {
+        "template_id": {
+            "type": "string"
+        },
+        "uid": {
+            "type": "string"
+        },
+        "vuid": {
+            "type": "string"
+        },
+        "composer": {
+            "type": "string"
+        },
+        "language": {
+            "type": "string",
+            "description": "ISO 639-1 language code"
+        },
+        "territory": {
+            "type": "string",
+            "description": "ISO 3166-1 territory code"
+        },
+        "content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "openEHR-EHR-EVALUATION.advance_care_directive.v2|Wilsverklaring": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "at0005": {
+                            "alias": "at0005|Ondersteunend / palliatief",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0005]/value",
+                                "description": "De aandoening is ongeneeslijk en progressief; behandeling is gericht op symptoomverlichting, comfort, kwaliteit van leven en waardigheid."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0004": {
+                            "alias": "at0004|Uitbreiding",
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "at0044",
+                                        "at0045",
+                                        "at0047"
+                                    ]
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "at0044",
+                                                "at0045",
+                                                "at0047"
+                                            ]
+                                        },
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "terminology": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_CODED_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "code"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0004]/value",
+                                "description": "Aanvullende informatie om het model uit te breiden met lokale inhoud of af te stemmen op andere referentiemodellen of informatiestandaarden.",
+                                "options": [
+                                    {
+                                        "code": "at0044",
+                                        "text": "Algemene toelichting"
+                                    },
+                                    {
+                                        "code": "at0045",
+                                        "text": "Structuur"
+                                    },
+                                    {
+                                        "code": "at0047",
+                                        "text": "Geldig vanaf"
+                                    }
+                                ]
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0006": {
+                            "alias": "at0006|Terminaal",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0006]/value",
+                                "description": "De levensverwachting is zeer beperkt (uren of dagen); geen levensverlengende behandeling; focus op comfort en waardigheid."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0007": {
+                            "alias": "at0007|Onbekend",
+                            "type": "array",
+                            "items": {
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "value": {
+                                                "type": "string"
+                                            },
+                                            "formatting": {
+                                                "type": "string"
+                                            },
+                                            "hyperlink": {
+                                                "type": "string",
+                                                "format": "uri"
+                                            },
+                                            "language": {
+                                                "type": "string"
+                                            },
+                                            "rmType": {
+                                                "const": "DV_TEXT"
+                                            }
+                                        },
+                                        "required": [
+                                            "value"
+                                        ]
+                                    }
+                                ]
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null,
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0007]/value",
+                                "description": "De intentie van zorg is niet bekend."
+                            }
+                        },
+                        "openEHR-EHR-CLUSTER.values_and_goals.v1|Waarden en doelen": {
+                            "alias": "at0000|Proactieve Zorgplanning",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "at0001": {
+                                    "alias": "at0001|Gecodeerde tekst",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0000]/items[at0001]/value",
+                                        "description": "@ intern @"
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0002": {
+                                    "alias": "at0002|Gebeurteniscontext",
+                                    "type": "array",
+                                    "items": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatting": {
+                                                        "type": "string"
+                                                    },
+                                                    "hyperlink": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    },
+                                                    "language": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "minItems": 0,
+                                    "minOccurs": 0,
+                                    "maxOccurs": null,
+                                    "ui": {
+                                        "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0000]/items[at0002]/value",
+                                        "description": "Contextinformatie over het moment en de omstandigheden waarin de proactieve zorgplanning is vastgelegd."
+                                    }
+                                },
+                                "at0003": {
+                                    "alias": "at0003|Structuur",
+                                    "type": "array",
+                                    "items": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatting": {
+                                                        "type": "string"
+                                                    },
+                                                    "hyperlink": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    },
+                                                    "language": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "minItems": 0,
+                                    "minOccurs": 0,
+                                    "maxOccurs": null,
+                                    "ui": {
+                                        "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0000]/items[at0003]/value",
+                                        "description": "@ intern @"
+                                    }
+                                },
+                                "at0004": {
+                                    "alias": "at0004|Uitbreiding",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0000]/items[at0004]/value",
+                                        "description": "Aanvullende informatie om het model uit te breiden met lokale inhoud of af te stemmen op andere referentiemodellen of informatiestandaarden."
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0005": {
+                                    "alias": "at0005|Ondersteunend / palliatief",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0000]/items[at0005]/value",
+                                        "description": "De aandoening is ongeneeslijk en progressief; behandeling is gericht op symptoomverlichting, comfort, kwaliteit van leven en waardigheid."
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                }
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0038": {
+                            "alias": "at0038|Onbekend",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_care_directive.v2]/data[at0001]/items[at0038]/value",
+                                "description": "Het besluit over deze interventie is niet bekend."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        }
+                    },
+                    "minOccurs": 0,
+                    "maxOccurs": 1
+                },
+                "openEHR-EHR-EVALUATION.advance_intervention_decisions.v1|Behandelgrenzen": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "at0002": {
+                            "alias": "at0002|Gebeurteniscontext",
+                            "oneOf": [
+                                {
+                                    "type": "string",
+                                    "enum": [
+                                        "at0003",
+                                        "at0004",
+                                        "at0005",
+                                        "at0006",
+                                        "at0007"
+                                    ]
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "code": {
+                                            "type": "string",
+                                            "enum": [
+                                                "at0003",
+                                                "at0004",
+                                                "at0005",
+                                                "at0006",
+                                                "at0007"
+                                            ]
+                                        },
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "terminology": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_CODED_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "code"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0002]/value",
+                                "description": "Contextinformatie over het moment en de omstandigheden waarin de proactieve zorgplanning is vastgelegd.",
+                                "options": [
+                                    {
+                                        "code": "at0003",
+                                        "text": "Structuur"
+                                    },
+                                    {
+                                        "code": "at0004",
+                                        "text": "Uitbreiding"
+                                    },
+                                    {
+                                        "code": "at0005",
+                                        "text": "Ondersteunend / palliatief"
+                                    },
+                                    {
+                                        "code": "at0006",
+                                        "text": "Terminaal"
+                                    },
+                                    {
+                                        "code": "at0007",
+                                        "text": "Onbekend"
+                                    }
+                                ]
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0056": {
+                            "alias": "at0056|Onderbouwing",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0056]/value",
+                                "description": "Toelichting op de onderbouwing van de gekozen intentie van zorg."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0008": {
+                            "alias": "at0008|Toelichting behandelgrenzen",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0008]/value",
+                                "description": "Narratieve beschrijving van alle behandelgrenzen, inclusief eventuele reanimatieafspraken."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0009": {
+                            "alias": "at0009|Reanimatiebesluit",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0009]/value",
+                                "description": "Besluit over de mate waarin cardiopulmonale reanimatie (CPR) passend is voor deze pati\u00ebnt."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0014": {
+                            "alias": "at0014|Per interventie",
+                            "type": "array",
+                            "items": {
+                                "alias": "at0014|Per interventie",
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "at0015": {
+                                        "alias": "at0015|Interventie",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": [
+                                                    "at0016",
+                                                    "at0017",
+                                                    "at0018",
+                                                    "at0019",
+                                                    "at0020",
+                                                    "at0021",
+                                                    "at0022",
+                                                    "at0023",
+                                                    "at0024",
+                                                    "at0025",
+                                                    "at0026",
+                                                    "at0027",
+                                                    "at0028",
+                                                    "at0029",
+                                                    "at0030",
+                                                    "at0031",
+                                                    "at0032",
+                                                    "at0033"
+                                                ]
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0016",
+                                                            "at0017",
+                                                            "at0018",
+                                                            "at0019",
+                                                            "at0020",
+                                                            "at0021",
+                                                            "at0022",
+                                                            "at0023",
+                                                            "at0024",
+                                                            "at0025",
+                                                            "at0026",
+                                                            "at0027",
+                                                            "at0028",
+                                                            "at0029",
+                                                            "at0030",
+                                                            "at0031",
+                                                            "at0032",
+                                                            "at0033"
+                                                        ]
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0014]/items[at0015]/value",
+                                            "description": "Naam van de mogelijke medische behandeling, handeling of procedure.",
+                                            "options": [
+                                                {
+                                                    "code": "at0016",
+                                                    "text": "Thoraxcompressies"
+                                                },
+                                                {
+                                                    "code": "at0017",
+                                                    "text": "Defibrillatie"
+                                                },
+                                                {
+                                                    "code": "at0018",
+                                                    "text": "Intubatie"
+                                                },
+                                                {
+                                                    "code": "at0019",
+                                                    "text": "Invasieve beademing"
+                                                },
+                                                {
+                                                    "code": "at0020",
+                                                    "text": "Niet-invasieve beademing"
+                                                },
+                                                {
+                                                    "code": "at0021",
+                                                    "text": "Perifeer infuus"
+                                                },
+                                                {
+                                                    "code": "at0022",
+                                                    "text": "Centraal veneuze of arteri\u00eble lijn"
+                                                },
+                                                {
+                                                    "code": "at0023",
+                                                    "text": "Parenterale vochttoediening"
+                                                },
+                                                {
+                                                    "code": "at0024",
+                                                    "text": "Parenterale of kunstmatige voeding"
+                                                },
+                                                {
+                                                    "code": "at0025",
+                                                    "text": "Medicatie bij circulatiestilstand"
+                                                },
+                                                {
+                                                    "code": "at0026",
+                                                    "text": "Circulatie-ondersteunende medicatie"
+                                                },
+                                                {
+                                                    "code": "at0027",
+                                                    "text": "Antibiotica / antivirale / antifungale middelen"
+                                                },
+                                                {
+                                                    "code": "at0028",
+                                                    "text": "Bloedproducten"
+                                                },
+                                                {
+                                                    "code": "at0029",
+                                                    "text": "Thoraxdrainage"
+                                                },
+                                                {
+                                                    "code": "at0030",
+                                                    "text": "Pacemaker"
+                                                },
+                                                {
+                                                    "code": "at0031",
+                                                    "text": "Dialyse"
+                                                },
+                                                {
+                                                    "code": "at0032",
+                                                    "text": "Overplaatsing naar ziekenhuis"
+                                                },
+                                                {
+                                                    "code": "at0033",
+                                                    "text": "Overplaatsing naar intensive care"
+                                                }
+                                            ]
+                                        },
+                                        "minOccurs": 1,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0034": {
+                                        "alias": "at0034|Besluit",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": [
+                                                    "at0035",
+                                                    "at0036",
+                                                    "at0037",
+                                                    "at0038"
+                                                ]
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0035",
+                                                            "at0036",
+                                                            "at0037",
+                                                            "at0038"
+                                                        ]
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0014]/items[at0034]/value",
+                                            "description": "Het genomen besluit over de betreffende interventie.",
+                                            "options": [
+                                                {
+                                                    "code": "at0035",
+                                                    "text": "Aanbevolen"
+                                                },
+                                                {
+                                                    "code": "at0036",
+                                                    "text": "Voorwaardelijk aanbevolen"
+                                                },
+                                                {
+                                                    "code": "at0037",
+                                                    "text": "Niet aanbevolen"
+                                                },
+                                                {
+                                                    "code": "at0038",
+                                                    "text": "Onbekend"
+                                                }
+                                            ]
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0039": {
+                                        "alias": "at0039|Voorwaarde",
+                                        "type": "array",
+                                        "items": {
+                                            "oneOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "additionalProperties": false,
+                                                    "properties": {
+                                                        "value": {
+                                                            "type": "string"
+                                                        },
+                                                        "formatting": {
+                                                            "type": "string"
+                                                        },
+                                                        "hyperlink": {
+                                                            "type": "string",
+                                                            "format": "uri"
+                                                        },
+                                                        "language": {
+                                                            "type": "string"
+                                                        },
+                                                        "rmType": {
+                                                            "const": "DV_TEXT"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "value"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "minItems": 0,
+                                        "minOccurs": 0,
+                                        "maxOccurs": null,
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0014]/items[at0039]/value",
+                                            "description": "Omschrijving van de omstandigheden waaronder een voorwaardelijk besluit geldt."
+                                        }
+                                    },
+                                    "at0040": {
+                                        "alias": "at0040|Toelichting",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatting": {
+                                                        "type": "string"
+                                                    },
+                                                    "hyperlink": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    },
+                                                    "language": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0014]/items[at0040]/value",
+                                            "description": "Aanvullende toelichting of motivatie bij het besluit."
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    }
+                                },
+                                "required": [
+                                    "at0015"
+                                ]
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null,
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0014]",
+                                "description": "Besluiten per mogelijke medische interventie die levensreddend, levensverlengend of belastend kunnen zijn."
+                            }
+                        },
+                        "at0041": {
+                            "alias": "at0041|Aanvullende details",
+                            "type": "array",
+                            "items": {
+                                "alias": "at0041|Aanvullende details",
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": []
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null,
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0041]",
+                                "description": "Aanvullende gestructureerde informatie over de behandelgrenzen."
+                            }
+                        },
+                        "at0042": {
+                            "alias": "at0042|Patient geinformeerd",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0042]/value",
+                                "description": "Beschrijving van de mate waarin de pati\u00ebnt op de hoogte is van de behandelgrenzen."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0043": {
+                            "alias": "at0043|Naasten geinformeerd",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0043]/value",
+                                "description": "Beschrijving van de mate waarin naasten of vertegenwoordigers zijn ge\u00efnformeerd."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        },
+                        "at0044": {
+                            "alias": "at0044|Algemene toelichting",
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "value": {
+                                            "type": "string"
+                                        },
+                                        "formatting": {
+                                            "type": "string"
+                                        },
+                                        "hyperlink": {
+                                            "type": "string",
+                                            "format": "uri"
+                                        },
+                                        "language": {
+                                            "type": "string"
+                                        },
+                                        "rmType": {
+                                            "const": "DV_TEXT"
+                                        }
+                                    },
+                                    "required": [
+                                        "value"
+                                    ]
+                                }
+                            ],
+                            "ui": {
+                                "path": "content[openEHR-EHR-EVALUATION.advance_intervention_decisions.v1]/data[at0001]/items[at0044]/value",
+                                "description": "Overkoepelende toelichting die niet in andere elementen is vastgelegd."
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        }
+                    },
+                    "minOccurs": 0,
+                    "maxOccurs": 1
+                }
+            }
+        },
+        "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "end_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "setting": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "code"
+                            ],
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                },
+                                "terminology": {
+                                    "type": "string"
+                                },
+                                "rmType": {
+                                    "const": "DV_CODED_TEXT"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "health_care_facility": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "identifiers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "issuer": {
+                                        "type": "string"
+                                    },
+                                    "assigner": {
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "participations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "function": {
+                                "type": "string"
+                            },
+                            "performer": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "mode": {
+                                "type": "string"
+                            },
+                            "time": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "other_context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "openEHR-EHR-CLUSTER.pzp_conversation.v1|PZP gesprek": {
+                            "alias": "at0000|Proactieve Zorgplanning",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "at0001": {
+                                    "alias": "at0001|Gecodeerde tekst",
+                                    "oneOf": [
+                                        {
+                                            "type": "string",
+                                            "enum": [
+                                                "at1001",
+                                                "at1002",
+                                                "at1003"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "at1001",
+                                                        "at1002",
+                                                        "at1003"
+                                                    ]
+                                                },
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "terminology": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_CODED_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "code"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0001]/value",
+                                        "description": "@ intern @",
+                                        "options": [
+                                            {
+                                                "code": "at1001",
+                                                "text": "Eerste gesprek"
+                                            },
+                                            {
+                                                "code": "at1002",
+                                                "text": "Vervolg gesprek"
+                                            },
+                                            {
+                                                "code": "at1003",
+                                                "text": "Herziening / actualisatie"
+                                            }
+                                        ]
+                                    },
+                                    "minOccurs": 1,
+                                    "maxOccurs": 1
+                                },
+                                "at0002": {
+                                    "alias": "at0002|Gebeurteniscontext",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0002]/value",
+                                        "description": "Contextinformatie over het moment en de omstandigheden waarin de proactieve zorgplanning is vastgelegd."
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0003": {
+                                    "alias": "at0003|Structuur",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "issuer": {
+                                                    "type": "string"
+                                                },
+                                                "assigner": {
+                                                    "type": "string"
+                                                },
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_IDENTIFIER"
+                                                }
+                                            },
+                                            "required": [
+                                                "id"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0003]/value",
+                                        "description": "@ intern @"
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0004": {
+                                    "alias": "at0004|Uitbreiding",
+                                    "oneOf": [
+                                        {
+                                            "type": "string",
+                                            "enum": [
+                                                "at2001",
+                                                "at2002",
+                                                "at2003",
+                                                "at2004"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "code": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "at2001",
+                                                        "at2002",
+                                                        "at2003",
+                                                        "at2004"
+                                                    ]
+                                                },
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "terminology": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_CODED_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "code"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0004]/value",
+                                        "description": "Aanvullende informatie om het model uit te breiden met lokale inhoud of af te stemmen op andere referentiemodellen of informatiestandaarden.",
+                                        "options": [
+                                            {
+                                                "code": "at2001",
+                                                "text": "Gestart"
+                                            },
+                                            {
+                                                "code": "at2002",
+                                                "text": "Vastgelegd"
+                                            },
+                                            {
+                                                "code": "at2003",
+                                                "text": "Bevestigd"
+                                            },
+                                            {
+                                                "code": "at2004",
+                                                "text": "Herzien"
+                                            }
+                                        ]
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0005": {
+                                    "alias": "at0005|Ondersteunend / palliatief",
+                                    "oneOf": [
+                                        {
+                                            "type": "string",
+                                            "format": "date"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string",
+                                                    "format": "date"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_DATE"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0005]/value",
+                                        "description": "De aandoening is ongeneeslijk en progressief; behandeling is gericht op symptoomverlichting, comfort, kwaliteit van leven en waardigheid."
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0006": {
+                                    "alias": "at0006|Terminaal",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0003]/items[at0000]/items[at0006]/value",
+                                        "description": "De levensverwachting is zeer beperkt (uren of dagen); geen levensverlengende behandeling; focus op comfort en waardigheid."
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                }
+                            },
+                            "required": [
+                                "at0001"
+                            ],
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

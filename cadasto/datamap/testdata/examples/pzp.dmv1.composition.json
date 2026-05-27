@@ -1,0 +1,95 @@
+{
+  "data": {
+    "vuid": "d770e1da-9e23-4835-91d9-366a92bde90a::TESTBASE24000001::9",
+    "uid": "d770e1da-9e23-4835-91d9-366a92bde90a",
+    "version_object_id": 327,
+    "version_tree_id": 9,
+    "artefact_id": 351,
+    "trunk_lifecycle_state": "complete",
+    "pzp_gesprek": [
+      {
+        "type_gesprek": {
+          "code": "at1001",
+          "value": "Eerste gesprek"
+        },
+        "aanleiding_gesprek": "Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Patiënt wil tijdig spreken over toekomstige zorg en behandelgrenzen.",
+        "processtatus": {
+          "code": "at2002",
+          "value": "Vastgelegd"
+        },
+        "datum_laatste_bevestiging": "2026-02-05T00:00:00+01:00",
+        "toelichting": "Eerste proactieve zorgplanningsgesprek gevoerd op initiatief van patiënt. Gesprek gevoerd in aanwezigheid van dochter."
+      }
+    ],
+    "type_verklaring": "Proactieve zorgplanning (PZP)",
+    "status": {
+      "code": "at0044",
+      "value": "Aanwezig"
+    },
+    "beschrijving": "PZP-afspraken vastgelegd naar aanleiding van gesprek met patiënt en naaste.",
+    "conditie": "Van toepassing bij verdere achteruitgang of acute verslechtering.",
+    "waarden_en_doelen": [
+      {
+        "wat_is_belangrijk_voor_de_patint": "Zelfstandigheid behouden en zo min mogelijk lijden.",
+        "persoonlijke_waarden": "Waardigheid, regie over eigen leven, geen onnodige medische belasting.",
+        "levensdoelen": "Zolang mogelijk thuis blijven wonen en tijd doorbrengen met familie.",
+        "zingevingsaspecten": "Familie en rust zijn belangrijker dan levensverlenging.",
+        "narratieve_toelichting": "Patiënt geeft aan dat kwaliteit van leven belangrijker is dan lengte van leven. Hij wil niet dat behandelingen het lijden verlengen zonder perspectief."
+      }
+    ],
+    "opmerking": "Afspraken sluiten aan bij eerder gevoerde gesprekken met huisarts.",
+    "geldigheid_start": "2025-12-03T13:45:00+01:00",
+    "revisie_verloop_datum": "2026-02-13T14:30:00+01:00",
+    "laatst_gepdatet": "2026-02-05T14:15:00+01:00",
+    "persoon": [
+      {
+        "gestructureerde_naam": [],
+        "elektronische_communicatie": [],
+        "organisatie": [],
+        "aanvullende_gegevens": []
+      }
+    ],
+    "mandaat": "Dochter is eerste contactpersoon en betrokken bij besluitvorming. Geen formeel wettelijk vertegenwoordiger.",
+    "digitale_versie": [],
+    "verklaring_locatie": [],
+    "uitbreiding": [],
+    "intentie_van_zorg": {
+      "code": "at0005",
+      "value": "Ondersteunend / palliatief"
+    },
+    "onderbouwing": "Gevorderd hartfalen en COPD met beperkte belastbaarheid. Curatieve behandeling niet realistisch.",
+    "toelichting_behandelgrenzen": "Focus op comfort, symptoombestrijding en kwaliteit van leven. Ziekenhuisopnames alleen bij duidelijke meerwaarde.",
+    "reanimatiebesluit": "Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Patiënt wil tijdig spreken over toekomstige zorg en behandelgrenzen.",
+    "per_interventie": [
+      {
+        "interventie": {
+          "code": "at0028",
+          "value": "Bloedproducten"
+        },
+        "besluit": {
+          "code": "at0037",
+          "value": "Niet aanbevolen"
+        },
+        "voorwaarde": "nvt"
+      },
+      {
+        "interventie": {
+          "code": "at0032",
+          "value": "Overplaatsing naar ziekenhuis"
+        },
+        "besluit": {
+          "code": "at0037",
+          "value": "Niet aanbevolen"
+        },
+        "voorwaarde": "Alleen bij behandelbare oorzaak met kans op duidelijk herstel.",
+        "toelichting": "Voorkeur voor behandeling in thuissituatie of hospice."
+      }
+    ],
+    "patint_genformeerd": "Ja, patiënt begrijpt en onderschrijft de gemaakte afspraken.",
+    "naasten_genformeerd": "Dochter aanwezig bij gesprek en akkoord met vastgelegde afspraken.",
+    "algemene_toelichting": "Gesprek in rustige setting gevoerd. Afspraken worden gedeeld met huisarts en wijkverpleging.",
+    "laatst_bijgewerkt": "2026-02-03T13:30:00+01:00",
+    "herziening_gepland": "2026-04-16T13:30:00+02:00",
+    "grondslag": "Gezamenlijke besluitvorming tussen patiënt, dochter en behandelend arts. Conform KNMG-richtlijn en PZP-handreiking."
+  }
+}

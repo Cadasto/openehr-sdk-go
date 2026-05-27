@@ -1,0 +1,420 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "T0016 Rapportage.v1 DMv2 datamap",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "content"
+  ],
+  "properties": {
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "other_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "zorgvrager": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "at0011",
+                    "at0012",
+                    "at0013",
+                    "at0014",
+                    "at0015"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code"
+                  ],
+                  "properties": {
+                    "rmType": {
+                      "const": "DV_CODED_TEXT"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "at0011",
+                        "at0012",
+                        "at0013",
+                        "at0014",
+                        "at0015"
+                      ]
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "terminology": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "context/other_context[at0001]/items[at0010]/value",
+                "options": [
+                  {
+                    "code": "at0011",
+                    "text": "Patient"
+                  },
+                  {
+                    "code": "at0012",
+                    "text": "Ouders"
+                  },
+                  {
+                    "code": "at0013",
+                    "text": "Vader"
+                  },
+                  {
+                    "code": "at0014",
+                    "text": "Moeder"
+                  },
+                  {
+                    "code": "at0015",
+                    "text": "Anders"
+                  }
+                ]
+              }
+            },
+            "type_contact": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "at0021",
+                    "at0022",
+                    "at0023",
+                    "at0024"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code"
+                  ],
+                  "properties": {
+                    "rmType": {
+                      "const": "DV_CODED_TEXT"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "at0021",
+                        "at0022",
+                        "at0023",
+                        "at0024"
+                      ]
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "terminology": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "context/other_context[at0001]/items[at0020]/value",
+                "options": [
+                  {
+                    "code": "at0021",
+                    "text": "Face to face"
+                  },
+                  {
+                    "code": "at0022",
+                    "text": "Ear to ear"
+                  },
+                  {
+                    "code": "at0023",
+                    "text": "Bit to Bit"
+                  },
+                  {
+                    "code": "at0024",
+                    "text": "Geen"
+                  }
+                ]
+              }
+            },
+            "type_rapportage": {
+              "oneOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "at0031",
+                    "at0032",
+                    "at0033",
+                    "at0034",
+                    "at0035",
+                    "at0036",
+                    "at0051"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code"
+                  ],
+                  "properties": {
+                    "rmType": {
+                      "const": "DV_CODED_TEXT"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "at0031",
+                        "at0032",
+                        "at0033",
+                        "at0034",
+                        "at0035",
+                        "at0036",
+                        "at0051"
+                      ]
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "terminology": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "context/other_context[at0001]/items[at0030]/value",
+                "options": [
+                  {
+                    "code": "at0031",
+                    "text": "Algemeen"
+                  },
+                  {
+                    "code": "at0032",
+                    "text": "BOPZ"
+                  },
+                  {
+                    "code": "at0033",
+                    "text": "Somatisch"
+                  },
+                  {
+                    "code": "at0034",
+                    "text": "Patientbespreking"
+                  },
+                  {
+                    "code": "at0035",
+                    "text": "Samenvatting"
+                  },
+                  {
+                    "code": "at0036",
+                    "text": "Doelgericht"
+                  },
+                  {
+                    "code": "at0051",
+                    "text": "Wvggz"
+                  }
+                ]
+              }
+            },
+            "kenmerken": {
+              "oneOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "at0041",
+                          "at0042",
+                          "at0043",
+                          "at0044"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "code"
+                        ],
+                        "properties": {
+                          "rmType": {
+                            "const": "DV_CODED_TEXT"
+                          },
+                          "code": {
+                            "type": "string",
+                            "enum": [
+                              "at0041",
+                              "at0042",
+                              "at0043",
+                              "at0044"
+                            ]
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "terminology": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "minItems": 0
+                },
+                {
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "at0041",
+                        "at0042",
+                        "at0043",
+                        "at0044"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "code"
+                      ],
+                      "properties": {
+                        "rmType": {
+                          "const": "DV_CODED_TEXT"
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "at0041",
+                            "at0042",
+                            "at0043",
+                            "at0044"
+                          ]
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "terminology": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ],
+              "ui": {
+                "path": "context/other_context[at0001]/items[at0040]/value",
+                "options": [
+                  {
+                    "code": "at0041",
+                    "text": "Crisisdienst"
+                  },
+                  {
+                    "code": "at0042",
+                    "text": "Levensgebeurtenis"
+                  },
+                  {
+                    "code": "at0043",
+                    "text": "Overleg/consult specialist"
+                  },
+                  {
+                    "code": "at0044",
+                    "text": "Evaluatie"
+                  }
+                ]
+              }
+            },
+            "referentie": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "rmType": {
+                      "const": "DV_EHR_URI"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "context/other_context[at0001]/items[at0050]/value"
+              }
+            }
+          }
+        }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rapportage"
+      ],
+      "properties": {
+        "rapportage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "synopsis"
+          ],
+          "properties": {
+            "synopsis": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "rmType": {
+                      "const": "DV_TEXT"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "formatting": {
+                      "type": "string"
+                    },
+                    "hyperlink": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "language": {
+                      "type": "string"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "content[openEHR-EHR-EVALUATION.clinical_synopsis.v1]/data[at0001]/items[at0002]/value"
+              }
+            }
+          },
+          "ui": {
+            "description": "Rapportage Compositie"
+          }
+        }
+      }
+    }
+  }
+}

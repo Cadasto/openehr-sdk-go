@@ -1,0 +1,150 @@
+{
+    "template_id": "Proactieve Zorgplanning::61cbd216-c406-3787-8981-e58f0f1a69f4",
+    "uid": "d770e1da-9e23-4835-91d9-366a92bde90a",
+    "vuid": "d770e1da-9e23-4835-91d9-366a92bde90a::TESTBASE24000001::9",
+    "composer": "Code24 Medewerker",
+    "language": "nl",
+    "territory": "NL",
+    "context": {
+        "start_time": "20260205T140806,000+0100",
+        "setting": "238|other care|",
+        "health_care_facility": {
+            "identifiers": []
+        },
+        "participations": [],
+        "other_context": {
+            "openEHR-EHR-CLUSTER.pzp_conversation.v1|PZP gesprek": {
+                "at0001|Type gesprek": {
+                    "code": "at1001",
+                    "value": "Eerste gesprek",
+                    "terminology": "local"
+                },
+                "at0002|Aanleiding gesprek": {
+                    "value": "Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Pati\u00ebnt wil tijdig spreken over toekomstige zorg en behandelgrenzen."
+                },
+                "at0003|Relatie met eerder PZP-gesprek": null,
+                "at0004|Processtatus": {
+                    "code": "at2002",
+                    "value": "Vastgelegd",
+                    "terminology": "local"
+                },
+                "at0005|Datum laatste bevestiging": {
+                    "value": "20260205"
+                },
+                "at0006|Toelichting": {
+                    "value": "Eerste proactieve zorgplanningsgesprek gevoerd op initiatief van pati\u00ebnt. Gesprek gevoerd in aanwezigheid van dochter."
+                }
+            }
+        }
+    },
+    "content": {
+        "openEHR-EHR-EVALUATION.advance_care_directive.v2|Wilsverklaring": {
+            "at0005|Type verklaring": {
+                "value": "Proactieve zorgplanning (PZP)"
+            },
+            "at0004|Status": {
+                "code": "at0044",
+                "value": "Aanwezig",
+                "terminology": "local"
+            },
+            "at0006|Beschrijving": {
+                "value": "PZP-afspraken vastgelegd naar aanleiding van gesprek met pati\u00ebnt en naaste."
+            },
+            "at0007|Conditie": [
+                {
+                    "value": "Van toepassing bij verdere achteruitgang of acute verslechtering."
+                }
+            ],
+            "openEHR-EHR-CLUSTER.values_and_goals.v1|Waarden en doelen": {
+                "at0001|Wat is belangrijk voor de patient": {
+                    "value": "Zelfstandigheid behouden en zo min mogelijk lijden."
+                },
+                "at0002|Persoonlijke waarden": [
+                    {
+                        "value": "Waardigheid, regie over eigen leven, geen onnodige medische belasting."
+                    }
+                ],
+                "at0003|Levensdoelen": [
+                    {
+                        "value": "Zolang mogelijk thuis blijven wonen en tijd doorbrengen met familie."
+                    }
+                ],
+                "at0004|Zingevingsaspecten": {
+                    "value": "Familie en rust zijn belangrijker dan levensverlenging."
+                },
+                "at0005|Narratieve toelichting": {
+                    "value": "Pati\u00ebnt geeft aan dat kwaliteit van leven belangrijker is dan lengte van leven. Hij wil niet dat behandelingen het lijden verlengen zonder perspectief."
+                }
+            },
+            "at0038|Opmerking": {
+                "value": "Afspraken sluiten aan bij eerder gevoerde gesprekken met huisarts."
+            }
+        },
+        "openEHR-EHR-EVALUATION.advance_intervention_decisions.v1|Behandelgrenzen": {
+            "at0002|Intentie van zorg": {
+                "code": "at0005",
+                "value": "Ondersteunend / palliatief",
+                "terminology": "local"
+            },
+            "at0056|Onderbouwing": {
+                "value": "Gevorderd hartfalen en COPD met beperkte belastbaarheid. Curatieve behandeling niet realistisch."
+            },
+            "at0008|Toelichting behandelgrenzen": {
+                "value": "Focus op comfort, symptoombestrijding en kwaliteit van leven. Ziekenhuisopnames alleen bij duidelijke meerwaarde."
+            },
+            "at0009|Reanimatiebesluit": {
+                "value": "Toenemende kwetsbaarheid en meerdere ziekenhuisopnames in afgelopen jaar. Pati\u00ebnt wil tijdig spreken over toekomstige zorg en behandelgrenzen."
+            },
+            "at0014|Per interventie": [
+                {
+                    "at0015|Interventie": {
+                        "code": "at0028",
+                        "value": "Bloedproducten",
+                        "terminology": "local"
+                    },
+                    "at0034|Besluit": {
+                        "code": "at0037",
+                        "value": "Niet aanbevolen",
+                        "terminology": "local"
+                    },
+                    "at0039|Voorwaarde": [
+                        {
+                            "value": "nvt"
+                        }
+                    ],
+                    "at0040|Toelichting": null
+                },
+                {
+                    "at0015|Interventie": {
+                        "code": "at0032",
+                        "value": "Overplaatsing naar ziekenhuis",
+                        "terminology": "local"
+                    },
+                    "at0034|Besluit": {
+                        "code": "at0037",
+                        "value": "Niet aanbevolen",
+                        "terminology": "local"
+                    },
+                    "at0039|Voorwaarde": [
+                        {
+                            "value": "Alleen bij behandelbare oorzaak met kans op duidelijk herstel."
+                        }
+                    ],
+                    "at0040|Toelichting": {
+                        "value": "Voorkeur voor behandeling in thuissituatie of hospice."
+                    }
+                }
+            ],
+            "at0041|Aanvullende details": [],
+            "at0042|Patient geinformeerd": {
+                "value": "Ja, pati\u00ebnt begrijpt en onderschrijft de gemaakte afspraken."
+            },
+            "at0043|Naasten geinformeerd": {
+                "value": "Dochter aanwezig bij gesprek en akkoord met vastgelegde afspraken."
+            },
+            "at0044|Algemene toelichting": {
+                "value": "Gesprek in rustige setting gevoerd. Afspraken worden gedeeld met huisarts en wijkverpleging."
+            }
+        }
+    }
+}

@@ -1,0 +1,47 @@
+{
+  "templateId": "development-6",
+  "language": "nl",
+  "datamap": {
+    "context": {
+      "other_context": {
+        "at0002|CLUSTER_SLOT": [
+          {
+            "dv_text": {
+              "value": "Other context note",
+              "formatting": "markdown",
+              "hyperlink": "https://example.com/context",
+              "language": "en"
+            },
+            "dv_count": {
+              "magnitude": 1
+            }
+          }
+        ]
+      }
+    },
+    "content": {
+      "duration": {
+        "events": [
+          {
+            "at0002|CLUSTER_SLOT": "2026-02-01T09:30:00Z",
+            "duration-1": {
+              "value": "PT30M"
+            },
+            "duration-2": {
+              "value": "PT1H"
+            },
+            "duration-3": {
+              "value": "PT2H"
+            },
+            "duration-4": {
+              "value": "PT15M"
+            },
+            "duration-5": {
+              "value": "PT45M"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

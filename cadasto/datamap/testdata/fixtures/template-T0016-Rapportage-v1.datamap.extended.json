@@ -1,0 +1,50 @@
+{
+  "templateId": "template-T0016-Rapportage-v1",
+  "language": "nl",
+  "datamap": {
+    "context": {
+      "other_context": {
+        "at0010|Zorgvrager": {
+          "code": "at0011",
+          "value": "Patient",
+          "terminology": "local"
+        },
+        "at0020|Type contact": {
+          "code": "at0021",
+          "value": "Face to face",
+          "terminology": "local"
+        },
+        "at0030|Type rapportage": {
+          "code": "at0031",
+          "value": "Algemeen",
+          "terminology": "local"
+        },
+        "at0040|Kenmerken": [
+          {
+            "code": "at0041",
+            "value": "Crisisdienst",
+            "terminology": "local"
+          },
+          {
+            "code": "at0042",
+            "value": "Levensgebeurtenis",
+            "terminology": "local"
+          }
+        ],
+        "at0050|Referentie": {
+          "value": "ehr://system/ehr/12345"
+        }
+      }
+    },
+    "content": {
+      "rapportage": {
+        "at0002|Synopsis": {
+          "value": "Korte samenvatting van de rapportage.",
+          "formatting": "markdown",
+          "hyperlink": "https://example.com/rapportage",
+          "language": "nl"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,124 @@
+{
+  "templateId": "vital_signs_v1",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "encounter": {
+        "events": [
+          {
+            "at0002|Any event": "2026-02-01T09:30:00Z",
+            "at0004|Tensie pols": {
+              "at0005|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0006|Systolisch": {
+                "magnitude": 120,
+                "unit": "mm[Hg]"
+              },
+              "at0007|Diastolisch": {
+                "magnitude": 80,
+                "unit": "mm[Hg]"
+              },
+              "at0008|Polsslag": {
+                "magnitude": 72,
+                "unit": "1/min"
+              },
+              "at0009|Houding": {
+                "code": "at0011",
+                "value": "zittend",
+                "terminology": "local"
+              }
+            },
+            "at0013|Lengte gewicht": {
+              "at0014|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0015|Lengte": {
+                "magnitude": 175,
+                "unit": "cm"
+              },
+              "at0016|Gewicht": {
+                "magnitude": 70,
+                "unit": "kg"
+              },
+              "at0017|BMI": {
+                "magnitude": 22.9,
+                "unit": "kg/m2"
+              },
+              "at0018|Taille": {
+                "magnitude": 85,
+                "unit": "cm"
+              }
+            },
+            "at0019|Temperatuur": {
+              "at0020|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0021|Temperatuur": {
+                "magnitude": 37.2,
+                "unit": "\u00b0C"
+              },
+              "at0046|Soort meting": {
+                "code": "at0047",
+                "value": "Oraal",
+                "terminology": "local"
+              }
+            },
+            "at0022|Defecatie": {
+              "at0023|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0024|Deflijst": {
+                "code": "at0031",
+                "value": "Nee",
+                "terminology": "local"
+              }
+            },
+            "at0033|Bloedsuiker": {
+              "at0034|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0036|Waarde": {
+                "magnitude": 6.1,
+                "unit": "mmol/L"
+              },
+              "at0035|Opmerkingen": {
+                "value": "Nuchter",
+                "language": "nl"
+              }
+            },
+            "at0037|Antistolling": {
+              "at0038|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0039|TT in INR": {
+                "magnitude": 2.4,
+                "unit": "INR"
+              },
+              "at0041|Dosering Sintrommitis": {
+                "magnitude": 1.5,
+                "unit": "mg"
+              },
+              "at0040|Opmerkingen": {
+                "value": "Controle",
+                "language": "nl"
+              },
+              "at0045|Volgende TT": {
+                "value": "2026-02-15"
+              }
+            },
+            "at0042|Saturatie (O2)": {
+              "at0043|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0044|Saturatie": {
+                "magnitude": 98,
+                "unit": "%"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

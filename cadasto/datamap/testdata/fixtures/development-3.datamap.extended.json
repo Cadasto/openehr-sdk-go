@@ -1,0 +1,32 @@
+{
+  "templateId": "development-3",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "development": {
+        "activities": [
+          {
+            "description": {
+              "dv_text": {
+                "value": "Activity description",
+                "formatting": "markdown",
+                "hyperlink": "https://example.com/activity",
+                "language": "en"
+              },
+              "dv_coded_text": {
+                "code": "example_code",
+                "value": "Example code",
+                "terminology": "local"
+              },
+              "dv_proportion": {
+                "type": "percent",
+                "numerator": 50,
+                "denominator": 100
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

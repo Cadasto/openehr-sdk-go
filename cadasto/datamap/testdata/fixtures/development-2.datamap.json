@@ -1,0 +1,20 @@
+{
+  "templateId": "development-2",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "developement": {
+        "at0002|DV_TEXT": "Initial assessment",
+        "dv_count": 1,
+        "at0003|CLUSTER optional": {
+          "at0004|DV_TEXT": "Optional note",
+          "at0005|DV_COUNT": 2
+        },
+        "at0006|CLUSTER required": {
+          "at0007|DV_TEXT": "Required note",
+          "at0009|DV_COUNT": 3
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,380 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "development-6 DMv2 datamap",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "content"
+    ],
+    "properties": {
+        "template_id": {
+            "type": "string"
+        },
+        "uid": {
+            "type": "string"
+        },
+        "vuid": {
+            "type": "string"
+        },
+        "composer": {
+            "type": "string"
+        },
+        "language": {
+            "type": "string",
+            "description": "ISO 639-1 language code"
+        },
+        "territory": {
+            "type": "string",
+            "description": "ISO 3166-1 territory code"
+        },
+        "content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "openEHR-EHR-OBSERVATION.duration.v0|duration": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "events"
+                    ],
+                    "properties": {
+                        "events": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "time"
+                                ],
+                                "properties": {
+                                    "time": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/time",
+                                            "description": "@ internal @"
+                                        }
+                                    },
+                                    "width": {
+                                        "type": "string",
+                                        "description": "ISO 8601 duration (INTERVAL_EVENT only)"
+                                    },
+                                    "math_function": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "required": [
+                                                    "code"
+                                                ],
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "description": "Mathematical function (INTERVAL_EVENT only)"
+                                    },
+                                    "sample_count": {
+                                        "type": "integer",
+                                        "description": "Number of samples (INTERVAL_EVENT only)"
+                                    },
+                                    "at0004": {
+                                        "alias": "at0004|duration-1",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DURATION"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value",
+                                            "description": "optional, max 1"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0005": {
+                                        "alias": "at0005|duration-2",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DURATION"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value",
+                                            "description": "optonal, max 1, wil min en max value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0006": {
+                                        "alias": "at0006|duration-3",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DURATION"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0006]/value",
+                                            "description": "optional;, max-1"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0007": {
+                                        "alias": "at0007|duration-4",
+                                        "type": "array",
+                                        "items": {
+                                            "oneOf": [
+                                                {
+                                                    "type": "string"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "additionalProperties": false,
+                                                    "properties": {
+                                                        "value": {
+                                                            "type": "string"
+                                                        },
+                                                        "rmType": {
+                                                            "const": "DV_DURATION"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "value"
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        "minItems": 0,
+                                        "minOccurs": 0,
+                                        "maxOccurs": null,
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0007]/value",
+                                            "description": "optional, unbouded"
+                                        }
+                                    },
+                                    "at0008": {
+                                        "alias": "at0008|duration-5",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DURATION"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.duration.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value",
+                                            "description": "required, max 1"
+                                        },
+                                        "minOccurs": 1,
+                                        "maxOccurs": 1
+                                    }
+                                }
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null
+                        }
+                    },
+                    "minOccurs": 0,
+                    "maxOccurs": 1
+                }
+            }
+        },
+        "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "end_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "setting": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "code"
+                            ],
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                },
+                                "terminology": {
+                                    "type": "string"
+                                },
+                                "rmType": {
+                                    "const": "DV_CODED_TEXT"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "health_care_facility": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "identifiers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "issuer": {
+                                        "type": "string"
+                                    },
+                                    "assigner": {
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "participations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "function": {
+                                "type": "string"
+                            },
+                            "performer": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "mode": {
+                                "type": "string"
+                            },
+                            "time": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "other_context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "at0002": {
+                            "alias": "at0002|CLUSTER_SLOT",
+                            "type": "array",
+                            "items": {
+                                "alias": "at0002|CLUSTER_SLOT",
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": []
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null,
+                            "ui": {
+                                "path": "context/other_context[at0001]/items[at0002]",
+                                "description": "@ internal @"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

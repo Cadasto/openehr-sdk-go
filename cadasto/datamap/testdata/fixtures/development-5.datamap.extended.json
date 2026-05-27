@@ -1,0 +1,83 @@
+{
+  "templateId": "development-5",
+  "language": "nl",
+  "datamap": {
+    "context": {
+      "other_context": {
+        "at0002|CLUSTER_SLOT": [
+          {
+            "dv_text": {
+              "value": "Other context note",
+              "formatting": "markdown",
+              "hyperlink": "https://example.com/context",
+              "language": "en"
+            },
+            "dv_count": {
+              "magnitude": 1
+            }
+          }
+        ]
+      }
+    },
+    "content": {
+      "development_evaluation": {
+        "dv_text": {
+          "value": "Evaluation note",
+          "formatting": "markdown",
+          "hyperlink": "https://example.com/evaluation",
+          "language": "en"
+        },
+        "dv_time": {
+          "value": "14:00"
+        }
+      },
+      "development_observation": {
+        "events": [
+          {
+            "at0002|CLUSTER_SLOT": "2026-02-01T09:30:00Z",
+            "at0004|DV_TEXT": {
+              "value": "Patient developing normally",
+              "formatting": "markdown",
+              "hyperlink": "https://example.com/note",
+              "language": "en"
+            },
+            "at0005|DV_CODED_TEXT": {
+              "code": "at0014",
+              "value": "value 1 dv_coded_text",
+              "terminology": "local"
+            },
+            "at0006|DV_QUANTITY": {
+              "magnitude": 12.5,
+              "unit": "kg"
+            },
+            "at0007|DV_PROPORTION": {
+              "type": "percent",
+              "numerator": 75,
+              "denominator": 100
+            },
+            "at0008|DV_COUNT": {
+              "magnitude": 3
+            },
+            "at0009|DV_DATE_TIME": {
+              "value": "2026-02-01T09:30:00Z"
+            },
+            "at0010|DV_TIME": {
+              "value": "14:00"
+            },
+            "at0011|DV_DATE": {
+              "value": "2026-02-01"
+            },
+            "at0012|DV_ORDINAL": {
+              "code": "at0016",
+              "ordinal": 1,
+              "value": "value 1 dv_ordinal"
+            },
+            "at0013|DV_BOOLEAN": {
+              "value": true
+            }
+          }
+        ]
+      }
+    }
+  }
+}

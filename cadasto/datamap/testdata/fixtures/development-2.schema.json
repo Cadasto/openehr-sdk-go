@@ -1,0 +1,229 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "development-2 DMv2 datamap",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "content"
+  ],
+  "properties": {
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "developement"
+      ],
+      "properties": {
+        "developement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "dv_text",
+            "dv_count"
+          ],
+          "properties": {
+            "dv_text": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    },
+                    "formatting": {
+                      "type": "string"
+                    },
+                    "hyperlink": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "language": {
+                      "type": "string"
+                    },
+                    "rmType": {
+                      "const": "DV_TEXT"
+                    }
+                  }
+                }
+              ],
+              "ui": {
+                "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0002]/value"
+              }
+            },
+            "dv_count": {
+              "oneOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "magnitude"
+                  ],
+                  "properties": {
+                    "magnitude": {
+                      "type": "integer"
+                    },
+                    "rmType": {
+                      "const": "DV_COUNT"
+                    }
+                  }
+                }
+              ]
+            },
+            "cluster_optional": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "dv_text": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "value"
+                      ],
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "formatting": {
+                          "type": "string"
+                        },
+                        "hyperlink": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "rmType": {
+                          "const": "DV_TEXT"
+                        }
+                      }
+                    }
+                  ],
+                  "ui": {
+                    "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0003]/items[at0004]/value"
+                  }
+                },
+                "dv_count": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "magnitude"
+                      ],
+                      "properties": {
+                        "magnitude": {
+                          "type": "integer"
+                        },
+                        "rmType": {
+                          "const": "DV_COUNT"
+                        }
+                      }
+                    }
+                  ],
+                  "ui": {
+                    "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0003]/items[at0005]/value"
+                  }
+                }
+              },
+              "ui": {
+                "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0003]"
+              }
+            },
+            "cluster_required": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "dv_text",
+                "dv_count"
+              ],
+              "properties": {
+                "dv_text": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "value"
+                      ],
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "formatting": {
+                          "type": "string"
+                        },
+                        "hyperlink": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "rmType": {
+                          "const": "DV_TEXT"
+                        }
+                      }
+                    }
+                  ],
+                  "ui": {
+                    "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0006]/items[at0007]/value"
+                  }
+                },
+                "dv_count": {
+                  "oneOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "magnitude"
+                      ],
+                      "properties": {
+                        "magnitude": {
+                          "type": "integer"
+                        },
+                        "rmType": {
+                          "const": "DV_COUNT"
+                        }
+                      }
+                    }
+                  ],
+                  "ui": {
+                    "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0006]/items[at0009]/value"
+                  }
+                }
+              },
+              "ui": {
+                "path": "content[openEHR-EHR-ADMIN_ENTRY.developement.v0]/data[at0001]/items[at0006]"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

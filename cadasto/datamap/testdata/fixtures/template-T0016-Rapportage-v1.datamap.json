@@ -1,0 +1,23 @@
+{
+  "templateId": "template-T0016-Rapportage-v1",
+  "language": "nl",
+  "datamap": {
+    "context": {
+      "other_context": {
+        "at0010|Zorgvrager": "at0011",
+        "at0020|Type contact": "at0021",
+        "at0030|Type rapportage": "at0031",
+        "at0040|Kenmerken": [
+          "at0041",
+          "at0042"
+        ],
+        "at0050|Referentie": "ehr://system/ehr/12345"
+      }
+    },
+    "content": {
+      "rapportage": {
+        "at0002|Synopsis": "Korte samenvatting van de rapportage."
+      }
+    }
+  }
+}

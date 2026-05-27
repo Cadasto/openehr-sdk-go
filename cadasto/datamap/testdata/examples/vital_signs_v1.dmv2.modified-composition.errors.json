@@ -1,0 +1,17 @@
+[
+    {
+        "path": "content.openEHR-EHR-OBSERVATION.vital_signs.v1.events[0].openEHR-EHR-OBSERVATION.vital_signs.v1",
+        "code": "additional_properties",
+        "message": "Unknown field."
+    },
+    {
+        "path": "content.encounter",
+        "code": "additional_properties",
+        "message": "Unknown field."
+    },
+    {
+        "path": "context",
+        "code": "additional_properties",
+        "message": "Unknown field."
+    }
+]

@@ -1,0 +1,121 @@
+{
+    "template_id": "vital_signs.v1",
+    "content": {
+        "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+            "events": [
+                {
+                    "at0002|Any event": null,
+                    "at0004|Tensie pols": {
+                        "at0005|Datum": {
+                            "value": null
+                        },
+                        "at0006|Systolisch": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0007|Diastolisch": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0008|Polsslag": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0009|Houding": {
+                            "code": null,
+                            "value": null,
+                            "terminology": "local"
+                        }
+                    },
+                    "at0013|Lengte gewicht": {
+                        "at0014|Datum": {
+                            "value": null
+                        },
+                        "at0015|Lengte": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0016|Gewicht": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0017|BMI": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0018|Taille": {
+                            "magnitude": null,
+                            "unit": null
+                        }
+                    },
+                    "at0019|Temperatuur": {
+                        "at0020|Datum": {
+                            "value": null
+                        },
+                        "at0021|Temperatuur": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0046|Soort meting": {
+                            "code": null,
+                            "value": null,
+                            "terminology": "local"
+                        }
+                    },
+                    "at0022|Defecatie": {
+                        "at0023|Datum": {
+                            "value": null
+                        },
+                        "at0024|Deflijst": {
+                            "code": null,
+                            "value": null,
+                            "terminology": "local"
+                        }
+                    },
+                    "at0033|Bloedsuiker": {
+                        "at0034|Datum": {
+                            "value": null
+                        },
+                        "at0036|Waarde": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0035|Opmerkingen": {
+                            "value": null,
+                            "language": "nl"
+                        }
+                    },
+                    "at0037|Antistolling": {
+                        "at0038|Datum": {
+                            "value": null
+                        },
+                        "at0039|TT in INR": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0041|Dosering Sintrommitis": {
+                            "magnitude": null,
+                            "unit": null
+                        },
+                        "at0040|Opmerkingen": {
+                            "value": null,
+                            "language": "nl"
+                        },
+                        "at0045|Volgende TT": {
+                            "value": null
+                        }
+                    },
+                    "at0042|Saturatie (O2)": {
+                        "at0043|Datum": {
+                            "value": null
+                        },
+                        "at0044|Saturatie": {
+                            "magnitude": null,
+                            "unit": null
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

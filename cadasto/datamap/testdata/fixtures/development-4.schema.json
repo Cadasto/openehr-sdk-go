@@ -1,0 +1,712 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "development-4 DMv2 datamap",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "content"
+    ],
+    "properties": {
+        "template_id": {
+            "type": "string"
+        },
+        "uid": {
+            "type": "string"
+        },
+        "vuid": {
+            "type": "string"
+        },
+        "composer": {
+            "type": "string"
+        },
+        "language": {
+            "type": "string",
+            "description": "ISO 639-1 language code"
+        },
+        "territory": {
+            "type": "string",
+            "description": "ISO 3166-1 territory code"
+        },
+        "content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "openEHR-EHR-OBSERVATION.development.v0|development": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "events"
+                    ],
+                    "properties": {
+                        "events": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "time"
+                                ],
+                                "properties": {
+                                    "time": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/time",
+                                            "description": "@ internal @"
+                                        }
+                                    },
+                                    "width": {
+                                        "type": "string",
+                                        "description": "ISO 8601 duration (INTERVAL_EVENT only)"
+                                    },
+                                    "math_function": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "required": [
+                                                    "code"
+                                                ],
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "description": "Mathematical function (INTERVAL_EVENT only)"
+                                    },
+                                    "sample_count": {
+                                        "type": "integer",
+                                        "description": "Number of samples (INTERVAL_EVENT only)"
+                                    },
+                                    "at0004": {
+                                        "alias": "at0004|DV_TEXT",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "formatting": {
+                                                        "type": "string"
+                                                    },
+                                                    "hyperlink": {
+                                                        "type": "string",
+                                                        "format": "uri"
+                                                    },
+                                                    "language": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0005": {
+                                        "alias": "at0005|DV_CODED_TEXT",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "enum": [
+                                                    "at0014",
+                                                    "at0015"
+                                                ]
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0014",
+                                                            "at0015"
+                                                        ]
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0005]/value",
+                                            "options": [
+                                                {
+                                                    "code": "at0014",
+                                                    "text": "value 1 dv_coded_text"
+                                                },
+                                                {
+                                                    "code": "at0015",
+                                                    "text": "value 2 dv_coded_text"
+                                                }
+                                            ]
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0006": {
+                                        "alias": "at0006|DV_QUANTITY",
+                                        "oneOf": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "magnitude": {
+                                                        "type": "number"
+                                                    },
+                                                    "unit": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_QUANTITY"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "magnitude"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0006]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0007": {
+                                        "alias": "at0007|DV_PROPORTION",
+                                        "oneOf": [
+                                            {
+                                                "type": "number"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "numerator": {
+                                                        "type": "number"
+                                                    },
+                                                    "denominator": {
+                                                        "type": "number"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_PROPORTION"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "type",
+                                                    "numerator",
+                                                    "denominator"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0007]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0008": {
+                                        "alias": "at0008|DV_COUNT",
+                                        "oneOf": [
+                                            {
+                                                "type": "integer"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "magnitude": {
+                                                        "type": "integer"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_COUNT"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "magnitude"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0008]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0009": {
+                                        "alias": "at0009|DV_DATE_TIME",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "format": "date-time"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DATE_TIME"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0009]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0010": {
+                                        "alias": "at0010|DV_TIME",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-2][0-9]:[0-5][0-9]$"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_TIME"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0010]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0011": {
+                                        "alias": "at0011|DV_DATE",
+                                        "oneOf": [
+                                            {
+                                                "type": "string",
+                                                "format": "date"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "format": "date"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_DATE"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0011]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0012": {
+                                        "alias": "at0012|DV_ORDINAL",
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "ordinal": {
+                                                        "type": "integer"
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_ORDINAL"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code",
+                                                    "ordinal"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0012]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0013": {
+                                        "alias": "at0013|DV_BOOLEAN",
+                                        "oneOf": [
+                                            {
+                                                "type": "boolean"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_BOOLEAN"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "value"
+                                                ]
+                                            }
+                                        ],
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.development.v0]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/value"
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    }
+                                }
+                            },
+                            "minItems": 0,
+                            "minOccurs": 0,
+                            "maxOccurs": null
+                        }
+                    },
+                    "minOccurs": 0,
+                    "maxOccurs": 1
+                }
+            }
+        },
+        "context": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "start_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "end_time": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "location": {
+                    "type": "string"
+                },
+                "setting": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                                "code"
+                            ],
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "value": {
+                                    "type": "string"
+                                },
+                                "terminology": {
+                                    "type": "string"
+                                },
+                                "rmType": {
+                                    "const": "DV_CODED_TEXT"
+                                }
+                            }
+                        }
+                    ]
+                },
+                "health_care_facility": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "name": {
+                            "type": "string"
+                        },
+                        "identifiers": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "issuer": {
+                                        "type": "string"
+                                    },
+                                    "assigner": {
+                                        "type": "string"
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "participations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "function": {
+                                "type": "string"
+                            },
+                            "performer": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "mode": {
+                                "type": "string"
+                            },
+                            "time": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "other_context": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "openEHR-EHR-CLUSTER.annotation.v0|annotation": {
+                            "alias": "at0000|development-4",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                                "at0001": {
+                                    "alias": "at0001|Item tree",
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "value": {
+                                                    "type": "string"
+                                                },
+                                                "formatting": {
+                                                    "type": "string"
+                                                },
+                                                "hyperlink": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_TEXT"
+                                                }
+                                            },
+                                            "required": [
+                                                "value"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0001]/items[at0000]/items[at0001]/value",
+                                        "description": "@ internal @"
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0002": {
+                                    "alias": "at0002|CLUSTER_SLOT",
+                                    "oneOf": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "additionalProperties": false,
+                                            "properties": {
+                                                "magnitude": {
+                                                    "type": "number"
+                                                },
+                                                "unit": {
+                                                    "type": "string"
+                                                },
+                                                "rmType": {
+                                                    "const": "DV_QUANTITY"
+                                                }
+                                            },
+                                            "required": [
+                                                "magnitude"
+                                            ]
+                                        }
+                                    ],
+                                    "ui": {
+                                        "path": "context/other_context[at0001]/items[at0000]/items[at0002]/value",
+                                        "description": "@ internal @"
+                                    },
+                                    "minOccurs": 0,
+                                    "maxOccurs": 1
+                                },
+                                "at0003": {
+                                    "alias": "at0003|Tree",
+                                    "type": "array",
+                                    "items": {
+                                        "alias": "at0003|Tree",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0004": {
+                                                "alias": "at0004|DV_TEXT",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "boolean"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_BOOLEAN"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "context/other_context[at0001]/items[at0000]/items[at0003]/items[at0004]/value"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0005": {
+                                                "alias": "at0005|DV_CODED_TEXT",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string"
+                                                            },
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "terminology": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_CODED_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "code"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "context/other_context[at0001]/items[at0000]/items[at0003]/items[at0005]/value"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        }
+                                    },
+                                    "minItems": 0,
+                                    "minOccurs": 0,
+                                    "maxOccurs": null,
+                                    "ui": {
+                                        "path": "context/other_context[at0001]/items[at0000]/items[at0003]",
+                                        "description": "@ internal @"
+                                    }
+                                }
+                            },
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,1101 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "vital_signs.v1 DMv2 datamap",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "content"
+    ],
+    "properties": {
+        "template_id": {
+            "type": "string"
+        },
+        "uid": {
+            "type": "string"
+        },
+        "vuid": {
+            "type": "string"
+        },
+        "composer": {
+            "type": "string"
+        },
+        "language": {
+            "type": "string",
+            "description": "ISO 639-1 language code"
+        },
+        "territory": {
+            "type": "string",
+            "description": "ISO 3166-1 territory code"
+        },
+        "content": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                        "events"
+                    ],
+                    "properties": {
+                        "events": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                    "time"
+                                ],
+                                "properties": {
+                                    "time": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "ui": {
+                                            "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/time",
+                                            "description": "*"
+                                        }
+                                    },
+                                    "width": {
+                                        "type": "string",
+                                        "description": "ISO 8601 duration (INTERVAL_EVENT only)"
+                                    },
+                                    "math_function": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "additionalProperties": false,
+                                                "required": [
+                                                    "code"
+                                                ],
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "value": {
+                                                        "type": "string"
+                                                    },
+                                                    "terminology": {
+                                                        "type": "string"
+                                                    },
+                                                    "rmType": {
+                                                        "const": "DV_CODED_TEXT"
+                                                    }
+                                                }
+                                            }
+                                        ],
+                                        "description": "Mathematical function (INTERVAL_EVENT only)"
+                                    },
+                                    "sample_count": {
+                                        "type": "integer",
+                                        "description": "Number of samples (INTERVAL_EVENT only)"
+                                    },
+                                    "at0004": {
+                                        "alias": "at0004|Tensie pols",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0005": {
+                                                "alias": "at0005|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/items[at0005]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0006": {
+                                                "alias": "at0006|Systolisch",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/items[at0006]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0007": {
+                                                "alias": "at0007|Diastolisch",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/items[at0007]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0008": {
+                                                "alias": "at0008|Polsslag",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/items[at0008]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0009": {
+                                                "alias": "at0009|Houding",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0010",
+                                                            "at0011",
+                                                            "at0012"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "at0010",
+                                                                    "at0011",
+                                                                    "at0012"
+                                                                ]
+                                                            },
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "terminology": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_CODED_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "code"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/items[at0009]/value",
+                                                    "description": "*",
+                                                    "options": [
+                                                        {
+                                                            "code": "at0010",
+                                                            "text": "liggend"
+                                                        },
+                                                        {
+                                                            "code": "at0011",
+                                                            "text": "zittend"
+                                                        },
+                                                        {
+                                                            "code": "at0012",
+                                                            "text": "staand"
+                                                        }
+                                                    ]
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0013": {
+                                        "alias": "at0013|Lengte gewicht",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0014": {
+                                                "alias": "at0014|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/items[at0014]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0015": {
+                                                "alias": "at0015|Lengte",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/items[at0015]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0016": {
+                                                "alias": "at0016|Gewicht",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/items[at0016]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0017": {
+                                                "alias": "at0017|BMI",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/items[at0017]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0018": {
+                                                "alias": "at0018|Taille",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0013]/items[at0018]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0019": {
+                                        "alias": "at0019|Temperatuur",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0020": {
+                                                "alias": "at0020|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0019]/items[at0020]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0021": {
+                                                "alias": "at0021|Temperatuur",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0019]/items[at0021]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0046": {
+                                                "alias": "at0046|Soort meting",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0047",
+                                                            "at0048",
+                                                            "at0049",
+                                                            "at0050",
+                                                            "at0051"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "at0047",
+                                                                    "at0048",
+                                                                    "at0049",
+                                                                    "at0050",
+                                                                    "at0051"
+                                                                ]
+                                                            },
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "terminology": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_CODED_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "code"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0019]/items[at0046]/value",
+                                                    "description": "*",
+                                                    "options": [
+                                                        {
+                                                            "code": "at0047",
+                                                            "text": "Oraal"
+                                                        },
+                                                        {
+                                                            "code": "at0048",
+                                                            "text": "Rectaal"
+                                                        },
+                                                        {
+                                                            "code": "at0049",
+                                                            "text": "Axillair (oksel)"
+                                                        },
+                                                        {
+                                                            "code": "at0050",
+                                                            "text": "Femoraal (lies)"
+                                                        },
+                                                        {
+                                                            "code": "at0051",
+                                                            "text": "Tympanisch (oor)"
+                                                        }
+                                                    ]
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0022": {
+                                        "alias": "at0022|Defecatie",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0023": {
+                                                "alias": "at0023|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0023]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0024": {
+                                                "alias": "at0024|Deflijst",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "at0025",
+                                                            "at0026",
+                                                            "at0027",
+                                                            "at0028",
+                                                            "at0029",
+                                                            "at0030",
+                                                            "at0031",
+                                                            "at0032"
+                                                        ]
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "code": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "at0025",
+                                                                    "at0026",
+                                                                    "at0027",
+                                                                    "at0028",
+                                                                    "at0029",
+                                                                    "at0030",
+                                                                    "at0031",
+                                                                    "at0032"
+                                                                ]
+                                                            },
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "terminology": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_CODED_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "code"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0022]/items[at0024]/value",
+                                                    "description": "*",
+                                                    "options": [
+                                                        {
+                                                            "code": "at0025",
+                                                            "text": "Ja"
+                                                        },
+                                                        {
+                                                            "code": "at0026",
+                                                            "text": "Ja, beetje"
+                                                        },
+                                                        {
+                                                            "code": "at0027",
+                                                            "text": "Ja, normaal"
+                                                        },
+                                                        {
+                                                            "code": "at0028",
+                                                            "text": "Ja, veel"
+                                                        },
+                                                        {
+                                                            "code": "at0029",
+                                                            "text": "Ja, diarree"
+                                                        },
+                                                        {
+                                                            "code": "at0030",
+                                                            "text": "Ja, incontinent"
+                                                        },
+                                                        {
+                                                            "code": "at0031",
+                                                            "text": "Nee"
+                                                        },
+                                                        {
+                                                            "code": "at0032",
+                                                            "text": "Onbekend"
+                                                        }
+                                                    ]
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0033": {
+                                        "alias": "at0033|Bloedsuiker",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0034": {
+                                                "alias": "at0034|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0033]/items[at0034]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0036": {
+                                                "alias": "at0036|Waarde",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0033]/items[at0036]/value",
+                                                    "description": "Bij een waarde lager dan 4 mmol/l of hoger dan 20mmol/l arts inschakelen"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0035": {
+                                                "alias": "at0035|Opmerkingen",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "formatting": {
+                                                                "type": "string"
+                                                            },
+                                                            "hyperlink": {
+                                                                "type": "string",
+                                                                "format": "uri"
+                                                            },
+                                                            "language": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0033]/items[at0035]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0037": {
+                                        "alias": "at0037|Antistolling",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0038": {
+                                                "alias": "at0038|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0037]/items[at0038]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0039": {
+                                                "alias": "at0039|TT in INR",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0037]/items[at0039]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0041": {
+                                                "alias": "at0041|Dosering Sintrommitis",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0037]/items[at0041]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0040": {
+                                                "alias": "at0040|Opmerkingen",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string"
+                                                            },
+                                                            "formatting": {
+                                                                "type": "string"
+                                                            },
+                                                            "hyperlink": {
+                                                                "type": "string",
+                                                                "format": "uri"
+                                                            },
+                                                            "language": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_TEXT"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0037]/items[at0040]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0045": {
+                                                "alias": "at0045|Volgende TT",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0037]/items[at0045]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    },
+                                    "at0042": {
+                                        "alias": "at0042|Saturatie (O2)",
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "at0043": {
+                                                "alias": "at0043|Datum",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_DATE_TIME"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "value"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0042]/items[at0043]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            },
+                                            "at0044": {
+                                                "alias": "at0044|Saturatie",
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number"
+                                                    },
+                                                    {
+                                                        "type": "object",
+                                                        "additionalProperties": false,
+                                                        "properties": {
+                                                            "magnitude": {
+                                                                "type": "number"
+                                                            },
+                                                            "unit": {
+                                                                "type": "string"
+                                                            },
+                                                            "rmType": {
+                                                                "const": "DV_QUANTITY"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "magnitude"
+                                                        ]
+                                                    }
+                                                ],
+                                                "ui": {
+                                                    "path": "content[openEHR-EHR-OBSERVATION.vital_signs.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0042]/items[at0044]/value",
+                                                    "description": "*"
+                                                },
+                                                "minOccurs": 0,
+                                                "maxOccurs": 1
+                                            }
+                                        },
+                                        "minOccurs": 0,
+                                        "maxOccurs": 1
+                                    }
+                                }
+                            },
+                            "minItems": 0,
+                            "maxItems": 1,
+                            "minOccurs": 0,
+                            "maxOccurs": 1
+                        }
+                    },
+                    "minOccurs": 0,
+                    "maxOccurs": null
+                }
+            }
+        }
+    }
+}

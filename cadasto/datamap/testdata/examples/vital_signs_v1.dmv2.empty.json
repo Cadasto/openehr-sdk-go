@@ -1,0 +1,51 @@
+{
+    "template_id": "vital_signs.v1",
+    "content": {
+        "openEHR-EHR-OBSERVATION.vital_signs.v1|vital_signs": {
+            "events": [
+                {
+                    "at0002|Any event": null,
+                    "at0004|Tensie pols": {
+                        "at0005|Datum": null,
+                        "at0006|Systolisch": null,
+                        "at0007|Diastolisch": null,
+                        "at0008|Polsslag": null,
+                        "at0009|Houding": null
+                    },
+                    "at0013|Lengte gewicht": {
+                        "at0014|Datum": null,
+                        "at0015|Lengte": null,
+                        "at0016|Gewicht": null,
+                        "at0017|BMI": null,
+                        "at0018|Taille": null
+                    },
+                    "at0019|Temperatuur": {
+                        "at0020|Datum": null,
+                        "at0021|Temperatuur": null,
+                        "at0046|Soort meting": null
+                    },
+                    "at0022|Defecatie": {
+                        "at0023|Datum": null,
+                        "at0024|Deflijst": null
+                    },
+                    "at0033|Bloedsuiker": {
+                        "at0034|Datum": null,
+                        "at0036|Waarde": null,
+                        "at0035|Opmerkingen": null
+                    },
+                    "at0037|Antistolling": {
+                        "at0038|Datum": null,
+                        "at0039|TT in INR": null,
+                        "at0041|Dosering Sintrommitis": null,
+                        "at0040|Opmerkingen": null,
+                        "at0045|Volgende TT": null
+                    },
+                    "at0042|Saturatie (O2)": {
+                        "at0043|Datum": null,
+                        "at0044|Saturatie": null
+                    }
+                }
+            ]
+        }
+    }
+}

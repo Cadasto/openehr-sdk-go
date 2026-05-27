@@ -1,0 +1,41 @@
+{
+  "templateId": "development-2",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "developement": {
+        "at0002|DV_TEXT": {
+          "value": "Initial assessment",
+          "formatting": "markdown",
+          "hyperlink": "https://example.com/assessment",
+          "language": "en"
+        },
+        "dv_count": {
+          "magnitude": 1
+        },
+        "at0003|CLUSTER optional": {
+          "at0004|DV_TEXT": {
+            "value": "Optional note",
+            "formatting": "markdown",
+            "hyperlink": "https://example.com/optional",
+            "language": "en"
+          },
+          "at0005|DV_COUNT": {
+            "magnitude": 2
+          }
+        },
+        "at0006|CLUSTER required": {
+          "at0007|DV_TEXT": {
+            "value": "Required note",
+            "formatting": "markdown",
+            "hyperlink": "https://example.com/required",
+            "language": "en"
+          },
+          "at0009|DV_COUNT": {
+            "magnitude": 3
+          }
+        }
+      }
+    }
+  }
+}

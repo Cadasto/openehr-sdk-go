@@ -1,0 +1,17 @@
+{
+    "meta": {
+        "template_id": "vital_signs.v1::d0ed9069-6b66-3c46-9516-15674e8d55cc",
+        "vuid": "62485d37-9c54-4230-9036-9e0330d17369::TESTBASE24000001::1"
+    },
+    "content": {
+        "encounter": {
+            "events": [
+                {
+                   "at0004": {
+                        "at0007": 222                        
+                    }
+                }
+            ]
+        }
+    }
+}

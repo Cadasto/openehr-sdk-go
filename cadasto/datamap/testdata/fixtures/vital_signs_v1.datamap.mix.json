@@ -1,0 +1,82 @@
+{
+  "templateId": "vital_signs_v1",
+  "language": "nl",
+  "datamap": {
+    "content": {
+      "encounter": {
+        "events": [
+          {
+            "at0002|Any event": "2026-02-01T09:30:00Z",
+            "at0004|Tensie pols": {
+              "at0005|Datum": "2026-02-01T09:30:00Z",
+              "at0006|Systolisch": {
+                "magnitude": 120,
+                "unit": "mm[Hg]"
+              },
+              "at0007|Diastolisch": 80,
+              "at0008|Polsslag": 72,
+              "at0009|Houding": "at0011"
+            },
+            "at0013|Lengte gewicht": {
+              "at0014|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0015|Lengte": 175,
+              "at0016|Gewicht": {
+                "magnitude": 70,
+                "unit": "kg"
+              },
+              "at0017|BMI": 22.9,
+              "at0018|Taille": {
+                "magnitude": 85,
+                "unit": "cm"
+              }
+            },
+            "at0019|Temperatuur": {
+              "at0020|Datum": "2026-02-01T09:30:00Z",
+              "at0021|Temperatuur": 37.2,
+              "at0046|Soort meting": {
+                "code": "at0047",
+                "value": "Oraal",
+                "terminology": "local"
+              }
+            },
+            "at0022|Defecatie": {
+              "at0023|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0024|Deflijst": "at0031"
+            },
+            "at0033|Bloedsuiker": {
+              "at0034|Datum": "2026-02-01T09:30:00Z",
+              "at0036|Waarde": {
+                "magnitude": 6.1,
+                "unit": "mmol/L"
+              },
+              "at0035|Opmerkingen": "Nuchter"
+            },
+            "at0037|Antistolling": {
+              "at0038|Datum": "2026-02-01T09:30:00Z",
+              "at0039|TT in INR": 2.4,
+              "at0041|Dosering Sintrommitis": {
+                "magnitude": 1.5,
+                "unit": "mg"
+              },
+              "at0040|Opmerkingen": {
+                "value": "Controle",
+                "language": "nl"
+              },
+              "at0045|Volgende TT": "2026-02-15"
+            },
+            "at0042|Saturatie (O2)": {
+              "at0043|Datum": {
+                "value": "2026-02-01T09:30:00Z"
+              },
+              "at0044|Saturatie": 98
+            }
+          }
+        ]
+      }
+    }
+  }
+}

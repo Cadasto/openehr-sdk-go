@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COMPOSITION xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="COMPOSITION" archetype_node_id="openEHR-EHR-COMPOSITION.encounter.v1">
+  <archetype_details>
+    <archetype_id>
+      <value>openEHR-EHR-COMPOSITION.encounter.v1</value>
+    </archetype_id>
+    <template_id>
+      <value>vital_signs.v1::d0ed9069-6b66-3c46-9516-15674e8d55cc::d0ed9069-6b66-3c46-9516-15674e8d55cc</value>
+    </template_id>
+    <rm_version>1.0.2</rm_version>
+  </archetype_details>
+  <language>
+    <terminology_id>
+      <value>ISO_639-1</value>
+    </terminology_id>
+    <code_string>nl</code_string>
+  </language>
+  <territory>
+    <terminology_id>
+      <value>ISO_3166-1</value>
+    </terminology_id>
+    <code_string>NL</code_string>
+  </territory>
+  <composer xsi:type="PARTY_IDENTIFIED">
+    <name/>
+  </composer>
+  <category>
+    <value>event</value>
+    <defining_code>
+      <terminology_id>
+        <value>openehr</value>
+      </terminology_id>
+      <code_string>433</code_string>
+    </defining_code>
+  </category>
+  <content archetype_node_id="openEHR-EHR-OBSERVATION.vital_signs.v1" xsi:type="OBSERVATION">
+    <data archetype_node_id="at0001" xsi:type="HISTORY">
+      <events archetype_node_id="at0002" xsi:type="EVENT">
+        <data archetype_node_id="at0003" xsi:type="ITEM_TREE">
+          <items archetype_node_id="at0004" xsi:type="CLUSTER">
+            <items archetype_node_id="at0005" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0006" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>20</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0007" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>222</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0008" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>60</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0009" xsi:type="ELEMENT">
+              <value xsi:type="DV_CODED_TEXT">
+                <value>at0010</value>
+                <defining_code>
+                  <terminology_id>
+                    <value>local</value>
+                  </terminology_id>
+                  <code_string>at0010</code_string>
+                </defining_code>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0013" xsi:type="CLUSTER">
+            <items archetype_node_id="at0014" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0015" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>198</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0016" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>87.5</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0017" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>22.3</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0018" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>40</magnitude>
+                <units/>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0019" xsi:type="CLUSTER">
+            <items archetype_node_id="at0020" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0021" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>37</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0046" xsi:type="ELEMENT">
+              <value xsi:type="DV_CODED_TEXT">
+                <value>at0049</value>
+                <defining_code>
+                  <terminology_id>
+                    <value>local</value>
+                  </terminology_id>
+                  <code_string>at0049</code_string>
+                </defining_code>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0022" xsi:type="CLUSTER">
+            <items archetype_node_id="at0023" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0024" xsi:type="ELEMENT">
+              <value xsi:type="DV_CODED_TEXT">
+                <value>at0031</value>
+                <defining_code>
+                  <terminology_id>
+                    <value>local</value>
+                  </terminology_id>
+                  <code_string>at0031</code_string>
+                </defining_code>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0033" xsi:type="CLUSTER">
+            <items archetype_node_id="at0034" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0036" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>5</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0035" xsi:type="ELEMENT">
+              <value xsi:type="DV_TEXT">
+                <value>Dit is prima</value>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0037" xsi:type="CLUSTER">
+            <items archetype_node_id="at0038" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0039" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>1.16</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0041" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>27</magnitude>
+                <units/>
+              </value>
+            </items>
+            <items archetype_node_id="at0040" xsi:type="ELEMENT">
+              <value xsi:type="DV_TEXT">
+                <value>Kan beter</value>
+              </value>
+            </items>
+            <items archetype_node_id="at0045" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE">
+                <value>2026-02-26</value>
+              </value>
+            </items>
+          </items>
+          <items archetype_node_id="at0042" xsi:type="CLUSTER">
+            <items archetype_node_id="at0043" xsi:type="ELEMENT">
+              <value xsi:type="DV_DATE_TIME">
+                <value></value>
+              </value>
+            </items>
+            <items archetype_node_id="at0044" xsi:type="ELEMENT">
+              <value xsi:type="DV_QUANTITY">
+                <magnitude>97</magnitude>
+                <units/>
+              </value>
+            </items>
+          </items>
+        </data>
+      </events>
+    </data>
+    <language>
+      <terminology_id>
+        <value>ISO_639-1</value>
+      </terminology_id>
+      <code_string>nl</code_string>
+    </language>
+    <encoding>
+      <terminology_id>
+        <value>IANA_character-sets</value>
+      </terminology_id>
+      <code_string>UTF-8</code_string>
+    </encoding>
+    <subject xsi:type="PARTY_SELF"/>
+  </content>
+</COMPOSITION>

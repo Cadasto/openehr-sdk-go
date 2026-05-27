@@ -1,0 +1,36 @@
+{
+  "templateId": "development-4",
+  "language": "nl",
+  "datamap": {
+    "context": {
+      "other_context": {
+        "cluster": {
+          "dv_text": "Other context note",
+          "dv_count": 1
+        }
+      }
+    },
+    "content": {
+      "development": {
+        "events": [
+          {
+            "at0002|CLUSTER_SLOT": "2026-02-01T09:30:00Z",
+            "at0004|DV_TEXT": "Patient developing normally",
+            "at0005|DV_CODED_TEXT": "at0014",
+            "at0006|DV_QUANTITY": {
+              "magnitude": 12.5,
+              "unit": "kg"
+            },
+            "at0007|DV_PROPORTION": 0.75,
+            "at0008|DV_COUNT": 3,
+            "at0009|DV_DATE_TIME": "2026-02-01T09:30:00Z",
+            "at0010|DV_TIME": "14:00",
+            "at0011|DV_DATE": "2026-02-01",
+            "at0012|DV_ORDINAL": "at0016",
+            "at0013|DV_BOOLEAN": true
+          }
+        ]
+      }
+    }
+  }
+}
