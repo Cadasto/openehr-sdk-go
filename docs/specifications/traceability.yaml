@@ -56,13 +56,15 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/serialize/canjson, testkit/cassettes, testkit/fixtures]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md]
-    probes: [PROBE-030, PROBE-031]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/2026-05-26-rm-polymorphic-decode-coverage.md]
+    probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/roundtrip_test.go
+      - openehr/serialize/canjson/polymorphic_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
+      - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
 
   - id: REQ-056
     title: Canonical XML

@@ -44,6 +44,27 @@ func TestProbe030(t *testing.T) {
 	}
 }
 
+// TestProbe038 runs PROBE-038 across the polymorphic-decode fixture
+// set vendored under testkit/cassettes/rm/polymorphic/ and asserts
+// every input decodes + re-marshals with the original `_type`
+// discriminators preserved (the SDK-GAP-11 substitutability guarantee).
+func TestProbe038(t *testing.T) {
+	if len(serializeprobes.Probe038Inputs) == 0 {
+		t.Fatal("Probe038Inputs is empty — polymorphic fixture set missing")
+	}
+	for _, in := range serializeprobes.Probe038Inputs {
+		t.Run(in.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe038CanjsonRMPolymorphicDecode(in.Body, in.Factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}
+
 // TestProbe031 runs PROBE-031 and asserts the unknown-_type input
 // surfaces as typereg.ErrUnknownType via errors.Is.
 func TestProbe031(t *testing.T) {
