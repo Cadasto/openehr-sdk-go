@@ -101,7 +101,13 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("care: service catalog: %w", err)
 	}
 
-	tokenOpts := []clientcreds.Option{clientcreds.WithHTTPClient(hc)}
+	// Cadasto's authorization server advertises only client_secret_post
+	// (token_endpoint_auth_methods_supported), so credentials go in the form
+	// body — not HTTP Basic (the clientcreds default).
+	tokenOpts := []clientcreds.Option{
+		clientcreds.WithHTTPClient(hc),
+		clientcreds.WithAuthMethod(clientcreds.AuthPost),
+	}
 	if cfg.Audience != "" {
 		tokenOpts = append(tokenOpts, clientcreds.WithAudience(cfg.Audience))
 	}
@@ -116,6 +122,20 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 
 	return &Client{rest: rest, codec: cfg.Codec}, nil
+}
+
+// Verify checks connectivity to the configured Cadasto CDR. It forces an
+// OAuth2 token acquisition and performs a single read-only capability call
+// (list operational templates), exercising the token endpoint, base URL and
+// audience without any write side effect. On success it returns the number of
+// templates visible; on failure the error pinpoints the failing leg (token vs.
+// REST). Intended for a platform "test connection" action.
+func (c *Client) Verify(ctx context.Context) (int, error) {
+	tpls, _, err := definition.ListTemplates(ctx, c.rest, definition.FormatADL14)
+	if err != nil {
+		return 0, fmt.Errorf("care: verify connection: %w", err)
+	}
+	return len(tpls), nil
 }
 
 // CreatePatient creates a fresh EHR (the patient's clinical record) in the CDR
