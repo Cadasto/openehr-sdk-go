@@ -4,7 +4,7 @@ import "testing"
 
 // REQ-058 — read path: a canonical RM OBSERVATION composition decodes into the
 // datamap shape (language/territory/composer/context + content → events →
-// items, with CLUSTER/ELEMENT keyed by "<at-code>|<label>").
+// items, with CLUSTER/ELEMENT keyed by the bare "<at-code>" per SPEC §4.3).
 
 func obsComposition() map[string]any {
 	return map[string]any{
@@ -81,19 +81,14 @@ func TestFromCompositionObservation(t *testing.T) {
 	if ev["time"] != "2026-05-27T10:00:00Z" {
 		t.Errorf("event.time: got %v", ev["time"])
 	}
-	cluster, ok := ev["at0004|Tensie"].(map[string]any)
+	cluster, ok := ev["at0004"].(map[string]any)
 	if !ok {
 		t.Fatalf("cluster key missing; event keys=%v", keysOf(ev))
 	}
-	elem, ok := cluster["at0006|Systolic"].(map[string]any)
-	if !ok {
-		t.Fatalf("element key missing; cluster keys=%v", keysOf(cluster))
-	}
-	if elem["magnitude"] != 120.0 || elem["units"] != "mm[Hg]" {
-		t.Errorf("element value: got %#v", elem)
-	}
-	if _, leaked := elem["_type"]; leaked {
-		t.Error("element value still carries _type (RM bookkeeping not stripped)")
+	// DV_QUANTITY decodes to the bare magnitude (datamap short form); units are
+	// template-derived and refilled on encode.
+	if mag, ok := cluster["at0006"]; !ok || mag != 120.0 {
+		t.Errorf("element value: got %#v (want 120.0)", cluster["at0006"])
 	}
 }
 

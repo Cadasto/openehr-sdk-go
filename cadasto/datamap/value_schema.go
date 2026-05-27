@@ -85,6 +85,8 @@ func shortSchemaForType(rmType string, options []optChoice) map[string]any {
 		return shortSchema("string", "", nil, `^[0-2][0-9]:[0-5][0-9]$`)
 	case "DV_CODED_TEXT", "DV_ORDINAL":
 		return shortSchema("string", "", enumFromOptions(options), "")
+	case "DV_MULTIMEDIA":
+		return shortSchema("string", "uri", nil, "")
 	default:
 		return shortSchema("string", "", nil, "")
 	}
@@ -134,6 +136,9 @@ func expandedSchemaForType(rmType string, options []optChoice) map[string]any {
 			"numerator":   shortSchema("number", "", nil, ""),
 			"denominator": shortSchema("number", "", nil, ""),
 		}, []string{"type", "numerator", "denominator"})
+	case "DV_MULTIMEDIA":
+		// Complex media value — keep permissive (media_type, size, uri, data…).
+		return map[string]any{"type": "object", "additionalProperties": true}
 	default:
 		return expandedSchema(rmType, map[string]any{"value": shortSchema("string", "", nil, "")}, []string{"value"})
 	}

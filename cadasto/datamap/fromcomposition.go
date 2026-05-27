@@ -20,7 +20,16 @@ import (
 // allow future OPT-driven label/coded-value resolution; it is currently unused
 // — decode walks the composition's own name / archetype_node_id fields.
 func FromComposition(opt *template.OperationalTemplate, composition map[string]any) (map[string]any, error) {
-	_ = opt
+	// Per-archetype-root term maps from the OPT, so decoded keys carry the same
+	// "atNNNN|Label" labels the Schema emits (SPEC §4.3) and therefore validate.
+	rootsByID := map[string]contentRoot{}
+	if opt != nil {
+		if root, ok := opt.Root().(template.ObjectNode); ok {
+			for _, r := range findContentArchetypeRoots(root) {
+				rootsByID[r.id] = r
+			}
+		}
+	}
 	if composition == nil {
 		return nil, fmt.Errorf("datamap.FromComposition: nil composition")
 	}
@@ -39,6 +48,16 @@ func FromComposition(opt *template.OperationalTemplate, composition map[string]a
 	if composer, ok := composition["composer"].(map[string]any); ok {
 		if name, _ := composer["name"].(string); name != "" {
 			out["composer"] = name
+		}
+	}
+
+	// The composition version uid lives in composition.uid.value
+	// ("<object>::<system>::<version>"); surface it (and the bare
+	// versioned-object id as vuid) so the datamap shows which version it is.
+	if uid := readNameValue(composition["uid"]); uid != "" {
+		out["uid"] = uid
+		if i := indexOf(uid, "::"); i >= 0 {
+			out["vuid"] = uid[:i]
 		}
 	}
 
@@ -62,7 +81,8 @@ func FromComposition(opt *template.OperationalTemplate, composition map[string]a
 			if !ok {
 				return nil, fmt.Errorf("content[%d] is not an object", i)
 			}
-			key, value, err := decodeArchetypeRoot(entry)
+			archetypeID, _ := entry["archetype_node_id"].(string)
+			key, value, err := decodeArchetypeRoot(entry, rootsByID[archetypeID])
 			if err != nil {
 				return nil, fmt.Errorf("content[%d]: %w", i, err)
 			}
@@ -75,11 +95,14 @@ func FromComposition(opt *template.OperationalTemplate, composition map[string]a
 }
 
 // decodeArchetypeRoot decodes one entry under content into its
-// "<archetype-id>|<label>" key and inner payload.
-func decodeArchetypeRoot(node map[string]any) (string, map[string]any, error) {
+// "<archetype-id>|<label>" key and inner payload. The matching OPT root (r)
+// supplies the term labels so keys align with Schema().
+func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string]any, error) {
 	archetypeID, _ := node["archetype_node_id"].(string)
 	key := archetypeID
-	if label := readNameValue(node["name"]); label != "" {
+	if r.label != "" {
+		key = archetypeID + "|" + r.label
+	} else if label := readNameValue(node["name"]); label != "" {
 		key = archetypeID + "|" + label
 	}
 
@@ -96,7 +119,7 @@ func decodeArchetypeRoot(node map[string]any) (string, map[string]any, error) {
 			if !ok {
 				return "", nil, fmt.Errorf("events[%d] is not an object", i)
 			}
-			decoded, err := decodeEvent(ev)
+			decoded, err := decodeEvent(ev, r)
 			if err != nil {
 				return "", nil, fmt.Errorf("events[%d]: %w", i, err)
 			}
@@ -104,7 +127,7 @@ func decodeArchetypeRoot(node map[string]any) (string, map[string]any, error) {
 		}
 		payload["events"] = events
 	case "EVALUATION", "ADMIN_ENTRY", "ACTION", "INSTRUCTION":
-		items, err := decodeItems(asList(data["items"]))
+		items, err := decodeItems(asList(data["items"]), r)
 		if err != nil {
 			return "", nil, err
 		}
@@ -118,7 +141,7 @@ func decodeArchetypeRoot(node map[string]any) (string, map[string]any, error) {
 	return key, payload, nil
 }
 
-func decodeEvent(event map[string]any) (map[string]any, error) {
+func decodeEvent(event map[string]any, r contentRoot) (map[string]any, error) {
 	out := map[string]any{}
 	if t := readDVValue(event["time"]); t != nil {
 		out["time"] = t
@@ -127,7 +150,7 @@ func decodeEvent(event map[string]any) (map[string]any, error) {
 		out["width"] = w
 	}
 	data, _ := event["data"].(map[string]any)
-	items, err := decodeItems(asList(data["items"]))
+	items, err := decodeItems(asList(data["items"]), r)
 	if err != nil {
 		return nil, err
 	}
@@ -137,8 +160,18 @@ func decodeEvent(event map[string]any) (map[string]any, error) {
 	return out, nil
 }
 
-func decodeItems(items []any) (map[string]any, error) {
-	out := map[string]any{}
+// decodeItems keys each item "atNNNN|Label" using the OPT term map (matching
+// Schema). Array-valued nodes (occurrences allow >1) are ALWAYS emitted as an
+// array — even with a single instance — to match the Schema's arraySchema
+// wrapping; single-occurrence nodes stay a scalar/object.
+func decodeItems(items []any, r contentRoot) (map[string]any, error) {
+	type bucket struct {
+		key  string
+		vals []any
+	}
+	order := []string{}
+	byNode := map[string]*bucket{}
+
 	for i, raw := range items {
 		item, ok := raw.(map[string]any)
 		if !ok {
@@ -146,21 +179,49 @@ func decodeItems(items []any) (map[string]any, error) {
 		}
 		nodeID, _ := item["archetype_node_id"].(string)
 		key := nodeID
-		if label := readNameValue(item["name"]); label != "" {
-			key = nodeID + "|" + label
+		if lbl := r.terms[nodeID]; lbl != "" {
+			key = nodeID + "|" + lbl
 		}
 
+		var decoded any
 		switch item["_type"] {
 		case "CLUSTER":
-			sub, err := decodeItems(asList(item["items"]))
+			sub, err := decodeItems(asList(item["items"]), r)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", nodeID, err)
 			}
-			out[key] = sub
+			// A coded runtime name identifies which instance this is (e.g. the
+			// lab determination "MDRD"/"eGFR/1.73m2" on a repeating result
+			// group). Plain-text names are the template label and are skipped.
+			if display, code := readCodedName(item["name"]); code != "" {
+				sub["_code"] = code
+				if display != "" {
+					sub["_name"] = display
+				}
+			}
+			decoded = sub
 		case "ELEMENT":
-			out[key] = decodeElementValue(item["value"])
+			decoded = decodeElementValue(item["value"])
 		default:
-			// Skip unknown structural nodes rather than erroring.
+			continue
+		}
+
+		b := byNode[nodeID]
+		if b == nil {
+			b = &bucket{key: key}
+			byNode[nodeID] = b
+			order = append(order, nodeID)
+		}
+		b.vals = append(b.vals, decoded)
+	}
+
+	out := map[string]any{}
+	for _, nodeID := range order {
+		b := byNode[nodeID]
+		if r.arrayNodes[nodeID] || len(b.vals) > 1 {
+			out[b.key] = b.vals
+		} else {
+			out[b.key] = b.vals[0]
 		}
 	}
 	return out, nil
@@ -178,10 +239,28 @@ func decodeElementValue(v any) any {
 		if s, ok := value["value"]; ok {
 			return s
 		}
-	case "DV_COUNT":
+	case "DV_COUNT", "DV_QUANTITY", "DV_PROPORTION":
+		// Datamap short form is the bare magnitude number; units/precision are
+		// template-derived and refilled by ToComposition.
 		if m, ok := value["magnitude"]; ok {
 			return m
 		}
+	case "DV_CODED_TEXT", "DV_ORDINAL":
+		// Datamap short form is the bare code string (from defining_code).
+		if code := readCodePhraseCode(value["defining_code"]); code != "" {
+			return code
+		}
+		// A coded text with no usable code is effectively free text — collapse
+		// to its value string so it re-encodes as a valid DV_TEXT.
+		if s, ok := value["value"].(string); ok {
+			return s
+		}
+	}
+	// Defensive: any value still carrying a defining_code is a coded value whose
+	// _type wasn't matched above — collapse it to its code so it stays
+	// schema-valid (datamap short form for coded values is the bare code).
+	if code := readCodePhraseCode(value["defining_code"]); code != "" {
+		return code
 	}
 	out := map[string]any{}
 	for k, val := range value {
@@ -239,4 +318,32 @@ func readNameValue(v any) string {
 	}
 	s, _ := obj["value"].(string)
 	return s
+}
+
+// readCodedName returns the display text and "<terminology>::<code>" of a
+// runtime DV_CODED_TEXT name. Returns empty code for a plain DV_TEXT name (the
+// template label), which the caller treats as "no meaningful runtime name".
+func readCodedName(v any) (display, code string) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	if t, _ := m["_type"].(string); t != "DV_CODED_TEXT" {
+		return "", ""
+	}
+	display, _ = m["value"].(string)
+	dc, ok := m["defining_code"].(map[string]any)
+	if !ok {
+		return display, ""
+	}
+	cs, _ := dc["code_string"].(string)
+	if cs == "" {
+		return display, ""
+	}
+	if ti, ok := dc["terminology_id"].(map[string]any); ok {
+		if term, _ := ti["value"].(string); term != "" {
+			return display, term + "::" + cs
+		}
+	}
+	return display, cs
 }

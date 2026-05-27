@@ -3,10 +3,12 @@ package care
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -138,6 +140,77 @@ func (c *Client) Verify(ctx context.Context) (int, error) {
 	return len(tpls), nil
 }
 
+// FetchOPT retrieves and parses the operational template for templateID. It
+// lets a consumer run the datamap codec (Schema/ToComposition) against a live
+// CDR template without care having to import cadasto/datamap (boundary rule).
+func (c *Client) FetchOPT(ctx context.Context, templateID string) (*template.OperationalTemplate, error) {
+	optBytes, err := c.FetchOPTRaw(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
+	if err != nil {
+		return nil, fmt.Errorf("care: parse template %s: %w", templateID, err)
+	}
+	return opt, nil
+}
+
+// FetchOPTRaw returns the raw OPT bytes for templateID without parsing — useful
+// to inspect the deployment's exact serialization when ParseOPT rejects it.
+func (c *Client) FetchOPTRaw(ctx context.Context, templateID string) ([]byte, error) {
+	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	if err != nil {
+		return nil, fmt.Errorf("care: fetch template %s: %w", templateID, err)
+	}
+	return optBytes, nil
+}
+
+// TemplateInfo is a lightweight view of an operational template in the CDR.
+type TemplateInfo struct {
+	TemplateID  string `json:"template_id"`
+	Concept     string `json:"concept,omitempty"`
+	ArchetypeID string `json:"archetype_id,omitempty"`
+	Version     string `json:"version,omitempty"`
+}
+
+// Templates lists the operational templates available in the CDR (read-only).
+func (c *Client) Templates(ctx context.Context) ([]TemplateInfo, error) {
+	metas, _, err := definition.ListTemplates(ctx, c.rest, definition.FormatADL14)
+	if err != nil {
+		return nil, fmt.Errorf("care: list templates: %w", err)
+	}
+	out := make([]TemplateInfo, len(metas))
+	for i, m := range metas {
+		out[i] = TemplateInfo{
+			TemplateID:  m.TemplateID,
+			Concept:     m.Concept,
+			ArchetypeID: m.ArchetypeID,
+			Version:     m.Version,
+		}
+	}
+	return out, nil
+}
+
+// QueryResult is a tabular AQL result: column names plus rows of raw cells.
+type QueryResult struct {
+	Columns []string `json:"columns"`
+	Rows    [][]any  `json:"rows"`
+}
+
+// Query runs an ad-hoc read-only AQL query against the CDR and returns the
+// result as columns + rows. Intended for diagnostics; no EHR scope is applied.
+func (c *Client) Query(ctx context.Context, aqlText string, params map[string]any) (*QueryResult, error) {
+	rs, _, err := query.ExecuteString(ctx, c.rest, aqlText, params)
+	if err != nil {
+		return nil, fmt.Errorf("care: query: %w", err)
+	}
+	cols := make([]string, len(rs.Columns))
+	for i, col := range rs.Columns {
+		cols[i] = col.Name
+	}
+	return &QueryResult{Columns: cols, Rows: rs.Rows}, nil
+}
+
 // CreatePatient creates a fresh EHR (the patient's clinical record) in the CDR
 // and returns its ehr_id.
 func (c *Client) CreatePatient(ctx context.Context) (string, error) {
@@ -214,4 +287,173 @@ func (c *Client) GetData(ctx context.Context, patientID, templateID, uid string)
 		return nil, fmt.Errorf("care: no Codec configured")
 	}
 	return nil, ErrNotImplemented
+}
+
+// SaveComposition stores a NEW composition (POST) from an already-encoded
+// canonical-JSON map and returns the new version uid. Codec-free: the caller
+// has already produced the composition (e.g. via datamap.ToComposition).
+func (c *Client) SaveComposition(ctx context.Context, patientID, templateID string, compMap map[string]any) (string, error) {
+	comp, err := compositionFromMap(compMap)
+	if err != nil {
+		return "", err
+	}
+	_, meta, err := composition.Save(ctx, c.rest, ehr.EHRID(patientID), comp, composition.WithTemplateID(templateID))
+	if err != nil {
+		return "", fmt.Errorf("care: save composition: %w", err)
+	}
+	if meta != nil {
+		return string(meta.VersionUID), nil
+	}
+	return "", nil
+}
+
+// UpdateComposition creates a NEW VERSION (PUT) of an existing composition and
+// returns the new version uid (…::N+1). voID is the versioned-object uuid (the
+// segment before the first "::"); ifMatch is the current full version uid.
+func (c *Client) UpdateComposition(ctx context.Context, patientID, voID, ifMatch, templateID string, compMap map[string]any) (string, error) {
+	comp, err := compositionFromMap(compMap)
+	if err != nil {
+		return "", err
+	}
+	_, meta, err := composition.Update(ctx, c.rest, ehr.EHRID(patientID), ehr.VersionedObjectID(voID), ifMatch, comp, composition.WithTemplateID(templateID))
+	if err != nil {
+		return "", fmt.Errorf("care: update composition: %w", err)
+	}
+	if meta != nil {
+		return string(meta.VersionUID), nil
+	}
+	return "", nil
+}
+
+// CompositionETag GETs a composition by ref (a versioned-object id returns the
+// latest version, a full version uid returns that version) and returns the
+// response ETag — i.e. the current version uid, suitable as an If-Match.
+func (c *Client) CompositionETag(ctx context.Context, patientID, ref string) (string, error) {
+	req := &transport.Request{
+		Method: http.MethodGet,
+		Path:   "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(ref),
+		Route:  "/ehr/{ehr_id}/composition/{versioned_object_or_version_uid}",
+		Accept: "application/json",
+	}
+	resp, err := c.rest.Do(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("care: head composition %s: %w", ref, err)
+	}
+	if resp != nil && resp.Metadata != nil {
+		return resp.Metadata.ETag, nil
+	}
+	return "", nil
+}
+
+// UpdateCompositionRaw PUTs a composition map as canonical JSON directly,
+// bypassing the typed *rm.Composition bridge (which rejects RM subtype
+// polymorphism and can re-serialize lossily). Returns the new version uid.
+func (c *Client) UpdateCompositionRaw(ctx context.Context, patientID, voID, ifMatch, templateID string, compMap map[string]any) (string, error) {
+	// Cadasto quirks for composition update (verified against acc):
+	//   1. the body MUST carry a uid (OBJECT_VERSION_ID = the preceding
+	//      version), else the server 500s in its extractUid helper;
+	//   2. the If-Match must be sent UNQUOTED — Cadasto keeps the surrounding
+	//      double quotes in the parsed value and then rejects it as "not a
+	//      valid Version UID". The transport quotes If-Match per RFC 7232, so
+	//      we set it as a raw header (Headers overrides the standard one).
+	compMap["uid"] = map[string]any{"_type": "OBJECT_VERSION_ID", "value": ifMatch}
+	body, err := json.Marshal(compMap)
+	if err != nil {
+		return "", fmt.Errorf("care: marshal composition: %w", err)
+	}
+	req := &transport.Request{
+		Method:     http.MethodPut,
+		Path:       "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(voID),
+		Route:      "/ehr/{ehr_id}/composition/{versioned_object_id}",
+		Body:       body,
+		TemplateID: templateID,
+		Accept:     "application/json",
+		Headers:    http.Header{"If-Match": []string{ifMatch}},
+	}
+	resp, err := c.rest.Do(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("care: update composition (raw): %w", err)
+	}
+	if resp != nil && resp.Metadata != nil {
+		return cleanVersionUID(resp.Metadata.ETag), nil
+	}
+	return "", nil
+}
+
+// cleanVersionUID strips surrounding quotes and the gzip-proxy "-gzip" ETag
+// suffix that Cadasto's Caddy front-end appends to compression-negotiated
+// responses, leaving a bare version uid.
+func cleanVersionUID(s string) string {
+	s = strings.TrimSuffix(strings.TrimPrefix(s, `"`), `"`)
+	if i := strings.Index(s, "-gzip"); i >= 0 {
+		s = s[:i]
+	}
+	return strings.Trim(s, `"`)
+}
+
+// SaveCompositionRaw POSTs a composition map as canonical JSON directly,
+// bypassing the typed bridge. Returns the new version uid.
+func (c *Client) SaveCompositionRaw(ctx context.Context, patientID, templateID string, compMap map[string]any) (string, error) {
+	body, err := json.Marshal(compMap)
+	if err != nil {
+		return "", fmt.Errorf("care: marshal composition: %w", err)
+	}
+	req := &transport.Request{
+		Method:     http.MethodPost,
+		Path:       "/ehr/" + url.PathEscape(patientID) + "/composition",
+		Route:      "/ehr/{ehr_id}/composition",
+		Body:       body,
+		TemplateID: templateID,
+		Accept:     "application/json",
+	}
+	resp, err := c.rest.Do(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("care: save composition (raw): %w", err)
+	}
+	if resp != nil && resp.Metadata != nil {
+		if resp.Metadata.ETag != "" {
+			return resp.Metadata.ETag, nil
+		}
+		return resp.Metadata.Location, nil
+	}
+	return "", nil
+}
+
+// GetComposition retrieves a stored composition by EHR id and version uid and
+// returns it as a canonical-JSON map (read-only). The caller can run the
+// datamap decoder (FromComposition) on the result with the matching OPT.
+func (c *Client) GetComposition(ctx context.Context, patientID, versionUID string) (map[string]any, error) {
+	// Fetch the raw canonical JSON instead of decoding into a typed
+	// *rm.Composition: the typed path (canjson/typereg) rejects RM subtype
+	// polymorphism (e.g. a DV_CODED_TEXT value where the model types DV_TEXT),
+	// and the datamap codec only needs the map form anyway.
+	b, err := c.GetCompositionRaw(ctx, patientID, versionUID, "application/json")
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("care: decode composition %s: %w", versionUID, err)
+	}
+	return m, nil
+}
+
+// GetCompositionRaw fetches a stored composition's raw bytes in the requested
+// representation (e.g. "application/json" or "application/xml"), bypassing the
+// typed RM decode. Empty accept defaults to JSON.
+func (c *Client) GetCompositionRaw(ctx context.Context, patientID, versionUID, accept string) ([]byte, error) {
+	if accept == "" {
+		accept = "application/json"
+	}
+	req := &transport.Request{
+		Method: http.MethodGet,
+		Path:   "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(versionUID),
+		Route:  "/ehr/{ehr_id}/composition/{versioned_object_or_version_uid}",
+		Accept: accept,
+	}
+	resp, err := c.rest.Do(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("care: get composition %s: %w", versionUID, err)
+	}
+	return resp.Body, nil
 }

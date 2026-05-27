@@ -46,10 +46,7 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 	content := make([]any, 0, len(roots))
 	for i := range roots {
 		r := roots[i]
-		rootPayload, _ := contentPayload[r.id+"|"+r.label].(map[string]any)
-		if rootPayload == nil {
-			rootPayload, _ = contentPayload[r.id].(map[string]any)
-		}
+		rootPayload := lookupRootPayload(contentPayload, r.id, r.label)
 		if rootPayload == nil {
 			continue
 		}
@@ -198,32 +195,41 @@ func encodeItems(itemsAttr *template.Attribute, payload map[string]any, terms ma
 			continue
 		}
 
-		switch obj.RMTypeName() {
-		case "CLUSTER":
-			subPayload, ok := value.(map[string]any)
-			if !ok {
-				return nil, fmt.Errorf("CLUSTER %s payload must be an object, got %T", nodeID, value)
+		// A slice means multiple instances of this repeating node (e.g. several
+		// "Result group" clusters); a scalar/object is a single instance.
+		instances := []any{value}
+		if arr, ok := value.([]any); ok {
+			instances = arr
+		}
+
+		for _, inst := range instances {
+			switch obj.RMTypeName() {
+			case "CLUSTER":
+				subPayload, ok := inst.(map[string]any)
+				if !ok {
+					return nil, fmt.Errorf("CLUSTER %s payload must be an object, got %T", nodeID, inst)
+				}
+				subItemsAttr := findAttr(obj, "items")
+				if subItemsAttr == nil {
+					continue
+				}
+				subItems, err := encodeItems(subItemsAttr, subPayload, terms)
+				if err != nil {
+					return nil, fmt.Errorf("cluster %s: %w", nodeID, err)
+				}
+				out = append(out, map[string]any{
+					"_type":             "CLUSTER",
+					"archetype_node_id": nodeID,
+					"name":              clusterName(subPayload, label),
+					"items":             subItems,
+				})
+			case "ELEMENT":
+				el, err := encodeElement(obj, inst, terms)
+				if err != nil {
+					return nil, fmt.Errorf("element %s: %w", nodeID, err)
+				}
+				out = append(out, el)
 			}
-			subItemsAttr := findAttr(obj, "items")
-			if subItemsAttr == nil {
-				continue
-			}
-			subItems, err := encodeItems(subItemsAttr, subPayload, terms)
-			if err != nil {
-				return nil, fmt.Errorf("cluster %s: %w", nodeID, err)
-			}
-			out = append(out, map[string]any{
-				"_type":             "CLUSTER",
-				"archetype_node_id": nodeID,
-				"name":              dvText(label),
-				"items":             subItems,
-			})
-		case "ELEMENT":
-			el, err := encodeElement(obj, value, terms)
-			if err != nil {
-				return nil, fmt.Errorf("element %s: %w", nodeID, err)
-			}
-			out = append(out, el)
 		}
 	}
 	return out, nil
@@ -301,6 +307,13 @@ func encodeCount(payload any) (map[string]any, error) {
 
 func encodeCodedText(payload any, terms map[string]string) (map[string]any, error) {
 	if m, ok := payload.(map[string]any); ok {
+		// A DV_CODED_TEXT with a null/empty code is invalid RM and the CDR
+		// rejects it; such a value is really free text, so emit DV_TEXT.
+		if !hasUsableCode(m) {
+			if v, ok := m["value"].(string); ok {
+				return map[string]any{"_type": "DV_TEXT", "value": v}, nil
+			}
+		}
 		out := map[string]any{"_type": "DV_CODED_TEXT"}
 		for k, v := range m {
 			out[k] = v
@@ -323,11 +336,32 @@ func encodeCodedText(payload any, terms map[string]string) (map[string]any, erro
 	}, nil
 }
 
+// hasUsableCode reports whether a coded-value payload carries a non-empty code,
+// either as a top-level "code" or inside a defining_code.code_string.
+func hasUsableCode(m map[string]any) bool {
+	if c, ok := m["code"].(string); ok && c != "" {
+		return true
+	}
+	if dc, ok := m["defining_code"].(map[string]any); ok {
+		if cs, ok := dc["code_string"].(string); ok && cs != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func encodeScalarWrap(rmType string, payload any) map[string]any {
 	if m, ok := payload.(map[string]any); ok {
-		out := map[string]any{"_type": rmType}
-		for k, v := range m {
-			out[k] = v
+		// Only carry value-type-relevant fields; drop foreign keys (e.g. a
+		// leftover defining_code from a coded-text source) that would make the
+		// scalar DV invalid. DV_TEXT also allows formatting/hyperlink/language.
+		out := map[string]any{"_type": rmType, "value": m["value"]}
+		if rmType == "DV_TEXT" {
+			for _, k := range []string{"formatting", "hyperlink", "language"} {
+				if v, ok := m[k]; ok {
+					out[k] = v
+				}
+			}
 		}
 		return out
 	}
@@ -356,6 +390,26 @@ func quantityDefault(n template.ObjectNode) (units string, precision int) {
 
 func dvText(value string) map[string]any {
 	return map[string]any{"_type": "DV_TEXT", "value": value}
+}
+
+// clusterName builds a CLUSTER's runtime name. When the payload carries a coded
+// runtime name (_code "<terminology>::<code>", optional _name display), it
+// emits a DV_CODED_TEXT; otherwise a plain DV_TEXT with the template label.
+func clusterName(payload map[string]any, label string) map[string]any {
+	code, _ := payload["_code"].(string)
+	if code == "" {
+		return dvText(label)
+	}
+	display, _ := payload["_name"].(string)
+	if display == "" {
+		display = label
+	}
+	terminology, codeStr := splitTerminology(code)
+	return map[string]any{
+		"_type":         "DV_CODED_TEXT",
+		"value":         display,
+		"defining_code": codePhrase(terminology, codeStr),
+	}
 }
 
 func dvDateTime(value string) map[string]any {
@@ -409,6 +463,28 @@ func termOrFallback(terms map[string]string, code, fallback string) string {
 		return t
 	}
 	return fallback
+}
+
+// lookupRootPayload finds the content-root payload for an archetype id,
+// tolerating any "|label" suffix: FromComposition keys roots by the
+// composition's stored name, which may differ from the OPT term label that
+// ToComposition computes for the same root.
+func lookupRootPayload(content map[string]any, id, label string) map[string]any {
+	if v, ok := content[id+"|"+label].(map[string]any); ok {
+		return v
+	}
+	if v, ok := content[id].(map[string]any); ok {
+		return v
+	}
+	prefix := id + "|"
+	for k, v := range content {
+		if k == id || (len(k) >= len(prefix) && k[:len(prefix)] == prefix) {
+			if m, ok := v.(map[string]any); ok {
+				return m
+			}
+		}
+	}
+	return nil
 }
 
 func lookupChildPayload(payload map[string]any, nodeID, label string) (any, bool) {

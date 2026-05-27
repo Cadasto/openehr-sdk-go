@@ -53,11 +53,34 @@ func buildSchemaObject(opt *template.OperationalTemplate) map[string]any {
 
 // contentRoot is a discovered archetype-root under the COMPOSITION's content.
 type contentRoot struct {
-	id    string
-	label string
-	terms map[string]string // at-code -> text
-	descs map[string]string // at-code -> description
-	node  template.ObjectNode
+	id         string
+	label      string
+	terms      map[string]string // at-code -> text
+	descs      map[string]string // at-code -> description
+	node       template.ObjectNode
+	arrayNodes map[string]bool // at-code -> true when occurrences allow >1 (array-valued)
+}
+
+// collectArrayNodes records every descendant at-code whose occurrences allow
+// more than one instance — these are array-valued in the datamap (matching the
+// Schema's arraySchema wrapping), even when only a single instance is present.
+func collectArrayNodes(n template.ObjectNode, out map[string]bool) {
+	if n == nil {
+		return
+	}
+	for _, a := range n.Attributes() {
+		for _, c := range a.Children() {
+			obj, ok := c.(template.ObjectNode)
+			if !ok {
+				continue
+			}
+			occ := fromMultiplicity(obj.Occurrences())
+			if nid := obj.NodeID(); nid != "" && (occ.upperUnbounded || (occ.upper != nil && *occ.upper > 1)) {
+				out[nid] = true
+			}
+			collectArrayNodes(obj, out)
+		}
+	}
 }
 
 func termMaps(ar *template.ArchetypeRoot) (text, desc map[string]string) {
@@ -86,7 +109,9 @@ func findContentArchetypeRoots(root template.ObjectNode) []contentRoot {
 			continue
 		}
 		terms, descs := termMaps(ar)
-		r := contentRoot{id: ar.ArchetypeID(), terms: terms, descs: descs, node: ar}
+		arrayNodes := map[string]bool{}
+		collectArrayNodes(ar, arrayNodes)
+		r := contentRoot{id: ar.ArchetypeID(), terms: terms, descs: descs, node: ar, arrayNodes: arrayNodes}
 		if lbl, ok := terms["at0000"]; ok && lbl != "" {
 			r.label = lbl
 		} else if parts := strings.Split(r.id, "."); len(parts) > 0 {
@@ -219,10 +244,11 @@ func buildEventItemSchema(eventNode template.ObjectNode, r contentRoot, parentPa
 		}
 	}
 
+	// time is NOT required: not every stored event carries a decodable time,
+	// and ToComposition fills a fallback (the composition start_time) when absent.
 	return map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"required":             []string{"time"},
 		"properties":           props,
 	}
 }
@@ -236,7 +262,11 @@ func buildItemsSchemaWithRequired(itemsAttr *template.Attribute, r contentRoot, 
 		}
 		occ := fromMultiplicity(obj.Occurrences())
 		if occ.lower != nil && *occ.lower > 0 {
-			required = append(required, obj.NodeID())
+			key := obj.NodeID()
+			if alias := formatNodeAlias(obj.NodeID(), r.terms); alias != "" {
+				key = alias
+			}
+			required = append(required, key)
 		}
 	}
 	return buildItemsSchema(itemsAttr, r, parentPath), required
@@ -256,6 +286,13 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 		}
 		nodePath := parentPath + "/items[" + nodeID + "]"
 		alias := formatNodeAlias(nodeID, r.terms)
+		// Property key is the labelled "atNNNN|Label" form (SPEC §4.3 datamap
+		// examples; matches the content-root convention). FromComposition emits
+		// the same labelled key so decoded data validates.
+		key := nodeID
+		if alias != "" {
+			key = alias
+		}
 		occ := fromMultiplicity(obj.Occurrences())
 		wrapArray := occ.upperUnbounded || (occ.upper != nil && *occ.upper > 1)
 
@@ -265,6 +302,11 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 			if subItems := findAttr(obj, "items"); subItems != nil {
 				clusterProps = buildItemsSchema(subItems, r, nodePath)
 			}
+			// Optional runtime-name slots for instance-named clusters (e.g. a
+			// repeating lab "result group" named per determination). Decode
+			// emits these only when the composition carries a coded name.
+			clusterProps["_code"] = shortSchema("string", "", nil, "")
+			clusterProps["_name"] = shortSchema("string", "", nil, "")
 			schema := map[string]any{
 				"type":                 "object",
 				"additionalProperties": false,
@@ -279,27 +321,49 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 				if alias != "" {
 					arr["alias"] = alias
 				}
-				props[nodeID] = arr
+				props[key] = arr
 			} else {
 				withOccurrences(schema, occ)
-				props[nodeID] = schema
+				props[key] = schema
 			}
 
 		case "ELEMENT":
-			var valueNode template.ObjectNode
+			// An ELEMENT value may constrain MULTIPLE RM types (a choice, e.g.
+			// a lab "Result value" allowing DV_QUANTITY or DV_TEXT). Emit a
+			// oneOf over every allowed type so any of them validates.
+			var valueNodes []template.ObjectNode
 			if valueAttr := findAttr(obj, "value"); valueAttr != nil {
-				if vn, ok := attrFirstObject(valueAttr); ok {
-					valueNode = vn
+				for _, c := range valueAttr.Children() {
+					// Skip the abstract DATA_VALUE base — it means the value is
+					// unconstrained (any data type), handled permissively below.
+					if vn, ok := c.(template.ObjectNode); ok {
+						if t := vn.RMTypeName(); t != "" && t != "DATA_VALUE" {
+							valueNodes = append(valueNodes, vn)
+						}
+					}
 				}
 			}
-			rmTypeOfValue := "DV_TEXT"
-			var codes []string
-			if valueNode != nil {
-				rmTypeOfValue = valueNode.RMTypeName()
-				codes = collectCodes(valueNode)
+			var options []optChoice
+			var schema map[string]any
+			if len(valueNodes) == 0 {
+				// Unconstrained value (any DATA_VALUE) — accept scalar or object.
+				schema = map[string]any{"description": "unconstrained value (any data type)"}
+			} else if len(valueNodes) == 1 {
+				rmTypeOfValue := "DV_TEXT"
+				if len(valueNodes) == 1 {
+					rmTypeOfValue = valueNodes[0].RMTypeName()
+					options = buildOptions(collectCodes(valueNodes[0]), r.terms)
+				}
+				schema = valueSchema(rmTypeOfValue, options)
+			} else {
+				branches := make([]any, 0, len(valueNodes)*2)
+				for _, vn := range valueNodes {
+					opts := buildOptions(collectCodes(vn), r.terms)
+					options = append(options, opts...)
+					branches = append(branches, shortSchemaForType(vn.RMTypeName(), opts), expandedSchemaForType(vn.RMTypeName(), opts))
+				}
+				schema = map[string]any{"oneOf": branches}
 			}
-			options := buildOptions(codes, r.terms)
-			schema := valueSchema(rmTypeOfValue, options)
 			ui := buildUi(nodePath+"/value", r.descs[nodeID], options)
 			if wrapArray {
 				arr := arraySchema(schema, occ)
@@ -307,14 +371,14 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 				if alias != "" {
 					arr["alias"] = alias
 				}
-				props[nodeID] = arr
+				props[key] = arr
 			} else {
 				schema["ui"] = ui
 				withOccurrences(schema, occ)
 				if alias != "" {
 					schema["alias"] = alias
 				}
-				props[nodeID] = schema
+				props[key] = schema
 			}
 		}
 	}
@@ -387,6 +451,13 @@ func findAttr(n template.ObjectNode, name string) *template.Attribute {
 	return nil
 }
 
+func contextChildren(a *template.Attribute) []template.Node {
+	if a == nil {
+		return nil
+	}
+	return a.Children()
+}
+
 func attrFirstObject(a *template.Attribute) (template.ObjectNode, bool) {
 	if a == nil {
 		return nil, false
@@ -437,10 +508,11 @@ func makeDescField(typ, desc string) map[string]any {
 // of standard EVENT_CONTEXT fields, optionally extended with the OPT's
 // other_context items. Returns nil when the COMPOSITION declares no context.
 func buildContextSchema(root template.ObjectNode, compTerms, compDescs map[string]string) map[string]any {
+	// The RM COMPOSITION always carries an EVENT_CONTEXT and FromComposition
+	// always emits a "context" key, so the schema must always model it — even
+	// when the OPT adds no context constraints. The OPT's context attr (when
+	// present) only extends the base block with other_context items.
 	contextAttr := findAttr(root, "context")
-	if contextAttr == nil {
-		return nil
-	}
 
 	props := map[string]any{
 		"start_time": shortSchema("string", "date-time", nil, ""),
@@ -491,7 +563,7 @@ func buildContextSchema(root template.ObjectNode, compTerms, compDescs map[strin
 	}
 	props["participations"] = map[string]any{"type": "array", "items": pItem}
 
-	for _, c := range contextAttr.Children() {
+	for _, c := range contextChildren(contextAttr) {
 		ctxObj, ok := c.(template.ObjectNode)
 		if !ok {
 			continue
