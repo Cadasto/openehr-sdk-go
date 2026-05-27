@@ -32,8 +32,10 @@ func (i *ItemList) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&i.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if i.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", i.Name); err != nil {
+			return err
+		}
 	}
 	if i.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", i.UID); err != nil {
@@ -87,8 +89,10 @@ func (i *ItemSingle) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error 
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&i.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if i.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", i.Name); err != nil {
+			return err
+		}
 	}
 	if i.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", i.UID); err != nil {
@@ -140,8 +144,10 @@ func (i *ItemTable) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&i.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if i.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", i.Name); err != nil {
+			return err
+		}
 	}
 	if i.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", i.UID); err != nil {
@@ -195,8 +201,10 @@ func (i *ItemTree) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&i.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if i.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", i.Name); err != nil {
+			return err
+		}
 	}
 	if i.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", i.UID); err != nil {

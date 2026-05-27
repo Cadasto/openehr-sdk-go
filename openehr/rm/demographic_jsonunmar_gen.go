@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -13,9 +14,8 @@ import (
 // BMM package: org.openehr.rm.demographic — canonical-JSON UnmarshalJSON companions
 
 type AddressJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -46,7 +46,22 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ADDRESS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				a.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			a.Name = dv
+		}
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -69,9 +84,8 @@ func (a *Address) UnmarshalJSON(data []byte) error {
 }
 
 type AgentJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Class     string            `json:"_type"`
+	Languages []json.RawMessage `json:"languages,omitempty"` // polymorphic []DVTextLike
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -81,8 +95,7 @@ type AgentJSONUnmarshaller struct {
 	Details  json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name          json.RawMessage     `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -112,7 +125,28 @@ func (a *Agent) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "AGENT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	a.Languages = aux.Languages
+	if aux.Languages != nil {
+		a.Languages = make([]DVTextLike, len(aux.Languages))
+		for idx, raw := range aux.Languages {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: jerr}
+					}
+					a.Languages[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: err}
+				}
+			} else {
+				a.Languages[idx] = dv
+			}
+		}
+	}
 	a.Roles = aux.Roles
 	a.Identities = aux.Identities
 	a.Contacts = aux.Contacts
@@ -124,7 +158,22 @@ func (a *Agent) UnmarshalJSON(data []byte) error {
 		a.Details = dv
 	}
 	a.Relationships = aux.Relationships
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				a.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			a.Name = dv
+		}
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -140,9 +189,8 @@ func (a *Agent) UnmarshalJSON(data []byte) error {
 }
 
 type CapabilityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -175,7 +223,22 @@ func (c *Capability) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CAPABILITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	c.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				c.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			c.Name = dv
+		}
+	}
 	c.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -199,9 +262,8 @@ func (c *Capability) UnmarshalJSON(data []byte) error {
 }
 
 type ContactJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -235,7 +297,22 @@ func (c *Contact) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CONTACT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	c.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				c.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			c.Name = dv
+		}
+	}
 	c.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -253,9 +330,8 @@ func (c *Contact) UnmarshalJSON(data []byte) error {
 }
 
 type GroupJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Class     string            `json:"_type"`
+	Languages []json.RawMessage `json:"languages,omitempty"` // polymorphic []DVTextLike
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -265,8 +341,7 @@ type GroupJSONUnmarshaller struct {
 	Details  json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name          json.RawMessage     `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -296,7 +371,28 @@ func (g *Group) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "GROUP", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	g.Languages = aux.Languages
+	if aux.Languages != nil {
+		g.Languages = make([]DVTextLike, len(aux.Languages))
+		for idx, raw := range aux.Languages {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: jerr}
+					}
+					g.Languages[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: err}
+				}
+			} else {
+				g.Languages[idx] = dv
+			}
+		}
+	}
 	g.Roles = aux.Roles
 	g.Identities = aux.Identities
 	g.Contacts = aux.Contacts
@@ -308,7 +404,22 @@ func (g *Group) UnmarshalJSON(data []byte) error {
 		g.Details = dv
 	}
 	g.Relationships = aux.Relationships
-	g.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				g.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			g.Name = dv
+		}
+	}
 	g.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -324,9 +435,8 @@ func (g *Group) UnmarshalJSON(data []byte) error {
 }
 
 type OrganisationJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Class     string            `json:"_type"`
+	Languages []json.RawMessage `json:"languages,omitempty"` // polymorphic []DVTextLike
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -336,8 +446,7 @@ type OrganisationJSONUnmarshaller struct {
 	Details  json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name          json.RawMessage     `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -367,7 +476,28 @@ func (o *Organisation) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORGANISATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	o.Languages = aux.Languages
+	if aux.Languages != nil {
+		o.Languages = make([]DVTextLike, len(aux.Languages))
+		for idx, raw := range aux.Languages {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: jerr}
+					}
+					o.Languages[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: err}
+				}
+			} else {
+				o.Languages[idx] = dv
+			}
+		}
+	}
 	o.Roles = aux.Roles
 	o.Identities = aux.Identities
 	o.Contacts = aux.Contacts
@@ -379,7 +509,22 @@ func (o *Organisation) UnmarshalJSON(data []byte) error {
 		o.Details = dv
 	}
 	o.Relationships = aux.Relationships
-	o.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				o.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			o.Name = dv
+		}
+	}
 	o.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -395,9 +540,8 @@ func (o *Organisation) UnmarshalJSON(data []byte) error {
 }
 
 type PartyIdentityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -428,7 +572,22 @@ func (p *PartyIdentity) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_IDENTITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	p.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				p.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			p.Name = dv
+		}
+	}
 	p.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -451,9 +610,8 @@ func (p *PartyIdentity) UnmarshalJSON(data []byte) error {
 }
 
 type PartyRelationshipJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -490,7 +648,22 @@ func (p *PartyRelationship) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_RELATIONSHIP", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	p.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				p.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			p.Name = dv
+		}
+	}
 	p.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -516,9 +689,8 @@ func (p *PartyRelationship) UnmarshalJSON(data []byte) error {
 }
 
 type PersonJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Class     string            `json:"_type"`
+	Languages []json.RawMessage `json:"languages,omitempty"` // polymorphic []DVTextLike
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -528,8 +700,7 @@ type PersonJSONUnmarshaller struct {
 	Details  json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name          json.RawMessage     `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -559,7 +730,28 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PERSON", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	p.Languages = aux.Languages
+	if aux.Languages != nil {
+		p.Languages = make([]DVTextLike, len(aux.Languages))
+		for idx, raw := range aux.Languages {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: jerr}
+					}
+					p.Languages[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/languages/%d", idx), Inner: err}
+				}
+			} else {
+				p.Languages[idx] = dv
+			}
+		}
+	}
 	p.Roles = aux.Roles
 	p.Identities = aux.Identities
 	p.Contacts = aux.Contacts
@@ -571,7 +763,22 @@ func (p *Person) UnmarshalJSON(data []byte) error {
 		p.Details = dv
 	}
 	p.Relationships = aux.Relationships
-	p.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				p.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			p.Name = dv
+		}
+	}
 	p.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -595,8 +802,7 @@ type RoleJSONUnmarshaller struct {
 	Details  json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name          json.RawMessage     `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -642,7 +848,22 @@ func (r *Role) UnmarshalJSON(data []byte) error {
 		r.Details = dv
 	}
 	r.Relationships = aux.Relationships
-	r.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				r.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			r.Name = dv
+		}
+	}
 	r.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -663,9 +884,8 @@ func (r *Role) UnmarshalJSON(data []byte) error {
 type VersionedPartyJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -687,7 +907,22 @@ func (v *VersionedParty) UnmarshalJSON(data []byte) error {
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }

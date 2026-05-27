@@ -25,17 +25,26 @@ type decoderConfig struct {
 }
 
 // WithRelaxedTypeDispatch toggles the polymorphic-dispatch policy
-// from STRICT (default — missing `xsi:type` at a polymorphic site is
-// an error) to RELAXED (missing `xsi:type` is allowed when the
-// declared abstract field has exactly one concrete descendant in the
-// merged BMM; the decoder then instantiates that descendant).
+// for ABSTRACT slots from STRICT (default — missing `xsi:type` at a
+// polymorphic site is an error) to RELAXED (missing `xsi:type` is
+// allowed when the declared abstract field has exactly one concrete
+// descendant in the merged BMM; the decoder then instantiates that
+// descendant). Scope: abstract slots only — slot types like
+// `DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY`.
 //
-// v1 NOTE: the relaxed escape hatch is recognised by the option
-// surface but enforced by future generator output — the current
-// generated [UnmarshalXML] methods only implement strict dispatch.
-// Setting this option today is a no-op for built-in RM types; the
-// hook stays here so the API does not break when the relaxed path
-// lands.
+// SDK-GAP-11 narrow-interface slots (`<Parent>Like` — DVTextLike,
+// PartyIdentifiedLike, …) have an independent, always-on fallback:
+// a missing `xsi:type` defaults to the declared parent's concrete
+// type, served by [DecodeAsOrDefault] from the generator emission.
+// That fallback is deterministic (the parent type is fixed by the
+// BMM) so it is not gated by this option.
+//
+// v1 NOTE: the relaxed escape hatch for ABSTRACT slots is recognised
+// by the option surface but enforced by future generator output —
+// the current generated [UnmarshalXML] methods at abstract slots
+// still implement strict dispatch. Setting this option today is a
+// no-op for those slots; the hook stays so the API does not break
+// when the relaxed path lands.
 func WithRelaxedTypeDispatch(enabled bool) DecoderOption {
 	return func(c *decoderConfig) { c.relaxedTypeDispatch = enabled }
 }
@@ -183,13 +192,75 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 			Inner: fmt.Errorf("canxml: %w", err),
 		}
 	}
-	t, ok := v.(T)
-	if !ok {
-		return zero, &DecodeError{
-			Path:  "/" + start.Name.Local,
-			Type:  typeName,
-			Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
+	if t, ok := v.(T); ok {
+		return t, nil
+	}
+	// Registry ctors return pointers; when T is a concrete value
+	// shape (e.g. `DVInterval[DVQuantity].Lower` dispatches via
+	// `DecodeAs[DVQuantity]`), assert to T first, then close the
+	// pointer-to-value gap via *T without reflection.
+	if pt, ok := v.(*T); ok && pt != nil {
+		return *pt, nil
+	}
+	return zero, &DecodeError{
+		Path:  "/" + start.Name.Local,
+		Type:  typeName,
+		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
+	}
+}
+
+// DecodeAsOrDefault is the polySingleNarrow (SDK-GAP-11) XML
+// counterpart of [DecodeAs]. When the element carries an `xsi:type`,
+// dispatch goes through [typereg.Default] exactly like DecodeAs.
+// When `xsi:type` is absent, the supplied defaultCtor instantiates
+// the declared parent type and dec.DecodeElement populates it —
+// preserving openEHR canonical XML where the static field type fixes
+// the concrete subtype.
+func DecodeAsOrDefault[T any](dec *xml.Decoder, start xml.StartElement, defaultCtor func() any) (T, error) {
+	var zero T
+	typeName, err := XSITypeOf(start)
+	if err != nil {
+		return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: err}
+	}
+	var v any
+	if typeName == "" {
+		if defaultCtor == nil {
+			return zero, &DecodeError{Path: "/" + start.Name.Local, Inner: fmt.Errorf("canxml: %w", typereg.ErrMissingType)}
+		}
+		v = defaultCtor()
+		if err := dec.DecodeElement(v, &start); err != nil {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Inner: fmt.Errorf("canxml: %w", err),
+			}
+		}
+	} else {
+		ctor, ok := typereg.Default.Lookup(typeName)
+		if !ok {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Type:  typeName,
+				Inner: fmt.Errorf("canxml: %q: %w", typeName, typereg.ErrUnknownType),
+			}
+		}
+		v = ctor()
+		if err := dec.DecodeElement(v, &start); err != nil {
+			return zero, &DecodeError{
+				Path:  "/" + start.Name.Local,
+				Type:  typeName,
+				Inner: fmt.Errorf("canxml: %w", err),
+			}
 		}
 	}
-	return t, nil
+	if t, ok := v.(T); ok {
+		return t, nil
+	}
+	if pt, ok := v.(*T); ok && pt != nil {
+		return *pt, nil
+	}
+	return zero, &DecodeError{
+		Path:  "/" + start.Name.Local,
+		Type:  typeName,
+		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
+	}
 }

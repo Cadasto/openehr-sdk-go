@@ -229,6 +229,16 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 	}
 }
 
+// auditBase unwraps a rm.AuditDetailsLike interface back to its
+// concrete rm.AuditDetails value. Post-SDK-GAP-11 the Version-family
+// CommitAudit field is a narrow interface so subtype payloads
+// (ATTESTATION) survive decode/re-marshal; the contribution.Submission
+// envelope still types Audit concretely.
+func auditBase(v rm.AuditDetailsLike) rm.AuditDetails {
+	a, _ := rm.AuditDetailsBase(v)
+	return a
+}
+
 // newOriginalVersionFixture builds a minimal ORIGINAL_VERSION<COMPOSITION>
 // for the PROBE-072 server fakes — the probe doesn't care about clinical
 // content, only the wire shape, so ArchetypeNodeID is the only Composition
@@ -264,7 +274,7 @@ func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    ov.CommitAudit,
+		Audit:    auditBase(ov.CommitAudit),
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
@@ -293,7 +303,7 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    ov.CommitAudit,
+		Audit:    auditBase(ov.CommitAudit),
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)

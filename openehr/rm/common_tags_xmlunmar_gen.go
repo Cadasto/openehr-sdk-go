@@ -52,9 +52,11 @@ func (i *ItemTag) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				i.TargetPath = &_v
 			case "owner_id":
-				if _err := _dec.DecodeElement(&i.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				i.OwnerID = _v
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err

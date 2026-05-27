@@ -130,8 +130,8 @@ func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "location":
-				_v := new(PartyIdentified)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[PartyIdentifiedLike](_dec, _t, func() any { return new(PartyIdentified) })
+				if _err != nil {
 					return _err
 				}
 				f.Location = _v
@@ -142,8 +142,8 @@ func (f *FeederAuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				f.Subject = _v
 			case "provider":
-				_v := new(PartyIdentified)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[PartyIdentifiedLike](_dec, _t, func() any { return new(PartyIdentified) })
+				if _err != nil {
 					return _err
 				}
 				f.Provider = _v
@@ -193,13 +193,17 @@ func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "meaning":
-				if _err := _dec.DecodeElement(&l.Meaning, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
+				if _err != nil {
 					return _err
 				}
+				l.Meaning = _v
 			case "type":
-				if _err := _dec.DecodeElement(&l.Type, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
+				if _err != nil {
 					return _err
 				}
+				l.Type = _v
 			case "target":
 				if _err := _dec.DecodeElement(&l.Target, &_t); _err != nil {
 					return _err

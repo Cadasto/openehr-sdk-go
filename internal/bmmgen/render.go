@@ -364,6 +364,12 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		b.WriteString(field)
 	}
 	b.WriteString("}\n")
+	// SDK-GAP-11: emit a narrow `<GoName>Like` interface alongside the
+	// concrete struct when this class has registered subtypes. Marker
+	// methods on the parent + every transitive subtype provide the
+	// type-set; downstream fields typed by the parent class are lifted
+	// to the interface so wire decode preserves subtype payloads.
+	emitNarrowInterface(&b, plan, pc, sc)
 	// Phase-3: emit method stubs for any functions declared on this
 	// class. For abstract+generic structs (e.g. EVENT[T]) this also
 	// emits the class's own functions on the embedding receiver.
@@ -371,6 +377,45 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		return "", err
 	}
 	return b.String(), nil
+}
+
+// emitNarrowInterface writes the `<GoName>Like` interface + marker
+// methods when pc has registered subtypes per plan.ConcreteSubtypes.
+// The marker method uses a value receiver on the parent and on every
+// transitive subtype, so the interface is satisfied by both `T` and
+// `*T` (mirrors the existing AbstractDescendants emission style at
+// [emitMarkerMethods]).
+func emitNarrowInterface(b *strings.Builder, plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) {
+	subs, ok := plan.ConcreteSubtypes[pc.BMMName]
+	if !ok || len(subs) == 0 {
+		return
+	}
+	if pc.External || sc.IsGeneric() || pc.IsPrimitive {
+		return
+	}
+	ifaceName := pc.GoName + "Like"
+	markerName := "is" + ifaceName
+	fmt.Fprintf(b, "\n// %s is the SDK-GAP-11 narrow polymorphic interface for %s.\n", ifaceName, pc.GoName)
+	fmt.Fprintf(b, "// Concrete-typed RM slots declared as %s admit Liskov substitution\n", pc.BMMName)
+	b.WriteString("// by any descendant per the openEHR RM; the wire decoder dispatches\n")
+	b.WriteString("// via typereg using this interface so subtype payloads survive the\n")
+	b.WriteString("// decode → re-marshal round-trip without field loss.\n")
+	fmt.Fprintf(b, "type %s interface {\n\t%s()\n}\n", ifaceName, markerName)
+	// Marker on the parent itself.
+	fmt.Fprintf(b, "\nfunc (%s) %s() {}\n", pc.GoName, markerName)
+	// Marker on each descendant.
+	for _, dn := range subs {
+		dc, ok := plan.Classes[dn]
+		if !ok {
+			continue
+		}
+		desc, isSimple := dc.Class.(*bmm.SimpleClass)
+		if !isSimple {
+			continue
+		}
+		recv := dc.GoName + genericReceiverParams(desc)
+		fmt.Fprintf(b, "func (%s) %s() {}\n", recv, markerName)
+	}
 }
 
 // collectFlattenedProperties returns the union of the class's own
@@ -815,6 +860,13 @@ func singleTypeRef(plan *Plan, owner *bmm.SimpleClass, name string) (string, boo
 		if sc, isSimple := pc.Class.(*bmm.SimpleClass); isSimple && sc.IsGeneric() {
 			return qualifyClassRef(plan, pc) + defaultGenericArgs(plan, sc), true, nil
 		}
+		// SDK-GAP-11: concrete class with registered subtypes is lifted
+		// to a narrow `<Parent>Like` Go interface. The struct field
+		// adopts the interface so the wire-decode dispatch via typereg
+		// is lossless across subtype payloads.
+		if iface, ok := narrowInterfaceGoName(plan, name); ok {
+			return iface, true, nil
+		}
 		return qualifyClassRef(plan, pc), true, nil
 	}
 	// Unknown — fall through to `any` with a TODO. Caller should
@@ -886,9 +938,10 @@ func goNameForRef(plan *Plan, name string) string {
 }
 
 // isInterfaceTypeRef reports whether the named BMM class resolves to
-// an interface in the generated Go code (abstract class or
-// P_BMM_INTERFACE). Optional properties typed by an interface do NOT
-// need an extra `*` indirection.
+// an interface in the generated Go code (abstract class, P_BMM_INTERFACE,
+// or a concrete-with-subtypes parent lifted to a narrow `<Parent>Like`
+// interface per SDK-GAP-11). Optional properties typed by an interface
+// do NOT need an extra `*` indirection.
 func isInterfaceTypeRef(plan *Plan, name string) bool {
 	pc, ok := plan.Classes[name]
 	if !ok {
@@ -898,7 +951,13 @@ func isInterfaceTypeRef(plan *Plan, name string) bool {
 	case *bmm.Interface:
 		return true
 	case *bmm.SimpleClass:
-		return cls.IsAbstract() && (!cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc))
+		if cls.IsAbstract() && (!cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc)) {
+			return true
+		}
+		// Concrete-with-subtypes — emitted as a narrow Go interface.
+		if _, hasKids := plan.ConcreteSubtypes[pc.BMMName]; hasKids && !cls.IsGeneric() && !pc.IsPrimitive {
+			return true
+		}
 	}
 	return false
 }

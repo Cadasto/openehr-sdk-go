@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -13,22 +14,19 @@ import (
 // BMM package: org.openehr.rm.composition.content.entry — canonical-JSON UnmarshalJSON companions
 
 type ActionJSONUnmarshaller struct {
-	Class    string          `json:"_type"`
-	Protocol json.RawMessage `json:"protocol,omitempty"` // polymorphic ItemStructure
-	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	Class       string          `json:"_type"`
+	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
-	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
-	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
+	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
+	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
+	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -72,11 +70,41 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 		}
 		a.Protocol = dv
 	}
-	a.GuidelineID = aux.GuidelineID
+	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
+				}
+				a.GuidelineID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
+			}
+		} else {
+			a.GuidelineID = dv
+		}
+	}
 	a.Language = aux.Language
 	a.Encoding = aux.Encoding
 	a.OtherParticipations = aux.OtherParticipations
-	a.WorkflowID = aux.WorkflowID
+	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
+				}
+				a.WorkflowID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
+			}
+		} else {
+			a.WorkflowID = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -91,7 +119,22 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 		}
 		a.Provider = dv
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				a.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			a.Name = dv
+		}
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -117,9 +160,8 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 }
 
 type ActivityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -161,7 +203,22 @@ func (a *Activity) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACTIVITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				a.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			a.Name = dv
+		}
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -193,12 +250,10 @@ type AdminEntryJSONUnmarshaller struct {
 	Encoding CodePhrase `json:"encoding"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
-	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
-	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
+	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
+	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
+	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -232,7 +287,22 @@ func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 	a.Language = aux.Language
 	a.Encoding = aux.Encoding
 	a.OtherParticipations = aux.OtherParticipations
-	a.WorkflowID = aux.WorkflowID
+	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
+				}
+				a.WorkflowID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
+			}
+		} else {
+			a.WorkflowID = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -247,7 +317,22 @@ func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 		}
 		a.Provider = dv
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				a.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			a.Name = dv
+		}
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -270,22 +355,19 @@ func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 }
 
 type EvaluationJSONUnmarshaller struct {
-	Class    string          `json:"_type"`
-	Protocol json.RawMessage `json:"protocol,omitempty"` // polymorphic ItemStructure
-	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	Class       string          `json:"_type"`
+	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
-	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
-	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
+	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
+	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
+	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -323,11 +405,41 @@ func (e *Evaluation) UnmarshalJSON(data []byte) error {
 		}
 		e.Protocol = dv
 	}
-	e.GuidelineID = aux.GuidelineID
+	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
+				}
+				e.GuidelineID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
+			}
+		} else {
+			e.GuidelineID = dv
+		}
+	}
 	e.Language = aux.Language
 	e.Encoding = aux.Encoding
 	e.OtherParticipations = aux.OtherParticipations
-	e.WorkflowID = aux.WorkflowID
+	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
+				}
+				e.WorkflowID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
+			}
+		} else {
+			e.WorkflowID = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -342,7 +454,22 @@ func (e *Evaluation) UnmarshalJSON(data []byte) error {
 		}
 		e.Provider = dv
 	}
-	e.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				e.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			e.Name = dv
+		}
+	}
 	e.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -365,22 +492,19 @@ func (e *Evaluation) UnmarshalJSON(data []byte) error {
 }
 
 type InstructionJSONUnmarshaller struct {
-	Class    string          `json:"_type"`
-	Protocol json.RawMessage `json:"protocol,omitempty"` // polymorphic ItemStructure
-	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	Class       string          `json:"_type"`
+	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
-	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
-	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
+	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
+	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
+	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -391,9 +515,8 @@ type InstructionJSONUnmarshaller struct {
 	// ArchetypeDetails Details of archetyping used on this node.
 	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DVText `json:"narrative"`
+	FeederAudit *FeederAudit    `json:"feeder_audit,omitempty"`
+	Narrative   json.RawMessage `json:"narrative"` // polymorphic DVTextLike
 	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
 	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
@@ -425,11 +548,41 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 		}
 		i.Protocol = dv
 	}
-	i.GuidelineID = aux.GuidelineID
+	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
+				}
+				i.GuidelineID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
+			}
+		} else {
+			i.GuidelineID = dv
+		}
+	}
 	i.Language = aux.Language
 	i.Encoding = aux.Encoding
 	i.OtherParticipations = aux.OtherParticipations
-	i.WorkflowID = aux.WorkflowID
+	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
+				}
+				i.WorkflowID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
+			}
+		} else {
+			i.WorkflowID = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -444,7 +597,22 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 		}
 		i.Provider = dv
 	}
-	i.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
+		}
+	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -456,7 +624,22 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 	i.Links = aux.Links
 	i.ArchetypeDetails = aux.ArchetypeDetails
 	i.FeederAudit = aux.FeederAudit
-	i.Narrative = aux.Narrative
+	if len(aux.Narrative) > 0 && string(aux.Narrative) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Narrative)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Narrative, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/narrative", Inner: jerr}
+				}
+				i.Narrative = &def
+			} else {
+				return &typereg.DecodeError{Path: "/narrative", Inner: err}
+			}
+		} else {
+			i.Narrative = dv
+		}
+	}
 	i.ExpiryTime = aux.ExpiryTime
 	i.WfDefinition = aux.WfDefinition
 	i.Activities = aux.Activities
@@ -507,9 +690,8 @@ type IsmTransitionJSONUnmarshaller struct {
 	// Transition The ISM transition which occurred to arrive in the current_state. Coded by openEHR terminology group  Instruction transitions.
 	Transition *DVCodedText `json:"transition,omitempty"`
 	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
-	CareflowStep *DVCodedText `json:"careflow_step,omitempty"`
-	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
-	Reason []DVText `json:"reason,omitempty"`
+	CareflowStep *DVCodedText      `json:"careflow_step,omitempty"`
+	Reason       []json.RawMessage `json:"reason,omitempty"` // polymorphic []DVTextLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into IsmTransition.
@@ -531,27 +713,45 @@ func (i *IsmTransition) UnmarshalJSON(data []byte) error {
 	i.CurrentState = aux.CurrentState
 	i.Transition = aux.Transition
 	i.CareflowStep = aux.CareflowStep
-	i.Reason = aux.Reason
+	if aux.Reason != nil {
+		i.Reason = make([]DVTextLike, len(aux.Reason))
+		for idx, raw := range aux.Reason {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/reason/%d", idx), Inner: jerr}
+					}
+					i.Reason[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/reason/%d", idx), Inner: err}
+				}
+			} else {
+				i.Reason[idx] = dv
+			}
+		}
+	}
 	return nil
 }
 
 type ObservationJSONUnmarshaller struct {
-	Class    string          `json:"_type"`
-	Protocol json.RawMessage `json:"protocol,omitempty"` // polymorphic ItemStructure
-	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	Class       string          `json:"_type"`
+	Protocol    json.RawMessage `json:"protocol,omitempty"`     // polymorphic ItemStructure
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"` // polymorphic ObjectRefLike
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
 	Encoding CodePhrase `json:"encoding"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
-	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
-	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
-	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	WorkflowID          json.RawMessage `json:"workflow_id,omitempty"` // polymorphic ObjectRefLike
+	Subject             json.RawMessage `json:"subject"`               // polymorphic PartyProxy
+	Provider            json.RawMessage `json:"provider,omitempty"`    // polymorphic PartyProxy
+	Name                json.RawMessage `json:"name"`                  // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -592,11 +792,41 @@ func (o *Observation) UnmarshalJSON(data []byte) error {
 		}
 		o.Protocol = dv
 	}
-	o.GuidelineID = aux.GuidelineID
+	if len(aux.GuidelineID) > 0 && string(aux.GuidelineID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.GuidelineID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.GuidelineID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/guideline_id", Inner: jerr}
+				}
+				o.GuidelineID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/guideline_id", Inner: err}
+			}
+		} else {
+			o.GuidelineID = dv
+		}
+	}
 	o.Language = aux.Language
 	o.Encoding = aux.Encoding
 	o.OtherParticipations = aux.OtherParticipations
-	o.WorkflowID = aux.WorkflowID
+	if len(aux.WorkflowID) > 0 && string(aux.WorkflowID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.WorkflowID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.WorkflowID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/workflow_id", Inner: jerr}
+				}
+				o.WorkflowID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/workflow_id", Inner: err}
+			}
+		} else {
+			o.WorkflowID = dv
+		}
+	}
 	if len(aux.Subject) > 0 && string(aux.Subject) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Subject)
 		if err != nil {
@@ -611,7 +841,22 @@ func (o *Observation) UnmarshalJSON(data []byte) error {
 		}
 		o.Provider = dv
 	}
-	o.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				o.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			o.Name = dv
+		}
+	}
 	o.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)

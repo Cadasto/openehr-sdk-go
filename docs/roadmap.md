@@ -39,7 +39,7 @@
 | Type registry | **Landed** | `openehr/rm/typereg/` REQ-040 | |
 | AOM 1.4 (generated) | **Landed** | `openehr/aom/aom14/` | |
 | AOM 2.4 | **Deferred** | `openehr/aom/aom2/` | BMM pinned; no codegen yet |
-| Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031 |
+| Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031/038; SDK-GAP-11 narrow polymorphic decode (`<Parent>Like` interfaces) [archived plan](plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md) |
 | Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
 | OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/2026-05-22-template-req100-followups.md) |

@@ -12,9 +12,9 @@ type ContributionJSONMarshaller struct {
 	// UID Unique identifier for this Contribution.
 	UID HierObjectID `json:"uid"`
 	// Versions Set of references to Versions causing changes to this EHR. Each contribution contains a list of versions, which may include paths pointing to any number of versionable items, i.e. items of types such as `COMPOSITION` and `FOLDER`.
-	Versions []ObjectRef `json:"versions"`
+	Versions []ObjectRefLike `json:"versions"`
 	// Audit Audit trail corresponding to the committal of this Contribution.
-	Audit AuditDetails `json:"audit"`
+	Audit AuditDetailsLike `json:"audit"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Contribution with `_type`
@@ -34,11 +34,11 @@ func (c *Contribution) MarshalJSON() ([]byte, error) {
 type ImportedVersionJSONMarshaller[T any] struct {
 	Class string `json:"_type"`
 	// Contribution Contribution in which this version was added.
-	Contribution ObjectRef `json:"contribution"`
+	Contribution ObjectRefLike `json:"contribution"`
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
 	Signature *string `json:"signature,omitempty"`
 	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetails `json:"commit_audit"`
+	CommitAudit AuditDetailsLike `json:"commit_audit"`
 	// Item The `ORIGINAL_VERSION` object that was imported.
 	Item OriginalVersion[any] `json:"item"`
 }
@@ -61,11 +61,11 @@ func (i *ImportedVersion[T]) MarshalJSON() ([]byte, error) {
 type OriginalVersionJSONMarshaller[T any] struct {
 	Class string `json:"_type"`
 	// Contribution Contribution in which this version was added.
-	Contribution ObjectRef `json:"contribution"`
+	Contribution ObjectRefLike `json:"contribution"`
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
 	Signature *string `json:"signature,omitempty"`
 	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetails `json:"commit_audit"`
+	CommitAudit AuditDetailsLike `json:"commit_audit"`
 	// UID Stored version of inheritance precursor.
 	UID ObjectVersionID `json:"uid"`
 	// PrecedingVersionUID Stored version of inheritance precursor.
@@ -105,7 +105,7 @@ type VersionedObjectJSONMarshaller[T any] struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }

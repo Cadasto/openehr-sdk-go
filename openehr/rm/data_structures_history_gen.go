@@ -47,7 +47,7 @@ type History[T ItemStructure] struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Origin Time origin of this event history. The first event is not necessarily at the origin point.
 	Origin DVDateTime `json:"origin"`
 	// Period Period between samples in this segment if periodic.
@@ -80,7 +80,7 @@ type IntervalEvent[T ItemStructure] struct {
 	// MathFunction Mathematical function of the data of this event, e.g.  maximum, mean etc. Coded using https://github.com/openEHR/terminology/blob/master/openEHR_RM/en/openehr_terminology.xml[openEHR vocabulary `event math function`]. Default value `640|actual|`, meaning 'actual value'.
 	MathFunction DVCodedText `json:"math_function"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// SampleCount Optional count of original samples to which this event corresponds.
 	SampleCount *Integer `json:"sample_count,omitempty"`
 	// State Optional state data for this event.
@@ -113,7 +113,7 @@ type PointEvent[T ItemStructure] struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// State Optional state data for this event.
 	State ItemStructure `json:"state,omitempty"`
 	// Time Time of this event. If the width is non-zero, it is the time point of the trailing edge of the event.

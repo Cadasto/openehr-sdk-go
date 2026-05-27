@@ -20,7 +20,7 @@ type Cluster struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
@@ -38,11 +38,11 @@ type Element struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// NullFlavour Flavour of null value, e.g. `253|unknown|`, `271|no information|`, `272|masked|`, and `273|not applicable|`.
 	NullFlavour *DVCodedText `json:"null_flavour,omitempty"`
 	// NullReason Optional specific reason for null value; if set, `_null_flavour_` must be set. Null reason may apply only to a minority of clinical data, commonly needed in reporting contexts.
-	NullReason *DVText `json:"null_reason,omitempty"`
+	NullReason DVTextLike `json:"null_reason,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// Value Property representing leaf value object of `ELEMENT`. In real data, any concrete subtype of `DATA_VALUE` can be used.

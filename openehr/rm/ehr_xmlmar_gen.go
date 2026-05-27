@@ -37,37 +37,53 @@ func (e *EHR) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeElement(&e.EHRID, xml.StartElement{Name: xml.Name{Local: "ehr_id"}}); err != nil {
 		return err
 	}
-	for _idx := range e.Contributions {
-		if err := _e.EncodeElement(&e.Contributions[_idx], xml.StartElement{Name: xml.Name{Local: "contributions"}}); err != nil {
+	for _, _item := range e.Contributions {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "contributions", _item); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&e.EHRStatus, xml.StartElement{Name: xml.Name{Local: "ehr_status"}}); err != nil {
-		return err
+	if e.EHRStatus != nil {
+		if err := canxml.EncodePoly(_e, "ehr_status", e.EHRStatus); err != nil {
+			return err
+		}
 	}
-	if err := _e.EncodeElement(&e.EHRAccess, xml.StartElement{Name: xml.Name{Local: "ehr_access"}}); err != nil {
-		return err
+	if e.EHRAccess != nil {
+		if err := canxml.EncodePoly(_e, "ehr_access", e.EHRAccess); err != nil {
+			return err
+		}
 	}
-	for _idx := range e.Compositions {
-		if err := _e.EncodeElement(&e.Compositions[_idx], xml.StartElement{Name: xml.Name{Local: "compositions"}}); err != nil {
+	for _, _item := range e.Compositions {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "compositions", _item); err != nil {
 			return err
 		}
 	}
 	if e.Directory != nil {
-		if err := _e.EncodeElement(e.Directory, xml.StartElement{Name: xml.Name{Local: "directory"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "directory", e.Directory); err != nil {
 			return err
 		}
 	}
 	if err := _e.EncodeElement(&e.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err
 	}
-	for _idx := range e.Folders {
-		if err := _e.EncodeElement(&e.Folders[_idx], xml.StartElement{Name: xml.Name{Local: "folders"}}); err != nil {
+	for _, _item := range e.Folders {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "folders", _item); err != nil {
 			return err
 		}
 	}
-	for _idx := range e.Tags {
-		if err := _e.EncodeElement(&e.Tags[_idx], xml.StartElement{Name: xml.Name{Local: "tags"}}); err != nil {
+	for _, _item := range e.Tags {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "tags", _item); err != nil {
 			return err
 		}
 	}
@@ -98,8 +114,10 @@ func (e *EHRAccess) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if e.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", e.Name); err != nil {
+			return err
+		}
 	}
 	if e.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", e.UID); err != nil {
@@ -153,8 +171,10 @@ func (e *EHRStatus) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if e.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", e.Name); err != nil {
+			return err
+		}
 	}
 	if e.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", e.UID); err != nil {
@@ -219,8 +239,10 @@ func (v *VersionedComposition) MarshalXML(_e *xml.Encoder, _start xml.StartEleme
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err
@@ -254,8 +276,10 @@ func (v *VersionedEHRAccess) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err
@@ -289,8 +313,10 @@ func (v *VersionedEHRStatus) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err

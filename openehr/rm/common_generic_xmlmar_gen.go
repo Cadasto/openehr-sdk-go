@@ -41,7 +41,7 @@ func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		return err
 	}
 	if a.Description != nil {
-		if err := _e.EncodeElement(a.Description, xml.StartElement{Name: xml.Name{Local: "description"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "description", a.Description); err != nil {
 			return err
 		}
 	}
@@ -65,8 +65,10 @@ func (a *Attestation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&a.Reason, xml.StartElement{Name: xml.Name{Local: "reason"}}); err != nil {
-		return err
+	if a.Reason != nil {
+		if err := canxml.EncodePoly(_e, "reason", a.Reason); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(a.IsPending, xml.StartElement{Name: xml.Name{Local: "is_pending"}}); err != nil {
 		return err
@@ -107,7 +109,7 @@ func (a *AuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		return err
 	}
 	if a.Description != nil {
-		if err := _e.EncodeElement(a.Description, xml.StartElement{Name: xml.Name{Local: "description"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "description", a.Description); err != nil {
 			return err
 		}
 	}
@@ -142,8 +144,10 @@ func (p *Participation) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&p.Function, xml.StartElement{Name: xml.Name{Local: "function"}}); err != nil {
-		return err
+	if p.Function != nil {
+		if err := canxml.EncodePoly(_e, "function", p.Function); err != nil {
+			return err
+		}
 	}
 	if p.Mode != nil {
 		if err := _e.EncodeElement(p.Mode, xml.StartElement{Name: xml.Name{Local: "mode"}}); err != nil {
@@ -336,8 +340,11 @@ func (r *RevisionHistoryItem) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 	if err := _e.EncodeElement(&r.VersionID, xml.StartElement{Name: xml.Name{Local: "version_id"}}); err != nil {
 		return err
 	}
-	for _idx := range r.Audits {
-		if err := _e.EncodeElement(&r.Audits[_idx], xml.StartElement{Name: xml.Name{Local: "audits"}}); err != nil {
+	for _, _item := range r.Audits {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "audits", _item); err != nil {
 			return err
 		}
 	}

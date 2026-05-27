@@ -10,7 +10,7 @@ type ItemTag struct {
 	// Key The tag key. May not be empty or contain leading or trailing whitespace.
 	Key string `json:"key"`
 	// OwnerID Identifier of owner object, such as EHR.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// Target Identifier of target, which may be a `VERSIONED_OBJECT<T>` or a `VERSION<T>`.
 	Target UIDBasedID `json:"target"`
 	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.

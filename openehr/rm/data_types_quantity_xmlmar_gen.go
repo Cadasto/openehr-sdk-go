@@ -90,10 +90,10 @@ func (d *DVInterval[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement) err
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&d.Lower, xml.StartElement{Name: xml.Name{Local: "lower"}}); err != nil {
+	if err := canxml.EncodePoly(_e, "lower", d.Lower); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&d.Upper, xml.StartElement{Name: xml.Name{Local: "upper"}}); err != nil {
+	if err := canxml.EncodePoly(_e, "upper", d.Upper); err != nil {
 		return err
 	}
 	if err := _e.EncodeElement(d.LowerUnbounded, xml.StartElement{Name: xml.Name{Local: "lower_unbounded"}}); err != nil {
@@ -375,8 +375,10 @@ func (r *ReferenceRange[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&r.Meaning, xml.StartElement{Name: xml.Name{Local: "meaning"}}); err != nil {
-		return err
+	if r.Meaning != nil {
+		if err := canxml.EncodePoly(_e, "meaning", r.Meaning); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&r.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
 		return err

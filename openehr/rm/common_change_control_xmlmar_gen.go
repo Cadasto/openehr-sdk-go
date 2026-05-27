@@ -34,13 +34,18 @@ func (c *Contribution) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeElement(&c.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	for _idx := range c.Versions {
-		if err := _e.EncodeElement(&c.Versions[_idx], xml.StartElement{Name: xml.Name{Local: "versions"}}); err != nil {
+	for _, _item := range c.Versions {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "versions", _item); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&c.Audit, xml.StartElement{Name: xml.Name{Local: "audit"}}); err != nil {
-		return err
+	if c.Audit != nil {
+		if err := canxml.EncodePoly(_e, "audit", c.Audit); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err
@@ -68,16 +73,20 @@ func (i *ImportedVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&i.Contribution, xml.StartElement{Name: xml.Name{Local: "contribution"}}); err != nil {
-		return err
+	if i.Contribution != nil {
+		if err := canxml.EncodePoly(_e, "contribution", i.Contribution); err != nil {
+			return err
+		}
 	}
 	if i.Signature != nil {
 		if err := _e.EncodeElement(*i.Signature, xml.StartElement{Name: xml.Name{Local: "signature"}}); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.CommitAudit, xml.StartElement{Name: xml.Name{Local: "commit_audit"}}); err != nil {
-		return err
+	if i.CommitAudit != nil {
+		if err := canxml.EncodePoly(_e, "commit_audit", i.CommitAudit); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&i.Item, xml.StartElement{Name: xml.Name{Local: "item"}}); err != nil {
 		return err
@@ -108,16 +117,20 @@ func (o *OriginalVersion[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&o.Contribution, xml.StartElement{Name: xml.Name{Local: "contribution"}}); err != nil {
-		return err
+	if o.Contribution != nil {
+		if err := canxml.EncodePoly(_e, "contribution", o.Contribution); err != nil {
+			return err
+		}
 	}
 	if o.Signature != nil {
 		if err := _e.EncodeElement(*o.Signature, xml.StartElement{Name: xml.Name{Local: "signature"}}); err != nil {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&o.CommitAudit, xml.StartElement{Name: xml.Name{Local: "commit_audit"}}); err != nil {
-		return err
+	if o.CommitAudit != nil {
+		if err := canxml.EncodePoly(_e, "commit_audit", o.CommitAudit); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&o.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
@@ -174,8 +187,10 @@ func (v *VersionedObject[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err

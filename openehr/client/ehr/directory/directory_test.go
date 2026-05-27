@@ -69,8 +69,8 @@ func TestGet(t *testing.T) {
 	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/directory" {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
-	if got.Name.Value != "Root Directory" {
-		t.Errorf("Name.Value = %q", got.Name.Value)
+	if rm.DVTextValueOf(got.Name) != "Root Directory" {
+		t.Errorf("Name.Value = %q", rm.DVTextValueOf(got.Name))
 	}
 	if len(got.Folders) != 2 {
 		t.Errorf("Folders count = %d, want 2", len(got.Folders))
@@ -191,8 +191,8 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 	if out == nil {
 		t.Fatal("expected decoded *rm.Folder on Prefer=representation, got nil")
 	}
-	if out.Name.Value != "Root Directory" {
-		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	if rm.DVTextValueOf(out.Name) != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", rm.DVTextValueOf(out.Name))
 	}
 	if meta.VersionUID != folderVUID {
 		t.Errorf("VersionUID = %q", meta.VersionUID)
@@ -250,8 +250,8 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 	if out == nil {
 		t.Fatal("expected decoded *rm.Folder on PUT Prefer=representation, got nil")
 	}
-	if out.Name.Value != "Root Directory" {
-		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	if rm.DVTextValueOf(out.Name) != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", rm.DVTextValueOf(out.Name))
 	}
 	if meta.VersionUID != newVUID {
 		t.Errorf("new VersionUID = %q", meta.VersionUID)

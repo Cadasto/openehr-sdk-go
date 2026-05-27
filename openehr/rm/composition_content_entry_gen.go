@@ -20,7 +20,7 @@ type Action struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// InstructionDetails Details of the Instruction that caused this Action to be performed, if there was one.
 	InstructionDetails *InstructionDetails `json:"instruction_details,omitempty"`
 	// IsmTransition Details of transition in the Instruction state machine caused by this Action.
@@ -30,7 +30,7 @@ type Action struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -56,7 +56,7 @@ type Action struct {
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }
 
 // Activity Defines a single activity within an Instruction, such as a medication administration.
@@ -78,7 +78,7 @@ type Activity struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Timing Timing of the activity, in the form of a parsable string. If used, the preferred syntax is ISO8601 'R' format, but other formats may be used including HL7 GTS.
 	//
 	// May be omitted if:
@@ -113,7 +113,7 @@ type AdminEntry struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
@@ -135,7 +135,7 @@ type AdminEntry struct {
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }
 
 // CareEntry The abstract parent of all clinical `ENTRY` subtypes. A `CARE_ENTRY` defines protocol and guideline attributes for all clinical Entry subtypes.
@@ -220,13 +220,13 @@ type Evaluation struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -250,7 +250,7 @@ type Evaluation struct {
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }
 
 // Instruction Used to specify actions in the future. Enables simple and complex specifications to be expressed, including in a fully-computable workflow form. Used for any actionable statement such as medication and therapeutic orders, monitoring, recall and review. Enough details must be provided for the specification to be directly executed by an actor, either human or machine.
@@ -272,15 +272,15 @@ type Instruction struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DVText `json:"narrative"`
+	Narrative DVTextLike `json:"narrative"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -306,7 +306,7 @@ type Instruction struct {
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
 	WfDefinition *DVParsable `json:"wf_definition,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }
 
 // InstructionDetails Used to record details of the Instruction causing an Action.
@@ -332,7 +332,7 @@ type IsmTransition struct {
 	// CurrentState The ISM current state. Coded by openEHR terminology group Instruction states.
 	CurrentState DVCodedText `json:"current_state"`
 	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
-	Reason []DVText `json:"reason,omitempty"`
+	Reason []DVTextLike `json:"reason,omitempty"`
 	// Transition The ISM transition which occurred to arrive in the current_state. Coded by openEHR terminology group  Instruction transitions.
 	Transition *DVCodedText `json:"transition,omitempty"`
 }
@@ -354,13 +354,13 @@ type Observation struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
@@ -386,5 +386,5 @@ type Observation struct {
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 }

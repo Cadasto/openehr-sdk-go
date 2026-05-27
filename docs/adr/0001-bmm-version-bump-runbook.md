@@ -66,7 +66,9 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
-10. **Open the PR.** The weekly drift-bot will pass on subsequent runs since `make codegen-verify` is now green; the PR's normal CI runs `make test` which includes `codegen-verify`.
+10. **Audit narrow-interface accessors** (SDK-GAP-11 / PROBE-038). If `bmmdiff -suggest-changelog` reports an Added class whose `ancestors` chain includes any of `DV_TEXT`, `DV_URI`, `AUDIT_DETAILS`, `PARTY_IDENTIFIED`, or `OBJECT_REF`, the generator auto-extends the matching `<Parent>Like` interface via its marker-method walk, but the closed type-switches in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) DO NOT pick the new subtype up — each needs an explicit `case *NewSubtype:` arm to recover the parent payload. Add the arm, then pin a round-trip case for the new subtype under [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go) so PROBE-038's substitution guarantee covers it.
+
+11. **Open the PR.** The weekly drift-bot will pass on subsequent runs since `make codegen-verify` is now green; the PR's normal CI runs `make test` which includes `codegen-verify`.
 
 ### Roles
 

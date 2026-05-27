@@ -11,6 +11,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 ### Added
 
 - **Testkit cassettes** — ehrbase Robot fixtures (minimal-entry, `Test_dv_*`, EHR_STATUS, FOLDER, persistent compositions, CONTRIBUTION submissions) under `testkit/cassettes/` with `fixtures.SubmissionJSON` and `scripts/ingest-robot-cassettes.sh`.
+- **RM polymorphic decode coverage (SDK-GAP-11)** — `bmmgen` emits narrow `<Parent>Like` interfaces (`DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`) so concrete-typed RM slots admit Liskov substitution per the RM (e.g. `LOCATABLE.name DV_TEXT` carrying `DV_CODED_TEXT` round-trips losslessly). `DV_INTERVAL[T: DV_ORDERED]` decodes its `lower` / `upper` via typereg. Breaking change: fields previously typed as the concrete parent are now interfaces — migrate via `rm.DVTextValueOf`, `rm.AsDVText`, `rm.AuditDetailsBase`. PROBE-038.
 
 ## [0.2.0] - 2026-05-26
 

@@ -34,15 +34,17 @@ func (c *Contribution) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					return _err
 				}
 			case "versions":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				c.Versions = append(c.Versions, _v)
 			case "audit":
-				if _err := _dec.DecodeElement(&c.Audit, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[AuditDetailsLike](_dec, _t, func() any { return new(AuditDetails) })
+				if _err != nil {
 					return _err
 				}
+				c.Audit = _v
 			default:
 				if _err := _dec.Skip(); _err != nil {
 					return _err
@@ -71,9 +73,11 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "contribution":
-				if _err := _dec.DecodeElement(&i.Contribution, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				i.Contribution = _v
 			case "signature":
 				var _v string
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
@@ -81,9 +85,11 @@ func (i *ImportedVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				i.Signature = &_v
 			case "commit_audit":
-				if _err := _dec.DecodeElement(&i.CommitAudit, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[AuditDetailsLike](_dec, _t, func() any { return new(AuditDetails) })
+				if _err != nil {
 					return _err
 				}
+				i.CommitAudit = _v
 			case "item":
 				if _err := _dec.DecodeElement(&i.Item, &_t); _err != nil {
 					return _err
@@ -116,9 +122,11 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "contribution":
-				if _err := _dec.DecodeElement(&o.Contribution, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				o.Contribution = _v
 			case "signature":
 				var _v string
 				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
@@ -126,9 +134,11 @@ func (o *OriginalVersion[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 				}
 				o.Signature = &_v
 			case "commit_audit":
-				if _err := _dec.DecodeElement(&o.CommitAudit, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[AuditDetailsLike](_dec, _t, func() any { return new(AuditDetails) })
+				if _err != nil {
 					return _err
 				}
+				o.CommitAudit = _v
 			case "uid":
 				if _err := _dec.DecodeElement(&o.UID, &_t); _err != nil {
 					return _err
@@ -193,9 +203,11 @@ func (v *VersionedObject[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err

@@ -75,8 +75,8 @@ func (d *DVCodedText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			case "hyperlink":
-				_v := new(DVURI)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVURILike](_dec, _t, func() any { return new(DVURI) })
+				if _err != nil {
 					return _err
 				}
 				d.Hyperlink = _v
@@ -136,8 +136,8 @@ func (d *DVParagraph) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "items":
-				var _v DVText
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				d.Items = append(d.Items, _v)
@@ -173,8 +173,8 @@ func (d *DVText) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 					return _err
 				}
 			case "hyperlink":
-				_v := new(DVURI)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[DVURILike](_dec, _t, func() any { return new(DVURI) })
+				if _err != nil {
 					return _err
 				}
 				d.Hyperlink = _v

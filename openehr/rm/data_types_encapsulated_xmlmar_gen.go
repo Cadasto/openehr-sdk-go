@@ -47,7 +47,7 @@ func (d *DVMultimedia) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if d.URI != nil {
-		if err := _e.EncodeElement(d.URI, xml.StartElement{Name: xml.Name{Local: "uri"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "uri", d.URI); err != nil {
 			return err
 		}
 	}

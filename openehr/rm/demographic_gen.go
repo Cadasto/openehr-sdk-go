@@ -33,13 +33,13 @@ type Address struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
 
 // Type Type of address, e.g. electronic,  locality. Taken from value of inherited `_name_` attribute.
-func (a *Address) Type() DVText {
+func (a *Address) Type() DVTextLike {
 	panic("not implemented: ADDRESS.type — implement in a non-generated file")
 }
 
@@ -60,11 +60,11 @@ type Agent struct {
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -88,7 +88,7 @@ type Capability struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// TimeValidity Valid time interval for the credentials of this capability.
 	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -110,7 +110,7 @@ type Contact struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// TimeValidity Valid time interval for this contact descriptor.
 	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -118,7 +118,7 @@ type Contact struct {
 }
 
 // Purpose Purpose for which this contact is used, e.g. mail,  daytime phone, etc. Taken from value of inherited `_name_` attribute.
-func (c *Contact) Purpose() DVText {
+func (c *Contact) Purpose() DVTextLike {
 	panic("not implemented: CONTACT.purpose — implement in a non-generated file")
 }
 
@@ -139,11 +139,11 @@ type Group struct {
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -169,11 +169,11 @@ type Organisation struct {
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -236,27 +236,27 @@ func (r *Role) ReverseRelationships() []LocatableRef {
 }
 
 // Type Type of party, such as  `PERSON`,  `ORGANISATION`, etc. Role name, e.g.  general practitioner ,  nurse ,  private citizen . Taken from inherited `_name_` attribute.
-func (a *Agent) Type() DVText {
+func (a *Agent) Type() DVTextLike {
 	panic("not implemented: PARTY.type — implement in a non-generated file")
 }
 
 // Type Type of party, such as  `PERSON`,  `ORGANISATION`, etc. Role name, e.g.  general practitioner ,  nurse ,  private citizen . Taken from inherited `_name_` attribute.
-func (g *Group) Type() DVText {
+func (g *Group) Type() DVTextLike {
 	panic("not implemented: PARTY.type — implement in a non-generated file")
 }
 
 // Type Type of party, such as  `PERSON`,  `ORGANISATION`, etc. Role name, e.g.  general practitioner ,  nurse ,  private citizen . Taken from inherited `_name_` attribute.
-func (o *Organisation) Type() DVText {
+func (o *Organisation) Type() DVTextLike {
 	panic("not implemented: PARTY.type — implement in a non-generated file")
 }
 
 // Type Type of party, such as  `PERSON`,  `ORGANISATION`, etc. Role name, e.g.  general practitioner ,  nurse ,  private citizen . Taken from inherited `_name_` attribute.
-func (p *Person) Type() DVText {
+func (p *Person) Type() DVTextLike {
 	panic("not implemented: PARTY.type — implement in a non-generated file")
 }
 
 // Type Type of party, such as  `PERSON`,  `ORGANISATION`, etc. Role name, e.g.  general practitioner ,  nurse ,  private citizen . Taken from inherited `_name_` attribute.
-func (r *Role) Type() DVText {
+func (r *Role) Type() DVTextLike {
 	panic("not implemented: PARTY.type — implement in a non-generated file")
 }
 
@@ -275,13 +275,13 @@ type PartyIdentity struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }
 
 // Purpose Purpose of identity, e.g. legal ,  stagename,  nickname,  tribal name,  trading name. Taken from value of inherited `_name_` attribute.
-func (p *PartyIdentity) Purpose() DVText {
+func (p *PartyIdentity) Purpose() DVTextLike {
 	panic("not implemented: PARTY_IDENTITY.purpose — implement in a non-generated file")
 }
 
@@ -300,7 +300,7 @@ type PartyRelationship struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Source Source of relationship.
 	Source PartyRef `json:"source"`
 	// Target Target of relationship.
@@ -312,7 +312,7 @@ type PartyRelationship struct {
 }
 
 // Type Type of relationship, such as  employment,  authority,  health provision
-func (p *PartyRelationship) Type() DVText {
+func (p *PartyRelationship) Type() DVTextLike {
 	panic("not implemented: PARTY_RELATIONSHIP.type — implement in a non-generated file")
 }
 
@@ -333,11 +333,11 @@ type Person struct {
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
 	Identities []PartyIdentity `json:"identities"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVText `json:"languages,omitempty"`
+	Languages []DVTextLike `json:"languages,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
@@ -367,7 +367,7 @@ type Role struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Performer Reference to Version container of Actor playing the role.
 	Performer PartyRef `json:"performer"`
 	// Relationships Relationships in which this Party takes part as source.

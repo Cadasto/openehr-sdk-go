@@ -35,7 +35,7 @@ type DVCodedText struct {
 // `DV_PARAGRAPH` is the standard way for constructing longer text items in summaries, reports and so on.
 type DVParagraph struct {
 	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVText `json:"items"`
+	Items []DVTextLike `json:"items"`
 }
 
 // DVText A text item, which may contain any amount of legal characters arranged as e.g. words, sentences etc (i.e. one `DV_TEXT` may be more than one word). Visual formatting and hyperlinks may be included via markdown.
@@ -61,7 +61,7 @@ type DVText struct {
 	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
 	//
 	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink *DVURI `json:"hyperlink,omitempty"`
+	Hyperlink DVURILike `json:"hyperlink,omitempty"`
 	// Language Optional indicator of the localised language in which the value is written. Coded from openEHR Code Set  languages . Only used when either the text object is in a different language from the enclosing `ENTRY`, or else the text object is being used outside of an `ENTRY` or other enclosing structure which indicates the language.
 	Language *CodePhrase `json:"language,omitempty"`
 	// Mappings Terms from other terminologies most closely matching this term, typically used where the originator (e.g. pathology lab) of information uses a local terminology but also supplies one or more equivalents from well known terminologies (e.g. LOINC).
@@ -69,6 +69,18 @@ type DVText struct {
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
 	Value string `json:"value"`
 }
+
+// DVTextLike is the SDK-GAP-11 narrow polymorphic interface for DVText.
+// Concrete-typed RM slots declared as DV_TEXT admit Liskov substitution
+// by any descendant per the openEHR RM; the wire decoder dispatches
+// via typereg using this interface so subtype payloads survive the
+// decode → re-marshal round-trip without field loss.
+type DVTextLike interface {
+	isDVTextLike()
+}
+
+func (DVText) isDVTextLike()      {}
+func (DVCodedText) isDVTextLike() {}
 
 // TermMapping Represents a coded term mapped to a `DV_TEXT`, and the relative match of the target term with respect to the mapped item. Plain or coded text items may appear in the EHR for which one or mappings in alternative terminologies are required. Mappings are only used to enable computer processing, so they can only be instances of `DV_CODED_TEXT`.
 //

@@ -165,19 +165,50 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 	if isNilValue(v) {
 		return nil
 	}
-	bn, ok := v.(BMMNamer)
+	bn, m, ok := bmmNamerAndMarshaler(v)
 	if !ok {
-		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement BMMNamer", name, v)
-	}
-	m, ok := v.(xml.Marshaler)
-	if !ok {
-		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement xml.Marshaler", name, v)
+		return fmt.Errorf("canxml: EncodePoly %s: %T does not implement BMMNamer/xml.Marshaler", name, v)
 	}
 	start := xml.StartElement{
 		Name: xml.Name{Local: name},
 		Attr: []xml.Attr{{Name: XSITypeAttrName(), Value: bn.BMMName()}},
 	}
 	return m.MarshalXML(e, start)
+}
+
+// bmmNamerAndMarshaler resolves v to its (BMMNamer, xml.Marshaler)
+// pair, accounting for the pointer-vs-value method-set gap. Generated
+// RM types declare BMMName / MarshalXML on the pointer receiver, so a
+// value-T encoded via a generic instantiation (e.g.
+// `DVInterval[DVQuantity].Lower` where Lower is `DVQuantity` by
+// value) fails a direct `v.(BMMNamer)` assertion. The fallback path
+// builds an addressable copy via reflect.New and asserts on the
+// resulting pointer — purely for read-only marshalling, so the
+// copy's lack of write-back to the caller is harmless.
+//
+// This is NOT `xsi:type` dispatch (that stays registry-driven per
+// REQ-040 / [typereg.Default]); see canxml/doc.go § Polymorphic
+// dispatch for the package-level note positioning this fallback as
+// an interop adapter for the codegen's generic-receiver shape, not
+// a polymorphism mechanism.
+func bmmNamerAndMarshaler(v any) (BMMNamer, xml.Marshaler, bool) {
+	if bn, ok := v.(BMMNamer); ok {
+		if m, ok := v.(xml.Marshaler); ok {
+			return bn, m, true
+		}
+	}
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Struct {
+		copy := reflect.New(rv.Type())
+		copy.Elem().Set(rv)
+		p := copy.Interface()
+		if bn, ok := p.(BMMNamer); ok {
+			if m, ok := p.(xml.Marshaler); ok {
+				return bn, m, true
+			}
+		}
+	}
+	return nil, nil, false
 }
 
 // isNilValue reports whether v is a nil interface or a non-nil
