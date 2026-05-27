@@ -289,6 +289,15 @@ The catalog is the normative list. Each entry has:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
 - **Satisfies:** REQ-040, REQ-052
 
+#### PROBE-038 — RM polymorphic decode coverage (SDK-GAP-11)
+
+- **Title:** `canjson.Unmarshal[Composition]` decodes every BMM-admissible `_type` discriminator at every substitutable slot — including (a) substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`) per openEHR RM Liskov substitution, and (b) generic types with abstract type parameters (e.g. `DV_INTERVAL[T: DV_ORDERED]`).
+- **Preconditions:** Vendored RM cassettes under `testkit/cassettes/rm/polymorphic/` covering both failure modes.
+- **Wire assertion:** Decode succeeds; the recovered tree preserves every original `_type` discriminator (no silent narrowing on substitutable slots); re-marshalling produces wire-equivalent JSON for the same logical content (canonical JSON ordering wins ties).
+- **Modes:** Sandbox.
+- **Status:** Draft — implementation tracked in [`docs/plans/2026-05-26-rm-polymorphic-decode-coverage.md`](../plans/2026-05-26-rm-polymorphic-decode-coverage.md). Flips to **Implemented (Sandbox)** once the ancestry-driven narrow-interface generator emission lands.
+- **Satisfies:** SDK-GAP-11, REQ-040, REQ-052
+
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
@@ -495,7 +504,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
-| Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
+| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; PROBE-038 (SDK-GAP-11 polymorphic decode coverage) reserved Draft per [`docs/plans/2026-05-26-rm-polymorphic-decode-coverage.md`](../plans/2026-05-26-rm-polymorphic-decode-coverage.md); 032 not yet |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
 | REST binding | PROBE-060 … 068, PROBE-071, PROBE-072 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); PROBE-065 (`minimal`) and REQ-094 `identifier` / empty-body follow-ups **not landed** ([`docs/plans/2026-05-25-req094-prefer-followups.md`](../plans/2026-05-25-req094-prefer-followups.md)) |
