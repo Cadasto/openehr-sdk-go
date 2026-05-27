@@ -1,12 +1,12 @@
 # Plan — RM generated-types: polymorphic decode coverage
 
 **Date:** 2026-05-26
-**Status:** Draft
+**Status:** **Landed 2026-05-26.** Phases 0–3 shipped on branch `feat/req040-rm-polymorphic-decode-coverage`. Both Issue A (substitutable subtypes in concrete-typed slots via narrow `<Parent>Like` interfaces) and Issue B (generic-over-abstract-bound dispatch) are closed; PROBE-038 implemented (Sandbox) end-to-end.
 **Owner:** SDK maintainers
-**Covers:** [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (type registry), [REQ-046](../specifications/bmm-conformance.md#primitive-type-mapping) (BMM mapping), [REQ-052](../specifications/wire.md#req-052) (canonical JSON), [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source)
-**Probes:** new — **PROBE-038** (canjson decode of polymorphic RM attributes — full subtype substitution coverage)
-**Implementation:** **partial** — Phase 1 landed (Issue B: generic `DV_INTERVAL[T]` over abstract `DV_ORDERED` decodes via typereg). Issue A still open: substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`).
-**Depends on:** [`internal/bmmgen/render_jsonunmar.go`](../../internal/bmmgen/render_jsonunmar.go) (generator); [`openehr/rm/typereg/`](../../openehr/rm/typereg/) (polymorphic dispatch); [BMM corpus](../../resources/bmm/) (`openehr_rm_1.2.0.bmm.json` parent-child graph)
+**Covers:** [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040) (type registry), [REQ-046](../../specifications/bmm-conformance.md#primitive-type-mapping) (BMM mapping), [REQ-052](../../specifications/wire.md#req-052) (canonical JSON), [REQ-095](../../specifications/wire.md#req-095) (OpenAPI authoritative source)
+**Probes:** **PROBE-038** — Implemented (Sandbox) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go).
+**Implementation:** **landed** — 5 narrow Go interfaces (`DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`) emitted from `plan.ConcreteSubtypes`; canjson + canxml dispatch via typereg / `DecodeAsOrDefault` with missing-`_type` fallback; helper accessors in [`openehr/rm/like_accessors.go`](../../../openehr/rm/like_accessors.go) cover the migration.
+**Depends on:** [`internal/bmmgen/render_jsonunmar.go`](../../../internal/bmmgen/render_jsonunmar.go) (generator); [`openehr/rm/typereg/`](../../../openehr/rm/typereg/) (polymorphic dispatch); [BMM corpus](../../../resources/bmm/) (`openehr_rm_1.2.0.bmm.json` parent-child graph)
 **Defers:** Lenient / permissive decoding modes (out of scope — fail loudly on unknown discriminators); BMM-model changes (RM model is correct; gap is purely in the Go-side generator's encoding of substitution semantics).
 
 ## Goal
@@ -26,11 +26,11 @@ canjson: COMPOSITION: decode /other_context: ... decode /items/0: typereg.Decode
       typereg: decoded type does not satisfy target
 ```
 
-The error trace points at the **`name`** field of an `ELEMENT` / `CLUSTER`, not its `value`. Per the BMM ([`openehr_rm_1.2.0.bmm.json`](../../resources/bmm/)), `LOCATABLE.name: DV_TEXT`. Per the openEHR RM spec, `DV_TEXT` admits Liskov substitution by any subtype; today the only direct subtype is `DV_CODED_TEXT` (concrete).
+The error trace points at the **`name`** field of an `ELEMENT` / `CLUSTER`, not its `value`. Per the BMM ([`openehr_rm_1.2.0.bmm.json`](../../../resources/bmm/)), `LOCATABLE.name: DV_TEXT`. Per the openEHR RM spec, `DV_TEXT` admits Liskov substitution by any subtype; today the only direct subtype is `DV_CODED_TEXT` (concrete).
 
-`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the SDK-GAP-11 draft's surface read was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
+`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the SDK-GAP-11 draft's surface read was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
 
-The root cause is the **strict class-equality check** every generated `UnmarshalJSON` emits today (e.g. [`data_types_text_jsonunmar_gen.go:159`](../../openehr/rm/data_types_text_jsonunmar_gen.go#L159)):
+The root cause is the **strict class-equality check** every generated `UnmarshalJSON` emits today (e.g. [`data_types_text_jsonunmar_gen.go:159`](../../../openehr/rm/data_types_text_jsonunmar_gen.go#L159)):
 
 ```go
 if aux.Class != "" && aux.Class != "DV_TEXT" {
@@ -50,7 +50,7 @@ canjson: DV_INTERVAL:
     DVIntervalJSONUnmarshaller[...rm.DVOrdered].lower of type rm.DVOrdered
 ```
 
-The generated [`DVIntervalJSONUnmarshaller[T DVOrdered]`](../../openehr/rm/data_types_quantity_jsonunmar_gen.go) carries `Lower T` and `Upper T`. When `T` is the *abstract bound itself* — `DVInterval[DVOrdered]` — Go's `encoding/json` cannot decode a JSON object into an interface field. The bench fixture uses `DV_INTERVAL<DV_QUANTITY>` (a concrete subtype) but the SDK's `ReferenceRange.range`, `DVQuantified.normal_range`, etc. all instantiate `DVInterval[DVOrdered]` — so the decoder hits the interface bound at runtime regardless of the on-wire concrete type.
+The generated [`DVIntervalJSONUnmarshaller[T DVOrdered]`](../../../openehr/rm/data_types_quantity_jsonunmar_gen.go) carries `Lower T` and `Upper T`. When `T` is the *abstract bound itself* — `DVInterval[DVOrdered]` — Go's `encoding/json` cannot decode a JSON object into an interface field. The bench fixture uses `DV_INTERVAL<DV_QUANTITY>` (a concrete subtype) but the SDK's `ReferenceRange.range`, `DVQuantified.normal_range`, etc. all instantiate `DVInterval[DVOrdered]` — so the decoder hits the interface bound at runtime regardless of the on-wire concrete type.
 
 The fix: emit `Lower`, `Upper` as `json.RawMessage` and dispatch via `typereg.DecodeAs[T]`. Same template the generator already uses for `Element.Value` (polymorphic `DataValue`); just generalised to type-parameterised polymorphic fields.
 
@@ -76,8 +76,8 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 
 **Tasks:**
 
-1. **Reserve PROBE-038** in [`docs/specifications/conformance.md`](../specifications/conformance.md) under Canonical JSON / formats: "Polymorphic RM decode coverage — `canjson.Unmarshal[Composition]` decodes every BMM-admissible discriminator across all substitutable slots and parameterised generic types". Status: **Draft**.
-2. **Vendor fixtures** under `testkit/cassettes/rm/polymorphic/` (via [`testkit/fixtures`](../../testkit/fixtures/) `RMJSON`) — one per failure mode:
+1. **Reserve PROBE-038** in [`docs/specifications/conformance.md`](../../specifications/conformance.md) under Canonical JSON / formats: "Polymorphic RM decode coverage — `canjson.Unmarshal[Composition]` decodes every BMM-admissible discriminator across all substitutable slots and parameterised generic types". Status: **Draft**.
+2. **Vendor fixtures** under `testkit/cassettes/rm/polymorphic/` (via [`testkit/fixtures`](../../../testkit/fixtures/) `RMJSON`) — one per failure mode:
    - `name_dv_coded_text.json` — minimal Composition with `LOCATABLE.name: DV_CODED_TEXT` at any nested depth.
    - `dv_interval_quantity.json` — minimal Composition with `ELEMENT.value: DV_INTERVAL<DV_QUANTITY>`.
    - `representative_full.json` — a wider real-world Composition exercising both patterns plus DVOrdinal / DVScale ranges (sourced from a CKM-published exemplar).
@@ -124,7 +124,7 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 1. Implement `testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go` — table-driven: for each of the three Phase-0 fixtures, decode via `canjson.Unmarshal`, re-marshal via `canjson.Marshal`, and assert (a) decode succeeds, (b) the recovered tree preserves every original `_type` discriminator (no silent narrowing on substitutable slots), (c) re-marshalling produces byte-equivalent JSON for the same logical content (canonical JSON wins ties).
 2. Conformance entry flips Draft → **Implemented (Sandbox)**; coverage matrix gains PROBE-038.
 3. `docs/specifications/traceability.yaml` REQ-052 entry gains PROBE-038 + probe file.
-4. `docs/specifications/wire.md` § Canonical JSON gains a "Polymorphic substitution" paragraph documenting the rule: any property's declared type admits Liskov substitution by any concrete subtype in `typereg`; the Go API surfaces this via `<Parent>Like` interfaces. Cross-reference [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) for what happens on BMM bump (new subtypes auto-extend the interfaces).
+4. `docs/specifications/wire.md` § Canonical JSON gains a "Polymorphic substitution" paragraph documenting the rule: any property's declared type admits Liskov substitution by any concrete subtype in `typereg`; the Go API surfaces this via `<Parent>Like` interfaces. Cross-reference [ADR 0001](../../adr/0001-bmm-version-bump-runbook.md) for what happens on BMM bump (new subtypes auto-extend the interfaces).
 
 **Definition of done:** `make ci` green; PROBE-038 passes against the three fixtures; `make spec-check` happy.
 
@@ -143,8 +143,8 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 - **SDK-GAP-11** — consumer gap report (private; concept only — naming and source consumer kept anonymous in this plan).
 - **SDK-GAP-09** — response-side bare-decode contract (closed in PR #17).
 - **SDK-GAP-10** — request-side `contribution.Commit` shape (closed in PR #22).
-- [`internal/bmmgen/render_jsonunmar.go`](../../internal/bmmgen/render_jsonunmar.go) — current generator for JSON unmarshallers; `polymorphicProperty` is the entry point.
-- [`openehr/rm/typereg/registry.go`](../../openehr/rm/typereg/registry.go) — type registry and `DecodeAs[T]` dispatch.
+- [`internal/bmmgen/render_jsonunmar.go`](../../../internal/bmmgen/render_jsonunmar.go) — current generator for JSON unmarshallers; `polymorphicProperty` is the entry point.
+- [`openehr/rm/typereg/registry.go`](../../../openehr/rm/typereg/registry.go) — type registry and `DecodeAs[T]` dispatch.
 - [openEHR RM Latest — DV_TEXT inheritance](https://specifications.openehr.org/releases/RM/latest/data_types.html#_dv_text_class) and [DV_INTERVAL](https://specifications.openehr.org/releases/RM/latest/data_types.html#_dv_interval_class).
 
 ## Implementation checklist
