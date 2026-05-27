@@ -1,7 +1,10 @@
 package canjson_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -13,6 +16,12 @@ import (
 // fixtures decode + re-marshal cleanly after Phase 2 lands the
 // ancestry-driven narrow polymorphic interfaces (DVTextLike etc.) on
 // top of Phase 1's generic-abstract-bound dispatch (DVInterval[T]).
+//
+// The assertion mirrors PROBE-038's discriminator-multiset check:
+// every `_type` value present in the input must reappear in the
+// re-marshalled output (counted). A silent narrowing — DV_CODED_TEXT
+// decoded into a parent DVText struct that drops defining_code and
+// re-emits as DV_TEXT — would show up here as a missing discriminator.
 func TestPolymorphicDecodeCoverage(t *testing.T) {
 	cases := []struct {
 		name string
@@ -41,12 +50,54 @@ func TestPolymorphicDecodeCoverage(t *testing.T) {
 			if err := canjson.Unmarshal(data, &comp); err != nil {
 				t.Fatalf("canjson.Unmarshal: %v", err)
 			}
-			// Round-trip — re-marshal must succeed and preserve every
-			// `_type` discriminator the original carried (the
-			// substitutability guarantee).
-			if _, err := canjson.Marshal(&comp); err != nil {
+			out, err := canjson.Marshal(&comp)
+			if err != nil {
 				t.Fatalf("canjson.Marshal (re-marshal): %v", err)
+			}
+			want := collectDiscriminators(t, data)
+			got := collectDiscriminators(t, out)
+			for k, n := range want {
+				if got[k] < n {
+					t.Errorf("re-marshalled body lost %s discriminator(s): want %d, got %d — subtype narrowed on decode", k, n, got[k])
+				}
 			}
 		})
 	}
+}
+
+// collectDiscriminators is the unit-test mirror of PROBE-038's
+// discriminator-multiset walker — kept inline so the test stays
+// self-contained and the probe package's helpers stay unexported.
+func collectDiscriminators(t *testing.T, b []byte) map[string]int {
+	t.Helper()
+	out := map[string]int{}
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
+	var top any
+	if err := dec.Decode(&top); err != nil {
+		t.Fatalf("collectDiscriminators: %v", err)
+	}
+	var walk func(any)
+	walk = func(v any) {
+		switch tt := v.(type) {
+		case map[string]any:
+			if tn, ok := tt["_type"].(string); ok {
+				out[tn]++
+			}
+			keys := make([]string, 0, len(tt))
+			for k := range tt {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				walk(tt[k])
+			}
+		case []any:
+			for _, e := range tt {
+				walk(e)
+			}
+		}
+	}
+	walk(top)
+	return out
 }

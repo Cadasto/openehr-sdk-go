@@ -11,6 +11,28 @@ package rm
 // accessor that handles both the parent and any subtype shape. These
 // helpers are the v0.x migration path; v1.0 may promote them to
 // interface methods once the field-vs-method naming clash is resolved.
+//
+// BMM-BUMP AUDIT (ADR 0001 step):
+//
+//   When a BMM bump introduces a NEW concrete subtype of any
+//   `<Parent>Like`-bearing class, the generator's marker emission picks
+//   it up automatically (the new subtype's struct gains the
+//   `is<Parent>Like()` method via the BMM ancestors graph). The closed
+//   type-switches below DO NOT — each new subtype needs an explicit
+//   `case *NewSubtype:` arm here so the helper recovers the parent
+//   payload from it. Without the audit, callers using e.g.
+//   `rm.AsDVText(name)` against a new DV_TEXT descendant would silently
+//   return (DVText{}, false).
+//
+//   On every BMM bump where `bmmdiff` reports added classes whose
+//   ancestors include a class in this set:
+//
+//     DV_TEXT       DV_URI       AUDIT_DETAILS
+//     PARTY_IDENTIFIED   OBJECT_REF
+//
+//   add a `case *Foo:` arm to the matching helper here and pin a
+//   round-trip test for the new subtype under
+//   `openehr/serialize/canjson/polymorphic_decode_test.go`.
 
 // DVTextValueOf returns the `value` rendition of any DV_TEXT subtype.
 // Returns "" when the interface is nil. Concrete dispatch is a closed
