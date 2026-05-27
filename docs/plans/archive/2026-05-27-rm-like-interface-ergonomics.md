@@ -1,13 +1,13 @@
 # Plan — RM `*Like` interface ergonomics (post SDK-GAP-11)
 
 **Date:** 2026-05-27
-**Status:** Draft
+**Status:** **Landed 2026-05-27.** Phases 1–3 shipped on PR #25. Method names use the `Get*` prefix (not bare `Value()` as originally drafted) because Go forbids a struct field and a method with the same name — see [§ Recommended direction](#recommended-direction-this-sdk).
 **Owner:** SDK maintainers
-**Covers:** SDK-GAP-11 follow-up (consumer ergonomics); [REQ-024](../specifications/idiom.md#generics-policy-req-024), [REQ-040](../specifications/rm-modeling.md#type-registry-req-040), [REQ-052](../specifications/wire.md#req-052)
+**Covers:** SDK-GAP-11 follow-up (consumer ergonomics); [REQ-024](../../specifications/idiom.md#generics-policy-req-024), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-052](../../specifications/wire.md#req-052)
 **Probes:** PROBE-038 (regression guard — no behaviour change required if decode/re-marshal unchanged)
-**Implementation:** planned
-**Depends on:** [archive/2026-05-26-rm-polymorphic-decode-coverage.md](archive/2026-05-26-rm-polymorphic-decode-coverage.md) (landed — `DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`)
-**Defers:** Replacing `typereg` + `*Like` interfaces with hand-rolled `*Union{Kind, Value}` structs across the whole RM tree (see [gopenehr survey](#survey-cadastogopenehr) — evaluate separately if ergonomics still insufficient after Phase 1)
+**Implementation:** **landed** — narrow `<Parent>Like` interface declarations moved out of the generator into hand-written [`openehr/rm/like_interfaces.go`](../../../openehr/rm/like_interfaces.go) with Get-prefixed accessor methods on all five interfaces. Compat helpers in [`openehr/rm/like_accessors.go`](../../../openehr/rm/like_accessors.go) delegate to the methods.
+**Depends on:** [archive/2026-05-26-rm-polymorphic-decode-coverage.md](2026-05-26-rm-polymorphic-decode-coverage.md) (landed — `DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`)
+**Defers:** Replacing `typereg` + `*Like` interfaces with hand-rolled `*Union{Kind, Value}` structs across the whole RM tree (see [gopenehr survey](#survey-cadastogopenehr) — evaluate separately if ergonomics insufficient after Phase 3)
 
 ## Goal
 
@@ -21,7 +21,7 @@ This plan is intentionally **three phases** — no archive/PROBE flip required; 
 
 | Phase | Outcome (one line) |
 |-------|-------------------|
-| **1** | `DVTextLike.Value()` / `DefiningCode()` generated; example uses `c.Name.Value()`; tests prove methods match `DVTextValueOf` |
+| **1** | `DVTextLike.Value()` / `DefiningCode()` generated; example uses `c.Name.GetValue()`; tests prove methods match `DVTextValueOf` |
 | **2** | Same method pattern for `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`; `openehr/rm/doc.go` documents substitution vs abstract interfaces |
 | **3** | `idiom.md` + CHANGELOG + `.gitignore` (`*.tmp`); optional gopenehr-style typed getters on `DVTextLike` if still needed |
 
@@ -97,13 +97,13 @@ Discriminator handling (representative — `internal/openehr/rm/dv_text.go`):
 
 | Interface | Methods (minimum) |
 |-----------|-------------------|
-| `DVTextLike` | `Value() string`, `DefiningCode() (CodePhrase, bool)` |
-| `DVURILike` | `URIValue() string` (or `Value() string`) |
+| `DVTextLike` | `GetValue() string`, `GetDefiningCode() (CodePhrase, bool)` |
+| `DVURILike` | `GetValue() string` |
 | `AuditDetailsLike` | embed accessors via `AuditDetailsBase`-equivalent methods or promote `AuditDetailsBase` to methods |
 | `PartyIdentifiedLike` | `Name() string`, `Identifiers() []DVIdentifier` (optional; narrower API) |
 | `ObjectRefLike` | `ID() ObjectID`, `Namespace() string`, `Type() string` via `ObjectRefBase` shape |
 
-Method names must avoid clashes with RM attribute names used as struct fields on other types; prefer **`Value()`** for text (method, not field) — e.g. `c.Name.Value()` in examples.
+Method names must avoid clashes with RM attribute names used as struct fields on the underlying concrete types. Since `DVText.Value` is already a field, `Value()` as a method name on the same struct is illegal — the shipped methods use a **`Get*`** prefix (`GetValue`, `GetDefiningCode`, …) to step out of the field/method namespace.
 
 **Do not** add `*.tmp` only in docs — track in hygiene commit (see Phase 3).
 
@@ -111,24 +111,24 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 
 ### Phase 1 — `DVTextLike` methods + example (highest impact)
 
-**Outcome:** Callers use `c.Name.Value()` (method) on any `DVTextLike` field; decode/re-marshal path unchanged; `DVTextValueOf` remains as a thin compatibility wrapper.
+**Outcome:** Callers use `c.Name.GetValue()` (method) on any `DVTextLike` field; decode/re-marshal path unchanged; `DVTextValueOf` remains as a thin compatibility wrapper.
 
 **Tasks:**
 
 1. Extend `internal/bmmgen` to emit on `DVTextLike`:
-   - `Value() string`
-   - `DefiningCode() (CodePhrase, bool)`
+   - `GetValue() string`
+   - `GetDefiningCode() (CodePhrase, bool)`
    - Concrete method bodies on `DVText`, `DVCodedText` (value + pointer receivers per interface satisfaction).
    - Closed variant set from `plan.ConcreteSubtypes["DV_TEXT"]`.
 2. Regenerate RM if interface definition moves into generated files; otherwise add methods in `like_accessors.go` / a small `like_methods.go` (non-generated) — **pick one place** and document in PR.
 3. `openehr/rm/like_accessors.go` — implement `DVTextValueOf` / `AsDVText` as delegates to interface methods (no behaviour change).
-4. `cmd/examples/canonical_json/main.go` — `c.Name.Value()` instead of `DVTextValueOf`.
+4. `cmd/examples/canonical_json/main.go` — `c.Name.GetValue()` instead of `DVTextValueOf`.
 5. Tests:
-   - `openehr/rm/*_test.go` — `Value()` / `DefiningCode()` for `*DVText`, `*DVCodedText`, nil `DVTextLike`.
+   - `openehr/rm/*_test.go` — `GetValue()` / `GetDefiningCode()` for `*DVText`, `*DVCodedText`, nil `DVTextLike`.
    - `openehr/serialize/canjson/polymorphic_decode_test.go` — unchanged wire assertions (regression only).
    - Optional: `testkit/probes/serialize/probes_test.go` — fail fast on `Probe038Input.loadErr` (clearer cassette-miss signal).
 
-**Definition of done:** `c.Name.Value()` compiles and equals prior `DVTextValueOf` semantics; PROBE-038 still passes; `make test` + `make ci` green.
+**Definition of done:** `c.Name.GetValue()` compiles and equals prior `DVTextValueOf` semantics; PROBE-038 still passes; `make test` + `make ci` green.
 
 ---
 
@@ -151,7 +151,7 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 2. `openehr/rm/doc.go` — § substitution slots:
    - `*Like` = concrete parent + allowed subtypes (GAP-11); use **methods** for shared parent attributes.
    - `DataValue` / `Item` / `ContentItem` / `UIDBasedID` = abstract interfaces; use **type assert** (unchanged).
-3. Update [`docs/adr/0001-bmm-version-bump-runbook.md`](../adr/0001-bmm-version-bump-runbook.md) step 10 cross-link: new subtype → new interface method implementations (in addition to `like_accessors` switch arms until removed).
+3. Update [`docs/adr/0001-bmm-version-bump-runbook.md`](../../adr/0001-bmm-version-bump-runbook.md) step 10 cross-link: new subtype → new interface method implementations (in addition to `like_accessors` switch arms until removed).
 4. Migrate in-repo call sites from `DVURIValueOf`, `AuditDetailsBase`, etc. to methods where it improves readability (optional within phase; at minimum new code uses methods).
 
 **Definition of done:** Each `*Like` has documented methods; in-repo validation/client code compiles without new func-only patterns; `make ci` green.
@@ -188,7 +188,7 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 | **Phase 1** | |
 | Phase 1 — `DVTextLike` interface: `Value()`, `DefiningCode()` | |
 | Phase 1 — concrete method bodies + `like_accessors` delegates | |
-| Phase 1 — `canonical_json` example `c.Name.Value()` | |
+| Phase 1 — `canonical_json` example `c.Name.GetValue()` | |
 | Phase 1 — unit tests (`DVText` / `DVCodedText` / nil) | |
 | Phase 1 — optional `TestProbe038` `loadErr` fast-fail | |
 | **Phase 2** | |
@@ -210,13 +210,13 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 
 ## Mapping to specs
 
-- [REQ-024](../specifications/idiom.md) — methods replace reflection; keep typereg dispatch in codecs.
-- [REQ-040](../specifications/rm-modeling.md) — registry unchanged.
-- [REQ-052](../specifications/wire.md) — wire.md BMM-bump note (ADR-0001 step 10) already aligned ([54d3f57](https://github.com/Cadasto/openehr-sdk-go/commit/54d3f57)).
-- [PROBE-038](../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage-sdk-gap-11) — no wire assertion change.
+- [REQ-024](../../specifications/idiom.md) — methods replace reflection; keep typereg dispatch in codecs.
+- [REQ-040](../../specifications/rm-modeling.md) — registry unchanged.
+- [REQ-052](../../specifications/wire.md) — wire.md BMM-bump note (ADR-0001 step 10) already aligned ([54d3f57](https://github.com/Cadasto/openehr-sdk-go/commit/54d3f57)).
+- [PROBE-038](../../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage-sdk-gap-11) — no wire assertion change.
 
 ## Cross-references
 
-- [archive/2026-05-26-rm-polymorphic-decode-coverage.md](archive/2026-05-26-rm-polymorphic-decode-coverage.md) — why `*Like` exists.
-- [openehr/rm/like_accessors.go](../../openehr/rm/like_accessors.go) — migration helpers (may thin after Phase 1).
+- [archive/2026-05-26-rm-polymorphic-decode-coverage.md](2026-05-26-rm-polymorphic-decode-coverage.md) — why `*Like` exists.
+- [openehr/rm/like_accessors.go](../../../openehr/rm/like_accessors.go) — migration helpers (may thin after Phase 1).
 - **External:** `Cadasto/gopenehr` — `internal/openehr/rm/{dv_text,content_item,item,data_value,uid_based_id,party_proxy,object_id}.go`.

@@ -132,6 +132,8 @@ if code, ok := c.Name.GetDefiningCode(); ok {
 
 The Get-prefix is mechanical, not stylistic — BMM property names like `value` and `defining_code` are already field identifiers on the concrete structs, and Go forbids a method and a field with the same name on a single type. The closed type-switch helpers in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) (`AsDVText`, `AuditDetailsBase`, …) are compat shims for callers consuming the parent struct value directly; prefer the methods when reading scalar fields.
 
+**Nil interface values:** calling `name.GetValue()` on a `nil` `DVTextLike` (e.g. an optional `*Like`-typed field left unset by the caller) panics like any other nil-interface method call. The compat helpers (`rm.DVTextValueOf(nil) → ""`, `rm.AsDVText(nil) → (zero, false)`) absorb the nil case for callers that want defensive defaults; for required-by-spec slots, prefer the direct method and let the panic surface the missing field early.
+
 **Abstract RM categories → existing marker interfaces.** `DataValue`, `Item`, `ContentItem`, `UIDBasedID`, `PartyProxy`, `DVOrdered`, `ItemStructure`, etc. stay as marker-only interfaces (REQ-040). Reach concrete fields via type assertion:
 
 ```go

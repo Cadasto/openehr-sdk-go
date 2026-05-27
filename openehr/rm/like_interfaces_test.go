@@ -1,6 +1,7 @@
 package rm_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -199,6 +200,60 @@ func TestObjectRefLikeAccessors(t *testing.T) {
 				t.Errorf("GetType = %q", tc.v.GetType())
 			}
 		})
+	}
+}
+
+// TestLocatableRefGetIDFromShadow guards against the post-decode gap
+// the v0.x.y reviewer flagged. The generated UnmarshalJSON populates
+// LocatableRef's shadow `ID UIDBasedID` field, NOT the embedded
+// `ObjectRef.ID`. GetID() MUST surface the shadow value, lifted to
+// ObjectID. A regression here would silently return nil on every
+// LOCATABLE_REF decoded from JSON.
+func TestLocatableRefGetIDFromShadow(t *testing.T) {
+	const body = `{"_type":"LOCATABLE_REF","namespace":"local","type":"VERSIONED_COMPOSITION","id":{"_type":"HIER_OBJECT_ID","value":"1234"},"path":"/data"}`
+	var l rm.LocatableRef
+	if err := json.Unmarshal([]byte(body), &l); err != nil {
+		t.Fatalf("Unmarshal LOCATABLE_REF: %v", err)
+	}
+	if l.ID == nil {
+		t.Fatalf("shadow LocatableRef.ID is nil after decode — wire fixture broken?")
+	}
+	// Sanity: the embedded parent's ID is left zero on the generated
+	// decode path; this is the bug surface GetID has to paper over.
+	if l.ObjectRef.ID != nil {
+		t.Errorf("ObjectRef.ID = %#v (expected nil; if this fires the generator changed and GetID can be simplified)", l.ObjectRef.ID)
+	}
+	got := l.GetID()
+	if got == nil {
+		t.Fatal("GetID returned nil after decode — regression of the post-decode shadow gap")
+	}
+	// Typereg ctors return pointers — the test asserts on *HierObjectID.
+	if hid, ok := got.(*rm.HierObjectID); !ok || hid == nil || hid.Value != "1234" {
+		t.Errorf("GetID = %#v, want *HierObjectID{Value: 1234}", got)
+	}
+	// Also exercise through the ObjectRefLike interface — same code
+	// path, but documents that the accessor is reachable from the
+	// generic polymorphic slot.
+	var asLike rm.ObjectRefLike = l
+	if asLike.GetID() == nil {
+		t.Error("ObjectRefLike.GetID() returned nil after decode")
+	}
+}
+
+// TestLocatableRefGetIDFallsBackToParent covers the hand-constructed
+// path where a caller sets only ObjectRef.ID (no shadow). GetID should
+// surface the parent value rather than returning nil.
+func TestLocatableRefGetIDFallsBackToParent(t *testing.T) {
+	l := rm.LocatableRef{
+		ObjectRef: rm.ObjectRef{
+			ID:        rm.GenericID{Value: "fallback"},
+			Namespace: "local",
+			Type:      "FOLDER",
+		},
+	}
+	id, ok := l.GetID().(rm.GenericID)
+	if !ok || id.Value != "fallback" {
+		t.Errorf("GetID = %#v, want GenericID{Value: fallback} from embedded ObjectRef", l.GetID())
 	}
 }
 

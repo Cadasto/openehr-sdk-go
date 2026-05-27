@@ -223,11 +223,21 @@ func (a AccessGroupRef) GetType() string      { return a.Type }
 func (l LocatableRef) isObjectRefLike()       {}
 
 // LocatableRef shadows ObjectRef.ID with its own typed UIDBasedID id.
-// The interface contract is on the OBJECT_REF parent's ID (the
-// ObjectID-typed field embedded via ObjectRef); GetID returns that
-// inherited field, NOT the LocatableRef-specific UIDBasedID. Callers
-// who want the UIDBasedID id type-assert to *LocatableRef.
-func (l LocatableRef) GetID() ObjectID      { return l.ObjectRef.ID }
+// The generated UnmarshalJSON populates the shadow `l.ID` (NOT the
+// embedded `l.ObjectRef.ID`), so GetID prefers the shadow when it is
+// set — lifting UIDBasedID → ObjectID via type assertion (every
+// concrete UIDBasedID also implements ObjectID). Falls back to the
+// embedded ObjectRef.ID for hand-constructed values that set only
+// the parent. Callers who specifically want the UIDBasedID-typed id
+// can type-assert to *LocatableRef.
+func (l LocatableRef) GetID() ObjectID {
+	if l.ID != nil {
+		if id, ok := l.ID.(ObjectID); ok {
+			return id
+		}
+	}
+	return l.ObjectRef.ID
+}
 func (l LocatableRef) GetNamespace() string { return l.Namespace }
 func (l LocatableRef) GetType() string      { return l.Type }
 func (p PartyRef) isObjectRefLike()         {}
