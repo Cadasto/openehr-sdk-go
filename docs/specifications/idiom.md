@@ -116,6 +116,41 @@ The type registry (REQ-040) is the **only** sanctioned mechanism for projecting 
 
 If a generic API is harder to read than a `T`-specific one for the most common call site, the generic is wrong — drop it.
 
+## Substitution slots and the `*Like` interfaces
+
+The openEHR RM permits Liskov substitution at every property slot (per AOM `valid_value` semantics). The Go SDK surfaces this on two distinct surfaces; the call pattern differs between them and consumers should know which is which.
+
+**Concrete-with-subtypes parents → narrow `<Parent>Like` interfaces.** Where the BMM declares a property with a concrete parent class that has registered subtypes (`LOCATABLE.name DV_TEXT`, `EVENT_CONTEXT.health_care_facility PARTY_IDENTIFIED`, audit envelopes on Versions, `OBJECT_REF`-typed slots, `DV_URI`-typed slots), the generated Go field type is a narrow interface — [`DVTextLike`](../../openehr/rm/like_interfaces.go), `PartyIdentifiedLike`, `AuditDetailsLike`, `ObjectRefLike`, `DVURILike`. The interface declares Get-prefixed accessor methods that work uniformly across the parent and every registered subtype:
+
+```go
+// Idiomatic — direct method call, no helper
+name := c.Name.GetValue()
+if code, ok := c.Name.GetDefiningCode(); ok {
+    // c.Name was a DV_CODED_TEXT on the wire; code is the terminology binding
+}
+```
+
+The Get-prefix is mechanical, not stylistic — BMM property names like `value` and `defining_code` are already field identifiers on the concrete structs, and Go forbids a method and a field with the same name on a single type. The closed type-switch helpers in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) (`AsDVText`, `AuditDetailsBase`, …) are compat shims for callers consuming the parent struct value directly; prefer the methods when reading scalar fields.
+
+**Abstract RM categories → existing marker interfaces.** `DataValue`, `Item`, `ContentItem`, `UIDBasedID`, `PartyProxy`, `DVOrdered`, `ItemStructure`, etc. stay as marker-only interfaces (REQ-040). Reach concrete fields via type assertion:
+
+```go
+// Idiomatic — type assert on a marker-only abstract interface
+if q, ok := el.Value.(*rm.DVQuantity); ok {
+    use(q.Magnitude, q.Units)
+}
+```
+
+Quick decision matrix:
+
+| RM slot shape | Go field type | Read scalars by | Read full payload by |
+|---|---|---|---|
+| Concrete parent with subtypes (DV_TEXT, AUDIT_DETAILS, …) | `<Parent>Like` interface | `f.GetValue()` (etc.) — methods | `rm.AsDVText(f)` / `rm.AuditDetailsBase(f)` — helpers |
+| Abstract RM category (DATA_VALUE, ITEM_STRUCTURE, …) | abstract Go interface | type assert | type assert |
+| Concrete parent without subtypes | concrete struct | direct field access | direct field access |
+
+Adding a new subtype on a BMM bump is documented in [ADR-0001 § Procedure step 10](../adr/0001-bmm-version-bump-runbook.md).
+
 ## Errors (REQ-025)
 
 ### Wrapping
