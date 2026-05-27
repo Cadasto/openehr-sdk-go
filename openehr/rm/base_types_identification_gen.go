@@ -132,20 +132,6 @@ type ObjectRef struct {
 	Type string `json:"type"`
 }
 
-// ObjectRefLike is the SDK-GAP-11 narrow polymorphic interface for ObjectRef.
-// Concrete-typed RM slots declared as OBJECT_REF admit Liskov substitution
-// by any descendant per the openEHR RM; the wire decoder dispatches
-// via typereg using this interface so subtype payloads survive the
-// decode → re-marshal round-trip without field loss.
-type ObjectRefLike interface {
-	isObjectRefLike()
-}
-
-func (ObjectRef) isObjectRefLike()      {}
-func (AccessGroupRef) isObjectRefLike() {}
-func (LocatableRef) isObjectRefLike()   {}
-func (PartyRef) isObjectRefLike()       {}
-
 // ObjectVersionID Globally unique identifier for one version of a versioned object; lexical form: `object_id  '::' creating_system_id  '::' version_tree_id`.
 type ObjectVersionID struct {
 	// Value The value of the id in the form defined below.

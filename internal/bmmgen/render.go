@@ -364,12 +364,14 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		b.WriteString(field)
 	}
 	b.WriteString("}\n")
-	// SDK-GAP-11: emit a narrow `<GoName>Like` interface alongside the
-	// concrete struct when this class has registered subtypes. Marker
-	// methods on the parent + every transitive subtype provide the
-	// type-set; downstream fields typed by the parent class are lifted
-	// to the interface so wire decode preserves subtype payloads.
-	emitNarrowInterface(&b, plan, pc, sc)
+	// SDK-GAP-11 narrow `<GoName>Like` interfaces were previously
+	// emitted here. They now live in the non-generated
+	// `openehr/rm/like_interfaces.go` so callers can use RM-shaped
+	// accessor methods (GetValue, GetDefiningCode, …) without the
+	// codegen growing a per-class method-body table. plan.ConcreteSubtypes
+	// remains the source of truth for field-type lifting (see
+	// singleTypeRef and polymorphicProperty); only the interface
+	// declaration + marker methods moved out.
 	// Phase-3: emit method stubs for any functions declared on this
 	// class. For abstract+generic structs (e.g. EVENT[T]) this also
 	// emits the class's own functions on the embedding receiver.
@@ -377,45 +379,6 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		return "", err
 	}
 	return b.String(), nil
-}
-
-// emitNarrowInterface writes the `<GoName>Like` interface + marker
-// methods when pc has registered subtypes per plan.ConcreteSubtypes.
-// The marker method uses a value receiver on the parent and on every
-// transitive subtype, so the interface is satisfied by both `T` and
-// `*T` (mirrors the existing AbstractDescendants emission style at
-// [emitMarkerMethods]).
-func emitNarrowInterface(b *strings.Builder, plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) {
-	subs, ok := plan.ConcreteSubtypes[pc.BMMName]
-	if !ok || len(subs) == 0 {
-		return
-	}
-	if pc.External || sc.IsGeneric() || pc.IsPrimitive {
-		return
-	}
-	ifaceName := pc.GoName + "Like"
-	markerName := "is" + ifaceName
-	fmt.Fprintf(b, "\n// %s is the SDK-GAP-11 narrow polymorphic interface for %s.\n", ifaceName, pc.GoName)
-	fmt.Fprintf(b, "// Concrete-typed RM slots declared as %s admit Liskov substitution\n", pc.BMMName)
-	b.WriteString("// by any descendant per the openEHR RM; the wire decoder dispatches\n")
-	b.WriteString("// via typereg using this interface so subtype payloads survive the\n")
-	b.WriteString("// decode → re-marshal round-trip without field loss.\n")
-	fmt.Fprintf(b, "type %s interface {\n\t%s()\n}\n", ifaceName, markerName)
-	// Marker on the parent itself.
-	fmt.Fprintf(b, "\nfunc (%s) %s() {}\n", pc.GoName, markerName)
-	// Marker on each descendant.
-	for _, dn := range subs {
-		dc, ok := plan.Classes[dn]
-		if !ok {
-			continue
-		}
-		desc, isSimple := dc.Class.(*bmm.SimpleClass)
-		if !isSimple {
-			continue
-		}
-		recv := dc.GoName + genericReceiverParams(desc)
-		fmt.Fprintf(b, "func (%s) %s() {}\n", recv, markerName)
-	}
 }
 
 // collectFlattenedProperties returns the union of the class's own

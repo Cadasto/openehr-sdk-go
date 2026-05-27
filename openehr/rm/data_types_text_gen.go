@@ -70,18 +70,6 @@ type DVText struct {
 	Value string `json:"value"`
 }
 
-// DVTextLike is the SDK-GAP-11 narrow polymorphic interface for DVText.
-// Concrete-typed RM slots declared as DV_TEXT admit Liskov substitution
-// by any descendant per the openEHR RM; the wire decoder dispatches
-// via typereg using this interface so subtype payloads survive the
-// decode → re-marshal round-trip without field loss.
-type DVTextLike interface {
-	isDVTextLike()
-}
-
-func (DVText) isDVTextLike()      {}
-func (DVCodedText) isDVTextLike() {}
-
 // TermMapping Represents a coded term mapped to a `DV_TEXT`, and the relative match of the target term with respect to the mapped item. Plain or coded text items may appear in the EHR for which one or mappings in alternative terminologies are required. Mappings are only used to enable computer processing, so they can only be instances of `DV_CODED_TEXT`.
 //
 // Used for adding classification terms (e.g. adding ICD classifiers to SNOMED descriptive terms), or mapping into equivalents in other terminologies (e.g. across nursing vocabularies).

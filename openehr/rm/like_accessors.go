@@ -1,60 +1,56 @@
 package rm
 
-// like_accessors.go: non-generated accessors for the SDK-GAP-11
-// narrow polymorphic interfaces (DVTextLike, DVURILike,
+// like_accessors.go: parent-struct helpers that complement the
+// SDK-GAP-11 narrow polymorphic interfaces (DVTextLike, DVURILike,
 // AuditDetailsLike, PartyIdentifiedLike, ObjectRefLike).
 //
-// The narrow interfaces lift concrete-typed RM slots to admit Liskov
-// substitution per the openEHR RM (e.g. LOCATABLE.name DV_TEXT may
-// carry a DV_CODED_TEXT instance at runtime). Callers that previously
-// reached for a struct field directly (`v.Name.Value`) need a tiny
-// accessor that handles both the parent and any subtype shape. These
-// helpers are the v0.x migration path; v1.0 may promote them to
-// interface methods once the field-vs-method naming clash is resolved.
+// The interfaces themselves and their Get-prefixed accessor methods
+// (GetValue, GetDefiningCode, …) live in like_interfaces.go and are
+// the preferred surface for scalar field reads. The helpers in this
+// file recover the FULL parent struct from any subtype payload —
+// useful at validation sites that consume a concrete `rm.DVText` or
+// `rm.AuditDetails` value rather than reading scalars one at a time.
 //
-// BMM-BUMP AUDIT (ADR 0001 step):
+// Compat shims (DVTextValueOf, DVURIValueOf) delegate to the new
+// interface methods and stay for callers migrating off the
+// pre-ergonomics closed type-switch pattern.
+//
+// BMM-BUMP AUDIT (ADR 0001 step 10):
 //
 //   When a BMM bump introduces a NEW concrete subtype of any
-//   `<Parent>Like`-bearing class, the generator's marker emission picks
-//   it up automatically (the new subtype's struct gains the
-//   `is<Parent>Like()` method via the BMM ancestors graph). The closed
-//   type-switches below DO NOT — each new subtype needs an explicit
-//   `case *NewSubtype:` arm here so the helper recovers the parent
-//   payload from it. Without the audit, callers using e.g.
-//   `rm.AsDVText(name)` against a new DV_TEXT descendant would silently
-//   return (DVText{}, false).
+//   `<Parent>Like`-bearing class, the generator's field-lift picks
+//   the new subtype up automatically — but TWO hand-edited files need
+//   updates:
 //
-//   On every BMM bump where `bmmdiff` reports added classes whose
-//   ancestors include a class in this set:
+//     1. like_interfaces.go — add the marker line
+//        `func (NewSubtype) is<Parent>Like() {}` AND a method body
+//        for every accessor on the parent interface.
+//     2. THIS FILE — add a `case *NewSubtype:` arm to the matching
+//        closed type-switch so `AsDVText` / `AuditDetailsBase` /
+//        `PartyIdentifiedBase` / `ObjectRefBase` recover the parent
+//        struct from the new subtype.
+//
+//   The bump set to audit on:
 //
 //     DV_TEXT       DV_URI       AUDIT_DETAILS
 //     PARTY_IDENTIFIED   OBJECT_REF
 //
-//   add a `case *Foo:` arm to the matching helper here and pin a
-//   round-trip test for the new subtype under
-//   `openehr/serialize/canjson/polymorphic_decode_test.go`.
+//   Add a round-trip test for the new subtype under
+//   `openehr/serialize/canjson/polymorphic_decode_test.go` so
+//   PROBE-038's substitution guarantee covers it.
 
 // DVTextValueOf returns the `value` rendition of any DV_TEXT subtype.
-// Returns "" when the interface is nil. Concrete dispatch is a closed
-// type-switch — no reflection (REQ-024).
+// Returns "" when the interface is nil.
+//
+// Compat shim: prefer `v.GetValue()` directly — that method now lives
+// on [DVTextLike] (see openehr/rm/like_interfaces.go). This helper
+// stays for callers migrating off the pre-Phase-1 closed type-switch
+// pattern.
 func DVTextValueOf(v DVTextLike) string {
-	switch t := v.(type) {
-	case *DVText:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVText:
-		return t.Value
-	case *DVCodedText:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVCodedText:
-		return t.Value
+	if v == nil {
+		return ""
 	}
-	return ""
+	return v.GetValue()
 }
 
 // AsDVText returns the DVText payload of v (the parent struct
@@ -81,25 +77,17 @@ func AsDVText(v DVTextLike) (DVText, bool) {
 	return DVText{}, false
 }
 
-// DVURIValueOf returns the `value` rendition of any DV_URI subtype.
+// DVURIValueOf returns the URI string carried by any DV_URI subtype.
+//
+// Compat shim: prefer `v.GetValue()` directly — that method now lives
+// on [DVURILike] (see openehr/rm/like_interfaces.go). This helper
+// stays for callers migrating off the pre-Phase-1 closed type-switch
+// pattern.
 func DVURIValueOf(v DVURILike) string {
-	switch t := v.(type) {
-	case *DVURI:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVURI:
-		return t.Value
-	case *DVEHRURI:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVEHRURI:
-		return t.Value
+	if v == nil {
+		return ""
 	}
-	return ""
+	return v.GetValue()
 }
 
 // AuditDetailsBase returns the AUDIT_DETAILS payload of v (the parent
