@@ -2,6 +2,7 @@ package datamap
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -57,6 +58,17 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 		content = append(content, entry)
 	}
 
+	// A payload that carried content but matched no root means its content keys
+	// do not line up with this template's archetype roots — fail loudly with
+	// both key sets rather than silently emitting an empty composition.
+	if len(content) == 0 && len(contentPayload) > 0 {
+		return nil, fmt.Errorf(
+			"datamap.ToComposition: content keys do not match template roots; payload has [%s], template expects [%s]",
+			strings.Join(mapKeys(contentPayload), ", "),
+			strings.Join(rootKeys(roots), ", "),
+		)
+	}
+
 	return map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": rootArchetypeID(root),
@@ -75,6 +87,22 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 	}, nil
 }
 
+func mapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func rootKeys(roots []contentRoot) []string {
+	keys := make([]string, 0, len(roots))
+	for _, r := range roots {
+		keys = append(keys, r.id+"|"+r.label)
+	}
+	return keys
+}
+
 func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, language string) (map[string]any, error) {
 	rmType := r.node.RMTypeName()
 	out := map[string]any{
@@ -85,6 +113,15 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 		"language":          codePhrase("ISO_639-1", language),
 		"encoding":          codePhrase("IANA_character-sets", "UTF-8"),
 		"subject":           map[string]any{"_type": "PARTY_SELF"},
+	}
+
+	// INSTRUCTION has activities[] (not data) — encode separately.
+	if rmType == "INSTRUCTION" {
+		return encodeInstruction(out, r, payload)
+	}
+	// ACTION has a description ITEM_TREE (not data) + time + ism_transition.
+	if rmType == "ACTION" {
+		return encodeAction(out, r, payload, startTime)
 	}
 
 	dataNode, ok := attrFirstObject(findAttr(r.node, "data"))
@@ -118,8 +155,8 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 			"origin":            dvDateTime(startTime),
 			"events":            events,
 		}
-	case "EVALUATION", "ADMIN_ENTRY", "ACTION", "INSTRUCTION":
-		itemsAttr := findAttr(dataNode, "items")
+	case "EVALUATION", "ADMIN_ENTRY":
+		itemsAttr := structuredItemsAttr(dataNode)
 		if itemsAttr == nil {
 			return nil, fmt.Errorf("%s data has no items", rmType)
 		}
@@ -127,14 +164,90 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 		if err != nil {
 			return nil, err
 		}
-		out["data"] = map[string]any{
-			"_type":             "ITEM_TREE",
-			"archetype_node_id": dataNode.NodeID(),
-			"name":              dvText(termOrFallback(r.terms, dataNode.NodeID(), "Tree")),
-			"items":             items,
-		}
+		out["data"] = encodeStructuredContainer(dataNode, items, "Tree", r.terms)
 	default:
 		return nil, fmt.Errorf("RM entry type %q not supported", rmType)
+	}
+	return out, nil
+}
+
+// encodeInstruction builds an INSTRUCTION from a datamap payload: a mandatory
+// narrative plus activities[], each an ACTIVITY whose description ITEM_TREE
+// carries the encoded items (+ optional timing).
+func encodeInstruction(out map[string]any, r contentRoot, payload map[string]any) (map[string]any, error) {
+	out["narrative"] = dvText(termOrFallback(r.terms, "narrative", "Instruction"))
+
+	actConstraint, ok := attrFirstObject(findAttr(r.node, "activities"))
+	if !ok {
+		return nil, fmt.Errorf("INSTRUCTION %s has no activities constraint", r.id)
+	}
+	var itemsAttr *template.Attribute
+	var descConstraint template.ObjectNode
+	if dc, ok := attrFirstObject(findAttr(actConstraint, "description")); ok {
+		descConstraint = dc
+		itemsAttr = structuredItemsAttr(dc)
+	}
+
+	actsPayload, _ := payload["activities"].([]any)
+	acts := make([]any, 0, len(actsPayload))
+	for i, a := range actsPayload {
+		am, ok := a.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("activities[%d] is not an object", i)
+		}
+		items := []any{}
+		if itemsAttr != nil {
+			enc, err := encodeItems(itemsAttr, am, r.terms)
+			if err != nil {
+				return nil, fmt.Errorf("activities[%d]: %w", i, err)
+			}
+			items = enc
+		}
+		description := map[string]any{
+			"_type":             "ITEM_TREE",
+			"archetype_node_id": "",
+			"name":              dvText("Tree"),
+			"items":             items,
+		}
+		if descConstraint != nil {
+			description = encodeStructuredContainer(descConstraint, items, "Tree", r.terms)
+		}
+		act := map[string]any{
+			"_type":               "ACTIVITY",
+			"archetype_node_id":   actConstraint.NodeID(),
+			"name":                dvText(termOrFallback(r.terms, actConstraint.NodeID(), "Activity")),
+			"action_archetype_id": "/.*/",
+			"description":         description,
+		}
+		if t, ok := am["timing"].(string); ok && t != "" {
+			act["timing"] = map[string]any{"_type": "DV_PARSABLE", "value": t, "formalism": "timing"}
+		}
+		acts = append(acts, act)
+	}
+	out["activities"] = acts
+	return out, nil
+}
+
+// encodeAction builds an ACTION: its description ITEM_TREE items, a time, and a
+// mandatory ism_transition (defaulting current_state to "completed").
+func encodeAction(out map[string]any, r contentRoot, payload map[string]any, startTime string) (map[string]any, error) {
+	descConstraint, ok := attrFirstObject(findAttr(r.node, "description"))
+	if !ok {
+		return nil, fmt.Errorf("ACTION %s has no description constraint", r.id)
+	}
+	items := []any{}
+	if itemsAttr := structuredItemsAttr(descConstraint); itemsAttr != nil {
+		enc, err := encodeItems(itemsAttr, payload, r.terms)
+		if err != nil {
+			return nil, err
+		}
+		items = enc
+	}
+	out["description"] = encodeStructuredContainer(descConstraint, items, "Tree", r.terms)
+	out["time"] = dvDateTime(stringOrDefault(payload["time"], startTime))
+	out["ism_transition"] = map[string]any{
+		"_type":         "ISM_TRANSITION",
+		"current_state": dvCodedText("completed", "openehr", "532"),
 	}
 	return out, nil
 }
@@ -146,7 +259,7 @@ func encodeEvent(eventConstraint template.ObjectNode, payload map[string]any, te
 	if !ok {
 		return nil, fmt.Errorf("event constraint has no data")
 	}
-	itemsAttr := findAttr(dataNode, "items")
+	itemsAttr := structuredItemsAttr(dataNode)
 	if itemsAttr == nil {
 		return nil, fmt.Errorf("event ITEM_TREE has no items")
 	}
@@ -169,12 +282,7 @@ func encodeEvent(eventConstraint template.ObjectNode, payload map[string]any, te
 		"archetype_node_id": eventConstraint.NodeID(),
 		"name":              dvText(termOrFallback(terms, eventConstraint.NodeID(), "Any event")),
 		"time":              dvDateTime(t),
-		"data": map[string]any{
-			"_type":             "ITEM_TREE",
-			"archetype_node_id": dataNode.NodeID(),
-			"name":              dvText(termOrFallback(terms, dataNode.NodeID(), "Tree")),
-			"items":             items,
-		},
+		"data":              encodeStructuredContainer(dataNode, items, "Tree", terms),
 	}, nil
 }
 
@@ -254,18 +362,128 @@ func encodeElement(elem template.ObjectNode, valuePayload any, terms map[string]
 }
 
 func encodeValue(constraint template.ObjectNode, payload any, terms map[string]string) (map[string]any, error) {
+	// Expanded notation: a self-describing object carrying an "rmType"
+	// discriminator (the inverse of decodeElementValue's expanded branch).
+	// Rename rmType→_type verbatim — the remaining fields are already the raw
+	// RM attributes, so we don't run the per-type short-form coercions.
+	if exp := encodeExpandedValue(payload); exp != nil {
+		return exp, nil
+	}
 	switch rmType := constraint.RMTypeName(); rmType {
 	case "DV_QUANTITY":
 		return encodeQuantity(constraint, payload)
-	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_TEXT", "DV_BOOLEAN":
+	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_TEXT", "DV_BOOLEAN", "DV_URI", "DV_EHR_URI":
 		return encodeScalarWrap(rmType, payload), nil
 	case "DV_COUNT":
 		return encodeCount(payload)
 	case "DV_CODED_TEXT":
 		return encodeCodedText(payload, terms)
+	case "DV_ORDINAL":
+		return encodeOrdinal(constraint, payload, terms)
+	case "DV_PROPORTION":
+		return encodeProportion(payload)
 	default:
 		return nil, fmt.Errorf("RM value type %q not supported", rmType)
 	}
+}
+
+// encodeOrdinal rebuilds a DV_ORDINAL from its short form (the bare symbol code,
+// e.g. "at0005" or "local::at0005"). The C_DV_ORDINAL constraint supplies the
+// ordinal integer + symbol terminology for the matching code; the term map
+// supplies the symbol display text. An object payload is passed through.
+func encodeOrdinal(constraint template.ObjectNode, payload any, terms map[string]string) (map[string]any, error) {
+	if m, ok := payload.(map[string]any); ok {
+		out := map[string]any{"_type": "DV_ORDINAL"}
+		for k, v := range m {
+			out[k] = v
+		}
+		return out, nil
+	}
+	code, ok := payload.(string)
+	if !ok {
+		return nil, fmt.Errorf("DV_ORDINAL: expected string code or object, got %T", payload)
+	}
+	terminology, codeStr := splitTerminology(code)
+	if co, ok := constraint.(*template.ComplexObject); ok {
+		if ord, ok := co.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
+			for _, sym := range ord.Values {
+				if sym.Symbol.CodeString != codeStr {
+					continue
+				}
+				symTerm := sym.Symbol.Terminology
+				if symTerm == "" {
+					symTerm = terminology
+				}
+				label := terms[codeStr]
+				if label == "" {
+					label = codeStr
+				}
+				return map[string]any{
+					"_type":   "DV_ORDINAL",
+					"value":   sym.Value,
+					"symbol":  dvCodedText(label, symTerm, codeStr),
+					"ordinal": sym.Value,
+				}, nil
+			}
+		}
+	}
+	// Constraint did not resolve the code — emit a best-effort ordinal carrying
+	// the symbol so the value is still a valid DV_ORDINAL.
+	label := terms[codeStr]
+	if label == "" {
+		label = codeStr
+	}
+	return map[string]any{
+		"_type":  "DV_ORDINAL",
+		"value":  0,
+		"symbol": dvCodedText(label, terminology, codeStr),
+	}, nil
+}
+
+// encodeProportion rebuilds a DV_PROPORTION. An object payload (numerator,
+// denominator, type) is passed through verbatim; a bare number is wrapped as a
+// ratio (type 0) with denominator 1 so its magnitude equals the short value.
+func encodeProportion(payload any) (map[string]any, error) {
+	if m, ok := payload.(map[string]any); ok {
+		out := map[string]any{"_type": "DV_PROPORTION"}
+		for k, v := range m {
+			out[k] = v
+		}
+		return out, nil
+	}
+	num, ok := toFloat(payload)
+	if !ok {
+		return nil, fmt.Errorf("DV_PROPORTION: expected number or object, got %T", payload)
+	}
+	return map[string]any{
+		"_type":       "DV_PROPORTION",
+		"numerator":   num,
+		"denominator": float64(1),
+		"type":        0,
+	}, nil
+}
+
+// encodeExpandedValue converts the expanded value notation
+// ({"rmType": "...", ...attrs}) back into an RM value object ({"_type": ...}).
+// Returns nil when payload is not an expanded object (so callers fall through
+// to the short-form coercions).
+func encodeExpandedValue(payload any) map[string]any {
+	m, ok := payload.(map[string]any)
+	if !ok {
+		return nil
+	}
+	rt, ok := m["rmType"].(string)
+	if !ok || rt == "" {
+		return nil
+	}
+	out := map[string]any{"_type": rt}
+	for k, v := range m {
+		if k == "rmType" {
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
 
 func encodeQuantity(constraint template.ObjectNode, payload any) (map[string]any, error) {
@@ -390,6 +608,33 @@ func quantityDefault(n template.ObjectNode) (units string, precision int) {
 
 func dvText(value string) map[string]any {
 	return map[string]any{"_type": "DV_TEXT", "value": value}
+}
+
+// encodeStructuredContainer builds an ITEM_STRUCTURE RM object, preserving the
+// constraint's real subtype and placing the encoded children under the matching
+// attribute: ITEM_TREE/ITEM_LIST → "items", ITEM_TABLE → "rows", ITEM_SINGLE →
+// a single "item". Defaults to ITEM_TREE when the constraint has no RM type.
+func encodeStructuredContainer(container template.ObjectNode, items []any, fallbackName string, terms map[string]string) map[string]any {
+	rmType := container.RMTypeName()
+	if rmType == "" {
+		rmType = "ITEM_TREE"
+	}
+	out := map[string]any{
+		"_type":             rmType,
+		"archetype_node_id": container.NodeID(),
+		"name":              dvText(termOrFallback(terms, container.NodeID(), fallbackName)),
+	}
+	switch rmType {
+	case "ITEM_SINGLE":
+		if len(items) > 0 {
+			out["item"] = items[0]
+		}
+	case "ITEM_TABLE":
+		out["rows"] = items
+	default:
+		out["items"] = items
+	}
+	return out
 }
 
 // clusterName builds a CLUSTER's runtime name. When the payload carries a coded

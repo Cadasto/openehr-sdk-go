@@ -59,6 +59,7 @@ type contentRoot struct {
 	descs      map[string]string // at-code -> description
 	node       template.ObjectNode
 	arrayNodes map[string]bool // at-code -> true when occurrences allow >1 (array-valued)
+	expanded   bool            // FromComposition: emit expanded ({rmType,…}) instead of short scalars
 }
 
 // collectArrayNodes records every descendant at-code whose occurrences allow
@@ -148,6 +149,32 @@ func buildContentSchema(roots []contentRoot) map[string]any {
 
 func buildArchetypeRootSchema(r contentRoot) map[string]any {
 	contentPath := "content[" + r.id + "]"
+
+	// INSTRUCTION: activities[] (each ACTIVITY carries a description ITEM_TREE).
+	if activitiesAttr := findAttr(r.node, "activities"); activitiesAttr != nil {
+		return map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"activities": buildActivitiesSchema(activitiesAttr, r, contentPath),
+			},
+		}
+	}
+
+	// ACTION: a description ITEM_TREE (not `data`) plus a time.
+	if descAttr := findAttr(r.node, "description"); descAttr != nil {
+		props := map[string]any{"time": shortSchema("string", "date-time", nil, "")}
+		if descChild, ok := attrFirstObject(descAttr); ok {
+			if itemsAttr := structuredItemsAttr(descChild); itemsAttr != nil {
+				itemsPath := contentPath + "/description[" + descChild.NodeID() + "]"
+				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
+					props[k] = v
+				}
+			}
+		}
+		return map[string]any{"type": "object", "additionalProperties": false, "properties": props}
+	}
+
 	dataAttr := findAttr(r.node, "data")
 	dataPath := contentPath
 	var dataChild template.ObjectNode
@@ -171,7 +198,7 @@ func buildArchetypeRootSchema(r contentRoot) map[string]any {
 				},
 			}
 		}
-		if itemsAttr := findAttr(dataChild, "items"); itemsAttr != nil {
+		if itemsAttr := structuredItemsAttr(dataChild); itemsAttr != nil {
 			items, required := buildItemsSchemaWithRequired(itemsAttr, r, dataPath)
 			out := map[string]any{
 				"type":                 "object",
@@ -205,6 +232,47 @@ func buildEventsSchema(eventsAttr *template.Attribute, r contentRoot, parentPath
 	return schema
 }
 
+// buildActivitiesSchema models an INSTRUCTION's activities[] — each item is the
+// activity's description ITEM_TREE items plus an optional timing string.
+func buildActivitiesSchema(activitiesAttr *template.Attribute, r contentRoot, parentPath string) map[string]any {
+	schema := map[string]any{"type": "array"}
+	act, ok := attrFirstObject(activitiesAttr)
+	if !ok {
+		return schema
+	}
+	occ := fromMultiplicity(act.Occurrences())
+	schema["items"] = buildActivityItemSchema(act, r, parentPath)
+	if occ.lower != nil {
+		schema["minItems"] = *occ.lower
+	}
+	if !occ.upperUnbounded && occ.upper != nil {
+		schema["maxItems"] = *occ.upper
+	}
+	return schema
+}
+
+func buildActivityItemSchema(act template.ObjectNode, r contentRoot, parentPath string) map[string]any {
+	actPath := parentPath + "/activities[" + act.NodeID() + "]"
+	props := map[string]any{
+		"timing": makeDescField("string", "ISO 8601 timing expression (optional)"),
+	}
+	if descAttr := findAttr(act, "description"); descAttr != nil {
+		if descChild, ok := attrFirstObject(descAttr); ok {
+			if itemsAttr := structuredItemsAttr(descChild); itemsAttr != nil {
+				itemsPath := actPath + "/description[" + descChild.NodeID() + "]"
+				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
+					props[k] = v
+				}
+			}
+		}
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties":           props,
+	}
+}
+
 func buildEventItemSchema(eventNode template.ObjectNode, r contentRoot, parentPath string) map[string]any {
 	eventPath := parentPath + "/events[" + eventNode.NodeID() + "]"
 
@@ -235,7 +303,7 @@ func buildEventItemSchema(eventNode template.ObjectNode, r contentRoot, parentPa
 
 	if dataAttr := findAttr(eventNode, "data"); dataAttr != nil {
 		if dataChild, ok := attrFirstObject(dataAttr); ok {
-			if itemsAttr := findAttr(dataChild, "items"); itemsAttr != nil {
+			if itemsAttr := structuredItemsAttr(dataChild); itemsAttr != nil {
 				itemsPath := eventPath + "/data[" + dataChild.NodeID() + "]"
 				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
 					props[k] = v
@@ -356,12 +424,15 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 				}
 				schema = valueSchema(rmTypeOfValue, options)
 			} else {
-				branches := make([]any, 0, len(valueNodes)*2)
+				// Multi-type value: a short branch per allowed RM type, plus a
+				// single permissive object that accepts any expanded form.
+				branches := make([]any, 0, len(valueNodes)+1)
 				for _, vn := range valueNodes {
 					opts := buildOptions(collectCodes(vn), r.terms)
 					options = append(options, opts...)
-					branches = append(branches, shortSchemaForType(vn.RMTypeName(), opts), expandedSchemaForType(vn.RMTypeName(), opts))
+					branches = append(branches, shortSchemaForType(vn.RMTypeName(), opts))
 				}
+				branches = append(branches, map[string]any{"type": "object", "additionalProperties": true})
 				schema = map[string]any{"oneOf": branches}
 			}
 			ui := buildUi(nodePath+"/value", r.descs[nodeID], options)
@@ -445,6 +516,21 @@ func findAttr(n template.ObjectNode, name string) *template.Attribute {
 	}
 	for _, a := range n.Attributes() {
 		if a.Name() == name {
+			return a
+		}
+	}
+	return nil
+}
+
+// structuredItemsAttr returns the child-holding attribute of an ITEM_STRUCTURE
+// container, normalising across the subtypes: ITEM_TREE/ITEM_LIST expose their
+// ELEMENT/CLUSTER children under "items", ITEM_TABLE under "rows" (each a
+// CLUSTER row), ITEM_SINGLE under "item" (a single ELEMENT). Returns nil when
+// none is present. The downstream items-walkers iterate Children() uniformly,
+// so a single-child "item" attribute works without special-casing.
+func structuredItemsAttr(container template.ObjectNode) *template.Attribute {
+	for _, name := range []string{"items", "rows", "item"} {
+		if a := findAttr(container, name); a != nil {
 			return a
 		}
 	}

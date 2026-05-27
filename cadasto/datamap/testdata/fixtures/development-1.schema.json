@@ -26,28 +26,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "formatting": {
-                            "type": "string"
-                          },
-                          "hyperlink": {
-                            "format": "uri",
-                            "type": "string"
-                          },
-                          "language": {
-                            "type": "string"
-                          },
-                          "rmType": {
-                            "const": "DV_TEXT"
-                          },
-                          "value": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "value"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -68,28 +47,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "code": {
-                            "enum": [
-                              "at0014",
-                              "at0015"
-                            ],
-                            "type": "string"
-                          },
-                          "rmType": {
-                            "const": "DV_CODED_TEXT"
-                          },
-                          "terminology": {
-                            "type": "string"
-                          },
-                          "value": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "code"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -116,21 +74,7 @@
                         "type": "number"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "magnitude": {
-                            "type": "number"
-                          },
-                          "rmType": {
-                            "const": "DV_QUANTITY"
-                          },
-                          "unit": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "magnitude"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -147,26 +91,7 @@
                         "type": "number"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "denominator": {
-                            "type": "number"
-                          },
-                          "numerator": {
-                            "type": "number"
-                          },
-                          "rmType": {
-                            "const": "DV_PROPORTION"
-                          },
-                          "type": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "numerator",
-                          "denominator"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -183,18 +108,7 @@
                         "type": "integer"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "magnitude": {
-                            "type": "integer"
-                          },
-                          "rmType": {
-                            "const": "DV_COUNT"
-                          }
-                        },
-                        "required": [
-                          "magnitude"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -212,19 +126,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "rmType": {
-                            "const": "DV_DATE_TIME"
-                          },
-                          "value": {
-                            "format": "date-time",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "value"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -242,19 +144,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "rmType": {
-                            "const": "DV_TIME"
-                          },
-                          "value": {
-                            "pattern": "^[0-2][0-9]:[0-5][0-9]$",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "value"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -272,19 +162,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "rmType": {
-                            "const": "DV_DATE"
-                          },
-                          "value": {
-                            "format": "date",
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "value"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -301,25 +179,7 @@
                         "type": "string"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "ordinal": {
-                            "type": "integer"
-                          },
-                          "rmType": {
-                            "const": "DV_ORDINAL"
-                          },
-                          "value": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "ordinal"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],
@@ -336,18 +196,7 @@
                         "type": "boolean"
                       },
                       {
-                        "additionalProperties": false,
-                        "properties": {
-                          "rmType": {
-                            "const": "DV_BOOLEAN"
-                          },
-                          "value": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "value"
-                        ],
+                        "additionalProperties": true,
                         "type": "object"
                       }
                     ],

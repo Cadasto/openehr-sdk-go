@@ -6,7 +6,11 @@ import (
 )
 
 // REQ-058 — value-schema layer: each clinical value renders as
-// oneOf[short, expanded] with an rmType discriminator on the expanded form.
+// oneOf[short, expanded]. The short branch is the ergonomic scalar (with enum
+// for coded values); the expanded branch is a permissive object that accepts
+// any RM value object (the "{rmType, …}" form), so round-tripped CDR data with
+// foreign/extra fields validates. Typed-expanded modelling lives in
+// expandedSchemaForType (see TestExpandedTextHasOptionalFields).
 
 func TestValueSchemaQuantity(t *testing.T) {
 	got := valueSchema("DV_QUANTITY", nil)
@@ -21,21 +25,8 @@ func TestValueSchemaQuantity(t *testing.T) {
 	}
 
 	exp := oneOf[1].(map[string]any)
-	if exp["type"] != "object" || exp["additionalProperties"] != false {
-		t.Errorf("expanded form: want object/additionalProperties=false, got %#v", exp)
-	}
-	props := exp["properties"].(map[string]any)
-	if mag := props["magnitude"].(map[string]any); mag["type"] != "number" {
-		t.Errorf("magnitude type: want number, got %v", mag["type"])
-	}
-	if _, ok := props["unit"]; !ok {
-		t.Error("expanded DV_QUANTITY missing unit property")
-	}
-	if rt := props["rmType"].(map[string]any); rt["const"] != "DV_QUANTITY" {
-		t.Errorf("rmType const: want DV_QUANTITY, got %v", rt["const"])
-	}
-	if req := exp["required"].([]string); !reflect.DeepEqual(req, []string{"magnitude"}) {
-		t.Errorf("required: want [magnitude], got %v", req)
+	if exp["type"] != "object" || exp["additionalProperties"] != true {
+		t.Errorf("expanded form: want permissive object (additionalProperties=true), got %#v", exp)
 	}
 }
 
@@ -50,13 +41,8 @@ func TestValueSchemaCodedTextEnum(t *testing.T) {
 	}
 
 	exp := oneOf[1].(map[string]any)
-	props := exp["properties"].(map[string]any)
-	code := props["code"].(map[string]any)
-	if enum, ok := code["enum"].([]string); !ok || len(enum) != 2 {
-		t.Errorf("expanded code enum: want 2 entries, got %#v", code["enum"])
-	}
-	if req := exp["required"].([]string); !reflect.DeepEqual(req, []string{"code"}) {
-		t.Errorf("required: want [code], got %v", req)
+	if exp["type"] != "object" || exp["additionalProperties"] != true {
+		t.Errorf("expanded form: want permissive object (additionalProperties=true), got %#v", exp)
 	}
 }
 

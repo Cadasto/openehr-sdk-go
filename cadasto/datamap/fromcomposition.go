@@ -20,12 +20,24 @@ import (
 // allow future OPT-driven label/coded-value resolution; it is currently unused
 // — decode walks the composition's own name / archetype_node_id fields.
 func FromComposition(opt *template.OperationalTemplate, composition map[string]any) (map[string]any, error) {
+	return fromComposition(opt, composition, false)
+}
+
+// FromCompositionExpanded is like FromComposition but emits the expanded value
+// form ({rmType, …RM fields…}) instead of collapsing to short scalars, so
+// types + units are preserved (and the result re-encodes losslessly).
+func FromCompositionExpanded(opt *template.OperationalTemplate, composition map[string]any) (map[string]any, error) {
+	return fromComposition(opt, composition, true)
+}
+
+func fromComposition(opt *template.OperationalTemplate, composition map[string]any, expanded bool) (map[string]any, error) {
 	// Per-archetype-root term maps from the OPT, so decoded keys carry the same
 	// "atNNNN|Label" labels the Schema emits (SPEC §4.3) and therefore validate.
 	rootsByID := map[string]contentRoot{}
 	if opt != nil {
 		if root, ok := opt.Root().(template.ObjectNode); ok {
 			for _, r := range findContentArchetypeRoots(root) {
+				r.expanded = expanded
 				rootsByID[r.id] = r
 			}
 		}
@@ -126,8 +138,35 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 			events = append(events, decoded)
 		}
 		payload["events"] = events
-	case "EVALUATION", "ADMIN_ENTRY", "ACTION", "INSTRUCTION":
-		items, err := decodeItems(asList(data["items"]), r)
+	case "INSTRUCTION":
+		actsRaw, _ := node["activities"].([]any)
+		acts := make([]any, 0, len(actsRaw))
+		for i, aRaw := range actsRaw {
+			a, ok := aRaw.(map[string]any)
+			if !ok {
+				return "", nil, fmt.Errorf("activities[%d] is not an object", i)
+			}
+			decoded, err := decodeActivity(a, r)
+			if err != nil {
+				return "", nil, fmt.Errorf("activities[%d]: %w", i, err)
+			}
+			acts = append(acts, decoded)
+		}
+		payload["activities"] = acts
+	case "ACTION":
+		if t := readDVValue(node["time"]); t != nil && t != "" {
+			payload["time"] = t
+		}
+		desc, _ := node["description"].(map[string]any)
+		items, err := decodeItems(structuredItemsList(desc), r)
+		if err != nil {
+			return "", nil, err
+		}
+		for k, v := range items {
+			payload[k] = v
+		}
+	case "EVALUATION", "ADMIN_ENTRY":
+		items, err := decodeItems(structuredItemsList(data), r)
 		if err != nil {
 			return "", nil, err
 		}
@@ -141,6 +180,24 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 	return key, payload, nil
 }
 
+// decodeActivity decodes one ACTIVITY: its description ITEM_TREE items plus an
+// optional timing string (DV_PARSABLE/DV_TEXT value).
+func decodeActivity(activity map[string]any, r contentRoot) (map[string]any, error) {
+	out := map[string]any{}
+	if t := readDVValue(activity["timing"]); t != nil && t != "" {
+		out["timing"] = t
+	}
+	desc, _ := activity["description"].(map[string]any)
+	items, err := decodeItems(structuredItemsList(desc), r)
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range items {
+		out[k] = v
+	}
+	return out, nil
+}
+
 func decodeEvent(event map[string]any, r contentRoot) (map[string]any, error) {
 	out := map[string]any{}
 	if t := readDVValue(event["time"]); t != nil {
@@ -150,7 +207,7 @@ func decodeEvent(event map[string]any, r contentRoot) (map[string]any, error) {
 		out["width"] = w
 	}
 	data, _ := event["data"].(map[string]any)
-	items, err := decodeItems(asList(data["items"]), r)
+	items, err := decodeItems(structuredItemsList(data), r)
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +258,13 @@ func decodeItems(items []any, r contentRoot) (map[string]any, error) {
 			}
 			decoded = sub
 		case "ELEMENT":
-			decoded = decodeElementValue(item["value"])
+			decoded = decodeElementValue(item["value"], r.expanded)
 		default:
+			continue
+		}
+		// Skip empty/null element values — they aren't in the datamap and the
+		// strict schema would reject a bare null.
+		if decoded == nil {
 			continue
 		}
 
@@ -229,44 +291,68 @@ func decodeItems(items []any, r contentRoot) (map[string]any, error) {
 
 // decodeElementValue strips RM bookkeeping from a DV_* value. Value-only DV
 // types collapse to their bare scalar; structured types keep their fields.
-func decodeElementValue(v any) any {
+func decodeElementValue(v any, expanded bool) any {
 	value, ok := v.(map[string]any)
 	if !ok {
 		return v
 	}
+	if expanded {
+		// Expanded form: the RM value with rmType discriminator (drop _type and
+		// nulls). Re-encodes losslessly via encodeValue's rmType path.
+		out := map[string]any{}
+		for k, val := range value {
+			if k != "_type" && val != nil {
+				out[k] = val
+			}
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		if rmType, _ := value["_type"].(string); rmType != "" {
+			out["rmType"] = rmType
+		}
+		return out
+	}
 	switch rmType, _ := value["_type"].(string); rmType {
 	case "DV_TEXT", "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_BOOLEAN", "DV_URI":
-		if s, ok := value["value"]; ok {
-			return s
-		}
+		return value["value"] // nil when empty → caller skips it
 	case "DV_COUNT", "DV_QUANTITY", "DV_PROPORTION":
 		// Datamap short form is the bare magnitude number; units/precision are
 		// template-derived and refilled by ToComposition.
-		if m, ok := value["magnitude"]; ok {
-			return m
-		}
-	case "DV_CODED_TEXT", "DV_ORDINAL":
-		// Datamap short form is the bare code string (from defining_code).
+		return value["magnitude"]
+	case "DV_CODED_TEXT":
+		// Short form is the bare code; a coded value with no code is free text.
 		if code := readCodePhraseCode(value["defining_code"]); code != "" {
 			return code
 		}
-		// A coded text with no usable code is effectively free text — collapse
-		// to its value string so it re-encodes as a valid DV_TEXT.
-		if s, ok := value["value"].(string); ok {
+		if s, ok := value["value"].(string); ok && s != "" {
 			return s
 		}
+		return nil
+	case "DV_ORDINAL":
+		// The code lives under symbol.defining_code.
+		if sym, ok := value["symbol"].(map[string]any); ok {
+			if code := readCodePhraseCode(sym["defining_code"]); code != "" {
+				return code
+			}
+		}
+		return nil
 	}
 	// Defensive: any value still carrying a defining_code is a coded value whose
-	// _type wasn't matched above — collapse it to its code so it stays
-	// schema-valid (datamap short form for coded values is the bare code).
+	// _type wasn't matched above — collapse it to its code.
 	if code := readCodePhraseCode(value["defining_code"]); code != "" {
 		return code
 	}
+	// Fallback: strip RM bookkeeping. An object that collapses to nothing
+	// meaningful (all-null) yields nil so the caller omits the empty field.
 	out := map[string]any{}
 	for k, val := range value {
-		if k != "_type" {
+		if k != "_type" && val != nil {
 			out[k] = val
 		}
+	}
+	if len(out) == 0 {
+		return nil
 	}
 	return out
 }
@@ -274,6 +360,39 @@ func decodeElementValue(v any) any {
 func asList(v any) []any {
 	l, _ := v.([]any)
 	return l
+}
+
+// CompositionTemplateID extracts the template_id from a canonical composition's
+// archetype_details, the OPT id needed to decode it via FromComposition.
+// Returns "" when absent.
+func CompositionTemplateID(comp map[string]any) string {
+	ad, ok := comp["archetype_details"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	tid, ok := ad["template_id"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	v, _ := tid["value"].(string)
+	return v
+}
+
+// structuredItemsList extracts the ELEMENT/CLUSTER list from a decoded
+// ITEM_STRUCTURE RM object, across subtypes: ITEM_TREE/ITEM_LIST use "items",
+// ITEM_TABLE uses "rows", ITEM_SINGLE uses a single "item" (wrapped to a list
+// so decodeItems can treat all containers uniformly).
+func structuredItemsList(container map[string]any) []any {
+	if v, ok := container["items"]; ok {
+		return asList(v)
+	}
+	if v, ok := container["rows"]; ok {
+		return asList(v)
+	}
+	if v, ok := container["item"]; ok && v != nil {
+		return []any{v}
+	}
+	return nil
 }
 
 func readCodePhraseCode(v any) string {

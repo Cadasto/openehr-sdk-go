@@ -140,16 +140,21 @@ func expandedSchemaForType(rmType string, options []optChoice) map[string]any {
 		// Complex media value — keep permissive (media_type, size, uri, data…).
 		return map[string]any{"type": "object", "additionalProperties": true}
 	default:
-		return expandedSchema(rmType, map[string]any{"value": shortSchema("string", "", nil, "")}, []string{"value"})
+		// Unmodelled value types (DV_INTERVAL, DV_IDENTIFIER, …) — permissive
+		// object so the decoded structure validates without per-type modelling.
+		return map[string]any{"type": "object", "additionalProperties": true}
 	}
 }
 
 // valueSchema returns the oneOf[short, expanded] wrapper for a value RM type.
+// The short branch is the ergonomic scalar; the expanded branch is a permissive
+// object that accepts the "{rmType, …}" form (and any RM value object). Short
+// and expanded are disjoint (scalar vs object) so oneOf stays unambiguous.
 func valueSchema(rmType string, options []optChoice) map[string]any {
 	return map[string]any{
 		"oneOf": []any{
 			shortSchemaForType(rmType, options),
-			expandedSchemaForType(rmType, options),
+			map[string]any{"type": "object", "additionalProperties": true},
 		},
 	}
 }
