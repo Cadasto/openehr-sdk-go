@@ -72,25 +72,17 @@ func AsDVText(v DVTextLike) (DVText, bool) {
 	return DVText{}, false
 }
 
-// DVURIValueOf returns the `value` rendition of any DV_URI subtype.
+// DVURIValueOf returns the URI string carried by any DV_URI subtype.
+//
+// Compat shim: prefer `v.GetValue()` directly — that method now lives
+// on [DVURILike] (see openehr/rm/like_interfaces.go). This helper
+// stays for callers migrating off the pre-Phase-1 closed type-switch
+// pattern.
 func DVURIValueOf(v DVURILike) string {
-	switch t := v.(type) {
-	case *DVURI:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVURI:
-		return t.Value
-	case *DVEHRURI:
-		if t == nil {
-			return ""
-		}
-		return t.Value
-	case DVEHRURI:
-		return t.Value
+	if v == nil {
+		return ""
 	}
-	return ""
+	return v.GetValue()
 }
 
 // AuditDetailsBase returns the AUDIT_DETAILS payload of v (the parent

@@ -70,50 +70,167 @@ func (d DVCodedText) GetDefiningCode() (CodePhrase, bool) { return d.DefiningCod
 // --- DVURILike ------------------------------------------------------
 
 // DVURILike is the SDK-GAP-11 narrow polymorphic interface for DV_URI.
-// Members: DVURI, DVEHRURI. Accessor methods land in Phase 2; the
-// interface declaration + markers ship now so generated fields
-// compile.
+// Concrete-typed RM slots declared as DV_URI admit Liskov substitution
+// by DV_EHR_URI on the wire.
+//
+// Members today: DVURI, DVEHRURI. The single accessor exposes the
+// URI string carried by both.
 type DVURILike interface {
 	isDVURILike()
+	// GetValue returns the URI string. Always non-empty on valid
+	// wire data per the RM invariant.
+	GetValue() string
 }
 
-func (d DVURI) isDVURILike()    {}
-func (d DVEHRURI) isDVURILike() {}
+func (d DVURI) isDVURILike()        {}
+func (d DVURI) GetValue() string    { return d.Value }
+func (d DVEHRURI) isDVURILike()     {}
+func (d DVEHRURI) GetValue() string { return d.Value }
 
 // --- AuditDetailsLike -----------------------------------------------
 
 // AuditDetailsLike is the SDK-GAP-11 narrow polymorphic interface for
-// AUDIT_DETAILS. Members: AuditDetails, Attestation. Accessor methods
-// land in Phase 2.
+// AUDIT_DETAILS. Concrete-typed RM slots declared as AUDIT_DETAILS
+// (Version.commit_audit, Contribution.audit, …) admit Liskov
+// substitution by ATTESTATION on the wire.
+//
+// Members today: AuditDetails, Attestation. Accessors mirror the
+// AUDIT_DETAILS parent's structurally-required fields — callers
+// reaching into Attestation-only fields (Reason, IsPending, Proof, …)
+// type-assert to *Attestation as usual.
 type AuditDetailsLike interface {
 	isAuditDetailsLike()
+	// GetSystemID returns the logical EHR system identifier.
+	GetSystemID() string
+	// GetTimeCommitted returns the commit timestamp.
+	GetTimeCommitted() DVDateTime
+	// GetChangeType returns the change-type coded value
+	// (openEHR Terminology `audit change type`).
+	GetChangeType() DVCodedText
+	// GetCommitter returns the party that committed the change.
+	GetCommitter() PartyProxy
+	// GetDescription returns the optional reason-for-committal text
+	// envelope; second return is false when not set.
+	GetDescription() (DVTextLike, bool)
 }
 
-func (a AuditDetails) isAuditDetailsLike() {}
-func (a Attestation) isAuditDetailsLike()  {}
+func (a AuditDetails) isAuditDetailsLike()          {}
+func (a AuditDetails) GetSystemID() string          { return a.SystemID }
+func (a AuditDetails) GetTimeCommitted() DVDateTime { return a.TimeCommitted }
+func (a AuditDetails) GetChangeType() DVCodedText   { return a.ChangeType }
+func (a AuditDetails) GetCommitter() PartyProxy     { return a.Committer }
+func (a AuditDetails) GetDescription() (DVTextLike, bool) {
+	if a.Description == nil {
+		return nil, false
+	}
+	return a.Description, true
+}
+func (a Attestation) isAuditDetailsLike()          {}
+func (a Attestation) GetSystemID() string          { return a.SystemID }
+func (a Attestation) GetTimeCommitted() DVDateTime { return a.TimeCommitted }
+func (a Attestation) GetChangeType() DVCodedText   { return a.ChangeType }
+func (a Attestation) GetCommitter() PartyProxy     { return a.Committer }
+func (a Attestation) GetDescription() (DVTextLike, bool) {
+	if a.Description == nil {
+		return nil, false
+	}
+	return a.Description, true
+}
 
 // --- PartyIdentifiedLike --------------------------------------------
 
 // PartyIdentifiedLike is the SDK-GAP-11 narrow polymorphic interface
-// for PARTY_IDENTIFIED. Members: PartyIdentified, PartyRelated.
-// Accessor methods land in Phase 2.
+// for PARTY_IDENTIFIED. Concrete-typed RM slots declared as
+// PARTY_IDENTIFIED (EVENT_CONTEXT.health_care_facility,
+// Participation.performer, …) admit Liskov substitution by
+// PARTY_RELATED on the wire.
+//
+// Members today: PartyIdentified, PartyRelated. Accessors expose the
+// PARTY_IDENTIFIED parent's structurally-relevant fields. PARTY_RELATED
+// adds `Relationship`, which callers type-assert for.
 type PartyIdentifiedLike interface {
 	isPartyIdentifiedLike()
+	// GetName returns the optional human-readable name; second
+	// return is false when the field is nil.
+	GetName() (string, bool)
+	// GetIdentifiers returns the (possibly empty) formal identifier
+	// list — nil and empty are equivalent at the call site.
+	GetIdentifiers() []DVIdentifier
+	// GetExternalRef returns the optional reference to external
+	// demographic detail; second return is false when nil.
+	GetExternalRef() (*PartyRef, bool)
 }
 
 func (p PartyIdentified) isPartyIdentifiedLike() {}
-func (p PartyRelated) isPartyIdentifiedLike()    {}
+func (p PartyIdentified) GetName() (string, bool) {
+	if p.Name == nil {
+		return "", false
+	}
+	return *p.Name, true
+}
+func (p PartyIdentified) GetIdentifiers() []DVIdentifier { return p.Identifiers }
+func (p PartyIdentified) GetExternalRef() (*PartyRef, bool) {
+	if p.ExternalRef == nil {
+		return nil, false
+	}
+	return p.ExternalRef, true
+}
+func (p PartyRelated) isPartyIdentifiedLike() {}
+func (p PartyRelated) GetName() (string, bool) {
+	if p.Name == nil {
+		return "", false
+	}
+	return *p.Name, true
+}
+func (p PartyRelated) GetIdentifiers() []DVIdentifier { return p.Identifiers }
+func (p PartyRelated) GetExternalRef() (*PartyRef, bool) {
+	if p.ExternalRef == nil {
+		return nil, false
+	}
+	return p.ExternalRef, true
+}
 
 // --- ObjectRefLike --------------------------------------------------
 
 // ObjectRefLike is the SDK-GAP-11 narrow polymorphic interface for
-// OBJECT_REF. Members: ObjectRef, AccessGroupRef, LocatableRef,
-// PartyRef. Accessor methods land in Phase 2.
+// OBJECT_REF. Concrete-typed RM slots declared as OBJECT_REF admit
+// Liskov substitution by ACCESS_GROUP_REF, LOCATABLE_REF, or PARTY_REF
+// on the wire.
+//
+// Members today: ObjectRef, AccessGroupRef, LocatableRef, PartyRef.
+// Accessors expose the OBJECT_REF parent's structurally-required
+// fields. LOCATABLE_REF adds `Path` (and a typed UIDBasedID id);
+// callers reaching for subtype-specific fields type-assert as usual.
 type ObjectRefLike interface {
 	isObjectRefLike()
+	// GetID returns the ObjectID identifier.
+	GetID() ObjectID
+	// GetNamespace returns the namespace string.
+	GetNamespace() string
+	// GetType returns the RM class name of the referred object
+	// (`PARTY`, `PERSON`, `ANY`, …).
+	GetType() string
 }
 
-func (o ObjectRef) isObjectRefLike()      {}
-func (a AccessGroupRef) isObjectRefLike() {}
-func (l LocatableRef) isObjectRefLike()   {}
-func (p PartyRef) isObjectRefLike()       {}
+func (o ObjectRef) isObjectRefLike()          {}
+func (o ObjectRef) GetID() ObjectID           { return o.ID }
+func (o ObjectRef) GetNamespace() string      { return o.Namespace }
+func (o ObjectRef) GetType() string           { return o.Type }
+func (a AccessGroupRef) isObjectRefLike()     {}
+func (a AccessGroupRef) GetID() ObjectID      { return a.ID }
+func (a AccessGroupRef) GetNamespace() string { return a.Namespace }
+func (a AccessGroupRef) GetType() string      { return a.Type }
+func (l LocatableRef) isObjectRefLike()       {}
+
+// LocatableRef shadows ObjectRef.ID with its own typed UIDBasedID id.
+// The interface contract is on the OBJECT_REF parent's ID (the
+// ObjectID-typed field embedded via ObjectRef); GetID returns that
+// inherited field, NOT the LocatableRef-specific UIDBasedID. Callers
+// who want the UIDBasedID id type-assert to *LocatableRef.
+func (l LocatableRef) GetID() ObjectID      { return l.ObjectRef.ID }
+func (l LocatableRef) GetNamespace() string { return l.Namespace }
+func (l LocatableRef) GetType() string      { return l.Type }
+func (p PartyRef) isObjectRefLike()         {}
+func (p PartyRef) GetID() ObjectID          { return p.ID }
+func (p PartyRef) GetNamespace() string     { return p.Namespace }
+func (p PartyRef) GetType() string          { return p.Type }

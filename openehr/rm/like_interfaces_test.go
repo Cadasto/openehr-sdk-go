@@ -63,6 +63,145 @@ func TestDVTextLikeGetValueNilInterface(t *testing.T) {
 	}
 }
 
+// TestDVURILikeGetValue pins the Phase 2 accessor: `.GetValue()` on a
+// DVURILike returns the URI string of the underlying concrete type
+// (DVURI or DVEHRURI).
+func TestDVURILikeGetValue(t *testing.T) {
+	tests := []struct {
+		name string
+		v    rm.DVURILike
+		want string
+	}{
+		{"DVURI value", rm.DVURI{Value: "https://example.org/x"}, "https://example.org/x"},
+		{"DVURI pointer", &rm.DVURI{Value: "https://example.org/x"}, "https://example.org/x"},
+		{"DVEHRURI value", rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://e1/abc"}}, "ehr://e1/abc"},
+		{"DVEHRURI pointer", &rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://e1/abc"}}, "ehr://e1/abc"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.v.GetValue(); got != tc.want {
+				t.Errorf("GetValue() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestAuditDetailsLikeAccessors pins Phase 2 accessors on AUDIT_DETAILS
+// and its ATTESTATION subtype: GetSystemID / GetTimeCommitted /
+// GetChangeType / GetCommitter / GetDescription. Attestation inherits
+// the parent's audit fields via Go embedding.
+func TestAuditDetailsLikeAccessors(t *testing.T) {
+	change := rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}}
+	descName := "alice"
+	committer := rm.PartyIdentified{Name: &descName}
+	when := rm.DVDateTime{Value: "2026-05-26T10:00:00Z"}
+
+	base := rm.AuditDetails{
+		SystemID:      "cdr.example",
+		TimeCommitted: when,
+		ChangeType:    change,
+		Committer:     committer,
+	}
+	att := rm.Attestation{AuditDetails: base, IsPending: false}
+
+	for _, tc := range []struct {
+		name string
+		v    rm.AuditDetailsLike
+	}{
+		{"AuditDetails", base},
+		{"Attestation (inherits base fields)", att},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.v.GetSystemID() != "cdr.example" {
+				t.Errorf("GetSystemID = %q", tc.v.GetSystemID())
+			}
+			if tc.v.GetTimeCommitted().Value != "2026-05-26T10:00:00Z" {
+				t.Errorf("GetTimeCommitted.Value = %q", tc.v.GetTimeCommitted().Value)
+			}
+			if tc.v.GetChangeType().Value != "creation" {
+				t.Errorf("GetChangeType.Value = %q", tc.v.GetChangeType().Value)
+			}
+			c, ok := tc.v.GetCommitter().(rm.PartyIdentified)
+			if !ok || c.Name == nil || *c.Name != "alice" {
+				t.Errorf("GetCommitter = %#v (expected PartyIdentified Name=alice)", tc.v.GetCommitter())
+			}
+			if _, present := tc.v.GetDescription(); present {
+				t.Errorf("GetDescription should be absent for empty description")
+			}
+		})
+	}
+}
+
+// TestPartyIdentifiedLikeAccessors pins GetName / GetIdentifiers /
+// GetExternalRef on both PartyIdentified and PartyRelated.
+func TestPartyIdentifiedLikeAccessors(t *testing.T) {
+	name := "Dr. Smith"
+	issuer := "GMC"
+	pid := rm.PartyIdentified{
+		Name: &name,
+		Identifiers: []rm.DVIdentifier{
+			{ID: "12345", Issuer: &issuer},
+		},
+	}
+	rel := rm.PartyRelated{PartyIdentified: pid, Relationship: rm.DVCodedText{DVText: rm.DVText{Value: "self"}}}
+
+	for _, tc := range []struct {
+		name string
+		v    rm.PartyIdentifiedLike
+	}{
+		{"PartyIdentified", pid},
+		{"PartyRelated (inherits PartyIdentified fields)", rel},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			n, ok := tc.v.GetName()
+			if !ok || n != "Dr. Smith" {
+				t.Errorf("GetName = (%q, %v), want (Dr. Smith, true)", n, ok)
+			}
+			ids := tc.v.GetIdentifiers()
+			if len(ids) != 1 || ids[0].ID != "12345" {
+				t.Errorf("GetIdentifiers = %#v", ids)
+			}
+			if _, present := tc.v.GetExternalRef(); present {
+				t.Errorf("GetExternalRef should be absent for nil ExternalRef")
+			}
+		})
+	}
+}
+
+// TestObjectRefLikeAccessors pins GetID / GetNamespace / GetType on
+// ObjectRef + the three subtypes. LocatableRef shadows ObjectRef.ID
+// with a typed UIDBasedID; the interface method returns the embedded
+// OBJECT_REF parent's ID per the contract — subtype-specific id type
+// is reached via type assertion.
+func TestObjectRefLikeAccessors(t *testing.T) {
+	base := rm.ObjectRef{
+		ID:        rm.GenericID{Value: "abc-123"},
+		Namespace: "local",
+		Type:      "PARTY",
+	}
+
+	for _, tc := range []struct {
+		name string
+		v    rm.ObjectRefLike
+	}{
+		{"ObjectRef", base},
+		{"AccessGroupRef", rm.AccessGroupRef{ObjectRef: base}},
+		{"PartyRef", rm.PartyRef{ObjectRef: base}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if id, ok := tc.v.GetID().(rm.GenericID); !ok || id.Value != "abc-123" {
+				t.Errorf("GetID = %#v, want GenericID{Value: abc-123}", tc.v.GetID())
+			}
+			if tc.v.GetNamespace() != "local" {
+				t.Errorf("GetNamespace = %q", tc.v.GetNamespace())
+			}
+			if tc.v.GetType() != "PARTY" {
+				t.Errorf("GetType = %q", tc.v.GetType())
+			}
+		})
+	}
+}
+
 // TestDVTextLikeGetDefiningCode pins the second Phase 1 accessor:
 // (CodePhrase, true) when the concrete type is DVCodedText; (zero,
 // false) when it is bare DVText.
