@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** [REQ-040](../specifications/rm-modeling.md#type-registry-req-040) (type registry), [REQ-046](../specifications/bmm-conformance.md#primitive-type-mapping) (BMM mapping), [REQ-052](../specifications/wire.md#req-052) (canonical JSON), [REQ-095](../specifications/wire.md#req-095) (OpenAPI authoritative source)
 **Probes:** new — **PROBE-038** (canjson decode of polymorphic RM attributes — full subtype substitution coverage)
-**Implementation:** **not landed** — `canjson.Unmarshal[Composition]` rejects two valid wire-shape patterns: (1) substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`); (2) generic `DV_INTERVAL[T]` parameterised over an abstract `DV_ORDERED`.
+**Implementation:** **partial** — Phase 1 landed (Issue B: generic `DV_INTERVAL[T]` over abstract `DV_ORDERED` decodes via typereg). Issue A still open: substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`).
 **Depends on:** [`internal/bmmgen/render_jsonunmar.go`](../../internal/bmmgen/render_jsonunmar.go) (generator); [`openehr/rm/typereg/`](../../openehr/rm/typereg/) (polymorphic dispatch); [BMM corpus](../../resources/bmm/) (`openehr_rm_1.2.0.bmm.json` parent-child graph)
 **Defers:** Lenient / permissive decoding modes (out of scope — fail loudly on unknown discriminators); BMM-model changes (RM model is correct; gap is purely in the Go-side generator's encoding of substitution semantics).
 
@@ -77,11 +77,11 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 **Tasks:**
 
 1. **Reserve PROBE-038** in [`docs/specifications/conformance.md`](../specifications/conformance.md) under Canonical JSON / formats: "Polymorphic RM decode coverage — `canjson.Unmarshal[Composition]` decodes every BMM-admissible discriminator across all substitutable slots and parameterised generic types". Status: **Draft**.
-2. **Vendor fixtures** under `testkit/cassettes/canonical_json/polymorphic/` — one per failure mode:
+2. **Vendor fixtures** under `testkit/cassettes/rm/polymorphic/` (via [`testkit/fixtures`](../../testkit/fixtures/) `RMJSON`) — one per failure mode:
    - `name_dv_coded_text.json` — minimal Composition with `LOCATABLE.name: DV_CODED_TEXT` at any nested depth.
    - `dv_interval_quantity.json` — minimal Composition with `ELEMENT.value: DV_INTERVAL<DV_QUANTITY>`.
    - `representative_full.json` — a wider real-world Composition exercising both patterns plus DVOrdinal / DVScale ranges (sourced from a CKM-published exemplar).
-3. **Failing test pin** at `openehr/serialize/canjson/polymorphic_decode_test.go` — table-driven against the three fixtures; `t.Skip("PROBE-038 — pending bmmgen polymorphism extension")` until Phase 2 lands.
+3. **Fixture test pin** at `openehr/serialize/canjson/polymorphic_decode_test.go` — table-driven against the three fixtures; Issue B case runs after Phase 1; Issue A cases `Skip` until Phase 2 lands.
 
 **Definition of done:** PROBE-038 entry visible in `docs/specifications/conformance.md`; `make spec-check` happy; the test stub compiles and is `Skip`-ped.
 
@@ -151,10 +151,10 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 
 | Step | Status |
 |---|---|
-| Phase 0 — PROBE-038 reserved + 3 failing fixture tests | |
-| Phase 1 — generic abstract decode (Issue B) | |
-| Phase 1 — bmmgen render_jsonunmar_test extension | |
-| Phase 1 — `make codegen` regen clean | |
+| Phase 0 — PROBE-038 reserved + 3 fixture tests | done |
+| Phase 1 — generic abstract decode (Issue B) | done |
+| Phase 1 — bmmgen `render_jsonunmar_polymorphic_test.go` | done |
+| Phase 1 — `make codegen` regen clean | done |
 | Phase 2 — ancestry-driven narrow interface emission | |
 | Phase 2 — full RM + AOM 1.4 regen + call-site migration | |
 | Phase 2 — CHANGELOG breaking-change note | |

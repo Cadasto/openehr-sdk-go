@@ -188,8 +188,8 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	}
 	// Registry ctors return pointers; when T is a concrete value
 	// shape (e.g. `DVInterval[DVQuantity].Lower` dispatches via
-	// `DecodeAs[DVQuantity]`), the pointer-to-value gap is closed
-	// here without reflection by trying `*T` first.
+	// `DecodeAs[DVQuantity]`), assert to T first, then close the
+	// pointer-to-value gap via *T without reflection.
 	if pt, ok := v.(*T); ok && pt != nil {
 		return *pt, nil
 	}
