@@ -10,6 +10,12 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+## [0.3.0] - 2026-05-28
+
+Third `v0.x` minor — RM polymorphic decode coverage (SDK-GAP-11) closes the wire-shape substitution gap on concrete-typed RM slots (`LOCATABLE.name`, `AUDIT_DETAILS`, `OBJECT_REF`, …); ergonomic `Get*` accessors on the narrow `*Like` interfaces become the preferred read surface; testkit cassette coverage rounds out ehrbase Robot fixtures. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the single breaking change this cycle is the field-type lift on substitution slots (migrate via `rm.DVTextValueOf` / `rm.AsDVText` / `rm.AuditDetailsBase` / `rm.PartyIdentifiedBase` / `rm.ObjectRefBase` or the new `Get*` accessors); pin to the exact tag.
+
+### Added
+
 - **Testkit cassettes** — ehrbase Robot fixtures (minimal-entry, `Test_dv_*`, EHR_STATUS, FOLDER, persistent compositions, CONTRIBUTION submissions) under `testkit/cassettes/` with `fixtures.SubmissionJSON` and `scripts/ingest-robot-cassettes.sh`.
 - **RM polymorphic decode coverage (SDK-GAP-11)** — `bmmgen` emits narrow `<Parent>Like` interfaces (`DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`) so concrete-typed RM slots admit Liskov substitution per the RM (e.g. `LOCATABLE.name DV_TEXT` carrying `DV_CODED_TEXT` round-trips losslessly). `DV_INTERVAL[T: DV_ORDERED]` decodes its `lower` / `upper` via typereg. Breaking change: fields previously typed as the concrete parent are now interfaces — migrate via `rm.DVTextValueOf`, `rm.AsDVText`, `rm.AuditDetailsBase`. PROBE-038.
 - **`*Like` interface ergonomics** — narrow interfaces now expose Get-prefixed accessor methods (`DVTextLike.GetValue`, `GetDefiningCode`; `DVURILike.GetValue`; `AuditDetailsLike.GetSystemID`/`GetTimeCommitted`/`GetChangeType`/`GetCommitter`/`GetDescription`; `PartyIdentifiedLike.GetName`/`GetIdentifiers`/`GetExternalRef`; `ObjectRefLike.GetID`/`GetNamespace`/`GetType`). Additive (non-breaking) on top of the SDK-GAP-11 lift. Pre-existing `rm.DVTextValueOf` / `rm.DVURIValueOf` helpers stay as thin compat shims. See [`openehr/rm/doc.go`](openehr/rm/doc.go) § Substitution slots.
