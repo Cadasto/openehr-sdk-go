@@ -185,6 +185,12 @@ func EncodePoly(e *xml.Encoder, name string, v any) error {
 // builds an addressable copy via reflect.New and asserts on the
 // resulting pointer — purely for read-only marshalling, so the
 // copy's lack of write-back to the caller is harmless.
+//
+// This is NOT `xsi:type` dispatch (that stays registry-driven per
+// REQ-040 / [typereg.Default]); see canxml/doc.go § Polymorphic
+// dispatch for the package-level note positioning this fallback as
+// an interop adapter for the codegen's generic-receiver shape, not
+// a polymorphism mechanism.
 func bmmNamerAndMarshaler(v any) (BMMNamer, xml.Marshaler, bool) {
 	if bn, ok := v.(BMMNamer); ok {
 		if m, ok := v.(xml.Marshaler); ok {

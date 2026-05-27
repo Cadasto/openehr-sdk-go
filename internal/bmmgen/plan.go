@@ -426,10 +426,6 @@ func walkPackage(p *bmm.Package, path string, into map[string]string) {
 	}
 }
 
-// registryGenericConcrete reports whether a concrete generic class
-// should be registered with default type arguments (e.g. POINT_EVENT
-// for EVENT polymorphism). Most generic concretes are only used with
-// explicit parameters and are omitted.
 // registryGenericConcrete reports whether a generic concrete class
 // should be added to the type registry under its bare BMM name
 // (e.g. "DV_INTERVAL" → &DVInterval[DVOrdered]{}). Two cases qualify:
