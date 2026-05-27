@@ -1,6 +1,7 @@
 package care
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,7 +9,10 @@ import (
 	"net/url"
 
 	"github.com/cadasto/openehr-sdk-go/auth/clientcreds"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/query"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -124,28 +128,70 @@ func (c *Client) CreatePatient(ctx context.Context) (string, error) {
 	return e.EHRID.Value, nil
 }
 
-// SaveData writes a datamap payload for a patient under the given template.
+// SaveData writes a datamap payload for a patient under the given template:
+// fetch the OPT from the CDR, encode via the codec, bridge canonical JSON to a
+// typed *rm.Composition, and POST it. Returns the new composition version uid.
 //
-// Slice 4b: resolve the OPT for templateID, run codec.ToComposition, bridge the
-// canonical JSON to a typed *rm.Composition, optionally validate against the
-// OPT, then POST via openehr/client/ehr/composition.Save.
+// Validation-gate (validate against the OPT before POST) is deferred — the
+// SDK's template-driven validator requires the internal compiled-template type
+// (REQ-102), not yet on the public surface.
 func (c *Client) SaveData(ctx context.Context, patientID, templateID string, datamap map[string]any) (string, error) {
 	if c.codec == nil {
 		return "", fmt.Errorf("care: no Codec configured")
 	}
-	return "", ErrNotImplemented
+	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	if err != nil {
+		return "", fmt.Errorf("care: fetch template %s: %w", templateID, err)
+	}
+	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
+	if err != nil {
+		return "", fmt.Errorf("care: parse template %s: %w", templateID, err)
+	}
+	compMap, err := c.codec.ToComposition(opt, datamap)
+	if err != nil {
+		return "", fmt.Errorf("care: encode composition: %w", err)
+	}
+	comp, err := compositionFromMap(compMap)
+	if err != nil {
+		return "", err
+	}
+	_, meta, err := composition.Save(ctx, c.rest, ehr.EHRID(patientID), comp, composition.WithTemplateID(templateID))
+	if err != nil {
+		return "", fmt.Errorf("care: save composition: %w", err)
+	}
+	if meta != nil {
+		return string(meta.VersionUID), nil
+	}
+	return "", nil
 }
 
-// GetData reads a stored composition back as a datamap payload. Slice 4b.
+// ListData returns the composition version uids stored for a patient under the
+// given template, via an ad-hoc AQL query scoped to the patient's EHR.
+func (c *Client) ListData(ctx context.Context, patientID, templateID string) ([]string, error) {
+	const q = "SELECT c/uid/value AS uid FROM EHR e " +
+		"CONTAINS COMPOSITION c " +
+		"WHERE c/archetype_details/template_id/value = $tpl"
+	rs, _, err := query.ExecuteString(ctx, c.rest, q, map[string]any{"tpl": templateID}, query.WithEHRID(patientID))
+	if err != nil {
+		return nil, fmt.Errorf("care: list data: %w", err)
+	}
+	var out []string
+	for _, row := range rs.Rows {
+		if len(row) > 0 {
+			if s, ok := row[0].(string); ok {
+				out = append(out, s)
+			}
+		}
+	}
+	return out, nil
+}
+
+// GetData reads a stored composition back as a datamap payload. Deferred
+// (slice 4b tail): needs the ehr composition Ref construction for a specific
+// version uid; ListData + SaveData cover the write+enumerate flow.
 func (c *Client) GetData(ctx context.Context, patientID, templateID, uid string) (map[string]any, error) {
 	if c.codec == nil {
 		return nil, fmt.Errorf("care: no Codec configured")
 	}
-	return nil, ErrNotImplemented
-}
-
-// ListData lists stored composition references for a patient + template via
-// AQL. Slice 4b.
-func (c *Client) ListData(ctx context.Context, patientID, templateID string) ([]string, error) {
 	return nil, ErrNotImplemented
 }
