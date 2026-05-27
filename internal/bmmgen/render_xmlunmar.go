@@ -173,7 +173,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
 
 	for _, ef := range elemFields {
-		caseBody, err := renderUnmarshalXMLField(plan, recv, ef)
+		caseBody, err := renderUnmarshalXMLField(plan, recv, sc, ef)
 		if err != nil {
 			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
@@ -195,14 +195,17 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 
 // renderUnmarshalXMLField returns the case branch source for one
 // property. The element local name is the property snake_case.
-func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, error) {
+// emitting is the concrete class whose codec is being rendered; it is
+// passed through to polymorphicProperty so inherited open generic
+// parameters can be classified via the emitting class's narrowed bound.
+func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, ef emittedField) (string, error) {
 	propName := ef.Prop.PropertyName()
 	goField := FieldName(propName)
 	elemName := propName
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
@@ -229,7 +232,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, 
 		return unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType), nil
 
 	case *bmm.SinglePropertyOpen:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
@@ -243,7 +246,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, 
 		return unmarshalXMLStructMandatory(recv, goField, elemName), nil
 
 	case *bmm.ContainerProperty:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySlice {
 			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
 		}

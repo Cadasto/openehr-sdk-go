@@ -67,11 +67,9 @@ func (d *DVCount) UnmarshalJSON(data []byte) error {
 }
 
 type DVIntervalJSONUnmarshaller[T DVOrdered] struct {
-	Class string `json:"_type"`
-	// Lower Lower bound.
-	Lower T `json:"lower,omitempty"`
-	// Upper Upper bound.
-	Upper T `json:"upper,omitempty"`
+	Class string          `json:"_type"`
+	Lower json.RawMessage `json:"lower,omitempty"` // polymorphic T
+	Upper json.RawMessage `json:"upper,omitempty"` // polymorphic T
 	// LowerUnbounded True if `_lower_` boundary open (i.e. = `-infinity`).
 	LowerUnbounded bool `json:"lower_unbounded"`
 	// UpperUnbounded True if `_upper_` boundary open (i.e. = `+infinity`).
@@ -98,8 +96,20 @@ func (d *DVInterval[T]) UnmarshalJSON(data []byte) error {
 			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_INTERVAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	d.Lower = aux.Lower
-	d.Upper = aux.Upper
+	if len(aux.Lower) > 0 && string(aux.Lower) != "null" {
+		dv, err := typereg.DecodeAs[T](aux.Lower)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/lower", Inner: err}
+		}
+		d.Lower = dv
+	}
+	if len(aux.Upper) > 0 && string(aux.Upper) != "null" {
+		dv, err := typereg.DecodeAs[T](aux.Upper)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/upper", Inner: err}
+		}
+		d.Upper = dv
+	}
 	d.LowerUnbounded = aux.LowerUnbounded
 	d.UpperUnbounded = aux.UpperUnbounded
 	d.LowerIncluded = aux.LowerIncluded

@@ -160,7 +160,7 @@ func renderMarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (stri
 	b.WriteString("\tif err := _e.EncodeToken(_start); err != nil {\n\t\treturn err\n\t}\n")
 
 	for _, ef := range elemFields {
-		line, err := renderMarshalXMLField(plan, recv, ef)
+		line, err := renderMarshalXMLField(plan, recv, sc, ef)
 		if err != nil {
 			return "", fmt.Errorf("render XML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
@@ -204,14 +204,17 @@ func marshalXMLAttribute(recv, goField, attrName string) string {
 // in render.go: SingleProperty (mandatory/optional, primitive/struct/
 // interface), SinglePropertyOpen (generic-param), ContainerProperty
 // (list/hash, mono/poly), GenericProperty (concrete generic).
-func renderMarshalXMLField(plan *Plan, recv string, ef emittedField) (string, error) {
+//
+// emitting is the concrete class whose codec is being rendered;
+// distinct from ef.Owner when the property is inherited.
+func renderMarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, ef emittedField) (string, error) {
 	propName := ef.Prop.PropertyName()
 	goField := FieldName(propName)
 	elemName := propName
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
-		_, kind := polymorphicProperty(plan, ef.Owner, p)
+		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return marshalXMLPolySingle(recv, goField, elemName), nil
 		}
@@ -233,7 +236,7 @@ func renderMarshalXMLField(plan *Plan, recv string, ef emittedField) (string, er
 		return marshalXMLPrimitiveOptional(recv, goField, elemName), nil
 
 	case *bmm.SinglePropertyOpen:
-		_, kind := polymorphicProperty(plan, ef.Owner, p)
+		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			// Open generic parameter with abstract bound (e.g. EVENT.data:
 			// T where T ItemStructure). T may be a value or pointer type
@@ -251,7 +254,7 @@ func renderMarshalXMLField(plan *Plan, recv string, ef emittedField) (string, er
 		return marshalXMLGenericOptional(recv, goField, elemName), nil
 
 	case *bmm.ContainerProperty:
-		_, kind := polymorphicProperty(plan, ef.Owner, p)
+		_, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySlice {
 			return marshalXMLPolySlice(recv, goField, elemName), nil
 		}

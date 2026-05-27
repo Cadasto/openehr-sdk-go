@@ -106,20 +106,34 @@ const (
 // type name of its abstract element together with a [polyKind]
 // classification. If the property is monomorphic, kind == polyNone.
 //
-// `owner` is the BMM class that declared `prop`; passed so the
-// helper can resolve open generic parameter constraints (e.g.
-// `Event[T ItemStructure].Data: T` is polymorphic when ItemStructure
-// is an interface in the plan).
-func polymorphicProperty(plan *Plan, owner *bmm.SimpleClass, prop bmm.Property) (string, polyKind) {
+// `owner` is the BMM class that declared `prop`. `emitting` is the
+// concrete class whose codec we are rendering; it differs from
+// `owner` when `prop` is inherited (e.g. DV_INTERVAL inherits
+// `lower: T` from `Interval`). Passing both lets the helper resolve
+// open generic parameter constraints from either the declaring view
+// (`Interval.T conforms_to Ordered`) or the narrowed emitting view
+// (`DV_INTERVAL.T conforms_to DV_ORDERED`). The narrowed view wins
+// when it resolves to an abstract type the plan knows — that is the
+// SDK-GAP-11 Issue B fix.
+func polymorphicProperty(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) (string, polyKind) {
 	switch p := prop.(type) {
 	case *bmm.SingleProperty:
 		if name, ok := abstractGoName(plan, p.TypeName); ok {
 			return name, polySingle
 		}
 	case *bmm.SinglePropertyOpen:
-		// Open generic parameter on the owner. When the parameter's
-		// constraint (including inherited bounds) is an abstract type
-		// or interface, route through typereg at decode time.
+		// Open generic parameter. Check the emitting class's narrowed
+		// bound first, then the declaring owner's bound, then the
+		// owner's inherited bound. Any resolution that lands on an
+		// abstract Go type routes the field through typereg at decode
+		// time.
+		if emitting != nil && emitting.GenericParameterDefs != nil {
+			if def, ok := emitting.GenericParameterDefs[p.TypeName]; ok && def.ConformsToType != "" {
+				if _, ok := abstractGoName(plan, def.ConformsToType); ok {
+					return p.TypeName, polySingle
+				}
+			}
+		}
 		if owner != nil && owner.GenericParameterDefs != nil {
 			if def, ok := owner.GenericParameterDefs[p.TypeName]; ok {
 				bound := def.ConformsToType
@@ -223,7 +237,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	fmt.Fprintf(&b, "type %s%s struct {\n", wireName, typeParams)
 	b.WriteString("\tClass string `json:\"_type\"`\n")
 	for _, ef := range fields {
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, ef.Prop)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, sc, ef.Prop)
 		propName := ef.Prop.PropertyName()
 		goField := FieldName(propName)
 		tag := jsonTagFor(ef.Prop, propName)
@@ -261,7 +275,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	b.WriteString("\t}\n")
 	// Copy non-polymorphic fields, then dispatch polymorphic ones.
 	for _, ef := range fields {
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, ef.Prop)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, sc, ef.Prop)
 		propName := ef.Prop.PropertyName()
 		goField := FieldName(propName)
 		switch kind {

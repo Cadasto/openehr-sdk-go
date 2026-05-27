@@ -183,13 +183,19 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 			Inner: fmt.Errorf("canxml: %w", err),
 		}
 	}
-	t, ok := v.(T)
-	if !ok {
-		return zero, &DecodeError{
-			Path:  "/" + start.Name.Local,
-			Type:  typeName,
-			Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
-		}
+	if t, ok := v.(T); ok {
+		return t, nil
 	}
-	return t, nil
+	// Registry ctors return pointers; when T is a concrete value
+	// shape (e.g. `DVInterval[DVQuantity].Lower` dispatches via
+	// `DecodeAs[DVQuantity]`), the pointer-to-value gap is closed
+	// here without reflection by trying `*T` first.
+	if pt, ok := v.(*T); ok && pt != nil {
+		return *pt, nil
+	}
+	return zero, &DecodeError{
+		Path:  "/" + start.Name.Local,
+		Type:  typeName,
+		Inner: fmt.Errorf("canxml: decoded %T: %w", v, typereg.ErrTypeMismatch),
+	}
 }
