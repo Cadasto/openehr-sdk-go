@@ -1,6 +1,6 @@
 module github.com/cadasto/openehr-sdk-go
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2

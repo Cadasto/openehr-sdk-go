@@ -11,7 +11,7 @@
 # target uses the official pinned image (LINT_IMAGE) directly. Keeps the
 # dev image small and avoids version-skew with the upstream lint release.
 
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 ARG ALPINE_VERSION=3.20
 
 FROM golang:${GO_VERSION}-alpine AS dev
