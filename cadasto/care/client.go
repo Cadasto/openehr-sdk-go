@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -59,7 +61,41 @@ type Config struct {
 type Client struct {
 	rest  *transport.Client
 	codec Codec
+
+	// OPT-cache (REQ-058 § perf): OPTs change rarely (admin-driven
+	// template-edits). Re-fetching the canonical XML on every
+	// SaveData/UpdateData adds ~450 ms per call against a remote CDR.
+	// Caching by templateID with a coarse TTL keeps warm tenants fast
+	// while still letting admin-changes propagate within minutes.
+	optCacheMu  sync.Mutex
+	optCache    map[string]cachedOPT
+	optCacheTTL time.Duration // 0 = disabled
 }
+
+// cachedOPT is one resolved OPT plus its expiry. Parsed once; reused
+// until expiry — both the raw bytes and the parsed *OperationalTemplate
+// are immutable post-parse so concurrent reads are safe.
+type cachedOPT struct {
+	opt       *template.OperationalTemplate
+	expiresAt time.Time
+}
+
+// defaultOPTCacheTTL is the cache-window applied when the caller did not
+// override via WithOPTCacheTTL. 5 minutes is a balance: warm bursts of
+// commits within one channel-run benefit fully, while an admin-edit on
+// the OPT propagates to all callers within minutes without manual
+// invalidation. Set to 0 to disable.
+const defaultOPTCacheTTL = 5 * time.Minute
+
+// WithOPTCacheTTL overrides the OPT-cache window. Pass 0 to disable the
+// cache entirely (useful in tests against a mocked definition endpoint).
+func WithOPTCacheTTL(d time.Duration) ClientOption {
+	return func(c *Client) { c.optCacheTTL = d }
+}
+
+// ClientOption tunes *Client post-construction. New options can be added
+// without breaking the NewClient signature.
+type ClientOption func(*Client)
 
 // ErrNotImplemented marks domain operations whose composition bridge is not yet
 // wired (Slice 4b: datamap -> *rm.Composition + OPT resolution).
@@ -68,7 +104,10 @@ var ErrNotImplemented = errors.New("cadasto/care: operation not implemented yet"
 // NewClient builds a care Client from Config: a static openEHR-REST service
 // catalog (BaseURL) plus an OAuth2 client-credentials token source (TokenURL).
 // Construction only — no network call until the first request.
-func NewClient(cfg Config) (*Client, error) {
+//
+// Optional [ClientOption]s tune post-construction state — e.g.
+// [WithOPTCacheTTL] to override the default OPT cache window.
+func NewClient(cfg Config, opts ...ClientOption) (*Client, error) {
 	if cfg.BaseURL == "" {
 		return nil, fmt.Errorf("care: BaseURL is required")
 	}
@@ -123,7 +162,15 @@ func NewClient(cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("care: transport: %w", err)
 	}
 
-	return &Client{rest: rest, codec: cfg.Codec}, nil
+	c := &Client{
+		rest:        rest,
+		codec:       cfg.Codec,
+		optCacheTTL: defaultOPTCacheTTL,
+	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c, nil
 }
 
 // Verify checks connectivity to the configured Cadasto CDR. It forces an
@@ -232,13 +279,9 @@ func (c *Client) SaveData(ctx context.Context, patientID, templateID string, dat
 	if c.codec == nil {
 		return "", fmt.Errorf("care: no Codec configured")
 	}
-	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	opt, err := c.resolveOPT(ctx, templateID)
 	if err != nil {
-		return "", fmt.Errorf("care: fetch template %s: %w", templateID, err)
-	}
-	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
-	if err != nil {
-		return "", fmt.Errorf("care: parse template %s: %w", templateID, err)
+		return "", err
 	}
 	compMap, err := c.codec.ToComposition(opt, datamap)
 	if err != nil {
@@ -275,19 +318,70 @@ func (c *Client) UpdateData(ctx context.Context, patientID, voID, ifMatch, templ
 	if c.codec == nil {
 		return "", fmt.Errorf("care: no Codec configured")
 	}
-	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	opt, err := c.resolveOPT(ctx, templateID)
 	if err != nil {
-		return "", fmt.Errorf("care: fetch template %s: %w", templateID, err)
-	}
-	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
-	if err != nil {
-		return "", fmt.Errorf("care: parse template %s: %w", templateID, err)
+		return "", err
 	}
 	compMap, err := c.codec.ToComposition(opt, datamap)
 	if err != nil {
 		return "", fmt.Errorf("care: encode composition: %w", err)
 	}
 	return c.UpdateCompositionRaw(ctx, patientID, voID, ifMatch, templateID, compMap)
+}
+
+// resolveOPT fetches and parses the OPT for the given templateID,
+// reusing a cached entry when the TTL window is still open. Cache miss
+// or disabled cache (TTL == 0) falls through to the canonical
+// definition.GetTemplate + template.ParseOPT path.
+//
+// Concurrency: a single goroutine wins the build under optCacheMu; the
+// runners-up see the freshly-cached entry on second look. Re-fetches
+// after TTL-expiry serialize through the same mutex.
+func (c *Client) resolveOPT(ctx context.Context, templateID string) (*template.OperationalTemplate, error) {
+	if c.optCacheTTL > 0 {
+		c.optCacheMu.Lock()
+		if entry, ok := c.optCache[templateID]; ok && time.Now().Before(entry.expiresAt) {
+			c.optCacheMu.Unlock()
+			return entry.opt, nil
+		}
+		c.optCacheMu.Unlock()
+	}
+
+	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	if err != nil {
+		return nil, fmt.Errorf("care: fetch template %s: %w", templateID, err)
+	}
+	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
+	if err != nil {
+		return nil, fmt.Errorf("care: parse template %s: %w", templateID, err)
+	}
+
+	if c.optCacheTTL > 0 {
+		c.optCacheMu.Lock()
+		if c.optCache == nil {
+			c.optCache = make(map[string]cachedOPT)
+		}
+		c.optCache[templateID] = cachedOPT{
+			opt:       opt,
+			expiresAt: time.Now().Add(c.optCacheTTL),
+		}
+		c.optCacheMu.Unlock()
+	}
+	return opt, nil
+}
+
+// InvalidateOPTCache verwijdert een templateID uit de cache zodat de
+// volgende SaveData/UpdateData 'em opnieuw fetcht. Bedoeld voor admin-
+// edit-flows ("ik heb net de OPT geüpdate, refresh nu") of tests.
+// Lege templateID = leeg de hele cache.
+func (c *Client) InvalidateOPTCache(templateID string) {
+	c.optCacheMu.Lock()
+	defer c.optCacheMu.Unlock()
+	if templateID == "" {
+		c.optCache = nil
+		return
+	}
+	delete(c.optCache, templateID)
 }
 
 // ListData returns the composition version uids stored for a patient under the
