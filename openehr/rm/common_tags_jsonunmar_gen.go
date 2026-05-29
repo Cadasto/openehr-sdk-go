@@ -38,7 +38,7 @@ func (i *ItemTag) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_TAG" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_TAG", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_TAG", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Key = aux.Key

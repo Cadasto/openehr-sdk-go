@@ -40,7 +40,7 @@ func (a *ArchetypeOntology) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE_ONTOLOGY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_ONTOLOGY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE_ONTOLOGY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.TermCodes = aux.TermCodes
@@ -73,7 +73,7 @@ func (a *ArchetypeTerm) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE_TERM" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_TERM", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE_TERM", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Code = aux.Code

@@ -307,6 +307,15 @@ func unmarshalXMLStructOptionalLit(recv, field, elem, goType string) string {
 }
 
 func unmarshalXMLPolySingle(recv, field, elem, ifaceName string) string {
+	// Concrete-supertype interfaces (e.g. DataValueText) defer to a
+	// hand-written helper that defaults missing `xsi:type` to the
+	// supertype's BMM name — keeps existing bare-DV_TEXT XML cassettes
+	// compatible after Phase-2 substitutability (REQ-058).
+	if isConcreteSupertypeInterface(ifaceName) {
+		return fmt.Sprintf(
+			"\t\t\tcase %q:\n\t\t\t\t_v, _err := Decode%sXML(_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+			elem, ifaceName, recv, field)
+	}
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
 		elem, ifaceName, recv, field)

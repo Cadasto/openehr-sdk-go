@@ -347,7 +347,20 @@ func encodeElement(elem template.ObjectNode, valuePayload any, terms map[string]
 	nodeID := elem.NodeID()
 	valueConstraint, ok := attrFirstObject(findAttr(elem, "value"))
 	if !ok {
-		return nil, fmt.Errorf("ELEMENT %s has no value constraint", nodeID)
+		// Unconstrained ELEMENT — sommige OPT-varianten laten de value-attr
+		// los om type-keuze aan de caller te geven. In dat geval is een
+		// expanded payload ({rmType, …}) de enige manier om te weten welk
+		// DV-type we moeten bouwen. Kortere bare-vormen kunnen we niet
+		// veilig wrappen zonder gokken op het type.
+		if exp := encodeExpandedValue(valuePayload); exp != nil {
+			return map[string]any{
+				"_type":             "ELEMENT",
+				"archetype_node_id": nodeID,
+				"name":              dvText(terms[nodeID]),
+				"value":             exp,
+			}, nil
+		}
+		return nil, fmt.Errorf("ELEMENT %s has no value constraint; payload must be expanded {rmType:…}", nodeID)
 	}
 	rmValue, err := encodeValue(valueConstraint, valuePayload, terms)
 	if err != nil {
@@ -637,23 +650,66 @@ func encodeStructuredContainer(container template.ObjectNode, items []any, fallb
 	return out
 }
 
-// clusterName builds a CLUSTER's runtime name. When the payload carries a coded
-// runtime name (_code "<terminology>::<code>", optional _name display), it
-// emits a DV_CODED_TEXT; otherwise a plain DV_TEXT with the template label.
+// clusterName builds a CLUSTER's runtime name from its Datamap-V2 payload.
+//
+// `_code` accepts two interchangeable shapes per the Datamap V2 spec
+// ([docs/specifications/datamap.md § Terminology binding]):
+//
+//   - Short form: a string `"<terminology>::<code>"`, or `"at*"` (local
+//     at-code), or any other bare string (defaults to `local`).
+//   - Expanded form: a map `{ "code": "...", "value": "...", "terminology": "..." }`
+//     where `terminology` defaults to `local` when absent.
+//
+// `_name` is the optional display string; falls back to the template label
+// or — for the expanded form — to the inner `value`.
+//
+// Returns a DV_CODED_TEXT map when `_code` carries a non-empty code; a
+// plain DV_TEXT with the template label otherwise.
 func clusterName(payload map[string]any, label string) map[string]any {
-	code, _ := payload["_code"].(string)
-	if code == "" {
+	terminology, codeStr, expandedDisplay, ok := parseCodeField(payload["_code"])
+	if !ok {
 		return dvText(label)
 	}
 	display, _ := payload["_name"].(string)
 	if display == "" {
+		display = expandedDisplay
+	}
+	if display == "" {
 		display = label
 	}
-	terminology, codeStr := splitTerminology(code)
 	return map[string]any{
 		"_type":         "DV_CODED_TEXT",
 		"value":         display,
 		"defining_code": codePhrase(terminology, codeStr),
+	}
+}
+
+// parseCodeField extracts (terminology, code, display, ok) from a `_code`
+// payload. Accepts both wire-shapes documented in REQ-058. `display`
+// carries the expanded form's `value` (string when present, else empty);
+// the caller decides how to combine it with sibling `_name`. `ok` is
+// false when no usable code could be extracted (nil, empty, malformed).
+func parseCodeField(raw any) (terminology, code, display string, ok bool) {
+	switch v := raw.(type) {
+	case string:
+		if v == "" {
+			return "", "", "", false
+		}
+		t, c := splitTerminology(v)
+		return t, c, "", true
+	case map[string]any:
+		code, _ = v["code"].(string)
+		if code == "" {
+			return "", "", "", false
+		}
+		display, _ = v["value"].(string)
+		terminology, _ = v["terminology"].(string)
+		if terminology == "" {
+			terminology = "local"
+		}
+		return terminology, code, display, true
+	default:
+		return "", "", "", false
 	}
 }
 

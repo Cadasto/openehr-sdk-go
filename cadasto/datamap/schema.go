@@ -373,7 +373,26 @@ func buildItemsSchema(itemsAttr *template.Attribute, r contentRoot, parentPath s
 			// Optional runtime-name slots for instance-named clusters (e.g. a
 			// repeating lab "result group" named per determination). Decode
 			// emits these only when the composition carries a coded name.
-			clusterProps["_code"] = shortSchema("string", "", nil, "")
+			//
+			// `_code` accepts both wire-shapes documented in REQ-058:
+			// short-form string ("SNOMED-CT::386725007") or expanded object
+			// ({code,value,terminology}). The encoder normalises both into
+			// the same canonical DV_CODED_TEXT.
+			clusterProps["_code"] = map[string]any{
+				"oneOf": []any{
+					map[string]any{"type": "string"},
+					map[string]any{
+						"type":                 "object",
+						"additionalProperties": false,
+						"properties": map[string]any{
+							"code":        map[string]any{"type": "string"},
+							"value":       map[string]any{"type": "string"},
+							"terminology": map[string]any{"type": "string"},
+						},
+						"required": []any{"code"},
+					},
+				},
+			}
 			clusterProps["_name"] = shortSchema("string", "", nil, "")
 			schema := map[string]any{
 				"type":                 "object",

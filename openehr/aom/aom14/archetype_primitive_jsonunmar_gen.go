@@ -36,7 +36,7 @@ func (c *CBoolean) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_BOOLEAN" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_BOOLEAN", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_BOOLEAN", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.TrueValid = aux.TrueValid
@@ -70,7 +70,7 @@ func (c *CDate) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_DATE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DATE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_DATE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.DayValidity = aux.DayValidity
@@ -115,7 +115,7 @@ func (c *CDateTime) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_DATE_TIME" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.MonthValidity = aux.MonthValidity
@@ -164,7 +164,7 @@ func (c *CDuration) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_DURATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_DURATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_DURATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.YearsAllowed = aux.YearsAllowed
@@ -203,7 +203,7 @@ func (c *CInteger) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_INTEGER" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_INTEGER", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_INTEGER", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.List = aux.List
@@ -235,7 +235,7 @@ func (c *CReal) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_REAL" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_REAL", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_REAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.List = aux.List
@@ -269,7 +269,7 @@ func (c *CString) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_STRING" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_STRING", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_STRING", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.Pattern = aux.Pattern
@@ -308,7 +308,7 @@ func (c *CTime) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_TIME" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_TIME", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_TIME", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.MinuteValidity = aux.MinuteValidity

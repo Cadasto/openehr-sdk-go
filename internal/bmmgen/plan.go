@@ -82,6 +82,17 @@ type Plan struct {
 	// are listed here; cross-target marker emission is the consumer's
 	// responsibility (none today).
 	AbstractDescendants map[string][]string
+	// Descendants is the full descendant-class index, populated for
+	// EVERY planned class (abstract and concrete). Used by the
+	// canonical-JSON UnmarshalJSON emitter to honour RM substitutability:
+	// a payload whose `_type` names a descendant of the slot's declared
+	// type MUST be accepted (cf. openEHR RM §`data_types.text`: "Since
+	// `DV_CODED_TEXT` is a subtype of `DV_TEXT`, it can be used in
+	// place of it"). Distinct from [AbstractDescendants] because the
+	// marker-method emission is only needed for abstract supertypes,
+	// while substitutability also covers concrete-with-descendants
+	// classes (DV_TEXT, DV_URI, PARTY_IDENTIFIED, AUDIT_DETAILS).
+	Descendants map[string][]string
 	// Notes collects human-readable warnings/skips encountered during
 	// planning. The CLI prints them in verbose mode and the DONE
 	// report should mention any non-empty entries.
@@ -138,6 +149,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 		Schema:              schema,
 		Classes:             make(map[string]*PlannedClass),
 		AbstractDescendants: make(map[string][]string),
+		Descendants:         make(map[string][]string),
 		CyclicSingleProps:   make(map[string]map[string]bool),
 	}
 
@@ -285,8 +297,49 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 	}
 
 	computeAbstractDescendants(p)
+	computeDescendants(p)
 	computeCyclicSingleProps(p)
 	return p, nil
+}
+
+// computeDescendants populates p.Descendants. For each planned class
+// (abstract OR concrete), the value is the sorted list of BMM class
+// names that transitively descend from it. Used by the JSON UnmarshalJSON
+// emitter to relax the strict `_type` equality check into a
+// substitutability check (REQ-058 spec: openEHR RM substitutability —
+// e.g. DV_CODED_TEXT in a DV_TEXT-typed slot).
+func computeDescendants(p *Plan) {
+	children := map[string][]string{}
+	for _, pc := range p.Classes {
+		for _, anc := range pc.Class.Ancestors() {
+			children[anc] = append(children[anc], pc.BMMName)
+		}
+	}
+	for _, list := range children {
+		sort.Strings(list)
+	}
+	for _, pc := range p.Classes {
+		if pc.External {
+			continue
+		}
+		seen := map[string]bool{}
+		queue := append([]string{}, children[pc.BMMName]...)
+		var out []string
+		for len(queue) > 0 {
+			next := queue[0]
+			queue = queue[1:]
+			if seen[next] {
+				continue
+			}
+			seen[next] = true
+			out = append(out, next)
+			queue = append(queue, children[next]...)
+		}
+		sort.Strings(out)
+		if len(out) > 0 {
+			p.Descendants[pc.BMMName] = out
+		}
+	}
 }
 
 // computeCyclicSingleProps detects directed cycles in the

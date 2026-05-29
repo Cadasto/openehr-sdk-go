@@ -32,8 +32,10 @@ func (s *Section) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&s.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if s.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", s.Name); err != nil {
+			return err
+		}
 	}
 	if s.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", s.UID); err != nil {

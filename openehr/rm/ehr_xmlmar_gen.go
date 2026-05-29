@@ -98,8 +98,10 @@ func (e *EHRAccess) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if e.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", e.Name); err != nil {
+			return err
+		}
 	}
 	if e.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", e.UID); err != nil {
@@ -153,8 +155,10 @@ func (e *EHRStatus) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&e.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if e.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", e.Name); err != nil {
+			return err
+		}
 	}
 	if e.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", e.UID); err != nil {

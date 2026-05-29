@@ -24,7 +24,7 @@ func main() {
 		log.Fatalf("canjson decode: %v", err)
 	}
 	fmt.Printf("composition: archetype_node_id=%s\n", c.ArchetypeNodeID)
-	fmt.Printf("  name=%q\n", c.Name.Value)
+	fmt.Printf("  name=%q\n", rm.DVTextValue(c.Name))
 	fmt.Printf("  language=%s (terminology=%s)\n", c.Language.CodeString, c.Language.TerminologyID.Value)
 	fmt.Printf("  territory=%s\n", c.Territory.CodeString)
 	fmt.Printf("  category=%s\n", c.Category.Value)

@@ -41,7 +41,7 @@ func (p *PointInterval[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "Point_interval" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Point_interval", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "Point_interval", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.Lower = aux.Lower
@@ -79,10 +79,10 @@ func (p *ProperInterval[T]) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: Proper_interval: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "Proper_interval" {
+	if aux.Class != "" && aux.Class != "Proper_interval" && aux.Class != "Multiplicity_interval" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Proper_interval", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "Proper_interval", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.Lower = aux.Lower

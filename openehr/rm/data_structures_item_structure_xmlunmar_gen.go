@@ -36,9 +36,11 @@ func (i *ItemList) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&i.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&i.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -107,9 +109,11 @@ func (i *ItemSingle) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&i.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&i.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -176,9 +180,11 @@ func (i *ItemTable) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&i.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&i.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -247,9 +253,11 @@ func (i *ItemTree) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&i.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&i.ArchetypeNodeID, &_t); _err != nil {
 					return _err

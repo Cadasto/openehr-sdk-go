@@ -35,7 +35,7 @@ func (a *Archetyped) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPED" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPED", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPED", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.ArchetypeID = aux.ArchetypeID
@@ -70,7 +70,7 @@ func (f *FeederAudit) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "FEEDER_AUDIT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "FEEDER_AUDIT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "FEEDER_AUDIT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	f.OriginatingSystemItemIds = aux.OriginatingSystemItemIds
@@ -116,7 +116,7 @@ func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "FEEDER_AUDIT_DETAILS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "FEEDER_AUDIT_DETAILS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "FEEDER_AUDIT_DETAILS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	f.SystemID = aux.SystemID
@@ -142,11 +142,9 @@ func (f *FeederAuditDetails) UnmarshalJSON(data []byte) error {
 }
 
 type LinkJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DVText `json:"meaning"`
-	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DVText `json:"type"`
+	Class   string          `json:"_type"`
+	Meaning json.RawMessage `json:"meaning"` // polymorphic DataValueText
+	Type    json.RawMessage `json:"type"`    // polymorphic DataValueText
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 }
@@ -164,11 +162,23 @@ func (l *Link) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "LINK" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "LINK", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "LINK", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	l.Meaning = aux.Meaning
-	l.Type = aux.Type
+	if len(aux.Meaning) > 0 && string(aux.Meaning) != "null" {
+		dv, err := DecodeDataValueText(aux.Meaning)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/meaning", Inner: err}
+		}
+		l.Meaning = dv
+	}
+	if len(aux.Type) > 0 && string(aux.Type) != "null" {
+		dv, err := DecodeDataValueText(aux.Type)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/type", Inner: err}
+		}
+		l.Type = dv
+	}
 	l.Target = aux.Target
 	return nil
 }

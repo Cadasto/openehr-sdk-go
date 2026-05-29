@@ -51,7 +51,7 @@ func (d *DVMultimedia) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_MULTIMEDIA" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_MULTIMEDIA", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_MULTIMEDIA", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Charset = aux.Charset
@@ -93,7 +93,7 @@ func (d *DVParsable) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PARSABLE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARSABLE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PARSABLE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Charset = aux.Charset

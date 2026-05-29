@@ -113,9 +113,11 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&e.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				e.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&e.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -184,9 +186,11 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&e.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				e.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&e.ArchetypeNodeID, &_t); _err != nil {
 					return _err

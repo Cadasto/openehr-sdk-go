@@ -399,7 +399,7 @@ func TestValidateComposition_AlternativeMismatch_Positive(t *testing.T) {
 	// surface but are unrelated.
 	compOK := &rm.Composition{
 		ArchetypeNodeID: "at0000",
-		Name:            rm.DVText{Value: "ok"},
+		Name:            &rm.DVText{Value: "ok"},
 	}
 	if r := validation.ValidateComposition(compOK, c); containsCode(r.Issues, "alternative_mismatch") {
 		t.Errorf("DVText under DV_TEXT|DV_CODED_TEXT alternatives mismatched: %+v", r.Issues)
@@ -619,7 +619,7 @@ func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
 	comp.Content = []rm.ContentItem{
 		&rm.Section{
 			ArchetypeNodeID: "openEHR-EHR-SECTION.unknown.v1",
-			Name:            rm.DVText{Value: "Section"},
+			Name:            &rm.DVText{Value: "Section"},
 			Items:           nil,
 		},
 	}
@@ -652,7 +652,7 @@ func TestValidateComposition_SectionEmptyNoPanic(t *testing.T) {
 func validVitalSignsComposition() *rm.Composition {
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		Name:            &rm.DVText{Value: "Encounter"},
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -683,7 +683,7 @@ func validVitalSignsComposition() *rm.Composition {
 func validBloodPressureObservation() *rm.Observation {
 	return &rm.Observation{
 		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-		Name:            rm.DVText{Value: "Blood pressure"},
+		Name:            &rm.DVText{Value: "Blood pressure"},
 		Language: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 			CodeString:    "en",
@@ -695,22 +695,22 @@ func validBloodPressureObservation() *rm.Observation {
 		Subject: rm.PartySelf{},
 		Data: rm.History[rm.ItemStructure]{
 			ArchetypeNodeID: "at0001",
-			Name:            rm.DVText{Value: "history"},
+			Name:            &rm.DVText{Value: "history"},
 			Origin:          rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 			Events: []rm.Event{
 				&rm.PointEvent[rm.ItemStructure]{
 					ArchetypeNodeID: "at0006",
-					Name:            rm.DVText{Value: "any event"},
+					Name:            &rm.DVText{Value: "any event"},
 					Time:            rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 					// vital_signs.opt pins both /data and /state on
 					// the PointEvent as ITEM_LIST with required items.
 					// Match the OPT RM-type or v2 emits rm_type_mismatch.
 					Data: &rm.ItemList{
 						ArchetypeNodeID: "at0003",
-						Name:            rm.DVText{Value: "blood pressure"},
+						Name:            &rm.DVText{Value: "blood pressure"},
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0004",
-							Name:            rm.DVText{Value: "Systolic"},
+							Name:            &rm.DVText{Value: "Systolic"},
 							Value: &rm.DVQuantity{
 								Magnitude: rm.Real(120),
 								Units:     "mm[Hg]",
@@ -719,10 +719,10 @@ func validBloodPressureObservation() *rm.Observation {
 					},
 					State: &rm.ItemList{
 						ArchetypeNodeID: "at0007",
-						Name:            rm.DVText{Value: "state"},
+						Name:            &rm.DVText{Value: "state"},
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0008",
-							Name:            rm.DVText{Value: "Position"},
+							Name:            &rm.DVText{Value: "Position"},
 						}},
 					},
 				},
@@ -735,11 +735,11 @@ func validBloodPressureObservation() *rm.Observation {
 		// satisfies the slot match.
 		Protocol: &rm.ItemTree{
 			ArchetypeNodeID: "at0011",
-			Name:            rm.DVText{Value: "protocol"},
+			Name:            &rm.DVText{Value: "protocol"},
 			Items: []rm.Item{
 				&rm.Cluster{
 					ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
-					Name:            rm.DVText{Value: "Device"},
+					Name:            &rm.DVText{Value: "Device"},
 				},
 			},
 		},

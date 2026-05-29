@@ -258,6 +258,38 @@ func (c *Client) SaveData(ctx context.Context, patientID, templateID string, dat
 	return "", nil
 }
 
+// UpdateData mirrors SaveData but writes via the PUT path against an
+// existing versioned object. Caller supplies the voID (the
+// VERSIONED_COMPOSITION uid found via Query/ListData) and the current
+// etag (from CompositionETag), which together form the If-Match-gated
+// update target.
+//
+// Flow: fetch OPT → codec.ToComposition(opt, datamap) → UpdateCompositionRaw.
+// Bypasst de typed *rm.Composition-bridge bewust (zelfde rationale als
+// UpdateCompositionRaw): RM-subtype-polymorphism in waarden zoals
+// Cluster.Name overleeft de canonical-JSON PUT lossless wanneer we niet
+// terug-en-weer via *rm.Composition serializeren.
+//
+// Returns the new version uid (post-PUT etag).
+func (c *Client) UpdateData(ctx context.Context, patientID, voID, ifMatch, templateID string, datamap map[string]any) (string, error) {
+	if c.codec == nil {
+		return "", fmt.Errorf("care: no Codec configured")
+	}
+	optBytes, _, err := definition.GetTemplate(ctx, c.rest, templateID, definition.FormatADL14)
+	if err != nil {
+		return "", fmt.Errorf("care: fetch template %s: %w", templateID, err)
+	}
+	opt, err := template.ParseOPT(bytes.NewReader(optBytes))
+	if err != nil {
+		return "", fmt.Errorf("care: parse template %s: %w", templateID, err)
+	}
+	compMap, err := c.codec.ToComposition(opt, datamap)
+	if err != nil {
+		return "", fmt.Errorf("care: encode composition: %w", err)
+	}
+	return c.UpdateCompositionRaw(ctx, patientID, voID, ifMatch, templateID, compMap)
+}
+
 // ListData returns the composition version uids stored for a patient under the
 // given template, via an ad-hoc AQL query scoped to the patient's EHR.
 func (c *Client) ListData(ctx context.Context, patientID, templateID string) ([]string, error) {

@@ -99,7 +99,7 @@ var Probe033Inputs = func() []Probe033Input {
 			Name: "Composition-with-polymorphic-composer",
 			Body: must(&rm.Composition{
 				ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-				Name:            rm.DVText{Value: "x"},
+				Name:            &rm.DVText{Value: "x"},
 				Language:        rm.CodePhrase{CodeString: "en"},
 				Territory:       rm.CodePhrase{CodeString: "GB"},
 				Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},

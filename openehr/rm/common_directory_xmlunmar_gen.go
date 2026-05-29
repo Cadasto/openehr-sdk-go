@@ -36,9 +36,11 @@ func (f *Folder) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&f.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				f.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&f.ArchetypeNodeID, &_t); _err != nil {
 					return _err

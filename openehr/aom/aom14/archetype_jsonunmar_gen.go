@@ -56,7 +56,7 @@ func (a *Archetype) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.OriginalLanguage = aux.OriginalLanguage

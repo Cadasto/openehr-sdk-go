@@ -42,8 +42,8 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			case "description":
-				_v := new(DVText)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				a.Description = _v
@@ -72,9 +72,11 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				a.Items = append(a.Items, _v)
 			case "reason":
-				if _err := _dec.DecodeElement(&a.Reason, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				a.Reason = _v
 			case "is_pending":
 				if _err := _dec.DecodeElement(&a.IsPending, &_t); _err != nil {
 					return _err
@@ -119,8 +121,8 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					return _err
 				}
 			case "description":
-				_v := new(DVText)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				a.Description = _v
@@ -158,9 +160,11 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "function":
-				if _err := _dec.DecodeElement(&p.Function, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				p.Function = _v
 			case "mode":
 				_v := new(DVCodedText)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {

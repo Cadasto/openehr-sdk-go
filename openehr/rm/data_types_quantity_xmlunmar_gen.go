@@ -424,9 +424,11 @@ func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "meaning":
-				if _err := _dec.DecodeElement(&r.Meaning, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				r.Meaning = _v
 			case "range":
 				if _err := _dec.DecodeElement(&r.Range, &_t); _err != nil {
 					return _err

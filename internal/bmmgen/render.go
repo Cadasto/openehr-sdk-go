@@ -364,6 +364,42 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		b.WriteString(field)
 	}
 	b.WriteString("}\n")
+	// RM-substitutability marker interface (REQ-058). For concrete BMM
+	// supertypes registered in [concreteSupertypeInterface] we emit:
+	//   1. The interface declaration (alongside the supertype's struct)
+	//   2. A self-marker method on the supertype itself
+	//   3. A marker method on every (transitively) concrete descendant
+	//
+	// The descendant markers are emitted here at the supertype's render
+	// site because they all live in the same generated package — this
+	// keeps the interface and its implementors co-located. External-
+	// package descendants would need to be wired by the consuming
+	// package; none exist today in the RM target.
+	if iface, ok := concreteSupertypeInterface[pc.BMMName]; ok {
+		fmt.Fprintf(&b, "\n// %s is the marker interface emitted by bmmgen for the\n", iface)
+		fmt.Fprintf(&b, "// concrete-with-descendants supertype %s. Field sites that\n", pc.BMMName)
+		fmt.Fprintf(&b, "// would otherwise carry a concrete %s use this interface so\n", pc.GoName)
+		b.WriteString("// canonical-JSON `_type` polymorphism dispatches losslessly to\n")
+		b.WriteString("// the actual descendant (REQ-058 §RM substitutability).\n")
+		fmt.Fprintf(&b, "type %s interface {\n", iface)
+		fmt.Fprintf(&b, "\tis%s()\n", iface)
+		b.WriteString("}\n")
+		fmt.Fprintf(&b, "\nfunc (*%s) is%s() {}\n", pc.GoName, iface)
+		// Descendants — all transitive concrete descendants get the marker.
+		for _, dn := range plan.Descendants[pc.BMMName] {
+			dc, ok := plan.Classes[dn]
+			if !ok {
+				continue
+			}
+			if _, isSimple := dc.Class.(*bmm.SimpleClass); !isSimple {
+				continue
+			}
+			if dc.External {
+				continue
+			}
+			fmt.Fprintf(&b, "func (*%s) is%s() {}\n", dc.GoName, iface)
+		}
+	}
 	// Phase-3: emit method stubs for any functions declared on this
 	// class. For abstract+generic structs (e.g. EVENT[T]) this also
 	// emits the class's own functions on the embedding receiver.
@@ -807,6 +843,15 @@ func singleTypeRef(plan *Plan, owner *bmm.SimpleClass, name string) (string, boo
 	if isSkippedPrimitive(name) || isSkippedClass(name) {
 		return "any /* TODO: unmapped " + name + " */", false, nil
 	}
+	// Concrete supertypes with substitutable descendants are emitted at
+	// field-sites as their generated Go marker interface (REQ-058
+	// §RM substitutability). The concrete struct still exists (in
+	// e.g. `data_types_text_gen.go`) and is used at construction sites
+	// — but fields typed as the BMM supertype carry the interface so
+	// `_type` polymorphism dispatches losslessly.
+	if iface, ok := concreteSupertypeInterface[name]; ok {
+		return iface, true, nil
+	}
 	if pc, ok := plan.Classes[name]; ok {
 		if codecPolymorphicAbstractGeneric(plan, pc) {
 			return qualifyClassRef(plan, pc), true, nil
@@ -890,6 +935,13 @@ func goNameForRef(plan *Plan, name string) string {
 // P_BMM_INTERFACE). Optional properties typed by an interface do NOT
 // need an extra `*` indirection.
 func isInterfaceTypeRef(plan *Plan, name string) bool {
+	// Concrete-with-descendants supertypes are emitted as marker
+	// interfaces at field-sites (REQ-058). Treat them as interface refs
+	// so the optional-pointer wrapping in [renderField] is suppressed
+	// (an interface value is already nilable).
+	if _, ok := concreteSupertypeInterface[name]; ok {
+		return true
+	}
 	pc, ok := plan.Classes[name]
 	if !ok {
 		return false

@@ -35,7 +35,7 @@ func (c *Contribution) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CONTRIBUTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CONTRIBUTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CONTRIBUTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.UID = aux.UID
@@ -69,7 +69,7 @@ func (i *ImportedVersion[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "IMPORTED_VERSION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "IMPORTED_VERSION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "IMPORTED_VERSION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Contribution = aux.Contribution
@@ -114,7 +114,7 @@ func (o *OriginalVersion[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ORIGINAL_VERSION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORIGINAL_VERSION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ORIGINAL_VERSION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	o.Contribution = aux.Contribution
@@ -149,10 +149,10 @@ func (v *VersionedObject[T]) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: VERSIONED_OBJECT: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "VERSIONED_OBJECT" {
+	if aux.Class != "" && aux.Class != "VERSIONED_OBJECT" && aux.Class != "VERSIONED_COMPOSITION" && aux.Class != "VERSIONED_EHR_ACCESS" && aux.Class != "VERSIONED_EHR_STATUS" && aux.Class != "VERSIONED_FOLDER" && aux.Class != "VERSIONED_PARTY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_OBJECT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSIONED_OBJECT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.UID = aux.UID

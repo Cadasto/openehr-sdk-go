@@ -283,6 +283,20 @@ requirements:
       - openehr/aql/aql_test.go
       - openehr/client/query/query_test.go
 
+  - id: REQ-058
+    title: Datamap V2
+    canonical: docs/specifications/datamap.md
+    status: draft
+    implementation: partial
+    packages: [cadasto/datamap]
+    tests:
+      - cadasto/datamap/clustername_test.go
+      - cadasto/datamap/tocomposition_test.go
+      - cadasto/datamap/fromcomposition_test.go
+      - cadasto/datamap/schema_test.go
+      - cadasto/datamap/validate_test.go
+      - openehr/rm/substitutability_test.go
+
   - id: REQ-057
     title: Stored AQL queries
     canonical: docs/specifications/wire.md#req-057

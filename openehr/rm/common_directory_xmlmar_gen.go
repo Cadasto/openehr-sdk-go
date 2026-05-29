@@ -32,8 +32,10 @@ func (f *Folder) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&f.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if f.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", f.Name); err != nil {
+			return err
+		}
 	}
 	if f.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", f.UID); err != nil {

@@ -51,7 +51,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055) | landed |
 | REQ-056 | Canonical XML | [wire.md § REQ-056](wire.md#req-056) | landed |
 | REQ-057 | Stored AQL queries | [wire.md § REQ-057](wire.md#req-057) | landed |
-| REQ-058 | Datamap V2 | [module-layout.md](module-layout.md), [scope.md](scope.md) | planned |
+| REQ-058 | Datamap V2 | [datamap.md](datamap.md) | partial |
 | REQ-059 | openEHR custom headers | [wire.md § REQ-059](wire.md#req-059) | partial |
 | REQ-060 | TokenSource interface | [auth.md § REQ-060](auth.md#req-060) | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061) | landed |

@@ -44,7 +44,7 @@ func (c *CCodedText) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_CODED_TEXT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.AssumedValue = aux.AssumedValue
@@ -85,7 +85,7 @@ func (c *COrdinal) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_ORDINAL" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.AssumedValue = aux.AssumedValue
@@ -126,7 +126,7 @@ func (c *CQuantity) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_QUANTITY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.AssumedValue = aux.AssumedValue
@@ -159,7 +159,7 @@ func (c *CQuantityItem) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_QUANTITY_ITEM" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_QUANTITY_ITEM", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_QUANTITY_ITEM", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.Magnitude = aux.Magnitude
@@ -188,7 +188,7 @@ func (o *Ordinal) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ORDINAL" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ORDINAL", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ORDINAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	o.Symbol = aux.Symbol

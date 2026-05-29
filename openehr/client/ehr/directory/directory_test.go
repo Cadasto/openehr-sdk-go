@@ -69,8 +69,8 @@ func TestGet(t *testing.T) {
 	if captured.URL.Path != "/openehr/v1/ehr/"+string(ehrIDFixture)+"/directory" {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
-	if got.Name.Value != "Root Directory" {
-		t.Errorf("Name.Value = %q", got.Name.Value)
+	if rm.DVTextValue(got.Name) != "Root Directory" {
+		t.Errorf("Name.Value = %q", rm.DVTextValue(got.Name))
 	}
 	if len(got.Folders) != 2 {
 		t.Errorf("Folders count = %d, want 2", len(got.Folders))
@@ -146,7 +146,7 @@ func TestSaveDirectory(t *testing.T) {
 	}))
 	defer srv.Close()
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root Directory"},
+		Name:            &rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	_, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder)
@@ -179,7 +179,7 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 	defer srv.Close()
 
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root Directory"},
+		Name:            &rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
@@ -191,8 +191,8 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 	if out == nil {
 		t.Fatal("expected decoded *rm.Folder on Prefer=representation, got nil")
 	}
-	if out.Name.Value != "Root Directory" {
-		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	if rm.DVTextValue(out.Name) != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", rm.DVTextValue(out.Name))
 	}
 	if meta.VersionUID != folderVUID {
 		t.Errorf("VersionUID = %q", meta.VersionUID)
@@ -212,7 +212,7 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	defer srv.Close()
 
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root"},
+		Name:            &rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
@@ -238,7 +238,7 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 	defer srv.Close()
 
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root Directory"},
+		Name:            &rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
@@ -250,8 +250,8 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 	if out == nil {
 		t.Fatal("expected decoded *rm.Folder on PUT Prefer=representation, got nil")
 	}
-	if out.Name.Value != "Root Directory" {
-		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", out.Name.Value)
+	if rm.DVTextValue(out.Name) != "Root Directory" {
+		t.Errorf("decoded Folder.Name = %q (bare-body decode likely wrong)", rm.DVTextValue(out.Name))
 	}
 	if meta.VersionUID != newVUID {
 		t.Errorf("new VersionUID = %q", meta.VersionUID)
@@ -268,7 +268,7 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	defer srv.Close()
 
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root"},
+		Name:            &rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
@@ -294,7 +294,7 @@ func TestUpdateDirectory(t *testing.T) {
 	}))
 	defer srv.Close()
 	folder := &rm.Folder{
-		Name:            rm.DVText{Value: "Root"},
+		Name:            &rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	if _, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {

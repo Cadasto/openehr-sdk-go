@@ -32,8 +32,10 @@ func (g *GenericEntry) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&g.Name, xml.StartElement{Name: xml.Name{Local: "name"}}); err != nil {
-		return err
+	if g.Name != nil {
+		if err := canxml.EncodePoly(_e, "name", g.Name); err != nil {
+			return err
+		}
 	}
 	if g.UID != nil {
 		if err := canxml.EncodePoly(_e, "uid", g.UID); err != nil {

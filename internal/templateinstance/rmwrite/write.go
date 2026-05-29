@@ -962,20 +962,29 @@ func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
 
 // --- coercion helpers ---------------------------------------------------
 
-// coerceDVText accepts both value- and pointer-receiver shapes; the
-// typereg ctor yields *DVText but rmread / hand-built code may pass
-// value-typed equivalents.
-func coerceDVText(child any) (rm.DVText, bool) {
+// coerceDVText accepts any payload that satisfies the DataValueText
+// marker interface (REQ-058 §RM substitutability) and returns a
+// `*DVText` view. For a `*DVCodedText` payload, the embedded `DVText`
+// is extracted (so the supertype's fields survive). Sites that need
+// the coded specialisation should consume DataValueText directly and
+// type-switch to `*DVCodedText`.
+//
+// Accepting both `DVText` (value) and `*DVText` (pointer) preserves
+// backward compatibility with hand-built call sites that used
+// non-pointer literals.
+func coerceDVText(child any) (rm.DataValueText, bool) {
 	switch v := child.(type) {
-	case *rm.DVText:
+	case rm.DataValueText:
 		if v == nil {
-			return rm.DVText{}, false
+			return nil, false
 		}
-		return *v, true
-	case rm.DVText:
 		return v, true
+	case rm.DVText:
+		return &v, true
+	case rm.DVCodedText:
+		return &v, true
 	}
-	return rm.DVText{}, false
+	return nil, false
 }
 
 func coerceDVCodedText(child any) (rm.DVCodedText, bool) {

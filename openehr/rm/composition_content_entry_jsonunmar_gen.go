@@ -27,8 +27,7 @@ type ActionJSONUnmarshaller struct {
 	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
 	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
 	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name       json.RawMessage `json:"name"`               // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -62,7 +61,7 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ACTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ACTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
@@ -91,7 +90,13 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 		}
 		a.Provider = dv
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		a.Name = dv
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -117,9 +122,8 @@ func (a *Action) UnmarshalJSON(data []byte) error {
 }
 
 type ActivityJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Class string          `json:"_type"`
+	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -158,10 +162,16 @@ func (a *Activity) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ACTIVITY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACTIVITY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ACTIVITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		a.Name = dv
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -197,8 +207,7 @@ type AdminEntryJSONUnmarshaller struct {
 	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
 	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
 	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name       json.RawMessage `json:"name"`               // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -226,7 +235,7 @@ func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ADMIN_ENTRY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ADMIN_ENTRY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ADMIN_ENTRY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Language = aux.Language
@@ -247,7 +256,13 @@ func (a *AdminEntry) UnmarshalJSON(data []byte) error {
 		}
 		a.Provider = dv
 	}
-	a.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		a.Name = dv
+	}
 	a.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -284,8 +299,7 @@ type EvaluationJSONUnmarshaller struct {
 	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
 	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
 	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name       json.RawMessage `json:"name"`               // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -313,7 +327,7 @@ func (e *Evaluation) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EVALUATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EVALUATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EVALUATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
@@ -342,7 +356,13 @@ func (e *Evaluation) UnmarshalJSON(data []byte) error {
 		}
 		e.Provider = dv
 	}
-	e.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		e.Name = dv
+	}
 	e.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -379,8 +399,7 @@ type InstructionJSONUnmarshaller struct {
 	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
 	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
 	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name       json.RawMessage `json:"name"`               // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -391,9 +410,8 @@ type InstructionJSONUnmarshaller struct {
 	// ArchetypeDetails Details of archetyping used on this node.
 	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DVText `json:"narrative"`
+	FeederAudit *FeederAudit    `json:"feeder_audit,omitempty"`
+	Narrative   json.RawMessage `json:"narrative"` // polymorphic DataValueText
 	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
 	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
@@ -415,7 +433,7 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "INSTRUCTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INSTRUCTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "INSTRUCTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
@@ -444,7 +462,13 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 		}
 		i.Provider = dv
 	}
-	i.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		i.Name = dv
+	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)
@@ -456,7 +480,13 @@ func (i *Instruction) UnmarshalJSON(data []byte) error {
 	i.Links = aux.Links
 	i.ArchetypeDetails = aux.ArchetypeDetails
 	i.FeederAudit = aux.FeederAudit
-	i.Narrative = aux.Narrative
+	if len(aux.Narrative) > 0 && string(aux.Narrative) != "null" {
+		dv, err := DecodeDataValueText(aux.Narrative)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/narrative", Inner: err}
+		}
+		i.Narrative = dv
+	}
 	i.ExpiryTime = aux.ExpiryTime
 	i.WfDefinition = aux.WfDefinition
 	i.Activities = aux.Activities
@@ -485,7 +515,7 @@ func (i *InstructionDetails) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "INSTRUCTION_DETAILS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INSTRUCTION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "INSTRUCTION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.InstructionID = aux.InstructionID
@@ -507,9 +537,8 @@ type IsmTransitionJSONUnmarshaller struct {
 	// Transition The ISM transition which occurred to arrive in the current_state. Coded by openEHR terminology group  Instruction transitions.
 	Transition *DVCodedText `json:"transition,omitempty"`
 	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
-	CareflowStep *DVCodedText `json:"careflow_step,omitempty"`
-	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
-	Reason []DVText `json:"reason,omitempty"`
+	CareflowStep *DVCodedText      `json:"careflow_step,omitempty"`
+	Reason       []json.RawMessage `json:"reason,omitempty"` // polymorphic []DataValueText
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into IsmTransition.
@@ -525,13 +554,25 @@ func (i *IsmTransition) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ISM_TRANSITION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ISM_TRANSITION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ISM_TRANSITION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.CurrentState = aux.CurrentState
 	i.Transition = aux.Transition
 	i.CareflowStep = aux.CareflowStep
-	i.Reason = aux.Reason
+	if aux.Reason != nil {
+		i.Reason = make([]DataValueText, len(aux.Reason))
+		for idx, raw := range aux.Reason {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DataValueText](raw)
+			if err != nil {
+				return &typereg.DecodeError{Path: fmt.Sprintf("/reason/%d", idx), Inner: err}
+			}
+			i.Reason[idx] = dv
+		}
+	}
 	return nil
 }
 
@@ -550,8 +591,7 @@ type ObservationJSONUnmarshaller struct {
 	WorkflowID *ObjectRef      `json:"workflow_id,omitempty"`
 	Subject    json.RawMessage `json:"subject"`            // polymorphic PartyProxy
 	Provider   json.RawMessage `json:"provider,omitempty"` // polymorphic PartyProxy
-	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVText `json:"name"`
+	Name       json.RawMessage `json:"name"`               // polymorphic DataValueText
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -582,7 +622,7 @@ func (o *Observation) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "OBSERVATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBSERVATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OBSERVATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Protocol) > 0 && string(aux.Protocol) != "null" {
@@ -611,7 +651,13 @@ func (o *Observation) UnmarshalJSON(data []byte) error {
 		}
 		o.Provider = dv
 	}
-	o.Name = aux.Name
+	if len(aux.Name) > 0 && string(aux.Name) != "null" {
+		dv, err := DecodeDataValueText(aux.Name)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/name", Inner: err}
+		}
+		o.Name = dv
+	}
 	o.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
 		dv, err := typereg.DecodeAs[UIDBasedID](aux.UID)

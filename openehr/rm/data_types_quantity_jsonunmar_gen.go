@@ -53,7 +53,7 @@ func (d *DVCount) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_COUNT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_COUNT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_COUNT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.AccuracyIsPercent = aux.AccuracyIsPercent
@@ -95,7 +95,7 @@ func (d *DVInterval[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_INTERVAL" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_INTERVAL", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_INTERVAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Lower = aux.Lower
@@ -134,7 +134,7 @@ func (d *DVOrdinal) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_ORDINAL" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_ORDINAL", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.NormalStatus = aux.NormalStatus
@@ -193,7 +193,7 @@ func (d *DVProportion) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PROPORTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PROPORTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PROPORTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.AccuracyIsPercent = aux.AccuracyIsPercent
@@ -272,7 +272,7 @@ func (d *DVQuantity) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_QUANTITY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_QUANTITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.AccuracyIsPercent = aux.AccuracyIsPercent
@@ -318,7 +318,7 @@ func (d *DVScale) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_SCALE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_SCALE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_SCALE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.NormalStatus = aux.NormalStatus
@@ -330,9 +330,8 @@ func (d *DVScale) UnmarshalJSON(data []byte) error {
 }
 
 type ReferenceRangeJSONUnmarshaller[T DVOrdered] struct {
-	Class string `json:"_type"`
-	// Meaning Term whose value indicates the meaning of this range, e.g.  normal,  critical,  therapeutic  etc.
-	Meaning DVText `json:"meaning"`
+	Class   string          `json:"_type"`
+	Meaning json.RawMessage `json:"meaning"` // polymorphic DataValueText
 	// Range The data range for this meaning, e.g. critical  etc.
 	Range DVInterval[DVOrdered] `json:"range"`
 }
@@ -350,10 +349,16 @@ func (r *ReferenceRange[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "REFERENCE_RANGE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REFERENCE_RANGE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "REFERENCE_RANGE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	r.Meaning = aux.Meaning
+	if len(aux.Meaning) > 0 && string(aux.Meaning) != "null" {
+		dv, err := DecodeDataValueText(aux.Meaning)
+		if err != nil {
+			return &typereg.DecodeError{Path: "/meaning", Inner: err}
+		}
+		r.Meaning = dv
+	}
 	r.Range = aux.Range
 	return nil
 }

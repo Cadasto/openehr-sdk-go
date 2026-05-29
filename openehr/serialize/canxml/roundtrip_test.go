@@ -33,7 +33,7 @@ func TestRoundTripStableSimpleValues(t *testing.T) {
 			name: "Composition-with-polymorphic-composer",
 			in: &rm.Composition{
 				ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-				Name:            rm.DVText{Value: "x"},
+				Name:            &rm.DVText{Value: "x"},
 				Language:        rm.CodePhrase{CodeString: "en"},
 				Territory:       rm.CodePhrase{CodeString: "GB"},
 				Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},

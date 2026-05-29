@@ -179,6 +179,14 @@ func containerElementAbstractName(plan *Plan, td *bmm.ContainerType) string {
 // abstractGoName returns the Go name of a BMM type if it resolves to
 // an abstract class or interface in the plan; ok == false otherwise.
 // Used by [polymorphicProperty] to detect polymorphic fields.
+//
+// Also returns the interface name for **concrete-with-descendants**
+// types listed in [concreteSupertypeInterface]. Such types are concrete
+// in the BMM but have RM-substitutable descendants (e.g. DV_TEXT ←
+// DV_CODED_TEXT). To honour substitutability losslessly on decode,
+// the generator promotes their field-type emissions to a marker
+// interface so the polymorphic-dispatch path picks the concrete
+// descendant by `_type`.
 func abstractGoName(plan *Plan, typeName string) (string, bool) {
 	if typeName == "" {
 		return "", false
@@ -194,8 +202,38 @@ func abstractGoName(plan *Plan, typeName string) (string, bool) {
 		if cls.IsAbstract() && (!cls.IsGeneric() || codecPolymorphicAbstractGeneric(plan, pc)) {
 			return qualifyClassRef(plan, pc), true
 		}
+		if iface, ok := concreteSupertypeInterface[typeName]; ok {
+			return iface, true
+		}
 	}
 	return "", false
+}
+
+// concreteSupertypeInterface maps a concrete BMM class name to the Go
+// marker-interface name we emit for its substitutability-polymorphism
+// site. Limited to the cases the SDK ships first-class lossless
+// round-trip support for; extend deliberately (REQ-058 §RM
+// substitutability).
+//
+// The interface name MUST differ from the concrete Go struct name (the
+// struct keeps its BMM-derived name; the interface gets the "RM-natural"
+// name). For DV_TEXT the natural name is `DataValueText`.
+var concreteSupertypeInterface = map[string]string{
+	"DV_TEXT": "DataValueText",
+}
+
+// isConcreteSupertypeInterface reports whether the given Go interface
+// name was emitted by the concrete-supertype path (i.e. is a value in
+// [concreteSupertypeInterface]). Used by the unmarshal emitter to route
+// such fields through a per-interface `Decode<Name>` helper that can
+// default missing `_type` discriminators to the supertype's BMM name.
+func isConcreteSupertypeInterface(name string) bool {
+	for _, v := range concreteSupertypeInterface {
+		if v == name {
+			return true
+		}
+	}
+	return false
 }
 
 // renderUnmarshalJSON emits the wire type + UnmarshalJSON method for
@@ -253,10 +291,23 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 	b.WriteString("\tif err := json.Unmarshal(data, &aux); err != nil {\n")
 	b.WriteString("\t\treturn fmt.Errorf(\"canjson: " + pc.BMMName + ": %w\", err)\n")
 	b.WriteString("\t}\n")
-	fmt.Fprintf(&b, "\tif aux.Class != \"\" && aux.Class != %q {\n", pc.BMMName)
+	// Substitutability check (REQ-058): accept `_type` equal to this
+	// class OR any of its known descendants. A `DV_CODED_TEXT` payload
+	// landing in a `DV_TEXT`-typed slot is RM-conformant per openEHR
+	// `data_types.text` (DV_CODED_TEXT IS-A DV_TEXT). The wire struct's
+	// non-descendant fields are silently dropped by encoding/json's
+	// field-name match; consumers who need full descendant fidelity
+	// should type the slot as the marker interface (e.g. DataValueText
+	// — generator support TBD per [docs/specifications/datamap.md]).
+	descendants := plan.Descendants[pc.BMMName]
+	fmt.Fprintf(&b, "\tif aux.Class != \"\" && aux.Class != %q", pc.BMMName)
+	for _, d := range descendants {
+		fmt.Fprintf(&b, " && aux.Class != %q", d)
+	}
+	b.WriteString(" {\n")
 	b.WriteString("\t\treturn &typereg.DecodeError{\n")
 	b.WriteString("\t\t\tPath: \"/_type\",\n")
-	fmt.Fprintf(&b, "\t\t\tInner: fmt.Errorf(\"canjson: expected %%q, got %%q: %%w\", %q, aux.Class, typereg.ErrTypeMismatch),\n", pc.BMMName)
+	fmt.Fprintf(&b, "\t\t\tInner: fmt.Errorf(\"canjson: expected %%q (or a descendant), got %%q: %%w\", %q, aux.Class, typereg.ErrTypeMismatch),\n", pc.BMMName)
 	b.WriteString("\t\t}\n")
 	b.WriteString("\t}\n")
 	// Copy non-polymorphic fields, then dispatch polymorphic ones.
@@ -269,7 +320,15 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			fmt.Fprintf(&b, "\t%s.%s = aux.%s\n", recv, goField, goField)
 		case polySingle:
 			fmt.Fprintf(&b, "\tif len(aux.%s) > 0 && string(aux.%s) != \"null\" {\n", goField, goField)
-			fmt.Fprintf(&b, "\t\tdv, err := typereg.DecodeAs[%s](aux.%s)\n", ifaceName, goField)
+			// Concrete-supertype interfaces (e.g. DataValueText) get a
+			// per-interface decode helper instead of a raw typereg call
+			// so the supertype can default missing `_type` discriminators
+			// to itself — preserves canonical-JSON shorthand (REQ-058).
+			if isConcreteSupertypeInterface(ifaceName) {
+				fmt.Fprintf(&b, "\t\tdv, err := Decode%s(aux.%s)\n", ifaceName, goField)
+			} else {
+				fmt.Fprintf(&b, "\t\tdv, err := typereg.DecodeAs[%s](aux.%s)\n", ifaceName, goField)
+			}
 			b.WriteString("\t\tif err != nil {\n")
 			fmt.Fprintf(&b, "\t\t\treturn &typereg.DecodeError{Path: \"/%s\", Inner: err}\n", propName)
 			b.WriteString("\t\t}\n")

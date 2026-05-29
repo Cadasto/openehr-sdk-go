@@ -666,7 +666,7 @@ func readElementSingle(e *rm.Element, attr string) (any, bool) {
 	case "null_flavour":
 		return ptrPresent(e.NullFlavour)
 	case "null_reason":
-		return ptrPresent(e.NullReason)
+		return dvTextPresent(e.NullReason)
 	}
 	return nil, false
 }
@@ -715,8 +715,14 @@ func strPresent(s string) (any, bool) {
 	return s, true
 }
 
-func dvTextPresent(t rm.DVText) (any, bool) {
-	if t.Value == "" {
+func dvTextPresent(t rm.DataValueText) (any, bool) {
+	// Name-slot fields are typed as the DataValueText marker interface
+	// (REQ-058). Presence is determined by the concrete payload's
+	// display value; nil interface is treated as absent.
+	if t == nil {
+		return nil, false
+	}
+	if rm.DVTextValue(t) == "" {
 		return t, false
 	}
 	return t, true

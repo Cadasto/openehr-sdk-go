@@ -100,9 +100,9 @@ func (f *FeederAuditDetails) MarshalJSON() ([]byte, error) {
 type LinkJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DVText `json:"meaning"`
+	Meaning DataValueText `json:"meaning"`
 	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DVText `json:"type"`
+	Type DataValueText `json:"type"`
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 }

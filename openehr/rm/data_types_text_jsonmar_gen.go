@@ -78,7 +78,7 @@ func (d *DVCodedText) MarshalJSON() ([]byte, error) {
 type DVParagraphJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVText `json:"items"`
+	Items []DataValueText `json:"items"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for DVParagraph with `_type`

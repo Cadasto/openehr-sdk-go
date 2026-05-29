@@ -13,7 +13,7 @@ import (
 func TestReadSingle_PresentValues(t *testing.T) {
 	comp := &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            rm.DVText{Value: "Encounter"},
+		Name:            &rm.DVText{Value: "Encounter"},
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{

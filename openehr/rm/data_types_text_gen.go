@@ -35,7 +35,7 @@ type DVCodedText struct {
 // `DV_PARAGRAPH` is the standard way for constructing longer text items in summaries, reports and so on.
 type DVParagraph struct {
 	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVText `json:"items"`
+	Items []DataValueText `json:"items"`
 }
 
 // DVText A text item, which may contain any amount of legal characters arranged as e.g. words, sentences etc (i.e. one `DV_TEXT` may be more than one word). Visual formatting and hyperlinks may be included via markdown.
@@ -69,6 +69,18 @@ type DVText struct {
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
 	Value string `json:"value"`
 }
+
+// DataValueText is the marker interface emitted by bmmgen for the
+// concrete-with-descendants supertype DV_TEXT. Field sites that
+// would otherwise carry a concrete DVText use this interface so
+// canonical-JSON `_type` polymorphism dispatches losslessly to
+// the actual descendant (REQ-058 §RM substitutability).
+type DataValueText interface {
+	isDataValueText()
+}
+
+func (*DVText) isDataValueText()      {}
+func (*DVCodedText) isDataValueText() {}
 
 // TermMapping Represents a coded term mapped to a `DV_TEXT`, and the relative match of the target term with respect to the mapped item. Plain or coded text items may appear in the EHR for which one or mappings in alternative terminologies are required. Mappings are only used to enable computer processing, so they can only be instances of `DV_CODED_TEXT`.
 //

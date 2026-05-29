@@ -31,7 +31,7 @@ func (r *ResourceAnnotations) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "RESOURCE_ANNOTATIONS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_ANNOTATIONS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "RESOURCE_ANNOTATIONS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	r.Documentation = aux.Documentation

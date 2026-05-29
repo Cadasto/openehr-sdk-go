@@ -163,7 +163,7 @@ func TestPutMinimal(t *testing.T) {
 	defer srv.Close()
 	status := &rm.EHRStatus{
 		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
-		Name:            rm.DVText{Value: "EHR Status"},
+		Name:            &rm.DVText{Value: "EHR Status"},
 		IsModifiable:    true,
 		IsQueryable:     true,
 		Subject:         rm.PartySelf{},

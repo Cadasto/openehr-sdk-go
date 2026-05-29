@@ -35,7 +35,7 @@ func (c *CodePhrase) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CODE_PHRASE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CODE_PHRASE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CODE_PHRASE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.TerminologyID = aux.TerminologyID
@@ -83,7 +83,7 @@ func (d *DVCodedText) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_CODED_TEXT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
@@ -97,9 +97,8 @@ func (d *DVCodedText) UnmarshalJSON(data []byte) error {
 }
 
 type DVParagraphJSONUnmarshaller struct {
-	Class string `json:"_type"`
-	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVText `json:"items"`
+	Class string            `json:"_type"`
+	Items []json.RawMessage `json:"items"` // polymorphic []DataValueText
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into DVParagraph.
@@ -115,10 +114,22 @@ func (d *DVParagraph) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PARAGRAPH" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARAGRAPH", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PARAGRAPH", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
-	d.Items = aux.Items
+	if aux.Items != nil {
+		d.Items = make([]DataValueText, len(aux.Items))
+		for idx, raw := range aux.Items {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[DataValueText](raw)
+			if err != nil {
+				return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: err}
+			}
+			d.Items[idx] = dv
+		}
+	}
 	return nil
 }
 
@@ -156,10 +167,10 @@ func (d *DVText) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: DV_TEXT: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "DV_TEXT" {
+	if aux.Class != "" && aux.Class != "DV_TEXT" && aux.Class != "DV_CODED_TEXT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_TEXT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_TEXT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
@@ -201,7 +212,7 @@ func (t *TermMapping) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "TERM_MAPPING" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERM_MAPPING", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TERM_MAPPING", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	t.Match = aux.Match

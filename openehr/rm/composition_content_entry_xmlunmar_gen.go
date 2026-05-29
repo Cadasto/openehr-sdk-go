@@ -80,9 +80,11 @@ func (a *Action) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				a.Provider = _v
 			case "name":
-				if _err := _dec.DecodeElement(&a.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				a.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&a.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -165,9 +167,11 @@ func (a *Activity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) erro
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&a.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				a.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&a.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -278,9 +282,11 @@ func (a *AdminEntry) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				a.Provider = _v
 			case "name":
-				if _err := _dec.DecodeElement(&a.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				a.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&a.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -393,9 +399,11 @@ func (e *Evaluation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 				}
 				e.Provider = _v
 			case "name":
-				if _err := _dec.DecodeElement(&e.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				e.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&e.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -508,9 +516,11 @@ func (i *Instruction) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				i.Provider = _v
 			case "name":
-				if _err := _dec.DecodeElement(&i.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&i.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -540,9 +550,11 @@ func (i *Instruction) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				i.FeederAudit = _v
 			case "narrative":
-				if _err := _dec.DecodeElement(&i.Narrative, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				i.Narrative = _v
 			case "expiry_time":
 				_v := new(DVDateTime)
 				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
@@ -646,8 +658,8 @@ func (i *IsmTransition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 				}
 				i.CareflowStep = _v
 			case "reason":
-				var _v DVText
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[DataValueText](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				i.Reason = append(i.Reason, _v)
@@ -729,9 +741,11 @@ func (o *Observation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				o.Provider = _v
 			case "name":
-				if _err := _dec.DecodeElement(&o.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				o.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&o.ArchetypeNodeID, &_t); _err != nil {
 					return _err

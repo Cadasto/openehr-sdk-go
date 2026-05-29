@@ -16,7 +16,7 @@ type AttestationJSONMarshaller struct {
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType DVCodedText `json:"change_type"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description *DVText `json:"description,omitempty"`
+	Description DataValueText `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
 	Committer PartyProxy `json:"committer"`
 	// AttestedView Optional visual representation of content attested e.g. screen image.
@@ -26,7 +26,7 @@ type AttestationJSONMarshaller struct {
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items []DVEHRURI `json:"items,omitempty"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason DVText `json:"reason"`
+	Reason DataValueText `json:"reason"`
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
@@ -61,7 +61,7 @@ type AuditDetailsJSONMarshaller struct {
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType DVCodedText `json:"change_type"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description *DVText `json:"description,omitempty"`
+	Description DataValueText `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
 	Committer PartyProxy `json:"committer"`
 }
@@ -85,7 +85,7 @@ func (a *AuditDetails) MarshalJSON() ([]byte, error) {
 type ParticipationJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
-	Function DVText `json:"function"`
+	Function DataValueText `json:"function"`
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
 	Mode *DVCodedText `json:"mode,omitempty"`
 	// Performer The id and possibly demographic system link of the party participating in the activity.

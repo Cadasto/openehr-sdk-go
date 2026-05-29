@@ -193,13 +193,17 @@ func (l *Link) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "meaning":
-				if _err := _dec.DecodeElement(&l.Meaning, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				l.Meaning = _v
 			case "type":
-				if _err := _dec.DecodeElement(&l.Type, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				l.Type = _v
 			case "target":
 				if _err := _dec.DecodeElement(&l.Target, &_t); _err != nil {
 					return _err

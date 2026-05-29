@@ -36,9 +36,11 @@ func (c *Cluster) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&c.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				c.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&c.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -107,9 +109,11 @@ func (e *Element) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				if _err := _dec.DecodeElement(&e.Name, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				e.Name = _v
 			case "archetype_node_id":
 				if _err := _dec.DecodeElement(&e.ArchetypeNodeID, &_t); _err != nil {
 					return _err
@@ -151,8 +155,8 @@ func (e *Element) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				e.Value = _v
 			case "null_reason":
-				_v := new(DVText)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				e.NullReason = _v

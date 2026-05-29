@@ -375,8 +375,10 @@ func (r *ReferenceRange[T]) MarshalXML(_e *xml.Encoder, _start xml.StartElement)
 	if err := _e.EncodeToken(_start); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&r.Meaning, xml.StartElement{Name: xml.Name{Local: "meaning"}}); err != nil {
-		return err
+	if r.Meaning != nil {
+		if err := canxml.EncodePoly(_e, "meaning", r.Meaning); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&r.Range, xml.StartElement{Name: xml.Name{Local: "range"}}); err != nil {
 		return err
