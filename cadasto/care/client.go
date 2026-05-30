@@ -17,6 +17,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/query"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
@@ -266,6 +267,62 @@ func (c *Client) CreatePatient(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("care: create EHR: %w", err)
 	}
 	return e.EHRID.Value, nil
+}
+
+// FindOrCreateEHR resolves an EHR for the (namespace, externalID) pair:
+// returns the existing EHR's UUID when one already maps to the subject,
+// or creates a new EHR (POST /ehr) with that subject set on its initial
+// EHR_STATUS otherwise.
+//
+// Idempotent on the (namespace, externalID) pair — repeat calls with the
+// same input return the same EHR-UUID. Other transport errors (auth,
+// 5xx) surface as wire errors; only transport.ErrNotFound on the lookup
+// triggers the create path.
+//
+// Why this lives on care.Client and not in a generic helper: the
+// EHR_STATUS payload the create requires is openEHR-version-specific
+// (archetype-id, IsModifiable/IsQueryable defaults, subject shape with
+// PartySelf/PartyRef/GenericID nesting). Centralising it here keeps
+// callers from rebuilding the boilerplate.
+func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID string) (string, error) {
+	if namespace == "" || externalID == "" {
+		return "", fmt.Errorf("care: FindOrCreateEHR: namespace and externalID are required")
+	}
+
+	// 1. Find pad — bestaat een EHR met deze subject-koppeling?
+	existing, _, err := ehr.GetBySubject(ctx, c.rest, namespace, externalID)
+	if err == nil && existing != nil {
+		return existing.EHRID.Value, nil
+	}
+	if err != nil && !errors.Is(err, transport.ErrNotFound) {
+		return "", fmt.Errorf("care: FindOrCreateEHR: lookup %s/%s: %w", namespace, externalID, err)
+	}
+
+	// 2. Create pad — bouw initial EHR_STATUS met de subject-koppeling
+	// zodat een latere find-by-subject deze nieuwe EHR vindt.
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            &rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject: rm.PartySelf{
+			ExternalRef: &rm.PartyRef{
+				ObjectRef: rm.ObjectRef{
+					Namespace: namespace,
+					Type:      "PERSON",
+					ID: rm.GenericID{
+						Scheme: namespace,
+						Value:  externalID,
+					},
+				},
+			},
+		},
+	}
+	created, _, err := ehr.Create(ctx, c.rest, ehr.WithInitialStatus(status))
+	if err != nil {
+		return "", fmt.Errorf("care: FindOrCreateEHR: create %s/%s: %w", namespace, externalID, err)
+	}
+	return created.EHRID.Value, nil
 }
 
 // SaveData writes a datamap payload for a patient under the given template:
