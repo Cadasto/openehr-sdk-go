@@ -19,18 +19,40 @@ import (
 // The opt parameter is accepted for API symmetry with ToComposition and to
 // allow future OPT-driven label/coded-value resolution; it is currently unused
 // — decode walks the composition's own name / archetype_node_id fields.
-func FromComposition(opt *template.OperationalTemplate, composition map[string]any) (map[string]any, error) {
-	return fromComposition(opt, composition, false)
+func FromComposition(opt *template.OperationalTemplate, composition map[string]any, opts ...DecodeOption) (map[string]any, error) {
+	return fromComposition(opt, composition, false, opts...)
 }
 
 // FromCompositionExpanded is like FromComposition but emits the expanded value
 // form ({rmType, …RM fields…}) instead of collapsing to short scalars, so
 // types + units are preserved (and the result re-encodes losslessly).
-func FromCompositionExpanded(opt *template.OperationalTemplate, composition map[string]any) (map[string]any, error) {
-	return fromComposition(opt, composition, true)
+func FromCompositionExpanded(opt *template.OperationalTemplate, composition map[string]any, opts ...DecodeOption) (map[string]any, error) {
+	return fromComposition(opt, composition, true, opts...)
 }
 
-func fromComposition(opt *template.OperationalTemplate, composition map[string]any, expanded bool) (map[string]any, error) {
+// DecodeOption tweaks the decode path. Default decode mirrors the short
+// datamap (archetyped content only); options opt-in to additional RM
+// attributes that aren't part of the round-trippable content payload.
+type DecodeOption func(*decodeConfig)
+
+type decodeConfig struct {
+	feederAudit bool
+}
+
+// WithFeederAudit includes the composition's FEEDER_AUDIT (origin/system
+// item-ids such as an order- or lab-result-number) in the decoded datamap
+// under the "feeder_audit" key. Off by default because feeder_audit is RM
+// provenance, not archetyped content — callers (e.g. the diagnostics
+// playground) enable it to inspect what ToComposition wrote.
+func WithFeederAudit() DecodeOption {
+	return func(c *decodeConfig) { c.feederAudit = true }
+}
+
+func fromComposition(opt *template.OperationalTemplate, composition map[string]any, expanded bool, opts ...DecodeOption) (map[string]any, error) {
+	var cfg decodeConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
 	// Per-archetype-root term maps from the OPT, so decoded keys carry the same
 	// "atNNNN|Label" labels the Schema emits (SPEC §4.3) and therefore validate.
 	rootsByID := map[string]contentRoot{}
@@ -103,7 +125,54 @@ func fromComposition(opt *template.OperationalTemplate, composition map[string]a
 		out["content"] = content
 	}
 
+	if cfg.feederAudit {
+		if fa := decodeFeederAudit(composition["feeder_audit"]); fa != nil {
+			out["feeder_audit"] = fa
+		}
+	}
+
 	return out, nil
+}
+
+// decodeFeederAudit is de inverse van de ToComposition-encoder: het zet de
+// canonical FEEDER_AUDIT terug naar de platte datamap-vorm. Retourneert nil
+// wanneer er geen feeder_audit op de composition staat.
+func decodeFeederAudit(raw any) map[string]any {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := map[string]any{}
+	if osa, ok := m["originating_system_audit"].(map[string]any); ok {
+		if sysID, _ := osa["system_id"].(string); sysID != "" {
+			out["originating_system_audit"] = map[string]any{"system_id": sysID}
+		}
+	}
+	if rawIDs, ok := m["originating_system_item_ids"].([]any); ok {
+		ids := make([]any, 0, len(rawIDs))
+		for _, ri := range rawIDs {
+			im, ok := ri.(map[string]any)
+			if !ok {
+				continue
+			}
+			dvID := map[string]any{}
+			for _, k := range []string{"id", "issuer", "assigner", "type"} {
+				if v, _ := im[k].(string); v != "" {
+					dvID[k] = v
+				}
+			}
+			if len(dvID) > 0 {
+				ids = append(ids, dvID)
+			}
+		}
+		if len(ids) > 0 {
+			out["originating_system_item_ids"] = ids
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // decodeArchetypeRoot decodes one entry under content into its
@@ -138,6 +207,18 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 			events = append(events, decoded)
 		}
 		payload["events"] = events
+		// protocol (bv. Test request details) — alleen terugzetten wanneer de
+		// composition er daadwerkelijk een gevulde protocol-ITEM_TREE voor
+		// heeft, zodat we geen lege "protocol"-key emitten.
+		if proto, ok := node["protocol"].(map[string]any); ok {
+			items, err := decodeItems(structuredItemsList(proto), r)
+			if err != nil {
+				return "", nil, fmt.Errorf("protocol: %w", err)
+			}
+			if len(items) > 0 {
+				payload["protocol"] = items
+			}
+		}
 	case "INSTRUCTION":
 		actsRaw, _ := node["activities"].([]any)
 		acts := make([]any, 0, len(actsRaw))

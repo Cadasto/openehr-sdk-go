@@ -69,7 +69,7 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 		)
 	}
 
-	return map[string]any{
+	comp := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": rootArchetypeID(root),
 		"name":              dvText(rootName(root)),
@@ -84,7 +84,96 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 			"setting":    dvCodedText("other care", "openehr", "238"),
 		},
 		"content": content,
-	}, nil
+	}
+
+	// other_context (ITEM_TREE op EVENT_CONTEXT, bv. een annotations-cluster)
+	// — alleen wanneer de datamap er inhoud voor levert; geen leeg skelet.
+	if oc, err := encodeOtherContext(root, payload); err != nil {
+		return nil, err
+	} else if oc != nil {
+		comp["context"].(map[string]any)["other_context"] = oc
+	}
+
+	// feeder_audit is een RM-attribuut op COMPOSITION (geen archetyped
+	// content) — het draagt de herkomst van de ingevoerde data, incl. de
+	// originating-system item-ids (bv. order-/lab-result-nummer). De
+	// caller levert 't als platte map; we encoden 't naar de canonical
+	// FEEDER_AUDIT-vorm zodat het querybaar in de CDR landt (anders gaat
+	// een business-key voor idempotency-find verloren).
+	if fa := feederAudit(payload["feeder_audit"]); fa != nil {
+		comp["feeder_audit"] = fa
+	}
+
+	return comp, nil
+}
+
+// feederAudit encodeert de datamap-feeder_audit (platte map) naar de
+// canonical FEEDER_AUDIT-vorm. Retourneert nil wanneer er niets bruikbaars
+// is (geen map, of geen system_id én geen item-ids) — dan laten we het
+// attribuut weg i.p.v. een invalide FEEDER_AUDIT te emitten.
+//
+// Verwachte input-shape:
+//
+//	{
+//	  "originating_system_audit":   {"system_id": "<sys>"},
+//	  "originating_system_item_ids": [{"id": "...", "issuer": "...", "assigner": "...", "type": "..."}]
+//	}
+func feederAudit(raw any) map[string]any {
+	m, ok := raw.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	out := map[string]any{"_type": "FEEDER_AUDIT"}
+
+	// originating_system_audit (FEEDER_AUDIT_DETAILS) — system_id is in de
+	// RM verplicht; zonder geldige system_id emitten we de details niet.
+	if osa, ok := m["originating_system_audit"].(map[string]any); ok {
+		if sysID := stringOrDefault(osa["system_id"], ""); sysID != "" {
+			out["originating_system_audit"] = map[string]any{
+				"_type":     "FEEDER_AUDIT_DETAILS",
+				"system_id": sysID,
+			}
+		}
+	}
+
+	// originating_system_item_ids ([]DV_IDENTIFIER) — id is verplicht per
+	// identifier; entries zonder id slaan we over.
+	if rawIDs, ok := m["originating_system_item_ids"].([]any); ok {
+		ids := make([]any, 0, len(rawIDs))
+		for _, ri := range rawIDs {
+			im, ok := ri.(map[string]any)
+			if !ok {
+				continue
+			}
+			id := stringOrDefault(im["id"], "")
+			if id == "" {
+				continue
+			}
+			dvID := map[string]any{"_type": "DV_IDENTIFIER", "id": id}
+			if v := stringOrDefault(im["issuer"], ""); v != "" {
+				dvID["issuer"] = v
+			}
+			if v := stringOrDefault(im["assigner"], ""); v != "" {
+				dvID["assigner"] = v
+			}
+			if v := stringOrDefault(im["type"], ""); v != "" {
+				dvID["type"] = v
+			}
+			ids = append(ids, dvID)
+		}
+		if len(ids) > 0 {
+			out["originating_system_item_ids"] = ids
+		}
+	}
+
+	// originating_system_audit is in de RM verplicht (1..1) op FEEDER_AUDIT.
+	// Zonder geldige system_id kunnen we geen valide FEEDER_AUDIT bouwen —
+	// dan laten we het attribuut weg i.p.v. een door de CDR-geweigerde body.
+	if _, hasOSA := out["originating_system_audit"]; !hasOSA {
+		return nil
+	}
+	return out
 }
 
 func mapKeys(m map[string]any) []string {
@@ -155,6 +244,15 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 			"origin":            dvDateTime(startTime),
 			"events":            events,
 		}
+		// protocol (ITEM_TREE, bv. Test request details met order-identifier)
+		// — alleen wanneer de datamap er daadwerkelijk inhoud voor levert.
+		proto, err := encodeProtocol(r, payload)
+		if err != nil {
+			return nil, err
+		}
+		if proto != nil {
+			out["protocol"] = proto
+		}
 	case "EVALUATION", "ADMIN_ENTRY":
 		itemsAttr := structuredItemsAttr(dataNode)
 		if itemsAttr == nil {
@@ -174,6 +272,79 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 // encodeInstruction builds an INSTRUCTION from a datamap payload: a mandatory
 // narrative plus activities[], each an ACTIVITY whose description ITEM_TREE
 // carries the encoded items (+ optional timing).
+// encodeProtocol bouwt de OBSERVATION.protocol-ITEM_TREE uit een datamap-
+// `protocol`-key, met dezelfde cluster/element-machinerie als de data-tree.
+// Retourneert nil (geen protocol-attribuut op de composition) wanneer de
+// datamap geen protocol levert, de OPT geen protocol-constraint heeft, of er
+// na het matchen niets overblijft — zo blijft een lege protocol-sectie weg.
+func encodeProtocol(r contentRoot, payload map[string]any) (map[string]any, error) {
+	protoPayload, ok := payload["protocol"].(map[string]any)
+	if !ok || len(protoPayload) == 0 {
+		return nil, nil
+	}
+	protoNode, ok := attrFirstObject(findAttr(r.node, "protocol"))
+	if !ok {
+		return nil, nil
+	}
+	itemsAttr := structuredItemsAttr(protoNode)
+	if itemsAttr == nil {
+		return nil, nil
+	}
+	items, err := encodeItems(itemsAttr, protoPayload, r.terms)
+	if err != nil {
+		return nil, fmt.Errorf("protocol: %w", err)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	return encodeStructuredContainer(protoNode, items, "Tree", r.terms), nil
+}
+
+// encodeOtherContext bouwt de EVENT_CONTEXT.other_context-ITEM_TREE uit een
+// datamap-`other_context`-key (bv. een annotations-cluster), met dezelfde
+// cluster/element-machinerie als data/protocol. De terms van eventuele
+// slot-archetypes (zoals openEHR-EHR-CLUSTER.annotations.v1) worden uit hun
+// eigen ArchetypeRoot gehaald zodat labels kloppen. Retourneert nil wanneer
+// de datamap geen other_context levert, de OPT 'm niet constraint, of er na
+// matchen niets overblijft — zo blijft een lege other_context-sectie weg.
+func encodeOtherContext(root template.ObjectNode, payload map[string]any) (map[string]any, error) {
+	ocPayload, ok := payload["other_context"].(map[string]any)
+	if !ok || len(ocPayload) == 0 {
+		return nil, nil
+	}
+	ctxNode, ok := attrFirstObject(findAttr(root, "context"))
+	if !ok {
+		return nil, nil
+	}
+	ocNode, ok := attrFirstObject(findAttr(ctxNode, "other_context"))
+	if !ok {
+		return nil, nil
+	}
+	itemsAttr := structuredItemsAttr(ocNode)
+	if itemsAttr == nil {
+		return nil, nil
+	}
+	// Verzamel terms uit slot-archetype-children (annotations.v1 e.d.) zodat
+	// hun at-code-labels beschikbaar zijn voor encodeItems.
+	terms := map[string]string{}
+	for _, c := range itemsAttr.Children() {
+		if ar, ok := c.(*template.ArchetypeRoot); ok {
+			t, _ := termMaps(ar)
+			for k, v := range t {
+				terms[k] = v
+			}
+		}
+	}
+	items, err := encodeItems(itemsAttr, ocPayload, terms)
+	if err != nil {
+		return nil, fmt.Errorf("other_context: %w", err)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	return encodeStructuredContainer(ocNode, items, "Tree", terms), nil
+}
+
 func encodeInstruction(out map[string]any, r contentRoot, payload map[string]any) (map[string]any, error) {
 	out["narrative"] = dvText(termOrFallback(r.terms, "narrative", "Instruction"))
 
@@ -496,6 +667,12 @@ func encodeExpandedValue(payload any) map[string]any {
 		}
 		out[k] = v
 	}
+	// LET OP: GEEN lege issuer/assigner/type aan een DV_IDENTIFIER toevoegen.
+	// Cadasto weigert dan de hele composition met 400 "Request data could not
+	// be converted to valid object" (bewezen 2026-06-01). De optionele velden
+	// horen ofwel een echte waarde te hebben ofwel afwezig te zijn — een
+	// `id`-only DV_IDENTIFIER is correct. mConsole's <issuer/> is een
+	// XML-render-artefact, geen submitbare canonical JSON.
 	return out
 }
 

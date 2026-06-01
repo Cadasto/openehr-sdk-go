@@ -97,6 +97,112 @@ func TestToCompositionRoundTrip(t *testing.T) {
 	assertContains(t, got, true)                          // DV_BOOLEAN
 }
 
+func TestToCompositionEncodesFeederAudit(t *testing.T) {
+	opt := loadOPT(t, "development-1")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-02-01T09:30:00Z"},
+		"feeder_audit": map[string]any{
+			"originating_system_audit": map[string]any{"system_id": "Apple"},
+			"originating_system_item_ids": []any{
+				map[string]any{"assigner": "Macbook", "id": "C2400001", "issuer": "Apple", "type": "Ordernumber"},
+			},
+		},
+		"content": map[string]any{},
+	}
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+	fa, ok := comp["feeder_audit"].(map[string]any)
+	if !ok {
+		t.Fatal("composition mist feeder_audit (encoder dropt 't nog)")
+	}
+	if fa["_type"] != "FEEDER_AUDIT" {
+		t.Errorf("feeder_audit _type = %v, want FEEDER_AUDIT", fa["_type"])
+	}
+	osa, _ := fa["originating_system_audit"].(map[string]any)
+	if osa["_type"] != "FEEDER_AUDIT_DETAILS" || osa["system_id"] != "Apple" {
+		t.Errorf("originating_system_audit = %v", osa)
+	}
+	ids, _ := fa["originating_system_item_ids"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("originating_system_item_ids: want 1, got %d", len(ids))
+	}
+	id0 := ids[0].(map[string]any)
+	if id0["_type"] != "DV_IDENTIFIER" || id0["id"] != "C2400001" || id0["type"] != "Ordernumber" || id0["issuer"] != "Apple" || id0["assigner"] != "Macbook" {
+		t.Errorf("DV_IDENTIFIER = %v", id0)
+	}
+}
+
+func TestToCompositionOmitsFeederAuditWithoutSystemID(t *testing.T) {
+	// FEEDER_AUDIT.originating_system_audit is RM-verplicht; zonder geldige
+	// system_id laten we het hele attribuut weg i.p.v. een door de CDR
+	// geweigerde body te bouwen.
+	opt := loadOPT(t, "development-1")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-02-01T09:30:00Z"},
+		"feeder_audit": map[string]any{
+			"originating_system_item_ids": []any{map[string]any{"id": "X"}},
+		},
+		"content": map[string]any{},
+	}
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+	if _, ok := comp["feeder_audit"]; ok {
+		t.Error("feeder_audit zou weggelaten moeten zijn zonder originating_system_audit.system_id")
+	}
+}
+
+func TestFeederAuditRoundTripOptIn(t *testing.T) {
+	opt := loadOPT(t, "development-1")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-02-01T09:30:00Z"},
+		"feeder_audit": map[string]any{
+			"originating_system_audit": map[string]any{"system_id": "Apple"},
+			"originating_system_item_ids": []any{
+				map[string]any{"id": "C2400001", "type": "Ordernumber", "issuer": "Apple", "assigner": "Macbook"},
+			},
+		},
+		"content": map[string]any{},
+	}
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+
+	// Zonder optie: feeder_audit NIET in de decoded datamap (default short).
+	plain, err := FromComposition(opt, comp)
+	if err != nil {
+		t.Fatalf("FromComposition: %v", err)
+	}
+	if _, ok := plain["feeder_audit"]; ok {
+		t.Error("feeder_audit zou afwezig moeten zijn zonder WithFeederAudit()")
+	}
+
+	// Met optie: round-trip terug naar de platte vorm.
+	got, err := FromComposition(opt, comp, WithFeederAudit())
+	if err != nil {
+		t.Fatalf("FromComposition(WithFeederAudit): %v", err)
+	}
+	fa, ok := got["feeder_audit"].(map[string]any)
+	if !ok {
+		t.Fatal("feeder_audit ontbreekt met WithFeederAudit()")
+	}
+	ids, _ := fa["originating_system_item_ids"].([]any)
+	if len(ids) != 1 {
+		t.Fatalf("item_ids: %v", fa)
+	}
+	id0 := ids[0].(map[string]any)
+	if id0["id"] != "C2400001" || id0["type"] != "Ordernumber" || id0["issuer"] != "Apple" || id0["assigner"] != "Macbook" {
+		t.Errorf("round-trip id = %v", id0)
+	}
+	if osa, _ := fa["originating_system_audit"].(map[string]any); osa["system_id"] != "Apple" {
+		t.Errorf("round-trip system_id = %v", fa["originating_system_audit"])
+	}
+}
+
 func TestToCompositionRequiresStartTime(t *testing.T) {
 	opt := loadOPT(t, "development-1")
 	_, err := ToComposition(opt, map[string]any{"content": map[string]any{}})
@@ -132,4 +238,26 @@ func assertContains(t *testing.T, haystack []any, want any) {
 		}
 	}
 	t.Errorf("round-trip lost value %v (got leaves %v)", want, haystack)
+}
+
+func TestEncodeExpandedValue_DVIdentifierNoEmptyFields(t *testing.T) {
+	// Cadasto weigert een DV_IDENTIFIER met lege issuer/assigner/type (400).
+	// De encoder mag die dus NIET toevoegen: alleen meegegeven velden blijven.
+	got := encodeExpandedValue(map[string]any{"rmType": "DV_IDENTIFIER", "id": "C2400002"})
+	if got["_type"] != "DV_IDENTIFIER" || got["id"] != "C2400002" {
+		t.Fatalf("base velden fout: %+v", got)
+	}
+	for _, f := range []string{"issuer", "assigner", "type"} {
+		if _, ok := got[f]; ok {
+			t.Errorf("veld %q zou afwezig moeten zijn (lege velden breken de CDR), kreeg %v", f, got[f])
+		}
+	}
+	// Meegegeven waarden blijven wél behouden.
+	got2 := encodeExpandedValue(map[string]any{"rmType": "DV_IDENTIFIER", "id": "X", "issuer": "GLIMS"})
+	if got2["issuer"] != "GLIMS" {
+		t.Errorf("issuer = %v, want GLIMS", got2["issuer"])
+	}
+	if _, ok := got2["assigner"]; ok {
+		t.Errorf("assigner zou afwezig moeten zijn, kreeg %v", got2["assigner"])
+	}
 }
