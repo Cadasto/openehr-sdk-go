@@ -310,7 +310,13 @@ func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID stri
 				ObjectRef: rm.ObjectRef{
 					Namespace: namespace,
 					Type:      "PERSON",
-					ID: rm.GenericID{
+					// Pointer i.p.v. value: canjson's polymorphic-marshaler
+					// emit alleen het `_type`-discriminator-veld voor pointer-
+					// implementaties van een interface-veld. Een value-
+					// GenericID round-tript zonder `_type:"GENERIC_ID"`, en
+					// Cadasto weigert dan de body met HTTP 400
+					// "Request data could not be converted to valid object".
+					ID: &rm.GenericID{
 						Scheme: namespace,
 						Value:  externalID,
 					},
@@ -344,18 +350,13 @@ func (c *Client) SaveData(ctx context.Context, patientID, templateID string, dat
 	if err != nil {
 		return "", fmt.Errorf("care: encode composition: %w", err)
 	}
-	comp, err := compositionFromMap(compMap)
-	if err != nil {
-		return "", err
-	}
-	_, meta, err := composition.Save(ctx, c.rest, ehr.EHRID(patientID), comp, composition.WithTemplateID(templateID))
-	if err != nil {
-		return "", fmt.Errorf("care: save composition: %w", err)
-	}
-	if meta != nil {
-		return string(meta.VersionUID), nil
-	}
-	return "", nil
+	// Raw canonical POST i.p.v. de typed *rm.Composition-bridge. Die bridge
+	// (compositionFromMap → composition.Save) is lossy: RM-subtype-polymorfie
+	// (Cluster.Name) én RM-provenance zoals feeder_audit overleven de
+	// round-trip-via-struct niet. UpdateData gebruikt om dezelfde reden al de
+	// raw PUT; SaveData spiegelt dat nu zodat de canonical map — inclusief
+	// feeder_audit/originating_system_item_ids — verbatim de CDR in gaat.
+	return c.SaveCompositionRaw(ctx, patientID, templateID, compMap)
 }
 
 // UpdateData mirrors SaveData but writes via the PUT path against an
@@ -523,7 +524,10 @@ func (c *Client) CompositionETag(ctx context.Context, patientID, ref string) (st
 		return "", fmt.Errorf("care: head composition %s: %w", ref, err)
 	}
 	if resp != nil && resp.Metadata != nil {
-		return resp.Metadata.ETag, nil
+		// Rauwe ETag schoonmaken: Cadasto's Caddy-proxy plakt er `-gzip` +
+		// RFC-7232-quotes omheen. Ongestript lekt dat in de If-Match van de
+		// volgende update → 400. cleanVersionUID levert de bare version-uid.
+		return cleanVersionUID(resp.Metadata.ETag), nil
 	}
 	return "", nil
 }
@@ -545,8 +549,12 @@ func (c *Client) UpdateCompositionRaw(ctx context.Context, patientID, voID, ifMa
 		return "", fmt.Errorf("care: marshal composition: %w", err)
 	}
 	req := &transport.Request{
-		Method:     http.MethodPut,
-		Path:       "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(voID),
+		Method: http.MethodPut,
+		// De path-param is de BARE VERSIONED_OBJECT-uuid; de volledige
+		// version-uid (uuid::host::version) hoort in If-Match, niet in 't pad
+		// (Cadasto antwoordt anders met 400). find_composition levert de
+		// volle uid, dus strippen we 'm hier defensief naar de object-uuid.
+		Path:       "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(versionedObjectID(voID)),
 		Route:      "/ehr/{ehr_id}/composition/{versioned_object_id}",
 		Body:       body,
 		TemplateID: templateID,
@@ -572,6 +580,19 @@ func cleanVersionUID(s string) string {
 		s = s[:i]
 	}
 	return strings.Trim(s, `"`)
+}
+
+// versionedObjectID reduceert een (mogelijk volledige) version-uid
+// "uuid::system::version" tot de bare VERSIONED_OBJECT-uuid — de waarde die
+// het composition-PUT-pad als {versioned_object_id} verwacht. Een uid zonder
+// "::" wordt ongewijzigd teruggegeven. Eerst cleanVersionUID zodat een
+// rauwe ETag (met quotes/-gzip) ook correct gestript wordt.
+func versionedObjectID(uid string) string {
+	uid = cleanVersionUID(uid)
+	if i := strings.Index(uid, "::"); i >= 0 {
+		return uid[:i]
+	}
+	return uid
 }
 
 // SaveCompositionRaw POSTs a composition map as canonical JSON directly,
