@@ -346,7 +346,26 @@ func encodeOtherContext(root template.ObjectNode, payload map[string]any) (map[s
 }
 
 func encodeInstruction(out map[string]any, r contentRoot, payload map[string]any) (map[string]any, error) {
-	out["narrative"] = dvText(termOrFallback(r.terms, "narrative", "Instruction"))
+	// narrative: gebruik de datamap-narrative indien aangeleverd, anders de
+	// template-term als fallback. (Een order levert hier z'n vrije tekst naar
+	// het lab; eerder werd de payload-narrative genegeerd.)
+	if nar, ok := payload["narrative"].(string); ok && nar != "" {
+		out["narrative"] = dvText(nar)
+	} else {
+		out["narrative"] = dvText(termOrFallback(r.terms, "narrative", "Instruction"))
+	}
+
+	// protocol (ITEM_TREE, bv. order-identifier + status) — dezelfde machinerie
+	// als OBSERVATION; alleen gezet wanneer de datamap er inhoud voor levert en
+	// de OPT 'm constraint. Eerder ontbrak dit voor INSTRUCTION, waardoor een
+	// order z'n protocol-velden (ordernummer/status) verloor bij encoden.
+	proto, err := encodeProtocol(r, payload)
+	if err != nil {
+		return nil, err
+	}
+	if proto != nil {
+		out["protocol"] = proto
+	}
 
 	actConstraint, ok := attrFirstObject(findAttr(r.node, "activities"))
 	if !ok {

@@ -2,7 +2,9 @@ package datamap
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -259,5 +261,57 @@ func TestEncodeExpandedValue_DVIdentifierNoEmptyFields(t *testing.T) {
 	}
 	if _, ok := got2["assigner"]; ok {
 		t.Errorf("assigner zou afwezig moeten zijn, kreeg %v", got2["assigner"])
+	}
+}
+
+// REQ-058 — INSTRUCTION write path: protocol + payload-narrative. Regressie voor
+// de bug waarbij encodeInstruction de protocol-ITEM_TREE wegliet (order-id/status
+// verdwenen) en de payload-narrative negeerde (altijd template-term). Gebruikt de
+// order-template Laboratorium opdracht.v1 (heeft een protocol-constraint at0008
+// met at0010/at0127); development-3 heeft geen protocol-attribuut.
+func TestToCompositionInstructionProtocolAndNarrative(t *testing.T) {
+	opt := loadOPT(t, "laborder")
+
+	const archetypeID = "openEHR-EHR-INSTRUCTION.request-lab_test.v1|Aanvraag laboratorium onderzoek"
+	dm := map[string]any{
+		"language":  "nl",
+		"territory": "NL",
+		"composer":  "Dr. Jansen",
+		"context":   map[string]any{"start_time": "2026-06-03T08:30:00Z"},
+		"content": map[string]any{
+			archetypeID: map[string]any{
+				"narrative": "Graag met spoed", // payload-narrative, niet de template-fallback
+				"protocol": map[string]any{
+					"at0010|Aanvrager ID":    "ORD-100", // order-id
+					"at0127|Status aanvraag": "NW",      // status
+				},
+				"activities": []any{
+					map[string]any{"at0121|Aanvraagde dienst": "Natrium"},
+				},
+			},
+		},
+	}
+
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+	raw, _ := json.Marshal(comp)
+	s := string(raw)
+
+	// protocol overleeft (vóór de fix volledig gedropt voor INSTRUCTION)
+	if !strings.Contains(s, "ORD-100") {
+		t.Errorf("order-id (protocol at0010) niet ge-encodeerd:\n%s", s)
+	}
+	if !strings.Contains(s, `"NW"`) {
+		t.Errorf("status (protocol at0127) niet ge-encodeerd:\n%s", s)
+	}
+	// payload-narrative gebruikt (niet de template-fallback "Instruction")
+	if !strings.Contains(s, "Graag met spoed") {
+		t.Errorf("payload-narrative niet gebruikt:\n%s", s)
+	}
+	// de aangevraagde bepaling overleeft
+	if !strings.Contains(s, "Natrium") {
+		t.Errorf("activity (at0121) niet ge-encodeerd:\n%s", s)
 	}
 }
