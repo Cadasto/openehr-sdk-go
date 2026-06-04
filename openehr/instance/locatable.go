@@ -16,7 +16,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 	switch v := rmValue.(type) {
 	case *rm.Composition:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -26,7 +26,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.Observation:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -36,7 +36,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.Evaluation:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -46,7 +46,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.Instruction:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -56,7 +56,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.Action:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -66,7 +66,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.AdminEntry:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -76,7 +76,7 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.GenericEntry:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
@@ -86,61 +86,61 @@ func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *
 		}
 	case *rm.Section:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.Activity:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.History[rm.ItemStructure]:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.PointEvent[rm.ItemStructure]:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 	case *rm.IntervalEvent[rm.ItemStructure]:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 	case *rm.ItemTree:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.ItemList:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.ItemSingle:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.ItemTable:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.Cluster:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}
 	case *rm.Element:
 		v.ArchetypeNodeID = nodeID
-		v.Name = &rm.DVText{Value: name}
+		v.Name = rm.DVText{Value: name}
 		if archetypeDetails != nil {
 			v.ArchetypeDetails = archetypeDetails
 		}

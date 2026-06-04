@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,7 +15,7 @@ import (
 
 type SectionJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -42,15 +43,24 @@ func (s *Section) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "SECTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "SECTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "SECTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				s.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			s.Name = dv
 		}
-		s.Name = dv
 	}
 	s.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {

@@ -66,11 +66,11 @@ type FeederAuditDetailsJSONMarshaller struct {
 	// SystemID Identifier of the system which handled the information item. This is the IT system owned by the organisation legally responsible for handling the data, and at which the data were previously created or passed by an earlier system.
 	SystemID string `json:"system_id"`
 	// Location Identifier of the particular site/facility within an organisation which handled the item. For computability, this identifier needs to be e.g. a PKI identifier which can be included in the identifier list of the `PARTY_IDENTIFIED` object.
-	Location *PartyIdentified `json:"location,omitempty"`
+	Location PartyIdentifiedLike `json:"location,omitempty"`
 	// Subject Identifiers for subject of the received information item.
 	Subject PartyProxy `json:"subject,omitempty"`
 	// Provider Optional provider(s) who created, committed, forwarded or otherwise handled the item.
-	Provider *PartyIdentified `json:"provider,omitempty"`
+	Provider PartyIdentifiedLike `json:"provider,omitempty"`
 	// Time Time of handling the item. For an originating system, this will be time of creation, for an intermediate feeder system, this will be a time of accession or other time of handling, where available.
 	Time *DVDateTime `json:"time,omitempty"`
 	// VersionID Any identifier used in the system such as  "interim" ,  "final" , or numeric versions if available.
@@ -100,9 +100,9 @@ func (f *FeederAuditDetails) MarshalJSON() ([]byte, error) {
 type LinkJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Meaning Used to describe the relationship, usually in clinical terms, such as  in response to  (the relationship between test results and an order),  follow-up to  and so on. Such relationships can represent any clinically meaningful connection between pieces of information. Values for meaning include those described in Annex C, ENV 13606 pt 2 under the categories of  generic ,  documenting and reporting ,  organisational ,  clinical ,  circumstancial , and  view management .
-	Meaning DataValueText `json:"meaning"`
+	Meaning DVTextLike `json:"meaning"`
 	// Type The type attribute is used to indicate a clinical or domain-level meaning for the kind of link, for example  problem  or  issue . If type values are designed appropriately, they can be used by the requestor of EHR extracts to categorise links which must be followed and which can be broken when the extract is created.
-	Type DataValueText `json:"type"`
+	Type DVTextLike `json:"type"`
 	// Target The logical  to  object in the link relation, as per the linguistic sense of the meaning attribute.
 	Target DVEHRURI `json:"target"`
 }

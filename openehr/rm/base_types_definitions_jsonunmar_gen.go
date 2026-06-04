@@ -26,10 +26,10 @@ func (b *BasicDefinitions) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: BASIC_DEFINITIONS: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "BASIC_DEFINITIONS" && aux.Class != "DATA_VALUE" && aux.Class != "DV_ABSOLUTE_QUANTITY" && aux.Class != "DV_AMOUNT" && aux.Class != "DV_BOOLEAN" && aux.Class != "DV_CODED_TEXT" && aux.Class != "DV_COUNT" && aux.Class != "DV_DATE" && aux.Class != "DV_DATE_TIME" && aux.Class != "DV_DURATION" && aux.Class != "DV_EHR_URI" && aux.Class != "DV_ENCAPSULATED" && aux.Class != "DV_GENERAL_TIME_SPECIFICATION" && aux.Class != "DV_IDENTIFIER" && aux.Class != "DV_INTERVAL" && aux.Class != "DV_MULTIMEDIA" && aux.Class != "DV_ORDERED" && aux.Class != "DV_ORDINAL" && aux.Class != "DV_PARAGRAPH" && aux.Class != "DV_PARSABLE" && aux.Class != "DV_PERIODIC_TIME_SPECIFICATION" && aux.Class != "DV_PROPORTION" && aux.Class != "DV_QUANTIFIED" && aux.Class != "DV_QUANTITY" && aux.Class != "DV_SCALE" && aux.Class != "DV_STATE" && aux.Class != "DV_TEMPORAL" && aux.Class != "DV_TEXT" && aux.Class != "DV_TIME" && aux.Class != "DV_TIME_SPECIFICATION" && aux.Class != "DV_URI" && aux.Class != "OPENEHR_DEFINITIONS" {
+	if aux.Class != "" && aux.Class != "BASIC_DEFINITIONS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "BASIC_DEFINITIONS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "BASIC_DEFINITIONS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil
@@ -49,10 +49,10 @@ func (o *OpenehrDefinitions) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: OPENEHR_DEFINITIONS: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "OPENEHR_DEFINITIONS" && aux.Class != "DATA_VALUE" && aux.Class != "DV_ABSOLUTE_QUANTITY" && aux.Class != "DV_AMOUNT" && aux.Class != "DV_BOOLEAN" && aux.Class != "DV_CODED_TEXT" && aux.Class != "DV_COUNT" && aux.Class != "DV_DATE" && aux.Class != "DV_DATE_TIME" && aux.Class != "DV_DURATION" && aux.Class != "DV_EHR_URI" && aux.Class != "DV_ENCAPSULATED" && aux.Class != "DV_GENERAL_TIME_SPECIFICATION" && aux.Class != "DV_IDENTIFIER" && aux.Class != "DV_INTERVAL" && aux.Class != "DV_MULTIMEDIA" && aux.Class != "DV_ORDERED" && aux.Class != "DV_ORDINAL" && aux.Class != "DV_PARAGRAPH" && aux.Class != "DV_PARSABLE" && aux.Class != "DV_PERIODIC_TIME_SPECIFICATION" && aux.Class != "DV_PROPORTION" && aux.Class != "DV_QUANTIFIED" && aux.Class != "DV_QUANTITY" && aux.Class != "DV_SCALE" && aux.Class != "DV_STATE" && aux.Class != "DV_TEMPORAL" && aux.Class != "DV_TEXT" && aux.Class != "DV_TIME" && aux.Class != "DV_TIME_SPECIFICATION" && aux.Class != "DV_URI" {
+	if aux.Class != "" && aux.Class != "OPENEHR_DEFINITIONS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OPENEHR_DEFINITIONS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OPENEHR_DEFINITIONS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil

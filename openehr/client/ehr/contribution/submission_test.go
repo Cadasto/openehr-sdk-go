@@ -37,7 +37,7 @@ func newImportedVersion() *rm.ImportedVersion[rm.Composition] {
 // remaining versionable T's in the closed set so the type-switch is
 // exercised for every documented case.
 func newOriginalVersionFolder() *rm.OriginalVersion[rm.Folder] {
-	folder := rm.Folder{Name: &rm.DVText{Value: "Encounters"}}
+	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
 	return &rm.OriginalVersion[rm.Folder]{
 		Version:        rm.Version[rm.Folder]{CommitAudit: *newAudit()},
 		UID:            rm.ObjectVersionID{Value: "3::cdr.example::1"},

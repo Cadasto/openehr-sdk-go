@@ -40,7 +40,7 @@ func (a *AccessGroupRef) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ACCESS_GROUP_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ACCESS_GROUP_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ACCESS_GROUP_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Namespace = aux.Namespace
@@ -74,7 +74,7 @@ func (a *ArchetypeID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Value = aux.Value
@@ -102,7 +102,7 @@ func (g *GenericID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "GENERIC_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "GENERIC_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "GENERIC_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	g.Value = aux.Value
@@ -129,7 +129,7 @@ func (h *HierObjectID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "HIER_OBJECT_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "HIER_OBJECT_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "HIER_OBJECT_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	h.Value = aux.Value
@@ -155,7 +155,7 @@ func (i *ISOOID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ISO_OID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ISO_OID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ISO_OID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Value = aux.Value
@@ -181,7 +181,7 @@ func (i *InternetID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "INTERNET_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "INTERNET_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INTERNET_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Value = aux.Value
@@ -218,7 +218,7 @@ func (l *LocatableRef) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "LOCATABLE_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "LOCATABLE_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "LOCATABLE_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	l.Namespace = aux.Namespace
@@ -259,10 +259,10 @@ func (o *ObjectRef) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: OBJECT_REF: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "OBJECT_REF" && aux.Class != "ACCESS_GROUP_REF" && aux.Class != "LOCATABLE_REF" && aux.Class != "PARTY_REF" {
+	if aux.Class != "" && aux.Class != "OBJECT_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OBJECT_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBJECT_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	o.Namespace = aux.Namespace
@@ -296,7 +296,7 @@ func (o *ObjectVersionID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "OBJECT_VERSION_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OBJECT_VERSION_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OBJECT_VERSION_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	o.Value = aux.Value
@@ -331,7 +331,7 @@ func (p *PartyRef) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "PARTY_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "PARTY_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.Namespace = aux.Namespace
@@ -365,7 +365,7 @@ func (t *TemplateID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "TEMPLATE_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TEMPLATE_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TEMPLATE_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	t.Value = aux.Value
@@ -391,7 +391,7 @@ func (t *TerminologyID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "TERMINOLOGY_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TERMINOLOGY_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERMINOLOGY_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	t.Value = aux.Value
@@ -417,7 +417,7 @@ func (u *Uuid) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "UUID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "UUID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "UUID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	u.Value = aux.Value
@@ -443,7 +443,7 @@ func (v *VersionTreeID) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "VERSION_TREE_ID" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSION_TREE_ID", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSION_TREE_ID", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.Value = aux.Value

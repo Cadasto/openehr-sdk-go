@@ -765,8 +765,10 @@ func (v *VersionedParty) MarshalXML(_e *xml.Encoder, _start xml.StartElement) er
 	if err := _e.EncodeElement(&v.UID, xml.StartElement{Name: xml.Name{Local: "uid"}}); err != nil {
 		return err
 	}
-	if err := _e.EncodeElement(&v.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if v.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", v.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeElement(&v.TimeCreated, xml.StartElement{Name: xml.Name{Local: "time_created"}}); err != nil {
 		return err

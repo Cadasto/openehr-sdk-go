@@ -49,8 +49,10 @@ func (i *ItemTag) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 			return err
 		}
 	}
-	if err := _e.EncodeElement(&i.OwnerID, xml.StartElement{Name: xml.Name{Local: "owner_id"}}); err != nil {
-		return err
+	if i.OwnerID != nil {
+		if err := canxml.EncodePoly(_e, "owner_id", i.OwnerID); err != nil {
+			return err
+		}
 	}
 	if err := _e.EncodeToken(_start.End()); err != nil {
 		return err

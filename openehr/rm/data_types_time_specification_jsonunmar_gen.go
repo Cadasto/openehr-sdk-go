@@ -31,7 +31,7 @@ func (d *DVGeneralTimeSpecification) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_GENERAL_TIME_SPECIFICATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_GENERAL_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_GENERAL_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
@@ -57,7 +57,7 @@ func (d *DVPeriodicTimeSpecification) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PERIODIC_TIME_SPECIFICATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PERIODIC_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PERIODIC_TIME_SPECIFICATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value

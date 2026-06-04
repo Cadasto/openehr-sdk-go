@@ -97,13 +97,17 @@ func (d *DVInterval[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "lower":
-				if _err := _dec.DecodeElement(&d.Lower, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[T](_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				d.Lower = _v
 			case "upper":
-				if _err := _dec.DecodeElement(&d.Upper, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[T](_dec, _t)
+				if _err != nil {
 					return _err
 				}
+				d.Upper = _v
 			case "lower_unbounded":
 				if _err := _dec.DecodeElement(&d.LowerUnbounded, &_t); _err != nil {
 					return _err
@@ -424,7 +428,7 @@ func (r *ReferenceRange[T]) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "meaning":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}

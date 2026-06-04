@@ -5,7 +5,7 @@
 // Default fixture testdata/minimal_blood_pressure.json is a
 // single–blood-pressure composition that validates cleanly against
 // vital_signs.opt (generated via gen_fixture.go). The vendored
-// testkit/cassettes/canonical_json/vital_signs.json cassette does
+// testkit/cassettes/compositions/vital_signs.json cassette does
 // not validate cleanly against that OPT (demo data / constraint
 // mismatches) — use -cassette to see that outcome.
 //
@@ -29,6 +29,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -79,10 +80,9 @@ func resolvePaths(useCassette bool, args []string) (jsonPath, optPath string) {
 		log.Fatal("cannot locate example source path")
 	}
 	exampleDir := filepath.Dir(here)
-	repoRoot := filepath.Join(exampleDir, "..", "..", "..")
 	defaultJSON := filepath.Join(exampleDir, "testdata", "minimal_blood_pressure.json")
-	defaultOPT := filepath.Join(repoRoot, "openehr", "template", "testdata", "vital_signs.opt")
-	cassetteJSON := filepath.Join(repoRoot, "testkit", "cassettes", "canonical_json", "vital_signs.json")
+	defaultOPT := fixtures.TemplateOptForName("vital_signs")
+	cassetteJSON := fixtures.CompositionJSON("vital_signs")
 
 	switch len(args) {
 	case 0:

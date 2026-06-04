@@ -36,7 +36,7 @@ func (a *Assertion) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ASSERTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ASSERTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ASSERTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Tag = aux.Tag
@@ -73,7 +73,7 @@ func (a *AssertionVariable) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ASSERTION_VARIABLE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ASSERTION_VARIABLE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ASSERTION_VARIABLE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.Name = aux.Name
@@ -106,7 +106,7 @@ func (e *ExprBinaryOperator) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EXPR_BINARY_OPERATOR" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EXPR_BINARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_BINARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	e.PrecedenceOverridden = aux.PrecedenceOverridden
@@ -152,7 +152,7 @@ func (e *ExprLeaf) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EXPR_LEAF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EXPR_LEAF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_LEAF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	e.Type = aux.Type
@@ -185,7 +185,7 @@ func (e *ExprUnaryOperator) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EXPR_UNARY_OPERATOR" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EXPR_UNARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EXPR_UNARY_OPERATOR", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	e.PrecedenceOverridden = aux.PrecedenceOverridden

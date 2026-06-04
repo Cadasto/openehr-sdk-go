@@ -2,11 +2,11 @@ package template_test
 
 import (
 	"errors"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // REQ-100 § Path syntax — accept valid forms.
@@ -297,7 +297,7 @@ func TestParseFile_VitalSigns_ContainsSlot(t *testing.T) {
 // TestParseFile_ClinicalNote_Identity by proving traversal works on a
 // structurally distinct OPT.
 func TestParseFile_ClinicalNote_Path(t *testing.T) {
-	opt, err := template.ParseFile(filepath.Join("testdata", "clinical_note.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("clinical_note"))
 	if err != nil {
 		t.Fatalf("ParseFile: %v", err)
 	}
@@ -680,7 +680,7 @@ func collectSlots(n template.Node) []*template.Slot {
 
 func mustParseVitalSigns(t *testing.T) *template.OperationalTemplate {
 	t.Helper()
-	opt, err := template.ParseFile(filepath.Join("testdata", "vital_signs.opt"))
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		t.Fatalf("load vital_signs.opt: %v", err)
 	}

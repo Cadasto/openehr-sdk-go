@@ -39,7 +39,7 @@ func (a *ArchetypeInternalRef) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE_INTERNAL_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE_INTERNAL_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_INTERNAL_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.RMTypeName = aux.RMTypeName
@@ -77,7 +77,7 @@ func (a *ArchetypeSlot) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ARCHETYPE_SLOT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ARCHETYPE_SLOT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ARCHETYPE_SLOT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.RMTypeName = aux.RMTypeName
@@ -115,7 +115,7 @@ func (c *CComplexObject) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_COMPLEX_OBJECT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_COMPLEX_OBJECT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_COMPLEX_OBJECT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.AssumedValue = aux.AssumedValue
@@ -162,7 +162,7 @@ func (c *CMultipleAttribute) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_MULTIPLE_ATTRIBUTE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_MULTIPLE_ATTRIBUTE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_MULTIPLE_ATTRIBUTE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.RMAttributeName = aux.RMAttributeName
@@ -211,7 +211,7 @@ func (c *CPrimitiveObject) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_PRIMITIVE_OBJECT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_PRIMITIVE_OBJECT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_PRIMITIVE_OBJECT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.AssumedValue = aux.AssumedValue
@@ -250,7 +250,7 @@ func (c *CSingleAttribute) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "C_SINGLE_ATTRIBUTE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "C_SINGLE_ATTRIBUTE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "C_SINGLE_ATTRIBUTE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.RMAttributeName = aux.RMAttributeName
@@ -294,7 +294,7 @@ func (c *Cardinality) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CARDINALITY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CARDINALITY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CARDINALITY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.Interval = aux.Interval
@@ -329,7 +329,7 @@ func (c *ConstraintRef) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CONSTRAINT_REF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CONSTRAINT_REF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CONSTRAINT_REF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.RMTypeName = aux.RMTypeName

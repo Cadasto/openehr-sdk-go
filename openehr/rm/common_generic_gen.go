@@ -21,7 +21,7 @@ type Attestation struct {
 	// Proof Proof of attestation.
 	Proof *string `json:"proof,omitempty"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason DataValueText `json:"reason"`
+	Reason DVTextLike `json:"reason"`
 }
 
 // AuditDetails The set of attributes required to document the committal of an information item to a repository.
@@ -31,7 +31,7 @@ type AuditDetails struct {
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
 	Committer PartyProxy `json:"committer"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description DataValueText `json:"description,omitempty"`
+	Description DVTextLike `json:"description,omitempty"`
 	// SystemID Identifier of the logical EHR system where the change was committed. This is almost always owned by the organisation legally responsible for the EHR, and is distinct from any application, or any hosting infrastructure.
 	SystemID string `json:"system_id"`
 	// TimeCommitted Time of committal of the item.
@@ -43,7 +43,7 @@ type AuditDetails struct {
 // Should not be used in place of more permanent relationships between demographic entities.
 type Participation struct {
 	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
-	Function DataValueText `json:"function"`
+	Function DVTextLike `json:"function"`
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
 	Mode *DVCodedText `json:"mode,omitempty"`
 	// Performer The id and possibly demographic system link of the party participating in the activity.
@@ -113,7 +113,7 @@ func (r *RevisionHistory) MostRecentVersionTimeCommitted() string {
 // RevisionHistoryItem An entry in a revision history, corresponding to a version from a versioned container. Consists of `AUDIT_DETAILS` instances with revision identifier of the revision to which the `AUDIT_DETAILS` instance belongs.
 type RevisionHistoryItem struct {
 	// Audits The audits for this revision; there will always be at least one commit audit (which may itself be an `ATTESTATION`), there may also be further attestations.
-	Audits []AuditDetails `json:"audits"`
+	Audits []AuditDetailsLike `json:"audits"`
 	// VersionID Version identifier for this revision.
 	VersionID ObjectVersionID `json:"version_id"`
 }

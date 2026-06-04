@@ -47,6 +47,33 @@ Every probe **MUST** be runnable in three modes:
 
 The probe definition is the single source; the runner picks the backend at invocation time. The same probe MUST pass in all three modes (with cassette recording done once against the live backend).
 
+### Vendored cassettes (`testkit/cassettes/`)
+
+Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
+
+**Layout** (vendor provenance is indexed in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md); it is not encoded in directory names):
+
+```
+testkit/cassettes/
+  templates/{template-id}.opt
+  compositions/{template-id}.json
+  compositions/{template-id}.xml     # when vendored
+  rm/{name}.json | {name}.xml        # RM-only samples (ehrbase, leaf XML, …)
+  submissions/{name}.json            # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
+  its_rest/                          # ITS-REST wire records (REQ-095)
+```
+
+| Kind | Role | Typical probes |
+|---|---|---|
+| `templates/` + `compositions/` | Operational template + canonical instance for a `template_id` | PROBE-022–027, PROBE-030 (JSON), PROBE-033 (XML when paired) |
+| `rm/` | RM root samples without a paired OPT (ehrbase COMPOSITION/EHR_STATUS/FOLDER, leaf `DV_QUANTITY`, …) | PROBE-030, PROBE-033 |
+| `submissions/` | CONTRIBUTION create payloads for the EHR contribution client (not `rm.Contribution` decode) | contribution client tests (REQ-059) |
+| `its_rest/` | Recorded HTTP request/response shapes | PROBE-010+, discovery probes (REQ-095) |
+
+Discovery for PROBE-030 / PROBE-033 walks `compositions/` and `rm/` via [`fixtures.ListCompositionJSON`](../../testkit/fixtures/discover.go) and [`fixtures.ListRMXML`](../../testkit/fixtures/discover.go). Templates with JSON or XML on disk but known codec gaps **MAY** be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work.
+
+**Legacy paths** (`testkit/cassettes/canonical_json/`, `canonical_xml/`, `fixtures/`, vendor subdirectories under `cassettes/`) are **retired** — do not reference them in new spec text, plans, or code comments.
+
 ## Probe catalog
 
 The catalog is the normative list. Each entry has:
@@ -262,10 +289,19 @@ The catalog is the normative list. Each entry has:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
 - **Satisfies:** REQ-040, REQ-052
 
+#### PROBE-038 — RM polymorphic decode coverage (SDK-GAP-11)
+
+- **Title:** `canjson.Unmarshal[Composition]` decodes every BMM-admissible `_type` discriminator at every substitutable slot — including (a) substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`) per openEHR RM Liskov substitution, and (b) generic types with abstract type parameters (e.g. `DV_INTERVAL[T: DV_ORDERED]`).
+- **Preconditions:** Vendored RM cassettes under `testkit/cassettes/rm/polymorphic/` covering both failure modes.
+- **Wire assertion:** Decode succeeds; the recovered tree preserves every original `_type` discriminator (no silent narrowing on substitutable slots); re-marshalling produces wire-equivalent JSON for the same logical content (canonical JSON ordering wins ties).
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go) exercises decode → re-marshal → `_type`-preservation on canjson across [`testkit/cassettes/rm/polymorphic/`](../../testkit/cassettes/rm/polymorphic/). The probe's scope is canjson; the underlying narrow-interface generator emission (`<Parent>Like` per BMM ancestors graph) lifts both canjson and canxml dispatch in the same change, but only canjson is asserted here. Plan: [`docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md`](../plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md).
+- **Satisfies:** SDK-GAP-11, REQ-040, REQ-052
+
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
-- **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/canonical_xml/`.
+- **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored cassettes](#vendored-cassettes-testkitcassettes)).
 - **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../testkit/probes/serialize/probe_033_canxml_round_trip.go).
@@ -468,7 +504,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
-| Canonical JSON / formats | PROBE-030 … 034 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034 implemented; 032 not yet |
+| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
 | REST binding | PROBE-060 … 068, PROBE-071, PROBE-072 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); PROBE-065 (`minimal`) and REQ-094 `identifier` / empty-body follow-ups **not landed** ([`docs/plans/2026-05-25-req094-prefer-followups.md`](../plans/2026-05-25-req094-prefer-followups.md)) |

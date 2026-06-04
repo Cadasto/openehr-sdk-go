@@ -23,11 +23,11 @@ type Folder struct {
 	// Folders Sub-folders of this `FOLDER`.
 	Folders []Folder `json:"folders,omitempty"`
 	// Items The list of references to other (usually) versioned objects logically in this folder.
-	Items []ObjectRef `json:"items,omitempty"`
+	Items []ObjectRefLike `json:"items,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
 	UID UIDBasedID `json:"uid,omitempty"`
 }

@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -19,9 +20,8 @@ type DVMultimediaJSONUnmarshaller struct {
 	// Language Optional indicator of the localised language in which the data is written, if relevant. Coded from openEHR Code Set `languages`.
 	Language *CodePhrase `json:"language,omitempty"`
 	// AlternateText Text to display in lieu of multimedia display/replay.
-	AlternateText *string `json:"alternate_text,omitempty"`
-	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
-	URI *DVURI `json:"uri,omitempty"`
+	AlternateText *string         `json:"alternate_text,omitempty"`
+	URI           json.RawMessage `json:"uri,omitempty"` // polymorphic DVURILike
 	// Data The actual data found at `_uri_`, if supplied inline.
 	Data []byte `json:"data,omitempty"`
 	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
@@ -51,13 +51,28 @@ func (d *DVMultimedia) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_MULTIMEDIA" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_MULTIMEDIA", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_MULTIMEDIA", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Charset = aux.Charset
 	d.Language = aux.Language
 	d.AlternateText = aux.AlternateText
-	d.URI = aux.URI
+	if len(aux.URI) > 0 && string(aux.URI) != "null" {
+		dv, err := typereg.DecodeAs[DVURILike](aux.URI)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVURI
+				if jerr := json.Unmarshal(aux.URI, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/uri", Inner: jerr}
+				}
+				d.URI = &def
+			} else {
+				return &typereg.DecodeError{Path: "/uri", Inner: err}
+			}
+		} else {
+			d.URI = dv
+		}
+	}
 	d.Data = aux.Data
 	d.MediaType = aux.MediaType
 	d.CompressionAlgorithm = aux.CompressionAlgorithm
@@ -93,7 +108,7 @@ func (d *DVParsable) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PARSABLE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PARSABLE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARSABLE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Charset = aux.Charset

@@ -13,25 +13,25 @@ type AccessControlSettings interface {
 // EHR The EHR object is the root object and access point of an EHR for a subject of care.
 type EHR struct {
 	// Compositions Master list of all Versioned Composition references in this EHR.
-	Compositions []ObjectRef `json:"compositions,omitempty"`
+	Compositions []ObjectRefLike `json:"compositions,omitempty"`
 	// Contributions List of contributions causing changes to this EHR. Each contribution contains a list of versions, which may include references to any number of `VERSION` instances, i.e. items of type `VERSIONED_COMPOSITION` and `VERSIONED_FOLDER`.
-	Contributions []ObjectRef `json:"contributions,omitempty"`
+	Contributions []ObjectRefLike `json:"contributions,omitempty"`
 	// Directory Optional directory structure for this EHR. If present, this is a reference to the first member of `_folders_`.
-	Directory *ObjectRef `json:"directory,omitempty"`
+	Directory ObjectRefLike `json:"directory,omitempty"`
 	// EHRAccess Reference to `EHR_ACCESS` object for this EHR.
-	EHRAccess ObjectRef `json:"ehr_access"`
+	EHRAccess ObjectRefLike `json:"ehr_access"`
 	// EHRID The unique identifier of this EHR.
 	//
 	// NOTE: is is strongly recommended that a UUID always be used for this field.
 	EHRID HierObjectID `json:"ehr_id"`
 	// EHRStatus Reference to `EHR_STATUS` object for this EHR.
-	EHRStatus ObjectRef `json:"ehr_status"`
+	EHRStatus ObjectRefLike `json:"ehr_status"`
 	// Folders Optional additional Folder structures for this EHR. If set, the `_directory_` attribute refers to the first member.
-	Folders []ObjectRef `json:"folders,omitempty"`
+	Folders []ObjectRefLike `json:"folders,omitempty"`
 	// SystemID The identifier of the logical EHR management system in which this EHR was created.
 	SystemID HierObjectID `json:"system_id"`
 	// Tags Optional list of tags associated with this EHR. Tag `_target_` values can only be within the same EHR.
-	Tags []ObjectRef `json:"tags,omitempty"`
+	Tags []ObjectRefLike `json:"tags,omitempty"`
 	// TimeCreated Time of creation of the EHR.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -52,7 +52,7 @@ type EHRAccess struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Settings Access control settings for the EHR. Instance is a subtype of the type `ACCESS_CONTROL_SETTINGS`, allowing for the use of different access control schemes.
 	Settings AccessControlSettings `json:"settings,omitempty"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -84,7 +84,7 @@ type EHRStatus struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// OtherDetails Any other details of the EHR summary object, in the form of an archetyped `ITEM_STRUCTURE`.
 	OtherDetails ItemStructure `json:"other_details,omitempty"`
 	// Subject The subject of this EHR. The `_external_ref_` attribute can be used to contain a direct reference to the subject in a demographic or identity service. Alternatively, the association between patients and their records may be done elsewhere for security reasons.

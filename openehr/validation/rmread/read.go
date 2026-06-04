@@ -447,7 +447,9 @@ func readEventContextSingle(c *rm.EventContext, attr string) (any, bool) {
 		}
 		return c.Location, true
 	case "health_care_facility":
-		return ptrPresent(c.HealthCareFacility)
+		// SDK-GAP-11: rm.PartyIdentifiedLike is an interface — nilable
+		// on its own; ifacePresent is the right predicate.
+		return ifacePresent(c.HealthCareFacility)
 	case "other_context":
 		return ifacePresent(c.OtherContext)
 	}
@@ -666,7 +668,9 @@ func readElementSingle(e *rm.Element, attr string) (any, bool) {
 	case "null_flavour":
 		return ptrPresent(e.NullFlavour)
 	case "null_reason":
-		return dvTextPresent(e.NullReason)
+		// SDK-GAP-11: rm.DVTextLike is an interface — nilable on its
+		// own; ifacePresent is the right predicate.
+		return ifacePresent(e.NullReason)
 	}
 	return nil, false
 }
@@ -715,17 +719,18 @@ func strPresent(s string) (any, bool) {
 	return s, true
 }
 
-func dvTextPresent(t rm.DataValueText) (any, bool) {
-	// Name-slot fields are typed as the DataValueText marker interface
-	// (REQ-058). Presence is determined by the concrete payload's
-	// display value; nil interface is treated as absent.
-	if t == nil {
+func dvTextPresent(v rm.DVTextLike) (any, bool) {
+	// SDK-GAP-11: name / narrative slots are typed as rm.DVTextLike
+	// (DVText OR DVCodedText subtype). Unwrap to the parent DVText
+	// payload — absence means nil interface or empty .Value.
+	if v == nil {
 		return nil, false
 	}
-	if rm.DVTextValue(t) == "" {
-		return t, false
+	t, ok := rm.AsDVText(v)
+	if !ok || t.Value == "" {
+		return v, false
 	}
-	return t, true
+	return v, true
 }
 
 func dvCodedTextPresent(t rm.DVCodedText) (any, bool) {

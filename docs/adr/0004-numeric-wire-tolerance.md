@@ -16,7 +16,7 @@ The canonical-JSON wire profile ([`docs/specifications/wire.md`](../../docs/spec
 - "`DV_QUANTITY` magnitudes are emitted as JSON numbers, not strings, **unless the spec mandates otherwise** (some implementations have used strings to avoid float-precision loss; the SDK takes a position — see § Floating-point precision below)."
 - "Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate."
 
-The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored cassettes confirm this — `testkit/cassettes/canonical_json/BMI.json` carries `"magnitude": "354"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
+The wire spec foresees that real producers exist that emit `"magnitude": "354"` (string) rather than `"magnitude": 354` (number). The vendored cassettes confirm this — `testkit/cassettes/compositions/BMI.json` carries `"magnitude": "354"` etc. The spec ENCODE side is settled (numbers only); the DECODE side has been implicit until now.
 
 A permissive decoder is needed for SDK consumers to round-trip real-world CDR fixtures, but stricter encoders downstream (PHP SDK, third-party producers) MUST be able to assume the SDK emits numbers. Asymmetric tolerance is the standard Postel-style answer; it needs to be **explicit** so cross-SDK parity (REQ-080, REQ-081) is unambiguous.
 
@@ -60,4 +60,4 @@ Both types are emitted by the BMM generator wherever the BMM primitive `Real` / 
 - [`docs/specifications/wire.md`](../../docs/specifications/wire.md) — REQ-052 (canonical-JSON wire profile, Floating-point precision).
 - [`openehr/rm/real.go`](../../openehr/rm/real.go), [`openehr/rm/integer.go`](../../openehr/rm/integer.go) — the alias types implementing this ADR.
 - [`internal/bmmgen/primitives.go`](../../internal/bmmgen/primitives.go) — the generator's mapping table.
-- [`testkit/cassettes/canonical_json/BMI.json`](../../testkit/cassettes/canonical_json/BMI.json) — concrete fixture with quoted-number magnitudes.
+- [`testkit/cassettes/compositions/BMI.json`](../../testkit/cassettes/compositions/BMI.json) — concrete fixture with quoted-number magnitudes.

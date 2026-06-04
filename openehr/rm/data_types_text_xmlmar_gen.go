@@ -72,7 +72,7 @@ func (d *DVCodedText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error
 		return err
 	}
 	if d.Hyperlink != nil {
-		if err := _e.EncodeElement(d.Hyperlink, xml.StartElement{Name: xml.Name{Local: "hyperlink"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "hyperlink", d.Hyperlink); err != nil {
 			return err
 		}
 	}
@@ -163,7 +163,7 @@ func (d *DVText) MarshalXML(_e *xml.Encoder, _start xml.StartElement) error {
 		return err
 	}
 	if d.Hyperlink != nil {
-		if err := _e.EncodeElement(d.Hyperlink, xml.StartElement{Name: xml.Name{Local: "hyperlink"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "hyperlink", d.Hyperlink); err != nil {
 			return err
 		}
 	}

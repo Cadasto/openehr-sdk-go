@@ -86,7 +86,7 @@ func TestXSITypeOfRejectsXMI(t *testing.T) {
 func TestEncoderEmptyElementShapeDocumented(t *testing.T) {
 	c := &rm.Composition{
 		ArchetypeNodeID: "x",
-		Name:            &rm.DVText{Value: "x"},
+		Name:            rm.DVText{Value: "x"},
 		Language:        rm.CodePhrase{CodeString: "en"},
 		Territory:       rm.CodePhrase{CodeString: "GB"},
 		Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},
@@ -109,10 +109,10 @@ func TestEncoderEmptyElementShapeDocumented(t *testing.T) {
 // RM structures.
 func TestDeepFolderTreeStackSafe(t *testing.T) {
 	const depth = 128
-	root := &rm.Folder{Name: &rm.DVText{Value: "root"}, ArchetypeNodeID: "root"}
+	root := &rm.Folder{Name: rm.DVText{Value: "root"}, ArchetypeNodeID: "root"}
 	cur := root
 	for i := 0; i < depth; i++ {
-		child := &rm.Folder{Name: &rm.DVText{Value: "child"}, ArchetypeNodeID: "child"}
+		child := &rm.Folder{Name: rm.DVText{Value: "child"}, ArchetypeNodeID: "child"}
 		cur.Folders = append(cur.Folders, *child)
 		cur = &cur.Folders[len(cur.Folders)-1]
 	}

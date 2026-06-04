@@ -6,7 +6,7 @@ How `github.com/cadasto/openehr-sdk-go` is versioned, tagged, and announced. Com
 
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html), per [REQ-004](specifications/packaging.md#req-004--semantic-versioning).
 
-The git tag (`v0.1.0`, `v0.2.0`, …) is the **single authoritative source** of the SDK version. Consumers pin via:
+The git tag (`v0.1.0`, `v0.2.0`, `v0.3.0`, …) is the **single authoritative source** of the SDK version. Consumers pin via:
 
 ```bash
 go get github.com/cadasto/openehr-sdk-go@v0.1.0

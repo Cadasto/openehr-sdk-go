@@ -42,7 +42,7 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 					return _err
 				}
 			case "description":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -72,7 +72,7 @@ func (a *Attestation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) e
 				}
 				a.Items = append(a.Items, _v)
 			case "reason":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -121,7 +121,7 @@ func (a *AuditDetails) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 					return _err
 				}
 			case "description":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -160,7 +160,7 @@ func (p *Participation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "function":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -375,8 +375,8 @@ func (r *RevisionHistoryItem) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEl
 					return _err
 				}
 			case "audits":
-				var _v AuditDetails
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[AuditDetailsLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				r.Audits = append(r.Audits, _v)

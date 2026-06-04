@@ -96,6 +96,20 @@ func TestDecodeUnknownTypeIsErrUnknownType(t *testing.T) {
 	}
 }
 
+func TestDecodeAsConcreteValueTypeParameter(t *testing.T) {
+	const typeName = "FAKE_BOX_VALUE_T"
+	if _, ok := Default.Lookup(typeName); !ok {
+		Default.Register(typeName, func() any { return &fakeBox{} })
+	}
+	got, err := DecodeAs[fakeBox]([]byte(`{"_type":"FAKE_BOX_VALUE_T","payload":"ok"}`))
+	if err != nil {
+		t.Fatalf("DecodeAs[fakeBox]: %v", err)
+	}
+	if got.Payload != "ok" {
+		t.Errorf("Payload = %q, want %q", got.Payload, "ok")
+	}
+}
+
 func TestDecodeAsTypeMismatchIsErrTypeMismatch(t *testing.T) {
 	r := NewRegistry()
 	r.Register("FAKE_BOX", func() any { return &fakeBox{} })

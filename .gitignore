@@ -51,3 +51,7 @@ bin/
 .DS_Store
 Thumbs.db
 tmp/
+.tmp/
+
+# bmmgen / gofmt atomic-write tempfiles
+*.tmp

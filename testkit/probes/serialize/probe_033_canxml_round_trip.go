@@ -3,9 +3,12 @@ package serializeprobes
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 // Probe033CanxmlRoundTrip implements PROBE-033: decoding a
@@ -65,18 +68,10 @@ func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
 }
 
 // Probe033Inputs is the canonical set of inputs exercised by
-// PROBE-033 in sandbox mode. v1 sources XML from the encoder applied
-// to a small set of hand-built RM values (mirror of PROBE-030's leaf
-// set). Once vendored XML cassettes land under
-// `testkit/cassettes/canonical_xml/` they will be appended here in
-// the same shape as PROBE-030 — same Composition graphs as the JSON
-// source-of-truth, validated by the cross-format invariant test in
-// `openehr/serialize/canxml/`.
+// PROBE-033 in sandbox mode. Leaf entries are bootstrap-encoded; cassette
+// entries are discovered from `testkit/cassettes/compositions/*.xml` and
+// `testkit/cassettes/rm/*.xml` via [fixtures.ListRMXML] (mirrors PROBE-030).
 var Probe033Inputs = func() []Probe033Input {
-	// We bootstrap the canonical XML for each leaf by encoding a known
-	// Go value with canxml.Marshal — the encoder is already golden-tested
-	// (see openehr/serialize/canxml/encode_test.go). Decoding that XML
-	// back via PROBE-033 then enforces the byte-equality round-trip.
 	must := func(v any) []byte {
 		b, err := canxml.Marshal(v)
 		if err != nil {
@@ -84,7 +79,7 @@ var Probe033Inputs = func() []Probe033Input {
 		}
 		return b
 	}
-	return []Probe033Input{
+	out := []Probe033Input{
 		{
 			Name:    "DV_QUANTITY",
 			Body:    must(&rm.DVQuantity{Magnitude: 80.5, Units: "kg"}),
@@ -99,7 +94,7 @@ var Probe033Inputs = func() []Probe033Input {
 			Name: "Composition-with-polymorphic-composer",
 			Body: must(&rm.Composition{
 				ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-				Name:            &rm.DVText{Value: "x"},
+				Name:            rm.DVText{Value: "x"},
 				Language:        rm.CodePhrase{CodeString: "en"},
 				Territory:       rm.CodePhrase{CodeString: "GB"},
 				Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},
@@ -108,6 +103,17 @@ var Probe033Inputs = func() []Probe033Input {
 			Factory: func() any { return new(rm.Composition) },
 		},
 	}
+	cassettes, err := loadXMLCassetteInputs()
+	if err != nil {
+		out = append(out, Probe033Input{
+			Name:    "_cassette_discovery_error",
+			Body:    nil,
+			Factory: func() any { return new(rm.Composition) },
+			loadErr: err,
+		})
+		return out
+	}
+	return append(out, cassettes...)
 }()
 
 // Probe033Input is one input entry for PROBE-033.
@@ -115,4 +121,32 @@ type Probe033Input struct {
 	Name    string
 	Body    []byte
 	Factory func() any
+	// loadErr is set when cassette discovery failed at init.
+	loadErr error
+}
+
+func loadXMLCassetteInputs() ([]Probe033Input, error) {
+	rels, err := fixtures.ListRMXML()
+	if err != nil {
+		return nil, fmt.Errorf("PROBE-033: list cassettes: %w", err)
+	}
+	root := fixtures.CassettesRoot()
+	out := make([]Probe033Input, 0, len(rels))
+	for _, rel := range rels {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		body, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("PROBE-033: read cassette %q: %w", rel, err)
+		}
+		factory, ok := fixtures.FactoryForXMLBody(body)
+		if !ok {
+			continue
+		}
+		out = append(out, Probe033Input{
+			Name:    "cassette:" + rel,
+			Body:    body,
+			Factory: factory,
+		})
+	}
+	return out, nil
 }

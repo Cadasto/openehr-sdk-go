@@ -156,15 +156,28 @@ func (r *Registry) Decode(data []byte) (any, error) {
 // value of T is returned together with the error on any failure.
 //
 // Useful at codec call sites: typereg.DecodeAs[*rm.DVQuantity](data).
+//
+// Registry constructors return pointers (`&Concrete{}`) so the JSON
+// decoder can populate them. Callers may parameterise T with either
+// the pointer shape (`*Concrete`), an interface satisfied by the
+// pointer (e.g. abstract `DVOrdered`), OR the value shape
+// (`Concrete`) — the last case arises when a generic codec method is
+// instantiated with a concrete value type (e.g.
+// `DVInterval[DVQuantity].Lower` dispatched via `DecodeAs[DVQuantity]`).
+// The function first asserts to T directly (matches the pointer /
+// interface shapes), then to `*T` and dereferences if successful —
+// closing the value-T gap without reflection.
 func DecodeAs[T any](data []byte) (T, error) {
 	var zero T
 	v, err := Default.Decode(data)
 	if err != nil {
 		return zero, err
 	}
-	t, ok := v.(T)
-	if !ok {
-		return zero, fmt.Errorf("typereg.DecodeAs: decoded %T: %w", v, ErrTypeMismatch)
+	if t, ok := v.(T); ok {
+		return t, nil
 	}
-	return t, nil
+	if pt, ok := v.(*T); ok && pt != nil {
+		return *pt, nil
+	}
+	return zero, fmt.Errorf("typereg.DecodeAs: decoded %T: %w", v, ErrTypeMismatch)
 }

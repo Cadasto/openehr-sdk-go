@@ -12,7 +12,7 @@ type ActionJSONMarshaller struct {
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
 	Protocol ItemStructure `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -20,7 +20,7 @@ type ActionJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
@@ -38,7 +38,7 @@ type ActionJSONMarshaller struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -93,7 +93,7 @@ func (a *Action) MarshalJSON() ([]byte, error) {
 type ActivityJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -150,7 +150,7 @@ type AdminEntryJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
@@ -168,7 +168,7 @@ type AdminEntryJSONMarshaller struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -214,7 +214,7 @@ type EvaluationJSONMarshaller struct {
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
 	Protocol ItemStructure `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -222,7 +222,7 @@ type EvaluationJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
@@ -240,7 +240,7 @@ type EvaluationJSONMarshaller struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -288,7 +288,7 @@ type InstructionJSONMarshaller struct {
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
 	Protocol ItemStructure `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -296,7 +296,7 @@ type InstructionJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
@@ -314,7 +314,7 @@ type InstructionJSONMarshaller struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -328,7 +328,7 @@ type InstructionJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DataValueText `json:"narrative"`
+	Narrative DVTextLike `json:"narrative"`
 	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
 	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
@@ -405,7 +405,7 @@ type IsmTransitionJSONMarshaller struct {
 	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
 	CareflowStep *DVCodedText `json:"careflow_step,omitempty"`
 	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
-	Reason []DataValueText `json:"reason,omitempty"`
+	Reason []DVTextLike `json:"reason,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for IsmTransition with `_type`
@@ -428,7 +428,7 @@ type ObservationJSONMarshaller struct {
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
 	Protocol ItemStructure `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID *ObjectRef `json:"guideline_id,omitempty"`
+	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -436,7 +436,7 @@ type ObservationJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID *ObjectRef `json:"workflow_id,omitempty"`
+	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
@@ -454,7 +454,7 @@ type ObservationJSONMarshaller struct {
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
 	Provider PartyProxy `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.

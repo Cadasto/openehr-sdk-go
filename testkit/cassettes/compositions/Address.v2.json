@@ -1,0 +1,233 @@
+{
+    "_type": "ADDRESS",
+    "archetype_node_id": "openEHR-DEMOGRAPHIC-ADDRESS.address.v2",
+    "name": {
+        "_type": "DV_CODED_TEXT",
+        "value": "Hoofdadres",
+        "defining_code": {
+            "terminology_id": {
+                "value": "local"
+            },
+            "code_string": "at0464"
+        }
+    },
+    "archetype_details": {
+        "archetype_id": {
+            "value": "openEHR-DEMOGRAPHIC-ADDRESS.address.v2"
+        },
+        "template_id": {
+            "value": "Address.v2"
+        },
+        "rm_version": "1.1.0"
+    },
+    "details": {
+        "_type": "ITEM_TREE",
+        "archetype_node_id": "at0001",
+        "name": {
+            "value": "Gegevens"
+        },
+        "items": [
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "at0002",
+                "name": {
+                    "value": "Adres regel"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0028",
+                        "name": {
+                            "value": "Straat"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "yaw rhvgs vlcj keyz pcrjuo"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0029",
+                        "name": {
+                            "value": "Huisnummer"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "wkvjqm igawut lziwh wyem qitahknu"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2401",
+                        "name": {
+                            "value": "Huisnummerletter"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "pzylwjht wnd vges vmowzqn vuyltg"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2402",
+                        "name": {
+                            "value": "Huisnummertoevoeging"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "cutqrhe jyibuwc kndeav spgk elqc"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2403",
+                        "name": {
+                            "value": "Aanduiding bij nummer"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "address_house_number_indication 804",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "address_house_number_indication-804"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "CLUSTER",
+                "archetype_node_id": "at0002",
+                "name": {
+                    "value": "Adres regel"
+                },
+                "items": [
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0028",
+                        "name": {
+                            "value": "Straat"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "lvzyc xnoylgi ozhwm megx gwxdjyat"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at0029",
+                        "name": {
+                            "value": "Huisnummer"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "ogebl fjbnwt urov ebglqtsd zfdjux"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2401",
+                        "name": {
+                            "value": "Huisnummerletter"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "yefal xvowiz wrcbxe kefnu snuby"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2402",
+                        "name": {
+                            "value": "Huisnummertoevoeging"
+                        },
+                        "value": {
+                            "_type": "DV_TEXT",
+                            "value": "ktiebj sgijycu sik tnikr acmwbsi"
+                        }
+                    },
+                    {
+                        "_type": "ELEMENT",
+                        "archetype_node_id": "at2403",
+                        "name": {
+                            "value": "Aanduiding bij nummer"
+                        },
+                        "value": {
+                            "_type": "DV_CODED_TEXT",
+                            "value": "address_house_number_indication 886",
+                            "defining_code": {
+                                "terminology_id": {
+                                    "value": "code24"
+                                },
+                                "code_string": "address_house_number_indication-886"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0006",
+                "name": {
+                    "value": "Postcode"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "zypqfj qnltasz lvswu gafcud ntsdukp"
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0007",
+                "name": {
+                    "value": "Woonplaats"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "beiypln woxmlvb ijk htafr yio"
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at2404",
+                "name": {
+                    "value": "Gemeente"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "ghazdu nkgtz smgin spljwdf yxt"
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at0009",
+                "name": {
+                    "value": "Land"
+                },
+                "value": {
+                    "_type": "DV_CODED_TEXT",
+                    "value": "mlrc avertd hxmvfadb pjyqzv itvlugj",
+                    "defining_code": {
+                        "terminology_id": {
+                            "value": "external"
+                        },
+                        "code_string": "code-6a160cb0d9cf1"
+                    }
+                }
+            },
+            {
+                "_type": "ELEMENT",
+                "archetype_node_id": "at2499",
+                "name": {
+                    "value": "Opmerkingen"
+                },
+                "value": {
+                    "_type": "DV_TEXT",
+                    "value": "adbr ouhb zfx kti fky"
+                }
+            }
+        ]
+    }
+}

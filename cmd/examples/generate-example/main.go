@@ -12,7 +12,7 @@
 // Run:
 //
 //	go run ./cmd/examples/generate-example \
-//	    --opt openehr/template/testdata/vital_signs.opt \
+//	    --opt testkit/cassettes/templates/vital_signs.opt \
 //	    --territory NL \
 //	    --composer-name "Test Composer" \
 //	    --policy example
@@ -27,14 +27,13 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
-	"runtime"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -97,14 +96,7 @@ func parsePolicy(s string) (instance.Policy, error) {
 	return 0, fmt.Errorf("unknown --policy %q (want 'minimal' or 'example')", s)
 }
 
-// defaultOPTPath resolves the vendored vital_signs.opt fixture
-// relative to this source file so `go run ./cmd/examples/generate-example`
-// works from any working directory.
+// defaultOPTPath resolves the vendored vital_signs template fixture.
 func defaultOPTPath() string {
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		log.Fatal("cannot resolve example source path")
-	}
-	repoRoot := filepath.Join(filepath.Dir(here), "..", "..", "..")
-	return filepath.Join(repoRoot, "openehr", "template", "testdata", "vital_signs.opt")
+	return fixtures.TemplateOptForName("vital_signs")
 }

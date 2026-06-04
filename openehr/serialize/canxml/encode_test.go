@@ -75,7 +75,7 @@ func TestMarshalDVQuantityOmitsNilOptional(t *testing.T) {
 func TestMarshalCompositionPolymorphicXSIType(t *testing.T) {
 	c := &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            &rm.DVText{Value: "body_weight"},
+		Name:            rm.DVText{Value: "body_weight"},
 		Language:        rm.CodePhrase{CodeString: "en"},
 		Territory:       rm.CodePhrase{CodeString: "GB"},
 		Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},
@@ -83,7 +83,7 @@ func TestMarshalCompositionPolymorphicXSIType(t *testing.T) {
 		Content: []rm.ContentItem{
 			&rm.Observation{
 				ArchetypeNodeID: "openEHR-EHR-OBSERVATION.body_weight.v2",
-				Name:            &rm.DVText{Value: "Body weight"},
+				Name:            rm.DVText{Value: "Body weight"},
 				Language:        rm.CodePhrase{CodeString: "en"},
 				Encoding:        rm.CodePhrase{CodeString: "UTF-8"},
 				Subject:         &rm.PartySelf{},
@@ -115,7 +115,7 @@ func TestMarshalCompositionPolymorphicXSIType(t *testing.T) {
 func TestMarshalEmptyContainerOmitted(t *testing.T) {
 	c := &rm.Composition{
 		ArchetypeNodeID: "x",
-		Name:            &rm.DVText{Value: "x"},
+		Name:            rm.DVText{Value: "x"},
 		Language:        rm.CodePhrase{CodeString: "en"},
 		Territory:       rm.CodePhrase{CodeString: "GB"},
 		Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},

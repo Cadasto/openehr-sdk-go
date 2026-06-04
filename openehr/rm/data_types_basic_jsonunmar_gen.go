@@ -31,7 +31,7 @@ func (d *DVBoolean) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_BOOLEAN" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_BOOLEAN", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_BOOLEAN", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
@@ -63,7 +63,7 @@ func (d *DVIdentifier) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_IDENTIFIER" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_IDENTIFIER", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_IDENTIFIER", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Issuer = aux.Issuer
@@ -94,7 +94,7 @@ func (d *DVState) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_STATE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_STATE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_STATE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value

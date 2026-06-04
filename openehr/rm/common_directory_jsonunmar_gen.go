@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,7 +15,7 @@ import (
 
 type FolderJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -25,9 +26,8 @@ type FolderJSONUnmarshaller struct {
 	// ArchetypeDetails Details of archetyping used on this node.
 	ArchetypeDetails *Archetyped `json:"archetype_details,omitempty"`
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
-	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
-	// Items The list of references to other (usually) versioned objects logically in this folder.
-	Items []ObjectRef `json:"items,omitempty"`
+	FeederAudit *FeederAudit      `json:"feeder_audit,omitempty"`
+	Items       []json.RawMessage `json:"items,omitempty"` // polymorphic []ObjectRefLike
 	// Folders Sub-folders of this `FOLDER`.
 	Folders []Folder        `json:"folders,omitempty"`
 	Details json.RawMessage `json:"details,omitempty"` // polymorphic ItemStructure
@@ -46,15 +46,24 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "FOLDER" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "FOLDER", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "FOLDER", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				f.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			f.Name = dv
 		}
-		f.Name = dv
 	}
 	f.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -67,7 +76,28 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 	f.Links = aux.Links
 	f.ArchetypeDetails = aux.ArchetypeDetails
 	f.FeederAudit = aux.FeederAudit
-	f.Items = aux.Items
+	if aux.Items != nil {
+		f.Items = make([]ObjectRefLike, len(aux.Items))
+		for idx, raw := range aux.Items {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: jerr}
+					}
+					f.Items[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: err}
+				}
+			} else {
+				f.Items[idx] = dv
+			}
+		}
+	}
 	f.Folders = aux.Folders
 	if len(aux.Details) > 0 && string(aux.Details) != "null" {
 		dv, err := typereg.DecodeAs[ItemStructure](aux.Details)
@@ -82,9 +112,8 @@ func (f *Folder) UnmarshalJSON(data []byte) error {
 type VersionedFolderJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -102,11 +131,26 @@ func (v *VersionedFolder) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "VERSIONED_FOLDER" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSIONED_FOLDER", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_FOLDER", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }

@@ -716,7 +716,7 @@ const (
 // ReferenceRange Defines a named range to be associated with any `DV_ORDERED` datum. Each such range is particular to the patient and context, e.g. sex, age, and any other factor which affects ranges. May be used to represent normal, therapeutic, dangerous, critical etc ranges.
 type ReferenceRange[T DVOrdered] struct {
 	// Meaning Term whose value indicates the meaning of this range, e.g.  normal,  critical,  therapeutic  etc.
-	Meaning DataValueText `json:"meaning"`
+	Meaning DVTextLike `json:"meaning"`
 	// Range The data range for this meaning, e.g. critical  etc.
 	Range DVInterval[DVOrdered] `json:"range"`
 }

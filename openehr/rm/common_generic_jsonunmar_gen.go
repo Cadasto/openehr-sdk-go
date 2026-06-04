@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -20,7 +21,7 @@ type AttestationJSONUnmarshaller struct {
 	TimeCommitted DVDateTime `json:"time_committed"`
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType  DVCodedText     `json:"change_type"`
-	Description json.RawMessage `json:"description,omitempty"` // polymorphic DataValueText
+	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
 	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
 	// AttestedView Optional visual representation of content attested e.g. screen image.
 	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
@@ -28,7 +29,7 @@ type AttestationJSONUnmarshaller struct {
 	Proof *string `json:"proof,omitempty"`
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items  []DVEHRURI      `json:"items,omitempty"`
-	Reason json.RawMessage `json:"reason"` // polymorphic DataValueText
+	Reason json.RawMessage `json:"reason"` // polymorphic DVTextLike
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
@@ -46,18 +47,27 @@ func (a *Attestation) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ATTESTATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ATTESTATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ATTESTATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.SystemID = aux.SystemID
 	a.TimeCommitted = aux.TimeCommitted
 	a.ChangeType = aux.ChangeType
 	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := DecodeDataValueText(aux.Description)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/description", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/description", Inner: jerr}
+				}
+				a.Description = &def
+			} else {
+				return &typereg.DecodeError{Path: "/description", Inner: err}
+			}
+		} else {
+			a.Description = dv
 		}
-		a.Description = dv
 	}
 	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
@@ -70,11 +80,20 @@ func (a *Attestation) UnmarshalJSON(data []byte) error {
 	a.Proof = aux.Proof
 	a.Items = aux.Items
 	if len(aux.Reason) > 0 && string(aux.Reason) != "null" {
-		dv, err := DecodeDataValueText(aux.Reason)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Reason)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/reason", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Reason, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/reason", Inner: jerr}
+				}
+				a.Reason = &def
+			} else {
+				return &typereg.DecodeError{Path: "/reason", Inner: err}
+			}
+		} else {
+			a.Reason = dv
 		}
-		a.Reason = dv
 	}
 	a.IsPending = aux.IsPending
 	return nil
@@ -88,7 +107,7 @@ type AuditDetailsJSONUnmarshaller struct {
 	TimeCommitted DVDateTime `json:"time_committed"`
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType  DVCodedText     `json:"change_type"`
-	Description json.RawMessage `json:"description,omitempty"` // polymorphic DataValueText
+	Description json.RawMessage `json:"description,omitempty"` // polymorphic DVTextLike
 	Committer   json.RawMessage `json:"committer"`             // polymorphic PartyProxy
 }
 
@@ -102,21 +121,30 @@ func (a *AuditDetails) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: AUDIT_DETAILS: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "AUDIT_DETAILS" && aux.Class != "ATTESTATION" {
+	if aux.Class != "" && aux.Class != "AUDIT_DETAILS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "AUDIT_DETAILS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "AUDIT_DETAILS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	a.SystemID = aux.SystemID
 	a.TimeCommitted = aux.TimeCommitted
 	a.ChangeType = aux.ChangeType
 	if len(aux.Description) > 0 && string(aux.Description) != "null" {
-		dv, err := DecodeDataValueText(aux.Description)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Description)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/description", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Description, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/description", Inner: jerr}
+				}
+				a.Description = &def
+			} else {
+				return &typereg.DecodeError{Path: "/description", Inner: err}
+			}
+		} else {
+			a.Description = dv
 		}
-		a.Description = dv
 	}
 	if len(aux.Committer) > 0 && string(aux.Committer) != "null" {
 		dv, err := typereg.DecodeAs[PartyProxy](aux.Committer)
@@ -130,7 +158,7 @@ func (a *AuditDetails) UnmarshalJSON(data []byte) error {
 
 type ParticipationJSONUnmarshaller struct {
 	Class    string          `json:"_type"`
-	Function json.RawMessage `json:"function"` // polymorphic DataValueText
+	Function json.RawMessage `json:"function"` // polymorphic DVTextLike
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
 	Mode      *DVCodedText    `json:"mode,omitempty"`
 	Performer json.RawMessage `json:"performer"` // polymorphic PartyProxy
@@ -151,15 +179,24 @@ func (p *Participation) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "PARTICIPATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "PARTICIPATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTICIPATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Function) > 0 && string(aux.Function) != "null" {
-		dv, err := DecodeDataValueText(aux.Function)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Function)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/function", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Function, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/function", Inner: jerr}
+				}
+				p.Function = &def
+			} else {
+				return &typereg.DecodeError{Path: "/function", Inner: err}
+			}
+		} else {
+			p.Function = dv
 		}
-		p.Function = dv
 	}
 	p.Mode = aux.Mode
 	if len(aux.Performer) > 0 && string(aux.Performer) != "null" {
@@ -193,10 +230,10 @@ func (p *PartyIdentified) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: PARTY_IDENTIFIED: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "PARTY_IDENTIFIED" && aux.Class != "PARTY_RELATED" {
+	if aux.Class != "" && aux.Class != "PARTY_IDENTIFIED" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "PARTY_IDENTIFIED", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_IDENTIFIED", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.ExternalRef = aux.ExternalRef
@@ -230,7 +267,7 @@ func (p *PartyRelated) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "PARTY_RELATED" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "PARTY_RELATED", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_RELATED", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.ExternalRef = aux.ExternalRef
@@ -259,7 +296,7 @@ func (p *PartySelf) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "PARTY_SELF" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "PARTY_SELF", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "PARTY_SELF", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.ExternalRef = aux.ExternalRef
@@ -285,7 +322,7 @@ func (r *RevisionHistory) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "REVISION_HISTORY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "REVISION_HISTORY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REVISION_HISTORY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	r.Items = aux.Items
@@ -295,9 +332,8 @@ func (r *RevisionHistory) UnmarshalJSON(data []byte) error {
 type RevisionHistoryItemJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// VersionID Version identifier for this revision.
-	VersionID ObjectVersionID `json:"version_id"`
-	// Audits The audits for this revision; there will always be at least one commit audit (which may itself be an `ATTESTATION`), there may also be further attestations.
-	Audits []AuditDetails `json:"audits"`
+	VersionID ObjectVersionID   `json:"version_id"`
+	Audits    []json.RawMessage `json:"audits"` // polymorphic []AuditDetailsLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into RevisionHistoryItem.
@@ -313,10 +349,31 @@ func (r *RevisionHistoryItem) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "REVISION_HISTORY_ITEM" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "REVISION_HISTORY_ITEM", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "REVISION_HISTORY_ITEM", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	r.VersionID = aux.VersionID
-	r.Audits = aux.Audits
+	if aux.Audits != nil {
+		r.Audits = make([]AuditDetailsLike, len(aux.Audits))
+		for idx, raw := range aux.Audits {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[AuditDetailsLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def AuditDetails
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: jerr}
+					}
+					r.Audits[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/audits/%d", idx), Inner: err}
+				}
+			} else {
+				r.Audits[idx] = dv
+			}
+		}
+	}
 	return nil
 }

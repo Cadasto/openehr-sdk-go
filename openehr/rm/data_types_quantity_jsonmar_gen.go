@@ -279,7 +279,7 @@ func (d *DVScale) MarshalJSON() ([]byte, error) {
 type ReferenceRangeJSONMarshaller[T DVOrdered] struct {
 	Class string `json:"_type"`
 	// Meaning Term whose value indicates the meaning of this range, e.g.  normal,  critical,  therapeutic  etc.
-	Meaning DataValueText `json:"meaning"`
+	Meaning DVTextLike `json:"meaning"`
 	// Range The data range for this meaning, e.g. critical  etc.
 	Range DVInterval[DVOrdered] `json:"range"`
 }

@@ -38,28 +38,32 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					return _err
 				}
 			case "contributions":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				e.Contributions = append(e.Contributions, _v)
 			case "ehr_status":
-				if _err := _dec.DecodeElement(&e.EHRStatus, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				e.EHRStatus = _v
 			case "ehr_access":
-				if _err := _dec.DecodeElement(&e.EHRAccess, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				e.EHRAccess = _v
 			case "compositions":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				e.Compositions = append(e.Compositions, _v)
 			case "directory":
-				_v := new(ObjectRef)
-				if _err := _dec.DecodeElement(_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
 				e.Directory = _v
@@ -68,14 +72,14 @@ func (e *EHR) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 					return _err
 				}
 			case "folders":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				e.Folders = append(e.Folders, _v)
 			case "tags":
-				var _v ObjectRef
-				if _err := _dec.DecodeElement(&_v, &_t); _err != nil {
+				_v, _err := canxml.DecodeAs[ObjectRefLike](_dec, _t)
+				if _err != nil {
 					return _err
 				}
 				e.Tags = append(e.Tags, _v)
@@ -113,7 +117,7 @@ func (e *EHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -186,7 +190,7 @@ func (e *EHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) err
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -269,9 +273,11 @@ func (v *VersionedComposition) UnmarshalXML(_dec *xml.Decoder, _start xml.StartE
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
@@ -308,9 +314,11 @@ func (v *VersionedEHRAccess) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err
@@ -347,9 +355,11 @@ func (v *VersionedEHRStatus) UnmarshalXML(_dec *xml.Decoder, _start xml.StartEle
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err

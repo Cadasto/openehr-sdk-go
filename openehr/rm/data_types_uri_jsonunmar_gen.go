@@ -31,7 +31,7 @@ func (d *DVEHRURI) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_EHR_URI" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_EHR_URI", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_EHR_URI", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
@@ -54,10 +54,10 @@ func (d *DVURI) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: DV_URI: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "DV_URI" && aux.Class != "DV_EHR_URI" {
+	if aux.Class != "" && aux.Class != "DV_URI" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_URI", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_URI", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value

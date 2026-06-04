@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,7 +15,7 @@ import (
 
 type ClusterJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -42,15 +43,24 @@ func (c *Cluster) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CLUSTER" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CLUSTER", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CLUSTER", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				c.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			c.Name = dv
 		}
-		c.Name = dv
 	}
 	c.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -81,7 +91,7 @@ func (c *Cluster) UnmarshalJSON(data []byte) error {
 
 type ElementJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -96,7 +106,7 @@ type ElementJSONUnmarshaller struct {
 	// NullFlavour Flavour of null value, e.g. `253|unknown|`, `271|no information|`, `272|masked|`, and `273|not applicable|`.
 	NullFlavour *DVCodedText    `json:"null_flavour,omitempty"`
 	Value       json.RawMessage `json:"value,omitempty"`       // polymorphic DataValue
-	NullReason  json.RawMessage `json:"null_reason,omitempty"` // polymorphic DataValueText
+	NullReason  json.RawMessage `json:"null_reason,omitempty"` // polymorphic DVTextLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into Element.
@@ -112,15 +122,24 @@ func (e *Element) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ELEMENT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ELEMENT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ELEMENT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				e.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			e.Name = dv
 		}
-		e.Name = dv
 	}
 	e.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -142,11 +161,20 @@ func (e *Element) UnmarshalJSON(data []byte) error {
 		e.Value = dv
 	}
 	if len(aux.NullReason) > 0 && string(aux.NullReason) != "null" {
-		dv, err := DecodeDataValueText(aux.NullReason)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.NullReason)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/null_reason", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.NullReason, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/null_reason", Inner: jerr}
+				}
+				e.NullReason = &def
+			} else {
+				return &typereg.DecodeError{Path: "/null_reason", Inner: err}
+			}
+		} else {
+			e.NullReason = dv
 		}
-		e.NullReason = dv
 	}
 	return nil
 }

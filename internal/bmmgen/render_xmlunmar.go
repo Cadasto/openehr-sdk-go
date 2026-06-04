@@ -173,7 +173,7 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 	b.WriteString("\t\t\tswitch _t.Name.Local {\n")
 
 	for _, ef := range elemFields {
-		caseBody, err := renderUnmarshalXMLField(plan, recv, ef)
+		caseBody, err := renderUnmarshalXMLField(plan, recv, sc, ef)
 		if err != nil {
 			return "", fmt.Errorf("render UnmarshalXML field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
@@ -195,20 +195,34 @@ func renderUnmarshalXML(plan *Plan, pc *PlannedClass, fields []emittedField) (st
 
 // renderUnmarshalXMLField returns the case branch source for one
 // property. The element local name is the property snake_case.
-func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, error) {
+// emitting is the concrete class whose codec is being rendered; it is
+// passed through to polymorphicProperty so inherited open generic
+// parameters can be classified via the emitting class's narrowed bound.
+func renderUnmarshalXMLField(plan *Plan, recv string, emitting *bmm.SimpleClass, ef emittedField) (string, error) {
 	propName := ef.Prop.PropertyName()
 	goField := FieldName(propName)
 	elemName := propName
 
 	switch p := ef.Prop.(type) {
 	case *bmm.SingleProperty:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
+		}
+		if kind == polySingleNarrow {
+			// SDK-GAP-11: narrow-interface slot. canxml.DecodeAsOrDefault
+			// dispatches via xsi:type when present and falls back to the
+			// declared parent's concrete type when the wire omits the
+			// discriminator (the openEHR canonical XML tolerance).
+			parentGo := strings.TrimSuffix(ifaceName, "Like")
+			return unmarshalXMLPolySingleNarrow(recv, goField, elemName, ifaceName, parentGo), nil
 		}
 		isClass := !isPrimitive(p.TypeName)
 		isInterface := isInterfaceTypeRef(plan, p.TypeName)
 		if isInterface {
+			// True abstract / Like-narrow handled by the polySingle
+			// branch above; this defensive fall-through covers any
+			// other interface-typed shape.
 			return unmarshalXMLPolySingle(recv, goField, elemName, p.TypeName), nil
 		}
 		if p.IsMandatory {
@@ -229,7 +243,7 @@ func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, 
 		return unmarshalXMLPrimitiveOptionalLit(recv, goField, elemName, goType), nil
 
 	case *bmm.SinglePropertyOpen:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
 		if kind == polySingle {
 			return unmarshalXMLPolySingle(recv, goField, elemName, ifaceName), nil
 		}
@@ -243,8 +257,13 @@ func renderUnmarshalXMLField(plan *Plan, recv string, ef emittedField) (string, 
 		return unmarshalXMLStructMandatory(recv, goField, elemName), nil
 
 	case *bmm.ContainerProperty:
-		ifaceName, kind := polymorphicProperty(plan, ef.Owner, p)
-		if kind == polySlice {
+		ifaceName, kind := polymorphicProperty(plan, ef.Owner, emitting, p)
+		if kind == polySlice || kind == polySliceNarrow {
+			// SDK-GAP-11: narrow-element slices share the same RawMessage
+			// + canxml.DecodeAs shape on the XML side. XML cassettes
+			// uniformly carry xsi:type on slice items today; a
+			// dedicated polySliceNarrow XML path can be added if a
+			// cassette appears that omits the discriminator.
 			return unmarshalXMLPolySlice(recv, goField, elemName, ifaceName), nil
 		}
 		if p.TypeDef != nil && p.TypeDef.ContainerType == "Hash" {
@@ -307,18 +326,20 @@ func unmarshalXMLStructOptionalLit(recv, field, elem, goType string) string {
 }
 
 func unmarshalXMLPolySingle(recv, field, elem, ifaceName string) string {
-	// Concrete-supertype interfaces (e.g. DataValueText) defer to a
-	// hand-written helper that defaults missing `xsi:type` to the
-	// supertype's BMM name — keeps existing bare-DV_TEXT XML cassettes
-	// compatible after Phase-2 substitutability (REQ-058).
-	if isConcreteSupertypeInterface(ifaceName) {
-		return fmt.Sprintf(
-			"\t\t\tcase %q:\n\t\t\t\t_v, _err := Decode%sXML(_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
-			elem, ifaceName, recv, field)
-	}
 	return fmt.Sprintf(
 		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAs[%s](_dec, _t)\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
 		elem, ifaceName, recv, field)
+}
+
+// unmarshalXMLPolySingleNarrow emits the SDK-GAP-11 narrow-interface
+// decode case: canxml.DecodeAsOrDefault dispatches via xsi:type when
+// present and otherwise instantiates the parent concrete type
+// (`parentGo`) — preserving openEHR canonical XML cassettes that omit
+// xsi:type on concrete-typed slots.
+func unmarshalXMLPolySingleNarrow(recv, field, elem, ifaceName, parentGo string) string {
+	return fmt.Sprintf(
+		"\t\t\tcase %q:\n\t\t\t\t_v, _err := canxml.DecodeAsOrDefault[%s](_dec, _t, func() any { return new(%s) })\n\t\t\t\tif _err != nil {\n\t\t\t\t\treturn _err\n\t\t\t\t}\n\t\t\t\t%s.%s = _v\n",
+		elem, ifaceName, parentGo, recv, field)
 }
 
 func unmarshalXMLPolySlice(recv, field, elem, ifaceName string) string {

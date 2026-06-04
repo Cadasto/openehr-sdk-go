@@ -9,7 +9,7 @@ import (
 // TestProbe030 runs PROBE-030 across the canonical input set and
 // asserts every input produces Status == "pass". The set spans leaf
 // RM values and full composition cassettes vendored under
-// testkit/cassettes/canonical_json/. The conformance harness in
+// testkit/cassettes/compositions/ and testkit/cassettes/rm/. The conformance harness in
 // `make conformance` invokes the same probe function against shared
 // cross-SDK cassettes (REQ-080).
 func TestProbe030(t *testing.T) {
@@ -28,12 +28,33 @@ func TestProbe030(t *testing.T) {
 		t.Error("Probe030Inputs missing leaf-type entries")
 	}
 	if !cassetteSeen {
-		t.Error("Probe030Inputs missing cassette entries — check testkit/cassettes/canonical_json/ discovery")
+		t.Error("Probe030Inputs missing cassette entries — check testkit/cassettes discovery via testkit/fixtures")
 	}
 
 	for _, in := range serializeprobes.Probe030Inputs {
 		t.Run(in.Name, func(t *testing.T) {
 			r, err := serializeprobes.Probe030CanjsonRoundTrip(in.Body, in.Factory)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe038 runs PROBE-038 across the polymorphic-decode fixture
+// set vendored under testkit/cassettes/rm/polymorphic/ and asserts
+// every input decodes + re-marshals with the original `_type`
+// discriminators preserved (the SDK-GAP-11 substitutability guarantee).
+func TestProbe038(t *testing.T) {
+	if len(serializeprobes.Probe038Inputs) == 0 {
+		t.Fatal("Probe038Inputs is empty — polymorphic fixture set missing")
+	}
+	for _, in := range serializeprobes.Probe038Inputs {
+		t.Run(in.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe038CanjsonRMPolymorphicDecode(in.Body, in.Factory)
 			if err != nil {
 				t.Fatalf("probe framework error: %v", err)
 			}
@@ -62,6 +83,20 @@ func TestProbe031(t *testing.T) {
 func TestProbe033(t *testing.T) {
 	if len(serializeprobes.Probe033Inputs) == 0 {
 		t.Fatal("Probe033Inputs is empty — bootstrap encoder failed at init")
+	}
+	var leafSeen, cassetteSeen bool
+	for _, in := range serializeprobes.Probe033Inputs {
+		if len(in.Name) > len("cassette:") && in.Name[:len("cassette:")] == "cassette:" {
+			cassetteSeen = true
+		} else {
+			leafSeen = true
+		}
+	}
+	if !leafSeen {
+		t.Error("Probe033Inputs missing leaf-type entries")
+	}
+	if !cassetteSeen {
+		t.Error("Probe033Inputs missing cassette entries — check testkit/cassettes discovery via testkit/fixtures")
 	}
 	for _, in := range serializeprobes.Probe033Inputs {
 		t.Run(in.Name, func(t *testing.T) {

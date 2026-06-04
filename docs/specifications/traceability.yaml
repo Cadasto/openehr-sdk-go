@@ -55,24 +55,28 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson]
-    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md]
-    probes: [PROBE-030, PROBE-031]
+    packages: [openehr/serialize/canjson, testkit/cassettes, testkit/fixtures]
+    plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md]
+    probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
       - openehr/serialize/canjson/encode_test.go
+      - openehr/serialize/canjson/roundtrip_test.go
+      - openehr/serialize/canjson/polymorphic_decode_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
+      - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
 
   - id: REQ-056
     title: Canonical XML
     canonical: docs/specifications/wire.md#req-056
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canxml]
+    packages: [openehr/serialize/canxml, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-xml-serialization.md]
     probes: [PROBE-033, PROBE-034]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
     tests:
+      - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/roundtrip_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
@@ -295,7 +299,6 @@ requirements:
       - cadasto/datamap/fromcomposition_test.go
       - cadasto/datamap/schema_test.go
       - cadasto/datamap/validate_test.go
-      - openehr/rm/substitutability_test.go
 
   - id: REQ-057
     title: Stored AQL queries
@@ -360,7 +363,7 @@ requirements:
     canonical: docs/specifications/conformance.md#runnability
     status: draft
     implementation: partial
-    packages: [testkit, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
+    packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
     probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
 
   - id: REQ-100

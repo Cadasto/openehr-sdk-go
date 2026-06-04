@@ -121,7 +121,7 @@ func (f *FeederAuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		return err
 	}
 	if f.Location != nil {
-		if err := _e.EncodeElement(f.Location, xml.StartElement{Name: xml.Name{Local: "location"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "location", f.Location); err != nil {
 			return err
 		}
 	}
@@ -131,7 +131,7 @@ func (f *FeederAuditDetails) MarshalXML(_e *xml.Encoder, _start xml.StartElement
 		}
 	}
 	if f.Provider != nil {
-		if err := _e.EncodeElement(f.Provider, xml.StartElement{Name: xml.Name{Local: "provider"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "provider", f.Provider); err != nil {
 			return err
 		}
 	}

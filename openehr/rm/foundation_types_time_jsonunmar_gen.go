@@ -29,7 +29,7 @@ func (i *ISO8601Timezone) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "Iso8601_timezone" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "Iso8601_timezone", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Iso8601_timezone", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil
@@ -52,7 +52,7 @@ func (t *TimeDefinitions) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "Time_Definitions" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "Time_Definitions", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "Time_Definitions", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil

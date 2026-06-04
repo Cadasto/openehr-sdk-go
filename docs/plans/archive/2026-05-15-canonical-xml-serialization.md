@@ -74,7 +74,7 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 2. **Reserve probes in [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)** (Draft placeholders):
    - **PROBE-033** — canonical-XML round trip (modulo compact whitespace)
    - **PROBE-034** — unknown `xsi:type` → `typereg.ErrUnknownType`
-3. **Vendor XML fixtures** → `testkit/cassettes/canonical_xml/`:
+3. **Vendor XML fixtures** → `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (layout since 2026-05; was `canonical_xml/`):
    - RM composition XML (convert or capture from CDR where available)
    - Small hand-crafted fragments for `OBSERVATION` / `DV_QUANTITY` polymorphism
    - Provenance README (sibling-repo path + refresh procedure)
@@ -206,7 +206,7 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 - openEHR ITS-REST — [Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.md) (defers XML detail to XSDs)
 - openEHR RM XSDs — normative element shape (pin release alongside BMM in `resources/bmm/README.md`)
 - Pinned BMM: same as JSON plan
-- Golden inputs: `testkit/cassettes/canonical_xml/`; cross-format source graphs from `testkit/cassettes/canonical_json/`
+- Golden inputs: `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`; cross-format source graphs from paired JSON under `compositions/`
 - Sibling reference (provenance only): reference CDR harness templates for `xsi:type` examples in OPT XML
 
 ## Out-of-band considerations

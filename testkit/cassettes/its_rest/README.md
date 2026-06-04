@@ -22,7 +22,7 @@ Pinned commit: `8e0a2a5d04ddb91cfa6c0c7ed68b9c89b9e3ad6c` (2026-04, ITS-REST 1.1
 | `ehr/` | openEHR REST EHR API read-path responses (EHR, EHR_STATUS, Folder) | `openehr/client/ehr/`, `.../ehrstatus`, `.../directory` tests |
 | `definition/` | openEHR REST Definition API responses (ADL 1.4 OPT + metadata) | `openehr/client/definition/` tests |
 
-Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../canonical_json/`](../canonical_json/) — those carry full COMPOSITION shapes and are reused here without duplication. AQL cassettes and ADL 2 source-form templates are **deferred** until their leaf clients land in later phases of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md).
+Composition GET responses (Phase 3 reads) are exercised against the canonical-JSON cassettes vendored under [`../compositions/`](../compositions/) and [`../rm/`](../rm/) — those carry full COMPOSITION shapes and are reused here without duplication. Resolve paths via [`../../fixtures/`](../../fixtures/). AQL cassettes and ADL 2 source-form templates are **deferred** until their leaf clients land in later phases of [`docs/plans/2026-05-15-rest-api-client.md`](../../../docs/plans/2026-05-15-rest-api-client.md).
 
 ## Provenance
 

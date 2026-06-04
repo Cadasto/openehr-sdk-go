@@ -26,10 +26,10 @@ func (o *OpenehrCodeSetIdentifiers) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: OPENEHR_CODE_SET_IDENTIFIERS: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "OPENEHR_CODE_SET_IDENTIFIERS" && aux.Class != "EXTERNAL_ENVIRONMENT_ACCESS" && aux.Class != "TERMINOLOGY_SERVICE" {
+	if aux.Class != "" && aux.Class != "OPENEHR_CODE_SET_IDENTIFIERS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OPENEHR_CODE_SET_IDENTIFIERS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OPENEHR_CODE_SET_IDENTIFIERS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil
@@ -49,10 +49,10 @@ func (o *OpenehrTerminologyGroupIdentifiers) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS" && aux.Class != "EXTERNAL_ENVIRONMENT_ACCESS" && aux.Class != "TERMINOLOGY_SERVICE" {
+	if aux.Class != "" && aux.Class != "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil
@@ -72,10 +72,10 @@ func (t *TerminologyService) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: TERMINOLOGY_SERVICE: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "TERMINOLOGY_SERVICE" && aux.Class != "EXTERNAL_ENVIRONMENT_ACCESS" {
+	if aux.Class != "" && aux.Class != "TERMINOLOGY_SERVICE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TERMINOLOGY_SERVICE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERMINOLOGY_SERVICE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil

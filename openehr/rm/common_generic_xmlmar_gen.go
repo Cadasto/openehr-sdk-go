@@ -340,8 +340,11 @@ func (r *RevisionHistoryItem) MarshalXML(_e *xml.Encoder, _start xml.StartElemen
 	if err := _e.EncodeElement(&r.VersionID, xml.StartElement{Name: xml.Name{Local: "version_id"}}); err != nil {
 		return err
 	}
-	for _idx := range r.Audits {
-		if err := _e.EncodeElement(&r.Audits[_idx], xml.StartElement{Name: xml.Name{Local: "audits"}}); err != nil {
+	for _, _item := range r.Audits {
+		if _item == nil {
+			continue
+		}
+		if err := canxml.EncodePoly(_e, "audits", _item); err != nil {
 			return err
 		}
 	}

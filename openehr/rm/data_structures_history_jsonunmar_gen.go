@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,7 +15,7 @@ import (
 
 type HistoryJSONUnmarshaller[T ItemStructure] struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -49,15 +50,24 @@ func (h *History[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "HISTORY" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "HISTORY", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "HISTORY", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				h.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			h.Name = dv
 		}
-		h.Name = dv
 	}
 	h.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -102,7 +112,7 @@ type IntervalEventJSONUnmarshaller[T ItemStructure] struct {
 	Time  DVDateTime      `json:"time"`
 	State json.RawMessage `json:"state,omitempty"` // polymorphic ItemStructure
 	Data  json.RawMessage `json:"data,omitempty"`  // polymorphic T
-	Name  json.RawMessage `json:"name"`            // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"`            // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -135,7 +145,7 @@ func (i *IntervalEvent[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "INTERVAL_EVENT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "INTERVAL_EVENT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "INTERVAL_EVENT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Time = aux.Time
@@ -154,11 +164,20 @@ func (i *IntervalEvent[T]) UnmarshalJSON(data []byte) error {
 		i.Data = dv
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
 		}
-		i.Name = dv
 	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -183,7 +202,7 @@ type PointEventJSONUnmarshaller[T ItemStructure] struct {
 	Time  DVDateTime      `json:"time"`
 	State json.RawMessage `json:"state,omitempty"` // polymorphic ItemStructure
 	Data  json.RawMessage `json:"data,omitempty"`  // polymorphic T
-	Name  json.RawMessage `json:"name"`            // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"`            // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -210,7 +229,7 @@ func (p *PointEvent[T]) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "POINT_EVENT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "POINT_EVENT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "POINT_EVENT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	p.Time = aux.Time
@@ -229,11 +248,20 @@ func (p *PointEvent[T]) UnmarshalJSON(data []byte) error {
 		p.Data = dv
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				p.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			p.Name = dv
 		}
-		p.Name = dv
 	}
 	p.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {

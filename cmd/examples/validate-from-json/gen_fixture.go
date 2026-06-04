@@ -15,6 +15,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 func main() {
@@ -81,7 +82,7 @@ func injectPartySelf(v any) {
 }
 
 func validateAgainstVitalSigns(comp *rm.Composition) validation.Result {
-	opt, err := template.ParseFile("../../../openehr/template/testdata/vital_signs.opt")
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +96,7 @@ func validateAgainstVitalSigns(comp *rm.Composition) validation.Result {
 func minimalComposition() *rm.Composition {
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            &rm.DVText{Value: "Encounter"},
+		Name:            rm.DVText{Value: "Encounter"},
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -119,7 +120,7 @@ func minimalComposition() *rm.Composition {
 func minimalObservation() *rm.Observation {
 	return &rm.Observation{
 		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-		Name:            &rm.DVText{Value: "Blood pressure"},
+		Name:            rm.DVText{Value: "Blood pressure"},
 		Language: rm.CodePhrase{
 			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 			CodeString:    "en",
@@ -131,28 +132,28 @@ func minimalObservation() *rm.Observation {
 		Subject: rm.PartySelf{},
 		Data: rm.History[rm.ItemStructure]{
 			ArchetypeNodeID: "at0001",
-			Name:            &rm.DVText{Value: "history"},
+			Name:            rm.DVText{Value: "history"},
 			Origin:          rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 			Events: []rm.Event{
 				&rm.PointEvent[rm.ItemStructure]{
 					ArchetypeNodeID: "at0006",
-					Name:            &rm.DVText{Value: "any event"},
+					Name:            rm.DVText{Value: "any event"},
 					Time:            rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 					Data: &rm.ItemList{
 						ArchetypeNodeID: "at0003",
-						Name:            &rm.DVText{Value: "blood pressure"},
+						Name:            rm.DVText{Value: "blood pressure"},
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0004",
-							Name:            &rm.DVText{Value: "Systolic"},
+							Name:            rm.DVText{Value: "Systolic"},
 							Value:           &rm.DVQuantity{Magnitude: rm.Real(120), Units: "mm[Hg]"},
 						}},
 					},
 					State: &rm.ItemList{
 						ArchetypeNodeID: "at0007",
-						Name:            &rm.DVText{Value: "state"},
+						Name:            rm.DVText{Value: "state"},
 						Items: []rm.Element{{
 							ArchetypeNodeID: "at0008",
-							Name:            &rm.DVText{Value: "Position"},
+							Name:            rm.DVText{Value: "Position"},
 						}},
 					},
 				},
@@ -160,11 +161,11 @@ func minimalObservation() *rm.Observation {
 		},
 		Protocol: &rm.ItemTree{
 			ArchetypeNodeID: "at0011",
-			Name:            &rm.DVText{Value: "protocol"},
+			Name:            rm.DVText{Value: "protocol"},
 			Items: []rm.Item{
 				&rm.Cluster{
 					ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
-					Name:            &rm.DVText{Value: "Device"},
+					Name:            rm.DVText{Value: "Device"},
 				},
 			},
 		},

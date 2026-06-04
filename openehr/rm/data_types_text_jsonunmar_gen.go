@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -35,7 +36,7 @@ func (c *CodePhrase) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "CODE_PHRASE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "CODE_PHRASE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "CODE_PHRASE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	c.TerminologyID = aux.TerminologyID
@@ -47,11 +48,8 @@ func (c *CodePhrase) UnmarshalJSON(data []byte) error {
 type DVCodedTextJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
-	Value string `json:"value"`
-	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
-	//
-	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink *DVURI `json:"hyperlink,omitempty"`
+	Value     string          `json:"value"`
+	Hyperlink json.RawMessage `json:"hyperlink,omitempty"` // polymorphic DVURILike
 	// Formatting If set, contains one of the following values:
 	//
 	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
@@ -83,11 +81,26 @@ func (d *DVCodedText) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_CODED_TEXT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_CODED_TEXT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
-	d.Hyperlink = aux.Hyperlink
+	if len(aux.Hyperlink) > 0 && string(aux.Hyperlink) != "null" {
+		dv, err := typereg.DecodeAs[DVURILike](aux.Hyperlink)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVURI
+				if jerr := json.Unmarshal(aux.Hyperlink, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/hyperlink", Inner: jerr}
+				}
+				d.Hyperlink = &def
+			} else {
+				return &typereg.DecodeError{Path: "/hyperlink", Inner: err}
+			}
+		} else {
+			d.Hyperlink = dv
+		}
+	}
 	d.Formatting = aux.Formatting
 	d.Mappings = aux.Mappings
 	d.Language = aux.Language
@@ -98,7 +111,7 @@ func (d *DVCodedText) UnmarshalJSON(data []byte) error {
 
 type DVParagraphJSONUnmarshaller struct {
 	Class string            `json:"_type"`
-	Items []json.RawMessage `json:"items"` // polymorphic []DataValueText
+	Items []json.RawMessage `json:"items"` // polymorphic []DVTextLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into DVParagraph.
@@ -114,20 +127,29 @@ func (d *DVParagraph) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_PARAGRAPH" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_PARAGRAPH", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_PARAGRAPH", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if aux.Items != nil {
-		d.Items = make([]DataValueText, len(aux.Items))
+		d.Items = make([]DVTextLike, len(aux.Items))
 		for idx, raw := range aux.Items {
 			if len(raw) == 0 || string(raw) == "null" {
 				continue
 			}
-			dv, err := typereg.DecodeAs[DataValueText](raw)
+			dv, err := typereg.DecodeAs[DVTextLike](raw)
 			if err != nil {
-				return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: err}
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def DVText
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: jerr}
+					}
+					d.Items[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/items/%d", idx), Inner: err}
+				}
+			} else {
+				d.Items[idx] = dv
 			}
-			d.Items[idx] = dv
 		}
 	}
 	return nil
@@ -136,11 +158,8 @@ func (d *DVParagraph) UnmarshalJSON(data []byte) error {
 type DVTextJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// Value Displayable rendition of the item, regardless of its underlying structure. For `DV_CODED_TEXT`, this is the rubric of the complete term as provided by the terminology service.
-	Value string `json:"value"`
-	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
-	//
-	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink *DVURI `json:"hyperlink,omitempty"`
+	Value     string          `json:"value"`
+	Hyperlink json.RawMessage `json:"hyperlink,omitempty"` // polymorphic DVURILike
 	// Formatting If set, contains one of the following values:
 	//
 	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
@@ -167,14 +186,29 @@ func (d *DVText) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: DV_TEXT: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "DV_TEXT" && aux.Class != "DV_CODED_TEXT" {
+	if aux.Class != "" && aux.Class != "DV_TEXT" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_TEXT", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_TEXT", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.Value = aux.Value
-	d.Hyperlink = aux.Hyperlink
+	if len(aux.Hyperlink) > 0 && string(aux.Hyperlink) != "null" {
+		dv, err := typereg.DecodeAs[DVURILike](aux.Hyperlink)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVURI
+				if jerr := json.Unmarshal(aux.Hyperlink, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/hyperlink", Inner: jerr}
+				}
+				d.Hyperlink = &def
+			} else {
+				return &typereg.DecodeError{Path: "/hyperlink", Inner: err}
+			}
+		} else {
+			d.Hyperlink = dv
+		}
+	}
 	d.Formatting = aux.Formatting
 	d.Mappings = aux.Mappings
 	d.Language = aux.Language
@@ -212,7 +246,7 @@ func (t *TermMapping) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "TERM_MAPPING" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TERM_MAPPING", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TERM_MAPPING", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	t.Match = aux.Match

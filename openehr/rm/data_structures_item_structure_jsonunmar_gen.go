@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -14,7 +15,7 @@ import (
 
 type ItemListJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -43,15 +44,24 @@ func (i *ItemList) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_LIST" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_LIST", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_LIST", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
 		}
-		i.Name = dv
 	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -70,7 +80,7 @@ func (i *ItemList) UnmarshalJSON(data []byte) error {
 
 type ItemSingleJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -98,15 +108,24 @@ func (i *ItemSingle) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_SINGLE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_SINGLE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_SINGLE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
 		}
-		i.Name = dv
 	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -125,7 +144,7 @@ func (i *ItemSingle) UnmarshalJSON(data []byte) error {
 
 type ItemTableJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -154,15 +173,24 @@ func (i *ItemTable) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_TABLE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_TABLE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_TABLE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
 		}
-		i.Name = dv
 	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -181,7 +209,7 @@ func (i *ItemTable) UnmarshalJSON(data []byte) error {
 
 type ItemTreeJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -209,15 +237,24 @@ func (i *ItemTree) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_TREE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_TREE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_TREE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				i.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			i.Name = dv
 		}
-		i.Name = dv
 	}
 	i.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {

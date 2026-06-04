@@ -36,7 +36,7 @@ func (a *Address) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -109,7 +109,7 @@ func (a *Agent) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "languages":
-				_v, _err := canxml.DecodeAs[DataValueText](_dec, _t)
+				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
 				if _err != nil {
 					return _err
 				}
@@ -145,7 +145,7 @@ func (a *Agent) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				}
 				a.Relationships = append(a.Relationships, _v)
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -212,7 +212,7 @@ func (c *Capability) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) er
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -291,7 +291,7 @@ func (c *Contact) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -370,7 +370,7 @@ func (g *Group) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "languages":
-				_v, _err := canxml.DecodeAs[DataValueText](_dec, _t)
+				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
 				if _err != nil {
 					return _err
 				}
@@ -406,7 +406,7 @@ func (g *Group) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				}
 				g.Relationships = append(g.Relationships, _v)
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -473,7 +473,7 @@ func (o *Organisation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "languages":
-				_v, _err := canxml.DecodeAs[DataValueText](_dec, _t)
+				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
 				if _err != nil {
 					return _err
 				}
@@ -509,7 +509,7 @@ func (o *Organisation) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) 
 				}
 				o.Relationships = append(o.Relationships, _v)
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -576,7 +576,7 @@ func (p *PartyIdentity) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement)
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -649,7 +649,7 @@ func (p *PartyRelationship) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElem
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -736,7 +736,7 @@ func (p *Person) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "languages":
-				_v, _err := canxml.DecodeAs[DataValueText](_dec, _t)
+				_v, _err := canxml.DecodeAs[DVTextLike](_dec, _t)
 				if _err != nil {
 					return _err
 				}
@@ -772,7 +772,7 @@ func (p *Person) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error 
 				}
 				p.Relationships = append(p.Relationships, _v)
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -863,7 +863,7 @@ func (r *Role) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error {
 				}
 				r.Relationships = append(r.Relationships, _v)
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -944,9 +944,11 @@ func (v *VersionedParty) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement
 					return _err
 				}
 			case "owner_id":
-				if _err := _dec.DecodeElement(&v.OwnerID, &_t); _err != nil {
+				_v, _err := canxml.DecodeAsOrDefault[ObjectRefLike](_dec, _t, func() any { return new(ObjectRef) })
+				if _err != nil {
 					return _err
 				}
+				v.OwnerID = _v
 			case "time_created":
 				if _err := _dec.DecodeElement(&v.TimeCreated, &_t); _err != nil {
 					return _err

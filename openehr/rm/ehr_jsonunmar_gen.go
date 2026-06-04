@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -19,23 +20,16 @@ type EHRJSONUnmarshaller struct {
 	// EHRID The unique identifier of this EHR.
 	//
 	// NOTE: is is strongly recommended that a UUID always be used for this field.
-	EHRID HierObjectID `json:"ehr_id"`
-	// Contributions List of contributions causing changes to this EHR. Each contribution contains a list of versions, which may include references to any number of `VERSION` instances, i.e. items of type `VERSIONED_COMPOSITION` and `VERSIONED_FOLDER`.
-	Contributions []ObjectRef `json:"contributions,omitempty"`
-	// EHRStatus Reference to `EHR_STATUS` object for this EHR.
-	EHRStatus ObjectRef `json:"ehr_status"`
-	// EHRAccess Reference to `EHR_ACCESS` object for this EHR.
-	EHRAccess ObjectRef `json:"ehr_access"`
-	// Compositions Master list of all Versioned Composition references in this EHR.
-	Compositions []ObjectRef `json:"compositions,omitempty"`
-	// Directory Optional directory structure for this EHR. If present, this is a reference to the first member of `_folders_`.
-	Directory *ObjectRef `json:"directory,omitempty"`
+	EHRID         HierObjectID      `json:"ehr_id"`
+	Contributions []json.RawMessage `json:"contributions,omitempty"` // polymorphic []ObjectRefLike
+	EHRStatus     json.RawMessage   `json:"ehr_status"`              // polymorphic ObjectRefLike
+	EHRAccess     json.RawMessage   `json:"ehr_access"`              // polymorphic ObjectRefLike
+	Compositions  []json.RawMessage `json:"compositions,omitempty"`  // polymorphic []ObjectRefLike
+	Directory     json.RawMessage   `json:"directory,omitempty"`     // polymorphic ObjectRefLike
 	// TimeCreated Time of creation of the EHR.
-	TimeCreated DVDateTime `json:"time_created"`
-	// Folders Optional additional Folder structures for this EHR. If set, the `_directory_` attribute refers to the first member.
-	Folders []ObjectRef `json:"folders,omitempty"`
-	// Tags Optional list of tags associated with this EHR. Tag `_target_` values can only be within the same EHR.
-	Tags []ObjectRef `json:"tags,omitempty"`
+	TimeCreated DVDateTime        `json:"time_created"`
+	Folders     []json.RawMessage `json:"folders,omitempty"` // polymorphic []ObjectRefLike
+	Tags        []json.RawMessage `json:"tags,omitempty"`    // polymorphic []ObjectRefLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into EHR.
@@ -51,25 +45,154 @@ func (e *EHR) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EHR" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EHR", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EHR", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	e.SystemID = aux.SystemID
 	e.EHRID = aux.EHRID
-	e.Contributions = aux.Contributions
-	e.EHRStatus = aux.EHRStatus
-	e.EHRAccess = aux.EHRAccess
-	e.Compositions = aux.Compositions
-	e.Directory = aux.Directory
+	if aux.Contributions != nil {
+		e.Contributions = make([]ObjectRefLike, len(aux.Contributions))
+		for idx, raw := range aux.Contributions {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/contributions/%d", idx), Inner: jerr}
+					}
+					e.Contributions[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/contributions/%d", idx), Inner: err}
+				}
+			} else {
+				e.Contributions[idx] = dv
+			}
+		}
+	}
+	if len(aux.EHRStatus) > 0 && string(aux.EHRStatus) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.EHRStatus)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.EHRStatus, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/ehr_status", Inner: jerr}
+				}
+				e.EHRStatus = &def
+			} else {
+				return &typereg.DecodeError{Path: "/ehr_status", Inner: err}
+			}
+		} else {
+			e.EHRStatus = dv
+		}
+	}
+	if len(aux.EHRAccess) > 0 && string(aux.EHRAccess) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.EHRAccess)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.EHRAccess, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/ehr_access", Inner: jerr}
+				}
+				e.EHRAccess = &def
+			} else {
+				return &typereg.DecodeError{Path: "/ehr_access", Inner: err}
+			}
+		} else {
+			e.EHRAccess = dv
+		}
+	}
+	if aux.Compositions != nil {
+		e.Compositions = make([]ObjectRefLike, len(aux.Compositions))
+		for idx, raw := range aux.Compositions {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/compositions/%d", idx), Inner: jerr}
+					}
+					e.Compositions[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/compositions/%d", idx), Inner: err}
+				}
+			} else {
+				e.Compositions[idx] = dv
+			}
+		}
+	}
+	if len(aux.Directory) > 0 && string(aux.Directory) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.Directory)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.Directory, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/directory", Inner: jerr}
+				}
+				e.Directory = &def
+			} else {
+				return &typereg.DecodeError{Path: "/directory", Inner: err}
+			}
+		} else {
+			e.Directory = dv
+		}
+	}
 	e.TimeCreated = aux.TimeCreated
-	e.Folders = aux.Folders
-	e.Tags = aux.Tags
+	if aux.Folders != nil {
+		e.Folders = make([]ObjectRefLike, len(aux.Folders))
+		for idx, raw := range aux.Folders {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/folders/%d", idx), Inner: jerr}
+					}
+					e.Folders[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/folders/%d", idx), Inner: err}
+				}
+			} else {
+				e.Folders[idx] = dv
+			}
+		}
+	}
+	if aux.Tags != nil {
+		e.Tags = make([]ObjectRefLike, len(aux.Tags))
+		for idx, raw := range aux.Tags {
+			if len(raw) == 0 || string(raw) == "null" {
+				continue
+			}
+			dv, err := typereg.DecodeAs[ObjectRefLike](raw)
+			if err != nil {
+				if errors.Is(err, typereg.ErrMissingType) {
+					var def ObjectRef
+					if jerr := json.Unmarshal(raw, &def); jerr != nil {
+						return &typereg.DecodeError{Path: fmt.Sprintf("/tags/%d", idx), Inner: jerr}
+					}
+					e.Tags[idx] = &def
+				} else {
+					return &typereg.DecodeError{Path: fmt.Sprintf("/tags/%d", idx), Inner: err}
+				}
+			} else {
+				e.Tags[idx] = dv
+			}
+		}
+	}
 	return nil
 }
 
 type EHRAccessJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -97,15 +220,24 @@ func (e *EHRAccess) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EHR_ACCESS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EHR_ACCESS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EHR_ACCESS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				e.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			e.Name = dv
 		}
-		e.Name = dv
 	}
 	e.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -130,7 +262,7 @@ func (e *EHRAccess) UnmarshalJSON(data []byte) error {
 
 type EHRStatusJSONUnmarshaller struct {
 	Class string          `json:"_type"`
-	Name  json.RawMessage `json:"name"` // polymorphic DataValueText
+	Name  json.RawMessage `json:"name"` // polymorphic DVTextLike
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
@@ -164,15 +296,24 @@ func (e *EHRStatus) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "EHR_STATUS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "EHR_STATUS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "EHR_STATUS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	if len(aux.Name) > 0 && string(aux.Name) != "null" {
-		dv, err := DecodeDataValueText(aux.Name)
+		dv, err := typereg.DecodeAs[DVTextLike](aux.Name)
 		if err != nil {
-			return &typereg.DecodeError{Path: "/name", Inner: err}
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def DVText
+				if jerr := json.Unmarshal(aux.Name, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/name", Inner: jerr}
+				}
+				e.Name = &def
+			} else {
+				return &typereg.DecodeError{Path: "/name", Inner: err}
+			}
+		} else {
+			e.Name = dv
 		}
-		e.Name = dv
 	}
 	e.ArchetypeNodeID = aux.ArchetypeNodeID
 	if len(aux.UID) > 0 && string(aux.UID) != "null" {
@@ -201,9 +342,8 @@ func (e *EHRStatus) UnmarshalJSON(data []byte) error {
 type VersionedCompositionJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -221,11 +361,26 @@ func (v *VersionedComposition) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "VERSIONED_COMPOSITION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSIONED_COMPOSITION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_COMPOSITION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }
@@ -233,9 +388,8 @@ func (v *VersionedComposition) UnmarshalJSON(data []byte) error {
 type VersionedEHRAccessJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -253,11 +407,26 @@ func (v *VersionedEHRAccess) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "VERSIONED_EHR_ACCESS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSIONED_EHR_ACCESS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_EHR_ACCESS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }
@@ -265,9 +434,8 @@ func (v *VersionedEHRAccess) UnmarshalJSON(data []byte) error {
 type VersionedEHRStatusJSONUnmarshaller struct {
 	Class string `json:"_type"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
-	UID HierObjectID `json:"uid"`
-	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	UID     HierObjectID    `json:"uid"`
+	OwnerID json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -285,11 +453,26 @@ func (v *VersionedEHRStatus) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "VERSIONED_EHR_STATUS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "VERSIONED_EHR_STATUS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "VERSIONED_EHR_STATUS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	v.UID = aux.UID
-	v.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				v.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			v.OwnerID = dv
+		}
+	}
 	v.TimeCreated = aux.TimeCreated
 	return nil
 }

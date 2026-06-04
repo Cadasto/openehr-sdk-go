@@ -37,7 +37,7 @@ type Composition struct {
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DataValueText `json:"name"`
+	Name DVTextLike `json:"name"`
 	// Territory Name of territory in which this Composition was written. Coded from openEHR  countries  code set, which is an expression of the ISO 3166 standard.
 	Territory CodePhrase `json:"territory"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
@@ -54,7 +54,7 @@ type EventContext struct {
 	// EndTime Optional end time of the clinical session.
 	EndTime *DVDateTime `json:"end_time,omitempty"`
 	// HealthCareFacility The health care facility under whose care the event took place. This is the most specific workgroup or delivery unit within a care delivery enterprise that has an official identifier in the health system, and can be used to ensure medico-legal accountability.
-	HealthCareFacility *PartyIdentified `json:"health_care_facility,omitempty"`
+	HealthCareFacility PartyIdentifiedLike `json:"health_care_facility,omitempty"`
 	// Location The actual location where the session occurred, e.g. 'microbiology lab 2', 'home', 'ward A3'  and so on.
 	Location *string `json:"location,omitempty"`
 	// OtherContext Other optional context which will be archetyped.

@@ -30,10 +30,24 @@ func TestRoundTripStableSimpleValues(t *testing.T) {
 			into: func() any { return new(rm.DVText) },
 		},
 		{
+			name: "DV_INTERVAL_DV_QUANTITY_bounds",
+			in: &rm.DVInterval[rm.DVOrdered]{
+				Interval: rm.Interval[rm.DVOrdered]{
+					Lower:          rm.DVQuantity{Magnitude: 60, Units: "kg"},
+					Upper:          rm.DVQuantity{Magnitude: 90, Units: "kg"},
+					LowerIncluded:  true,
+					UpperIncluded:  true,
+					LowerUnbounded: false,
+					UpperUnbounded: false,
+				},
+			},
+			into: func() any { return new(rm.DVInterval[rm.DVOrdered]) },
+		},
+		{
 			name: "Composition-with-polymorphic-composer",
 			in: &rm.Composition{
 				ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-				Name:            &rm.DVText{Value: "x"},
+				Name:            rm.DVText{Value: "x"},
 				Language:        rm.CodePhrase{CodeString: "en"},
 				Territory:       rm.CodePhrase{CodeString: "GB"},
 				Category:        rm.DVCodedText{DVText: rm.DVText{Value: "event"}},

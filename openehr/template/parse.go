@@ -87,12 +87,12 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if err := dec.Decode(&wire); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
-	// Accept the two OPT 1.4 XML serializations seen in the wild: the
-	// Ocean/Template-Designer shape (root <template>) and the canonical
-	// RM-class shape (root <OPERATIONAL_TEMPLATE>, e.g. Code24/Cadasto,
-	// EHRbase). Both carry the same template_id/definition wrapper fields.
-	if local := wire.XMLName.Local; local != "" && local != "template" && local != "OPERATIONAL_TEMPLATE" {
-		return nil, fmt.Errorf("%w: root element <%s>, expected <template> or <OPERATIONAL_TEMPLATE>", ErrInvalidOPT, local)
+	// Forward-compat: defend against non-<template> documents that
+	// somehow decoded (e.g. when the OPT XSD wrapper is renamed by a
+	// downstream tool). xml.Decoder is permissive about root names
+	// when the target struct does not pin a namespace.
+	if wire.XMLName.Local != "" && wire.XMLName.Local != "template" {
+		return nil, fmt.Errorf("%w: root element <%s>, expected <template>", ErrInvalidOPT, wire.XMLName.Local)
 	}
 	// Reject trailing non-whitespace tokens — a well-formed OPT has
 	// exactly one root element; anything else after </template> means
@@ -125,10 +125,8 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if wire.UID != nil {
 		tmpl.uid = strings.TrimSpace(wire.UID.Value)
 	}
-	if lang := wire.Language; lang != nil {
-		tmpl.language = strings.TrimSpace(lang.CodeString)
-	} else if lang := wire.OriginalLanguage; lang != nil {
-		tmpl.language = strings.TrimSpace(lang.CodeString)
+	if wire.Language != nil {
+		tmpl.language = strings.TrimSpace(wire.Language.CodeString)
 	}
 	return tmpl, nil
 }
@@ -169,20 +167,14 @@ func requireEOF(dec *xml.Decoder) error {
 // rebind the `xsi` prefix or omit the declaration on inner elements.
 
 type xmlTemplate struct {
-	// XMLName is intentionally unpinned: the decoder records the actual
-	// root name (<template> or <OPERATIONAL_TEMPLATE>) and parseOPT
-	// validates it. Pinning would make encoding/xml reject the latter.
-	XMLName xml.Name
-	// Language is the Template-Designer shape; OriginalLanguage is the
-	// RM-class shape (<original_language>). parseOPT prefers whichever is set.
-	Language         *xmlCodePhrase   `xml:"language"`
-	OriginalLanguage *xmlCodePhrase   `xml:"original_language"`
-	UID              *xmlValueWrapper `xml:"uid"`
-	TemplateID       *xmlValueWrapper `xml:"template_id"`
-	Concept          string           `xml:"concept"`
-	Description      *xmlDescription  `xml:"description"`
-	Definition       *xmlCObject      `xml:"definition"`
-	Annotations      []xmlAnnotation  `xml:"annotations"`
+	XMLName     xml.Name         `xml:"template"`
+	Language    *xmlCodePhrase   `xml:"language"`
+	UID         *xmlValueWrapper `xml:"uid"`
+	TemplateID  *xmlValueWrapper `xml:"template_id"`
+	Concept     string           `xml:"concept"`
+	Description *xmlDescription  `xml:"description"`
+	Definition  *xmlCObject      `xml:"definition"`
+	Annotations []xmlAnnotation  `xml:"annotations"`
 }
 
 type xmlValueWrapper struct {
@@ -347,11 +339,7 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 	switch o.Type {
 	case "C_COMPLEX_OBJECT", "":
 		return buildComplexObject(o, strict)
-	case "C_ARCHETYPE_ROOT", "T_ARCHETYPE_ROOT":
-		// T_ARCHETYPE_ROOT is the template-flattened archetype root the
-		// OPERATIONAL_TEMPLATE serialization uses for nested archetypes;
-		// structurally identical to C_ARCHETYPE_ROOT (archetype_id +
-		// term_definitions + flattened attributes).
+	case "C_ARCHETYPE_ROOT":
 		co, err := buildComplexObject(o, strict)
 		if err != nil {
 			return nil, err

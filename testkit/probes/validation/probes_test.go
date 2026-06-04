@@ -2,18 +2,17 @@ package validationprobes_test
 
 import (
 	"os"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/validation"
 )
 
 // PROBE-025 — positive case. A structurally-complete blood-pressure
 // composition against vital_signs.opt produces zero issues.
 func TestProbe025CompositionValidate_Positive(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	cases := []probes.ValidateCase{
 		{
 			Name:        "valid_blood_pressure",
@@ -38,7 +37,7 @@ func TestProbe025CompositionValidate_Positive(t *testing.T) {
 // magnitude triggers a single primitive_out_of_range issue. Stable
 // across SDKs that implement REQ-103 + REQ-102 v2.
 func TestProbe025CompositionValidate_PrimitiveOutOfRange(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -68,7 +67,7 @@ func TestProbe025CompositionValidate_PrimitiveOutOfRange(t *testing.T) {
 // element from the ITEM_LIST surfaces a `required` issue at the
 // /data/items path. Negative-case stability test.
 func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -98,7 +97,7 @@ func TestProbe026MissingNodes_MissingSystolic(t *testing.T) {
 // A Content[i] whose archetype_node_id matches no OPT root and no
 // slot include fails the slot-fit fallback.
 func TestProbe026MissingNodes_SlotFillUnknownArchetype(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	comp.Content = []rm.ContentItem{
 		&rm.Observation{
@@ -125,7 +124,7 @@ func TestProbe026MissingNodes_SlotFillUnknownArchetype(t *testing.T) {
 // PROBE-026 — DV_QUANTITY units outside the OPT-allowed list fires
 // `primitive_unit_unknown` at the element's /value path.
 func TestProbe026MissingNodes_PrimitiveUnitUnknown(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -154,7 +153,7 @@ func TestProbe026MissingNodes_PrimitiveUnitUnknown(t *testing.T) {
 // PROBE-026 — category defining_code outside the OPT closed list
 // fires `primitive_not_in_list` at /category/defining_code.
 func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	comp.Category.DefiningCode = rm.CodePhrase{
 		TerminologyID: rm.TerminologyID{Value: "openehr"},
@@ -183,7 +182,7 @@ func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
 // /data/events. Both constraints are independent — multiset
 // reflects both for cross-SDK parity.
 func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	obs.Data.Events = nil
@@ -212,7 +211,7 @@ func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 // so cross-SDK implementations are bound to the same code
 // multiset for the occurrences-upper-bound clause.
 func TestProbe026MissingNodes_DuplicateSystolicOccurrences(t *testing.T) {
-	body := loadFixture(t, "vital_signs.opt")
+	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
 	obs := comp.Content[0].(*rm.Observation)
 	pe := obs.Data.Events[0].(*rm.PointEvent[rm.ItemStructure])
@@ -293,7 +292,7 @@ func TestProbe026MissingNodes_AlternativeMismatch(t *testing.T) {
 			OPT:  []byte(probe026AlternativeMismatchOPT),
 			Composition: &rm.Composition{
 				ArchetypeNodeID: "at0000",
-				Name:            &rm.DVText{Value: "probe"},
+				Name:            rm.DVText{Value: "probe"},
 				Category: rm.DVCodedText{
 					DVText: rm.DVText{Value: "event"},
 					DefiningCode: rm.CodePhrase{
@@ -334,7 +333,7 @@ func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
 			OPT:  []byte(probe026RMTypeMismatchOPT),
 			Composition: &rm.Composition{
 				ArchetypeNodeID: "at0000",
-				Name:            &rm.DVText{Value: "probe"},
+				Name:            rm.DVText{Value: "probe"},
 				Category: rm.DVCodedText{
 					DVText: rm.DVText{Value: "event"},
 					DefiningCode: rm.CodePhrase{
@@ -366,19 +365,12 @@ func TestProbe026MissingNodes_RMTypeMismatch(t *testing.T) {
 	}
 }
 
-// loadFixture reads an OPT file from openehr/template/testdata
-// relative to the test file's own location. Reaches across the
-// module tree but stays inside the SDK; no transport involvement.
+// loadFixture reads a vendored template.opt from testkit/cassettes/templates/.
 func loadFixture(t *testing.T, name string) []byte {
 	t.Helper()
-	_, here, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatalf("could not resolve test file path via runtime.Caller")
-	}
-	path := filepath.Join(filepath.Dir(here), "..", "..", "..", "openehr", "template", "testdata", name)
-	body, err := os.ReadFile(path)
+	body, err := os.ReadFile(fixtures.TemplateOptForName(name))
 	if err != nil {
-		t.Fatalf("read fixture %q: %v", path, err)
+		t.Fatalf("read fixture %q: %v", name, err)
 	}
 	return body
 }
@@ -386,7 +378,7 @@ func loadFixture(t *testing.T, name string) []byte {
 func validBloodPressureComposition() *rm.Composition {
 	return &rm.Composition{
 		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
-		Name:            &rm.DVText{Value: "Encounter"},
+		Name:            rm.DVText{Value: "Encounter"},
 		Category: rm.DVCodedText{
 			DVText: rm.DVText{Value: "event"},
 			DefiningCode: rm.CodePhrase{
@@ -406,7 +398,7 @@ func validBloodPressureComposition() *rm.Composition {
 		Content: []rm.ContentItem{
 			&rm.Observation{
 				ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
-				Name:            &rm.DVText{Value: "Blood pressure"},
+				Name:            rm.DVText{Value: "Blood pressure"},
 				Language: rm.CodePhrase{
 					TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
 					CodeString:    "en",
@@ -418,19 +410,19 @@ func validBloodPressureComposition() *rm.Composition {
 				Subject: rm.PartySelf{},
 				Data: rm.History[rm.ItemStructure]{
 					ArchetypeNodeID: "at0001",
-					Name:            &rm.DVText{Value: "history"},
+					Name:            rm.DVText{Value: "history"},
 					Origin:          rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 					Events: []rm.Event{
 						&rm.PointEvent[rm.ItemStructure]{
 							ArchetypeNodeID: "at0006",
-							Name:            &rm.DVText{Value: "any event"},
+							Name:            rm.DVText{Value: "any event"},
 							Time:            rm.DVDateTime{Value: "2026-05-24T10:00:00Z"},
 							Data: &rm.ItemList{
 								ArchetypeNodeID: "at0003",
-								Name:            &rm.DVText{Value: "blood pressure"},
+								Name:            rm.DVText{Value: "blood pressure"},
 								Items: []rm.Element{{
 									ArchetypeNodeID: "at0004",
-									Name:            &rm.DVText{Value: "Systolic"},
+									Name:            rm.DVText{Value: "Systolic"},
 									Value: &rm.DVQuantity{
 										Magnitude: rm.Real(120),
 										Units:     "mm[Hg]",
@@ -439,10 +431,10 @@ func validBloodPressureComposition() *rm.Composition {
 							},
 							State: &rm.ItemList{
 								ArchetypeNodeID: "at0007",
-								Name:            &rm.DVText{Value: "state"},
+								Name:            rm.DVText{Value: "state"},
 								Items: []rm.Element{{
 									ArchetypeNodeID: "at0008",
-									Name:            &rm.DVText{Value: "Position"},
+									Name:            rm.DVText{Value: "Position"},
 								}},
 							},
 						},
@@ -450,11 +442,11 @@ func validBloodPressureComposition() *rm.Composition {
 				},
 				Protocol: &rm.ItemTree{
 					ArchetypeNodeID: "at0011",
-					Name:            &rm.DVText{Value: "protocol"},
+					Name:            rm.DVText{Value: "protocol"},
 					Items: []rm.Item{
 						&rm.Cluster{
 							ArchetypeNodeID: "openEHR-EHR-CLUSTER.device.v1",
-							Name:            &rm.DVText{Value: "Device"},
+							Name:            rm.DVText{Value: "Device"},
 						},
 					},
 				},

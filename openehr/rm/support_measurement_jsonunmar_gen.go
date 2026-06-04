@@ -26,10 +26,10 @@ func (m *MeasurementService) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return fmt.Errorf("canjson: MEASUREMENT_SERVICE: %w", err)
 	}
-	if aux.Class != "" && aux.Class != "MEASUREMENT_SERVICE" && aux.Class != "EXTERNAL_ENVIRONMENT_ACCESS" {
+	if aux.Class != "" && aux.Class != "MEASUREMENT_SERVICE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "MEASUREMENT_SERVICE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "MEASUREMENT_SERVICE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	return nil

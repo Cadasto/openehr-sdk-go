@@ -5,6 +5,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -20,9 +21,8 @@ type ItemTagJSONUnmarshaller struct {
 	Value  *string         `json:"value,omitempty"`
 	Target json.RawMessage `json:"target"` // polymorphic UIDBasedID
 	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
-	TargetPath *string `json:"target_path,omitempty"`
-	// OwnerID Identifier of owner object, such as EHR.
-	OwnerID ObjectRef `json:"owner_id"`
+	TargetPath *string         `json:"target_path,omitempty"`
+	OwnerID    json.RawMessage `json:"owner_id"` // polymorphic ObjectRefLike
 }
 
 // UnmarshalJSON decodes canonical openEHR JSON into ItemTag.
@@ -38,7 +38,7 @@ func (i *ItemTag) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "ITEM_TAG" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "ITEM_TAG", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "ITEM_TAG", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	i.Key = aux.Key
@@ -51,6 +51,21 @@ func (i *ItemTag) UnmarshalJSON(data []byte) error {
 		i.Target = dv
 	}
 	i.TargetPath = aux.TargetPath
-	i.OwnerID = aux.OwnerID
+	if len(aux.OwnerID) > 0 && string(aux.OwnerID) != "null" {
+		dv, err := typereg.DecodeAs[ObjectRefLike](aux.OwnerID)
+		if err != nil {
+			if errors.Is(err, typereg.ErrMissingType) {
+				var def ObjectRef
+				if jerr := json.Unmarshal(aux.OwnerID, &def); jerr != nil {
+					return &typereg.DecodeError{Path: "/owner_id", Inner: jerr}
+				}
+				i.OwnerID = &def
+			} else {
+				return &typereg.DecodeError{Path: "/owner_id", Inner: err}
+			}
+		} else {
+			i.OwnerID = dv
+		}
+	}
 	return nil
 }

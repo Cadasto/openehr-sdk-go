@@ -42,7 +42,7 @@ func (r *ResourceDescription) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "RESOURCE_DESCRIPTION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_DESCRIPTION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	r.OriginalAuthor = aux.OriginalAuthor
@@ -94,7 +94,7 @@ func (r *ResourceDescriptionItem) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "RESOURCE_DESCRIPTION_ITEM" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "RESOURCE_DESCRIPTION_ITEM", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "RESOURCE_DESCRIPTION_ITEM", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	r.Language = aux.Language
@@ -133,7 +133,7 @@ func (t *TranslationDetails) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "TRANSLATION_DETAILS" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "TRANSLATION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "TRANSLATION_DETAILS", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	t.Language = aux.Language

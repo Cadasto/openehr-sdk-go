@@ -8,11 +8,11 @@ package rm
 // Contribution Documents a Contribution (change set) of one or more versions added to a change-controlled repository.
 type Contribution struct {
 	// Audit Audit trail corresponding to the committal of this Contribution.
-	Audit AuditDetails `json:"audit"`
+	Audit AuditDetailsLike `json:"audit"`
 	// UID Unique identifier for this Contribution.
 	UID HierObjectID `json:"uid"`
 	// Versions Set of references to Versions causing changes to this EHR. Each contribution contains a list of versions, which may include paths pointing to any number of versionable items, i.e. items of types such as `COMPOSITION` and `FOLDER`.
-	Versions []ObjectRef `json:"versions"`
+	Versions []ObjectRefLike `json:"versions"`
 }
 
 // ImportedVersion Versions whose content is an `ORIGINAL_VERSION` copied from another location; this class inherits `_commit_audit_` and `_contribution_` from `VERSION<T>`, providing imported versions with their own audit trail and Contribution, distinct from those of the imported `ORIGINAL_VERSION`.
@@ -71,9 +71,9 @@ func (o *OriginalVersion[T]) IsMerged() bool {
 // Version Abstract model of one Version within a Version container, containing data, commit audit trail, and the identifier of its Contribution.
 type Version[T any] struct {
 	// CommitAudit Audit trail corresponding to the committal of this version to the `VERSIONED_OBJECT`.
-	CommitAudit AuditDetails `json:"commit_audit"`
+	CommitAudit AuditDetailsLike `json:"commit_audit"`
 	// Contribution Contribution in which this version was added.
-	Contribution ObjectRef `json:"contribution"`
+	Contribution ObjectRefLike `json:"contribution"`
 	// Signature OpenPGP digital signature or digest of content committed in this Version.
 	Signature *string `json:"signature,omitempty"`
 }
@@ -118,7 +118,7 @@ func (v *Version[T]) UID() ObjectVersionID {
 // VersionedObject Version control abstraction, defining semantics for versioning one complex object.
 type VersionedObject[T any] struct {
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRef `json:"owner_id"`
+	OwnerID ObjectRefLike `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
@@ -143,21 +143,21 @@ func (v *VersionedObject[T]) CommitAttestation(aVerID ObjectVersionID, anAttesta
 }
 
 // CommitImportedVersion Add a new imported version. Details of version id etc come from the `ORIGINAL_VERSION` being committed.
-func (v *VersionedObject[T]) CommitImportedVersion(aContribution ObjectRef, aVersion OriginalVersion[any], anAudit AuditDetails) any {
+func (v *VersionedObject[T]) CommitImportedVersion(aContribution ObjectRefLike, aVersion OriginalVersion[any], anAudit AuditDetailsLike) any {
 	panic("not implemented: VERSIONED_OBJECT.commit_imported_version — implement in a non-generated file")
 }
 
 // CommitOriginalMergedVersion Add a new original merged version. This commit function adds a parameter containing the ids of other versions merged into the current one.
 //
 // Pre: all_version_ids.has (a_preceding_version_uid) or else version_count = 0
-func (v *VersionedObject[T]) CommitOriginalMergedVersion(aContribution ObjectRef, aData T, aLifecycleState DVCodedText, aNewVersionUID ObjectVersionID, aPrecedingVersionID ObjectVersionID, anAudit AuditDetails, anOtherInputUids []ObjectVersionID, signingKey string) any {
+func (v *VersionedObject[T]) CommitOriginalMergedVersion(aContribution ObjectRefLike, aData T, aLifecycleState DVCodedText, aNewVersionUID ObjectVersionID, aPrecedingVersionID ObjectVersionID, anAudit AuditDetailsLike, anOtherInputUids []ObjectVersionID, signingKey string) any {
 	panic("not implemented: VERSIONED_OBJECT.commit_original_merged_version — implement in a non-generated file")
 }
 
 // CommitOriginalVersion Add a new original version.
 //
 // Pre: all_version_ids.has (a_preceding_version_uid) or else version_count = 0
-func (v *VersionedObject[T]) CommitOriginalVersion(aContribution ObjectRef, aData T, aLifecycleState DVCodedText, aNewVersionUID ObjectVersionID, aPrecedingVersionID ObjectVersionID, anAudit AuditDetails, signingKey string) any {
+func (v *VersionedObject[T]) CommitOriginalVersion(aContribution ObjectRefLike, aData T, aLifecycleState DVCodedText, aNewVersionUID ObjectVersionID, aPrecedingVersionID ObjectVersionID, anAudit AuditDetailsLike, signingKey string) any {
 	panic("not implemented: VERSIONED_OBJECT.commit_original_version — implement in a non-generated file")
 }
 

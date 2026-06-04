@@ -132,7 +132,7 @@ func (e *EventContext) MarshalXML(_e *xml.Encoder, _start xml.StartElement) erro
 		}
 	}
 	if e.HealthCareFacility != nil {
-		if err := _e.EncodeElement(e.HealthCareFacility, xml.StartElement{Name: xml.Name{Local: "health_care_facility"}}); err != nil {
+		if err := canxml.EncodePoly(_e, "health_care_facility", e.HealthCareFacility); err != nil {
 			return err
 		}
 	}

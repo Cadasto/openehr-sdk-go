@@ -36,7 +36,7 @@ func (c *Cluster) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -109,7 +109,7 @@ func (e *Element) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 		case xml.StartElement:
 			switch _t.Name.Local {
 			case "name":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}
@@ -155,7 +155,7 @@ func (e *Element) UnmarshalXML(_dec *xml.Decoder, _start xml.StartElement) error
 				}
 				e.Value = _v
 			case "null_reason":
-				_v, _err := DecodeDataValueTextXML(_dec, _t)
+				_v, _err := canxml.DecodeAsOrDefault[DVTextLike](_dec, _t, func() any { return new(DVText) })
 				if _err != nil {
 					return _err
 				}

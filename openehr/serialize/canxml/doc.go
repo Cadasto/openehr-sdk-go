@@ -73,6 +73,13 @@
 //
 // # Polymorphic dispatch
 //
+// [EncodePoly] uses a small reflect.New fallback in
+// [bmmNamerAndMarshaler] only to bridge value-typed concrete fields at
+// generic instantiation sites (e.g. DVInterval[DVQuantity].Lower where
+// Lower is DVQuantity by value). This is not _type dispatch — that
+// remains registry-driven per REQ-040 — and the copy is read-only for
+// marshalling.
+//
 // The codec consults [typereg.Default] for every `xsi:type` lookup,
 // reusing the type registry that powers canjson — `xsi:type`
 // discriminator strings are the same identifiers as canjson `_type`.

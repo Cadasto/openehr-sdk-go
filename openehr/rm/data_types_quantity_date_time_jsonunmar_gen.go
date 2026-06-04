@@ -50,7 +50,7 @@ func (d *DVDate) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_DATE" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_DATE", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DATE", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.MagnitudeStatus = aux.MagnitudeStatus
@@ -100,7 +100,7 @@ func (d *DVDateTime) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_DATE_TIME" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DATE_TIME", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.MagnitudeStatus = aux.MagnitudeStatus
@@ -154,7 +154,7 @@ func (d *DVDuration) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_DURATION" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_DURATION", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_DURATION", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.AccuracyIsPercent = aux.AccuracyIsPercent
@@ -205,7 +205,7 @@ func (d *DVTime) UnmarshalJSON(data []byte) error {
 	if aux.Class != "" && aux.Class != "DV_TIME" {
 		return &typereg.DecodeError{
 			Path:  "/_type",
-			Inner: fmt.Errorf("canjson: expected %q (or a descendant), got %q: %w", "DV_TIME", aux.Class, typereg.ErrTypeMismatch),
+			Inner: fmt.Errorf("canjson: expected %q, got %q: %w", "DV_TIME", aux.Class, typereg.ErrTypeMismatch),
 		}
 	}
 	d.MagnitudeStatus = aux.MagnitudeStatus
