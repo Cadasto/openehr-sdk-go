@@ -113,7 +113,20 @@ func findContentArchetypeRoots(root template.ObjectNode) []contentRoot {
 		arrayNodes := map[string]bool{}
 		collectArrayNodes(ar, arrayNodes)
 		r := contentRoot{id: ar.ArchetypeID(), terms: terms, descs: descs, node: ar, arrayNodes: arrayNodes}
-		if lbl, ok := terms["at0000"]; ok && lbl != "" {
+		// Name the runtime content node from the ArchetypeRoot's actual
+		// node_id, not a hardcoded "at0000": a template may specialise the
+		// root (e.g. at0000.1) and rename it (the OPT's term for the
+		// specialised code is the value the CDR validates the COMPOSITION's
+		// /content[...]/name against). Hardcoding at0000 picked the parent
+		// archetype term (e.g. "*Healthcare service request(en)") and made
+		// Cadasto reject the composition with a 422 name-mismatch.
+		rootCode := ar.NodeID()
+		if rootCode == "" {
+			rootCode = "at0000"
+		}
+		if lbl, ok := terms[rootCode]; ok && lbl != "" {
+			r.label = lbl
+		} else if lbl, ok := terms["at0000"]; ok && lbl != "" {
 			r.label = lbl
 		} else if parts := strings.Split(r.id, "."); len(parts) > 0 {
 			r.label = parts[len(parts)-1]
