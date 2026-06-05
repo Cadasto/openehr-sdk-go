@@ -87,12 +87,15 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if err := dec.Decode(&wire); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
-	// Forward-compat: defend against non-<template> documents that
-	// somehow decoded (e.g. when the OPT XSD wrapper is renamed by a
-	// downstream tool). xml.Decoder is permissive about root names
-	// when the target struct does not pin a namespace.
-	if wire.XMLName.Local != "" && wire.XMLName.Local != "template" {
-		return nil, fmt.Errorf("%w: root element <%s>, expected <template>", ErrInvalidOPT, wire.XMLName.Local)
+	// Accept both OPT serialisations: the OPT-XSD form (root <template>, of
+	// type OPERATIONAL_TEMPLATE) and the canonical AOM form where the root is
+	// the class name itself (<OPERATIONAL_TEMPLATE>, e.g. served by Cadasto's
+	// definition-endpoint). Both wrap identical children (template_id, concept,
+	// definition); only the root element name differs. The struct no longer
+	// pins XMLName so the decoder accepts either; we still reject genuinely
+	// foreign roots here.
+	if root := wire.XMLName.Local; root != "" && root != "template" && root != "OPERATIONAL_TEMPLATE" {
+		return nil, fmt.Errorf("%w: root element <%s>, expected <template> or <OPERATIONAL_TEMPLATE>", ErrInvalidOPT, root)
 	}
 	// Reject trailing non-whitespace tokens — a well-formed OPT has
 	// exactly one root element; anything else after </template> means
@@ -127,6 +130,9 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	}
 	if wire.Language != nil {
 		tmpl.language = strings.TrimSpace(wire.Language.CodeString)
+	} else if wire.OriginalLanguage != nil {
+		// Canonical AOM form (<OPERATIONAL_TEMPLATE>) uses <original_language>.
+		tmpl.language = strings.TrimSpace(wire.OriginalLanguage.CodeString)
 	}
 	return tmpl, nil
 }
@@ -167,14 +173,18 @@ func requireEOF(dec *xml.Decoder) error {
 // rebind the `xsi` prefix or omit the declaration on inner elements.
 
 type xmlTemplate struct {
-	XMLName     xml.Name         `xml:"template"`
-	Language    *xmlCodePhrase   `xml:"language"`
-	UID         *xmlValueWrapper `xml:"uid"`
-	TemplateID  *xmlValueWrapper `xml:"template_id"`
-	Concept     string           `xml:"concept"`
-	Description *xmlDescription  `xml:"description"`
-	Definition  *xmlCObject      `xml:"definition"`
-	Annotations []xmlAnnotation  `xml:"annotations"`
+	// XMLName is intentionally NOT pinned to "template": the decoder must also
+	// accept a <OPERATIONAL_TEMPLATE> root (canonical AOM form). The root name
+	// is validated explicitly in ParseOPT.
+	XMLName          xml.Name
+	Language         *xmlCodePhrase   `xml:"language"`
+	OriginalLanguage *xmlCodePhrase   `xml:"original_language"`
+	UID              *xmlValueWrapper `xml:"uid"`
+	TemplateID       *xmlValueWrapper `xml:"template_id"`
+	Concept          string           `xml:"concept"`
+	Description      *xmlDescription  `xml:"description"`
+	Definition       *xmlCObject      `xml:"definition"`
+	Annotations      []xmlAnnotation  `xml:"annotations"`
 }
 
 type xmlValueWrapper struct {
@@ -328,6 +338,17 @@ type xmlIdentifiedValue struct {
 func buildNode(o *xmlCObject, strict bool) (Node, error) {
 	if o == nil {
 		return nil, fmt.Errorf("%w: nil node", ErrInvalidOPT)
+	}
+	// T_ARCHETYPE_ROOT is the template-constraint flavour of an archetype
+	// root emitted by some CDRs (Cadasto) in the <OPERATIONAL_TEMPLATE>
+	// serialisation; the AOM/Ocean serialisation uses C_ARCHETYPE_ROOT.
+	// They are structurally identical for our decode (both carry
+	// archetype_id + term_definitions), so normalise to the C-form before
+	// the type switch. Without this the T-nodes fall through to the generic
+	// complex-object path, never become *ArchetypeRoot, and the datamap
+	// codec can't resolve content roots (no term labels, no expanded codes).
+	if o.Type == "T_ARCHETYPE_ROOT" {
+		o.Type = "C_ARCHETYPE_ROOT"
 	}
 	// The OPT root <definition> element carries no xsi:type but
 	// behaves as a C_ARCHETYPE_ROOT when an archetype_id is present

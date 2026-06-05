@@ -234,6 +234,22 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 			acts = append(acts, decoded)
 		}
 		payload["activities"] = acts
+		// protocol (bv. order-/aanvrager-details) — spiegelt de OBSERVATION-tak:
+		// alleen terugzetten bij een gevulde protocol-ITEM_TREE.
+		if proto, ok := node["protocol"].(map[string]any); ok {
+			items, err := decodeItems(structuredItemsList(proto), r)
+			if err != nil {
+				return "", nil, fmt.Errorf("protocol: %w", err)
+			}
+			if len(items) > 0 {
+				payload["protocol"] = items
+			}
+		}
+		// narrative (INSTRUCTION RM-attribuut, DV_TEXT) — emit de bare value
+		// wanneer aanwezig.
+		if nv := readDVValue(node["narrative"]); nv != nil && nv != "" {
+			payload["narrative"] = nv
+		}
 	case "ACTION":
 		if t := readDVValue(node["time"]); t != nil && t != "" {
 			payload["time"] = t
