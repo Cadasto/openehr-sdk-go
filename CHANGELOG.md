@@ -10,6 +10,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+- Transport-layer 401 → re-auth via optional `auth.Invalidatable` capability: `transport/` invalidates the active TokenSource on a wire 401 and retries once with a fresh token; `auth/clientcreds` implements it, recovering tokens minted without `expires_in` (REQ-063, PROBE-073/074).
+
 ## [0.3.0] - 2026-05-28
 
 Third `v0.x` minor — RM polymorphic decode coverage (SDK-GAP-11) closes the wire-shape substitution gap on concrete-typed RM slots (`LOCATABLE.name`, `AUDIT_DETAILS`, `OBJECT_REF`, …); ergonomic `Get*` accessors on the narrow `*Like` interfaces become the preferred read surface; testkit cassette coverage rounds out ehrbase Robot fixtures. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the single breaking change this cycle is the field-type lift on substitution slots (migrate via `rm.DVTextValueOf` / `rm.AsDVText` / `rm.AuditDetailsBase` / `rm.PartyIdentifiedBase` / `rm.ObjectRefBase` or the new `Get*` accessors); pin to the exact tag.

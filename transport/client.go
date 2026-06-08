@@ -145,14 +145,25 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		start = time.Now()
 	}
 	var (
-		resp    *Response
-		lastErr error
-		attempt int
+		resp     *Response
+		lastErr  error
+		attempt  int
+		reauthed bool
 	)
 	for {
 		attempt++
 		span.SetAttributes(attribute.Int("retry.attempt", attempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
+		// One-shot 401-driven re-auth (REQ-063): a wire 401 on an
+		// authenticated request can mean a stale cached token the source
+		// could not self-detect (e.g. minted without expires_in). Invalidate
+		// the token and retry once with a freshly acquired one, outside the
+		// retry budget so a disabled retry policy still recovers.
+		if !reauthed && c.reauthAfter401(ctx, req, resp) {
+			reauthed = true
+			span.AddEvent("auth.reauth_after_401")
+			continue
+		}
 		if !c.shouldRetry(req, resp, lastErr, attempt) {
 			break
 		}
@@ -343,6 +354,23 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 		return ts
 	}
 	return c.cfg.tokenSrc
+}
+
+// reauthAfter401 reports whether the request should be retried once after a
+// wire 401 because the active TokenSource supports invalidation (REQ-063).
+// When it returns true it has already invalidated the cached token, so the
+// next attempt's plumbHeaders acquires a fresh one. Requests that suppress
+// auth (NoAuth) or whose source is not Invalidatable surface the 401 as-is.
+func (c *Client) reauthAfter401(ctx context.Context, req *Request, resp *Response) bool {
+	if req.NoAuth || resp == nil || resp.StatusCode != http.StatusUnauthorized {
+		return false
+	}
+	inv, ok := c.tokenSourceFor(ctx).(auth.Invalidatable)
+	if !ok {
+		return false
+	}
+	inv.Invalidate()
+	return true
 }
 
 // mapWireError maps a non-2xx response onto a typed *WireError, decoding

@@ -140,6 +140,43 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 	}
 }
 
+// PROBE-074 proves REQ-063 — a token minted WITHOUT expires_in has a zero
+// ExpiresAt and is therefore never treated as stale, so it is reused across
+// Token calls; Invalidate drops it so the next call performs a fresh exchange.
+// This is the recovery path transport/ drives after a wire 401 when the
+// authorization server omits expires_in (the observed Cadasto acc behaviour).
+func TestInvalidateForcesRefetchWhenNoExpiry(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		n := atomic.AddInt32(&hits, 1)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "tok-" + string(byte('0'+n)),
+			"token_type":   "Bearer",
+			// deliberately NO expires_in → zero ExpiresAt
+		})
+	}))
+	defer srv.Close()
+
+	src, err := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t1, _ := src.Token(context.Background())
+	t2, _ := src.Token(context.Background())
+	if t1.Value != t2.Value {
+		t.Errorf("no-expiry token should be reused; got %q then %q", t1.Value, t2.Value)
+	}
+	src.Invalidate()
+	t3, _ := src.Token(context.Background())
+	if t3.Value == t1.Value {
+		t.Errorf("expected fresh token after Invalidate; still %q", t3.Value)
+	}
+	if h := atomic.LoadInt32(&hits); h != 2 {
+		t.Errorf("expected exactly 2 token fetches (initial + post-invalidate), got %d", h)
+	}
+}
+
 func TestTokenAuthBasicOAuth2FormEncoding(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()

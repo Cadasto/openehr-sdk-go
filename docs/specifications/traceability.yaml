@@ -335,9 +335,12 @@ requirements:
     canonical: docs/specifications/auth.md#req-063
     status: draft
     implementation: partial
-    packages: [auth/smart]
+    packages: [auth/smart, auth, auth/clientcreds, transport]
+    probes: [PROBE-073, PROBE-074]
     tests:
       - auth/smart/smart_test.go
+      - transport/reauth_test.go
+      - auth/clientcreds/clientcreds_test.go
 
   - id: REQ-064
     title: Launch context

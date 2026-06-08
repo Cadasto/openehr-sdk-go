@@ -161,6 +161,17 @@ func FromConfig(cfg Config) (*Source, error) {
 	return &Source{cfg: cfg, tokenURL: u}, nil
 }
 
+// Invalidate drops the cached token so the next Token call performs a fresh
+// exchange. It satisfies auth.Invalidatable: transport/ calls this after a
+// wire 401 on an authenticated request, which recovers the case where the
+// authorization server omitted "expires_in" (zero ExpiresAt → never treated
+// as stale) yet the token has in fact expired server-side (REQ-063).
+func (s *Source) Invalidate() {
+	s.mu.Lock()
+	s.cur = auth.Token{}
+	s.mu.Unlock()
+}
+
 // Token returns the current access token, refreshing transparently
 // when the cached token is within RefreshThreshold of expiry.
 // Concurrent callers share the in-flight exchange.

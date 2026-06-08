@@ -151,9 +151,15 @@ Refresh uses the stored `refresh_token` against the deployment's `token_endpoint
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
 
+#### Transport-layer 401 → re-auth (Invalidatable)
+
+A `TokenSource` **MAY** implement the optional `auth.Invalidatable` capability (a single `Invalidate()` method that drops any cached token). When the active source implements it, `transport/` **MUST**, on a `401 Unauthorized` for an authenticated request, invalidate the source and retry the request **exactly once** with a freshly acquired token, outside the retry budget (so a disabled retry policy still recovers). A source that does not implement `Invalidatable` (e.g. `StaticTokenSource`) surfaces the `401` to the consumer unchanged.
+
+This recovers the case a source **cannot** self-detect: an access token minted without an `expires_in` hint has a zero `ExpiresAt` and is therefore never treated as stale by proactive refresh, yet may have expired server-side. `auth/clientcreds` implements `Invalidatable`; `Invalidate()` clears the cached token so the next `Token()` performs a fresh client-credentials exchange.
+
 Out of scope (v1 implementation status):
 
-- **Transport-layer 401 → refresh:** `transport/` maps `401 Unauthorized` to `ErrUnauthorized` and does **not** invoke `auth/smart` refresh automatically. Proactive refresh on `TokenSource.Token()` before expiry is implemented; wire-triggered re-auth after an expired access token on an in-flight REST call is the consumer's responsibility (call `Token()` again or restart the launch flow). `auth/clientcreds` and `auth/jwtbearer` have no refresh path.
+- **`auth/smart` refresh-token surfacing:** the typed re-authentication-required signal on `refresh_token`-grant failure is still to be designed; `auth/smart` does not yet auto-refresh via its stored `refresh_token` on a wire 401. The transport-layer `Invalidatable` re-auth above covers re-acquirable grants (`auth/clientcreds`); `auth/jwtbearer` may adopt `Invalidatable` when its re-assertion path lands.
 
 ### REQ-064 — Launch context
 

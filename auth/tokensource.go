@@ -53,6 +53,22 @@ type TokenSource interface {
 	Token(ctx context.Context) (Token, error)
 }
 
+// Invalidatable is an optional capability a TokenSource MAY implement: it
+// drops any cached token so the next Token call re-acquires a fresh one.
+//
+// transport/ type-asserts the active TokenSource to Invalidatable after a
+// wire 401 on an authenticated request and, when supported, invalidates and
+// retries the request exactly once with a freshly acquired token (REQ-063).
+// This recovers from a stale cached token the source could not self-detect —
+// most notably one minted without an expiry hint (no "expires_in"), which
+// has a zero ExpiresAt and is therefore never proactively refreshed.
+//
+// Sources that cannot refresh (e.g. StaticTokenSource) MUST NOT implement
+// this; the 401 then surfaces to the caller unchanged.
+type Invalidatable interface {
+	Invalidate()
+}
+
 // StaticTokenSource returns a TokenSource that always yields t.
 //
 // Useful for tests, for short-lived ad-hoc clients, and for consumers
