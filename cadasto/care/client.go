@@ -591,6 +591,26 @@ func (c *Client) UpdateCompositionRaw(ctx context.Context, patientID, voID, ifMa
 	return "", nil
 }
 
+// DeleteComposition logically deletes the composition addressed by
+// versionUID. Per ITS-REST (and the Cadasto EHR-API docs) the path parameter
+// MUST be the latest (most recent) full OBJECT_VERSION_ID — it doubles as the
+// concurrency token: a stale uid yields 409 with the current version in the
+// ETag. The delete is logical: a new version with lifecycle "deleted" is
+// appended; the version history stays intact and AQL no longer returns the
+// composition.
+func (c *Client) DeleteComposition(ctx context.Context, patientID, versionUID string) error {
+	uid := cleanVersionUID(versionUID)
+	req := &transport.Request{
+		Method: http.MethodDelete,
+		Path:   "/ehr/" + url.PathEscape(patientID) + "/composition/" + url.PathEscape(uid),
+		Route:  "/ehr/{ehr_id}/composition/{preceding_version_uid}",
+	}
+	if _, err := c.rest.Do(ctx, req); err != nil {
+		return fmt.Errorf("care: delete composition %s: %w", uid, err)
+	}
+	return nil
+}
+
 // cleanVersionUID strips surrounding quotes and the gzip-proxy "-gzip" ETag
 // suffix that Cadasto's Caddy front-end appends to compression-negotiated
 // responses, leaving a bare version uid.
