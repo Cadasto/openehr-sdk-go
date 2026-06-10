@@ -22,6 +22,67 @@ import (
 // shape mirrors what FromComposition produces (content keyed by
 // "<archetype-id>|<label>", items by "<at-code>|<label>"); bare keys without
 // the "|label" suffix are also accepted. context.start_time is required.
+// encodeComposer builds COMPOSITION.composer (PARTY_IDENTIFIED). The payload
+// value is either a plain string (name-only, backwards compatible) or an
+// expanded map:
+//
+//	{"name": "...",
+//	 "id": "...", "id_scheme": "...", "id_namespace": "...", "id_type": "...",
+//	 "identifiers": [{"id": "...", "type": "...", "issuer": "...", "assigner": "..."}, ...]}
+//
+// The id* keys become an external_ref (PARTY_REF/GENERIC_ID) so the composer
+// is AQL-queryable on identifier (c/composer/external_ref/id/value) instead
+// of display name; identifiers become DV_IDENTIFIERs (e.g. AGB, tenant).
+func encodeComposer(v any) map[string]any {
+	out := map[string]any{"_type": "PARTY_IDENTIFIED", "name": "Cadasto SDK"}
+	switch c := v.(type) {
+	case string:
+		if c != "" {
+			out["name"] = c
+		}
+	case map[string]any:
+		if name, _ := c["name"].(string); name != "" {
+			out["name"] = name
+		}
+		if id, _ := c["id"].(string); id != "" {
+			out["external_ref"] = map[string]any{
+				"_type":     "PARTY_REF",
+				"namespace": stringOrDefault(c["id_namespace"], "lab24"),
+				"type":      stringOrDefault(c["id_type"], "PERSON"),
+				"id": map[string]any{
+					"_type":  "GENERIC_ID",
+					"value":  id,
+					"scheme": stringOrDefault(c["id_scheme"], "id"),
+				},
+			}
+		}
+		if ids, _ := c["identifiers"].([]any); len(ids) > 0 {
+			list := make([]any, 0, len(ids))
+			for _, raw := range ids {
+				m, _ := raw.(map[string]any)
+				if m == nil {
+					continue
+				}
+				idv, _ := m["id"].(string)
+				if idv == "" {
+					continue
+				}
+				dv := map[string]any{"_type": "DV_IDENTIFIER", "id": idv}
+				for _, k := range []string{"type", "issuer", "assigner"} {
+					if s, _ := m[k].(string); s != "" {
+						dv[k] = s
+					}
+				}
+				list = append(list, dv)
+			}
+			if len(list) > 0 {
+				out["identifiers"] = list
+			}
+		}
+	}
+	return out
+}
+
 func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (map[string]any, error) {
 	root, ok := opt.Root().(template.ObjectNode)
 	if !ok {
@@ -30,7 +91,7 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 
 	language := stringOrDefault(payload["language"], "nl")
 	territory := stringOrDefault(payload["territory"], "NL")
-	composer := stringOrDefault(payload["composer"], "Cadasto SDK")
+	composer := encodeComposer(payload["composer"])
 
 	contextPayload, _ := payload["context"].(map[string]any)
 	startTime := stringOrDefault(contextPayload["start_time"], "")
@@ -77,7 +138,7 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 		"language":          codePhrase("ISO_639-1", language),
 		"territory":         codePhrase("ISO_3166-1", territory),
 		"category":          dvCodedText("event", "openehr", "433"),
-		"composer":          map[string]any{"_type": "PARTY_IDENTIFIED", "name": composer},
+		"composer":          composer,
 		"context": map[string]any{
 			"_type":      "EVENT_CONTEXT",
 			"start_time": dvDateTime(startTime),
