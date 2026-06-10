@@ -250,6 +250,11 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 		if nv := readDVValue(node["narrative"]); nv != nil && nv != "" {
 			payload["narrative"] = nv
 		}
+		// guideline_id (OBJECT_REF) — passthrough terug de datamap in, zodat
+		// de formulier-referentie niet verloren gaat bij decoderen.
+		if g, ok := node["guideline_id"].(map[string]any); ok && len(g) > 0 {
+			payload["guideline_id"] = g
+		}
 	case "ACTION":
 		if t := readDVValue(node["time"]); t != nil && t != "" {
 			payload["time"] = t

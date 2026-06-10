@@ -416,6 +416,14 @@ func encodeInstruction(out map[string]any, r contentRoot, payload map[string]any
 		out["narrative"] = dvText(termOrFallback(r.terms, "narrative", "Instruction"))
 	}
 
+	// guideline_id (CARE_ENTRY RM-attribuut, OBJECT_REF) — verwijzing naar de
+	// richtlijn/het formulier dat deze entry voortbracht. Passthrough van de
+	// caller-payload (map met id/namespace/type); legacy-systemen leggen hier
+	// de view-template/formulier-naam vast.
+	if g, ok := payload["guideline_id"].(map[string]any); ok && len(g) > 0 {
+		out["guideline_id"] = g
+	}
+
 	// protocol (ITEM_TREE, bv. order-identifier + status) — dezelfde machinerie
 	// als OBSERVATION; alleen gezet wanneer de datamap er inhoud voor levert en
 	// de OPT 'm constraint. Eerder ontbrak dit voor INSTRUCTION, waardoor een
