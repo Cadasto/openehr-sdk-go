@@ -636,7 +636,24 @@ func encodeValue(constraint template.ObjectNode, payload any, terms map[string]s
 	switch rmType := constraint.RMTypeName(); rmType {
 	case "DV_QUANTITY":
 		return encodeQuantity(constraint, payload)
-	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_TEXT", "DV_BOOLEAN", "DV_URI", "DV_EHR_URI":
+	case "DV_TEXT":
+		// DV_CODED_TEXT IS-A DV_TEXT: een DV_TEXT-constraint staat een coded
+		// instance toe. Draagt de payload een code (short-form
+		// {code,value,terminology} of een defining_code), emit dan
+		// DV_CODED_TEXT zodat de code behouden blijft — anders verliest bv.
+		// at0121 "Aangevraagde dienst" (order-OPT) z'n bestelcode bij commit.
+		if m, ok := payload.(map[string]any); ok && hasUsableCode(m) {
+			if terminology, code, display, pok := parseCodeField(m); pok {
+				label := display
+				if label == "" {
+					label = code
+				}
+				return dvCodedText(label, terminology, code), nil
+			}
+			return encodeCodedText(payload, terms)
+		}
+		return encodeScalarWrap(rmType, payload), nil
+	case "DV_DATE_TIME", "DV_DATE", "DV_TIME", "DV_BOOLEAN", "DV_URI", "DV_EHR_URI":
 		return encodeScalarWrap(rmType, payload), nil
 	case "DV_COUNT":
 		return encodeCount(payload)
