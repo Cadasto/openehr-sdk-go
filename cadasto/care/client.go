@@ -284,6 +284,26 @@ func (c *Client) CreatePatient(ctx context.Context) (string, error) {
 // (archetype-id, IsModifiable/IsQueryable defaults, subject shape with
 // PartySelf/PartyRef/GenericID nesting). Centralising it here keeps
 // callers from rebuilding the boilerplate.
+// FindEHR looks up an existing EHR by subject (namespace + external id),
+// WITHOUT creating one on a miss — the read-path counterpart of
+// FindOrCreateEHR (reads must never mint EHRs). found=false on a clean miss.
+func (c *Client) FindEHR(ctx context.Context, namespace, externalID string) (string, bool, error) {
+	if namespace == "" || externalID == "" {
+		return "", false, fmt.Errorf("care: FindEHR: namespace and externalID are required")
+	}
+	existing, _, err := ehr.GetBySubject(ctx, c.rest, namespace, externalID)
+	if err != nil {
+		if errors.Is(err, transport.ErrNotFound) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("care: FindEHR: lookup %s/%s: %w", namespace, externalID, err)
+	}
+	if existing == nil {
+		return "", false, nil
+	}
+	return existing.EHRID.Value, true, nil
+}
+
 func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID string) (string, error) {
 	if namespace == "" || externalID == "" {
 		return "", fmt.Errorf("care: FindOrCreateEHR: namespace and externalID are required")
