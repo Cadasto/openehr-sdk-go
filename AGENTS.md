@@ -36,10 +36,11 @@ Reading order for any contributor or agent:
 
 | # | Doc | Scope |
 |---|---|---|
+| 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
 | 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
 | 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine-readable map in [traceability.yaml](docs/specifications/traceability.yaml) |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package map + mermaid diagram |
-| 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks |
+| 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI agent conventions, MCP / openEHR skills, hooks, **example-doc maintenance** |
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions (0001–0005 Accepted) |
 | 6 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
 | 7 | [CHANGELOG.md](CHANGELOG.md) | High-level release log (`## [Unreleased]` rolls forward) |
@@ -58,6 +59,19 @@ When implementing or reviewing against a REQ:
 4. Run `make spec-check` before claiming spec compliance (`make ci` includes it).
 
 New normative text goes in the **canonical topic spec** first, then the REQ registry row — not duplicate bodies in `REQ.md`.
+
+### Runnable examples (agents)
+
+[`cmd/examples/`](cmd/examples/) holds worked programs for each major SDK surface. [`docs/examples.md`](docs/examples.md) is the **developer-facing catalog**; [`docs/quick-start.md`](docs/quick-start.md) is the onboarding path that links into it.
+
+When you **add, rename, remove, or materially change** an example (CLI flags, packages shown, fixtures, or the integration path it demonstrates), update the docs in the **same PR**:
+
+1. [`cmd/examples/doc.go`](cmd/examples/doc.go) — package comment bullet list (canonical inventory for agents).
+2. [`docs/examples.md`](docs/examples.md) — summary table, per-example section, learning order if the story changed.
+3. [`docs/quick-start.md`](docs/quick-start.md) — only when the change affects onboarding (new first-run path, new REST wiring pattern, or a snippet worth copying).
+4. [`README.md`](README.md) — Quickstart block if the recommended first command changes.
+
+Run the example (`go run ./cmd/examples/<name>`) and align any sample output in the docs with what it actually prints. Full checklist: [docs/ai-workflow.md § Developer examples](docs/ai-workflow.md#developer-examples--docs).
 
 ## Module layout
 

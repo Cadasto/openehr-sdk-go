@@ -29,6 +29,32 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
    - For RM mapping during CDR extraction, cross-check against the private reference CDR codebase — but do not blindly port; the SDK has stricter boundary rules.
 5. **Build** before claiming done: `make ci` (includes `make spec-check`). See [ci.md](ci.md) for what GitHub runs on every PR.
 
+## Developer examples & docs
+
+[`cmd/examples/`](../cmd/examples/) demonstrates integration patterns for human developers. [`examples.md`](examples.md) catalogs them; [`quick-start.md`](quick-start.md) is the onboarding entry. Agents landing or evolving examples MUST keep those docs in sync — same PR, no follow-up ticket.
+
+### When to update
+
+| Change | Update |
+|---|---|
+| New `cmd/examples/<name>/` | `doc.go` bullet, `examples.md` (table + section), learning order if relevant |
+| Rename or remove an example | Same files; grep for stale paths in `docs/` and `README.md` |
+| New/changed CLI flags or default fixtures | `examples.md` flags table; example file header comment |
+| New public API surface the example is meant to teach | `quick-start.md` snippet if it's a primary path; otherwise `examples.md` only |
+| Example now needs network / auth / env vars | Document prerequisites in `examples.md`; wire pattern in `quick-start.md` if it's the first REST example of that kind |
+
+### Per-example section shape (`docs/examples.md`)
+
+Each entry SHOULD include: **purpose** (one sentence), **run command(s)**, **packages imported**, **fixtures** (if non-obvious), **flags** (table when applicable), and **what to copy** into an app. Keep sample output short and verified — run the program, don't guess.
+
+### Inventory sources (keep aligned)
+
+1. [`cmd/examples/doc.go`](../cmd/examples/doc.go) — machine/agent index in the package comment.
+2. [`docs/examples.md`](examples.md) — human catalog with narrative.
+3. Example `main.go` header — run instructions and REQ citations for implementers.
+
+If the three disagree, `doc.go` and the runnable code win; fix the markdown to match.
+
 ## Editing rules
 
 ### Always
@@ -40,6 +66,7 @@ How AI assistant agents (Claude Code, Cursor, Copilot, Codex, …) should work i
 - **Functional options** for configuration. Constructors take options, not config structs.
 - **`internal/` for implementation helpers** with no public-surface rationale — document the rationale in [architecture.md](architecture.md) when adding to `internal/`.
 - **Conventional Commits** for commit messages (see [AGENTS.md § Code style and conventions](../AGENTS.md#code-style-and-conventions)).
+- **Keep example docs in sync** when changing [`cmd/examples/`](../cmd/examples/) — see [Developer examples & docs](#developer-examples--docs) and [AGENTS.md § Runnable examples](../AGENTS.md#runnable-examples-agents).
 - **CHANGELOG.md** — short, high-level `## [Unreleased]` bullets only. File-level detail belongs in commit messages and PR bodies. **Pre-1.0:** only `### Added` is used; `### Changed` / `### Fixed` / `### Removed` are reserved for post-v1.0 entries. See [AGENTS.md § Code style and conventions](../AGENTS.md#code-style-and-conventions).
 
 ### Never

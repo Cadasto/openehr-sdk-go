@@ -5,6 +5,11 @@
 // soon-to-exist federator, etc.) live in their own repos — examples
 // here are reference shapes only.
 //
+// Developer docs: docs/examples.md (catalog) and docs/quick-start.md
+// (onboarding). When adding or materially changing an example, update
+// those files and this bullet list in the same PR — see AGENTS.md
+// § Runnable examples and docs/ai-workflow.md § Developer examples.
+//
 // Runnable programs (from repo root):
 //
 //   - cmd/examples/canonical_json       — canjson decode (REQ-052)
