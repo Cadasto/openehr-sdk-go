@@ -34,6 +34,9 @@ func TestGetStoredQueryEmptyBody(t *testing.T) {
 	if meta.Name != wantName {
 		t.Errorf("Name = %q, want %q", meta.Name, wantName)
 	}
+	if meta.Version != wantVersion {
+		t.Errorf("Version = %q, want %q", meta.Version, wantVersion)
+	}
 }
 
 func TestPutStoredQuery(t *testing.T) {

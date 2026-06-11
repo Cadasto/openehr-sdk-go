@@ -117,12 +117,13 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 // Wire: GET /definition/query/{qualified_query_name}/{version}.
 func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, version string) (*StoredQueryMetadata, *transport.Metadata, error) {
 	name := strings.TrimSpace(qualifiedName)
-	if name == "" || strings.TrimSpace(version) == "" {
+	ver := strings.TrimSpace(version)
+	if name == "" || ver == "" {
 		return nil, nil, fmt.Errorf("definition.GetStoredQuery: %w: name and version are required", transport.ErrInvalidConfig)
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(version),
+		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(ver),
 		Route:  "/definition/query/{qualified_query_name}/{version}",
 		Accept: "application/json",
 	}
@@ -134,7 +135,7 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 		return nil, nil, err
 	}
 	if len(resp.Body) == 0 {
-		return &StoredQueryMetadata{Name: name, Version: version}, resp.Metadata, nil
+		return &StoredQueryMetadata{Name: name, Version: ver}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
@@ -200,5 +201,3 @@ func DeleteStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, 
 	}
 	return resp.Metadata, nil
 }
-
-// extend Repository in template.go - I'll add methods to repository interface via stored_query_repo.go patch
