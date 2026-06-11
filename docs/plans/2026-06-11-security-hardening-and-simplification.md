@@ -202,22 +202,20 @@ Add `WithMaxResponseBody(n int64) Option` following the `WithRetry` pattern at `
 - Modify: `openehr/client/ehr/itemtag_wire.go:139`, `smart/principal.go:51`
 - Test: `openehr/client/ehr` wire tests, `smart` principal tests
 
-- [ ] **Step 1: Failing tests** — (a) `FormatItemTagHeader` with `Key: "k\r\nX-Evil: 1"` returns an error (preferred over silent stripping — a tag key with CR/LF is caller error); (b) mutate the map passed into principal construction after the call; assert `PrincipalIdentity.Raw` is unaffected.
-- [ ] **Step 2: Run** — `go test ./openehr/client/ehr/ ./smart/ -v` → FAIL.
-- [ ] **Step 3: Implement** —
-  - `itemtag_wire.go`: in `FormatItemTagHeader`, before writing each field: `if strings.ContainsAny(s, "\r\n\x00") { return "", fmt.Errorf("item tag field contains control characters") }` (keep `escapeItemTagValue` for quotes). Go's transport would reject the request anyway, but failing here gives the caller a actionable error instead of a transport refusal. Reject all bytes < 0x20 except `\t`.
-  - `principal.go`: `Raw: maps.Clone(claims)`.
-- [ ] **Step 4: Run** — `go test ./openehr/client/... ./smart/... -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(ehr,smart): reject control chars in item-tag headers; copy principal claims`
+- [x] **Step 1: Failing tests** — (a) `FormatItemTagHeader` with `Key: "k\r\nX-Evil: 1"` returns an error (preferred over silent stripping — a tag key with CR/LF is caller error); (b) mutate the map passed into principal construction after the call; assert `PrincipalIdentity.Raw` is unaffected.
+- [x] **Step 2: Run** — `go test ./openehr/client/ehr/ ./smart/ -v` → FAIL.
+- [x] **Step 3: Implement** — `hasCtrlChars` rejects bytes <0x20 except tab, plus DEL (0x7F), on Key/Value/TargetPath; `principalFromClaims` uses `maps.Clone`. Review follow-up also cloned `LaunchContext.Raw` (same aliasing) — `15641bb`.
+- [x] **Step 4: Run** — `go test ./openehr/client/... ./smart/... -v` → PASS.
+- [x] **Step 5: Commit** — `fix(ehr,smart): reject control chars in item-tag headers; copy principal claims` *(8b40580 + 15641bb)*
 
 ### Task 7: Check JWKS fetch status before reading the body (R6)
 
 **Files:**
 - Modify: `auth/smart/jwks.go:113-122`
 
-- [ ] **Step 1**: Reorder — status check first, drain ≤ 4 KiB to `io.Discard` on non-2xx, then the existing `io.LimitReader(resp.Body, 1<<20)` read. Behavior-preserving; existing tests must stay green.
-- [ ] **Step 2: Run** — `go test ./auth/smart/ -v` → PASS.
-- [ ] **Step 3: Commit** — `chore(auth/smart): check JWKS status before body read`
+- [x] **Step 1**: Reorder — status check first, drain ≤ 4 KiB to `io.Discard` on non-2xx, then the existing `io.LimitReader(resp.Body, 1<<20)` read. Behavior-preserving; existing tests must stay green.
+- [x] **Step 2: Run** — `go test ./auth/smart/ -v` → PASS.
+- [x] **Step 3: Commit** — `chore(auth/smart): check JWKS status before body read` *(a66ac41)*
 
 ---
 
