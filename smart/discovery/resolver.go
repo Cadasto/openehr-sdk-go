@@ -444,10 +444,11 @@ func acceptedVersionsString(m map[string]struct{}) string {
 }
 
 // warnInsecure emits a logger warning when any catalog URL uses
-// plaintext http://. The Resolver does not refuse those URLs (only the
-// initial issuer fetch is gated by allowInsecure) — the consumer is
-// authoritative on which deployments they want to talk to. The warning
-// surfaces the posture so misconfigurations are visible.
+// plaintext http://. It only runs for catalogs that passed parsing: in
+// strict mode non-https auth endpoints are rejected there, so warnings
+// here cover the allowInsecure path plus service base_url entries,
+// which are warn-only — the consumer is authoritative on which
+// deployments they want to talk to.
 func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check := func(name string, u *url.URL) {
 		if u == nil {
