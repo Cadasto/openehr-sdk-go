@@ -456,4 +456,3 @@ func jsonTagFor(prop bmm.Property, propName string) string {
 	}
 	return fmt.Sprintf("`json:%q`", propName+",omitempty")
 }
-
