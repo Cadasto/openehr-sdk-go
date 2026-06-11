@@ -133,6 +133,9 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 		}
 		return nil, nil, err
 	}
+	if len(resp.Body) == 0 {
+		return &StoredQueryMetadata{Name: name, Version: version}, resp.Metadata, nil
+	}
 	var out StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
 		return nil, resp.Metadata, fmt.Errorf("definition.GetStoredQuery: decode: %w", err)
