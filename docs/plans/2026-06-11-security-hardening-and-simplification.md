@@ -229,9 +229,9 @@ Add `WithMaxResponseBody(n int64) Option` following the `WithRetry` pattern at `
 - Modify: `openehr/template/parse.go` (reader entry), `openehr/client/definition/template.go:170`, `openehr/bmm/load.go:20`
 - Test: each package's parse/upload tests
 
-- [ ] **Step 1: Failing tests** — feed each entry point a reader larger than its cap (use `io.LimitReader` over `rand.Reader` masked to ASCII, or a repeat-reader); assert a size-limit error, not an OOM or parse error.
-- [ ] **Step 2: Run** — `go test ./openehr/template/ ./openehr/client/definition/ ./openehr/bmm/ -v` → FAIL.
-- [ ] **Step 3: Implement** — shared idiom, local constants (no new package needed):
+- [x] **Step 1: Failing tests** — feed each entry point a reader larger than its cap (use `io.LimitReader` over `rand.Reader` masked to ASCII, or a repeat-reader); assert a size-limit error, not an OOM or parse error.
+- [x] **Step 2: Run** — `go test ./openehr/template/ ./openehr/client/definition/ ./openehr/bmm/ -v` → FAIL.
+- [x] **Step 3: Implement** — shared idiom, local constants (no new package needed). *(Caps are unexported `var`s for test-overridability; OPT path uses `io.LimitedReader` with an `N==0` check after decode + requireEOF — see boundary test. `bmm.Load` wraps new `ErrInputTooLarge`. Commits a7aab6f + 60d673f.)*
 
 ```go
 const maxOPTBytes = 32 << 20 // generous: real OPTs are < 5 MiB
@@ -245,8 +245,8 @@ if int64(len(data)) > maxOPTBytes {
 ```
 
 Caps: OPT parse 32 MiB, `UploadTemplate` 32 MiB, `bmm.Load` 32 MiB. For the streaming `xml.Decoder` path in `parse.go`, wrap the reader itself with the limit (decoder errors at the cap; map that error to the message above).
-- [ ] **Step 4: Run** — `go test ./openehr/... -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(template,bmm,client): bound untrusted input reads`
+- [x] **Step 4: Run** — `go test ./openehr/... -v` → PASS.
+- [x] **Step 5: Commit** — `fix(template,bmm,client): bound untrusted input reads` *(a7aab6f + 60d673f)*
 
 ### Task 9: Depth-limit OPT tree build and path walking (R2)
 
