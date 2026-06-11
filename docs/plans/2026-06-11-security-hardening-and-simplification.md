@@ -324,11 +324,13 @@ type CString struct {
 - Modify: `openehr/bmm/internal.go:40-…` (`marshalDiscriminated`, `marshalClassObject`), `openehr/bmm/function.go:120`
 - Test: `openehr/bmm` round-trip tests; add a determinism test
 
-- [ ] **Step 1: Failing test** — marshal a `Function` with ≥ 5 fields 50 times; assert byte-identical output every time (fails today: `map[string]any` ordering).
-- [ ] **Step 2: Run** — `go test ./openehr/bmm/ -run TestMarshalDeterminism -v` → FAIL (flaky-by-design today).
-- [ ] **Step 3: Implement** — replace `Function.MarshalJSON`'s map with the buffer + `sortedKeys` style already used by `marshalDiscriminated`. Then remove the marshal→unmarshal round-trip inside `marshalDiscriminated`/`marshalClassObject`: the common structs have ≤ 4 statically known fields — emit them directly with a small `emitField(buf, key string, v any)` helper.
-- [ ] **Step 4: Run** — `go test ./openehr/bmm/ -v` (round-trip corpus is the real gate) → PASS.
-- [ ] **Step 5: Commit** — `perf(bmm): deterministic direct-emission marshalling`
+**DESCOPED after investigation** (`b45e047`):
+
+- **Q3 (determinism) — non-issue.** The premise ("`map[string]any` ordering is random") is wrong: Go's `encoding/json` **sorts string map keys**, so `Function.MarshalJSON` output is already deterministic. Verified empirically — byte-identical across 50×5 marshal runs. No determinism bug exists.
+- **Real residue applied:** `Function.MarshalJSON` copied `Parameters` into an identical intermediate map for no reason. Removed it (direct assign) and documented the stable-ordering guarantee. Round-trip corpus green.
+- **Q2 (round-trip removal) — deliberately NOT done.** `marshalDiscriminated`'s `json.Marshal`→`Unmarshal`→re-emit is *correct* and produces sorted-key output the round-trip corpus depends on byte-for-byte. It runs at codegen / BMM-load time, **not** on the openEHR data hot path, so the gain is a constant factor on cold code. A direct-emission rewrite would have to reproduce the exact sorted output or break the corpus — risk > value. Left as-is per YAGNI.
+
+- [x] Applied: `simplify(bmm): drop redundant Parameters map copy in Function.MarshalJSON` *(b45e047)*
 
 ### Task 14: Deduplicate `parseOAuth2Error` and `marshalAuditDetails` (Q4, Q5)
 
