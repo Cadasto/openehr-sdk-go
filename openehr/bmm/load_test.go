@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -453,8 +452,8 @@ func TestLoad_inputTooLarge(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when input exceeds maxBMMBytes")
 	}
-	if !strings.Contains(err.Error(), "exceeds") {
-		t.Errorf("error should mention 'exceeds', got: %v", err)
+	if !errors.Is(err, ErrInputTooLarge) {
+		t.Errorf("error should wrap ErrInputTooLarge, got: %v", err)
 	}
 }
 

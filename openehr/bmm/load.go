@@ -28,7 +28,7 @@ func Load(r io.Reader) (*Schema, error) {
 		return nil, fmt.Errorf("bmm.Load: read: %w", err)
 	}
 	if int64(len(data)) > maxBMMBytes {
-		return nil, fmt.Errorf("bmm.Load: input exceeds %d bytes", maxBMMBytes)
+		return nil, fmt.Errorf("bmm.Load: %w: exceeds %d bytes", ErrInputTooLarge, maxBMMBytes)
 	}
 	return loadFromBytes(data)
 }

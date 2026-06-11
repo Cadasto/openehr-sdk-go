@@ -33,6 +33,11 @@ var (
 	// inconsistent shape (e.g. a P_BMM_CONTAINER_TYPE with neither
 	// type_def nor type set).
 	ErrInvalidShape = errors.New("bmm: invalid object shape")
+
+	// ErrInputTooLarge is returned when a BMM document exceeds the
+	// loader's read cap (see maxBMMBytes), guarding against memory
+	// exhaustion from a hostile or oversized schema.
+	ErrInputTooLarge = errors.New("bmm: input too large")
 )
 
 // unknownTypeError wraps ErrUnknownType with the offending discriminator

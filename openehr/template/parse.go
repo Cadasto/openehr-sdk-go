@@ -73,34 +73,16 @@ func parseFile(path string, strict bool) (*OperationalTemplate, error) {
 // temporarily via t.Cleanup.
 var maxOPTBytes int64 = 32 << 20
 
-// cappedReader caps total bytes read from r; once the budget is
-// exhausted it reports EOF and sets exceeded, so callers can
-// distinguish "input too large" from a genuinely malformed document.
-type cappedReader struct {
-	r        io.Reader
-	remain   int64
-	exceeded bool
-}
-
-func (c *cappedReader) Read(p []byte) (int, error) {
-	if c.remain <= 0 {
-		c.exceeded = true
-		return 0, io.EOF
-	}
-	if int64(len(p)) > c.remain {
-		p = p[:c.remain]
-	}
-	n, err := c.r.Read(p)
-	c.remain -= int64(n)
-	return n, err
-}
-
 func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: nil reader", ErrInvalidOPT)
 	}
-	cr := &cappedReader{r: r, remain: maxOPTBytes + 1}
-	br := bufio.NewReader(cr)
+	// Cap the read with a one-byte margin: when the source holds more
+	// than maxOPTBytes, the decoder drains the extra byte and lr.N
+	// reaches 0, which we treat as "too large" rather than letting a
+	// truncated read surface as a misleading malformed-XML error.
+	lr := &io.LimitedReader{R: r, N: maxOPTBytes + 1}
+	br := bufio.NewReader(lr)
 	peek, peekErr := br.Peek(3)
 	if peekErr != nil && !errors.Is(peekErr, io.EOF) {
 		return nil, fmt.Errorf("%w: read header: %w", ErrInvalidOPT, peekErr)
@@ -114,13 +96,10 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	dec := xml.NewDecoder(br)
 	var wire xmlTemplate
 	if err := dec.Decode(&wire); err != nil {
-		if cr.exceeded {
+		if lr.N == 0 {
 			return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
 		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
-	}
-	if cr.exceeded {
-		return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
 	}
 	// Forward-compat: defend against non-<template> documents that
 	// somehow decoded (e.g. when the OPT XSD wrapper is renamed by a
@@ -133,7 +112,15 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	// exactly one root element; anything else after </template> means
 	// the document is either malformed or carries multiple roots.
 	if err := requireEOF(dec); err != nil {
+		if lr.N == 0 {
+			return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
+	}
+	// Authoritative size check: lr.N == 0 means the full maxOPTBytes+1
+	// budget was consumed, i.e. the source is larger than the cap.
+	if lr.N == 0 {
+		return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
 	}
 	if wire.TemplateID == nil || strings.TrimSpace(wire.TemplateID.Value) == "" {
 		return nil, fmt.Errorf("%w: missing or empty template_id", ErrInvalidOPT)
