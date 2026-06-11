@@ -354,6 +354,30 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	}
 }
 
+func TestResolveIssuerMatch(t *testing.T) {
+	// Start an unstarted server so we know srv.URL before building the body.
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := `{
+			"issuer":"` + srv.URL + `",
+			"authorization_endpoint":"https://auth.example.com/auth",
+			"token_endpoint":"https://auth.example.com/token",
+			"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		}`
+		_, _ = io.WriteString(w, body)
+	}))
+	srv.Start()
+	defer srv.Close()
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("expected success when document issuer matches requested issuer, got: %v", err)
+	}
+	if cat.Issuer != srv.URL {
+		t.Errorf("catalog.Issuer = %q, want %q", cat.Issuer, srv.URL)
+	}
+}
+
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) {
