@@ -22,6 +22,9 @@ func (e *AQLError) Error() string {
 	if e.Message != "" {
 		return fmt.Sprintf("query: %s", e.Message)
 	}
+	if e.Code != "" {
+		return fmt.Sprintf("query: %s", e.Code)
+	}
 	return "query: execution failed"
 }
 
