@@ -461,6 +461,7 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check("authorization_endpoint", cat.Auth.AuthorizationEndpoint)
 	check("token_endpoint", cat.Auth.TokenEndpoint)
 	check("jwks_uri", cat.Auth.JWKSURI)
+	check("registration_endpoint", cat.Auth.RegistrationEndpoint)
 	for id, s := range cat.Services {
 		check("services["+id+"].base_url", s.BaseURL)
 	}

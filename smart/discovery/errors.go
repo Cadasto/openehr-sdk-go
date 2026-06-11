@@ -28,9 +28,10 @@ const (
 	// ReasonAuthEndpointsMissing indicates the authorization or token
 	// endpoint URL is absent from a SMART config that requires them.
 	ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
-	// ReasonInsecureURL indicates an http:// URL was rejected by the
-	// default fetcher (REQ-092). Override with WithAllowInsecure to opt
-	// into plaintext fetches in development.
+	// ReasonInsecureURL indicates a non-https URL was rejected — either
+	// the issuer fetch or a catalog auth endpoint URL in the discovery
+	// document (REQ-092). Override with WithAllowInsecure to opt into
+	// plaintext URLs in development.
 	ReasonInsecureURL DiscoveryErrorReason = "insecure_url"
 	// ReasonIssuerMismatch indicates the discovery document's "issuer"
 	// field does not equal the URL used to fetch it. Per OIDC Discovery
