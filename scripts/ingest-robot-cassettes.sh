@@ -81,12 +81,18 @@ done
 # 6 — contribution submission wire (CONTRIBUTION + inline ORIGINAL_VERSION)
 while IFS= read -r -d '' f; do
   base=$(basename "$f")
+  # Reject filenames carrying shell-special or path-traversal characters
+  # before they flow into copy targets (the Robot source is external).
+  if [[ ! "$base" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "skip (unsafe filename): $base" >&2
+    continue
+  fi
   # ~1.2MB bulk payload; smaller contribution fixtures cover multi-version cases.
   if [[ "$base" == "contribution.create_multiple_compositions.json" ]]; then
     continue
   fi
   rel=${f#"$ROBOT/"}
-  safe=$(echo "$rel" | tr '/' '_')
+  safe=$(printf '%s' "$rel" | tr '/' '_')
   cp_sub "$rel" "$safe"
 done < <(find "$ROBOT/contributions" -name '*.json' -print0)
 
