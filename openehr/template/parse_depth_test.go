@@ -49,8 +49,9 @@ func TestBuildNode_DepthExceeded(t *testing.T) {
 	maxOPTDepth = 4
 	t.Cleanup(func() { maxOPTDepth = orig })
 
-	// Build a tree deeper than the cap (cap+2 levels to be clearly over).
-	xml := nestedOPTXML(maxOPTDepth + 2)
+	// maxOPTDepth+1 is the first failing depth (guard fires at
+	// depth > maxOPTDepth), pinning the exact fence.
+	xml := nestedOPTXML(maxOPTDepth + 1)
 	_, err := ParseOPT(strings.NewReader(xml))
 	if err == nil {
 		t.Fatal("expected error for OPT nesting that exceeds maxOPTDepth, got nil")
@@ -82,6 +83,14 @@ func TestBuildNode_DepthAtCap(t *testing.T) {
 	xmlUnder := nestedOPTXML(maxOPTDepth - 1)
 	if _, err := ParseOPT(strings.NewReader(xmlUnder)); err != nil {
 		t.Fatalf("document at maxOPTDepth-1 (%d) levels should parse cleanly, got: %v", maxOPTDepth-1, err)
+	}
+
+	// depth=maxOPTDepth exactly: the deepest buildNode sees depth ==
+	// maxOPTDepth, and the guard fires only on depth > maxOPTDepth, so
+	// this must parse — pins the off-by-one fence.
+	xmlAtCap := nestedOPTXML(maxOPTDepth)
+	if _, err := ParseOPT(strings.NewReader(xmlAtCap)); err != nil {
+		t.Fatalf("document at exactly maxOPTDepth (%d) levels should parse cleanly, got: %v", maxOPTDepth, err)
 	}
 }
 

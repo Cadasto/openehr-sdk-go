@@ -73,8 +73,10 @@ func parseFile(path string, strict bool) (*OperationalTemplate, error) {
 // temporarily via t.Cleanup.
 var maxOPTBytes int64 = 32 << 20
 
-// maxOPTDepth is the maximum OPT node-tree nesting depth; real OPTs are
-// well under 64. A var (not const) so tests can lower it.
+// maxOPTDepth is the maximum OPT node-tree nesting depth. Real OPTs stay
+// well under 64 levels (COMPOSITION > SECTION > … > ELEMENT ≈ 5–20); the
+// 128 cap gives generous headroom while bounding recursion against a
+// crafted document. A var (not const) so tests can lower it.
 var maxOPTDepth = 128
 
 func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
