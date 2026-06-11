@@ -182,7 +182,7 @@ func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error
 	for _, opt := range opts {
 		opt(&o)
 	}
-	return walkPath(t.root, p.segments, &o)
+	return walkPath(t.root, p.segments, &o, 0)
 }
 
 // ValidatePath reports whether p resolves against the OPT — a
@@ -196,9 +196,16 @@ func (t *OperationalTemplate) ValidatePath(p Path, opts ...ResolveOption) error 
 	return err
 }
 
-func walkPath(n Node, segs []pathSegment, o *resolveOpts) (Node, error) {
+func walkPath(n Node, segs []pathSegment, o *resolveOpts, depth int) (Node, error) {
 	if len(segs) == 0 {
 		return n, nil
+	}
+	// Defence in depth: parseOPT already caps tree depth at maxOPTDepth,
+	// but walkPath operates on the Node interface, so a tree built by
+	// other means (or one carrying a cycle) could otherwise drive
+	// unbounded recursion. Bound the descent independently.
+	if depth > maxOPTDepth {
+		return nil, fmt.Errorf("%w: path nesting exceeds %d levels", ErrPathNotFound, maxOPTDepth)
 	}
 	co, ok := descendableObject(n)
 	if !ok {
@@ -241,7 +248,7 @@ func walkPath(n Node, segs []pathSegment, o *resolveOpts) (Node, error) {
 	if len(segs) == 1 {
 		return matched, nil
 	}
-	return walkPath(matched, segs[1:], o)
+	return walkPath(matched, segs[1:], o, depth+1)
 }
 
 // descendableObject returns the embedded ComplexObject of a node
