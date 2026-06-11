@@ -268,11 +268,11 @@ Caps: OPT parse 32 MiB, `UploadTemplate` 32 MiB, `bmm.Load` 32 MiB. For the stre
 
 `encoding/json`'s scanner rejects >10 000 nesting, but below that each generated `UnmarshalJSON` re-enters `typereg.DecodeAs` → fresh `json.Decoder` per `json.RawMessage`, giving O(depth × size) re-validation and deep call stacks. A 5 MB / 9 000-deep document is a CPU sink.
 
-- [ ] **Step 1: Failing test** — build a nested `CLUSTER` JSON ~2 000 levels deep (string builder loop); assert unmarshal into `rm.Cluster` errors with a depth message within a bounded time (`testing.Short()`-guard the generous variant).
-- [ ] **Step 2: Run** — `go test ./openehr/rm/ -run TestDeepNesting -v` → FAIL (succeeds slowly today).
-- [ ] **Step 3: Implement** — cheapest robust approach: in `typereg` add a package-level `maxDecodeDepth = 512` enforced with a `sync.Pool`-free goroutine-local counter is **not** available in Go — instead emit a depth check that counts via a lightweight scan: in `Registry.Decode`, before dispatch, run `json.Valid` once at the *top-level* entry only and measure nesting with a 20-line byte scanner (`{`/`[` depth counter, string-aware); reject > `maxDecodeDepth`. Top-level-only measurement avoids per-level rework and fixes both the stack and the O(depth×size) amplification (sub-decoders then skip the scan via an unexported `decodeNoScan` used by generated code — only the public entry pays it).
-- [ ] **Step 4: Regenerate + run** — `make codegen && go test ./openehr/rm/... -v && make codegen-verify` → PASS.
-- [ ] **Step 5: Commit** — `fix(rm/typereg,bmmgen): nesting depth limit on polymorphic decode`
+- [x] **Step 1: Failing test** — `TestDecode_maxDepthExceeded` builds ~2 000-deep nested JSON; asserts `errors.Is(ErrMaxDepthExceeded)`. Plus `jsonNestingDepth` unit + boundary tests, and `TestDecode_shallowOK` (no false positive).
+- [x] **Step 2: Run** → FAIL first.
+- [x] **Step 3: Implement** — **Deviation (simpler, no generator change):** `Registry.Decode` is the single polymorphic-dispatch chokepoint (every child routes through `DecodeAs` → `Decode`). Added `maxDecodeDepth = 512`, a string/escape-aware early-exiting `jsonNestingDepth` scanner, and a pre-dispatch reject wrapping new `ErrMaxDepthExceeded` — all in hand-written `openehr/rm/typereg/registry.go`. **No `internal/bmmgen` change, no regeneration.** Spec review verified the chokepoint has no hole (759 DecodeAs sites; the only non-typereg fallback decodes non-recursive leaf types) and confirmed end-to-end that rm.Cluster decode rejects at `/items/0`.
+- [x] **Step 4: Run** — `go test ./... ` green; no codegen needed.
+- [x] **Step 5: Commit** — `fix(rm/typereg): bound nesting depth in polymorphic decode (DoS guard)` *(9257d30 + 102e919)*
 
 ### Task 11: Empty-body guard in `GetStoredQuery`; cycle guard in `effectiveProperties` (R4, R5)
 
