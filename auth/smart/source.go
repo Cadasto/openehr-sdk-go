@@ -2,7 +2,6 @@ package smart
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"io"
 	"net/http"
@@ -162,11 +161,11 @@ type AuthorizationRequest struct {
 // many concurrent launches when each flow keeps its own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
-		b := make([]byte, stateLen)
-		if _, err := rand.Read(b); err != nil {
+		var err error
+		state, err = randBase64URL(stateLen)
+		if err != nil {
 			return AuthorizationRequest{}, fmt.Errorf("smart: generate state: %w", err)
 		}
-		state = base64URLEncode(b)
 	}
 	pkce, err := NewPKCEPair()
 	if err != nil {

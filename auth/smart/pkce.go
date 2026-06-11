@@ -23,11 +23,10 @@ type PKCEPair struct {
 // its S256 code_challenge (REQ-061). Plain challenge method is
 // prohibited.
 func NewPKCEPair() (PKCEPair, error) {
-	b := make([]byte, codeVerifierLen)
-	if _, err := rand.Read(b); err != nil {
+	verifier, err := randBase64URL(codeVerifierLen)
+	if err != nil {
 		return PKCEPair{}, fmt.Errorf("smart: generate code_verifier: %w", err)
 	}
-	verifier := base64URLEncode(b)
 	sum := sha256.Sum256([]byte(verifier))
 	return PKCEPair{
 		Verifier:  verifier,
@@ -37,4 +36,14 @@ func NewPKCEPair() (PKCEPair, error) {
 
 func base64URLEncode(b []byte) string {
 	return base64.RawURLEncoding.EncodeToString(b)
+}
+
+// randBase64URL returns n cryptographically random bytes encoded as an
+// unpadded base64url string.
+func randBase64URL(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64URLEncode(b), nil
 }

@@ -88,7 +88,7 @@ type ClaimsSigner struct {
 	// KeyID is the "kid" JWS header.
 	KeyID string
 
-	jtiCounter uint64
+	jtiCounter atomic.Uint64
 }
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
@@ -202,7 +202,7 @@ func signRS256(signer crypto.Signer, input string) ([]byte, error) {
 // bytes (unpredictability and cross-restart uniqueness). The 24 bytes
 // encode to exactly 32 base64url characters with no padding.
 func newJTI(s *ClaimsSigner) (string, error) {
-	counter := atomic.AddUint64(&s.jtiCounter, 1)
+	counter := s.jtiCounter.Add(1)
 	var b [24]byte
 	binary.BigEndian.PutUint64(b[:8], uint64(time.Now().UnixNano()))
 	binary.BigEndian.PutUint64(b[8:16], counter)
