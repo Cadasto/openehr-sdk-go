@@ -370,9 +370,9 @@ type CString struct {
 - Modify: `auth/smart` — extract a private `randBase64URL(n int) (string, error)` helper in `pkce.go` and use it from both `BeginAuthorization` (`source.go`) and `NewPKCEPair`/state gen (dedupe the identical `rand.Read`+`base64URLEncode` block; carried over from Task 5 review).
 - Modify: `auth/jwtbearer/assertion.go` — migrate `ClaimsSigner.jtiCounter uint64` to `atomic.Uint64` (`s.jtiCounter.Add(1)`), clearing the long-standing `atomictypes` lint and 32-bit alignment concern (carried over from Task 5 review).
 
-- [ ] **Step 1**: Apply all; behavior-neutral.
-- [ ] **Step 2: Run** — `go build ./... && go test ./transport/ ./openehr/validation/ ./openehr/client/query/ -v` → PASS.
-- [ ] **Step 3: Commit** — `docs(query),refactor(transport,validation): AQL injection warning + cleanups`
+- [x] **Step 1**: Applied all five (rename via `git mv`; `strings.Join`; ExecuteString warning; `randBase64URL` dedup; `jtiCounter` → `atomic.Uint64`). Behavior-neutral; reviewer confirmed byte-identical output, no value-copy, gofmt/vet clean.
+- [x] **Step 2: Run** — `go build ./... && go test ./... ` → PASS.
+- [x] **Step 3: Commit** — `refactor(transport,validation,query,auth): naming, docs, and micro-cleanups` *(c8a8faa)*
 
 ---
 
