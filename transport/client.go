@@ -235,7 +235,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 
 	limit := c.cfg.maxResponseBody
 	if limit == 0 {
-		limit = 64 << 20 // 64 MiB default
+		limit = DefaultMaxResponseBody
 	}
 	var reader io.Reader = httpResp.Body
 	if limit > 0 {
@@ -246,7 +246,7 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.effectiveRoute(), err)
 	}
 	if limit > 0 && int64(len(respBody)) > limit {
-		return nil, fmt.Errorf("transport: %s %s: response body exceeds %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
+		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,

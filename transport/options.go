@@ -111,10 +111,17 @@ func WithRawErrorBodies(on bool) Option {
 	return func(cfg *config) { cfg.rawErrorBodies = on }
 }
 
+// DefaultMaxResponseBody is the response body read cap applied when
+// WithMaxResponseBody is not set (or set to 0): 64 MiB.
+const DefaultMaxResponseBody int64 = 64 << 20
+
 // WithMaxResponseBody caps the number of response body bytes read per
 // request, guarding against memory exhaustion from a misbehaving or
-// hostile server. The default is 64 MiB. A value of 0 selects the
-// default; a negative value disables the limit (unbounded read).
+// hostile server. The default is DefaultMaxResponseBody (64 MiB). A
+// value of 0 selects the default; a negative value disables the limit
+// (unbounded read). Large responses — e.g. bulk EHR exports — may
+// require a higher cap via WithMaxResponseBody(n) or an unbounded read
+// via WithMaxResponseBody(-1).
 func WithMaxResponseBody(n int64) Option {
 	return func(cfg *config) { cfg.maxResponseBody = n }
 }

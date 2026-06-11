@@ -159,9 +159,9 @@ func WithRawErrorBodies(on bool) Option {
 - Modify: `transport/client.go:236`, `transport/options.go`
 - Test: `transport/client_test.go`
 
-- [ ] **Step 1: Failing test** — `httptest` server streaming > limit bytes; client with `WithMaxResponseBody(1 << 10)`; assert `Do` returns an error mentioning the limit, not an OOM-sized body.
-- [ ] **Step 2: Run** — `go test ./transport/ -run TestMaxResponseBody -v` → FAIL.
-- [ ] **Step 3: Implement** — default 64 MiB, 0 = default, negative = unlimited (documented):
+- [x] **Step 1: Failing test** — `httptest` server streaming > limit bytes; client with `WithMaxResponseBody(1 << 10)`; assert `Do` returns an error mentioning the limit, not an OOM-sized body.
+- [x] **Step 2: Run** — `go test ./transport/ -run TestMaxResponseBody -v` → FAIL.
+- [x] **Step 3: Implement** — default 64 MiB, 0 = default, negative = unlimited (documented). *(Landed with exported `DefaultMaxResponseBody` const; error reads `read body: response exceeds limit of N bytes`.)*
 
 ```go
 limit := c.cfg.maxResponseBody
@@ -179,8 +179,8 @@ if limit > 0 && int64(len(respBody)) > limit {
 ```
 
 Add `WithMaxResponseBody(n int64) Option` following the `WithRetry` pattern at `options.go:69`.
-- [ ] **Step 4: Run** — `go test ./transport/... -v` → PASS.
-- [ ] **Step 5: Commit** — `feat(transport): bounded response body reads (default 64 MiB)`
+- [x] **Step 4: Run** — `go test ./transport/... -v` → PASS.
+- [x] **Step 5: Commit** — `feat(transport): bounded response body reads (default 64 MiB)` *(dfb8c12 + polish)*
 
 ### Task 5: Generate or validate OAuth `state`; randomize JTI (S5, S6)
 
