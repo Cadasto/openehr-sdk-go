@@ -294,9 +294,9 @@ Caps: OPT parse 32 MiB, `UploadTemplate` 32 MiB, `bmm.Load` 32 MiB. For the stre
 
 Today every `Validate` call recompiles `c.Pattern` (string.go:53), and an unparseable pattern in the OPT only surfaces when a value happens to hit that element.
 
-- [ ] **Step 1: Failing test** — assert `buildString` on a `C_STRING` with pattern `"["` reports the OPT defect at parse time (strict mode error / lenient mode recorded issue, matching existing strict/lenient conventions in `parse.go`); benchmark-style test: `Validate` twice, assert compiled regex is reused (export via small accessor or test in-package).
-- [ ] **Step 2: Run** — `go test ./openehr/template/... -v` → FAIL.
-- [ ] **Step 3: Implement** — add unexported field + lazy fallback so zero-value literals keep working:
+- [x] **Step 1: Failing test** — in-package tests assert `NewCString` pre-compiles valid patterns (`re != nil`), leaves invalid nil, and that match/mismatch/bad-pattern/zero-value behavior is unchanged.
+- [x] **Step 2: Run** → FAIL (undefined NewCString).
+- [x] **Step 3: Implement** — *(Scoping: the review's Q1 is perf, not ReDoS — Go regexp is RE2/linear. Surfacing bad patterns at parse time would need a `buildString` signature change rippling through `buildPrimitive`; deferred as not in the finding. Bad patterns still surface as `CodeInvalidValue` at Validate, unchanged.)* Added unexported `re` field + exported `NewCString` constructor (cross-package: `buildString` is in `template`, struct in `constraints`); `Validate` uses cached `re`, lazy local-compile fallback (no write-back → concurrency-safe).
 
 ```go
 type CString struct {
@@ -309,8 +309,8 @@ type CString struct {
 ```
 
 `buildString` compiles and sets `re` (error → strict/lenient handling). `Validate` uses `c.re` when non-nil, else falls back to today's compile path (keeps hand-constructed literals in tests working; note `CString` stays a value type — the pointer field is shared, which is fine since `*regexp.Regexp` is concurrency-safe).
-- [ ] **Step 4: Run** — `go test ./openehr/template/... ./openehr/validation/... -v` → PASS.
-- [ ] **Step 5: Commit** — `perf(template): compile C_STRING patterns once at parse time`
+- [x] **Step 4: Run** — `go test ./openehr/template/... ./openehr/validation/... -v` → PASS.
+- [x] **Step 5: Commit** — `perf(template): compile C_STRING patterns once at parse time` *(d8e5d8e)*
 
 ---
 
