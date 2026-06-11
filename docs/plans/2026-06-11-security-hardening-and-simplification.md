@@ -85,9 +85,9 @@ Close the security, robustness, and code-quality findings from the 2026-06-11 re
 
 Per OIDC Discovery §4.3 the fetched document's `issuer` MUST equal the URL used to fetch it. Today the document value silently wins, letting a hostile/misconfigured server impersonate another issuer downstream (ID-token `iss` checks would then pass for the wrong server).
 
-- [ ] **Step 1: Write the failing test** — serve a SMART configuration whose `"issuer"` differs from the resolver's requested issuer; assert `Resolve` returns a `*DiscoveryError` (reason: parse/validation) and a nil catalog. Follow the existing `httptest`-based cases in `resolver_test.go`.
-- [ ] **Step 2: Run it** — `go test ./smart/discovery/ -run TestResolve -v` → FAIL (catalog currently returned with the document's issuer).
-- [ ] **Step 3: Implement** — replace the override at `resolver.go:346-348`:
+- [x] **Step 1: Write the failing test** — serve a SMART configuration whose `"issuer"` differs from the resolver's requested issuer; assert `Resolve` returns a `*DiscoveryError` (reason: parse/validation) and a nil catalog. Follow the existing `httptest`-based cases in `resolver_test.go`.
+- [x] **Step 2: Run it** — `go test ./smart/discovery/ -run TestResolve -v` → FAIL (catalog currently returned with the document's issuer).
+- [x] **Step 3: Implement** — replace the override at `resolver.go:346-348`: *(landed with a dedicated `ReasonIssuerMismatch` instead of `ReasonParseError`; match-success path covered by `TestResolveIssuerMatch`)*
 
 ```go
 resolvedIssuer := issuer
@@ -101,8 +101,8 @@ if wire.Issuer != "" && wire.Issuer != issuer {
 ```
 
 (Keep `resolvedIssuer` so an absent `wire.Issuer` still resolves to the caller's value; update the now-wrong code comment.)
-- [ ] **Step 4: Run tests** — `go test ./smart/... -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(smart/discovery): reject issuer mismatch in discovery document`
+- [x] **Step 4: Run tests** — `go test ./smart/... -v` → PASS.
+- [x] **Step 5: Commit** — `fix(smart/discovery): reject issuer mismatch in discovery document` *(e5030dc + 52b6934)*
 
 ### Task 2: Enforce HTTPS on `jwks_uri` (and other endpoint URLs) unless `allowInsecure` (S2)
 
@@ -112,9 +112,9 @@ if wire.Issuer != "" && wire.Issuer != issuer {
 
 `warnInsecure` (resolver.go:439) only logs. A document pointing `jwks_uri` at `http://…` or an internal host is accepted, and `auth/smart/source.go` will fetch it for signature keys — key-trust over plaintext. Full same-origin enforcement is **deferred** (see header); HTTPS-only is the uncontroversial floor.
 
-- [ ] **Step 1: Failing test** — discovery document with `"jwks_uri": "http://attacker.example/keys"`, resolver without `AllowInsecure`; assert resolution fails with a `DiscoveryError`. Add the mirror case: with `AllowInsecure()` it succeeds (warn path).
-- [ ] **Step 2: Run** — `go test ./smart/discovery/ -v` → FAIL.
-- [ ] **Step 3: Implement** — in the URL `parse` helper (which already rejects missing scheme/host at lines 334, 364), add:
+- [x] **Step 1: Failing test** — discovery document with `"jwks_uri": "http://attacker.example/keys"`, resolver without `AllowInsecure`; assert resolution fails with a `DiscoveryError`. Add the mirror case: with `AllowInsecure()` it succeeds (warn path).
+- [x] **Step 2: Run** — `go test ./smart/discovery/ -v` → FAIL.
+- [x] **Step 3: Implement** — in the URL `parse` helper (which already rejects missing scheme/host at lines 334, 364), add: *(landed in `parseAuthEndpoints`; also covers `registration_endpoint`. Residual: `services[].base_url` stays warn-only — candidate follow-up)*
 
 ```go
 if !r.cfg.allowInsecure && u.Scheme != "https" {
@@ -123,8 +123,8 @@ if !r.cfg.allowInsecure && u.Scheme != "https" {
 ```
 
 This intentionally covers `authorization_endpoint`/`token_endpoint` too — same trust argument. Keep `warnInsecure` for the `allowInsecure` path.
-- [ ] **Step 4: Run** — `go test ./smart/... ./auth/... -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(smart/discovery): require https on catalog endpoints unless AllowInsecure`
+- [x] **Step 4: Run** — `go test ./smart/... ./auth/... -v` → PASS.
+- [x] **Step 5: Commit** — `fix(smart/discovery): require https on catalog endpoints unless AllowInsecure` *(32c464d + efd7679 + 8d648db)*
 
 ### Task 3: Stop rendering server error bodies into `WireError.Error()`; gate `RawBody` (S3)
 
