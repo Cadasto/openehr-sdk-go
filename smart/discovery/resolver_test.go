@@ -378,6 +378,64 @@ func TestResolveIssuerMatch(t *testing.T) {
 	}
 }
 
+// TestResolveInsecureEndpointRejectedStrict verifies that a discovery
+// document containing a non-https endpoint URL (here jwks_uri) is
+// rejected with ReasonInsecureURL when the resolver runs in strict mode
+// (no WithAllowInsecure). The issuer itself is served over TLS so the
+// issuer-level check does not interfere.
+func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
+	body := `{
+		"authorization_endpoint":"http://attacker.example/auth",
+		"token_endpoint":"http://attacker.example/token",
+		"jwks_uri":"http://attacker.example/keys",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	// Strict resolver: no WithAllowInsecure. Use the TLS server's client so
+	// the self-signed cert is trusted.
+	r, err := NewResolver(NewMemoryCache(), WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if cat != nil {
+		t.Error("expected nil catalog when endpoint URLs are non-https in strict mode")
+	}
+	var derr *DiscoveryError
+	if !errors.As(err, &derr) || derr.Reason != ReasonInsecureURL {
+		t.Fatalf("expected insecure_url DiscoveryError, got %v", err)
+	}
+}
+
+// TestResolveInsecureEndpointAllowedWhenAllowInsecure verifies that the
+// same non-https endpoint URLs are accepted (with a warning) when the
+// resolver is configured with WithAllowInsecure.
+func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
+	body := `{
+		"authorization_endpoint":"http://dev.example/auth",
+		"token_endpoint":"http://dev.example/token",
+		"jwks_uri":"http://dev.example/keys",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	// mustResolver includes WithAllowInsecure, so both the issuer fetch
+	// and the endpoint-URL scheme check should permit http.
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("WithAllowInsecure should permit http endpoint URLs, got: %v", err)
+	}
+	if cat == nil {
+		t.Fatal("expected non-nil catalog")
+	}
+}
+
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) {

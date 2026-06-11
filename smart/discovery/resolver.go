@@ -321,7 +321,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	if err := json.Unmarshal(body, &wire); err != nil {
 		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: err}
 	}
-	auth, err := parseAuthEndpoints(issuer, wire)
+	auth, err := parseAuthEndpoints(issuer, wire, r.cfg.allowInsecure)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +363,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	}, nil
 }
 
-func parseAuthEndpoints(issuer string, w smartConfigWire) (AuthEndpoints, error) {
+func parseAuthEndpoints(issuer string, w smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
 	var out AuthEndpoints
 	parse := func(name, raw string) (*url.URL, error) {
 		if raw == "" {
@@ -372,6 +372,9 @@ func parseAuthEndpoints(issuer string, w smartConfigWire) (AuthEndpoints, error)
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
+		}
+		if !allowInsecure && u.Scheme != "https" {
+			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
 		}
 		return u, nil
 	}
