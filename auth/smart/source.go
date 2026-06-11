@@ -207,7 +207,7 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 // launch. callbackState is the state query parameter received at the redirect
 // URI; it is compared against req.State and [ErrLaunchInvalidState] is
 // returned on mismatch before any network call is made, defending against
-// CSRF (auth.md §REQ-061). The returned [TokenResponse] carries SMART launch
+// CSRF (REQ-061). The returned [TokenResponse] carries SMART launch
 // parameters for smart/ (REQ-064).
 func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {

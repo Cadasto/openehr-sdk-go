@@ -43,8 +43,10 @@ func TestBeginAuthorizationEmptyStateGeneratesRandom(t *testing.T) {
 	if req.State == "" {
 		t.Fatal("BeginAuthorization(\"\") returned empty State, want non-empty")
 	}
-	if len(req.State) < 32 {
-		t.Fatalf("BeginAuthorization(\"\") State len = %d, want >= 32", len(req.State))
+	// stateLen=32 random bytes base64url-encode to exactly 43 chars; an
+	// exact check makes any entropy/encoding regression visible.
+	if len(req.State) != 43 {
+		t.Fatalf("BeginAuthorization(\"\") State len = %d, want 43", len(req.State))
 	}
 
 	// Two successive calls must produce distinct states (unpredictability).
@@ -210,8 +212,8 @@ func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 	_, _, err := src.ExchangeAuthorizationCode(context.Background(), "code", "", smart.AuthorizationRequest{})
-	if err == nil {
-		t.Fatal("expected error")
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
 	}
 }
 
@@ -329,10 +331,10 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	if reqA.PKCE.Verifier == reqB.PKCE.Verifier {
 		t.Fatal("expected distinct verifiers")
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", "state-a", reqA); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA.State, reqA); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", "state-b", reqB); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB.State, reqB); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {
