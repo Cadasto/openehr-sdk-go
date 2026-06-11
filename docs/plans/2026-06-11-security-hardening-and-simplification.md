@@ -280,11 +280,11 @@ Caps: OPT parse 32 MiB, `UploadTemplate` 32 MiB, `bmm.Load` 32 MiB. For the stre
 - Modify: `openehr/client/definition/stored_query.go:137`, `internal/bmmgen/render_rminfo.go:119`
 - Test: `stored_query` tests; `internal/bmmgen` unit test with a cyclic two-class schema
 
-- [ ] **Step 1: Failing tests** — (a) stub transport returning 200 with empty body → assert no decode error (mirror `ListStoredQueries`'s guard at line 167); (b) feed `effectiveProperties` a plan whose classes A⇄B list each other as ancestors → assert it returns instead of hanging (run with `-timeout 10s`).
-- [ ] **Step 2: Run** — both → FAIL/timeout.
-- [ ] **Step 3: Implement** — (a) copy the sibling guard; (b) add `visitedClass := map[string]bool{}` to the `visit` closure, mirroring `AncestorChain`'s guard in `plan.go:702`.
-- [ ] **Step 4: Run** — `go test ./openehr/client/definition/ ./internal/bmmgen/ -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(definition,bmmgen): empty-body guard; ancestor cycle guard`
+- [x] **Step 1: Failing tests** — (a) stub transport returning 200 empty body → assert no decode error; (b) `effectiveProperties` on a cyclic A⇄B ancestor plan returns instead of stack-overflowing.
+- [x] **Step 2: Run** — both → FAIL/overflow.
+- [x] **Step 3: Implement** — (a) sibling empty-body guard (also trims `version` like `name`); (b) separate `visitedClass` map in the `visit` closure. Diamond-inheritance output identity proven; `make codegen-verify` clean (generated output byte-identical).
+- [x] **Step 4: Run** — `go test ./openehr/client/definition/ ./internal/bmmgen/` → PASS.
+- [x] **Step 5: Commit** — `fix(definition,bmmgen): empty-body guard; ancestor cycle guard` *(7e18dc6 + 5a878eb)*
 
 ### Task 12: Compile `CString` patterns at parse time (Q1)
 
