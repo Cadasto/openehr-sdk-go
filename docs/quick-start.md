@@ -94,7 +94,7 @@ Typical CI pipeline: **bytes → RM → compiled OPT → validation issues**.
 go run ./cmd/examples/validate-from-json
 ```
 
-This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and prints either `OK` or a list of constraint violations. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
+This decodes `testdata/minimal_blood_pressure.json`, compiles `vital_signs.opt`, and prints either `result : OK — JSON validates against OPT` or a list of constraint violations. See [examples.md](examples.md#validate-from-json) for flags and custom file paths.
 
 ---
 
@@ -146,11 +146,15 @@ Replace the static catalog URL with your deployment's openEHR REST base (usually
 ```go
 import "github.com/cadasto/openehr-sdk-go/auth/clientcreds"
 
-ts := clientcreds.New(clientcreds.Config{
-	TokenURL:     "https://auth.example/oauth/token",
-	ClientID:     os.Getenv("CLIENT_ID"),
-	ClientSecret: os.Getenv("CLIENT_SECRET"),
-})
+ts, err := clientcreds.New(
+	os.Getenv("CLIENT_ID"),
+	os.Getenv("CLIENT_SECRET"),
+	"https://auth.example/oauth/token",
+	clientcreds.WithHTTPClient(hc),
+)
+if err != nil {
+	log.Fatal(err)
+}
 
 c, err := transport.New(cat,
 	transport.WithHTTPClient(hc),

@@ -56,7 +56,7 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 | 1 — entry point for any agent | [AGENTS.md](AGENTS.md) |
 | 2 — **normative specifications** (REQ / PROBE / STRAND) | [docs/specifications/](docs/specifications/) |
 | 3 — design narrative, dependency mermaid | [docs/architecture.md](docs/architecture.md) |
-| 4 — AI agent conventions, MCP skills | [docs/ai-workflow.md](docs/ai-workflow.md) |
+| 4 — AI agent conventions, MCP skills, example-doc maintenance | [docs/ai-workflow.md](docs/ai-workflow.md) |
 | 5 — CI / contributor checks | [docs/ci.md](docs/ci.md) |
 | 6 — ADRs (closed) | [docs/adr/](docs/adr/) |
 | 6b — landed vs planned | [docs/roadmap.md](docs/roadmap.md) |

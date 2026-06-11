@@ -189,6 +189,14 @@ go run ./cmd/examples/ehr_create
 
 **Packages:** `smart/discovery`, `transport`, `openehr/client/ehr`
 
+**Sample output:**
+
+```text
+created EHR: id=f0e1d2c3-b4a5-6789-0123-456789abcdef
+  system_id=example.system
+OK: end-to-end EHR creation against in-process httptest backend
+```
+
 **What to copy into your app:**
 
 1. Build a `discovery.ServiceCatalog` (static or fetched from a SMART issuer).

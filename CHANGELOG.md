@@ -10,6 +10,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+- **Developer onboarding** — quick-start and runnable examples catalog under `docs/`.
+
 ## [0.3.0] - 2026-05-28
 
 Third `v0.x` minor — RM polymorphic decode coverage (SDK-GAP-11) closes the wire-shape substitution gap on concrete-typed RM slots (`LOCATABLE.name`, `AUDIT_DETAILS`, `OBJECT_REF`, …); ergonomic `Get*` accessors on the narrow `*Like` interfaces become the preferred read surface; testkit cassette coverage rounds out ehrbase Robot fixtures. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the single breaking change this cycle is the field-type lift on substitution slots (migrate via `rm.DVTextValueOf` / `rm.AsDVText` / `rm.AuditDetailsBase` / `rm.PartyIdentifiedBase` / `rm.ObjectRefBase` or the new `Get*` accessors); pin to the exact tag.
