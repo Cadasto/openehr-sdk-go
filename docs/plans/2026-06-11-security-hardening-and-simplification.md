@@ -385,8 +385,8 @@ type CString struct {
 **Files:**
 - Modify: `.github/workflows/release.yml:26-27`
 
-- [ ] **Step 1**: Set workflow-level `permissions: contents: read`; add `permissions: contents: write` only on the job (or split job) that runs `gh release create`. Validate with `actionlint` if available (`make ci` includes lint image per Makefile).
-- [ ] **Step 2: Commit** — `ci(release): least-privilege permissions`
+- [x] **Step 1**: Workflow token now defaults to `contents: read`; split into a read-only `verify` job (checkout, setup-go, `make ci`, build+upload release notes) and a `publish` job (`needs: verify`, `if: dry_run == false`, `permissions: contents: write`) that only downloads the notes artifact and runs `gh release create`. Dry-run path preserved. *(No `actionlint`/yaml parser in sandbox — validated structurally: no tabs, correct indentation, consistent `needs.verify.outputs.*` refs. **Pending Phase-4 review** — see status note.)*
+- [x] **Step 2: Commit** — `ci(release): least-privilege permissions via verify/publish split` *(8c6cf1f)*
 
 ### Task 18: Script hardening (I2, I3)
 
@@ -394,8 +394,8 @@ type CString struct {
 - Modify: `scripts/spec-check.sh:46` (`grep -q` → `grep -qF`), same for any sibling interpolations in that script
 - Modify: `scripts/ingest-robot-cassettes.sh:82-91` — `printf '%s' "$rel"` instead of `echo "$rel"`; allowlist `[[ "$base" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "skip: $base"; continue; }`
 
-- [ ] **Step 1**: Apply; run `bash -n` on both, then `make spec-check` and (if Robot data present) a dry ingest.
-- [ ] **Step 2: Commit** — `chore(scripts): fixed-string grep + filename allowlist`
+- [x] **Step 1**: Applied — `spec-check.sh` lines 46 + 122 use `grep -qF` (probe/REQ ids matched literally); `ingest-robot-cassettes.sh` uses `printf '%s'` for path munging and an allowlist `^[A-Za-z0-9._-]+$` on the external source filename. `bash -n` clean on both; `make spec-check` still OK. *(**Pending Phase-4 review** — see status note.)*
+- [x] **Step 2: Commit** — `chore(scripts): fixed-string grep + filename allowlist` *(51fadfb)*
 
 ### Task 19: Pin builder image; assert generator output paths (I4, I5)
 
