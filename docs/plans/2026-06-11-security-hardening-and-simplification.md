@@ -339,9 +339,9 @@ type CString struct {
 - Modify: `openehr/client/ehr/composition/composition.go:289`, `…/directory/directory.go:260`, `…/ehrstatus/ehrstatus.go:178` → single helper in `openehr/client/ehr` (e.g. `audit_wire.go`)
 - Test: existing suites cover both paths
 
-- [ ] **Step 1**: Pure refactor — move/delete, update call sites. Both already import the target packages (verify `ehr` parent import direction does not cycle; if the three live *under* `ehr`, the helper belongs in `ehr` itself or `ehr/internal`).
-- [ ] **Step 2: Run** — `go build ./... && go test ./auth/... ./openehr/client/... -v` → PASS.
-- [ ] **Step 3: Commit** — `refactor(auth,ehr): deduplicate parseOAuth2Error and marshalAuditDetails`
+- [x] **Step 1**: Pure refactor — both local `parseOAuth2Error` deleted → `auth.ParseOAuth2Error`; three local `marshalAuditDetails` deleted → new exported `ehr.MarshalAuditDetails` in `openehr/client/ehr/audit.go` (parent package; subpackages import it as `openehrclient`, no cycle). Behavior byte-identical; reviewer confirmed zero residual dupes.
+- [x] **Step 2: Run** — `go build ./... && go test ./auth/... ./openehr/client/... -v` → PASS.
+- [x] **Step 3: Commit** — `refactor(auth,ehr): deduplicate parseOAuth2Error and marshalAuditDetails` *(eb82f58)*
 
 ### Task 15: Cache `KnownRMTypes`; tidy generator hot spots (Q6, Q7)
 
