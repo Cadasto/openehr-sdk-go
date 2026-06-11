@@ -3,6 +3,7 @@ package rminfo
 import (
 	"slices"
 	"sort"
+	"sync"
 )
 
 // Lookup answers structural questions about RM classes from the
@@ -79,7 +80,9 @@ type AttrMeta struct {
 
 // lookup is the concrete Lookup backed by a data map.
 type lookup struct {
-	data map[string]ClassMeta
+	data      map[string]ClassMeta
+	knownOnce sync.Once
+	known     []string
 }
 
 func (l *lookup) RequiredAttributes(rmType string) []string {
@@ -121,10 +124,13 @@ func (l *lookup) IsContainer(parentRMType, attrName string) (bool, bool) {
 }
 
 func (l *lookup) KnownRMTypes() []string {
-	out := make([]string, 0, len(l.data))
-	for k := range l.data {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return slices.Clip(out)
+	l.knownOnce.Do(func() {
+		l.known = make([]string, 0, len(l.data))
+		for k := range l.data {
+			l.known = append(l.known, k)
+		}
+		sort.Strings(l.known)
+	})
+	// Return a copy so callers may sort/mutate without corrupting the cache.
+	return slices.Clone(l.known)
 }
