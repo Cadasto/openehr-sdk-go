@@ -16,6 +16,25 @@ type CString struct {
 	Pattern string
 	List    []string
 	Default string
+
+	re *regexp.Regexp // compiled Pattern; nil until set by NewCString or compiled lazily in Validate
+}
+
+// NewCString builds a CString and pre-compiles pattern so repeated
+// Validate calls reuse the compiled regexp instead of recompiling. An
+// invalid pattern is not reported here — it is left uncompiled and
+// surfaces as CodeInvalidValue on Validate, preserving the
+// "value-violation vs unparseable-OPT-regex" distinction. pattern, list,
+// and assumed (the C_STRING <assumed_value> default) map to the struct
+// fields.
+func NewCString(pattern string, list []string, assumed string) CString {
+	c := CString{Pattern: pattern, List: list, Default: assumed}
+	if pattern != "" {
+		if re, err := regexp.Compile(pattern); err == nil {
+			c.re = re
+		}
+	}
+	return c
 }
 
 func (CString) isPrimitive() {}
@@ -50,17 +69,15 @@ func (c CString) Validate(value any) []Violation {
 		})
 	}
 	if c.Pattern != "" {
-		re, err := regexp.Compile(c.Pattern)
+		re := c.re
+		var err error
+		if re == nil {
+			re, err = regexp.Compile(c.Pattern)
+		}
 		if err != nil {
-			out = append(out, Violation{
-				Code:   CodeInvalidValue,
-				Detail: fmt.Sprintf("constraint pattern %q is not a valid regex: %v", c.Pattern, err),
-			})
+			out = append(out, Violation{Code: CodeInvalidValue, Detail: fmt.Sprintf("constraint pattern %q is not a valid regex: %v", c.Pattern, err)})
 		} else if !re.MatchString(s) {
-			out = append(out, Violation{
-				Code:   CodePatternMismatch,
-				Detail: fmt.Sprintf("%q does not match pattern %q", s, c.Pattern),
-			})
+			out = append(out, Violation{Code: CodePatternMismatch, Detail: fmt.Sprintf("%q does not match pattern %q", s, c.Pattern)})
 		}
 	}
 	return out
