@@ -292,11 +292,13 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 			if we.OpenEHR.Code == "" {
 				t.Error("OpenEHR.Code empty")
 			}
-			if we.OpenEHR.Message == "" {
-				t.Error("OpenEHR.Message empty")
+			// Default: Message and RawBody are omitted (PHI gate).
+			// See TestWireErrorDefaultOmitsMessageAndRawBody.
+			if we.OpenEHR.Message != "" {
+				t.Errorf("OpenEHR.Message = %q; default client must omit message (PHI)", we.OpenEHR.Message)
 			}
-			if len(we.RawBody) == 0 {
-				t.Error("RawBody empty")
+			if len(we.RawBody) != 0 {
+				t.Errorf("RawBody non-empty (%d bytes); default client must omit raw body (PHI)", len(we.RawBody))
 			}
 		})
 	}
@@ -671,6 +673,105 @@ func TestTraceparentInjected(t *testing.T) {
 	// guarantee; presence would indicate an unexpected global tracer.
 	if tp := captured.Get("traceparent"); tp != "" {
 		t.Logf("traceparent present under no-op tracer: %q (informational)", tp)
+	}
+}
+
+// TestWireErrorDefaultOmitsMessageAndRawBody verifies that a Client built
+// without WithRawErrorBodies does not expose PHI-bearing fields: Error()
+// must omit the server message, WireError.OpenEHR.Message must be empty,
+// WireError.RawBody must be nil/empty, and WireError.OpenEHR.Code (a coded
+// terminology identifier, not free text) must still be present.
+func TestWireErrorDefaultOmitsMessageAndRawBody(t *testing.T) {
+	const phi = "patient 1234 not found"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(404)
+		_, _ = w.Write([]byte(`{"message":"` + phi + `","code":"NOT_FOUND"}`))
+	}))
+	defer srv.Close()
+
+	// Default client — no WithRawErrorBodies.
+	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
+	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var we *WireError
+	if !errors.As(err, &we) {
+		t.Fatalf("expected *WireError, got %T", err)
+	}
+
+	// Error() must not contain the PHI message or any patient identifier.
+	errStr := we.Error()
+	if strings.Contains(errStr, "1234") {
+		t.Errorf("Error() leaks PHI: %q (must not contain \"1234\")", errStr)
+	}
+	if strings.Contains(errStr, phi) {
+		t.Errorf("Error() leaks PHI: %q (must not contain message text)", errStr)
+	}
+
+	// Error() must still contain the openEHR code (non-PHI coded identifier).
+	if !strings.Contains(errStr, "NOT_FOUND") {
+		t.Errorf("Error() = %q; must contain openEHR code NOT_FOUND", errStr)
+	}
+
+	// OpenEHR detail is present but Message is cleared.
+	if we.OpenEHR == nil {
+		t.Fatal("expected OpenEHR detail to be set (code still present)")
+	}
+	if we.OpenEHR.Code != "NOT_FOUND" {
+		t.Errorf("OpenEHR.Code = %q, want NOT_FOUND", we.OpenEHR.Code)
+	}
+	if we.OpenEHR.Message != "" {
+		t.Errorf("OpenEHR.Message = %q; default client must clear message (PHI)", we.OpenEHR.Message)
+	}
+
+	// RawBody must be empty by default.
+	if len(we.RawBody) != 0 {
+		t.Errorf("RawBody = %d bytes; default client must not preserve raw body (PHI)", len(we.RawBody))
+	}
+}
+
+// TestWireErrorOptInPreservesMessageAndRawBody verifies that a Client built
+// with WithRawErrorBodies(true) preserves the full server payload on WireError:
+// OpenEHR.Message is populated and RawBody contains the server response bytes.
+func TestWireErrorOptInPreservesMessageAndRawBody(t *testing.T) {
+	const phi = "patient 1234 not found"
+	const rawPayload = `{"message":"patient 1234 not found","code":"NOT_FOUND"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(404)
+		_, _ = w.Write([]byte(rawPayload))
+	}))
+	defer srv.Close()
+
+	// Opt-in client.
+	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()), WithRawErrorBodies(true))
+	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	var we *WireError
+	if !errors.As(err, &we) {
+		t.Fatalf("expected *WireError, got %T", err)
+	}
+
+	if we.OpenEHR == nil {
+		t.Fatal("expected OpenEHR detail")
+	}
+	if we.OpenEHR.Code != "NOT_FOUND" {
+		t.Errorf("OpenEHR.Code = %q, want NOT_FOUND", we.OpenEHR.Code)
+	}
+	if we.OpenEHR.Message != phi {
+		t.Errorf("OpenEHR.Message = %q, want %q (opt-in should preserve)", we.OpenEHR.Message, phi)
+	}
+	if len(we.RawBody) == 0 {
+		t.Error("RawBody empty; WithRawErrorBodies(true) must preserve raw body")
+	}
+	if string(we.RawBody) != rawPayload {
+		t.Errorf("RawBody = %q, want %q", we.RawBody, rawPayload)
 	}
 }
 

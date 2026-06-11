@@ -25,6 +25,8 @@ type config struct {
 	logger *slog.Logger
 
 	observer Observer
+
+	rawErrorBodies bool
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -96,4 +98,13 @@ func WithLogger(l *slog.Logger) Option {
 // layers that don't know whether the consumer wants observability).
 func WithObserver(o Observer) Option {
 	return func(cfg *config) { cfg.observer = o }
+}
+
+// WithRawErrorBodies opts in to preserving server error payloads on
+// WireError (the OpenEHR envelope message and the raw response body).
+// These may contain PHI; leave disabled (the default) whenever error
+// values can reach logs, traces, or observers. The openEHR error code
+// is always preserved regardless of this setting.
+func WithRawErrorBodies(on bool) Option {
+	return func(cfg *config) { cfg.rawErrorBodies = on }
 }
