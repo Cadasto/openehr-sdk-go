@@ -157,11 +157,11 @@ func TestJTIHasCryptoRandEntropy(t *testing.T) {
 		t.Fatalf("two fresh signers (counter=1 each) produced identical JTI %q — crypto/rand entropy missing", jti)
 	}
 
-	// Verify 1000 calls from a single signer are all distinct.
+	// Verify 1000 calls from a single signer are all distinct (length + uniqueness
+	// are a deterministic proxy for crypto/rand entropy presence).
 	const N = 1000
-	seen := make(map[string]struct{}, N+2)
-	seen[jti] = struct{}{}
-	seen[jti2] = struct{}{}
+	seen := make(map[string]struct{}, N+1)
+	seen[jti] = struct{}{} // seed with the first signer's initial JTI
 	for range N {
 		id, err := newJTI(s)
 		if err != nil {

@@ -151,19 +151,18 @@ type AuthorizationRequest struct {
 // BeginAuthorization generates PKCE material for a single launch.
 //
 // If state is empty, a cryptographically random state value is generated
-// (32 bytes of entropy, base64url-encoded) and returned in
-// [AuthorizationRequest].State. The caller MUST persist req.State and
-// compare it against the state parameter on the authorization-code
-// callback to defend against CSRF. If state is non-empty it is used
+// (stateLen bytes of entropy, base64url-encoded) and returned in
+// [AuthorizationRequest].State. If state is non-empty it is used
 // verbatim — the caller takes responsibility for its strength and
 // session binding.
 //
 // Callers MUST retain the returned [AuthorizationRequest] and pass it
-// unchanged to [Source.ExchangeAuthorizationCode]; a Source supports
+// unchanged to [Source.ExchangeAuthorizationCode], which compares the
+// state received at the redirect URI against req.State. A Source supports
 // many concurrent launches when each flow keeps its own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
-		b := make([]byte, 32)
+		b := make([]byte, stateLen)
 		if _, err := rand.Read(b); err != nil {
 			return AuthorizationRequest{}, fmt.Errorf("smart: generate state: %w", err)
 		}
@@ -203,13 +202,19 @@ func (s *Source) AuthorizeURL(req AuthorizationRequest, launch string) (string, 
 	return u.String(), nil
 }
 
-// ExchangeAuthorizationCode completes the PKCE flow (REQ-061). req
-// MUST be the [AuthorizationRequest] returned by [Source.BeginAuthorization]
-// for this launch (state + PKCE verifier). The returned [TokenResponse]
-// carries SMART launch parameters for smart/ (REQ-064).
-func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
+// ExchangeAuthorizationCode completes the PKCE flow (REQ-061). req MUST be
+// the [AuthorizationRequest] returned by [Source.BeginAuthorization] for this
+// launch. callbackState is the state query parameter received at the redirect
+// URI; it is compared against req.State and [ErrLaunchInvalidState] is
+// returned on mismatch before any network call is made, defending against
+// CSRF (auth.md §REQ-061). The returned [TokenResponse] carries SMART launch
+// parameters for smart/ (REQ-064).
+func (s *Source) ExchangeAuthorizationCode(ctx context.Context, code string, callbackState string, req AuthorizationRequest) (auth.Token, TokenResponse, error) {
 	if req.State == "" || req.PKCE.Verifier == "" {
 		return auth.Token{}, TokenResponse{}, fmt.Errorf("%w: AuthorizationRequest from BeginAuthorization is required", auth.ErrInvalidConfig)
+	}
+	if callbackState != req.State {
+		return auth.Token{}, TokenResponse{}, ErrLaunchInvalidState
 	}
 	tok, tr, refresh, err := s.exchangeCode(ctx, code, req.PKCE.Verifier)
 	if err != nil {

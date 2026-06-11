@@ -10,6 +10,7 @@ import (
 const (
 	codeVerifierLen = 64
 	challengeMethod = "S256"
+	stateLen        = 32 // 256-bit CSRF state entropy (RFC 6749 §10.10)
 )
 
 // PKCEPair holds the RFC 7636 verifier and S256 challenge.
