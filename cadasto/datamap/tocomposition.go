@@ -945,10 +945,25 @@ func encodeStructuredContainer(container template.ObjectNode, items []any, fallb
 // `_name` is the optional display string; falls back to the template label
 // or — for the expanded form — to the inner `value`.
 //
-// Returns a DV_CODED_TEXT map when `_code` carries a non-empty code; a
-// plain DV_TEXT with the template label otherwise.
+// As a compact alternative when `_code` is absent, `name` accepts the
+// shorthand `"<terminology>::<code>|<display>"` (REQ-058 extension).
+// A `name` without `|` is treated as a plain display string (DV_TEXT).
+// `_code` always takes precedence over the `name` shorthand when both present.
+//
+// Returns a DV_CODED_TEXT map when a code is resolved; a plain DV_TEXT with
+// the explicit name string or the template label otherwise.
 func clusterName(payload map[string]any, label string) map[string]any {
 	terminology, codeStr, expandedDisplay, ok := parseCodeField(payload["_code"])
+	if !ok {
+		// Try compact name shorthand: "term::code|display"
+		if nameStr, _ := payload["name"].(string); nameStr != "" {
+			terminology, codeStr, expandedDisplay, ok = parseNameShorthand(nameStr)
+			if !ok {
+				// Plain name string → use as DV_TEXT display value
+				return dvText(nameStr)
+			}
+		}
+	}
 	if !ok {
 		return dvText(label)
 	}
@@ -964,6 +979,24 @@ func clusterName(payload map[string]any, label string) map[string]any {
 		"value":         display,
 		"defining_code": codePhrase(terminology, codeStr),
 	}
+}
+
+// parseNameShorthand parses the compact `"<terminology>::<code>|<display>"`
+// shorthand accepted by the `name` key (REQ-058 extension). Returns ok=false
+// when the string contains no `|` separator (treated as plain text by the
+// caller) or when the left part yields an empty code.
+func parseNameShorthand(s string) (terminology, code, display string, ok bool) {
+	idx := indexOf(s, "|")
+	if idx < 0 {
+		return "", "", "", false
+	}
+	left := s[:idx]
+	right := s[idx+1:]
+	t, c := splitTerminology(left)
+	if c == "" {
+		return "", "", "", false
+	}
+	return t, c, right, true
 }
 
 // parseCodeField extracts (terminology, code, display, ok) from a `_code`

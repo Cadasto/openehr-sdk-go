@@ -155,6 +155,87 @@ func TestClusterName_EmptyStringCode_FallsThrough(t *testing.T) {
 	}
 }
 
+// --- name shorthand (REQ-058 extension) ---
+//
+// `"name": "term::code|display"` is a compact alternative to `_code` + `_name`
+// that the encoder accepts when no `_code` key is present. The `|` splits code
+// from display; the left side follows the `splitTerminology` convention.
+
+// PROBE-058c — happy path: MOLIS::BG01|Glucose(nuchter) becomes DV_CODED_TEXT.
+func TestClusterName_NameShorthand_ExternalTerminology(t *testing.T) {
+	got := clusterName(map[string]any{
+		"name": "MOLIS::BG01|Glucose(nuchter)",
+	}, "Result")
+	want := map[string]any{
+		"_type": "DV_CODED_TEXT",
+		"value": "Glucose(nuchter)",
+		"defining_code": map[string]any{
+			"_type":          "CODE_PHRASE",
+			"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "MOLIS"},
+			"code_string":    "BG01",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// PROBE-058d — name shorthand without terminology:: prefix defaults to local.
+func TestClusterName_NameShorthand_DefaultsToLocal(t *testing.T) {
+	got := clusterName(map[string]any{
+		"name": "BG01|Glucose",
+	}, "Result")
+	dc := got["defining_code"].(map[string]any)
+	tid := dc["terminology_id"].(map[string]any)
+	if tid["value"] != "local" {
+		t.Errorf("terminology = %v, want local", tid["value"])
+	}
+	if dc["code_string"] != "BG01" {
+		t.Errorf("code = %v, want BG01", dc["code_string"])
+	}
+	if got["value"] != "Glucose" {
+		t.Errorf("value = %v, want Glucose", got["value"])
+	}
+}
+
+// PROBE-058e — name without | is plain DV_TEXT (no code).
+func TestClusterName_NameShorthand_NoPipe_IsPlainText(t *testing.T) {
+	got := clusterName(map[string]any{
+		"name": "Glucose(nuchter)",
+	}, "Result")
+	want := map[string]any{"_type": "DV_TEXT", "value": "Glucose(nuchter)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+// PROBE-058f — _code takes precedence over name shorthand when both present.
+func TestClusterName_CodeWinsOverNameShorthand(t *testing.T) {
+	got := clusterName(map[string]any{
+		"_code": "LOINC::1975-2",
+		"_name": "Bilirubin",
+		"name":  "MOLIS::BG01|Should be ignored",
+	}, "Result")
+	dc := got["defining_code"].(map[string]any)
+	if dc["code_string"] != "1975-2" {
+		t.Errorf("_code should win: code = %v, want 1975-2", dc["code_string"])
+	}
+	if got["value"] != "Bilirubin" {
+		t.Errorf("_name should win: value = %v, want Bilirubin", got["value"])
+	}
+}
+
+// PROBE-058g — name shorthand + _name: _name sibling overrides the parsed display.
+func TestClusterName_NameShorthand_SiblingNameOverridesDisplay(t *testing.T) {
+	got := clusterName(map[string]any{
+		"name":  "MOLIS::BG01|Glucose(nuchter)",
+		"_name": "override label",
+	}, "Result")
+	if got["value"] != "override label" {
+		t.Errorf("_name sibling should win: value = %v, want override label", got["value"])
+	}
+}
+
 // --- parseCodeField unit-tests ---
 
 func TestParseCodeField_NilInput(t *testing.T) {
