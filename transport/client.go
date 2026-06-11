@@ -233,9 +233,20 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	respBody, err := io.ReadAll(httpResp.Body)
+	limit := c.cfg.maxResponseBody
+	if limit == 0 {
+		limit = 64 << 20 // 64 MiB default
+	}
+	var reader io.Reader = httpResp.Body
+	if limit > 0 {
+		reader = io.LimitReader(httpResp.Body, limit+1)
+	}
+	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+	}
+	if limit > 0 && int64(len(respBody)) > limit {
+		return nil, fmt.Errorf("transport: %s %s: response body exceeds %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,

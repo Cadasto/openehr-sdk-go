@@ -27,6 +27,8 @@ type config struct {
 	observer Observer
 
 	rawErrorBodies bool
+
+	maxResponseBody int64
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -107,4 +109,12 @@ func WithObserver(o Observer) Option {
 // is always preserved regardless of this setting.
 func WithRawErrorBodies(on bool) Option {
 	return func(cfg *config) { cfg.rawErrorBodies = on }
+}
+
+// WithMaxResponseBody caps the number of response body bytes read per
+// request, guarding against memory exhaustion from a misbehaving or
+// hostile server. The default is 64 MiB. A value of 0 selects the
+// default; a negative value disables the limit (unbounded read).
+func WithMaxResponseBody(n int64) Option {
+	return func(cfg *config) { cfg.maxResponseBody = n }
 }

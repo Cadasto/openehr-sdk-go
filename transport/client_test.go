@@ -775,6 +775,51 @@ func TestWireErrorOptInPreservesMessageAndRawBody(t *testing.T) {
 	}
 }
 
+// TestMaxResponseBody verifies the body size cap enforced by WithMaxResponseBody.
+//
+// Sub-test "exceeded": a 1 KiB cap on a 4 KiB response must return an error
+// whose message contains "exceeds" (not an OOM / truncated success).
+//
+// Sub-test "within_limit": a small response (a few bytes) with the default cap
+// (64 MiB, i.e. no option set) must succeed — normal traffic is unaffected.
+func TestMaxResponseBody(t *testing.T) {
+	t.Run("exceeded", func(t *testing.T) {
+		// Server returns 4 KiB; client caps at 1 KiB.
+		body4k := strings.Repeat("x", 4<<10)
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(body4k))
+		}))
+		defer srv.Close()
+		c, _ := New(newCatalog(t, srv),
+			WithHTTPClient(srv.Client()),
+			WithMaxResponseBody(1<<10),
+		)
+		_, err := c.Do(context.Background(), &Request{Path: "/x"})
+		if err == nil {
+			t.Fatal("expected error for oversized body, got nil")
+		}
+		if !strings.Contains(err.Error(), "exceeds") {
+			t.Errorf("error %q should mention \"exceeds\"", err.Error())
+		}
+	})
+
+	t.Run("within_limit", func(t *testing.T) {
+		// Small body, default client (64 MiB cap) — must succeed.
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		}))
+		defer srv.Close()
+		c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
+		resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+		if err != nil {
+			t.Fatalf("unexpected error for small body: %v", err)
+		}
+		if len(resp.Body) == 0 {
+			t.Error("expected non-empty body")
+		}
+	})
+}
+
 // readCassette returns the bytes of a vendored cassette at
 // testkit/cassettes/its_rest/<dir>/<name>.
 func readCassette(t *testing.T, dir, name string) []byte {
