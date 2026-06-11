@@ -349,9 +349,9 @@ type CString struct {
 - Modify: `openehr/rm/rminfo/lookup.go:123`, `internal/bmmgen/render_jsonmar.go:116`, `internal/bmmgen/render_jsonunmar.go:72`
 - Test: existing suites
 
-- [ ] **Step 1**: `lookup.go` — compute the sorted slice once (package `var` over the generated `defaultData`); `KnownRMTypes` returns a fresh `slices.Clone` of it (callers may sort/mutate). `render_jsonmar.go` — hoist `regexp.MustCompile` to a package `var` (qualifier is static per Target; parameterize with `%s` only if needed — check both call sites first). `render_jsonunmar.go:72` — replace `strings.Contains(strings.Join(chunks, ""), …)` with a loop-and-break.
-- [ ] **Step 2: Run** — `go test ./openehr/rm/rminfo/ ./internal/bmmgen/ -v && make codegen-verify` → PASS.
-- [ ] **Step 3: Commit** — `perf(rminfo,bmmgen): cache known-type list and generator regex`
+- [x] **Step 1**: `lookup.go` — `KnownRMTypes` memoized via `sync.Once` on the (immutable-after-construction) `lookup`, returns `slices.Clone` (works for Default + New, no value-copy since used only via `*lookup`). `render_jsonmar.go` — qualifier regex cached by qualifier string via `qualifierClassRE` (mutex+map; identical pattern; covers both renderer paths). `render_jsonunmar.go` — `strings.Join`+Contains replaced with loop-and-break (markers can't straddle whole-class chunks); dead `regexp` import removed.
+- [x] **Step 2: Run** — `go test ./openehr/rm/rminfo/ ./internal/bmmgen/ && make codegen-verify` → PASS (codegen-verify: no `*_gen.go` diff).
+- [x] **Step 3: Commit** — `perf(rminfo,bmmgen): cache known-type list and generator qualifier regex` *(f3b9e74 + 94167b8 gofmt)*
 
 ### Task 16: Naming, docs, and micro-cleanups (Q8)
 
