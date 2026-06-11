@@ -254,11 +254,11 @@ Caps: OPT parse 32 MiB, `UploadTemplate` 32 MiB, `bmm.Load` 32 MiB. For the stre
 - Modify: `openehr/template/parse.go` (`buildNode`/`buildComplexObject`), `openehr/template/path.go:199` (`walkPath`)
 - Test: `openehr/template/parse_test.go` (synthesize a >limit-depth OPT), `path_test.go`
 
-- [ ] **Step 1: Failing test** — generate an OPT XML string with 200 nested `children` complex objects; assert `ParseOPT` returns `ErrInvalidOPT` (depth) rather than succeeding/overflowing; assert `walkPath` on a hand-built >limit tree returns `ErrPathNotFound`-class error.
-- [ ] **Step 2: Run** — `go test ./openehr/template/ -v` → FAIL.
-- [ ] **Step 3: Implement** — thread `depth int` through the recursive builders and `walkPath`; `const maxOPTDepth = 128` (real OPTs sit well under 64). Error on exceed; no API change (internal recursion only).
-- [ ] **Step 4: Run** — `go test ./openehr/template/ -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(template): depth limits on OPT tree build and path walk`
+- [x] **Step 1: Failing test** — generate an OPT XML string with deeply nested `children` complex objects; assert `ParseOPT` returns `ErrInvalidOPT` (depth); assert `walkPath` on a hand-built >limit tree returns `ErrPathNotFound`-class error. *(Boundary pinned at exact cap and cap+1.)*
+- [x] **Step 2: Run** — `go test ./openehr/template/ -v` → FAIL.
+- [x] **Step 3: Implement** — thread `depth int` through the recursive builders and `walkPath`; `var maxOPTDepth = 128` (var for test-overridability; guard fires at `depth > maxOPTDepth`). Error on exceed; no API change.
+- [x] **Step 4: Run** — `go test ./openehr/template/ -v` → PASS.
+- [x] **Step 5: Commit** — `fix(template): depth limits on OPT tree build and path walk` *(28645b4 + 87c553c)*
 
 ### Task 10: Depth-limit generated polymorphic JSON decode (R3 — fix in the generator)
 

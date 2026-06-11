@@ -185,3 +185,19 @@ func TestJSONNestingDepth(t *testing.T) {
 		}
 	}
 }
+
+// TestJSONNestingDepth_boundary pins the exact fence at maxDecodeDepth:
+// a value nested exactly to the cap is accepted (depth == cap), while
+// cap+1 is reported over (the early-exit returns a value > cap). Guards
+// against an off-by-one slipping the > maxDecodeDepth check to >=.
+func TestJSONNestingDepth_boundary(t *testing.T) {
+	nested := func(n int) []byte {
+		return []byte(strings.Repeat("[", n) + strings.Repeat("]", n))
+	}
+	if got := jsonNestingDepth(nested(maxDecodeDepth)); got != maxDecodeDepth {
+		t.Errorf("depth at cap: got %d, want %d (must be accepted)", got, maxDecodeDepth)
+	}
+	if got := jsonNestingDepth(nested(maxDecodeDepth + 1)); got <= maxDecodeDepth {
+		t.Errorf("depth cap+1: got %d, want > %d (must be rejected)", got, maxDecodeDepth)
+	}
+}
