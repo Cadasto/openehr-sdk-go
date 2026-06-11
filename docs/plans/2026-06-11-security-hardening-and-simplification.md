@@ -134,9 +134,9 @@ This intentionally covers `authorization_endpoint`/`token_endpoint` too — same
 
 `WireError.Error()` interpolates `OpenEHR.Message`, and `RawBody` carries the full server response. Both flow into `slog`, OTel span status, and `Observation.Err` — in a healthcare CDR these routinely contain patient identifiers. `REQ-candidate: error values MUST NOT carry server payload content unless explicitly enabled.`
 
-- [ ] **Step 1: Failing test** — build a `WireError` with `OpenEHR.Message = "patient 1234 not found"`; assert `err.Error()` does **not** contain `"1234"` but does contain status code + route. Add a test that `WithRawErrorBodies(true)` preserves today's behavior (`RawBody` populated, message rendered).
-- [ ] **Step 2: Run** — `go test ./transport/ -run TestWireError -v` → FAIL.
-- [ ] **Step 3: Implement** —
+- [x] **Step 1: Failing test** — build a `WireError` with `OpenEHR.Message = "patient 1234 not found"`; assert `err.Error()` does **not** contain `"1234"` but does contain status code + route. Add a test that `WithRawErrorBodies(true)` preserves today's behavior (`RawBody` populated, message rendered).
+- [x] **Step 2: Run** — `go test ./transport/ -run TestWireError -v` → FAIL.
+- [x] **Step 3: Implement** — *(`Code` + `CodedText` retained by default; only `Message`/`RawBody` gated. Downstream: `openehr/client/query` `AQLError.Error()` now surfaces the PHI-free code when message suppressed — `992d52b`)*
   - `errors.go`: drop the `message=%q` clause from `Error()` (keep `code=` — openEHR error *codes* are not PHI). Document that `OpenEHR.Message`/`RawBody` remain available via `errors.As` for callers who need them.
   - `client.go:356`: populate `RawBody` (and `OpenEHR.Message`) only when `cfg.rawErrorBodies` is set; otherwise truncate `RawBody` to 0 and keep only the parsed error *code*.
   - `options.go`: add
@@ -150,8 +150,8 @@ func WithRawErrorBodies(on bool) Option {
 }
 ```
 
-- [ ] **Step 4: Run** — `go test ./transport/... -v` → PASS. Check `emitObservation`/OTel paths still compile and span status no longer embeds the message.
-- [ ] **Step 5: Commit** — `fix(transport): keep server error payloads out of Error() by default (PHI)`
+- [x] **Step 4: Run** — `go test ./transport/... -v` → PASS. Check `emitObservation`/OTel paths still compile and span status no longer embeds the message.
+- [x] **Step 5: Commit** — `fix(transport): keep server error payloads out of Error() by default (PHI)` *(34127f7 + 992d52b)*
 
 ### Task 4: Cap response body reads in the transport (S4)
 
