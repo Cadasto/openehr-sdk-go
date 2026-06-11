@@ -131,6 +131,49 @@ func TestClaimsSignerJTIUnique(t *testing.T) {
 	}
 }
 
+func TestJTIHasCryptoRandEntropy(t *testing.T) {
+	// A 24-byte JTI (8 time + 8 counter + 8 rand) base64url-encodes to
+	// exactly 32 characters (24 * 4/3 = 32, no padding with RawURLEncoding).
+	// The old 16-byte JTI encoded to 22 characters. This length check is a
+	// deterministic proxy for verifying that the crypto/rand bytes are
+	// present.
+	s := &ClaimsSigner{}
+	jti, err := newJTI(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jti) != 32 {
+		t.Fatalf("JTI len = %d, want 32 (24 bytes base64url); crypto/rand bytes missing?", len(jti))
+	}
+
+	// Two fresh signers with counter=1 and potentially the same nanosecond
+	// must produce distinct JTIs thanks to the rand component.
+	s2 := &ClaimsSigner{}
+	jti2, err := newJTI(s2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jti == jti2 {
+		t.Fatalf("two fresh signers (counter=1 each) produced identical JTI %q — crypto/rand entropy missing", jti)
+	}
+
+	// Verify 1000 calls from a single signer are all distinct.
+	const N = 1000
+	seen := make(map[string]struct{}, N+2)
+	seen[jti] = struct{}{}
+	seen[jti2] = struct{}{}
+	for range N {
+		id, err := newJTI(s)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, dup := seen[id]; dup {
+			t.Fatalf("duplicate JTI %q after %d calls", id, len(seen))
+		}
+		seen[id] = struct{}{}
+	}
+}
+
 func TestClaimsSignerValidates(t *testing.T) {
 	tests := []struct {
 		name string

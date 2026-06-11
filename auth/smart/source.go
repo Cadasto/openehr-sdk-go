@@ -2,6 +2,7 @@ package smart
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"net/http"
@@ -148,12 +149,25 @@ type AuthorizationRequest struct {
 }
 
 // BeginAuthorization generates PKCE material for a single launch.
+//
+// If state is empty, a cryptographically random state value is generated
+// (32 bytes of entropy, base64url-encoded) and returned in
+// [AuthorizationRequest].State. The caller MUST persist req.State and
+// compare it against the state parameter on the authorization-code
+// callback to defend against CSRF. If state is non-empty it is used
+// verbatim — the caller takes responsibility for its strength and
+// session binding.
+//
 // Callers MUST retain the returned [AuthorizationRequest] and pass it
 // unchanged to [Source.ExchangeAuthorizationCode]; a Source supports
 // many concurrent launches when each flow keeps its own request value.
 func (s *Source) BeginAuthorization(state string) (AuthorizationRequest, error) {
 	if state == "" {
-		return AuthorizationRequest{}, fmt.Errorf("%w: state is required", auth.ErrInvalidConfig)
+		b := make([]byte, 32)
+		if _, err := rand.Read(b); err != nil {
+			return AuthorizationRequest{}, fmt.Errorf("smart: generate state: %w", err)
+		}
+		state = base64URLEncode(b)
 	}
 	pkce, err := NewPKCEPair()
 	if err != nil {

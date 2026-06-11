@@ -22,6 +22,62 @@ func testAuthEndpoints(srv *httptest.Server) discovery.AuthEndpoints {
 	}
 }
 
+func TestBeginAuthorizationEmptyStateGeneratesRandom(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Empty state must not error — it must generate a random state instead.
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization(\"\") error = %v, want nil", err)
+	}
+	if req.State == "" {
+		t.Fatal("BeginAuthorization(\"\") returned empty State, want non-empty")
+	}
+	if len(req.State) < 32 {
+		t.Fatalf("BeginAuthorization(\"\") State len = %d, want >= 32", len(req.State))
+	}
+
+	// Two successive calls must produce distinct states (unpredictability).
+	req2, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.State == req2.State {
+		t.Fatalf("two BeginAuthorization(\"\") calls returned the same State %q", req.State)
+	}
+}
+
+func TestBeginAuthorizationNonEmptyStatePreserved(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const supplied = "my-explicit-state"
+	req, err := src.BeginAuthorization(supplied)
+	if err != nil {
+		t.Fatalf("BeginAuthorization(%q) error = %v, want nil", supplied, err)
+	}
+	if req.State != supplied {
+		t.Fatalf("req.State = %q, want %q", req.State, supplied)
+	}
+}
+
 func TestPKCEAndAuthorizeURL(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
