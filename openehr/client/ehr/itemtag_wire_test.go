@@ -59,6 +59,9 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 			if !strings.Contains(err.Error(), "control characters") {
 				t.Errorf("error should mention 'control characters', got: %v", err)
 			}
+			if !strings.Contains(err.Error(), "item tag[0]") {
+				t.Errorf("error should identify the offending tag index, got: %v", err)
+			}
 			if got != "" {
 				t.Errorf("expected empty string on error, got %q", got)
 			}
@@ -70,7 +73,7 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 // inside a value does not cause an error (RFC 9110 permits HT in field values).
 func TestFormatItemTagHeader_TabAllowed(t *testing.T) {
 	tags := []ehr.ItemTag{
-		{Key: "k", Value: "v\twith\ttabs", TargetPath: "/p\tath"},
+		{Key: "k\tey", Value: "v\twith\ttabs", TargetPath: "/p\tath"},
 	}
 	got, err := ehr.FormatItemTagHeader(tags)
 	if err != nil {

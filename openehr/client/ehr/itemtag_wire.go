@@ -149,12 +149,13 @@ func escapeItemTagValue(s string) string {
 	return strings.ReplaceAll(s, `"`, `\"`)
 }
 
-// hasCtrlChars reports whether s contains a C0 control byte other than
-// horizontal tab — such bytes (notably CR/LF) must never reach an HTTP
-// header value (RFC 9110 §5.5), where they enable header injection.
+// hasCtrlChars reports whether s contains a byte disallowed in an HTTP
+// header field value (RFC 9110 §5.5): any C0 control byte other than
+// horizontal tab, or DEL (0x7F). CR/LF in particular must never reach a
+// header value, where they enable header injection.
 func hasCtrlChars(s string) bool {
 	for i := 0; i < len(s); i++ {
-		if s[i] < 0x20 && s[i] != '\t' {
+		if (s[i] < 0x20 && s[i] != '\t') || s[i] == 0x7f {
 			return true
 		}
 	}

@@ -3,6 +3,7 @@ package smart
 import (
 	"context"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -65,7 +66,7 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		Encounter: tr.Encounter,
 		User:      tr.FHIRUser,
 		Issuer:    cfg.Issuer,
-		Raw:       tr.Raw,
+		Raw:       maps.Clone(tr.Raw),
 	}
 	if tr.Scope != "" {
 		lc.Scopes = strings.Fields(tr.Scope)
@@ -112,8 +113,6 @@ func idTokenClaimMap(claims *IDTokenClaims) map[string]any {
 	if claims.Nonce != "" {
 		all["nonce"] = claims.Nonce
 	}
-	for k, v := range claims.Extra {
-		all[k] = v
-	}
+	maps.Copy(all, claims.Extra)
 	return all
 }
