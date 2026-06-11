@@ -341,11 +341,20 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 			Capabilities: append([]string(nil), s.Capabilities...),
 		}
 	}
-	// Trust the issuer the caller supplied over the document's iss
-	// field — the discovery URL is the authoritative identifier.
+	// The caller-supplied issuer is authoritative — it is the URL we
+	// fetched the document from. Per OIDC Discovery §4.3 the document's
+	// "issuer" field MUST equal that URL when present; a mismatch means
+	// a hostile or misconfigured server is responding, and we must reject
+	// it to prevent downstream ID-token iss checks from passing against
+	// the wrong server. An absent "issuer" is allowed and simply resolves
+	// to the caller's value.
 	resolvedIssuer := issuer
-	if wire.Issuer != "" {
-		resolvedIssuer = wire.Issuer
+	if wire.Issuer != "" && wire.Issuer != issuer {
+		return nil, &DiscoveryError{
+			Issuer: issuer,
+			Reason: ReasonIssuerMismatch,
+			Inner:  fmt.Errorf("document issuer %q does not match requested issuer %q", wire.Issuer, issuer),
+		}
 	}
 	return &ServiceCatalog{
 		Issuer:   resolvedIssuer,

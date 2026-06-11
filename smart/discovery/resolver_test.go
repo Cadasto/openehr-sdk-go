@@ -206,7 +206,6 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 
 func TestResolveMissingServiceRequired(t *testing.T) {
 	body := `{
-        "issuer":"https://x",
         "authorization_endpoint":"https://x/a",
         "token_endpoint":"https://x/t",
         "response_types_supported":["code"],
@@ -229,7 +228,7 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 
 func TestResolveMalformedURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"issuer":"x","services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
+		_, _ = io.WriteString(w, `{"services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -327,6 +326,31 @@ func TestStaleCatalog(t *testing.T) {
 	cat2 := &ServiceCatalog{} // zero ExpiresAt
 	if cat2.Stale(time.Now()) {
 		t.Error("zero-expiry catalog should not be stale")
+	}
+}
+
+func TestResolveIssuerMismatch(t *testing.T) {
+	// The document's "issuer" field differs from the URL used to fetch it.
+	// Per OIDC Discovery §4.3, Resolve must reject the document and return
+	// a *DiscoveryError with ReasonIssuerMismatch.
+	body := `{
+		"issuer":"https://evil.example.com",
+		"authorization_endpoint":"https://evil.example.com/auth",
+		"token_endpoint":"https://evil.example.com/token",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if cat != nil {
+		t.Error("expected nil catalog on issuer mismatch")
+	}
+	var derr *DiscoveryError
+	if !errors.As(err, &derr) || derr.Reason != ReasonIssuerMismatch {
+		t.Fatalf("expected issuer_mismatch DiscoveryError, got %v", err)
 	}
 }
 

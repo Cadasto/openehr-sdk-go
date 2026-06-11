@@ -32,6 +32,12 @@ const (
 	// default fetcher (REQ-092). Override with WithAllowInsecure to opt
 	// into plaintext fetches in development.
 	ReasonInsecureURL DiscoveryErrorReason = "insecure_url"
+	// ReasonIssuerMismatch indicates the discovery document's "issuer"
+	// field does not equal the URL used to fetch it. Per OIDC Discovery
+	// §4.3 this is a hard validation failure — accepting a mismatched
+	// issuer would let a hostile server impersonate another identity
+	// provider downstream.
+	ReasonIssuerMismatch DiscoveryErrorReason = "issuer_mismatch"
 )
 
 // DiscoveryError is the typed error every discovery failure surfaces
