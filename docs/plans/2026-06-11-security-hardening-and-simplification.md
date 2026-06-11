@@ -188,23 +188,13 @@ Add `WithMaxResponseBody(n int64) Option` following the `WithRetry` pattern at `
 - Modify: `auth/smart/source.go:154-163`, `auth/jwtbearer/assertion.go:200-208`
 - Test: `auth/smart/smart_test.go`, `auth/jwtbearer` tests
 
-- [ ] **Step 1: Failing tests** — (a) `BeginAuthorization("")` on a new variant `BeginAuthorizationAuto()` (or `state == ""` now meaning "generate") returns a request whose `State` is ≥ 32 base64url chars and unique across two calls; (b) two `ClaimsSigner`s freshly constructed produce JTIs that differ even with a frozen clock (inject via existing `now func()` seam if present, else compare across signers).
-- [ ] **Step 2: Run** — `go test ./auth/... -v` → FAIL.
-- [ ] **Step 3: Implement** —
-  - `source.go`: keep the explicit-state path (callers binding state to their session store), but generate when empty instead of erroring — reuse the `crypto/rand` + base64url pattern from `NewPKCEPair` in `auth/smart/pkce.go`. Update the doc comment: caller MUST persist the returned `State` and compare on callback.
-  - `assertion.go` `newJTI`: append 16 bytes of `crypto/rand`, drop nothing else:
+- [x] **Step 1: Failing tests** — (a) `BeginAuthorization("")` returns a request whose `State` is ≥ 32 base64url chars (exact 43) and unique across two calls; (b) freshly-constructed `ClaimsSigner`s produce distinct JTIs (cross-signer distinctness exercises the rand component).
+- [x] **Step 2: Run** — `go test ./auth/... -v` → FAIL.
+- [x] **Step 3: Implement** — `source.go` generates when empty (reusing the PKCE `crypto/rand`+base64url idiom, `stateLen=32`); `newJTI` is now 24 bytes = 8 time + 8 counter + 8 `crypto/rand` (kept counter for in-process uniqueness; dropped redundant base64 padding-trim).
+- [x] **Step 4: Run** — `go test ./auth/... -v` → PASS.
+- [x] **Step 5: Commit** — `fix(auth): generated OAuth state + random JTI entropy` *(01fb841)*
 
-```go
-var rnd [16]byte
-if _, err := rand.Read(rnd[:]); err != nil {
-	return "", fmt.Errorf("jwtbearer: jti entropy: %w", err)
-}
-return fmt.Sprintf("%d-%d-%s", time.Now().UnixNano(), counter,
-	base64.RawURLEncoding.EncodeToString(rnd[:])), nil
-```
-
-- [ ] **Step 4: Run** — `go test ./auth/... -v` → PASS.
-- [ ] **Step 5: Commit** — `fix(auth): generated OAuth state + random JTI entropy`
+**Deviation (approved):** review surfaced that the project spec ([auth.md:120](../specifications/auth.md) — "the SDK **MUST** verify the `state`", `ErrLaunchInvalidState`) was never implemented, and auto-generating state made the gap acute. Scope was extended (user-approved, breaking change pre-1.0) to **enforce** verification in the SDK: `ExchangeAuthorizationCode` gained a `callbackState` parameter and returns the new `ErrLaunchInvalidState` sentinel on mismatch *before* any token-endpoint call (`a2e7601` + test tightening `83dce0f`). Deferred to Task 16: extract a shared `randBase64URL` helper (dup in `source.go`/`pkce.go`) and migrate `jtiCounter` to `atomic.Uint64`.
 
 ### Task 6: Sanitize item-tag header values; copy principal claims (S7, S8)
 
@@ -377,7 +367,10 @@ type CString struct {
 // CDR binds as named placeholders. String-built AQL is injectable.
 ```
 
-- [ ] **Step 1**: Apply all three; behavior-neutral.
+- Modify: `auth/smart` — extract a private `randBase64URL(n int) (string, error)` helper in `pkce.go` and use it from both `BeginAuthorization` (`source.go`) and `NewPKCEPair`/state gen (dedupe the identical `rand.Read`+`base64URLEncode` block; carried over from Task 5 review).
+- Modify: `auth/jwtbearer/assertion.go` — migrate `ClaimsSigner.jtiCounter uint64` to `atomic.Uint64` (`s.jtiCounter.Add(1)`), clearing the long-standing `atomictypes` lint and 32-bit alignment concern (carried over from Task 5 review).
+
+- [ ] **Step 1**: Apply all; behavior-neutral.
 - [ ] **Step 2: Run** — `go build ./... && go test ./transport/ ./openehr/validation/ ./openehr/client/query/ -v` → PASS.
 - [ ] **Step 3: Commit** — `docs(query),refactor(transport,validation): AQL injection warning + cleanups`
 
