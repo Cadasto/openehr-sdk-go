@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -438,6 +439,22 @@ func TestLoad_nilReader(t *testing.T) {
 	_, err := Load(nil)
 	if err == nil {
 		t.Fatalf("expected error on nil reader")
+	}
+}
+
+func TestLoad_inputTooLarge(t *testing.T) {
+	orig := maxBMMBytes
+	maxBMMBytes = 16
+	t.Cleanup(func() { maxBMMBytes = orig })
+
+	// Feed 100 bytes — over the 16-byte cap.
+	r := bytes.NewReader(bytes.Repeat([]byte("a"), 100))
+	_, err := Load(r)
+	if err == nil {
+		t.Fatal("expected error when input exceeds maxBMMBytes")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error should mention 'exceeds', got: %v", err)
 	}
 }
 

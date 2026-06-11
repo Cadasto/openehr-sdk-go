@@ -67,11 +67,40 @@ func parseFile(path string, strict bool) (*OperationalTemplate, error) {
 	return parseOPT(f, strict)
 }
 
+// maxOPTBytes is the maximum number of bytes parseOPT will read from
+// an io.Reader before returning an "input too large" error. Default is
+// 32 MiB. Unexported so tests in package template can lower it
+// temporarily via t.Cleanup.
+var maxOPTBytes int64 = 32 << 20
+
+// cappedReader caps total bytes read from r; once the budget is
+// exhausted it reports EOF and sets exceeded, so callers can
+// distinguish "input too large" from a genuinely malformed document.
+type cappedReader struct {
+	r        io.Reader
+	remain   int64
+	exceeded bool
+}
+
+func (c *cappedReader) Read(p []byte) (int, error) {
+	if c.remain <= 0 {
+		c.exceeded = true
+		return 0, io.EOF
+	}
+	if int64(len(p)) > c.remain {
+		p = p[:c.remain]
+	}
+	n, err := c.r.Read(p)
+	c.remain -= int64(n)
+	return n, err
+}
+
 func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: nil reader", ErrInvalidOPT)
 	}
-	br := bufio.NewReader(r)
+	cr := &cappedReader{r: r, remain: maxOPTBytes + 1}
+	br := bufio.NewReader(cr)
 	peek, peekErr := br.Peek(3)
 	if peekErr != nil && !errors.Is(peekErr, io.EOF) {
 		return nil, fmt.Errorf("%w: read header: %w", ErrInvalidOPT, peekErr)
@@ -85,7 +114,13 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	dec := xml.NewDecoder(br)
 	var wire xmlTemplate
 	if err := dec.Decode(&wire); err != nil {
+		if cr.exceeded {
+			return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
+	}
+	if cr.exceeded {
+		return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
 	}
 	// Forward-compat: defend against non-<template> documents that
 	// somehow decoded (e.g. when the OPT XSD wrapper is renamed by a

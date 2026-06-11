@@ -6,6 +6,12 @@ import (
 	"io"
 )
 
+// maxBMMBytes is the maximum number of bytes Load will read from an
+// io.Reader before returning an "input too large" error. Default is
+// 32 MiB. Unexported so tests in package bmm can lower it temporarily
+// via t.Cleanup to avoid allocating the full budget in test runs.
+var maxBMMBytes int64 = 32 << 20
+
 // Load parses a single P_BMM JSON document from r into an in-memory
 // [Schema]. The decoder dispatches on the `_type` discriminator for
 // every polymorphic node (properties, types, function parameters,
@@ -17,9 +23,12 @@ func Load(r io.Reader) (*Schema, error) {
 	if r == nil {
 		return nil, fmt.Errorf("bmm.Load: reader is nil")
 	}
-	data, err := io.ReadAll(r)
+	data, err := io.ReadAll(io.LimitReader(r, maxBMMBytes+1))
 	if err != nil {
 		return nil, fmt.Errorf("bmm.Load: read: %w", err)
+	}
+	if int64(len(data)) > maxBMMBytes {
+		return nil, fmt.Errorf("bmm.Load: input exceeds %d bytes", maxBMMBytes)
 	}
 	return loadFromBytes(data)
 }
