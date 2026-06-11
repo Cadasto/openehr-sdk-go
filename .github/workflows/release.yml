@@ -8,6 +8,11 @@
 # offers a dry-run that prints the would-be release notes without creating
 # anything (useful before pushing the tag).
 #
+# Least privilege: the workflow token defaults to contents:read. Only the
+# `publish` job — which does nothing but `gh release create` — is granted
+# contents:write, so the verify/build steps (make ci, scripts) never run
+# with a write-capable token.
+#
 # Policy: docs/releases.md. Plan: docs/plans/archive/2026-05-25-versioning-strategy.md.
 
 name: Release
@@ -24,16 +29,20 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Verify and draft
+  verify:
+    name: Verify and build notes
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      dry_run: ${{ steps.meta.outputs.dry_run }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -86,14 +95,30 @@ jobs:
           name: release-notes-${{ steps.meta.outputs.tag }}
           path: release_notes.md
 
+  publish:
+    name: Create draft release
+    needs: verify
+    if: needs.verify.outputs.dry_run == 'false'
+    runs-on: ubuntu-latest
+    # Only this job needs write access — to create the draft release.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download release notes artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes-${{ needs.verify.outputs.tag }}
+
       - name: Create draft GitHub Release
-        if: steps.meta.outputs.dry_run == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "${{ steps.meta.outputs.tag }}" \
-            --title "${{ steps.meta.outputs.tag }}" \
+          gh release create "${{ needs.verify.outputs.tag }}" \
+            --title "${{ needs.verify.outputs.tag }}" \
             --notes-file release_notes.md \
             --draft \
             --target "$GITHUB_SHA"
