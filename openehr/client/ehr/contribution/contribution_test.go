@@ -37,15 +37,29 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	return c
 }
 
-func newAudit() *rm.AuditDetails {
+// newAudit builds the write-side UpdateAudit DTO for Submission.Audit
+// (no time_committed; _type AUDIT_DETAILS).
+func newAudit() contribution.UpdateAudit {
 	name := "alice"
-	return &rm.AuditDetails{
+	return contribution.UpdateAudit{
 		SystemID:  "cdr.example",
-		Committer: rm.PartyIdentified{Name: &name},
+		Committer: &rm.PartyIdentified{Name: &name},
 		ChangeType: rm.DVCodedText{
 			DVText:       rm.DVText{Value: "creation"},
 			DefiningCode: rm.CodePhrase{CodeString: "249"},
 		},
+	}
+}
+
+// newCommitAudit builds the persisted-shaped rm.AuditDetails used as a
+// version's commit_audit (the sealed AuditDetailsLike). Distinct from
+// newAudit(), which builds the write-side UpdateAudit for Submission.Audit.
+func newCommitAudit() rm.AuditDetails {
+	name := "alice"
+	return rm.AuditDetails{
+		SystemID:      "cdr.example",
+		Committer:     &rm.PartyIdentified{Name: &name},
+		ChangeType:    rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
 }
@@ -54,16 +68,16 @@ func newAudit() *rm.AuditDetails {
 // suitable for use as a Submission.Versions[i] element. The Composition
 // fixture only needs ArchetypeNodeID for the round-trip assertion —
 // production callers pass real archetype-node Compositions.
-func newOriginalVersion() *rm.OriginalVersion[rm.Composition] {
+func newOriginalVersion() *contribution.OriginalVersion[rm.Composition] {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
-	return &rm.OriginalVersion[rm.Composition]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
 		Version: rm.Version[rm.Composition]{
-			CommitAudit: *newAudit(),
+			CommitAudit: newCommitAudit(),
 		},
 		UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &comp,
-	}
+	})
 }
 
 func TestCommitMinimal(t *testing.T) {
@@ -79,7 +93,7 @@ func TestCommitMinimal(t *testing.T) {
 	defer srv.Close()
 
 	batch := &contribution.Submission{
-		Audit:    *newAudit(),
+		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
 	out, meta, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch)
@@ -135,7 +149,7 @@ func TestCommitSubmissionShape(t *testing.T) {
 	defer srv.Close()
 
 	batch := &contribution.Submission{
-		Audit:    *newAudit(),
+		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
 	if _, _, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch); err != nil {
@@ -195,7 +209,7 @@ func TestCommitMapsVersionConflict(t *testing.T) {
 	}))
 	defer srv.Close()
 	batch := &contribution.Submission{
-		Audit:    *newAudit(),
+		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
 	_, _, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch)
