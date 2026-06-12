@@ -3,6 +3,7 @@ package bmm
 import (
 	"context"
 	"fmt"
+	"reflect"
 )
 
 // LoadAll resolves a BMM schema and its transitive includes via the
@@ -21,8 +22,11 @@ import (
 //     openehr_base_1.3.0 and openehr_rm_1.2.0, with the RM definition
 //     being the authoritative refinement.) When two *sibling* ancestor
 //     schemas (i.e. two distinct includes of the same descendant) both
-//     declare the same class, that's an ErrSchemaConflict — there is
-//     no winner.
+//     declare the same class with *differing* definitions, that's an
+//     ErrSchemaConflict — there is no winner. An *identical* definition
+//     reached via two include paths (a diamond — e.g. am24 includes both
+//     base and lang, and lang also includes base) is benign and merged
+//     once.
 //   - Packages are merged by fully-qualified package name (the map key
 //     plus the recursive Name field). When two schemas both define the
 //     same package node, their class-name lists are concatenated
@@ -134,7 +138,10 @@ func mergeAncestor(dst, ancestor *Schema, descendantClasses, descendantPrims map
 			if _, inDescendant := descendantPrims[k]; inDescendant {
 				continue // descendant shadow — allowed
 			}
-			if _, exists := dst.PrimitiveTypes[k]; exists {
+			if existing, exists := dst.PrimitiveTypes[k]; exists {
+				if reflect.DeepEqual(existing, v) {
+					continue // identical definition reached via a shared ancestor (diamond) — benign
+				}
 				return &schemaConflictError{
 					ClassName: k,
 					SchemaA:   dst.SchemaID(),
@@ -154,7 +161,10 @@ func mergeAncestor(dst, ancestor *Schema, descendantClasses, descendantPrims map
 			if _, inDescendant := descendantClasses[k]; inDescendant {
 				continue // descendant shadow — allowed
 			}
-			if _, exists := dst.ClassDefinitions[k]; exists {
+			if existing, exists := dst.ClassDefinitions[k]; exists {
+				if reflect.DeepEqual(existing, v) {
+					continue // identical definition reached via a shared ancestor (diamond) — benign
+				}
 				return &schemaConflictError{
 					ClassName: k,
 					SchemaA:   dst.SchemaID(),
