@@ -410,9 +410,11 @@ if rel, err := filepath.Rel(outDir, clean); err != nil || strings.HasPrefix(rel,
 }
 ```
 
-- [ ] **Step 1: Failing test** — `internal/bmmgen` test invoking the path-build with a hostile package name containing `../`; assert error.
-- [ ] **Step 2: Implement + run** — `go test ./internal/bmmgen/ -v && make codegen-verify` → PASS; `docker build .` still succeeds.
-- [ ] **Step 3: Commit** — `chore(docker,bmmgen): pin Go patch version; confine generator output paths`
+- [x] **Step 1: Failing test** — `confine_test.go`: `TestConfinePath` (escape→err, child→ok) + `TestSafeFileBase` (plain component ok; `..`, `a/b`, `dir/`, `a\b`, `openehr/rm` rejected).
+- [x] **Step 2: Implement + run** — two source guards: `confinePath(opts.OutDir, outDir)` (covers BMM-derived `OutSubDir`) and `safeFileBase(f.FileBase)` (covers BMM-derived file base) — together confine every per-file path; fixed-component paths (`typereg_gen.go`, `rminfo/lookup_gen.go`) are inherently safe. `Dockerfile` `GO_VERSION` → `1.25.0`. `go test ./internal/bmmgen/` + `make codegen-verify` → PASS (no drift; guards accept real BMM). (Docker build not run in sandbox; tag form `golang:1.25.0-alpine` valid.)
+- [x] **Step 3: Commit** — `chore(docker,bmmgen): pin Go patch version; confine generator output paths` *(001f443)*
+
+**Phase-4 review (Tasks 17–19):** spec ✅ (all I1–I5 compliant; generator guards have no bypass — `FileBase` dot-traversal is neutralised by `.`→`_`, and raw separators are rejected by `safeFileBase`). Quality "yes, with fixes": applied the dead `verify.version` output removal (`b77abf1`); **rejected** dropping the `grep -qF "#### ${pr} "` trailing space (it prevents `PROBE-1`/`PROBE-10` prefix collisions). Noted as follow-ups (pre-existing / untestable here): release `--target "$GITHUB_SHA"` peeling for annotated tags, dead `ALPINE_VERSION` ARG, optional removal of the `publish`-job checkout (kept to preserve the original's known-good `gh`-in-checkout behavior), and extending the ingest allowlist to the other dynamic loops.
 
 ---
 
