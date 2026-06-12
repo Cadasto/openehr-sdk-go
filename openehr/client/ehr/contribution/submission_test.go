@@ -39,7 +39,7 @@ func newImportedVersion() *rm.ImportedVersion[rm.Composition] {
 func newOriginalVersionFolder() *rm.OriginalVersion[rm.Folder] {
 	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
 	return &rm.OriginalVersion[rm.Folder]{
-		Version:        rm.Version[rm.Folder]{CommitAudit: *newAudit()},
+		Version:        rm.Version[rm.Folder]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "3::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &folder,
@@ -49,7 +49,7 @@ func newOriginalVersionFolder() *rm.OriginalVersion[rm.Folder] {
 func newOriginalVersionEHRAccess() *rm.OriginalVersion[rm.EHRAccess] {
 	access := rm.EHRAccess{}
 	return &rm.OriginalVersion[rm.EHRAccess]{
-		Version:        rm.Version[rm.EHRAccess]{CommitAudit: *newAudit()},
+		Version:        rm.Version[rm.EHRAccess]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "4::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &access,
@@ -114,7 +114,7 @@ func TestSubmissionValidate(t *testing.T) {
 				// generic instantiation is rejected.
 				Versions: []contribution.CommitVersion{
 					&rm.OriginalVersion[rm.PartyIdentified]{
-						Version:        rm.Version[rm.PartyIdentified]{CommitAudit: *newAudit()},
+						Version:        rm.Version[rm.PartyIdentified]{CommitAudit: newCommitAudit()},
 						UID:            rm.ObjectVersionID{Value: "x::cdr.example::1"},
 						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 					},
@@ -141,7 +141,7 @@ func TestSubmissionValidate(t *testing.T) {
 
 func TestSubmissionMarshalJSONCanonical(t *testing.T) {
 	sub := &contribution.Submission{
-		Audit:    *newAudit(),
+		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
 	b, err := canjson.Marshal(sub)
@@ -182,13 +182,13 @@ func TestSubmissionMixesVersionable(t *testing.T) {
 		IsModifiable:    true,
 	}
 	statusVer := &rm.OriginalVersion[rm.EHRStatus]{
-		Version:        rm.Version[rm.EHRStatus]{CommitAudit: *newAudit()},
+		Version:        rm.Version[rm.EHRStatus]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "2::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &status,
 	}
 	sub := &contribution.Submission{
-		Audit:    *newAudit(),
+		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion(), statusVer},
 	}
 	b, err := canjson.Marshal(sub)

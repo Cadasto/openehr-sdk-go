@@ -22,10 +22,14 @@ import (
 //
 // SDK-GAP-10. Plan: docs/plans/archive/2026-05-26-contribution-submission-shape.md.
 type Submission struct {
-	// Audit is the AUDIT_DETAILS envelope applied to the whole batch
-	// (REQ-059). Carried inside the body — there is no separate
-	// `openehr-audit-details` header on this endpoint.
-	Audit rm.AuditDetails
+	// Audit is the write-side commit-audit applied to the whole batch
+	// (REQ-059 / SPECITS-95 / ITS-REST PR 131). Carried inside the body
+	// — there is no separate `openehr-audit-details` header on this
+	// endpoint. Uses [UpdateAudit] (not [rm.AuditDetails]) so that
+	// server-assigned time_committed is never emitted; _type defaults to
+	// "AUDIT_DETAILS" (accepted by conformant CDRs) — see [UpdateAudit.Type]
+	// to fall back to "UPDATE_AUDIT" for non-conformant servers.
+	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit.
 	// Each element MUST be a *rm.OriginalVersion[T] or
 	// *rm.ImportedVersion[T] for T in {rm.Composition, rm.EHRStatus,
@@ -87,7 +91,7 @@ func (s *Submission) Validate() error {
 // mirrors the OpenAPI definition (audit before versions); per-version
 // `_type` discrimination is emitted by each element's own MarshalJSON.
 type submissionJSON struct {
-	Audit    rm.AuditDetails `json:"audit"`
+	Audit    UpdateAudit     `json:"audit"`
 	Versions []CommitVersion `json:"versions"`
 }
 

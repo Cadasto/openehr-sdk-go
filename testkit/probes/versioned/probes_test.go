@@ -247,7 +247,7 @@ func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
 	name := "alice"
 	audit := rm.AuditDetails{
 		SystemID:  "cdr.example",
-		Committer: rm.PartyIdentified{Name: &name},
+		Committer: &rm.PartyIdentified{Name: &name},
 		ChangeType: rm.DVCodedText{
 			DVText:       rm.DVText{Value: "creation"},
 			DefiningCode: rm.CodePhrase{CodeString: "249"},
@@ -274,7 +274,7 @@ func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    auditBase(ov.CommitAudit),
+		Audit:    contribution.UpdateAuditFromAuditDetails(auditBase(ov.CommitAudit)),
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
@@ -303,7 +303,7 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    auditBase(ov.CommitAudit),
+		Audit:    contribution.UpdateAuditFromAuditDetails(auditBase(ov.CommitAudit)),
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
