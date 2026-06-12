@@ -29,6 +29,15 @@ Plus building-block use cases that import a single sub-package (RM modeling, cod
 
 ## Quickstart
 
+**New to the SDK?** Start with [docs/quick-start.md](docs/quick-start.md) and the runnable catalog in [docs/examples.md](docs/examples.md).
+
+```bash
+go get github.com/cadasto/openehr-sdk-go@v0.3.0
+go run ./cmd/examples/canonical_json   # first building-block example (no network)
+```
+
+Contributors:
+
 ```bash
 make help        # grouped targets (toolchain, test, lint, CI, …)
 make doctor      # check host Go vs Docker fallback
@@ -43,10 +52,11 @@ Go `1.25.x` on the host is the fast path. If host Go is missing, build the Docke
 
 | Reading order | Doc |
 |---|---|
+| 0 — **developer onboarding** | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) |
 | 1 — entry point for any agent | [AGENTS.md](AGENTS.md) |
 | 2 — **normative specifications** (REQ / PROBE / STRAND) | [docs/specifications/](docs/specifications/) |
 | 3 — design narrative, dependency mermaid | [docs/architecture.md](docs/architecture.md) |
-| 4 — AI agent conventions, MCP skills | [docs/ai-workflow.md](docs/ai-workflow.md) |
+| 4 — AI agent conventions, MCP skills, example-doc maintenance | [docs/ai-workflow.md](docs/ai-workflow.md) |
 | 5 — CI / contributor checks | [docs/ci.md](docs/ci.md) |
 | 6 — ADRs (closed) | [docs/adr/](docs/adr/) |
 | 6b — landed vs planned | [docs/roadmap.md](docs/roadmap.md) |
