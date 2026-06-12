@@ -194,6 +194,7 @@ go run ./cmd/examples/ehr_create
 ```text
 created EHR: id=f0e1d2c3-b4a5-6789-0123-456789abcdef
   system_id=example.system
+  metadata: VersionUID="f0e1d2c3-b4a5-6789-0123-456789abcdef" Location="/openehr/v1/ehr/f0e1d2c3-b4a5-6789-0123-456789abcdef"
 OK: end-to-end EHR creation against in-process httptest backend
 ```
 
