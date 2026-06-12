@@ -16,4 +16,14 @@
 // every version commits or none do. Errors map per REQ-093;
 // optimistic-concurrency failures within the batch return
 // [transport.ErrVersionConflict].
+//
+// The commit audit uses the write-side shape [UpdateAudit] (not the
+// persisted `rm.AuditDetails`): it omits the server-assigned
+// `time_committed` and keeps `change_type` as `DV_CODED_TEXT`
+// (SPECITS-95 / ITS-REST PR 131). It marshals as `_type:"AUDIT_DETAILS"`
+// by default — the form reference CDRs validate — with a settable
+// [AuditTypeUpdateAudit] fallback for servers that refuse it. Inline
+// versions are submitted through the [OriginalVersion] / [ImportedVersion]
+// write-wrappers ([WrapOriginalVersion] / [WrapImportedVersion]), which
+// carry the same commit-audit shape. PROBE-072; REQ-050 / REQ-095.
 package contribution

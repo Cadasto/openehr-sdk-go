@@ -86,7 +86,7 @@
 | EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
 | Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 write gaps → followups plan |
 | Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / SDK-GAP-09 notes as composition |
-| Contribution | **Landed** | `openehr/client/ehr/contribution/` | Submission body is `Contribution_create` (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); response remains persisted `rm.Contribution`. PROBE-072 / SDK-GAP-10. [Archived plan](plans/archive/2026-05-26-contribution-submission-shape.md). |
+| Contribution | **Landed** | `openehr/client/ehr/contribution/` | Submission body is `Contribution_create` (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); response remains persisted `rm.Contribution`. Write-side commit audit drops server-assigned `time_committed`, keeps `DV_CODED_TEXT` `change_type`, defaults to `AUDIT_DETAILS` with an `UPDATE_AUDIT` fallback (SPECITS-95 / ITS-REST PR 131). PROBE-072 / SDK-GAP-10. Archived plans: [submission shape](plans/archive/2026-05-26-contribution-submission-shape.md), [write-audit](plans/archive/2026-06-11-contribution-update-audit-dv-coded-text.md). |
 | ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |
 | Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
