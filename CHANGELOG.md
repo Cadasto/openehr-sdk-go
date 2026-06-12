@@ -8,6 +8,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-12
+
+Fourth `v0.x` minor — security hardening across auth / transport / SMART / OPT + BMM input, SMART launch-state verification (REQ-061), the contribution write-audit shape correction (SPECITS-95 / ITS-REST PR 131), plus deduplication and least-privilege release tooling and a `lang` BMM pin sync. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — two breaks this cycle, both with no in-tree callers: (1) `smart.Source.ExchangeAuthorizationCode` gains a `callbackState` argument verified before any token-endpoint call (migrate by passing the redirect's `state` query parameter; `BeginAuthorization("")` now self-generates state); (2) the contribution submission write shape — `Submission.Audit` is now `contribution.UpdateAudit` and `Submission.Versions` entries are the `OriginalVersion[T]` / `ImportedVersion[T]` write-wrappers (migrate via `WrapOriginalVersion` / `WrapImportedVersion`). Pin to the exact tag.
+
 ### Added
 
 - **Developer onboarding** — quick-start and runnable examples catalog under `docs/`.
