@@ -2,6 +2,7 @@ package smart_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,6 +20,64 @@ func testAuthEndpoints(srv *httptest.Server) discovery.AuthEndpoints {
 		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
 		TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
 		JWKSURI:               discovery.MustParseURL(srv.URL + "/jwks"),
+	}
+}
+
+func TestBeginAuthorizationEmptyStateGeneratesRandom(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Empty state must not error — it must generate a random state instead.
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatalf("BeginAuthorization(\"\") error = %v, want nil", err)
+	}
+	if req.State == "" {
+		t.Fatal("BeginAuthorization(\"\") returned empty State, want non-empty")
+	}
+	// stateLen=32 random bytes base64url-encode to exactly 43 chars; an
+	// exact check makes any entropy/encoding regression visible.
+	if len(req.State) != 43 {
+		t.Fatalf("BeginAuthorization(\"\") State len = %d, want 43", len(req.State))
+	}
+
+	// Two successive calls must produce distinct states (unpredictability).
+	req2, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.State == req2.State {
+		t.Fatalf("two BeginAuthorization(\"\") calls returned the same State %q", req.State)
+	}
+}
+
+func TestBeginAuthorizationNonEmptyStatePreserved(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const supplied = "my-explicit-state"
+	req, err := src.BeginAuthorization(supplied)
+	if err != nil {
+		t.Fatalf("BeginAuthorization(%q) error = %v, want nil", supplied, err)
+	}
+	if req.State != supplied {
+		t.Fatalf("req.State = %q, want %q", req.State, supplied)
 	}
 }
 
@@ -92,7 +151,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, tr, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", req)
+	tok, tr, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", "state-abc", req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,9 +211,99 @@ func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, _, err := src.ExchangeAuthorizationCode(context.Background(), "code", smart.AuthorizationRequest{})
-	if err == nil {
-		t.Fatal("expected error")
+	_, _, err := src.ExchangeAuthorizationCode(context.Background(), "code", "", smart.AuthorizationRequest{})
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
+	}
+}
+
+// TestExchangeAuthorizationCodeStateMismatch verifies that a wrong callback
+// state returns ErrLaunchInvalidState and does NOT hit the token endpoint
+// (REQ-061: validate state before exchanging the code).
+func TestExchangeAuthorizationCodeStateMismatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("token endpoint must not be called on state mismatch; got request to %s", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := src.BeginAuthorization("known-state")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, exchangeErr := src.ExchangeAuthorizationCode(context.Background(), "code", "WRONG-state", req)
+	if !errors.Is(exchangeErr, smart.ErrLaunchInvalidState) {
+		t.Fatalf("expected ErrLaunchInvalidState, got %v", exchangeErr)
+	}
+}
+
+// TestExchangeAuthorizationCodeStateMatch verifies that a matching callback
+// state proceeds to the token exchange (REQ-061).
+func TestExchangeAuthorizationCodeStateMatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"at-ok","token_type":"Bearer","expires_in":3600}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := src.BeginAuthorization("correct-state")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, exchangeErr := src.ExchangeAuthorizationCode(context.Background(), "code", "correct-state", req)
+	if exchangeErr != nil {
+		t.Fatalf("expected no error on state match, got %v", exchangeErr)
+	}
+	if tok.Value != "at-ok" {
+		t.Fatalf("access token = %q, want %q", tok.Value, "at-ok")
+	}
+}
+
+// TestAuthorizeURLStateReachesURL verifies the state generated by BeginAuthorization
+// is included verbatim in the authorize URL query parameter (2a).
+func TestAuthorizeURLStateReachesURL(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	src, err := smart.New("client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := src.BeginAuthorization("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := src.AuthorizeURL(req, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := url.Parse(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := parsed.Query().Get("state"); got != req.State {
+		t.Fatalf("authorize URL state = %q, want %q", got, req.State)
 	}
 }
 
@@ -182,10 +331,10 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	if reqA.PKCE.Verifier == reqB.PKCE.Verifier {
 		t.Fatal("expected distinct verifiers")
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA.State, reqA); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB.State, reqB); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {

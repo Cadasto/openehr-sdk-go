@@ -280,7 +280,7 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		return auth.Token{}, &auth.ExchangeError{
 			Sentinel:   auth.ErrTokenExchangeFailed,
 			StatusCode: resp.StatusCode,
-			OAuth2:     parseOAuth2Error(body),
+			OAuth2:     auth.ParseOAuth2Error(body),
 			Inner:      fmt.Errorf("token endpoint returned %d", resp.StatusCode),
 		}
 	}
@@ -322,18 +322,4 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 		Scope:     scope,
 		Issuer:    s.cfg.Issuer,
 	}, nil
-}
-
-// parseOAuth2Error decodes the RFC 6749 § 5.2 error envelope. Returns
-// nil when the body does not match the envelope shape.
-func parseOAuth2Error(body []byte) *auth.OAuth2Error {
-	var env struct {
-		Error            string `json:"error"`
-		ErrorDescription string `json:"error_description"`
-		ErrorURI         string `json:"error_uri"`
-	}
-	if err := json.Unmarshal(body, &env); err != nil || env.Error == "" {
-		return nil
-	}
-	return &auth.OAuth2Error{Code: env.Error, Description: env.ErrorDescription, URI: env.ErrorURI}
 }

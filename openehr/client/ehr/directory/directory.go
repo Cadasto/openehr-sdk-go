@@ -138,7 +138,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Save: marshal body: %w", err)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Save: %w", err)
 	}
@@ -177,7 +177,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Update: marshal body: %w", err)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Update: %w", err)
 	}
@@ -212,7 +212,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	for _, o := range opts {
 		o(&cfg)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, fmt.Errorf("directory.Delete: %w", err)
 	}
@@ -255,17 +255,6 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 		return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
 	}
 	return &folder, meta, nil
-}
-
-func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
-	if a == nil {
-		return "", nil
-	}
-	b, err := canjson.Marshal(a)
-	if err != nil {
-		return "", fmt.Errorf("marshal audit details: %w", err)
-	}
-	return string(b), nil
 }
 
 // Repository mirrors the package-level Directory functions.

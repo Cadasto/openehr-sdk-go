@@ -41,7 +41,10 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 	return doResultSet(ctx, c, req)
 }
 
-// ExecuteString is an escape hatch for raw AQL strings and parameters.
+// ExecuteString is an escape hatch for raw AQL. aqlText MUST be a
+// static or programmatically validated statement; never interpolate
+// caller-supplied values into it — pass them via params, which the CDR
+// binds as named placeholders. String-built AQL is injectable.
 func ExecuteString(ctx context.Context, c *transport.Client, aqlText string, params map[string]any, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	q := aql.NewQuery(aqlText)
 	q.Parameters = params

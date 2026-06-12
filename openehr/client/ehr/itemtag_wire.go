@@ -24,6 +24,15 @@ func FormatItemTagHeader(tags []ItemTag) (string, error) {
 		if strings.TrimSpace(t.Key) == "" {
 			return "", fmt.Errorf("ehr: item tag[%d]: empty key", i)
 		}
+		if hasCtrlChars(t.Key) {
+			return "", fmt.Errorf("ehr: item tag[%d]: key contains control characters", i)
+		}
+		if t.Value != "" && hasCtrlChars(t.Value) {
+			return "", fmt.Errorf("ehr: item tag[%d]: value contains control characters", i)
+		}
+		if t.TargetPath != "" && hasCtrlChars(t.TargetPath) {
+			return "", fmt.Errorf("ehr: item tag[%d]: target_path contains control characters", i)
+		}
 		var b strings.Builder
 		b.WriteString(`key="`)
 		b.WriteString(escapeItemTagValue(t.Key))
@@ -138,4 +147,17 @@ func readQuotedItemTagValue(valPart string) (val, rest string, err error) {
 
 func escapeItemTagValue(s string) string {
 	return strings.ReplaceAll(s, `"`, `\"`)
+}
+
+// hasCtrlChars reports whether s contains a byte disallowed in an HTTP
+// header field value (RFC 9110 §5.5): any C0 control byte other than
+// horizontal tab, or DEL (0x7F). CR/LF in particular must never reach a
+// header value, where they enable header injection.
+func hasCtrlChars(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if (s[i] < 0x20 && s[i] != '\t') || s[i] == 0x7f {
+			return true
+		}
+	}
+	return false
 }

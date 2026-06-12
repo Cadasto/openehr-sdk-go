@@ -321,7 +321,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	if err := json.Unmarshal(body, &wire); err != nil {
 		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: err}
 	}
-	auth, err := parseAuthEndpoints(issuer, wire)
+	auth, err := parseAuthEndpoints(issuer, wire, r.cfg.allowInsecure)
 	if err != nil {
 		return nil, err
 	}
@@ -341,11 +341,20 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 			Capabilities: append([]string(nil), s.Capabilities...),
 		}
 	}
-	// Trust the issuer the caller supplied over the document's iss
-	// field — the discovery URL is the authoritative identifier.
+	// The caller-supplied issuer is authoritative — it is the URL we
+	// fetched the document from. Per OIDC Discovery §4.3 the document's
+	// "issuer" field MUST equal that URL when present; a mismatch means
+	// a hostile or misconfigured server is responding, and we must reject
+	// it to prevent downstream ID-token iss checks from passing against
+	// the wrong server. An absent "issuer" is allowed and simply resolves
+	// to the caller's value.
 	resolvedIssuer := issuer
-	if wire.Issuer != "" {
-		resolvedIssuer = wire.Issuer
+	if wire.Issuer != "" && wire.Issuer != issuer {
+		return nil, &DiscoveryError{
+			Issuer: issuer,
+			Reason: ReasonIssuerMismatch,
+			Inner:  fmt.Errorf("document issuer %q does not match requested issuer %q", wire.Issuer, issuer),
+		}
 	}
 	return &ServiceCatalog{
 		Issuer:   resolvedIssuer,
@@ -354,7 +363,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	}, nil
 }
 
-func parseAuthEndpoints(issuer string, w smartConfigWire) (AuthEndpoints, error) {
+func parseAuthEndpoints(issuer string, w smartConfigWire, allowInsecure bool) (AuthEndpoints, error) {
 	var out AuthEndpoints
 	parse := func(name, raw string) (*url.URL, error) {
 		if raw == "" {
@@ -363,6 +372,9 @@ func parseAuthEndpoints(issuer string, w smartConfigWire) (AuthEndpoints, error)
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("%s %q invalid", name, raw)}
+		}
+		if !allowInsecure && u.Scheme != "https" {
+			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: fmt.Errorf("%s uses scheme %q; https required (use WithAllowInsecure for development)", name, u.Scheme)}
 		}
 		return u, nil
 	}
@@ -432,10 +444,11 @@ func acceptedVersionsString(m map[string]struct{}) string {
 }
 
 // warnInsecure emits a logger warning when any catalog URL uses
-// plaintext http://. The Resolver does not refuse those URLs (only the
-// initial issuer fetch is gated by allowInsecure) — the consumer is
-// authoritative on which deployments they want to talk to. The warning
-// surfaces the posture so misconfigurations are visible.
+// plaintext http://. It only runs for catalogs that passed parsing: in
+// strict mode non-https auth endpoints are rejected there, so warnings
+// here cover the allowInsecure path plus service base_url entries,
+// which are warn-only — the consumer is authoritative on which
+// deployments they want to talk to.
 func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check := func(name string, u *url.URL) {
 		if u == nil {
@@ -448,6 +461,7 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check("authorization_endpoint", cat.Auth.AuthorizationEndpoint)
 	check("token_endpoint", cat.Auth.TokenEndpoint)
 	check("jwks_uri", cat.Auth.JWKSURI)
+	check("registration_endpoint", cat.Auth.RegistrationEndpoint)
 	for id, s := range cat.Services {
 		check("services["+id+"].base_url", s.BaseURL)
 	}

@@ -206,7 +206,6 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 
 func TestResolveMissingServiceRequired(t *testing.T) {
 	body := `{
-        "issuer":"https://x",
         "authorization_endpoint":"https://x/a",
         "token_endpoint":"https://x/t",
         "response_types_supported":["code"],
@@ -229,7 +228,7 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 
 func TestResolveMalformedURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"issuer":"x","services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
+		_, _ = io.WriteString(w, `{"services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -327,6 +326,113 @@ func TestStaleCatalog(t *testing.T) {
 	cat2 := &ServiceCatalog{} // zero ExpiresAt
 	if cat2.Stale(time.Now()) {
 		t.Error("zero-expiry catalog should not be stale")
+	}
+}
+
+func TestResolveIssuerMismatch(t *testing.T) {
+	// The document's "issuer" field differs from the URL used to fetch it.
+	// Per OIDC Discovery §4.3, Resolve must reject the document and return
+	// a *DiscoveryError with ReasonIssuerMismatch.
+	body := `{
+		"issuer":"https://evil.example.com",
+		"authorization_endpoint":"https://evil.example.com/auth",
+		"token_endpoint":"https://evil.example.com/token",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if cat != nil {
+		t.Error("expected nil catalog on issuer mismatch")
+	}
+	var derr *DiscoveryError
+	if !errors.As(err, &derr) || derr.Reason != ReasonIssuerMismatch {
+		t.Fatalf("expected issuer_mismatch DiscoveryError, got %v", err)
+	}
+}
+
+func TestResolveIssuerMatch(t *testing.T) {
+	// Start an unstarted server so we know srv.URL before building the body.
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := `{
+			"issuer":"` + srv.URL + `",
+			"authorization_endpoint":"https://auth.example.com/auth",
+			"token_endpoint":"https://auth.example.com/token",
+			"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		}`
+		_, _ = io.WriteString(w, body)
+	}))
+	srv.Start()
+	defer srv.Close()
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("expected success when document issuer matches requested issuer, got: %v", err)
+	}
+	if cat.Issuer != srv.URL {
+		t.Errorf("catalog.Issuer = %q, want %q", cat.Issuer, srv.URL)
+	}
+}
+
+// TestResolveInsecureEndpointRejectedStrict verifies that a discovery
+// document containing a non-https endpoint URL (here jwks_uri) is
+// rejected with ReasonInsecureURL when the resolver runs in strict mode
+// (no WithAllowInsecure). The issuer itself is served over TLS so the
+// issuer-level check does not interfere.
+func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
+	body := `{
+		"authorization_endpoint":"http://attacker.example/auth",
+		"token_endpoint":"http://attacker.example/token",
+		"jwks_uri":"http://attacker.example/keys",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	// Strict resolver: no WithAllowInsecure. Use the TLS server's client so
+	// the self-signed cert is trusted.
+	r, err := NewResolver(NewMemoryCache(), WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if cat != nil {
+		t.Error("expected nil catalog when endpoint URLs are non-https in strict mode")
+	}
+	var derr *DiscoveryError
+	if !errors.As(err, &derr) || derr.Reason != ReasonInsecureURL {
+		t.Fatalf("expected insecure_url DiscoveryError, got %v", err)
+	}
+}
+
+// TestResolveInsecureEndpointAllowedWhenAllowInsecure verifies that the
+// same non-https endpoint URLs are accepted (with a warning) when the
+// resolver is configured with WithAllowInsecure.
+func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
+	body := `{
+		"authorization_endpoint":"http://dev.example/auth",
+		"token_endpoint":"http://dev.example/token",
+		"jwks_uri":"http://dev.example/keys",
+		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+	}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	// mustResolver includes WithAllowInsecure, so both the issuer fetch
+	// and the endpoint-URL scheme check should permit http.
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("WithAllowInsecure should permit http endpoint URLs, got: %v", err)
+	}
+	if cat == nil {
+		t.Fatal("expected non-nil catalog")
 	}
 }
 

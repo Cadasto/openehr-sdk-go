@@ -51,6 +51,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // Options controls a single generator invocation.
@@ -163,7 +164,13 @@ func runTarget(opts Options, t Target, resolver wrappedResolver, result *Result)
 	result.Notes = append(result.Notes, plan.Notes...)
 
 	outDir := filepath.Join(opts.OutDir, t.OutSubDir)
+	if err := confinePath(opts.OutDir, outDir); err != nil {
+		return tr, err
+	}
 	for _, f := range plan.Files {
+		if !safeFileBase(f.FileBase) {
+			return tr, fmt.Errorf("bmmgen: unsafe file base %q", f.FileBase)
+		}
 		body, err := RenderFile(plan, f)
 		if err != nil {
 			return tr, err
@@ -380,6 +387,28 @@ func compareFile(path string, want []byte) (*DriftRecord, error) {
 		return nil, nil
 	}
 	return &DriftRecord{Path: path, Got: got, Want: want, Existing: true}, nil
+}
+
+// confinePath rejects path when it escapes outDir after cleaning. The
+// generator builds output paths from BMM-derived components (a target's
+// OutSubDir, a file base from package names); a crafted schema carrying
+// ".." or absolute segments must not be able to make the generator write
+// outside its output root.
+func confinePath(outDir, path string) error {
+	root := filepath.Clean(outDir)
+	rel, err := filepath.Rel(root, filepath.Clean(path))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("bmmgen: path %q escapes output dir %q", path, outDir)
+	}
+	return nil
+}
+
+// safeFileBase reports whether s is a single, separator-free filename
+// component (not "", ".", "..", and carrying no "/" or "\"). File bases
+// are derived from BMM package names; this keeps a hostile name from
+// turning "<dir>/<base>_gen.go" into a path-traversal write.
+func safeFileBase(s string) bool {
+	return s != "" && s != "." && s != ".." && s == filepath.Base(s) && !strings.ContainsAny(s, `/\`)
 }
 
 // writeAtomic writes body to path via a "<path>.tmp" rename. Skips

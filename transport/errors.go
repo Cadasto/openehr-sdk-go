@@ -40,9 +40,14 @@ var (
 // OpenEHRErrorDetail is the parsed openEHR REST error envelope per
 // REQ-093. Nil when the response body did not match the envelope shape.
 type OpenEHRErrorDetail struct {
-	// Message is the human-readable description.
+	// Message is the human-readable description from the server.
+	// May contain PHI (patient identifiers, composition UUIDs, etc.).
+	// Populated only when the client is constructed with WithRawErrorBodies(true);
+	// empty by default so error values are safe to log and trace.
+	// Extract via errors.As when needed; do not include in log lines.
 	Message string `json:"message"`
 	// Code is the openEHR error code (e.g. "VALIDATION_FAILED").
+	// Coded terminology identifier — treated as non-PHI; always preserved.
 	Code string `json:"code"`
 	// CodedText optionally enumerates terminology-coded error tags.
 	CodedText []CodedTextItem `json:"coded_text,omitempty"`
@@ -67,15 +72,25 @@ type WireError struct {
 	// URL is the resolved URL with parameters substituted.
 	Method, URL, Route string
 	// OpenEHR is the parsed openEHR error envelope (REQ-093). Nil when
-	// the body could not be parsed as such.
+	// the body could not be parsed as such. OpenEHR.Message may contain
+	// PHI and is only populated when the client is built with
+	// WithRawErrorBodies(true). OpenEHR.Code is always present.
 	OpenEHR *OpenEHRErrorDetail
 	// RawBody preserves the raw response bytes for diagnostics.
+	// May contain PHI; only populated when the client is built with
+	// WithRawErrorBodies(true). Empty by default.
 	RawBody []byte
 	// Sentinel is the categorical class for errors.Is.
 	Sentinel error
 }
 
-// Error implements error.
+// Error implements error. The returned string includes the HTTP status,
+// the openEHR error code, and the request route — all non-PHI fields.
+// The server message and raw body are deliberately omitted so WireError
+// values are safe to include in logs, traces, and observer callbacks.
+// Callers that need the message (e.g. for user-facing error reporting in
+// a controlled environment) should use errors.As to extract the full
+// WireError after opting in via WithRawErrorBodies.
 func (e *WireError) Error() string {
 	var b strings.Builder
 	if e.Sentinel != nil {
@@ -89,13 +104,8 @@ func (e *WireError) Error() string {
 	if e.StatusCode != 0 {
 		fmt.Fprintf(&b, " status=%d", e.StatusCode)
 	}
-	if e.OpenEHR != nil {
-		if e.OpenEHR.Code != "" {
-			fmt.Fprintf(&b, " code=%s", e.OpenEHR.Code)
-		}
-		if e.OpenEHR.Message != "" {
-			fmt.Fprintf(&b, " message=%q", e.OpenEHR.Message)
-		}
+	if e.OpenEHR != nil && e.OpenEHR.Code != "" {
+		fmt.Fprintf(&b, " code=%s", e.OpenEHR.Code)
 	}
 	return b.String()
 }

@@ -176,16 +176,15 @@ func buildReal(o *xmlCObject, strict bool) (constraints.CReal, error) {
 }
 
 func buildString(o *xmlCObject) constraints.CString {
-	c := constraints.CString{
-		Pattern: strings.TrimSpace(o.PrimitivePattern),
-		Default: strings.TrimSpace(o.AssumedValue),
-	}
+	pattern := strings.TrimSpace(o.PrimitivePattern)
+	assumed := strings.TrimSpace(o.AssumedValue)
+	var list []string
 	for _, item := range o.PrimitiveList {
 		if s := strings.TrimSpace(item.Text); s != "" {
-			c.List = append(c.List, s)
+			list = append(list, s)
 		}
 	}
-	return c
+	return constraints.NewCString(pattern, list, assumed)
 }
 
 func buildDuration(o *xmlCObject) constraints.CDuration {

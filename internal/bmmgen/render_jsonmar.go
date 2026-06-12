@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
@@ -104,6 +105,22 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	return formatted, nil
 }
 
+var (
+	qualifierREMu    sync.Mutex
+	qualifierRECache = map[string]*regexp.Regexp{}
+)
+
+func qualifierClassRE(qualifier string) *regexp.Regexp {
+	qualifierREMu.Lock()
+	defer qualifierREMu.Unlock()
+	if re, ok := qualifierRECache[qualifier]; ok {
+		return re
+	}
+	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(qualifier) + `\.[A-Z]`)
+	qualifierRECache[qualifier] = re
+	return re
+}
+
 // needsExternalImportForJSONMar reports whether any rendered chunk
 // references the target's external qualifier as a Go identifier
 // (i.e. "rm." followed by an uppercase letter). Differs from the
@@ -113,7 +130,7 @@ func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 	if plan.Target.ExternalQualifier == "" || plan.Target.ExternalImport == "" {
 		return false
 	}
-	re := regexp.MustCompile(`\b` + regexp.QuoteMeta(plan.Target.ExternalQualifier) + `\.[A-Z]`)
+	re := qualifierClassRE(plan.Target.ExternalQualifier)
 	for _, c := range chunks {
 		if re.MatchString(c) {
 			return true

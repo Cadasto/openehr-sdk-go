@@ -113,12 +113,15 @@ func (j *JWKS) fetch(ctx context.Context) error {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		// Drain a bounded prefix so the connection can be reused, then
+		// fail without parsing the (irrelevant) error body.
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
+		return fmt.Errorf("jwks fetch: status %d", resp.StatusCode)
+	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		return err
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("jwks fetch: status %d", resp.StatusCode)
 	}
 	var doc struct {
 		Keys []json.RawMessage `json:"keys"`

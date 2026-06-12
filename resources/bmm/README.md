@@ -16,7 +16,7 @@ These files are **the SDK's source of truth** for the openEHR Reference Model, A
 | `openehr_rm_1.2.0.bmm.json` | `openehr_rm_1.2.0` | 2.4 | 146 | base 1.3.0 | **primary** (excluding `ehr_extract` package) | Reference Model: clinical + demographic |
 | `openehr_am_1.4.0.bmm.json` | `openehr_am_1.4.0` | 2.4 | 39 | base 1.3.0 | **primary** | Archetype Object Model 1.4 (ADL 1.4) |
 | `openehr_am_2.4.0.bmm.json` | `openehr_am_2.4.0` | 2.4 | 75 | base 1.3.0 + lang 1.1.0 | **deferred** | Archetype Object Model 2 (ADL 2 / AOM 2) |
-| `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | (BMM meta-classes, ODIN, expression model) | — | **deferred** (reference only) | LANG types — meta-model, ODIN, expression model. Used as documentation while `openehr/bmm/` is hand-written. |
+| `openehr_lang_1.1.0.bmm.json` | `openehr_lang_1.1.0` | 2.4 | 86 | base 1.3.0 | **deferred** (reference only) | LANG types — BMM meta-model + `P_BMM` persistence classes. Used as documentation while `openehr/bmm/` is hand-written. |
 | `openehr_term_3.1.0.bmm.json` | `openehr_term_3.1.0` | — | (terminology service interface) | — | **deferred** | Terminology service interface |
 
 **Primary** files drive v1 code generation. **Deferred** files stay here (no removal) — they are kept for future generation phases or as cross-references. See [`../../docs/specifications/scope.md`](../../docs/specifications/scope.md#out-of-scope-v1) and [`../../docs/specifications/bmm-conformance.md § v1 scope summary`](../../docs/specifications/bmm-conformance.md#v1-scope-summary).
@@ -36,6 +36,8 @@ base 1.3.0  (foundation)
 These BMM files are published by the openEHR Foundation as the computable form of the corresponding openEHR specification documents. The on-disk format is **`P_BMM`** — the persistence binding of the abstract BMM meta-model, defined in the openEHR LANG specification (`bmm` and `bmm_persistence`).
 
 The files in this directory are **byte-identical copies** of the upstream releases. They are stored here (rather than fetched at build time) for the reasons listed above. When upstream publishes a newer version, see § Updating below.
+
+All six pins were verified byte-identical to [`openEHR/BMM-publisher`](https://github.com/openEHR/BMM-publisher) `resources/` on **2026-06-12**. At that time `openehr_lang_1.1.0` was re-synced to the canonical modular publisher form (it had previously been a flattened variant); the other five matched. To re-audit, fetch each `resources/<file>` from the publisher and `sha256sum` against the pin.
 
 ## Updating
 

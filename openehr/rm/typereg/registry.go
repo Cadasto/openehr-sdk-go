@@ -17,6 +17,49 @@ import (
 	"sync"
 )
 
+// maxDecodeDepth bounds the JSON nesting depth Decode accepts. encoding/json
+// caps nesting at 10000; this far lower bound reflects real RM data, which
+// nests only a few dozen levels (COMPOSITION > SECTION > … > CLUSTER > ELEMENT),
+// while still bounding the recursive polymorphic decode path.
+const maxDecodeDepth = 512
+
+// jsonNestingDepth returns the maximum bracket/brace nesting depth in
+// data, ignoring braces inside strings (with escape handling). It exits
+// early once the depth exceeds maxDecodeDepth, so a hostile document
+// costs only O(bytes up to the limit) rather than O(whole document).
+func jsonNestingDepth(data []byte) int {
+	depth, maxDepth := 0, 0
+	inStr, esc := false, false
+	for _, b := range data {
+		if inStr {
+			switch {
+			case esc:
+				esc = false
+			case b == '\\':
+				esc = true
+			case b == '"':
+				inStr = false
+			}
+			continue
+		}
+		switch b {
+		case '"':
+			inStr = true
+		case '{', '[':
+			depth++
+			if depth > maxDepth {
+				maxDepth = depth
+			}
+			if depth > maxDecodeDepth {
+				return depth // early exit; caller rejects
+			}
+		case '}', ']':
+			depth--
+		}
+	}
+	return maxDepth
+}
+
 // Sentinel errors returned by [Registry.Decode] and [DecodeAs]. They
 // are unwrap-compatible (errors.Is) so call sites such as the canjson
 // codec can wrap them in a richer [DecodeError] without losing the
@@ -32,6 +75,11 @@ var (
 	// not satisfy the target interface or type parameter T at a
 	// [DecodeAs] call site.
 	ErrTypeMismatch = errors.New("typereg: decoded type does not satisfy target")
+	// ErrMaxDepthExceeded signals that the JSON nesting depth of a value
+	// handed to Decode exceeds maxDecodeDepth — a guard against stack
+	// exhaustion and quadratic re-parsing from a crafted deeply-nested
+	// polymorphic document (e.g. nested CLUSTER/SECTION trees).
+	ErrMaxDepthExceeded = errors.New("typereg: nesting depth exceeds limit")
 )
 
 // DecodeError is the unified envelope returned by the canjson and
@@ -130,6 +178,9 @@ func (r *Registry) Lookup(typeName string) (func() any, bool) {
 //   - no constructor is registered for the discriminator,
 //   - the body fails to decode into the concrete type.
 func (r *Registry) Decode(data []byte) (any, error) {
+	if d := jsonNestingDepth(data); d > maxDecodeDepth {
+		return nil, fmt.Errorf("typereg.Decode: %w (%d > %d)", ErrMaxDepthExceeded, d, maxDecodeDepth)
+	}
 	var head struct {
 		Type string `json:"_type"`
 	}
