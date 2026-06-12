@@ -235,7 +235,12 @@ requirements:
     canonical: docs/specifications/wire.md#req-095
     status: draft
     implementation: partial
-    packages: [testkit/cassettes/its_rest]
+    packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution]
+    probes: [PROBE-072]
+    tests:
+      - openehr/client/ehr/contribution/update_audit_test.go
+      - openehr/client/ehr/contribution/version_test.go
+      - testkit/probes/versioned/probe_072_contribution_submission_shape.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"

@@ -306,6 +306,30 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	}
 }
 
+func TestProbe072RejectsTimeCommittedAudit(t *testing.T) {
+	// Planted body: a Contribution_create shape whose batch audit carries a
+	// server-assigned time_committed — the extended PROBE-072 MUST flag it
+	// (SPECITS-95 / ITS-REST PR 131).
+	planted := []byte(`{"audit":{"_type":"AUDIT_DETAILS","system_id":"x","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}},"time_committed":{"value":"2026-01-01T00:00:00Z"}},"versions":[{"_type":"ORIGINAL_VERSION","data":{"_type":"COMPOSITION"},"commit_audit":{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}}}}]}`)
+	var captured []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		captured = planted
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	ov := newOriginalVersionFixture()
+	sub := &contribution.Submission{Audit: ov.CommitAudit, Versions: []contribution.CommitVersion{ov}}
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" || !contains(r.Detail, "time_committed") {
+		t.Errorf("PROBE-072 status=%q detail=%q (want fail mentioning time_committed)", r.Status, r.Detail)
+	}
+}
+
 func TestProbe013CrossEHRIsolation(t *testing.T) {
 	const (
 		ehrAID          openehrclient.EHRID      = "ehrA-1111-2222-3333-444444444444"
