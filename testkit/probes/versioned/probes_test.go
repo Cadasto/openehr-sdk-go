@@ -229,21 +229,12 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 	}
 }
 
-// auditBase unwraps a rm.AuditDetailsLike interface back to its
-// concrete rm.AuditDetails value. Post-SDK-GAP-11 the Version-family
-// CommitAudit field is a narrow interface so subtype payloads
-// (ATTESTATION) survive decode/re-marshal; the contribution.Submission
-// envelope still types Audit concretely.
-func auditBase(v rm.AuditDetailsLike) rm.AuditDetails {
-	a, _ := rm.AuditDetailsBase(v)
-	return a
-}
-
 // newOriginalVersionFixture builds a minimal ORIGINAL_VERSION<COMPOSITION>
 // for the PROBE-072 server fakes — the probe doesn't care about clinical
 // content, only the wire shape, so ArchetypeNodeID is the only Composition
-// field set.
-func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
+// field set. Returns the contribution write-side wrapper so commit_audit
+// drops the server-assigned time_committed.
+func newOriginalVersionFixture() *contribution.OriginalVersion[rm.Composition] {
 	name := "alice"
 	audit := rm.AuditDetails{
 		SystemID:  "cdr.example",
@@ -255,12 +246,12 @@ func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
-	return &rm.OriginalVersion[rm.Composition]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
 		Version:        rm.Version[rm.Composition]{CommitAudit: audit},
 		UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &comp,
-	}
+	})
 }
 
 func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
@@ -274,7 +265,7 @@ func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    contribution.UpdateAuditFromAuditDetails(auditBase(ov.CommitAudit)),
+		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
@@ -303,7 +294,7 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    contribution.UpdateAuditFromAuditDetails(auditBase(ov.CommitAudit)),
+		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)

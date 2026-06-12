@@ -31,17 +31,18 @@ type Submission struct {
 	// to fall back to "UPDATE_AUDIT" for non-conformant servers.
 	Audit UpdateAudit
 	// Versions is the closed type-set of inline-data versions to commit.
-	// Each element MUST be a *rm.OriginalVersion[T] or
-	// *rm.ImportedVersion[T] for T in {rm.Composition, rm.EHRStatus,
-	// rm.Folder, rm.EHRAccess}. Validate enforces this via an explicit
-	// type-switch over the 8 concrete generic instantiations (no
-	// reflection per REQ-024); the slice must also be non-empty.
+	// Each element MUST be an *[OriginalVersion][T] or *[ImportedVersion][T]
+	// for T in {rm.Composition, rm.EHRStatus, rm.Folder, rm.EHRAccess}.
+	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
+	// Validate enforces this via an explicit type-switch over the 8 concrete
+	// generic instantiations (no reflection per REQ-024); the slice must also
+	// be non-empty.
 	Versions []CommitVersion
 }
 
 // CommitVersion is the marker interface for Submission.Versions[i].
-// Closed type-set: *rm.OriginalVersion[T] and *rm.ImportedVersion[T]
-// for the four versionable T's. Other types satisfying this method set
+// Closed type-set: *[OriginalVersion][T] and *[ImportedVersion][T] for the
+// four versionable T's. Other types satisfying this method set
 // (json.Marshaler + BMMName() string) are detected at Submission.Validate
 // via the BMMName check.
 type CommitVersion interface {
@@ -50,8 +51,8 @@ type CommitVersion interface {
 }
 
 // Validate enforces the documented closed type-set: each
-// Submission.Versions[i] must be a *rm.OriginalVersion[T] or
-// *rm.ImportedVersion[T] for T ∈ {rm.Composition, rm.EHRStatus,
+// Submission.Versions[i] must be an *[OriginalVersion][T] or
+// *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
 // rm.Folder, rm.EHRAccess} — the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
 // also required (the spec rejects an empty contribution).
@@ -71,16 +72,16 @@ func (s *Submission) Validate() error {
 			return fmt.Errorf("Submission.Versions[%d] is nil", i)
 		}
 		switch v.(type) {
-		case *rm.OriginalVersion[rm.Composition],
-			*rm.OriginalVersion[rm.EHRStatus],
-			*rm.OriginalVersion[rm.Folder],
-			*rm.OriginalVersion[rm.EHRAccess],
-			*rm.ImportedVersion[rm.Composition],
-			*rm.ImportedVersion[rm.EHRStatus],
-			*rm.ImportedVersion[rm.Folder],
-			*rm.ImportedVersion[rm.EHRAccess]:
+		case *OriginalVersion[rm.Composition],
+			*OriginalVersion[rm.EHRStatus],
+			*OriginalVersion[rm.Folder],
+			*OriginalVersion[rm.EHRAccess],
+			*ImportedVersion[rm.Composition],
+			*ImportedVersion[rm.EHRStatus],
+			*ImportedVersion[rm.Folder],
+			*ImportedVersion[rm.EHRAccess]:
 		default:
-			return fmt.Errorf("Submission.Versions[%d] is %T (BMMName=%q); want *rm.OriginalVersion[T] or *rm.ImportedVersion[T] for T in {Composition, EHRStatus, Folder, EHRAccess}", i, v, v.BMMName())
+			return fmt.Errorf("Submission.Versions[%d] is %T (BMMName=%q); want *OriginalVersion[T] or *ImportedVersion[T] for T in {Composition, EHRStatus, Folder, EHRAccess}", i, v, v.BMMName())
 		}
 	}
 	return nil

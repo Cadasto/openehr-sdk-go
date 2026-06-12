@@ -68,16 +68,16 @@ func newCommitAudit() rm.AuditDetails {
 // suitable for use as a Submission.Versions[i] element. The Composition
 // fixture only needs ArchetypeNodeID for the round-trip assertion —
 // production callers pass real archetype-node Compositions.
-func newOriginalVersion() *rm.OriginalVersion[rm.Composition] {
+func newOriginalVersion() *contribution.OriginalVersion[rm.Composition] {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
-	return &rm.OriginalVersion[rm.Composition]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
 		Version: rm.Version[rm.Composition]{
 			CommitAudit: newCommitAudit(),
 		},
 		UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &comp,
-	}
+	})
 }
 
 func TestCommitMinimal(t *testing.T) {

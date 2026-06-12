@@ -20,40 +20,40 @@ func (fakeNonVersion) BMMName() string              { return "WRONG_TYPE" }
 // newImportedVersion builds a minimal IMPORTED_VERSION<COMPOSITION> for
 // the closed-set tests. ImportedVersion wraps an OriginalVersion under
 // `Item`; both halves carry the spec-mandated discriminators.
-func newImportedVersion() *rm.ImportedVersion[rm.Composition] {
+func newImportedVersion() *contribution.ImportedVersion[rm.Composition] {
 	inner := newOriginalVersion()
 	innerAny := rm.OriginalVersion[any]{
-		Version:        rm.Version[any]{CommitAudit: inner.CommitAudit},
-		UID:            inner.UID,
-		LifecycleState: inner.LifecycleState,
+		Version:        rm.Version[any]{CommitAudit: inner.Version.CommitAudit},
+		UID:            inner.Version.UID,
+		LifecycleState: inner.Version.LifecycleState,
 	}
-	return &rm.ImportedVersion[rm.Composition]{
-		Version: rm.Version[rm.Composition]{CommitAudit: inner.CommitAudit},
+	return contribution.WrapImportedVersion(&rm.ImportedVersion[rm.Composition]{
+		Version: rm.Version[rm.Composition]{CommitAudit: inner.Version.CommitAudit},
 		Item:    innerAny,
-	}
+	})
 }
 
 // newOriginalVersionFolder / newOriginalVersionEHRAccess cover the two
 // remaining versionable T's in the closed set so the type-switch is
 // exercised for every documented case.
-func newOriginalVersionFolder() *rm.OriginalVersion[rm.Folder] {
+func newOriginalVersionFolder() *contribution.OriginalVersion[rm.Folder] {
 	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
-	return &rm.OriginalVersion[rm.Folder]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Folder]{
 		Version:        rm.Version[rm.Folder]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "3::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &folder,
-	}
+	})
 }
 
-func newOriginalVersionEHRAccess() *rm.OriginalVersion[rm.EHRAccess] {
+func newOriginalVersionEHRAccess() *contribution.OriginalVersion[rm.EHRAccess] {
 	access := rm.EHRAccess{}
-	return &rm.OriginalVersion[rm.EHRAccess]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.EHRAccess]{
 		Version:        rm.Version[rm.EHRAccess]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "4::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &access,
-	}
+	})
 }
 
 func TestSubmissionValidate(t *testing.T) {
@@ -113,11 +113,11 @@ func TestSubmissionValidate(t *testing.T) {
 				// BMMName is ORIGINAL_VERSION but the concrete
 				// generic instantiation is rejected.
 				Versions: []contribution.CommitVersion{
-					&rm.OriginalVersion[rm.PartyIdentified]{
+					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.PartyIdentified]{
 						Version:        rm.Version[rm.PartyIdentified]{CommitAudit: newCommitAudit()},
 						UID:            rm.ObjectVersionID{Value: "x::cdr.example::1"},
 						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
-					},
+					}),
 				},
 			},
 			wantErr: "OriginalVersion[",
@@ -181,12 +181,12 @@ func TestSubmissionMixesVersionable(t *testing.T) {
 		IsQueryable:     true,
 		IsModifiable:    true,
 	}
-	statusVer := &rm.OriginalVersion[rm.EHRStatus]{
+	statusVer := contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.EHRStatus]{
 		Version:        rm.Version[rm.EHRStatus]{CommitAudit: newCommitAudit()},
 		UID:            rm.ObjectVersionID{Value: "2::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &status,
-	}
+	})
 	sub := &contribution.Submission{
 		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion(), statusVer},
