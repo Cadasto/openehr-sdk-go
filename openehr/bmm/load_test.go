@@ -84,10 +84,11 @@ func TestLoad_eachBMM(t *testing.T) {
 			hasIncludes: []string{"openehr_base_1.3.0", "openehr_lang_1.1.0"},
 		},
 		{
-			file:       "openehr_lang_1.1.0.bmm.json",
-			classes:    172,
-			primitives: 0,
-			id:         "openehr_lang_1.1.0",
+			file:        "openehr_lang_1.1.0.bmm.json",
+			classes:     86,
+			primitives:  0,
+			id:          "openehr_lang_1.1.0",
+			hasIncludes: []string{"openehr_base_1.3.0"},
 		},
 		{
 			file:       "openehr_term_3.1.0.bmm.json",
@@ -306,13 +307,14 @@ func TestLoadAll_am2IncludesBaseAndLang(t *testing.T) {
 	if got := len(s.PrimitiveTypes); got != 29 {
 		t.Errorf("am2 merged primitives: got %d, want 29", got)
 	}
-	// am2 (75) + lang (172) + base (43) = 290, less any shared names
-	// across the trio. We don't pin a precise count here because the
-	// shape of the overlap is incidental; instead we assert lower- and
-	// upper-bound sanity plus presence of marker classes.
+	// am2 (75) + lang (86) + base (43) = 204, less any shared names
+	// across the trio. base is reached via a diamond (am2→base and
+	// am2→lang→base) but merged once. We don't pin a precise count
+	// because the shape of the overlap is incidental; instead we assert
+	// lower- and upper-bound sanity plus presence of marker classes.
 	got := len(s.ClassDefinitions)
-	if got < 250 || got > 43+172+75 {
-		t.Errorf("am2 merged classes: got %d, want roughly %d", got, 43+172+75)
+	if got < 180 || got > 43+86+75 {
+		t.Errorf("am2 merged classes: got %d, want roughly %d", got, 43+86+75)
 	}
 	if _, ok := s.ClassDefinitions["OBJECT_REF"]; !ok {
 		t.Errorf("am2 merged: missing OBJECT_REF (base)")
@@ -355,20 +357,23 @@ func TestLoadAll_descendantShadowsAncestor(t *testing.T) {
 }
 
 func TestLoadAll_siblingAncestorsConflict(t *testing.T) {
-	// Two siblings (parent1 and parent2) both define class X; the
-	// descendant does not. mergeAncestor MUST surface ErrSchemaConflict.
+	// Two siblings (parent1 and parent2) both define class X with
+	// DIFFERING definitions; the descendant does not. mergeAncestor MUST
+	// surface ErrSchemaConflict (no winner between disagreeing siblings).
+	// Identical sibling definitions, by contrast, merge benignly — see
+	// TestLoadAll_identicalSiblingDefsMerge.
 	parent1 := `{
 		"schema_name": "p1",
 		"rm_release": "1.0.0",
 		"class_definitions": {
-			"X": { "name": "X" }
+			"X": { "name": "X", "documentation": "from p1" }
 		}
 	}`
 	parent2 := `{
 		"schema_name": "p2",
 		"rm_release": "1.0.0",
 		"class_definitions": {
-			"X": { "name": "X" }
+			"X": { "name": "X", "documentation": "from p2" }
 		}
 	}`
 	child := `{
@@ -390,6 +395,52 @@ func TestLoadAll_siblingAncestorsConflict(t *testing.T) {
 	}
 	if !errors.Is(err, ErrSchemaConflict) {
 		t.Errorf("got %v, want errors.Is(err, ErrSchemaConflict)", err)
+	}
+}
+
+func TestLoadAll_identicalSiblingDefsMerge(t *testing.T) {
+	// Two siblings (parent1 and parent2) both define class X with an
+	// IDENTICAL definition; the descendant does not. This models a
+	// diamond where both include paths reach the same definition (e.g.
+	// a shared base). It MUST merge benignly — no ErrSchemaConflict —
+	// and X MUST be present exactly once.
+	parent1 := `{
+		"schema_name": "p1",
+		"rm_release": "1.0.0",
+		"class_definitions": {
+			"X": { "name": "X", "documentation": "shared" }
+		}
+	}`
+	parent2 := `{
+		"schema_name": "p2",
+		"rm_release": "1.0.0",
+		"class_definitions": {
+			"X": { "name": "X", "documentation": "shared" }
+		}
+	}`
+	child := `{
+		"schema_name": "c",
+		"rm_release": "1.0.0",
+		"includes": {
+			"p1_1.0.0": { "id": "p1_1.0.0" },
+			"p2_1.0.0": { "id": "p2_1.0.0" }
+		}
+	}`
+	r := MapResolver{
+		"c_1.0.0":  []byte(child),
+		"p1_1.0.0": []byte(parent1),
+		"p2_1.0.0": []byte(parent2),
+	}
+	s, err := LoadAll("c_1.0.0", r)
+	if err != nil {
+		t.Fatalf("identical sibling definitions must merge benignly, got: %v", err)
+	}
+	x, ok := s.ClassDefinitions["X"]
+	if !ok {
+		t.Fatalf("X not present after merge")
+	}
+	if got := x.Documentation(); got != "shared" {
+		t.Errorf("merged X documentation: got %q, want %q", got, "shared")
 	}
 }
 
