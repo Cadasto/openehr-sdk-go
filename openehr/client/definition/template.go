@@ -136,6 +136,12 @@ func (m TemplateMetadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(merged)
 }
 
+// maxUploadBytes is the maximum number of bytes UploadTemplate will
+// read from the body io.Reader before returning an "input too large"
+// error. Default is 32 MiB. Unexported so tests in package definition
+// can lower it temporarily via t.Cleanup.
+var maxUploadBytes int64 = 32 << 20
+
 // uploadConfig is the resolved option set for [UploadTemplate].
 type uploadConfig struct {
 	versionParam string
@@ -167,9 +173,12 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 	if body == nil {
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: nil body", transport.ErrInvalidConfig)
 	}
-	raw, err := io.ReadAll(body)
+	raw, err := io.ReadAll(io.LimitReader(body, maxUploadBytes+1))
 	if err != nil {
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: read body: %w", err)
+	}
+	if int64(len(raw)) > maxUploadBytes {
+		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: body exceeds %d bytes", transport.ErrInvalidConfig, maxUploadBytes)
 	}
 	if len(raw) == 0 {
 		return nil, nil, fmt.Errorf("definition.UploadTemplate: %w: empty body", transport.ErrInvalidConfig)

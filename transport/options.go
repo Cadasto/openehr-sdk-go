@@ -25,6 +25,10 @@ type config struct {
 	logger *slog.Logger
 
 	observer Observer
+
+	rawErrorBodies bool
+
+	maxResponseBody int64
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -96,4 +100,28 @@ func WithLogger(l *slog.Logger) Option {
 // layers that don't know whether the consumer wants observability).
 func WithObserver(o Observer) Option {
 	return func(cfg *config) { cfg.observer = o }
+}
+
+// WithRawErrorBodies opts in to preserving server error payloads on
+// WireError (the OpenEHR envelope message and the raw response body).
+// These may contain PHI; leave disabled (the default) whenever error
+// values can reach logs, traces, or observers. The openEHR error code
+// is always preserved regardless of this setting.
+func WithRawErrorBodies(on bool) Option {
+	return func(cfg *config) { cfg.rawErrorBodies = on }
+}
+
+// DefaultMaxResponseBody is the response body read cap applied when
+// WithMaxResponseBody is not set (or set to 0): 64 MiB.
+const DefaultMaxResponseBody int64 = 64 << 20
+
+// WithMaxResponseBody caps the number of response body bytes read per
+// request, guarding against memory exhaustion from a misbehaving or
+// hostile server. The default is DefaultMaxResponseBody (64 MiB). A
+// value of 0 selects the default; a negative value disables the limit
+// (unbounded read). Large responses — e.g. bulk EHR exports — may
+// require a higher cap via WithMaxResponseBody(n) or an unbounded read
+// via WithMaxResponseBody(-1).
+func WithMaxResponseBody(n int64) Option {
+	return func(cfg *config) { cfg.maxResponseBody = n }
 }

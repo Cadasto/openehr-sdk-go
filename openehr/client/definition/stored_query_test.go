@@ -11,6 +11,34 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
 )
 
+// TestGetStoredQueryEmptyBody verifies that a 200 response with an
+// empty body does not return a decode error. CDRs may legally return
+// 200/204 with no body on a GET; without the guard, json.Unmarshal
+// yields "unexpected end of JSON input".
+func TestGetStoredQueryEmptyBody(t *testing.T) {
+	const wantName = "org.openehr::vitals"
+	const wantVersion = "1.0.0"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// intentionally empty body
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.GetStoredQuery(context.Background(), newClient(t, srv), wantName, wantVersion)
+	if err != nil {
+		t.Fatalf("GetStoredQuery: unexpected error on empty body: %v", err)
+	}
+	if meta == nil {
+		t.Fatal("GetStoredQuery: returned nil metadata")
+	}
+	if meta.Name != wantName {
+		t.Errorf("Name = %q, want %q", meta.Name, wantName)
+	}
+	if meta.Version != wantVersion {
+		t.Errorf("Version = %q, want %q", meta.Version, wantVersion)
+	}
+}
+
 func TestPutStoredQuery(t *testing.T) {
 	var captured *http.Request
 	var body string

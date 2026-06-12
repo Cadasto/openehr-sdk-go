@@ -43,7 +43,7 @@ flush_req() {
       [[ -f "${ROOT}/${pl}" ]] || die "$current_id: missing plan ${pl}"
     done
     for pr in "${probe_ids[@]}"; do
-      grep -q "#### ${pr} " "$CONF" || die "$current_id: ${pr} not found in conformance.md"
+      grep -qF "#### ${pr} " "$CONF" || die "$current_id: ${pr} not found in conformance.md"
     done
   fi
   current_id=""
@@ -119,7 +119,7 @@ flush_req
 # Registry mentions every yaml id
 while IFS= read -r id; do
   [[ -z "$id" ]] && continue
-  grep -q "| ${id} |" "$REQ_REG" || warn_msg "${id} in traceability.yaml but not in REQ.md registry"
+  grep -qF "| ${id} |" "$REQ_REG" || warn_msg "${id} in traceability.yaml but not in REQ.md registry"
 done < <(grep -E '^[[:space:]]*-[[:space:]]*id:[[:space:]]*REQ-' "$YAML" | sed -E 's/.*id:[[:space:]]*//')
 
 if [[ $fail -ne 0 ]]; then

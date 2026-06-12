@@ -126,3 +126,78 @@ func TestDecodeAsTypeMismatchIsErrTypeMismatch(t *testing.T) {
 		t.Errorf("err = %v; want errors.Is(_, ErrTypeMismatch)", err)
 	}
 }
+
+// TestDecode_maxDepthExceeded verifies that Decode rejects input whose
+// JSON nesting exceeds maxDecodeDepth before dispatch (so the test does
+// NOT need a registered type — the depth check runs first).
+func TestDecode_maxDepthExceeded(t *testing.T) {
+	// Build a document nested ~2000 levels deep: far above maxDecodeDepth (512).
+	const depth = 2000
+	inner := `{"_type":"X"}`
+	for i := 0; i < depth; i++ {
+		inner = `{"_type":"X","x":` + inner + `}`
+	}
+	r := NewRegistry()
+	_, err := r.Decode([]byte(inner))
+	if err == nil {
+		t.Fatal("expected error for deeply-nested document, got nil")
+	}
+	if !errors.Is(err, ErrMaxDepthExceeded) {
+		t.Errorf("err = %v; want errors.Is(_, ErrMaxDepthExceeded)", err)
+	}
+}
+
+// TestDecode_shallowOK verifies that a shallow (non-deep) document with
+// an unknown _type still reaches dispatch and returns ErrUnknownType —
+// i.e. the depth guard does not introduce false positives.
+func TestDecode_shallowOK(t *testing.T) {
+	r := NewRegistry()
+	_, err := r.Decode([]byte(`{"_type":"NOPE"}`))
+	if err == nil {
+		t.Fatal("expected error for unknown _type, got nil")
+	}
+	if !errors.Is(err, ErrUnknownType) {
+		t.Errorf("err = %v; want errors.Is(_, ErrUnknownType)", err)
+	}
+}
+
+// TestJSONNestingDepth exercises the depth scanner with hand-crafted
+// literals, including braces inside strings (which must not be counted).
+func TestJSONNestingDepth(t *testing.T) {
+	cases := []struct {
+		input string
+		want  int
+	}{
+		{`{}`, 1},
+		{`{"a":{"b":[1,2]}}`, 3},
+		// Braces inside a string value must not be counted.
+		{`{"a":"}}}"} `, 1},
+		// Array of objects.
+		{`[{"a":1},{"b":2}]`, 2},
+		// Escape before closing quote — the \" inside the string should
+		// not end the string early.
+		{`{"a":"x\"}"} `, 1},
+	}
+	for _, tc := range cases {
+		got := jsonNestingDepth([]byte(tc.input))
+		if got != tc.want {
+			t.Errorf("jsonNestingDepth(%q) = %d, want %d", tc.input, got, tc.want)
+		}
+	}
+}
+
+// TestJSONNestingDepth_boundary pins the exact fence at maxDecodeDepth:
+// a value nested exactly to the cap is accepted (depth == cap), while
+// cap+1 is reported over (the early-exit returns a value > cap). Guards
+// against an off-by-one slipping the > maxDecodeDepth check to >=.
+func TestJSONNestingDepth_boundary(t *testing.T) {
+	nested := func(n int) []byte {
+		return []byte(strings.Repeat("[", n) + strings.Repeat("]", n))
+	}
+	if got := jsonNestingDepth(nested(maxDecodeDepth)); got != maxDecodeDepth {
+		t.Errorf("depth at cap: got %d, want %d (must be accepted)", got, maxDecodeDepth)
+	}
+	if got := jsonNestingDepth(nested(maxDecodeDepth + 1)); got <= maxDecodeDepth {
+		t.Errorf("depth cap+1: got %d, want > %d (must be rejected)", got, maxDecodeDepth)
+	}
+}

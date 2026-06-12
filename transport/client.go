@@ -233,9 +233,20 @@ func (c *Client) doOnce(ctx context.Context, req *Request, target *url.URL) (*Re
 	}
 	defer func() { _ = httpResp.Body.Close() }()
 
-	respBody, err := io.ReadAll(httpResp.Body)
+	limit := c.cfg.maxResponseBody
+	if limit == 0 {
+		limit = DefaultMaxResponseBody
+	}
+	var reader io.Reader = httpResp.Body
+	if limit > 0 {
+		reader = io.LimitReader(httpResp.Body, limit+1)
+	}
+	respBody, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("transport: %s %s: read body: %w", req.effectiveMethod(), req.effectiveRoute(), err)
+	}
+	if limit > 0 && int64(len(respBody)) > limit {
+		return nil, fmt.Errorf("transport: %s %s: read body: response exceeds limit of %d bytes", req.effectiveMethod(), req.effectiveRoute(), limit)
 	}
 	resp := &Response{
 		StatusCode: httpResp.StatusCode,
@@ -347,17 +358,28 @@ func (c *Client) tokenSourceFor(ctx context.Context) auth.TokenSource {
 
 // mapWireError maps a non-2xx response onto a typed *WireError, decoding
 // the openEHR error envelope when possible.
+//
+// By default (rawErrorBodies false) the openEHR envelope Message and the
+// raw response body are omitted from the error — both may contain PHI.
+// The openEHR Code (a coded terminology identifier) is always preserved.
+// Enable WithRawErrorBodies to retain the full payload for diagnostics in
+// environments where WireError values cannot reach logs or traces.
 func (c *Client) mapWireError(req *Request, target *url.URL, resp *Response) error {
 	we := &WireError{
 		StatusCode: resp.StatusCode,
 		Method:     req.effectiveMethod(),
 		URL:        sanitisedURL(target),
 		Route:      req.effectiveRoute(),
-		RawBody:    append([]byte(nil), resp.Body...),
 		Sentinel:   statusToSentinel(resp.StatusCode),
 	}
 	if detail, ok := decodeOpenEHRError(resp.Body); ok {
+		if !c.cfg.rawErrorBodies {
+			detail.Message = ""
+		}
 		we.OpenEHR = detail
+	}
+	if c.cfg.rawErrorBodies {
+		we.RawBody = append([]byte(nil), resp.Body...)
 	}
 	return we
 }

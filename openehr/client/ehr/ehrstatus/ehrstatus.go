@@ -142,7 +142,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if err != nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: marshal body: %w", err)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w", err)
 	}
@@ -171,19 +171,6 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		return nil, meta, fmt.Errorf("ehrstatus.Put: decode response: %w", err)
 	}
 	return &out, meta, nil
-}
-
-// marshalAuditDetails canjson-encodes a non-nil AuditDetails for the
-// openehr-audit-details header. Returns "" for nil input.
-func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
-	if a == nil {
-		return "", nil
-	}
-	b, err := canjson.Marshal(a)
-	if err != nil {
-		return "", fmt.Errorf("marshal audit details: %w", err)
-	}
-	return string(b), nil
 }
 
 // Repository mirrors the package functions for DI seams.

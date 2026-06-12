@@ -116,9 +116,10 @@ type Function struct {
 
 // MarshalJSON serialises Function so the polymorphic Parameters values
 // and Result emit their _type discriminators (relying on the concrete
-// MarshalJSON methods).
+// MarshalJSON methods). Output is stable: encoding/json sorts map keys,
+// so the assembled object's keys — and the nested parameters/condition
+// map keys — emit in lexicographic order on every call.
 func (f *Function) MarshalJSON() ([]byte, error) {
-	// We build a stable, ordered structure via a small helper.
 	m := map[string]any{
 		"name": f.Name,
 	}
@@ -132,12 +133,7 @@ func (f *Function) MarshalJSON() ([]byte, error) {
 		m["aliases"] = f.Aliases
 	}
 	if len(f.Parameters) > 0 {
-		// Sorted keys for stable output.
-		ordered := map[string]any{}
-		for k, v := range f.Parameters {
-			ordered[k] = v
-		}
-		m["parameters"] = ordered
+		m["parameters"] = f.Parameters
 	}
 	if f.Result != nil {
 		m["result"] = f.Result

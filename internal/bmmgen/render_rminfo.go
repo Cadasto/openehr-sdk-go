@@ -114,9 +114,14 @@ func effectiveProperties(plan *Plan, className string) (map[string]rmAttr, []str
 	out := make(map[string]rmAttr)
 	var order []string
 	seen := make(map[string]bool)
+	visitedClass := make(map[string]bool)
 
 	var visit func(name string)
 	visit = func(name string) {
+		if visitedClass[name] {
+			return
+		}
+		visitedClass[name] = true
 		pc, ok := plan.Classes[name]
 		if !ok {
 			return

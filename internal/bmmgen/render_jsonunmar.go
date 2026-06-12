@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"regexp"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -69,7 +68,14 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 	// missing-_type fallback. Always-included; gofmt prunes unused
 	// imports? No — generated code must declare only what it uses,
 	// so add only when at least one chunk uses it.
-	if strings.Contains(strings.Join(chunks, ""), "errors.Is(") {
+	needsErrors := false
+	for _, c := range chunks {
+		if strings.Contains(c, "errors.Is(") {
+			needsErrors = true
+			break
+		}
+	}
+	if needsErrors {
 		body.WriteString("\t\"errors\"\n")
 	}
 	body.WriteString("\t\"fmt\"\n\n")
@@ -450,8 +456,3 @@ func jsonTagFor(prop bmm.Property, propName string) string {
 	}
 	return fmt.Sprintf("`json:%q`", propName+",omitempty")
 }
-
-// QuoteMeta exposes the regexp helper used to escape qualifier
-// strings when building per-target regular expressions. Kept in
-// this file so the unmarshaller renderer is self-contained.
-var _ = regexp.QuoteMeta

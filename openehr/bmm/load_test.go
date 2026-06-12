@@ -441,6 +441,22 @@ func TestLoad_nilReader(t *testing.T) {
 	}
 }
 
+func TestLoad_inputTooLarge(t *testing.T) {
+	orig := maxBMMBytes
+	maxBMMBytes = 16
+	t.Cleanup(func() { maxBMMBytes = orig })
+
+	// Feed 100 bytes — over the 16-byte cap.
+	r := bytes.NewReader(bytes.Repeat([]byte("a"), 100))
+	_, err := Load(r)
+	if err == nil {
+		t.Fatal("expected error when input exceeds maxBMMBytes")
+	}
+	if !errors.Is(err, ErrInputTooLarge) {
+		t.Errorf("error should wrap ErrInputTooLarge, got: %v", err)
+	}
+}
+
 func TestLoad_unknownType(t *testing.T) {
 	doc := `{
 		"schema_name": "x",

@@ -137,7 +137,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: marshal body: %w", err)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: %w", err)
 	}
@@ -191,7 +191,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: marshal body: %w", err)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w", err)
 	}
@@ -234,7 +234,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	for _, o := range opts {
 		o(&cfg)
 	}
-	auditHeader, err := marshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {
 		return nil, fmt.Errorf("composition.Delete: %w", err)
 	}
@@ -282,19 +282,6 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 		return nil, meta, fmt.Errorf("composition: decode Composition: %w", err)
 	}
 	return &comp, meta, nil
-}
-
-// marshalAuditDetails canjson-encodes a non-nil AuditDetails for the
-// openehr-audit-details header. Returns "" for nil input.
-func marshalAuditDetails(a *rm.AuditDetails) (string, error) {
-	if a == nil {
-		return "", nil
-	}
-	b, err := canjson.Marshal(a)
-	if err != nil {
-		return "", fmt.Errorf("marshal audit details: %w", err)
-	}
-	return string(b), nil
 }
 
 func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, versionHdr string, err error) {

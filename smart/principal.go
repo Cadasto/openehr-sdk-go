@@ -1,5 +1,7 @@
 package smart
 
+import "maps"
+
 // PrincipalType is a platform-issued principal category (REQ-067).
 type PrincipalType string
 
@@ -14,7 +16,11 @@ const (
 type PrincipalIdentity struct {
 	UID  string
 	Type PrincipalType
-	Raw  map[string]any
+	// Raw is a defensive shallow copy of the claims map from which this
+	// identity was extracted. Callers may read it freely; mutations to the
+	// original claims map after construction do not affect Raw (and vice
+	// versa). Nested values are not deep-copied.
+	Raw map[string]any
 }
 
 // PrincipalClaimNames configures claim keys for [PrincipalIdentity]
@@ -48,7 +54,7 @@ func principalFromClaims(claims map[string]any, names PrincipalClaimNames) *Prin
 	if typRaw != "" && pt != PrincipalTypePerson && pt != PrincipalTypeAgent {
 		pt = PrincipalTypeUnknown
 	}
-	return &PrincipalIdentity{UID: uid, Type: pt, Raw: claims}
+	return &PrincipalIdentity{UID: uid, Type: pt, Raw: maps.Clone(claims)}
 }
 
 func claimString(claims map[string]any, key string) (string, bool) {

@@ -67,11 +67,28 @@ func parseFile(path string, strict bool) (*OperationalTemplate, error) {
 	return parseOPT(f, strict)
 }
 
+// maxOPTBytes is the maximum number of bytes parseOPT will read from
+// an io.Reader before returning an "input too large" error. Default is
+// 32 MiB. Unexported so tests in package template can lower it
+// temporarily via t.Cleanup.
+var maxOPTBytes int64 = 32 << 20
+
+// maxOPTDepth is the maximum OPT node-tree nesting depth. Real OPTs stay
+// well under 64 levels (COMPOSITION > SECTION > … > ELEMENT ≈ 5–20); the
+// 128 cap gives generous headroom while bounding recursion against a
+// crafted document. A var (not const) so tests can lower it.
+var maxOPTDepth = 128
+
 func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	if r == nil {
 		return nil, fmt.Errorf("%w: nil reader", ErrInvalidOPT)
 	}
-	br := bufio.NewReader(r)
+	// Cap the read with a one-byte margin: when the source holds more
+	// than maxOPTBytes, the decoder drains the extra byte and lr.N
+	// reaches 0, which we treat as "too large" rather than letting a
+	// truncated read surface as a misleading malformed-XML error.
+	lr := &io.LimitedReader{R: r, N: maxOPTBytes + 1}
+	br := bufio.NewReader(lr)
 	peek, peekErr := br.Peek(3)
 	if peekErr != nil && !errors.Is(peekErr, io.EOF) {
 		return nil, fmt.Errorf("%w: read header: %w", ErrInvalidOPT, peekErr)
@@ -85,6 +102,9 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	dec := xml.NewDecoder(br)
 	var wire xmlTemplate
 	if err := dec.Decode(&wire); err != nil {
+		if lr.N == 0 {
+			return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
 	}
 	// Forward-compat: defend against non-<template> documents that
@@ -98,7 +118,15 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 	// exactly one root element; anything else after </template> means
 	// the document is either malformed or carries multiple roots.
 	if err := requireEOF(dec); err != nil {
+		if lr.N == 0 {
+			return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
+		}
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOPT, err)
+	}
+	// Authoritative size check: lr.N == 0 means the full maxOPTBytes+1
+	// budget was consumed, i.e. the source is larger than the cap.
+	if lr.N == 0 {
+		return nil, fmt.Errorf("%w: input exceeds %d bytes", ErrInvalidOPT, maxOPTBytes)
 	}
 	if wire.TemplateID == nil || strings.TrimSpace(wire.TemplateID.Value) == "" {
 		return nil, fmt.Errorf("%w: missing or empty template_id", ErrInvalidOPT)
@@ -107,7 +135,7 @@ func parseOPT(r io.Reader, strict bool) (*OperationalTemplate, error) {
 		return nil, fmt.Errorf("%w: missing definition", ErrInvalidOPT)
 	}
 
-	root, err := buildNode(wire.Definition, strict)
+	root, err := buildNode(wire.Definition, strict, 0)
 	if err != nil {
 		// Use %w for the inner error so errors.Is reaches the
 		// builder sentinel (e.g. ErrUnsupportedNode) through the
@@ -325,9 +353,12 @@ type xmlIdentifiedValue struct {
 
 // --- wire → public node tree --------------------------------------------
 
-func buildNode(o *xmlCObject, strict bool) (Node, error) {
+func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 	if o == nil {
 		return nil, fmt.Errorf("%w: nil node", ErrInvalidOPT)
+	}
+	if depth > maxOPTDepth {
+		return nil, fmt.Errorf("%w: node nesting exceeds %d levels", ErrInvalidOPT, maxOPTDepth)
 	}
 	// The OPT root <definition> element carries no xsi:type but
 	// behaves as a C_ARCHETYPE_ROOT when an archetype_id is present
@@ -338,9 +369,9 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 	}
 	switch o.Type {
 	case "C_COMPLEX_OBJECT", "":
-		return buildComplexObject(o, strict)
+		return buildComplexObject(o, strict, depth)
 	case "C_ARCHETYPE_ROOT":
-		co, err := buildComplexObject(o, strict)
+		co, err := buildComplexObject(o, strict, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -391,7 +422,7 @@ func buildNode(o *xmlCObject, strict bool) (Node, error) {
 	}
 }
 
-func buildComplexObject(o *xmlCObject, strict bool) (*ComplexObject, error) {
+func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, error) {
 	occ, err := intervalToMultiplicity(o.Occurrences)
 	if err != nil {
 		return nil, fmt.Errorf("occurrences on %q (%s): %w", o.NodeID, o.RMTypeName, err)
@@ -402,7 +433,7 @@ func buildComplexObject(o *xmlCObject, strict bool) (*ComplexObject, error) {
 		occurrences: occ,
 	}
 	for _, a := range o.Attributes {
-		attr, err := buildAttribute(a, strict)
+		attr, err := buildAttribute(a, strict, depth)
 		if err != nil {
 			return nil, err
 		}
@@ -411,7 +442,7 @@ func buildComplexObject(o *xmlCObject, strict bool) (*ComplexObject, error) {
 	return co, nil
 }
 
-func buildAttribute(a *xmlCAttribute, strict bool) (*Attribute, error) {
+func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error) {
 	existence, err := intervalToMultiplicity(a.Existence)
 	if err != nil {
 		return nil, fmt.Errorf("existence on attribute %q: %w", a.Name, err)
@@ -439,7 +470,7 @@ func buildAttribute(a *xmlCAttribute, strict bool) (*Attribute, error) {
 		return nil, fmt.Errorf("%w: attribute xsi:type=%q", ErrUnsupportedNode, a.Type)
 	}
 	for _, c := range a.Children {
-		node, err := buildNode(c, strict)
+		node, err := buildNode(c, strict, depth+1)
 		if err != nil {
 			return nil, err
 		}

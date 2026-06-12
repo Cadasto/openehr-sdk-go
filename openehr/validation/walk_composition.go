@@ -173,15 +173,11 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 // formatAllowedTypes renders the OPT child RM types for inclusion
 // in alternative_mismatch Detail messages.
 func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
-	out := "["
+	names := make([]string, len(children))
 	for i, c := range children {
-		if i > 0 {
-			out += ", "
-		}
-		out += c.RMTypeName()
+		names[i] = c.RMTypeName()
 	}
-	out += "]"
-	return out
+	return "[" + strings.Join(names, ", ") + "]"
 }
 
 // walkMultipleAttribute enforces existence + cardinality on a

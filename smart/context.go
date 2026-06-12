@@ -15,7 +15,10 @@ type LaunchContext struct {
 	IDToken   *IDTokenClaims
 	Issuer    string
 	Principal *PrincipalIdentity
-	Raw       map[string]any
+	// Raw is a defensive shallow copy of the token-response raw map;
+	// nested values are not deep-copied. Mutating it does not affect the
+	// originating TokenResponse.
+	Raw map[string]any
 }
 
 // WithLaunchContext attaches lc to ctx for downstream handlers.
