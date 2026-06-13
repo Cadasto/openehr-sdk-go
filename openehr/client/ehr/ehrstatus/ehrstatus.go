@@ -118,9 +118,11 @@ func WithAuditDetails(a *rm.AuditDetails) PutOption {
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Wire: PUT /ehr/{ehr_id}/ehr_status with If-Match. The response
-// shape follows the Prefer option: minimal returns no body, the
-// returned `*rm.EHRStatus` is nil and only the metadata is populated;
-// representation returns the full updated EHR_STATUS in the body.
+// shape follows the Prefer option (REQ-094): minimal returns no body,
+// the returned `*rm.EHRStatus` is nil and only the metadata is
+// populated; identifier returns the ITS-REST `Identifier` body,
+// resolved into the metadata `VersionUID`; representation returns the
+// full updated EHR_STATUS in the body.
 //
 // Errors map per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
 // [transport.ErrPreconditionFailed], 428 → [transport.ErrPreconditionRequired].
@@ -163,14 +165,29 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		return nil, nil, err
 	}
 	meta := newVersionMetadata(resp.Metadata)
-	if cfg.prefer != transport.PreferRepresentation || len(resp.Body) == 0 {
+	switch cfg.prefer {
+	case transport.PreferRepresentation:
+		if len(resp.Body) == 0 {
+			// REQ-094: representation MUST NOT silently downgrade to an
+			// empty body — surface it rather than returning a nil resource.
+			return nil, meta, fmt.Errorf("ehrstatus.Put: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
+		}
+		var out rm.EHRStatus
+		if err := canjson.Unmarshal(resp.Body, &out); err != nil {
+			return nil, meta, fmt.Errorf("ehrstatus.Put: decode response: %w", err)
+		}
+		return &out, meta, nil
+	case transport.PreferIdentifier:
+		// REQ-094: populate the identifier slot (meta.VersionUID) from the
+		// ITS-REST Identifier body when present; never silently discard it.
+		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
+			return nil, meta, fmt.Errorf("ehrstatus.Put: %w", err)
+		}
+		return nil, meta, nil
+	default:
+		// minimal / default: empty body expected; id is in Location/ETag.
 		return nil, meta, nil
 	}
-	var out rm.EHRStatus
-	if err := canjson.Unmarshal(resp.Body, &out); err != nil {
-		return nil, meta, fmt.Errorf("ehrstatus.Put: decode response: %w", err)
-	}
-	return &out, meta, nil
 }
 
 // Repository mirrors the package functions for DI seams.

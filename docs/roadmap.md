@@ -70,7 +70,7 @@
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
 | Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–093, REQ-096–098 | |
-| `Prefer` negotiation (REQ-094) | **Partial** | `transport/`, `openehr/client/ehr/composition/`, `directory/` | `return=representation` bare-body decode landed (SDK-GAP-09); `identifier` + empty-body guard **not landed** — [plan](plans/2026-05-25-req094-prefer-followups.md) |
+| `Prefer` negotiation (REQ-094) | **Landed** | `transport/`, `openehr/client/ehr/composition/`, `directory/`, `ehrstatus/` | All three write-path modes landed: `return=representation` bare-body decode (SDK-GAP-09), `return=identifier` slot population, and `representation` + empty body → `ErrInvalidShape`. [Archived plan](plans/archive/2026-05-25-req094-prefer-followups.md); PROBE-065 round-trip deferred |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
 | Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
@@ -84,7 +84,7 @@
 | System | **Landed** | `openehr/client/system/` | Capabilities, version |
 | EHR (create, get, delete) | **Landed** | `openehr/client/ehr/` | |
 | EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
-| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 write gaps → followups plan |
+| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 `Prefer` write-path complete |
 | Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / SDK-GAP-09 notes as composition |
 | Contribution | **Landed** | `openehr/client/ehr/contribution/` | Submission body is `Contribution_create` (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); response remains persisted `rm.Contribution`. Write-side commit audit drops server-assigned `time_committed`, keeps `DV_CODED_TEXT` `change_type`, defaults to `AUDIT_DETAILS` with an `UPDATE_AUDIT` fallback (SPECITS-95 / ITS-REST PR 131). PROBE-072 / SDK-GAP-10. Archived plans: [submission shape](plans/archive/2026-05-26-contribution-submission-shape.md), [write-audit](plans/archive/2026-06-11-contribution-update-audit-dv-coded-text.md). |
 | ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |

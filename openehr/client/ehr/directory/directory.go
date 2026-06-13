@@ -118,11 +118,12 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // Directory; saving when one already exists is a server-side error
 // (typically 409). Use [Update] to modify an existing Directory.
 //
-// Wire: POST /ehr/{ehr_id}/directory. Per ITS-REST OpenAPI
-// `201_directory` (SDK-GAP-09), the response body — when the caller
-// asks for the representation — is a bare `Folder`. With
-// `PreferMinimal` (the spec default) the body is empty and only
-// metadata (`ETag` → `VersionUID`) is populated.
+// Wire: POST /ehr/{ehr_id}/directory. The response shape follows the
+// Prefer option (REQ-094): `PreferRepresentation` returns a bare `Folder`
+// (SDK-GAP-09, ITS-REST `201_directory`); `PreferIdentifier` returns the
+// ITS-REST `Identifier` body, resolved into the metadata `VersionUID`;
+// `PreferMinimal` (the spec default) returns an empty body with only
+// metadata (`ETag` → `VersionUID`) populated.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Save: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -234,10 +235,12 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 }
 
 // doWrite executes a Save / Update request and decodes the response
-// body when Prefer=representation. Per ITS-REST OpenAPI `201_directory`
-// / `200_FOLDER_retrieved` (SDK-GAP-09), the body is a bare `Folder`
-// — not an `ORIGINAL_VERSION<Folder>` envelope. With other Prefer
-// values the body is empty and the returned Folder pointer is nil.
+// body per the Prefer mode (REQ-094). Per ITS-REST OpenAPI `201_directory`
+// / `200_FOLDER_retrieved` (SDK-GAP-09), Prefer=representation decodes a
+// bare `Folder` — not an `ORIGINAL_VERSION<Folder>` envelope — and returns
+// [transport.ErrInvalidShape] on an empty body; Prefer=identifier resolves
+// the ITS-REST Identifier body into the version metadata; for minimal /
+// default the body is empty and the returned Folder pointer is nil.
 func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -247,14 +250,29 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 		return nil, nil, err
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	if prefer != transport.PreferRepresentation || len(resp.Body) == 0 {
+	switch prefer {
+	case transport.PreferRepresentation:
+		if len(resp.Body) == 0 {
+			// REQ-094: representation MUST NOT silently downgrade to an
+			// empty body — surface it rather than returning a nil resource.
+			return nil, meta, fmt.Errorf("directory: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
+		}
+		var folder rm.Folder
+		if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
+			return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
+		}
+		return &folder, meta, nil
+	case transport.PreferIdentifier:
+		// REQ-094: populate the identifier slot (meta.VersionUID) from the
+		// ITS-REST Identifier body when present; never silently discard it.
+		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
+			return nil, meta, fmt.Errorf("directory: %w", err)
+		}
+		return nil, meta, nil
+	default:
+		// minimal / default: empty body expected; id is in Location/ETag.
 		return nil, meta, nil
 	}
-	var folder rm.Folder
-	if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
-		return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
-	}
-	return &folder, meta, nil
 }
 
 // Repository mirrors the package-level Directory functions.

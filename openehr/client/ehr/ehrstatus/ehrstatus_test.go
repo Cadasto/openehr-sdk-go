@@ -192,6 +192,71 @@ func TestPutMinimal(t *testing.T) {
 	}
 }
 
+// TestPutRepresentationEmptyBodyErrors pins REQ-094 on the ehr_status
+// leaf (same shared doWrite pattern as composition/directory): an empty
+// body under Prefer=return=representation MUST surface
+// transport.ErrInvalidShape, not a silent nil EHR_STATUS.
+func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(ehrStatusUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/ehr_status/"+string(ehrStatusUID))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject:         rm.PartySelf{},
+	}
+	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		ehrstatus.WithPrefer(transport.PreferRepresentation),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+	if out != nil {
+		t.Errorf("expected nil EHR_STATUS on empty representation body, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != ehrStatusUID {
+		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+}
+
+// TestPutIdentifierPopulatesVersionUIDFromBody pins REQ-094 Phase 2 on
+// the ehr_status leaf: the ITS-REST Identifier body populates the
+// identifier slot when Location is absent.
+func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
+	const idVUID openehrclient.VersionUID = "cccc3333-4444-5555-6666-777788889999::cdr.example::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"uid":"` + string(idVUID) + `"}`))
+	}))
+	defer srv.Close()
+
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject:         rm.PartySelf{},
+	}
+	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		ehrstatus.WithPrefer(transport.PreferIdentifier),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		t.Errorf("expected nil EHR_STATUS in identifier mode, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != idVUID {
+		t.Fatalf("expected VersionUID %q from identifier body, got %+v", idVUID, meta)
+	}
+}
+
 func TestPutRejectsEmptyIfMatch(t *testing.T) {
 	_, _, err := ehrstatus.Put(context.Background(), nil, ehrIDFixture, "", &rm.EHRStatus{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
