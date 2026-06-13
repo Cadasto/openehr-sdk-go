@@ -223,6 +223,84 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestSaveRepresentationEmptyBodyErrors pins REQ-094 on the directory
+// leaf: Prefer=return=representation with an empty server body MUST
+// surface transport.ErrInvalidShape, not a silent nil Folder.
+func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		directory.WithPrefer(transport.PreferRepresentation),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+	if out != nil {
+		t.Errorf("expected nil Folder on empty representation body, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != folderVUID {
+		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+}
+
+// TestSaveIdentifierPopulatesVersionUIDFromBody pins REQ-094 Phase 2:
+// the ITS-REST Identifier body {"uid": ...} populates the identifier
+// slot (VersionMetadata.VersionUID) when Location is absent.
+func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
+	const idVUID openehrclient.VersionUID = "bbbb2222-3333-4444-5555-666677778888::cdr.example::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"uid":"` + string(idVUID) + `"}`))
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		directory.WithPrefer(transport.PreferIdentifier),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		t.Errorf("expected nil Folder in identifier mode, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != idVUID {
+		t.Fatalf("expected VersionUID %q from identifier body, got %+v", idVUID, meta)
+	}
+}
+
+// TestSaveIdentifierMalformedBodyErrors pins the strict no-silent-
+// downgrade posture on the directory leaf.
+func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"not_uid":"x"}`))
+	}))
+	defer srv.Close()
+
+	folder := &rm.Folder{
+		Name:            rm.DVText{Value: "Root"},
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+	}
+	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		directory.WithPrefer(transport.PreferIdentifier),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+}
+
 // TestUpdateRepresentationDecodesBareFolder pins SDK-GAP-09 on the directory
 // PUT path: `Prefer: return=representation` on PUT returns a bare FOLDER per
 // the ITS-REST OpenAPI `200_FOLDER_retrieved` schema.
