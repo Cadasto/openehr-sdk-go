@@ -247,14 +247,29 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 		return nil, nil, err
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	if prefer != transport.PreferRepresentation || len(resp.Body) == 0 {
+	switch prefer {
+	case transport.PreferRepresentation:
+		if len(resp.Body) == 0 {
+			// REQ-094: representation MUST NOT silently downgrade to an
+			// empty body — surface it rather than returning a nil resource.
+			return nil, meta, fmt.Errorf("directory: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
+		}
+		var folder rm.Folder
+		if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
+			return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
+		}
+		return &folder, meta, nil
+	case transport.PreferIdentifier:
+		// REQ-094: populate the identifier slot (meta.VersionUID) from the
+		// ITS-REST Identifier body when present; never silently discard it.
+		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
+			return nil, meta, fmt.Errorf("directory: %w", err)
+		}
+		return nil, meta, nil
+	default:
+		// minimal / default: empty body expected; id is in Location/ETag.
 		return nil, meta, nil
 	}
-	var folder rm.Folder
-	if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
-		return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
-	}
-	return &folder, meta, nil
 }
 
 // Repository mirrors the package-level Directory functions.

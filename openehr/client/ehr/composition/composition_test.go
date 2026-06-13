@@ -246,6 +246,119 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	}
 }
 
+// TestSaveRepresentationEmptyBodyErrors pins REQ-094: when the caller
+// asks for Prefer=return=representation but the server returns an empty
+// body, doWrite MUST surface transport.ErrInvalidShape rather than
+// silently returning a nil Composition ("MUST NOT silently downgrade").
+func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	out, meta, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+	if out != nil {
+		t.Errorf("expected nil Composition on empty representation body, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != compositionVUID {
+		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+}
+
+// TestUpdateRepresentationEmptyBodyErrors mirrors the empty-body guard
+// on the PUT path.
+func TestUpdateRepresentationEmptyBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	out, _, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t),
+		composition.WithPrefer(transport.PreferRepresentation),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+	if out != nil {
+		t.Errorf("expected nil Composition, got %+v", out)
+	}
+}
+
+// TestSaveIdentifierPopulatesVersionUIDFromBody pins REQ-094 Phase 2:
+// Prefer=return=identifier yields the ITS-REST Identifier body
+// {"uid": ...}; the identifier slot (VersionMetadata.VersionUID) is
+// populated from the body when the Location header is absent.
+func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
+	const idVUID openehrclient.VersionUID = "aaaa1111-2222-3333-4444-555566667777::cdr.example::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"uid":"` + string(idVUID) + `"}`))
+	}))
+	defer srv.Close()
+
+	out, meta, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		composition.WithPrefer(transport.PreferIdentifier),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		t.Errorf("expected nil Composition in identifier mode, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != idVUID {
+		t.Fatalf("expected VersionUID %q from identifier body, got %+v", idVUID, meta)
+	}
+}
+
+// TestSaveIdentifierPrefersLocation pins that Location stays canonical
+// (REQ-094): with both a Location header and an Identifier body present,
+// the Location-derived VersionUID wins; the body is a fallback only.
+func TestSaveIdentifierPrefersLocation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/composition/"+string(compositionVUID))
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"uid":"different-uid::cdr.example::9"}`))
+	}))
+	defer srv.Close()
+
+	_, meta, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		composition.WithPrefer(transport.PreferIdentifier),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.VersionUID != compositionVUID {
+		t.Errorf("expected Location-derived VersionUID %q, got %q", compositionVUID, meta.VersionUID)
+	}
+}
+
+// TestSaveIdentifierMalformedBodyErrors pins the strict no-silent-
+// downgrade posture: a non-empty identifier body lacking `uid` is
+// surfaced as transport.ErrInvalidShape rather than discarded.
+func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"not_uid":"x"}`))
+	}))
+	defer srv.Close()
+
+	_, _, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		composition.WithPrefer(transport.PreferIdentifier),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+}
+
 func TestSaveRejectsNil(t *testing.T) {
 	_, _, err := composition.Save(context.Background(), nil, ehrIDFixture, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {

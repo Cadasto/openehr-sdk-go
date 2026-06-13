@@ -105,7 +105,7 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-**Follow-up (not landed):** [`docs/plans/2026-05-25-req094-prefer-followups.md`](../plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` slot population on write returns and strict empty-body handling for `representation`. Search **`NOT LANDED`** in that plan before assuming REQ-094 is complete on write paths.
+All three write-path modes are landed across `composition` / `directory` / `ehr_status`: `representation` decodes the bare resource (SDK-GAP-09) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
 
 - **Lives in:** [`transport/`](../transport/), [`openehr/client/ehr/`](../openehr/client/ehr/)
 
