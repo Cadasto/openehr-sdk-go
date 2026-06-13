@@ -42,8 +42,8 @@
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031/038; SDK-GAP-11 narrow polymorphic decode (`<Parent>Like` interfaces) [archived plan](plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md) |
 | Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
-| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/2026-05-22-template-req100-followups.md) |
-| Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/2026-05-22-template-req100-followups.md) |
+| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/archive/2026-05-22-template-req100-followups.md) |
+| Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/archive/2026-05-22-template-req100-followups.md) |
 | RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Internal until public shape stabilises. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
@@ -138,9 +138,10 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 |---------|--------|-------|
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
-| Release / semver strategy | **Landed (2026-05-26)** | `v0.1.0` tag; [`release.yml`](../.github/workflows/release.yml) | [archived plan](plans/archive/2026-05-25-versioning-strategy.md) — policy docs + tag-driven release workflow; `v1.0.0` ceremony tracked separately |
+| Release / semver strategy | **Landed (2026-06-12)** | `v0.4.0` tag; [`release.yml`](../.github/workflows/release.yml) | [archived plan](plans/archive/2026-05-25-versioning-strategy.md) — policy docs + tag-driven release workflow; `v1.0.0` ceremony tracked separately |
+| Developer onboarding | **Landed** | [`quick-start.md`](quick-start.md) + [`examples.md`](examples.md) — install, REST wiring, catalog of all `cmd/examples/` programs |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse,validate-composition,validate-from-json,primitive-validate}` |
+| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — `canonical_json`, `canxml_roundtrip`, `ehr_create`, `generate-example`, `opt-parse`, `primitive-validate`, `validate-composition`, `validate-from-json`; catalog in [`examples.md`](examples.md) |
 
 ---
 

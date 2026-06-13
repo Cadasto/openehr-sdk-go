@@ -3,7 +3,7 @@
 - **Status:** Accepted, 2026-05-22.
 - **Supersedes:** —
 - **Superseded by:** —
-- **Tracks:** [`docs/plans/2026-05-22-template-req100-followups.md`](../plans/2026-05-22-template-req100-followups.md) Phases 4 + 4-bis. Phases 5 (walker pattern at `internal/templatecompile/walk/`) and 6 (REQ-103 primitive constraints at `openehr/template/constraints/`) build on this foundation without changing C1–C6.
+- **Tracks:** [`docs/plans/archive/2026-05-22-template-req100-followups.md`](../plans/archive/2026-05-22-template-req100-followups.md) Phases 4 + 4-bis. Phases 5 (walker pattern at `internal/templatecompile/walk/`) and 6 (REQ-103 primitive constraints at `openehr/template/constraints/`) build on this foundation without changing C1–C6.
 
 ## Context
 

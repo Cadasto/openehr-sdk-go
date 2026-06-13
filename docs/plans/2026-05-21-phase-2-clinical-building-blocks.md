@@ -94,7 +94,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 | Child plan | Phase 0 (spec/fixtures) | Phase 1 (MVP) | Phase 2 (hardening) | Status |
 |---|---|---|---|---|
 | OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
-| Composition builder | | | | **Open** |
+| Composition builder | Done | Done | — | **Done** — REQ-101 `NewSkeleton` + `Builder.Set/Build`; PROBE-023 full round-trip. [archive](archive/2026-05-21-composition-builder.md) |
 | Validation (REQ-102 composition) | Done | Done | — | **Done** — [composition validation plan](archive/2026-05-24-composition-validation-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](archive/2026-05-21-validation.md)) |
 | AQL builders | | | | **Open** (wire models **Done**) |
 

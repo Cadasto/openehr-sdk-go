@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** proposed REQ-106 (WebTemplate JSON export). **REQ-107** is reserved for OPT→RM instance synthesis — [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md).
 **Implementation:** planned
-**Depends on:** [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitive constraints) — both are prerequisites
+**Depends on:** [archive/2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitive constraints) — both are prerequisites
 **Defers:** Round-trip from WebTemplate JSON back to OPT; JSON-schema-conformant validation against a reference implementation
 
 ## Goal
@@ -92,7 +92,7 @@ Until then this plan is a placeholder reserving the design space, the proposed R
 ## Mapping to specs
 
 - Pending: REQ-106 (JSON-format simplified template export)
-- Foundation: [REQ-100 follow-up plan](2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitives)
+- Foundation: [REQ-100 follow-up plan](archive/2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitives)
 
 ## References (informational)
 
