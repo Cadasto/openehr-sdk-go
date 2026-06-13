@@ -8,6 +8,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-13
+
+Fifth `v0.x` minor — completes REQ-094 `Prefer` write-path negotiation on versioned writes (`composition` / `directory` / `ehr_status`): `return=identifier` populates the version identifier slot from the ITS-REST `Identifier` body, and `return=representation` with an empty body now returns `transport.ErrInvalidShape` instead of silently yielding a nil resource. New exported surface: `ehr.Identifier` + `(*VersionMetadata).ResolveIdentifierBody`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the only behavioural change this cycle is the stricter empty-`representation` handling (previously a silent `nil`); no signature changes and no in-tree callers affected. Pin to the exact tag.
+
 ### Added
 
 - **REQ-094 `Prefer` write-path negotiation completed.** Versioned writes (`composition` / `directory` / `ehr_status`) now honour `Prefer: return=identifier` — the ITS-REST `Identifier` body (`{"uid": …}`) populates the `VersionMetadata` identifier slot (via `ehr.ResolveIdentifierBody`, with the `Location` header staying canonical) — and `return=representation` with an empty body now returns `transport.ErrInvalidShape` instead of silently yielding a nil resource ("MUST NOT silently downgrade").
