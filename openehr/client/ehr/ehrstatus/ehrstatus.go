@@ -118,9 +118,11 @@ func WithAuditDetails(a *rm.AuditDetails) PutOption {
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Wire: PUT /ehr/{ehr_id}/ehr_status with If-Match. The response
-// shape follows the Prefer option: minimal returns no body, the
-// returned `*rm.EHRStatus` is nil and only the metadata is populated;
-// representation returns the full updated EHR_STATUS in the body.
+// shape follows the Prefer option (REQ-094): minimal returns no body,
+// the returned `*rm.EHRStatus` is nil and only the metadata is
+// populated; identifier returns the ITS-REST `Identifier` body,
+// resolved into the metadata `VersionUID`; representation returns the
+// full updated EHR_STATUS in the body.
 //
 // Errors map per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
 // [transport.ErrPreconditionFailed], 428 → [transport.ErrPreconditionRequired].
