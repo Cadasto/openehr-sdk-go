@@ -53,11 +53,11 @@ Every spec file starts with a `Status:` line:
 
 | Status | Meaning |
 |---|---|
-| **Draft** | actively in motion; can change without notice |
-| **Stable** | safe to implement against; changes go through a deprecation cycle |
+| **Draft** | **normative and binding for implementation now**; wording may still change before v1 (no deprecation cycle) |
+| **Stable** | frozen contract; changes go through a deprecation cycle |
 | **Deprecated** | scheduled for removal; new code MUST NOT depend on it |
 
-At v0 scaffolding stage, all specs are **Draft**.
+**`Draft` is binding, not provisional.** Pre-v1.0, every topic spec is `Draft` — that marks the *stability promise* (the text may still change), **not** the authority. A `Draft` REQ is normative **right now**; it is not "planned" or "optional." Whether it is *built* is the separate `Impl.` column in [REQ.md](REQ.md) / `implementation:` in [traceability.yaml](traceability.yaml). Promotion `Draft → Stable` happens at v1.
 
 ## Traceability
 

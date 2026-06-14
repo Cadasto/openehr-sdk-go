@@ -42,6 +42,7 @@ Reading order:
 
 When implementing or reviewing against a REQ:
 
+0. Run `make spec-context REQ=NNN` — one bundle with the registry row, traceability block (packages/probes/tests/plans), canonical excerpt, and touching strands.
 1. Open the row in [`docs/specifications/REQ.md`](docs/specifications/REQ.md) → follow the **Canonical** link (don't read prose out of `REQ.md` itself).
 2. Check [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) for landed packages, probes, and tests.
 3. Cite `REQ-NNN` / `PROBE-NNN` in tests and `doc.go`; update `traceability.yaml` when landing code.

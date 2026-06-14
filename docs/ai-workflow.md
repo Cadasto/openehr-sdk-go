@@ -40,11 +40,12 @@ The openEHR conformance probe suite is the source of truth for wire-level semant
 
 ## The loop
 
+0. **Assemble context in one shot:** `make spec-context REQ=094` — bundles the registry row, the `traceability.yaml` block (packages, probes, tests, plans), the canonical spec excerpt, and any research strands that touch the REQ. Start here; it routes you to the canonical sources instead of grepping.
 1. **Locate** your task's REQ via the [REQ registry](specifications/REQ.md) → follow the row to its **canonical** topic spec (don't read prose out of `REQ.md` itself).
 2. **Inspect ground truth before editing** — RM shapes via MCP `type_specification_get`, terminology via `terminology_resolve`. Never hardcode a path or numeric literal without verifying.
 3. **Cite identifiers** — tests and `doc.go` reference REQ-NNN / PROBE-NNN; update [traceability.yaml](specifications/traceability.yaml) when landing packages or probes; never renumber published IDs.
 4. **Don't decide open questions in code** — don't silently resolve a [research strand](specifications/research-strands.md), and don't add a normative MUST/SHOULD/MAY without a REQ to anchor it. Surface it or draft an [ADR](adr/).
-5. **Verify** — `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md).
+5. **Verify** — `make ci` (includes `make spec-check`) before claiming done. See [ci.md](ci.md). **For wire/client changes, green tests aren't enough:** read the `probes:` on the REQ's traceability entry (or `make spec-context`), open each `#### PROBE-NNN` in [conformance.md](specifications/conformance.md), and treat the task as done only when each is **Implemented (Sandbox)** or explicitly deferred in the plan. `make probe-status` lists each probe's status and whether its test file exists.
 
 The full editing rules — idiomatic surface, the `cadasto/` boundary contract, and the do-not-touch list — are canonical in [AGENTS.md](../AGENTS.md) and [specifications/idiom.md](specifications/idiom.md). Follow those; this file intentionally doesn't duplicate them.
 
