@@ -94,7 +94,7 @@ func selectTargets(spec string) ([]bmmgen.Target, error) {
 		return bmmgen.DefaultTargets(), nil
 	}
 	var out []bmmgen.Target
-	for _, name := range strings.Split(spec, ",") {
+	for name := range strings.SplitSeq(spec, ",") {
 		name = strings.TrimSpace(name)
 		switch name {
 		case "rm":

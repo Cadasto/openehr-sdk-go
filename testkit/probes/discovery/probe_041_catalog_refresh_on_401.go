@@ -31,14 +31,14 @@ import (
 func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Result, error) {
 	r := Result{Probe: "PROBE-041"}
 	if len(cassetteBody) == 0 {
-		return r, fmt.Errorf("PROBE-041: cassetteBody is empty")
+		return r, errors.New("PROBE-041: cassetteBody is empty")
 	}
 	var (
-		hits int32
+		hits atomic.Int32
 		mode atomic.Int32 // 0 = serve cassette; 1 = 401 reject
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		if mode.Load() == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"message":"unauthorized","code":"UNAUTHORIZED"}`))
@@ -63,7 +63,7 @@ func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Resu
 		r.Detail = fmt.Sprintf("priming Resolve failed: %v", err)
 		return r, nil
 	}
-	primingHits := atomic.LoadInt32(&hits)
+	primingHits := hits.Load()
 	if primingHits != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("priming Resolve produced %d fetches; want exactly 1", primingHits)
@@ -90,7 +90,7 @@ func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Resu
 		r.Detail = fmt.Sprintf("DiscoveryError.Reason = %q; want %q", derr.Reason, discovery.ReasonFetchFailed)
 		return r, nil
 	}
-	refreshHits := atomic.LoadInt32(&hits) - primingHits
+	refreshHits := hits.Load() - primingHits
 	if refreshHits != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("Refresh issued %d fetches after the priming Resolve; want exactly 1", refreshHits)

@@ -2,6 +2,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -13,7 +14,7 @@ type Integer int32
 // UnmarshalJSON accepts a JSON number or a decimal integer string.
 func (i *Integer) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 {
-		return fmt.Errorf("rm.Integer: empty input")
+		return errors.New("rm.Integer: empty input")
 	}
 	if b[0] == '"' {
 		var s string

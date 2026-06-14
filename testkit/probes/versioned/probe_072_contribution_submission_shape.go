@@ -3,6 +3,7 @@ package versionedprobes
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -39,7 +40,7 @@ import (
 func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Client, capturedBody *[]byte, ehrID openehrclient.EHRID, sub *contribution.Submission) (Result, error) {
 	r := Result{Probe: "PROBE-072"}
 	if c == nil || ehrID == "" || sub == nil || capturedBody == nil {
-		return r, fmt.Errorf("PROBE-072: missing required inputs (client/ehr/submission/captured)")
+		return r, errors.New("PROBE-072: missing required inputs (client/ehr/submission/captured)")
 	}
 	if _, _, err := contribution.Commit(ctx, c, ehrID, sub); err != nil {
 		r.Status = "fail"

@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -29,7 +30,7 @@ type StaticConfig struct {
 // DiscoveryError.
 func NewStaticCatalog(cfg StaticConfig) (*ServiceCatalog, error) {
 	if cfg.Issuer == "" {
-		return nil, &DiscoveryError{Reason: ReasonParseError, Inner: fmt.Errorf("StaticConfig.Issuer is required")}
+		return nil, &DiscoveryError{Reason: ReasonParseError, Inner: errors.New("StaticConfig.Issuer is required")}
 	}
 	for id, e := range cfg.Services {
 		if e.BaseURL == nil {

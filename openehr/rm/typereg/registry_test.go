@@ -134,7 +134,7 @@ func TestDecode_maxDepthExceeded(t *testing.T) {
 	// Build a document nested ~2000 levels deep: far above maxDecodeDepth (512).
 	const depth = 2000
 	inner := `{"_type":"X"}`
-	for i := 0; i < depth; i++ {
+	for range depth {
 		inner = `{"_type":"X","x":` + inner + `}`
 	}
 	r := NewRegistry()

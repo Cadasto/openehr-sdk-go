@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"maps"
 	"sort"
 	"strings"
 
@@ -420,9 +421,7 @@ func collectFlattenedProperties(plan *Plan, sc *bmm.SimpleClass, embedded map[st
 	}
 	walk(sc)
 	// Own properties override.
-	for name, p := range sc.Properties {
-		result[name] = p
-	}
+	maps.Copy(result, sc.Properties)
 	return result
 }
 

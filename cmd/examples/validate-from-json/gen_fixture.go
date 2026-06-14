@@ -43,10 +43,10 @@ func main() {
 	if !r2.OK {
 		panic(fmt.Sprintf("round-trip composition invalid: %d issues", len(r2.Issues)))
 	}
-	if err := os.MkdirAll("testdata", 0755); err != nil {
+	if err := os.MkdirAll("testdata", 0o755); err != nil {
 		panic(err)
 	}
-	if err := os.WriteFile("testdata/minimal_blood_pressure.json", b, 0644); err != nil {
+	if err := os.WriteFile("testdata/minimal_blood_pressure.json", b, 0o644); err != nil {
 		panic(err)
 	}
 	fmt.Printf("wrote testdata/minimal_blood_pressure.json (%d bytes)\n", len(b))

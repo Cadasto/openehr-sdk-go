@@ -3,6 +3,7 @@ package compositionprobes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -46,7 +47,7 @@ type Assignment struct {
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) {
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {
-		return r, fmt.Errorf("PROBE-023: nil compiled template")
+		return r, errors.New("PROBE-023: nil compiled template")
 	}
 	if rt := c.Root().RMTypeName(); rt != "COMPOSITION" {
 		r.Status = "skip"

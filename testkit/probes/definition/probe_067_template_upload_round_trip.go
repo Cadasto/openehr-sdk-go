@@ -3,6 +3,7 @@ package definitionprobes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -28,10 +29,10 @@ import (
 func Probe067TemplateUploadRoundTrip(ctx context.Context, c *transport.Client, opt []byte, templateID string) (Result, error) {
 	r := Result{Probe: "PROBE-067"}
 	if c == nil {
-		return r, fmt.Errorf("PROBE-067: nil transport.Client")
+		return r, errors.New("PROBE-067: nil transport.Client")
 	}
 	if len(opt) == 0 {
-		return r, fmt.Errorf("PROBE-067: empty OPT")
+		return r, errors.New("PROBE-067: empty OPT")
 	}
 
 	uploaded, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(opt))

@@ -341,18 +341,18 @@ func TestGenerateUIDCarriesType(t *testing.T) {
 // failing-test diagnostic, without quoting the whole composition.
 func uidSlice(b []byte) string {
 	const k = `"uid":`
-	i := bytes.Index(b, []byte(k))
-	if i < 0 {
+	_, after, ok := bytes.Cut(b, []byte(k))
+	if !ok {
 		return "<uid not present>"
 	}
-	rest := b[i+len(k):]
+	rest := after
 	// Walk a balanced { … } object — small handwritten scanner so
 	// the test does not pull in an extra dependency.
 	if len(rest) == 0 || rest[0] != '{' {
 		return string(rest[:min(64, len(rest))])
 	}
 	depth := 0
-	for j := 0; j < len(rest); j++ {
+	for j := range rest {
 		switch rest[j] {
 		case '{':
 			depth++

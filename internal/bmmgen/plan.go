@@ -2,6 +2,7 @@ package bmmgen
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -121,8 +122,8 @@ func BuildPlan(ctx context.Context, rootID string, resolver bmm.Resolver) (*Plan
 // BuildPlanForTarget loads the BMM root schema for the given target
 // (via the supplied resolver) and computes a [Plan].
 func BuildPlanForTarget(ctx context.Context, t Target, resolver bmm.Resolver) (*Plan, error) {
-	_ = ctx // reserved; bmm.LoadAll does not yet thread context.
-	schema, err := bmm.LoadAll(t.RootID, resolver)
+	_ = ctx                                        // reserved; bmm.LoadAll does not yet thread context.
+	schema, err := bmm.LoadAll(t.RootID, resolver) //nolint:contextcheck // ctx reserved; public bmm.LoadAll does not thread context yet
 	if err != nil {
 		return nil, fmt.Errorf("bmmgen: load %q: %w", t.RootID, err)
 	}
@@ -140,7 +141,7 @@ func PlanFromSchema(schema *bmm.Schema) (*Plan, error) {
 // schema, using the supplied target.
 func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 	if schema == nil {
-		return nil, fmt.Errorf("bmmgen: schema is nil")
+		return nil, errors.New("bmmgen: schema is nil")
 	}
 	p := &Plan{
 		Target:              t,
@@ -204,7 +205,7 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 	for _, name := range sortedStringKeys(schema.ClassDefinitions) {
 		cls := schema.ClassDefinitions[name]
 		if isSkippedClass(name) {
-			p.Notes = append(p.Notes, fmt.Sprintf("skip class (skipped class set): %s", name))
+			p.Notes = append(p.Notes, "skip class (skipped class set): "+name)
 			continue
 		}
 		pkgPath := classToPkg[name]

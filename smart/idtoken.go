@@ -7,8 +7,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"strings"
 	"time"
 
@@ -60,11 +62,11 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 	}
 	pub, err := rsaPublicKeyFromJWK(jwk)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", auth.ErrJWKSValidationFailed, err)
+		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(sigB64)
 	if err != nil {
-		return nil, fmt.Errorf("%w: signature decode: %v", auth.ErrJWKSValidationFailed, err)
+		return nil, fmt.Errorf("%w: signature decode: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	signingInput := headerB64 + "." + payloadB64
 	sum := sha256.Sum256([]byte(signingInput))
@@ -89,10 +91,10 @@ func splitJWT(raw string) (header, payload, sig string, err error) {
 func decodeJWTPart(b64 string, dest any) error {
 	b, err := base64.RawURLEncoding.DecodeString(b64)
 	if err != nil {
-		return fmt.Errorf("%w: segment decode: %v", auth.ErrJWKSValidationFailed, err)
+		return fmt.Errorf("%w: segment decode: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	if err := json.Unmarshal(b, dest); err != nil {
-		return fmt.Errorf("%w: segment json: %v", auth.ErrJWKSValidationFailed, err)
+		return fmt.Errorf("%w: segment json: %w", auth.ErrJWKSValidationFailed, err)
 	}
 	return nil
 }
@@ -107,7 +109,7 @@ func rsaPublicKeyFromJWK(jwk json.RawMessage) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	if meta.Kty != "RSA" || meta.N == "" || meta.E == "" {
-		return nil, fmt.Errorf("JWK is not RSA")
+		return nil, errors.New("JWK is not RSA")
 	}
 	nBytes, err := base64.RawURLEncoding.DecodeString(meta.N)
 	if err != nil {
@@ -120,7 +122,7 @@ func rsaPublicKeyFromJWK(jwk json.RawMessage) (*rsa.PublicKey, error) {
 	n := new(big.Int).SetBytes(nBytes)
 	e := int(new(big.Int).SetBytes(eBytes).Int64())
 	if e == 0 {
-		return nil, fmt.Errorf("invalid RSA exponent")
+		return nil, errors.New("invalid RSA exponent")
 	}
 	return &rsa.PublicKey{N: n, E: e}, nil
 }
@@ -205,12 +207,7 @@ func audienceStrings(v any) []string {
 }
 
 func audContains(aud []string, want string) bool {
-	for _, a := range aud {
-		if a == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(aud, want)
 }
 
 func claimNumericTime(claims map[string]any, key string) (time.Time, error) {

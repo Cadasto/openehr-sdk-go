@@ -2,7 +2,7 @@ package contribution
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -62,7 +62,7 @@ type updateAuditJSON struct {
 // never emitted (server-assigned).
 func (a UpdateAudit) MarshalJSON() ([]byte, error) {
 	if a.Committer == nil {
-		return nil, fmt.Errorf("contribution.UpdateAudit: Committer is required")
+		return nil, errors.New("contribution.UpdateAudit: Committer is required")
 	}
 	t := a.Type
 	if t == "" {

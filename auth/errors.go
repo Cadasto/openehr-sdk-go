@@ -46,7 +46,7 @@ func (e *OAuth2Error) Error() string {
 	case e.Description != "":
 		return fmt.Sprintf("oauth2: %s: %s", e.Code, e.Description)
 	default:
-		return fmt.Sprintf("oauth2: %s", e.Code)
+		return "oauth2: " + e.Code
 	}
 }
 

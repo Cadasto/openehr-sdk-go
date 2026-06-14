@@ -2,6 +2,7 @@ package validationprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -41,7 +42,7 @@ type ValidateCase struct {
 func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-025"}
 	if len(cases) == 0 {
-		return r, fmt.Errorf("PROBE-025: at least one case required")
+		return r, errors.New("PROBE-025: at least one case required")
 	}
 	var failures []string
 	for _, tc := range cases {
@@ -66,7 +67,7 @@ func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 func Probe026MissingNodes(cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-026"}
 	if len(cases) == 0 {
-		return r, fmt.Errorf("PROBE-026: at least one case required")
+		return r, errors.New("PROBE-026: at least one case required")
 	}
 	var failures []string
 	for _, tc := range cases {

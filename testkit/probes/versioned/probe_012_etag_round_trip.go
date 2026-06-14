@@ -2,6 +2,7 @@ package versionedprobes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -27,7 +28,7 @@ import (
 func Probe012ETagRoundTrip(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, update *rm.Composition) (Result, error) {
 	r := Result{Probe: "PROBE-012"}
 	if c == nil || ehrID == "" || voID == "" || update == nil {
-		return r, fmt.Errorf("PROBE-012: missing required inputs (client/ehr/voID/update)")
+		return r, errors.New("PROBE-012: missing required inputs (client/ehr/voID/update)")
 	}
 	_, meta, err := composition.Get(ctx, c, ehrID, openehrclient.LatestOf(voID))
 	if err != nil {

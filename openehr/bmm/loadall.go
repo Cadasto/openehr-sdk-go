@@ -2,8 +2,10 @@ package bmm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 )
 
 // LoadAll resolves a BMM schema and its transitive includes via the
@@ -43,10 +45,10 @@ import (
 // reuses the prior result.
 func LoadAll(rootID string, resolver Resolver) (*Schema, error) {
 	if resolver == nil {
-		return nil, fmt.Errorf("bmm.LoadAll: resolver is nil")
+		return nil, errors.New("bmm.LoadAll: resolver is nil")
 	}
 	if rootID == "" {
-		return nil, fmt.Errorf("bmm.LoadAll: rootID is empty")
+		return nil, errors.New("bmm.LoadAll: rootID is empty")
 	}
 	state := &loadAllState{
 		resolver: resolver,
@@ -64,12 +66,10 @@ type loadAllState struct {
 
 func (st *loadAllState) load(ctx context.Context, id string) (*Schema, error) {
 	// Cycle detection: id already in stack?
-	for _, s := range st.stack {
-		if s == id {
-			chain := append([]string{}, st.stack...)
-			chain = append(chain, id)
-			return nil, &circularIncludesError{SchemaID: id, Chain: chain}
-		}
+	if slices.Contains(st.stack, id) {
+		chain := append([]string{}, st.stack...)
+		chain = append(chain, id)
+		return nil, &circularIncludesError{SchemaID: id, Chain: chain}
 	}
 	// Already merged via another path?
 	if cached, ok := st.visited[id]; ok {

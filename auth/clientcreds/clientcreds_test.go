@@ -47,9 +47,9 @@ func TestNewValidatesConfig(t *testing.T) {
 }
 
 func TestTokenSuccess(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		if user, _, ok := r.BasicAuth(); !ok || user == "" {
 			t.Error("expected Basic auth header")
 		}
@@ -105,15 +105,15 @@ func TestTokenSuccess(t *testing.T) {
 	if _, err := src.Token(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("token endpoint hit %d times, want 1 (cache miss)", got)
 	}
 }
 
 func TestTokenRefreshOnExpiry(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n := atomic.AddInt32(&hits, 1)
+		n := hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "tok-" + string(byte('0'+n)),
@@ -135,7 +135,7 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 	if t1.Value == t2.Value {
 		t.Errorf("expected refresh on stale; got same token %q", t1.Value)
 	}
-	if h := atomic.LoadInt32(&hits); h < 2 {
+	if h := hits.Load(); h < 2 {
 		t.Errorf("expected ≥2 hits, got %d", h)
 	}
 }
@@ -218,10 +218,10 @@ func TestTokenOAuth2Error(t *testing.T) {
 }
 
 func TestTokenConcurrentCoalesce(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	gate := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		<-gate // block until released
 		_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":3600}`))
 	}))
@@ -243,7 +243,7 @@ func TestTokenConcurrentCoalesce(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	close(gate)
 	wg.Wait()
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected coalesced into 1 exchange, got %d", got)
 	}
 }
