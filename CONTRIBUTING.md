@@ -50,7 +50,7 @@ Imperative mood. Body explains *why* (the *what* is in the diff). Reference REQ-
 make help        # grouped targets
 make ci          # full PR gate
 make test        # unit tests
-make fmt         # gofmt -w -s
+make fmt         # gofumpt + goimports
 make vet
 make lint
 make codegen     # regenerate RM + AOM from resources/bmm/
@@ -62,16 +62,17 @@ Go `1.25.x` on the host is the fast path; the Makefile transparently routes thro
 
 ### Hooks and IDE integration
 
-- After Write/Edit on `*.go`, Claude Code runs `gofmt -w -s` on the touched file (see [`.claude/hooks/gofmt-on-save.sh`](.claude/hooks/gofmt-on-save.sh)).
+- After Write/Edit on `*.go`, Claude Code formats the touched file with gofumpt + goimports (see [`.claude/hooks/goformat-on-save.sh`](.claude/hooks/goformat-on-save.sh)).
 - Pre-commit linters are not enforced by hook; run `make lint` before opening a PR.
 
 ## Code style
 
+The normative, elaborate idiom spec is [`docs/specifications/idiom.md`](docs/specifications/idiom.md) — context propagation, `*http.Client` injection, functional options, generics-no-reflection, error wrapping / typed errors, concurrency, imports & naming, and public-API stability. Formatting, lint, and commit conventions are in [AGENTS.md § Code style and conventions](AGENTS.md#code-style-and-conventions). Read those first; the highlights that trip up most PRs:
+
 - **Building-block independence (REQ-013)**: `openehr/{rm,serialize,validation,template,instance,composition}/` and `openehr/aql/` (models only) MUST be usable standalone, with no imports of `transport/`, `auth/`, or `openehr/client/*`. Enforced by `TestXxxForbiddenImports` in each package. See [`docs/specifications/module-layout.md`](docs/specifications/module-layout.md).
 - **No reflection** (REQ-024) — closed type-switches only on RM polymorphism. Generics are fine; `reflect.Value` is not.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
-- **Comments**: WHY, not WHAT. Identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot).
-- One short comment line per non-obvious choice. No multi-paragraph docstrings except on package-level `doc.go`.
+- **Comments**: WHY, not WHAT — identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
 
 ## Releases
 
