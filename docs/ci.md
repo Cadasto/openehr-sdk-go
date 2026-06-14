@@ -32,7 +32,7 @@ This complements PR CI: it catches generator-template drift between human-driven
 
 ```bash
 make doctor    # toolchain diagnosis
-make ci        # full PR gate (fmt, mod tidy, vet, test, lint, build)
+make ci        # full PR gate (fmt, mod tidy, vet, test, lint, spec-check, build)
 make test-race # optional; matches main-branch Race job
 ```
 
@@ -47,6 +47,8 @@ Run `make help` for the full grouped list. Common targets:
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
+| Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
+| Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |
 | Lint | `make lint` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
 
 **Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).

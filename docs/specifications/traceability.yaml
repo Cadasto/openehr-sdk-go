@@ -147,6 +147,16 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
 
+  - id: REQ-073
+    title: Discovery trust posture
+    canonical: docs/specifications/service-discovery.md#req-073--discovery-trust-posture
+    status: draft
+    implementation: landed
+    packages: [smart/discovery]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    tests:
+      - smart/discovery/resolver_test.go
+
   - id: REQ-050
     title: REST 1.1.0-development pin
     canonical: docs/specifications/wire.md#req-050
@@ -178,6 +188,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
     tests:
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
@@ -212,7 +223,10 @@ requirements:
     canonical: docs/specifications/transport.md#req-093--openehr-error-envelope-mapping
     status: draft
     implementation: landed
-    packages: [transport]
+    packages: [transport, openehr/client/query]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    tests:
+      - transport/client_test.go
 
   - id: REQ-094
     title: Prefer negotiation
@@ -309,10 +323,11 @@ requirements:
 
   - id: REQ-061
     title: SMART-on-openEHR PKCE
-    canonical: docs/specifications/auth.md#req-061
+    canonical: docs/specifications/auth.md#req-061--pkce-flow
     status: draft
     implementation: landed
     packages: [auth/smart]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
     tests:
       - auth/smart/smart_test.go
       - auth/smart/pkce.go
@@ -376,6 +391,23 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-21-template-parser.md
       - docs/plans/archive/2026-05-22-template-req100-followups.md
+
+  - id: REQ-108
+    title: Untrusted document bounds
+    canonical: docs/specifications/clinical-modeling.md#req-108--untrusted-document-bounds
+    status: draft
+    implementation: landed
+    packages:
+      - openehr/template
+      - openehr/bmm
+      - openehr/client/definition
+      - openehr/rm/typereg
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    tests:
+      - openehr/template/parse_cap_test.go
+      - openehr/template/parse_depth_test.go
+      - openehr/bmm/load_test.go
+      - openehr/rm/typereg/registry_test.go
 
   - id: REQ-103
     title: Primitive constraint introspection
@@ -443,6 +475,7 @@ requirements:
     # See docs/plans/archive/2026-05-24-composition-validation-template-driven.md.
     implementation: landed
     packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
+    adrs: [docs/adr/0006-composition-validation-walker-placement.md]
     probes: [PROBE-025, PROBE-026]
     tests:
       - openehr/validation/composition_test.go

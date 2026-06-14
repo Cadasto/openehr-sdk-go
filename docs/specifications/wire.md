@@ -75,6 +75,8 @@ openEHR REST 1.1.0-development defines a family of `openehr-*` custom headers ca
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
 
+When formatting `openehr-item-tag` header values, the SDK **MUST** reject keys, values, and target paths that contain control characters (bytes `< 0x20` except tab, and `DEL` `0x7F`) — a caller-supplied tag key or value with embedded CR/LF is a caller error, not a sanitisation opportunity (header injection).
+
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
 The SDK **MUST NOT** require consumers to construct the audit envelope by hand — `*rm.AuditDetails` is a generated RM type per REQ-042, serialised via canonical JSON / canonical XML at the codec boundary.
@@ -198,6 +200,8 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 - Sends it as an openEHR REST `POST /query/aql` (or `GET /query/aql/{queryId}` for stored queries).
 - Decodes the response: `meta`, `columns`, `rows`. Row values are typed via generics where the caller pre-declares column types; otherwise they decode to `any` and the call site casts.
 - Surfaces AQL-level errors (parse, path resolution) as typed errors distinct from generic `WireError`.
+
+**AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
 ### Stored AQL
 

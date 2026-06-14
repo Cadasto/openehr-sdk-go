@@ -109,6 +109,34 @@ All errors wrap context with `fmt.Errorf("...: %w", err)`; callers compare with 
 
 ---
 
+## REQ-108 — Untrusted document bounds
+
+Clinical-modeling and codec entry points **MUST** bound how much untrusted input they read and how deeply they recurse, so hostile OPT XML, BMM JSON, uploaded templates, or crafted canonical JSON cannot exhaust memory or CPU before the caller's own policy kicks in. Landed reasoning: archived [security-hardening plan](../plans/archive/2026-06-11-security-hardening-and-simplification.md).
+
+### OPT parse and path walk (`openehr/template/`)
+
+- **`ParseOPT` / `ParseFile`** **MUST** reject inputs larger than **32 MiB** (`maxOPTBytes`). Oversize input **MUST** wrap `ErrInvalidOPT` with an `input exceeds N bytes` message.
+- **Tree build and `walkPath`** **MUST** reject nesting deeper than **128 levels** (`maxOPTDepth`). Exceeding the depth **MUST** wrap `ErrInvalidOPT` (parse) or `ErrPathNotFound` (path walk).
+
+### BMM load (`openehr/bmm/`)
+
+- **`bmm.Load`** **MUST** reject inputs larger than **32 MiB** (`maxBMMBytes`) with `bmm.ErrInputTooLarge`. See also REQ-045.
+
+### Definition template upload (`openehr/client/definition/`)
+
+- **`UploadTemplate`** **MUST** apply the same **32 MiB** cap as OPT parse before forwarding bytes to the CDR.
+
+### Polymorphic JSON decode (`openehr/rm/typereg/`)
+
+- **`Registry.Decode`** (the single polymorphic-dispatch chokepoint used by generated `UnmarshalJSON`) **MUST** reject JSON whose nesting depth exceeds **512 levels** before dispatch, returning `typereg.ErrMaxDepthExceeded`. The guard lives in hand-written `registry.go` (not per-type generated decoders) — see [ADR 0002](../adr/0002-bmm-codegen-decisions.md) and REQ-040. `encoding/json`'s own 10 000-level scanner limit remains a backstop; this REQ covers the amplification window below that ceiling.
+
+Constants **MAY** be package-level variables overridable in tests; defaults above are normative for production.
+
+- **Lives in:** [`openehr/template/`](../../openehr/template/), [`openehr/bmm/`](../../openehr/bmm/), [`openehr/client/definition/`](../../openehr/client/definition/), [`openehr/rm/typereg/`](../../openehr/rm/typereg/)
+- **Tests:** `openehr/template/parse_cap_test.go`, `openehr/template/parse_depth_test.go`, `openehr/bmm/load_test.go`, `openehr/rm/typereg/registry_test.go`
+
+---
+
 ## REQ-103 — Primitive constraint introspection
 
 The SDK **MUST** expose every OPT primitive constraint as a typed value attached to its leaf node, so validators and composition-builder consumers can introspect ranges, allowed lists, patterns, units, and code lists without re-parsing the OPT XML.
@@ -236,6 +264,8 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 ### Trust model
 
 The validator treats the **compiled OPT as authoritative for structure** and the **composition as the instance under test**. Structural traversal is template-driven: for each compiled OPT node, the walker reads the corresponding RM property by `rm_attribute_name`, enforces existence / cardinality / alternatives, and recurses into matched RM children. Path strings in `Issue.Path` come from the OPT's pre-computed `AQLPath` (`templatecompile.CompiledNode.AQLPath`) — composition-supplied predicates never form lookup keys, so missing nodes are reported instead of silently bypassed.
+
+The lockstep walker lives in `openehr/validation/` (not `internal/templatecompile/walk/`) — see [ADR 0006](../adr/0006-composition-validation-walker-placement.md). `internal/templatecompile/walk/` remains OPT-only traversal for compile-time tooling.
 
 An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: it descended the composition graph via typed switches, built AQL paths from the composition's at-codes, looked up OPT constraints at those paths, and applied REQ-103 primitive checks at every matched leaf. That intermediate could not flag missing OPT-required nodes (no RM subtree → no path → no lookup); the template-driven walk closes that gap. See the plan at [`docs/plans/archive/2026-05-24-composition-validation-template-driven.md`](../plans/archive/2026-05-24-composition-validation-template-driven.md) for the migration's phase split.
 

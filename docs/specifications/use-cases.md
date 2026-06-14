@@ -8,7 +8,7 @@ The SDK is not built in a vacuum: every public-surface decision is justified by 
 
 ## Primary use cases
 
-Four named consumers drive the SDK's primary surface. For each: what the SDK provides, what stays bespoke in the consumer.
+Five named consumers drive the SDK's primary surface. For each: what the SDK provides, what stays bespoke in the consumer.
 
 ### Benchmark
 
@@ -61,6 +61,17 @@ Fan-out over multiple openEHR backends with per-node spec pinning, partial-failu
 | `context.Context` propagation across goroutines | Routing decisions (which subset of nodes to call) |
 
 Federation policy is the subject of a separate research track once MPI lands. The SDK provides the *primitives*; the policy is bespoke.
+
+### openEHR SMART app (Go backend)
+
+A server-side web or API service that performs a SMART-on-openEHR launch, handles tokens, and makes CDR calls on the user's behalf — the Go backend behind a clinical app.
+
+| SDK provides | Stays bespoke |
+|---|---|
+| SMART-on-openEHR launch + PKCE flow (`auth/smart`, REQ-060–069) | Web framework, routing, and the redirect/callback wiring for the deployment |
+| Discovery of service base URLs and auth endpoints (`smart/discovery`, REQ-070–073) | Session store and how tokens are persisted across a user session |
+| ID-token validation / JWKS handling and coalesced token refresh (`auth/`, `smart/`) | Scope-to-feature authorization policy inside the app |
+| Typed REST methods for CDR calls behind the launch (`openehr/client/ehr/…`) | Front-end / UI and product-specific workflow |
 
 ## Building-block use cases
 

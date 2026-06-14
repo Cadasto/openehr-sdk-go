@@ -66,6 +66,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-070 | First-class discovery | [service-discovery.md § REQ-070](service-discovery.md#req-070) | landed |
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |
 | REQ-072 | Discovery validation | [service-discovery.md § REQ-072](service-discovery.md#req-072) | landed |
+| REQ-073 | Discovery trust posture | [service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture) | landed |
 | REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
 | REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
 | REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#req-082--runnability) | partial |
@@ -85,6 +86,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-102 | Composition validation | [clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) | landed |
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | landed |
+| REQ-108 | Untrusted document bounds | [clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) | landed |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
@@ -101,7 +103,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | BMM conformance | 041–047 | 048–049 |
 | Wire format | 050–059 | — |
 | Authentication | 060–068 | 069 |
-| Service discovery | 070–072 | 073–079 |
+| Service discovery | 070–073 | 074–079 |
 | openEHR conformance | 080–082 | 083–089 |
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
