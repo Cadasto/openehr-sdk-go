@@ -95,12 +95,14 @@ fmt: ## Apply gofumpt + goimports via golangci-lint (formatters in .golangci.yml
 	@$(GOLANGCI) fmt ./...
 
 fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
-	@out=$$($(GOLANGCI) fmt --diff ./... 2>&1); \
-	if [ -n "$$out" ]; then \
-		echo "$$out"; \
+	@# Key off the exit code, not captured output: `fmt --diff` exits non-zero
+	@# and writes the diff to stdout when reformatting is needed. Capturing
+	@# stderr here would also swallow Docker image-pull progress (cold runner)
+	@# into the check and fail spuriously.
+	@$(GOLANGCI) fmt --diff ./... || { \
 		echo "formatting needed: run 'make fmt'"; \
 		exit 1; \
-	fi
+	}
 
 vet: ## Run go vet ./...
 	@$(GO) vet ./...
