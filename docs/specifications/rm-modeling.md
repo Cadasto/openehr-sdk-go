@@ -4,7 +4,7 @@
 
 Rules for representing the openEHR Reference Model (RM) in Go. Covers REQ-030 through REQ-040.
 
-The RM types in `openehr/rm/` are **generated** from the pinned BMM schemas in [`../resources/bmm/`](../resources/bmm/); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are in [bmm-conformance.md](bmm-conformance.md).
+The RM types in `openehr/rm/` are **generated** from the pinned BMM schemas in [`../resources/bmm/`](../../resources/bmm); the rules below state the *shape* the generator emits. Generator semantics (mapping rules per P_BMM construct, primitive types, file conventions) are in [bmm-conformance.md](bmm-conformance.md).
 
 The RM has deep polymorphism: `LOCATABLE → ENTRY → COMPOSITION`; `DATA_VALUE → DV_QUANTITY → DV_DURATION`. Go's type system does not have inheritance, and emulating inheritance leads to runtime-tag confusion and reflection-heavy decoders. This SDK takes a different approach: **concrete structs**, **embedded base structs**, **interfaces for abstract categories**, and **a central type registry for `_type`**.
 
@@ -33,7 +33,7 @@ These are common in dynamic-language ports. They produce reflection-heavy decode
 
 Shared RM fields **MUST** be expressed as embedded structs in concrete types.
 
-> **Generator output.** The example below teaches the conceptual layering REQ-031 requires. The actual `bmmgen` output diverges per [`../docs/adr/0002-bmm-codegen-decisions.md`](../docs/adr/0002-bmm-codegen-decisions.md) D4: abstract non-generic ancestors are emitted as Go marker interfaces and their properties are **flattened** into every concrete descendant struct. The generated `Composition` therefore carries `Name`, `ArchetypeNodeID`, `UID`, etc. as own fields rather than via a `Locatable` embed. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds. The teaching example below remains the normative *model* of the layering REQ-031 expresses; ADR 0002 D4 is the canonical *output rule*.
+> **Generator output.** The example below teaches the conceptual layering REQ-031 requires. The actual `bmmgen` output diverges per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D4: abstract non-generic ancestors are emitted as Go marker interfaces and their properties are **flattened** into every concrete descendant struct. The generated `Composition` therefore carries `Name`, `ArchetypeNodeID`, `UID`, etc. as own fields rather than via a `Locatable` embed. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds. The teaching example below remains the normative *model* of the layering REQ-031 expresses; ADR 0002 D4 is the canonical *output rule*.
 
 ```go
 // Locatable carries the fields that every LOCATABLE descendant shares.
@@ -160,7 +160,7 @@ Constraints to follow:
 
 ## What is NOT in scope here
 
-- **Schema generation strategy.** The RM types in `openehr/rm/` are generated from the pinned BMM schemas; see [bmm-conformance.md](bmm-conformance.md) for the generator contract and [`../docs/plans/`](../docs/plans/) for the implementation plan. The rules in this document apply to the *output* of the generator.
+- **Schema generation strategy.** The RM types in `openehr/rm/` are generated from the pinned BMM schemas; see [bmm-conformance.md](bmm-conformance.md) for the generator contract and [`../docs/plans/`](../plans) for the implementation plan. The rules in this document apply to the *output* of the generator.
 - **Template-specific generated structs.** A typed Go struct for a specific OPT (e.g. a vital-signs template) is **not** part of `openehr/rm/` — that belongs in the consuming project (see [scope.md § Out of scope](scope.md#out-of-scope-v1)).
 - **The full RM type list.** The dictionary of types lives in `openehr/rm/` once implemented; this spec defines the *rules*, not the inventory.
 

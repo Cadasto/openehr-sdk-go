@@ -103,7 +103,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [REQ.md](REQ.md) | Requirement registry (index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |
-| [transport.md](transport.md) | Transport layer REQ-090–094 |
+| [transport.md](transport.md) | Transport layer REQ-090–094, 096–098 |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [scope.md](scope.md) | What is in and out of v1 scope |
 | [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, boundary rules, versioning |

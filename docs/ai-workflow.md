@@ -51,7 +51,7 @@ The full editing rules — idiomatic surface, the `cadasto/` boundary contract, 
 
 ## Examples
 
-When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/examples/) program, keep its docs in sync **in the same PR** — [`cmd/examples/doc.go`](../cmd/examples/doc.go), [examples.md](examples.md), and [quick-start.md](quick-start.md) when the onboarding path changes. Full checklist: [AGENTS.md § Runnable examples](../AGENTS.md#runnable-examples-agents). If `doc.go` and the markdown disagree, the runnable code wins.
+When you add, rename, remove, or materially change a [`cmd/examples/`](../cmd/examples/) program, keep its docs in sync **in the same PR** — [`cmd/examples/doc.go`](../cmd/examples/doc.go), [examples.md](examples.md), and [quick-start.md](quick-start.md) when the onboarding path changes. See also [AGENTS.md § Spec-driven workflow](../AGENTS.md#spec-driven-workflow-agents). If `doc.go` and the markdown disagree, the runnable code wins.
 
 ## Hooks
 

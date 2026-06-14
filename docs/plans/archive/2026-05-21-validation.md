@@ -196,7 +196,7 @@ const (
 |---|---|
 | Depends-on: REQ-100 follow-up plan Phases 4 + 4-bis + 5 + 6 | |
 | Phase 0 REQ-102 spec + sentinels + interfaces + import-guard test | landed |
-| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [archive/2026-05-24-composition-validation-template-driven.md](archive/2026-05-24-composition-validation-template-driven.md)) |
+| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [archive/2026-05-24-composition-validation-template-driven.md](2026-05-24-composition-validation-template-driven.md)) |
 | Phase 2 Demographic validator | |
 | Phase 2 AQL lint subset | |
 | PROBE-024 sandbox probe | |
@@ -212,12 +212,12 @@ The [composition validation plan](2026-05-24-composition-validation-template-dri
 
 ## Mapping to specs
 
-- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — validation must not import serialize
-- [`docs/specifications/rm-modeling.md`](../../docs/specifications/rm-modeling.md) — concrete types, typereg
-- [`openehr/validation/doc.go`](../../openehr/validation/doc.go) — package intent
-- [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
+- [`docs/specifications/module-layout.md`](../../specifications/module-layout.md) — validation must not import serialize
+- [`docs/specifications/rm-modeling.md`](../../specifications/rm-modeling.md) — concrete types, typereg
+- [`openehr/validation/doc.go`](../../../openehr/validation/doc.go) — package intent
+- [`docs/specifications/clinical-modeling.md`](../../specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
 - Proposed: `docs/specifications/clinical-modeling.md` § REQ-102 — validation surfaces
-- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)
+- [`docs/specifications/conformance.md`](../../specifications/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)
 
 ## References (research baseline, informational)
 

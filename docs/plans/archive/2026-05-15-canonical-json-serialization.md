@@ -78,7 +78,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 **Tasks:**
 
-1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
+1. **Amend [`docs/specifications/wire.md`](../../specifications/wire.md) REQ-052** — replace the lexicographic default with BMM declaration order + `_type` first + lexicographic `Hash` keys (per § Canonical ordering above). One CHANGELOG bullet under `## [Unreleased]`.
 2. **Vendor golden fixtures** into this repo (REQ-082 cassette independence):
    - Copy a minimal set of canonical JSON compositions from the reference CDR harness into `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (or `openehr/serialize/canjson/testdata/`).
    - Record provenance in `testkit/cassettes/README.md` (source commit, refresh command).
@@ -215,7 +215,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 1. `bench_test.go`: encode/decode ~50 KiB composition; batch 10k decodes.
 2. Compare stdlib vs optional build-tag backends **after** baseline exists — default remains **`encoding/json`** unless evidence says otherwise (document alloc/op costs of per-type `MarshalJSON`).
-3. Close STRAND-04 **polymorphism** sub-strand in [`docs/specifications/research-strands.md`](../../docs/specifications/research-strands.md); leave codec-perf open if benchmarks are inconclusive.
+3. Close STRAND-04 **polymorphism** sub-strand in [`docs/specifications/research-strands.md`](../../specifications/research-strands.md); leave codec-perf open if benchmarks are inconclusive.
 
 **Definition of done:** `go test -bench=. ./openehr/serialize/canjson/...` runs; short numbers in this plan or an ADR.
 
@@ -235,17 +235,17 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 
 ## Mapping to specs
 
-- [docs/specifications/wire.md § Canonical JSON](../../docs/specifications/wire.md#canonical-json) — REQ-052 (amended in Phase 0)
-- [docs/specifications/rm-modeling.md § Type registry](../../docs/specifications/rm-modeling.md#type-registry) — REQ-040
-- [docs/specifications/idiom.md § Generics policy](../../docs/specifications/idiom.md#generics-policy) — REQ-024: reflection OK for ordinary field mapping; `_type` dispatch only via typereg
-- [docs/specifications/conformance.md PROBE-030, PROBE-031](../../docs/specifications/conformance.md)
-- [`.codebase-memory/adr.md`](../../.codebase-memory/adr.md) — D3 typereg layout, D4 flattening, D5 `rm.CodePhrase`
-- [docs/specifications/research-strands.md STRAND-04](../../docs/specifications/research-strands.md)
+- [docs/specifications/wire.md § Canonical JSON](../../specifications/wire.md#canonical-json) — REQ-052 (amended in Phase 0)
+- [docs/specifications/rm-modeling.md § Type registry](../../specifications/rm-modeling.md#type-registry-req-040) — REQ-040
+- [docs/specifications/idiom.md § Generics policy](../../specifications/idiom.md#generics-policy-req-024) — REQ-024: reflection OK for ordinary field mapping; `_type` dispatch only via typereg
+- [docs/specifications/conformance.md PROBE-030, PROBE-031](../../specifications/conformance.md)
+- [`.codebase-memory/adr.md`](../../../.codebase-memory/adr.md) — D3 typereg layout, D4 flattening, D5 `rm.CodePhrase`
+- [docs/specifications/research-strands.md STRAND-04](../../specifications/research-strands.md)
 
 ## References
 
 - openEHR ITS-REST — [Simplified Formats](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.md) (canonical JSON role, `_type` discriminator)
-- Pinned BMM: [`resources/bmm/openehr_rm_1.2.0.bmm.json`](../../resources/bmm/openehr_rm_1.2.0.bmm.json), [`resources/bmm/openehr_base_1.3.0.bmm.json`](../../resources/bmm/openehr_base_1.3.0.bmm.json)
+- Pinned BMM: [`resources/bmm/openehr_rm_1.2.0.bmm.json`](../../../resources/bmm/openehr_rm_1.2.0.bmm.json), [`resources/bmm/openehr_base_1.3.0.bmm.json`](../../../resources/bmm/openehr_base_1.3.0.bmm.json)
 - Golden inputs: `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (vendored; provenance in `testkit/cassettes/README.md`)
 - Cross-format tests: shared with [canonical XML plan](2026-05-15-canonical-xml-serialization.md)
 

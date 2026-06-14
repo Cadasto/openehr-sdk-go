@@ -212,7 +212,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
    - `openehr-audit-details` set from a `transport.WithAuditDetails(...)` per-call option.
    - `Prefer` from a `transport.WithPrefer("return=representation")` option.
    - W3C `traceparent`/`tracestate` from OTel propagation (REQ-090).
-6. **Error mapping** — status code → typed sentinel from [`docs/specifications/idiom.md § Errors`](../../../docs/specifications/idiom.md#errors):
+6. **Error mapping** — status code → typed sentinel from [`docs/specifications/idiom.md § Errors`](../../../docs/specifications/idiom.md#errors-req-025):
    - `404` → `ErrNotFound`
    - `401` → `ErrUnauthorized`
    - `403` → `ErrForbidden`
@@ -409,7 +409,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 - [docs/specifications/wire.md § REST version pin](../../../docs/specifications/wire.md#req-050) — REQ-050; the contract.
 - [docs/specifications/wire.md § Cadasto spec-version header](../../../docs/specifications/wire.md#req-051) — REQ-051; opt-in plumbing in `transport/`.
 - [docs/specifications/wire.md § Optimistic concurrency](../../../docs/specifications/wire.md#req-054) — REQ-054; the versioned-write contract.
-- [docs/specifications/wire.md § AQL](../../../docs/specifications/wire.md#req-055) — REQ-055; consumed by `client/query/`.
+- [docs/specifications/wire.md § AQL](../../../docs/specifications/wire.md#req-055--wire-boundary) — REQ-055; consumed by `client/query/`.
 - [docs/specifications/wire.md § Stored AQL](../../../docs/specifications/wire.md#req-057) — REQ-057; consumed by `client/definition/` and `client/query/`.
 - [docs/specifications/idiom.md](../../../docs/specifications/idiom.md) — REQ-020..026; followed by every leaf client.
 - [docs/specifications/auth.md](../../../docs/specifications/auth.md) — REQ-060..068; integrated via `transport.WithTokenSource` and per-request `auth.WithTokenSource(ctx, ts)`.

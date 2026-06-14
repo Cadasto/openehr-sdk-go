@@ -70,8 +70,8 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 
 **Tasks:**
 
-1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-056** — add element/attribute ordering aligned with JSON plan (BMM order, `xsi:type` first). Same CHANGELOG bullet as JSON Phase 0 if not already done.
-2. **Reserve probes in [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)** (Draft placeholders):
+1. **Amend [`docs/specifications/wire.md`](../../specifications/wire.md) REQ-056** — add element/attribute ordering aligned with JSON plan (BMM order, `xsi:type` first). Same CHANGELOG bullet as JSON Phase 0 if not already done.
+2. **Reserve probes in [`docs/specifications/conformance.md`](../../specifications/conformance.md)** (Draft placeholders):
    - **PROBE-033** — canonical-XML round trip (modulo compact whitespace)
    - **PROBE-034** — unknown `xsi:type` → `typereg.ErrUnknownType`
 3. **Vendor XML fixtures** → `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (layout since 2026-05; was `canonical_xml/`):
@@ -194,12 +194,12 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 
 ## Mapping to specs
 
-- [docs/specifications/wire.md § Canonical XML](../../docs/specifications/wire.md#canonical-xml) — REQ-056 (amend in Phase 0)
-- [docs/specifications/rm-modeling.md § Type registry](../../docs/specifications/rm-modeling.md#type-registry) — REQ-040; use `Lookup`, not `Decode`
-- [docs/specifications/idiom.md § Generics policy](../../docs/specifications/idiom.md#generics-policy) — REQ-024
-- [docs/specifications/conformance.md PROBE-033, PROBE-034](../../docs/specifications/conformance.md) — reserved Phase 0
+- [docs/specifications/wire.md § Canonical XML](../../specifications/wire.md#canonical-xml) — REQ-056 (amend in Phase 0)
+- [docs/specifications/rm-modeling.md § Type registry](../../specifications/rm-modeling.md#type-registry-req-040) — REQ-040; use `Lookup`, not `Decode`
+- [docs/specifications/idiom.md § Generics policy](../../specifications/idiom.md#generics-policy-req-024) — REQ-024
+- [docs/specifications/conformance.md PROBE-033, PROBE-034](../../specifications/conformance.md) — reserved Phase 0
 - [Canonical JSON plan](2026-05-15-canonical-json-serialization.md) — shared ordering, `poly`, cross-format tests
-- [`.codebase-memory/adr.md`](../../.codebase-memory/adr.md) — typereg layout (D3), flattening (D4)
+- [`.codebase-memory/adr.md`](../../../.codebase-memory/adr.md) — typereg layout (D3), flattening (D4)
 
 ## References
 

@@ -75,7 +75,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `cmd/bmmgen/` | CLI entry point for the BMM-driven code generator (REQ-042). |
 | `internal/` | Implementation helpers excluded from BC promises (Go convention). |
 | `internal/bmmgen/` | BMM code-generator implementation. Reads `resources/bmm/*.bmm.json` via `openehr/bmm/` and emits `openehr/rm/`, `openehr/aom/aom14/`, and the `typereg` registry. Not part of the public API. |
-| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../resources/README.md) and [`../resources/bmm/README.md`](../resources/bmm/README.md). |
+| `resources/` | Pinned SDK assets (BMM schemas under `resources/bmm/`, future XSDs and similar). See [`../resources/README.md`](../../resources/README.md) and [`../resources/bmm/README.md`](../../resources/bmm/README.md). |
 | `docs/` | Narrative documentation (architecture, AI workflow, ADRs, plans). |
 | `docs/specifications/` | Normative specifications — this tree. |
 
@@ -151,7 +151,7 @@ The package **MUST** mirror the `Repository` pattern used by `openehr/client/ehr
 
 Out of scope at v1: bulk operations, async-job admin endpoints, ITS-REST capability negotiation (lives in `openehr/client/system`).
 
-- **Lives in:** [`openehr/client/admin/`](../openehr/client/admin/)
+- **Lives in:** [`openehr/client/admin/`](../../openehr/client/admin)
 - **Probes:** unit tests `TestDeleteEHR*`, `TestDeleteAllEHRs`, `TestPurgeTemplates`, `TestRepositoryRoundTrip` in `openehr/client/admin/admin_test.go`
 
 ## Boundary rules (summary)
@@ -170,7 +170,7 @@ Anything under `internal/` is **outside** the public API surface (REQ-005). Per 
 
 When adding to `internal/`:
 
-- Document the rationale in [docs/architecture.md](../docs/architecture.md) — "why is this not on the public surface?".
+- Document the rationale in [docs/architecture.md](../architecture.md) — "why is this not on the public surface?".
 - Prefer placing helpers in the package that needs them, not in `internal/`, unless reuse across ≥2 packages or a need for cross-package encapsulation justifies the move.
 - `internal/` **MUST NOT** be used as a dumping ground for "I don't want to commit to this name yet". If a package is real, name it and place it; if not, do not export it yet.
 

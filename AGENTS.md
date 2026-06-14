@@ -62,7 +62,7 @@ Full taxonomy and the package tree are in [module-layout.md](docs/specifications
 - `internal/…` is consumer-invisible and excluded from semver promises.
 - **Building-block independence (REQ-013):** `openehr/{rm,serialize,validation,template}` and `openehr/aql` (models only) MUST be usable standalone, with no `transport/` or `auth/` import.
 
-## Code style
+## Code style and conventions
 
 The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md) (context propagation, `*http.Client` injection, functional options, generics-no-reflection, errors, concurrency, naming, public-API stability) — read it. The quick version:
 
@@ -86,6 +86,8 @@ Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Unit / race tests | `make test` / `make test-race` |
 | BMM codegen verify | `make codegen-verify` |
 | Spec traceability | `make spec-check` |
+| Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
+| Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
 
 Test framework is stdlib `testing` + helpers in `testkit/`. The only third-party runtime dependency is OpenTelemetry (tracing, confined to `transport/`) — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).

@@ -2,7 +2,7 @@
 
 **Status:** Living checklist — tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
 
-**Also see:** phase table in [AGENTS.md](../AGENTS.md#status-and-active-scope), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
+**Also see:** [AGENTS.md § Project](../AGENTS.md#project), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
 
 ## Legend
 

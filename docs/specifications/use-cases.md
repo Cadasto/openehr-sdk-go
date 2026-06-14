@@ -86,7 +86,7 @@ Sequencing follows **consumer demand**, one capability slice at a time:
 - **Phase 4** — Cadasto extras (Extra, Datamap, MPI preview, Admin, Care aggregates).
 - **Phase 5** — openEHR conformance-probe ratification, `v1.0.0`.
 
-Each phase ends with the corresponding probes transitioning `Draft` → `Implemented` → `Ratified` in [conformance.md](conformance.md); each milestone produces a plan in [`../docs/plans/`](../docs/plans/) citing the REQ-IDs and PROBE-IDs it addresses.
+Each phase ends with the corresponding probes transitioning `Draft` → `Implemented` → `Ratified` in [conformance.md](conformance.md); each milestone produces a plan in [`../docs/plans/`](../plans) citing the REQ-IDs and PROBE-IDs it addresses.
 
 ## Out-of-scope use cases
 

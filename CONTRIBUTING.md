@@ -29,7 +29,7 @@
 3. Update [`CHANGELOG.md`](CHANGELOG.md) under `## [Unreleased]` if your change is consumer-visible. Pre-1.0 we use **only `### Added`**; fold fix-ups into Added bullets — see the file's preamble.
 4. If you add or change a REQ-marked behaviour, update [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) in the same PR (`make spec-check` enforces this).
 5. Cite REQ-NNN / PROBE-NNN in commit messages and doc comments. REQs are stable identifiers — never renumber.
-6. **New or changed `cmd/examples/`** — update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [AGENTS.md § Runnable examples](AGENTS.md#runnable-examples-agents).
+6. **New or changed `cmd/examples/`** — update [`docs/examples.md`](docs/examples.md) and [`cmd/examples/doc.go`](cmd/examples/doc.go) in the same PR; touch [`docs/quick-start.md`](docs/quick-start.md) when the onboarding path changes. See [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 7. Keep PRs **scoped to one logical change**. The reviewer's job is easier; your change ships faster.
 
 ### Commit messages

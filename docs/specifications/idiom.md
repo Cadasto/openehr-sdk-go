@@ -219,7 +219,7 @@ Documented exceptions:
 
 ## Imports and naming
 
-- **Import groups:** standard library; third-party; module-internal — separated by blank lines. `gofmt` handles ordering within groups; consumers **SHOULD** run `goimports` to enforce the group separation.
+- **Import groups:** standard library; third-party; module-internal — separated by blank lines. `gofumpt` + `goimports` (run via `golangci-lint fmt` / `make fmt`) handle ordering and enforce the group separation.
 - **Package names:** short, lowercase, no underscores, no plurals (`composition`, not `compositions`). Avoid stuttering — `composition.Composition` is allowed if the type is the package's primary export; `composition.Service` and `composition.Repository` are preferred for non-primary types.
 - **Exported names:** `CamelCase`. Acronyms preserve case (`HTTPClient`, `JWKS`, `EHRID`).
 - **Unexported names:** `camelCase` with leading lowercase.

@@ -6,7 +6,7 @@
 **Covers:** REQ-013, REQ-024, REQ-030–033; **REQ-101** (generic composition builder)
 **Probes:** PROBE-023 (Implemented Sandbox — build + canjson marshal-fragment parity v1; full unmarshal round-trip lands with [`2026-05-26-c-primitive-object-wire-parser.md`](2026-05-26-c-primitive-object-wire-parser.md) Phase 2)
 **Implementation:** landed (Phases 0–2: spec + `NewSkeleton` + `Builder.Set/Build`; per-template typed builders deferred to OET-authoring plan)
-**Depends on:** [`2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 (compiled template + RMInfoLookup + walker); [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) (proposed REQ-107 — skeleton engine); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
+**Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 (compiled template + RMInfoLookup + walker); [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md) (proposed REQ-107 — skeleton engine); [`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](../2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Per-template generated Go structs; FLAT/STRUCTURED ingest (REQ-053); automatic `EVENT` timing population beyond documented defaults; OET-driven authoring builder
 
 ## Goal
@@ -196,11 +196,11 @@ func (b *Builder) TemplateID() string
 
 ## Mapping to specs
 
-- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — composition vs client split, no `serialize/` import
-- [`docs/specifications/rm-modeling.md`](../../docs/specifications/rm-modeling.md) — concrete types, typereg
-- [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
+- [`docs/specifications/module-layout.md`](../../specifications/module-layout.md) — composition vs client split, no `serialize/` import
+- [`docs/specifications/rm-modeling.md`](../../specifications/rm-modeling.md) — concrete types, typereg
+- [`docs/specifications/clinical-modeling.md`](../../specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
 - Proposed: `docs/specifications/clinical-modeling.md` § REQ-101 — composition builder
-- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-023 (proposed)
+- [`docs/specifications/conformance.md`](../../specifications/conformance.md) — PROBE-023 (proposed)
 
 ## References (research baseline, informational)
 

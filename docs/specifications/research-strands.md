@@ -51,8 +51,8 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 | Sub-question | Resolution | ADR |
 |---|---|---|
-| Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../docs/adr/0003-rm-event-polymorphism.md) |
-| `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../docs/adr/0004-numeric-wire-tolerance.md) |
+| Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
+| `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
 
 ### Still open
 

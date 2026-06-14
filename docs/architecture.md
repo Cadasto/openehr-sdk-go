@@ -134,7 +134,7 @@ The SDK does not take a "base URL". It takes a `smart/discovery.ServiceCatalog` 
 
 ### `internal/` is invisible
 
-Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling: `internal/bmmgen` (RM/AOM/canonical JSON emission) and `internal/bmmdiff` (BMM corpus diff for version bumps). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
+Anything under `internal/` is excluded from BC promises (REQ-005). Today this holds generator tooling — `internal/bmmgen` (RM/AOM/canonical JSON emission) and `internal/bmmdiff` (BMM corpus diff for version bumps) — plus the compiled-template foundation: `internal/templatecompile` (parsed OPT → walker-friendly compiled form behind the builder and validator) and `internal/templateinstance` (template-driven RM instance synthesis). When in doubt whether a helper belongs in a public package or `internal/`, ask: "would a consumer write a meaningful caller against this directly?" If no, it goes in `internal/`.
 
 ## Code generation
 

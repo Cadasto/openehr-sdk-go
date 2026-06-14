@@ -232,7 +232,7 @@ When writing your own tests, prefer importing fixtures from `testkit` rather tha
 
 ## Maintaining this catalog
 
-Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Developer examples & docs](ai-workflow.md#developer-examples--docs).
+Agents and contributors: when you add or materially change an example under `cmd/examples/`, update this file, [`cmd/examples/doc.go`](../cmd/examples/doc.go), and [`quick-start.md`](quick-start.md) (if onboarding changes) in the **same PR**. Checklist: [ai-workflow.md § Examples](ai-workflow.md#examples).
 
 ---
 

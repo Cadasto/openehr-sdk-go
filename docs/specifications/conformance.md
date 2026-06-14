@@ -172,7 +172,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** An existing Composition with a known `version_uid`.
 - **Wire assertion:** PUT `/ehr/{ehr_id}/composition/{versioned_object_id}` without `If-Match` returns `428`; the SDK maps this to `transport.ErrPreconditionRequired`. The Go SDK additionally short-circuits empty `ifMatch` at the call site with `transport.ErrInvalidConfig` per the typed-write-path guard.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../testkit/probes/versioned/probe_010_put_without_if_match.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_010_put_without_if_match.go`](../../testkit/probes/versioned/probe_010_put_without_if_match.go).
 - **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-011 — PUT Composition with stale If-Match
@@ -181,7 +181,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Composition has been updated since the SDK's cached `version_uid`.
 - **Wire assertion:** PUT returns `412` or `409`; SDK maps to `ErrPreconditionFailed` or `ErrVersionConflict` accordingly.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_011_put_stale_if_match.go`](../testkit/probes/versioned/probe_011_put_stale_if_match.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_011_put_stale_if_match.go`](../../testkit/probes/versioned/probe_011_put_stale_if_match.go).
 - **Satisfies:** REQ-054, REQ-093
 
 #### PROBE-012 — ETag survives round trip
@@ -190,7 +190,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Read-then-write workflow.
 - **Wire assertion:** GET response carries `ETag`; PUT carries the same value as `If-Match`; PUT returns `204` or `200`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_012_etag_round_trip.go`](../testkit/probes/versioned/probe_012_etag_round_trip.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_012_etag_round_trip.go`](../../testkit/probes/versioned/probe_012_etag_round_trip.go).
 - **Satisfies:** REQ-054
 
 #### PROBE-013 — Cross-EHR isolation
@@ -199,7 +199,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Two distinct EHRs; a Composition known to belong to EHR A.
 - **Wire assertion:** GET `/ehr/{ehr_b_id}/composition/{version_uid_from_a}` returns `404 Not Found`, never `200`, never the EHR A data.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_013_cross_ehr_isolation.go`](../testkit/probes/versioned/probe_013_cross_ehr_isolation.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_013_cross_ehr_isolation.go`](../../testkit/probes/versioned/probe_013_cross_ehr_isolation.go).
 - **Satisfies:** REQ-054
 
 ### AQL
@@ -281,7 +281,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A reference Composition cassette.
 - **Wire assertion:** `serialize.Decode → struct → serialize.Encode` produces output that, after the SDK's canonical-ordering pass, matches the input.
 - **Modes:** Sandbox (no network).
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_030_canjson_round_trip.go`](../testkit/probes/serialize/probe_030_canjson_round_trip.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_030_canjson_round_trip.go`](../../testkit/probes/serialize/probe_030_canjson_round_trip.go).
 - **Satisfies:** REQ-052, REQ-040, REQ-082
 
 #### PROBE-031 — `_type` discriminator decoded via registry
@@ -290,7 +290,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A cassette containing an unregistered `_type`.
 - **Wire assertion:** Decode returns `typereg.ErrUnknownType` with the unknown `_type` value.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
 - **Satisfies:** REQ-040, REQ-052
 
 #### PROBE-038 — RM polymorphic decode coverage (SDK-GAP-11)
@@ -308,7 +308,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored cassettes](#vendored-cassettes-testkitcassettes)).
 - **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
 - **Modes:** Sandbox (no network).
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../testkit/probes/serialize/probe_033_canxml_round_trip.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).
 - **Satisfies:** REQ-056, REQ-040, REQ-082
 
 #### PROBE-034 — `xsi:type` discriminator decoded via registry
@@ -317,7 +317,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A cassette (or hand-crafted XML) containing an unregistered `xsi:type`.
 - **Wire assertion:** Decode returns `typereg.ErrUnknownType` with the unknown type value, wrapped in `*typereg.DecodeError`.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_034_typereg_xsi_unknown.go`](../testkit/probes/serialize/probe_034_typereg_xsi_unknown.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_034_typereg_xsi_unknown.go`](../../testkit/probes/serialize/probe_034_typereg_xsi_unknown.go).
 - **Satisfies:** REQ-040, REQ-056
 
 #### PROBE-032 — FLAT → canonical → FLAT round trip
@@ -336,7 +336,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Catalog with declared TTL > 0; two constructions in quick succession.
 - **Wire assertion:** Exactly one discovery fetch occurs.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/discovery/probe_040_catalog_ttl.go`](../testkit/probes/discovery/probe_040_catalog_ttl.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/discovery/probe_040_catalog_ttl.go`](../../testkit/probes/discovery/probe_040_catalog_ttl.go).
 - **Satisfies:** REQ-070, REQ-072
 
 #### PROBE-041 — Catalog refresh on 401
@@ -345,7 +345,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached catalog; backend rotates and returns `401` on the cached token.
 - **Wire assertion:** SDK refreshes JWKS/catalog once, retries once. On second `401`, returns `transport.ErrUnauthorized`.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The full transport-driven retry-on-401 + `transport.ErrUnauthorized` mapping (REQ-071 bullet 3) lands once the transport calls into `Resolver.Refresh` on 401 — currently transport surfaces 401 directly without re-driving discovery.
+- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The full transport-driven retry-on-401 + `transport.ErrUnauthorized` mapping (REQ-071 bullet 3) lands once the transport calls into `Resolver.Refresh` on 401 — currently transport surfaces 401 directly without re-driving discovery.
 - **Satisfies:** REQ-071 (discovery half), REQ-072
 
 ### REST binding
@@ -366,7 +366,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as bare `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` schema (oneOf: `Composition` | `Identifier`) — **not** an `ORIGINAL_VERSION<COMPOSITION>` envelope, which lives at `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). The response `ETag` is captured into `VersionMetadata`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) via PROBE-071 — the bare-body wire assertion (and the symmetric PUT path) is exercised by [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) and the strict-against-spec unit pins `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../openehr/client/ehr/composition/composition_test.go). PROBE-061 stays as the named "Composition versioned write with `Prefer: return=representation`" probe in the REST-binding range; PROBE-071 is the SDK-GAP-09-anchored superset covering both POST and PUT with the strict-rejection assertion.
+- **Status:** Implemented (Sandbox) via PROBE-071 — the bare-body wire assertion (and the symmetric PUT path) is exercised by [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) and the strict-against-spec unit pins `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../../openehr/client/ehr/composition/composition_test.go). PROBE-061 stays as the named "Composition versioned write with `Prefer: return=representation`" probe in the REST-binding range; PROBE-071 is the SDK-GAP-09-anchored superset covering both POST and PUT with the strict-rejection assertion.
 - **Satisfies:** REQ-094 (`return=representation` arm only). The `Prefer=identifier` slot and empty-body strictness are now landed (leaf unit tests) — see the archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md).
 
 #### PROBE-062 — `openehr-audit-details` header round-trip
@@ -415,7 +415,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend supports ADL1.4 template upload at the standard path.
 - **Wire assertion:** Upload request carries `Content-Type: application/xml`; GET response body equals the uploaded OPT bytes (modulo backend-side reformatting documented per deployment).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/definition/probe_067_template_upload_round_trip.go`](../testkit/probes/definition/probe_067_template_upload_round_trip.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/definition/probe_067_template_upload_round_trip.go`](../../testkit/probes/definition/probe_067_template_upload_round_trip.go).
 
 #### PROBE-068 — Error envelope decodes into `WireError.OpenEHR`
 
@@ -440,7 +440,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend exposes the ITS-REST `/admin/*` surface; admin deletion is enabled for the tenant.
 - **Wire assertion:** `admin.DeleteEHR` succeeds; `errors.Is(ehr.Get(...), transport.ErrNotFound)` is true after the delete.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../openehr/client/admin/admin_test.go). A standalone probe file (`testkit/probes/admin/`) is deferred.
+- **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../../openehr/client/admin/admin_test.go). A standalone probe file (`testkit/probes/admin/`) is deferred.
 - **Satisfies:** REQ-099
 
 #### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION (SDK-GAP-09)
@@ -449,7 +449,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per SDK-GAP-09). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) which exercises both POST and PUT arms in a single invocation when `voID` and `ifMatch` are supplied; otherwise the PUT arm is skipped and the probe still passes on POST alone. Unit-level pins covering both verbs and both halves of the strict-against-spec contract: `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../openehr/client/ehr/composition/composition_test.go). The same shape applies to `directory.Save` / `directory.Update` per `201_directory` / `200_FOLDER_retrieved`; covered by `TestSaveRepresentationDecodesBareFolder`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareFolder`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/directory/directory_test.go`](../openehr/client/ehr/directory/directory_test.go).
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) which exercises both POST and PUT arms in a single invocation when `voID` and `ifMatch` are supplied; otherwise the PUT arm is skipped and the probe still passes on POST alone. Unit-level pins covering both verbs and both halves of the strict-against-spec contract: `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../../openehr/client/ehr/composition/composition_test.go). The same shape applies to `directory.Save` / `directory.Update` per `201_directory` / `200_FOLDER_retrieved`; covered by `TestSaveRepresentationDecodesBareFolder`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareFolder`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/directory/directory_test.go`](../../openehr/client/ehr/directory/directory_test.go).
 - **Satisfies:** SDK-GAP-09, REQ-094 (`return=representation` arm only).
 
 #### PROBE-072 — Contribution submission body matches `Contribution_create` (SDK-GAP-10)
@@ -478,7 +478,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Default context.
 - **Wire assertion:** Request succeeds; no global state mutation.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — covered by [`transport/client_test.go`](../transport/client_test.go).
+- **Status:** Implemented (Sandbox) — covered by [`transport/client_test.go`](../../transport/client_test.go).
 - **Satisfies:** REQ-090
 
 ## Adding probes
@@ -505,10 +505,10 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 | Topic | Probes | Lives in (test code) |
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
-| Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../testkit/probes/versioned/) — all implemented (Sandbox) |
+| Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
-| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../testkit/probes/serialize/) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
-| Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../testkit/probes/discovery/) — both implemented (Sandbox) |
-| Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../transport/client_test.go); *planned* — `testkit/probes/observability/` |
-| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip) still deferred |
+| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
+| Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |
+| Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../../transport/client_test.go); *planned* — `testkit/probes/observability/` |
+| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip) still deferred |

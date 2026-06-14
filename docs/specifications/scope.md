@@ -9,7 +9,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Area | Coverage |
 |---|---|
 | openEHR REST `1.1.0-development` — primary surface | EHR, Composition, Contribution, Directory, EHR_STATUS, ItemTags, Template/Definition, Demographic, AQL, System endpoints |
-| openEHR Reference Model | Concrete types for clinical and demographic RM (excluding the `ehr_extract` package — deferred), type registry, embedded base structs, interfaces for abstract categories ([rm-modeling.md](rm-modeling.md)) — **generated** from the pinned BMM schema in [`../resources/bmm/`](../resources/bmm/) per [bmm-conformance.md](bmm-conformance.md) |
+| openEHR Reference Model | Concrete types for clinical and demographic RM (excluding the `ehr_extract` package — deferred), type registry, embedded base structs, interfaces for abstract categories ([rm-modeling.md](rm-modeling.md)) — **generated** from the pinned BMM schema in [`../resources/bmm/`](../../resources/bmm) per [bmm-conformance.md](bmm-conformance.md) |
 | Archetype Object Model 1.4 | `openehr/aom/aom14/` — generated from `openehr_am_1.4.0.bmm.json`; sibling of `openehr/rm/`. Consumed by `openehr/template/` for parsing ADL 1.4 archetypes embedded in OPTs. |
 | BMM loader | Public `openehr/bmm/` (hand-written for v1) — P_BMM JSON parser, includes resolution, queryable in-memory model. Building block (REQ-045). |
 | Code generator | In-tree `internal/bmmgen` + `cmd/bmmgen` emitting RM + AOM 1.4 + type registry — drift-checked in CI |
