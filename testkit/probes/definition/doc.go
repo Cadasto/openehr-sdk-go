@@ -1,4 +1,4 @@
-// Package definitionprobes hosts the cross-SDK conformance probes
+// Package definitionprobes hosts the openEHR conformance probes
 // for the openEHR REST Definition API (PROBE-067 today; more follow
 // alongside ADL 2 and stored-AQL surfaces).
 //

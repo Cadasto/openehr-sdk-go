@@ -66,9 +66,10 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-070 | First-class discovery | [service-discovery.md § REQ-070](service-discovery.md#req-070) | landed |
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |
 | REQ-072 | Discovery validation | [service-discovery.md § REQ-072](service-discovery.md#req-072) | landed |
-| REQ-080 | Conformance probe parity | [conformance.md § Parity scope](conformance.md#parity-scope) | planned |
-| REQ-081 | Wire-level parity | [conformance.md § Parity scope](conformance.md#parity-scope) | planned |
+| REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
+| REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
 | REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#runnability) | partial |
+| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | planned |
 | REQ-090 | OpenTelemetry hooks | [transport.md § REQ-090](transport.md#req-090) | landed |
 | REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091) | landed |
 | REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092) | landed |
@@ -101,7 +102,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Wire format | 050–059 | — |
 | Authentication | 060–068 | 069 |
 | Service discovery | 070–072 | 073–079 |
-| Cross-SDK conformance | 080–082 | 083–089 |
+| openEHR conformance | 080–082 | 083–089 |
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |

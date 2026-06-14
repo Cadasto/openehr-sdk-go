@@ -4,7 +4,7 @@
 
 The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers) and REQ-095 (OpenAPI authoritative source). Transport hygiene (REQ-090–094) lives in [transport.md](transport.md).
 
-The premise: cross-SDK parity is wire-level (REQ-081). Source-level idioms diverge between Go and PHP SDKs; the bytes on the wire and the AQL strings are identical.
+The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
 ## Functional API areas
 
@@ -103,7 +103,7 @@ Canonical-JSON properties:
 
 Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate. If a wire value exceeds JSON's number precision (rare in clinical data), the SDK **MUST** report this on decode as a typed error rather than silently rounding.
 
-Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). Cross-SDK parity (REQ-081) requires every SDK to follow the same asymmetric profile.
+Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). The asymmetric profile is part of the openEHR wire contract this SDK follows (REQ-080).
 
 Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 

@@ -20,7 +20,7 @@
 | Wire format (REST, AQL, canonical JSON, FLAT, STRUCTURED) | [`../docs/specifications/wire.md`](../docs/specifications/wire.md) |
 | Transport (retry, OTel, TLS posture) | [`../docs/specifications/transport.md`](../docs/specifications/transport.md) |
 | Service discovery flow | [`../docs/specifications/service-discovery.md`](../docs/specifications/service-discovery.md) |
-| Cross-SDK conformance probes (PROBE-NNN) | [`../docs/specifications/conformance.md`](../docs/specifications/conformance.md) |
+| openEHR conformance probes (PROBE-NNN) | [`../docs/specifications/conformance.md`](../docs/specifications/conformance.md) |
 | Use cases — primary and building-block | [`../docs/specifications/use-cases.md`](../docs/specifications/use-cases.md) |
 | Open research strands (STRAND-NN) | [`../docs/specifications/research-strands.md`](../docs/specifications/research-strands.md) |
 | Closed architectural decisions | [`adr/`](adr/) |
@@ -120,9 +120,9 @@ The package tree has two named boundaries:
 
 The first cut is about future-proofing module structure; the second is about present-day consumer ergonomics.
 
-### Idiomatic Go, not a PHP port
+### Idiomatic Go
 
-The API is designed for Go — package-level functions, typed errors, `context.Context`-first, injected `*http.Client`, functional options — rather than mirroring the PHP SDK's repository/exception shape. Cross-SDK parity is enforced at the **wire** (the HTTP bytes, the AQL string), not in source (REQ-080, REQ-081): the same logical operation produces byte-identical traffic across SDKs, not similar-looking code.
+The API is designed for Go — package-level functions, typed errors, `context.Context`-first, injected `*http.Client`, functional options. Correctness is defined at the **wire** (the HTTP bytes, the AQL string) against the openEHR spec (REQ-080), independent of any particular source shape.
 
 ### Type registry, not reflection
 

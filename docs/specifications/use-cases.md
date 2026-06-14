@@ -78,13 +78,13 @@ These consumers **MUST NOT** be forced to import `transport/`, `auth/`, or `smar
 
 ## Sequencing
 
-The SDK does not pursue feature parity with the PHP SDK in lockstep — sequencing follows **consumer demand**, one capability slice at a time:
+Sequencing follows **consumer demand**, one capability slice at a time:
 
 - **Phase 1** — core REST + auth slice: `auth/clientcreds`, `transport/`, `openehr/rm/`, `openehr/client/ehr/` (unblocks the benchmark and any CRUD consumer).
 - **Phase 2** — MCP and SMART consumers: `auth/smart`, `smart/`, `smart/discovery`.
 - **Phase 3** — federator: multi-issuer, multi-catalog, partial-failure.
 - **Phase 4** — Cadasto extras (Extra, Datamap, MPI preview, Admin, Care aggregates).
-- **Phase 5** — cross-SDK probe ratification, `v1.0.0`.
+- **Phase 5** — openEHR conformance-probe ratification, `v1.0.0`.
 
 Each phase ends with the corresponding probes transitioning `Draft` → `Implemented` → `Ratified` in [conformance.md](conformance.md); each milestone produces a plan in [`../docs/plans/`](../docs/plans/) citing the REQ-IDs and PROBE-IDs it addresses.
 

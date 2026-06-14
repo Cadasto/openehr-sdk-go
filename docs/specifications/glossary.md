@@ -149,16 +149,13 @@ A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, w
 
 ---
 
-## Cross-language / cross-SDK
+## Conformance and sources
 
 **Cadasto SDK Specification proposal**
 The pre-implementation design document for this SDK, maintained alongside Cadasto architectural sources. Its content is reflected in this `docs/specifications/` tree; this tree is the day-to-day source of truth.
 
-**PHP SDK / Cadasto PHP SDK**
-The sister SDK targeting the same openEHR REST surface, same SMART-on-openEHR conformance probe set, with PHP-idiomatic APIs (repositories + builders, exceptions). Cross-language parity is enforced at the wire level (REQ-081).
-
-**Conformance probe parity**
-The contract that the same `PROBE-NNN` is implementable identically in both Go and PHP SDKs and produces the same pass/fail against a reference deployment (REQ-080).
+**Conformance probe**
+The openEHR wire-conformance assertion behind a stable `PROBE-NNN`: a single-definition check that the SDK's wire output conforms to the openEHR spec against a reference deployment (REQ-080).
 
 ---
 

@@ -53,7 +53,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `smart/` | Application-level SMART AppContext (patient, user, encounter, launch parameters) and App Registration helpers. Distinct from `auth/smart` (OAuth2 flow). |
 | `smart/discovery/` | Service catalog resolver. |
 | `sandbox/` | In-memory and recorded-fixture transports implementing the same client interfaces as the production REST clients. |
-| `testkit/` | Test doubles, fluent builders, clock abstraction, JWKS fixture, recorder/replay, conformance-probe runner. Vendored cross-SDK bytes under `testkit/cassettes/` (`templates/`, `compositions/`, `rm/`, `its_rest/`); path resolution in `testkit/fixtures/`. Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
+| `testkit/` | Test doubles, fluent builders, clock abstraction, JWKS fixture, recorder/replay, conformance-probe runner. Vendored conformance cassettes under `testkit/cassettes/` (`templates/`, `compositions/`, `rm/`, `its_rest/`); path resolution in `testkit/fixtures/`. Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
 
 ### Cadasto extras
 
@@ -193,8 +193,8 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). The mapping of changes 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
 
 - All REQs in this catalog are `Status: Stable`.
-- The probe set in `conformance.md` reaches the parity bar with the PHP SDK.
-- A reference Cadasto deployment passes the probe set.
+- The openEHR wire-conformance probe suite in `conformance.md` passes.
+- A reference openEHR deployment passes the probe suite.
 
 `v2`+ would live under `…/v2/` per Go's semantic-import-versioning convention. Major-version bumps are deliberate, not accidental — a `v0.x → v1.0.0` doc-only relicense or a missing import-path bump is a release defect.
 

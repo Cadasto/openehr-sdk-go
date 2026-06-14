@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The cross-SDK contract that enforces wire-level parity between this Go SDK and the Cadasto PHP SDK. Covers REQ-080, REQ-081, REQ-082.
+The conformance probe suite for this SDK. Covers openEHR wire conformance (REQ-080, REQ-082) and Cadasto-platform API conformance for the `cadasto/*` extras (REQ-083).
 
 A **conformance probe** is an executable assertion that the SDK exercises against either:
 
@@ -12,28 +12,22 @@ A **conformance probe** is an executable assertion that the SDK exercises agains
 
 to verify wire-level conformance to openEHR REST + SMART-on-openEHR.
 
-Each probe has a stable `PROBE-NNN` ID. Probes are identical across the Go and PHP SDKs: same ID, same assertion, same pass/fail outcome against a reference deployment.
+Each probe has a stable `PROBE-NNN` ID, a single normative definition (here), and a pass/fail outcome against a reference deployment.
 
-## Parity scope
+## Conformance scope
 
-### REQ-080 — Probe parity
+### REQ-080 — openEHR wire conformance
 
-The probe set defined here **MUST** be implementable identically in both SDKs. Concrete implications:
+The probe suite verifies the SDK against the **openEHR wire contract**, not against any other implementation:
 
 - A probe's **assertion** is wire-level: the HTTP request bytes (method, path, headers, body), the response status, the response body shape.
-- A probe's **identifier** is shared across languages.
-- A probe's **definition** lives once (in this spec) and is implemented separately in each SDK's test suite.
-- A probe **MUST NOT** assert on source-level idioms (function names, error types, exception classes).
+- A probe's **definition** lives once, here, and is implemented in the SDK's test suite.
+- A probe **MUST NOT** assert on source-level idioms (function names, error types).
+- Decode→encode round-trips **MUST** be byte-stable (modulo documented field ordering).
 
-### REQ-081 — Wire-level parity, not source-level
+### REQ-081 — Wire-level parity (retired)
 
-The PHP SDK uses repositories + exceptions; the Go SDK uses package functions + typed errors. Both are correct; the probe set does not care which.
-
-What the probe set **does** care about:
-
-- The wire-format HTTP request is byte-identical when comparing equivalent calls.
-- The AQL string emitted by the AQL builder is identical.
-- The error class that surfaces to the application maps identically (a `412` produces "precondition failed" in both, however that's named in each language).
+**Status: Deprecated.** This requirement once framed conformance as byte-for-byte parity with the Cadasto PHP SDK. The SDK no longer pursues cross-SDK parity: wire-level correctness is defined against the openEHR spec (REQ-080), and the idiomatic-Go surface stands on its own (REQ-023, [idiom.md](idiom.md)). The identifier is retained (stable; never reused) but carries no active requirement.
 
 ### REQ-082 — Runnability
 
@@ -43,9 +37,19 @@ Every probe **MUST** be runnable in three modes:
 |---|---|---|
 | **Sandbox** | `sandbox/` in-memory transport | Fast unit tests; CI default |
 | **Cassette** | Recorded `.har` or `.yaml` fixture | Deterministic CI against captured real-deployment traffic |
-| **Live** | A reference Cadasto deployment | Pre-release verification; cross-SDK parity confirmation |
+| **Live** | A reference openEHR deployment | Pre-release verification against a real backend |
 
 The probe definition is the single source; the runner picks the backend at invocation time. The same probe MUST pass in all three modes (with cassette recording done once against the live backend).
+
+### REQ-083 — Cadasto platform API conformance
+
+The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform extras under `cadasto/` (Extra API, Datamap, MPI, Care, admin) have **no openEHR spec**; their wire contract is the **Cadasto platform API** itself.
+
+- The authority is the Cadasto platform's API definition (its OpenAPI document where one exists) or, failing that, recorded fixtures from a reference Cadasto deployment.
+- `cadasto/*` probes assert the SDK's request/response wire shape against that contract — **not** against any other SDK. This is the first-party replacement for the retired cross-SDK parity check (REQ-081): the platform is the authority, so a divergence both SDKs shared can no longer pass silently.
+- Cassettes live under `testkit/cassettes/cadasto/`; per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
+
+**Status: planned.** The `cadasto/*` surfaces are Phase 4; the conformance fixtures land with them.
 
 ### Vendored cassettes (`testkit/cassettes/`)
 
@@ -83,7 +87,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
 - **Modes** — Sandbox / Cassette / Live.
-- **Status** — Draft (in this spec), Implemented (in code), Ratified (cross-SDK pass against reference), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
+- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Authentication and discovery
@@ -253,7 +257,7 @@ The catalog is the normative list. Each entry has:
 
 #### PROBE-026 — Missing required nodes / cardinality
 
-- **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across SDKs.
+- **Title:** Sharpens PROBE-025 with negative structural cases — missing required nodes, empty multi-valued attributes with `existence ≥ 1`, occurrences upper-bound violations, RM-type mismatches under C_SINGLE_ATTRIBUTE alternatives — and asserts the issue-code multiset (`required`, `cardinality`, `rm_type_mismatch`, `alternative_mismatch`) is stable across conformant implementations.
 - **Preconditions:** Same OPT + composition tuple shape as PROBE-025; cases focus on the v2 template-driven structural completion surface that the RM-guided intermediate could not detect.
 - **Wire assertion:** Sandbox-only — same pipeline as PROBE-025. A composition with the systolic ELEMENT removed surfaces `required` at the ITEM_LIST `/items` path; an empty `events` slice surfaces `required` + `cardinality`; an unmatched alternative surfaces `alternative_mismatch`.
 - **Modes:** Sandbox.
@@ -436,7 +440,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Preconditions:** Backend exposes the ITS-REST `/admin/*` surface; admin deletion is enabled for the tenant.
 - **Wire assertion:** `admin.DeleteEHR` succeeds; `errors.Is(ehr.Get(...), transport.ErrNotFound)` is true after the delete.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../openehr/client/admin/admin_test.go). Cross-SDK probe file (`testkit/probes/admin/`) deferred until the PHP SDK lands the admin client.
+- **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../openehr/client/admin/admin_test.go). A standalone probe file (`testkit/probes/admin/`) is deferred.
 - **Satisfies:** REQ-099
 
 #### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION (SDK-GAP-09)

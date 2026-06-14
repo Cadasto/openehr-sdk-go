@@ -7,7 +7,7 @@
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
 **Implementation:** partial — landed: OPT parser (REQ-100) including the C_PRIMITIVE_OBJECT inner-`<item>` wire parser, compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, REQ-102 composition validation, REQ-107 template-driven instance generator (with full PROBE-023 unmarshal round-trip), REQ-101 composition builder; open: AQL builders ([plan](2026-05-21-aql-builders.md)); demographic/AQL validators still planned (umbrella validation plan)
 **Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
-**Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
+**Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full openEHR conformance-probe ratification (REQ-080)
 
 ## Goal
 
@@ -87,7 +87,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 2. **Package-level API (REQ-023).** Prefer functions + options; optional `Repository` only where the REST client already established the pattern.
 3. **No reflection for type dispatch (REQ-024).** Template/composition paths use generics or closed switches over known RM categories — not `reflect` for clinical data.
 4. **Traceability.** Land code → update [`docs/specifications/traceability.yaml`](../../docs/specifications/traceability.yaml) + [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md) in the **same PR** as the child plan phase completes.
-5. **Probes.** Sandbox-first probes under `testkit/probes/{template,composition,validation,aql}/` when wire assertions exist; ratification (REQ-081) stays out of scope until PHP SDK parity.
+5. **Probes.** Sandbox-first probes under `testkit/probes/{template,composition,validation,aql}/` when wire assertions exist; Live-mode ratification (REQ-082) stays out of scope for now.
 
 ## Umbrella progress
 

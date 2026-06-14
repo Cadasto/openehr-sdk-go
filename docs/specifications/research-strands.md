@@ -29,7 +29,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Cancelled.
 
-**Rationale:** Not pursued. Each SDK is hand-written and independent; wire-level conformance is guaranteed by the shared cross-SDK probe set (REQ-080/081), so no shared contract source or code-generation pipeline is needed.
+**Rationale:** Not pursued. The SDK is hand-written and independent; wire-level conformance is guaranteed by the openEHR conformance probe suite (REQ-080), so no shared contract source or code-generation pipeline is needed.
 
 ---
 
@@ -67,7 +67,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking.
 
-**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and cross-SDK parity (REQ-080).
+**Implementation gate:** Phase 1b — affects every read path in `openehr/client/*` and openEHR wire conformance (REQ-080).
 
 ---
 
@@ -75,7 +75,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Status:** Open.
 
-**Question:** There is no Go equivalent of Laravel Socialite (the PHP SDK's auth substrate). Implementing `auth/smart` is first-party work. What's the implementation plan and how is it validated?
+**Question:** There is no batteries-included Go substrate for OAuth2 / SMART-on-openEHR; implementing `auth/smart` is first-party work. What's the implementation plan and how is it validated?
 
 **Why it's open:** REQ-061..064 describe the *contract*. The implementation is non-trivial: PKCE, JWKS rotation, refresh, launch context, error mapping. There is risk of subtle drift from the SMART App Launch specification.
 
@@ -83,7 +83,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 - Implement against a reference SMART-on-openEHR deployment.
 - Validate against PROBE-001..007 (the auth probes).
-- Compare wire output to a PHP SDK trace against the same deployment.
+- Compare wire output to the expected envelopes from a reference deployment.
 
 **Resolution form:** ADR-NNN documenting the auth library scope, dependencies (e.g. `golang.org/x/oauth2` vs hand-rolled), and the conformance-probe pass evidence. Amends REQ-061..064.
 
@@ -116,7 +116,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Decision:** Module path is `github.com/cadasto/openehr-sdk-go`; semantic-import versioning for v2+; `internal/` boundary per Go convention.
 
-**Rationale:** Locked early to avoid late-cycle import-path churn. Cross-language discoverability with the Cadasto PHP SDK informs the name.
+**Rationale:** Locked early to avoid late-cycle import-path churn.
 
 **Codified in:** REQ-001, REQ-004, REQ-005, [module-layout.md § Versioning](module-layout.md#versioning).
 

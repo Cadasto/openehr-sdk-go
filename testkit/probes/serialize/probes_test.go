@@ -11,7 +11,7 @@ import (
 // RM values and full composition cassettes vendored under
 // testkit/cassettes/compositions/ and testkit/cassettes/rm/. The conformance harness in
 // `make conformance` invokes the same probe function against shared
-// cross-SDK cassettes (REQ-080).
+// openEHR conformance cassettes (REQ-080).
 func TestProbe030(t *testing.T) {
 	// Sanity-check the input set: at least one leaf entry AND at
 	// least one cassette entry — guards against a silent regression

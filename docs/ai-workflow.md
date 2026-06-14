@@ -36,7 +36,7 @@ This repo is an openEHR workspace. Before guessing an RM path, terminology code,
 | `archetype-explain`, `template-explain` | semantics of an archetype / OPT — input to builders and validation tests |
 | `aql-designer` | design / explain / review AQL for `openehr/aql/` |
 
-The cross-SDK conformance probe set is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
+The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
 ## The loop
 
@@ -61,5 +61,3 @@ After Write/Edit on a `*.go` file, Claude Code formats it via [`.claude/hooks/go
 - **Open decision** (STRAND-NN) → draft an [ADR](adr/) or ask the user; don't settle it in a PR.
 - **Ambiguous spec** → `openehr-assistant:guide` (`howto/spec-lookup`) for the canonical wording.
 - **Missing normative rule** → add a `Status: Draft` REQ in [REQ.md](specifications/REQ.md) and elaborate in the topic spec before coding — never a rule that exists only in code.
-
-_Cross-SDK parity with the PHP SDK is **wire-level only** (REQ-081): match the wire, not the source shape._

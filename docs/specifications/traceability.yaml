@@ -623,15 +623,22 @@ requirements:
     packages: [transport]
 
   - id: REQ-080
-    title: Conformance probe parity
-    canonical: docs/specifications/conformance.md#parity-scope
+    title: openEHR wire conformance
+    canonical: docs/specifications/conformance.md#conformance-scope
     status: draft
     implementation: planned
     packages: [testkit/probes]
 
   - id: REQ-081
-    title: Wire-level parity
-    canonical: docs/specifications/conformance.md#parity-scope
+    title: Wire-level parity (retired)
+    canonical: docs/specifications/conformance.md#req-081--wire-level-parity-retired
+    status: deprecated
+    implementation: deprecated
+    packages: [testkit/probes]
+
+  - id: REQ-083
+    title: Cadasto platform API conformance
+    canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
     status: draft
     implementation: planned
-    packages: [testkit/probes]
+    packages: [cadasto]

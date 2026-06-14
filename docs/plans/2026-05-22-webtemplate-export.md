@@ -69,7 +69,7 @@ Open this plan for active development when **any** of:
 
 - A direct consumer requests JSON-format template output (typical demand: form-generation tooling, FHIR-mapping UIs).
 - Composition builder (REQ-101) is landed and a UI consumer needs the same template metadata client-side.
-- A cross-SDK conformance probe is needed against an existing reference implementation.
+- A conformance probe against an existing reference implementation is needed.
 
 Until then this plan is a placeholder reserving the design space, the proposed REQ-106 identifier, and a clear deferral path for reviewers asking "where does WebTemplate fit?".
 

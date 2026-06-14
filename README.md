@@ -43,7 +43,7 @@ What the SDK provides today and what's planned. The authoritative landed-vs-plan
 - **Authentication** — SMART-on-openEHR (PKCE), client-credentials, JWT-bearer, and basic token sources, layered over a generic injected `TokenSource`. → [auth](docs/specifications/auth.md)
 - **Service discovery** — multi-backend service catalog with per-node spec pinning and partial-failure handling. → [service-discovery](docs/specifications/service-discovery.md)
 - **Cadasto platform extras** — Datamap, MPI, Extra API, Admin, and Care aggregates, shipped in-module for v1 behind a clean cut line. → [module-layout](docs/specifications/module-layout.md)
-- **Conformance** — a shared cross-SDK probe set guarantees wire-level parity with the PHP SDK. → [conformance](docs/specifications/conformance.md)
+- **Conformance** — an openEHR wire-conformance probe suite (round-trip byte-stability, spec-correct envelopes). → [conformance](docs/specifications/conformance.md)
 
 _OET and ADL 2 are out of v1 scope._
 
@@ -96,10 +96,6 @@ Open research strands live in [research-strands.md](docs/specifications/research
 | [docs/releases.md](docs/releases.md) | Release process + version policy |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting |
-
-## Equivalent SDK
-
-Cadasto's **PHP SDK** targets the same openEHR REST surface and the same SMART-on-openEHR conformance probe set, with an idiomatic PHP API. Cross-language parity is enforced by the shared probe set, not by source-code mirroring.
 
 ## License
 

@@ -14,7 +14,7 @@ import (
 // Probe027GeneratedValidates asserts that the canonical
 // generator → validator round-trip passes cleanly for the supplied
 // compiled OPT. The probe is sandbox-only (no transport
-// dependency); cross-SDK parity means another implementation of
+// dependency); openEHR conformance: another implementation of
 // REQ-107 + REQ-102 v2 against the same fixtures MUST produce the
 // same OK outcome.
 //

@@ -21,8 +21,8 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Service discovery | First-class `ServiceCatalog`, cached, refresh-able, with hand-built catalogs for non-discovering backends ([service-discovery.md](service-discovery.md)) |
 | Cadasto-platform extras | Cadasto Extra API, **Datamap V2** (REQ-058), minimal MPI search (preview), Admin endpoints, Care aggregates — shipped in the same module under `cadasto/` ([module-layout.md § Cadasto extras](module-layout.md#cadasto-extras)) |
 | Sandbox + recorded fixtures | In-memory and cassette-replay transports for hermetic SDK-consumer tests |
-| Testkit + conformance probes | Test doubles, fluent builders, the cross-SDK probe runner ([conformance.md](conformance.md)) |
-| Cross-SDK parity contract | Wire-level parity with the Cadasto PHP SDK via the shared probe set (REQ-080, REQ-081) |
+| Testkit + conformance probes | Test doubles, fluent builders, the openEHR conformance-probe runner ([conformance.md](conformance.md)) |
+| openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec (REQ-080) |
 | Examples per primary use case | Worked example programs under `cmd/examples/` for benchmark, seeder, MCP, federator |
 
 ## Out of scope (v1)
@@ -40,7 +40,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | MCP framework selection and MCP tool catalog | A separate proposal. This SDK only guarantees the surface is *consumable* from an MCP server. |
 | Webhooks client | Deferred to a later phase. |
 | Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line (REQ-010, REQ-011) ensures extraction would be mechanical. |
-| Code generation from a shared contract source (PHP ↔ Go OpenAPI) | Not pursued (STRAND-02, cancelled). SDKs are hand-written and independent; cross-SDK conformance is the shared probe set. |
+| Code generation from a shared contract source (OpenAPI-generated wire DTOs) | Not pursued (STRAND-02, cancelled). The SDK is hand-written; openEHR wire conformance is the probe suite. |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
 | Multi-tenant routing, per-tenant credential storage | A consumer concern. The SDK exposes per-call auth via `TokenSource`; storage and selection of credentials is application-side. |

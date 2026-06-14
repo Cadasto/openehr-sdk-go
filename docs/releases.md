@@ -39,8 +39,8 @@ While on `v0.x`: **minor** bumps may break the public API (release notes list ev
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
 1. All REQs in [`REQ.md`](specifications/REQ.md) at `Status: Stable`.
-2. Probe parity with the PHP SDK ([REQ-080](specifications/conformance.md#req-080--probe-parity) / [REQ-081](specifications/conformance.md#req-081--wire-level-parity-not-source-level)).
-3. A reference Cadasto deployment passes the live probe set ([REQ-082](specifications/conformance.md#req-082--runnability)).
+2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
+3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
 Until then we ship `v0.x` adopter slices; current progress is in [`docs/roadmap.md`](roadmap.md).
 

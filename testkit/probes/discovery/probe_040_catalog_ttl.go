@@ -1,7 +1,7 @@
-// Package discoveryprobes hosts the cross-SDK conformance probes for
+// Package discoveryprobes hosts the openEHR conformance probes for
 // the openEHR service-discovery layer. Each probe corresponds to a
 // PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
-// the Go and PHP SDKs against shared cassettes (REQ-080).
+// any openEHR-conformant implementation against shared cassettes (REQ-080).
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:

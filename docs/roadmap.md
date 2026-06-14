@@ -127,7 +127,8 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed; `sandbox/` cassette runner open (REQ-082) |
-| PHP SDK wire parity | **Planned** | — | REQ-080–081 |
+| openEHR conformance ratification | **Planned** | — | REQ-080, REQ-082 |
+| Cadasto API conformance | **Planned** | `testkit/cassettes/cadasto/` | REQ-083 — `cadasto/*` extras anchored to the Cadasto platform API contract (Phase 4) |
 | OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Not all surfaces covered |
 
 ---

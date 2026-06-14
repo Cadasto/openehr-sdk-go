@@ -93,7 +93,7 @@ Test framework is stdlib `testing` + helpers in `testkit/`. The only third-party
 
 ## openEHR knowledge
 
-Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The cross-SDK conformance probe set is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
+Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
 ## Do not touch (yet)
 

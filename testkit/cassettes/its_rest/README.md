@@ -40,7 +40,7 @@ Hand-crafted error envelopes that match the REQ-093 shape (`{message, code, code
 | `412.json` | 412 Precondition Failed | `If-Match` syntactically rejected by backend |
 | `428.json` | 428 Precondition Required | PUT without `If-Match` against versioned resource |
 
-The envelopes are deliberately small and language-agnostic so the same cassettes are reusable across the Go and PHP SDKs (REQ-080, REQ-081). When a real deployment surfaces a richer envelope (e.g. `coded_text` populated against an openEHR terminology), refresh from that deployment and record the source commit here.
+The envelopes are deliberately small and language-agnostic openEHR wire records (REQ-080). When a real deployment surfaces a richer envelope (e.g. `coded_text` populated against an openEHR terminology), refresh from that deployment and record the source commit here.
 
 ### `system/`
 
