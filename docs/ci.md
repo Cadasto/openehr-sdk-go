@@ -57,17 +57,6 @@ Run `make help` for the full grouped list. Common targets:
 - Pin: `golangci/golangci-lint:v2.11.4` (Makefile `LINT_IMAGE` and GitHub Action `version`)
 - Generated `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go` have relaxed duplicate/complexity rules
 
-## Recommended branch protection (`main`)
-
-| Check | Required for merge? |
-|---|---|
-| Verify | Yes |
-| Test | Yes |
-| Lint | Yes |
-| Race | Optional (informational until the team promotes it) |
-
-Also enable **Require branches to be up to date before merging** when PR volume warrants it.
-
 ## Dependency updates
 
 [`.github/dependabot.yml`](../.github/dependabot.yml) opens weekly PRs for `go.mod` and GitHub Actions version bumps.

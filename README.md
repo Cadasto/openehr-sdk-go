@@ -22,7 +22,7 @@ go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: pin an exact tag fo
 
 The primary consumers:
 
-1. **Benchmark and load tools** — high-concurrency CRUD against the openEHR API; the reference CDR load harness is the first consumer.
+1. **Benchmark and load tools** — high-concurrency CRUD against the openEHR REST API for capacity planning.
 2. **Synthetic data seeders** — OPT-guided fakers driving bulk Compositions and demographic records.
 3. **MCP servers** — exposing openEHR operations as MCP tools for agentic clients, with token-forwarded auth.
 4. **Federative API clients** — fan-out over multiple openEHR backends with per-node spec pinning and partial-failure handling.

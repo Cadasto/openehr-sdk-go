@@ -89,6 +89,8 @@ Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 Test framework is stdlib `testing` + helpers in `testkit/`. The only third-party runtime dependency is OpenTelemetry (tracing, confined to `transport/`) — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
+**Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+
 ## openEHR knowledge
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The cross-SDK conformance probe set is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.

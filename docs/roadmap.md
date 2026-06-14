@@ -1,6 +1,6 @@
 # SDK roadmap — landed vs planned
 
-**Status:** Living checklist (2026-05). Tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
+**Status:** Living checklist — tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
 
 **Also see:** phase table in [AGENTS.md](../AGENTS.md#status-and-active-scope), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
 
@@ -22,7 +22,7 @@
 | **0** | Scaffolding — module layout, specs, Makefile, CI | **Complete** |
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
-| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
+| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, benchmark harness | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; benchmark harness deferred) |
 | **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([archive](plans/archive/2026-05-24-composition-validation-template-driven.md)); **REQ-107 template-driven instance generator landed** ([archive](plans/archive/2026-05-24-template-instance-example-generator.md)); **REQ-101 composition builder landed** ([archive](plans/archive/2026-05-21-composition-builder.md)); **C_PRIMITIVE_OBJECT wire-parser + UID emission landed** ([archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md)) — PROBE-023 now does full unmarshal round-trip. Open: AQL builders. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
@@ -95,7 +95,7 @@
 | Demographic | **Planned** | `openehr/client/demographic/` | `doc.go` only |
 | Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
 
-REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-client.md) (plan table may lag — this roadmap reflects the tree).
+REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-rest-api-client.md) (archived; this roadmap reflects the tree). Demographic follow-up: [2026-06-14-demographic-rest-client.md](plans/2026-06-14-demographic-rest-client.md).
 
 ---
 
@@ -138,7 +138,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 |---------|--------|-------|
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
-| Release / semver strategy | **Landed (2026-06-12)** | `v0.4.0` tag; [`release.yml`](../.github/workflows/release.yml) | [archived plan](plans/archive/2026-05-25-versioning-strategy.md) — policy docs + tag-driven release workflow; `v1.0.0` ceremony tracked separately |
+| Release / semver strategy | **Landed** | Tag-driven [`release.yml`](../.github/workflows/release.yml); policy in [`releases.md`](releases.md), `v1.0.0` ceremony tracked separately ([archived plan](plans/archive/2026-05-25-versioning-strategy.md)) |
 | Developer onboarding | **Landed** | [`quick-start.md`](quick-start.md) + [`examples.md`](examples.md) — install, REST wiring, catalog of all `cmd/examples/` programs |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
 | Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — `canonical_json`, `canxml_roundtrip`, `ehr_create`, `generate-example`, `opt-parse`, `primitive-validate`, `validate-composition`, `validate-from-json`; catalog in [`examples.md`](examples.md) |

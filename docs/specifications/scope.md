@@ -40,7 +40,7 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | MCP framework selection and MCP tool catalog | A separate proposal. This SDK only guarantees the surface is *consumable* from an MCP server. |
 | Webhooks client | Deferred to a later phase. |
 | Extraction of Cadasto-platform extras (`cadasto/…`) into a separate Go module | Conditional later step driven by STRAND-08. v1 keeps everything together; the cut line (REQ-010, REQ-011) ensures extraction would be mechanical. |
-| Code generation from a shared contract source (PHP ↔ Go OpenAPI) | Subject of STRAND-02. v1 ships hand-written even if codegen is later adopted. |
+| Code generation from a shared contract source (PHP ↔ Go OpenAPI) | Not pursued (STRAND-02, cancelled). SDKs are hand-written and independent; cross-SDK conformance is the shared probe set. |
 | Template-specific generated structs (e.g. a typed Go struct for a vital-signs OPT) | Belongs in the consuming project; the generic OPT-driven builder lives in `openehr/composition`. |
 | Connection-pooling, transport-level TLS, proxy config | Owned by the consumer's injected `*http.Client` (REQ-021); SDK does not allocate transports. |
 | Multi-tenant routing, per-tenant credential storage | A consumer concern. The SDK exposes per-call auth via `TokenSource`; storage and selection of credentials is application-side. |
@@ -50,5 +50,5 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 Items occasionally confused with SDK scope:
 
 - The SDK is a **library**, not a service. No `main` package, no listening sockets, no database driver. The `cmd/examples/` programs are illustrative only.
-- The openEHR-CDR repository (the SDK's first consumer) implements the *server* side of openEHR REST. The SDK implements the *client* side. They do not share runtime code; the SDK extraction reuses the CDR's RM mapping and HTTP scaffolding patterns, not its handlers.
+- A CDR implements the *server* side of openEHR REST; this SDK implements the *client* side. They share no runtime code.
 - The MCP server use case is a target, not a deliverable. The SDK ships method signatures that map 1:1 to MCP tool definitions; the MCP framework integration is the consuming MCP server's responsibility.

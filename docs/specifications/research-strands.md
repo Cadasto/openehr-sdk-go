@@ -17,67 +17,27 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-01 — Extraction from reference CDR
 
-**Status:** Open.
+**Status:** Resolved.
 
-**Question:** Which parts of the existing reference CDR Go codebase (HTTP wrapper, RM mapping, auth scaffolding, load-test utilities) move to the SDK, and which remain bespoke in the consumer harness?
+**Decision:** The SDK is specified and built as an independent module — its surface is defined by the specs, not derived from or gated on any existing codebase. Where a reference CDR already implements a primitive (an HTTP wrapper, RM mapping, auth scaffolding), reuse is opportunistic and case-by-case: generalisable primitives belong in the SDK; consumer-specific concerns stay in the consumer.
 
-**Why it's open:** the cdr code is hand-grown for a server-side use case. Some primitives generalise to a client SDK; others (e.g. PostgreSQL connection pooling, archive triggers, tenant routing) are server-only and stay. The boundary is non-trivial.
-
-**Evidence needed:**
-
-- File-level inventory of the cdr's HTTP layer, RM types, JWT verifier, error envelope code.
-- A decision per file: SDK / bespoke / shared via a third package.
-- Post-migration benchmark run confirming no measurable percentile regression (target: same p50, p95, p99 within 5%).
-
-**Resolution form:** ADR that lists the moved files, the shared types, and any helpers that needed re-shaping. Amends REQ-001..014.
-
-**Implementation gate:** Phase 1 of the use-cases sequencing (POC milestones 1–3) cannot finish without a decision here.
+**Codified in:** the building-block and boundary rules (REQ-010..014).
 
 ---
 
 ## STRAND-02 — Shared contract source-of-truth (PHP ↔ Go)
 
-**Status:** Open. **Significant decision — warrants a dedicated ADR.**
+**Status:** Cancelled.
 
-**Question:** Both SDKs target the same openEHR REST `1.1.0-development` surface. How is the contract maintained?
-
-**Options:**
-
-(a) **Independent hand-written clients with shared test cassettes.** Each SDK is hand-written; the conformance-probe set + shared cassettes catch wire-level drift. Lowest tooling investment; relies on probe coverage being complete.
-
-(b) **Shared OpenAPI document; both SDKs generate their typed REST layer from it.** Highest up-front investment; strongest cross-language conformance guarantee. Risks: generated code complicates Go idiom (functional options, ctx-first) and PHP idiom (repositories, exceptions).
-
-(c) **Hybrid.** Hand-written public surfaces (repositories / package functions, idiomatic options) on top of generated low-level wire DTOs from an OpenAPI document maintained alongside.
-
-**Evidence needed:**
-
-- Spike a generated low-level DTO layer for one resource (e.g. EHR + EHR_STATUS) in each language. Measure idiom impact.
-- Estimate the maintenance cost of the OpenAPI document.
-- Run the probe set against each option's prototype.
-
-**Resolution form:** ADR-NNN that selects (a), (b), or (c) with reasoning. Amends REQ-050 (REST version pin — the contract source becomes named) and adds (if (b)/(c)) generation-pipeline REQs.
-
-**Implementation gate:** Decision can wait until Phase 2; affects sequencing of cross-SDK probe ratification (Phase 5).
+**Rationale:** Not pursued. Each SDK is hand-written and independent; wire-level conformance is guaranteed by the shared cross-SDK probe set (REQ-080/081), so no shared contract source or code-generation pipeline is needed.
 
 ---
 
 ## STRAND-03 — Go-idiomatic surface validation
 
-**Status:** Open.
+**Status:** Resolved.
 
-**Question:** Are package-level functions the right primary surface, or should the SDK mirror the PHP SDK's repository-struct surface for cross-language familiarity?
-
-**Why it's open:** REQ-023 currently says "package-level functions SHOULD be the primary surface". But "SHOULD" leaves room for evidence-driven adjustment.
-
-**Evidence needed:**
-
-- Implement the EHR + Composition surface in both shapes against the four named use cases.
-- Measure: lines of caller code, IDE autocomplete clarity, mockability for tests.
-- Survey the four use-case consumers (benchmark, seeder, MCP, federator) for preference.
-
-**Resolution form:** ADR-NNN confirming or revising REQ-023, REQ-022 (functional options), REQ-021 (HTTP client injection).
-
-**Implementation gate:** Affects Phase 1 (CDR extraction) — best resolved before significant surface lands.
+**Decision:** Package-level functions are the primary surface; repository structs are offered as a convenience for injection seams. Settled by the landed client surface and codified in REQ-021..024 ([idiom.md](idiom.md)) — the SDK follows idiomatic Go rather than mirroring another SDK's source shape.
 
 ---
 
@@ -195,9 +155,9 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 | Strand | Title | Status | Affects |
 |---|---|---|---|
-| [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | Open | REQ-001..014; Phase 1 |
-| [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | Open | REQ-050; cross-SDK |
-| [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | Open | REQ-021..023 |
+| [STRAND-01](#strand-01--extraction-from-reference-cdr) | Extraction from reference CDR | **Resolved** | REQ-010..014 |
+| [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | **Cancelled** | — |
+| [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | **Resolved** | REQ-021..024 |
 | [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | REQ-024, REQ-040, REQ-052..053 |
 | [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | Open | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |

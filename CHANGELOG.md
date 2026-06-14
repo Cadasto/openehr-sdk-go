@@ -77,5 +77,5 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 
 - [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
 - AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
-- Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.
-- CDR benchmark migration ([plan §Phase 9](docs/plans/2026-05-15-rest-api-client.md), STRAND-01).
+- Demographic REST client ([plan](docs/plans/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
+- Benchmark harness migration ([plan §Phase 9](docs/plans/archive/2026-05-15-rest-api-client.md)).

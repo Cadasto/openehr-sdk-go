@@ -333,7 +333,7 @@ The SDK **MUST** ship a template-authoritative RM instance synthesiser at `opene
 
 ### Scope
 
-The generator is the single skeleton-and-populate engine the composition builder (REQ-101), tests, examples, and CDR seeding (STRAND-01) all consume. The root may be **any** RM type the OPT's `rm_type_name` declares — `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `ADMIN_ENTRY`, `CLUSTER`, `SECTION`, `GENERIC_ENTRY`, `ELEMENT`. Output is **synthetic example data**: structurally and constraint-valid for the OPT, not clinically meaningful. The closed root set is v1; new root types appear through a follow-up REQ.
+The generator is the single skeleton-and-populate engine the composition builder (REQ-101), tests, examples, and data seeding all consume. The root may be **any** RM type the OPT's `rm_type_name` declares — `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `ADMIN_ENTRY`, `CLUSTER`, `SECTION`, `GENERIC_ENTRY`, `ELEMENT`. Output is **synthetic example data**: structurally and constraint-valid for the OPT, not clinically meaningful. The closed root set is v1; new root types appear through a follow-up REQ.
 
 ### Contract
 

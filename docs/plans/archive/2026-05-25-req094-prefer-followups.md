@@ -6,7 +6,7 @@
 **Covers:** [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation)
 **Probes:** PROBE-065 (`minimal` round-trip — separate plan scope, still deferred); no new probe IDs added
 **Implementation:** **landed** — write-path `identifier` slot population and strict `representation` empty-body handling shipped across `composition` / `directory` / `ehr_status` (shared `doWrite`); see [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation)
-**Depends on:** [2026-05-15-rest-api-client.md](../2026-05-15-rest-api-client.md) Phase 2 (`transport.WithPrefer`, leaf `doWrite`); SDK-GAP-09 landed in PR #17 (`return=representation` bare-body decode for composition/directory)
+**Depends on:** [2026-05-15-rest-api-client.md](2026-05-15-rest-api-client.md) Phase 2 (`transport.WithPrefer`, leaf `doWrite`); SDK-GAP-09 landed in PR #17 (`return=representation` bare-body decode for composition/directory)
 **Defers:** PROBE-065 minimal→GET round-trip (keep in REST client plan Phase 3+)
 
 ## Goal

@@ -153,7 +153,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin]
-    plans: [docs/plans/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md]
     probes: [PROBE-072]
     tests:
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
@@ -166,7 +166,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/ehr/composition, openehr/client/ehr/ehrstatus]
-    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
     probes: [PROBE-010, PROBE-011, PROBE-012, PROBE-013]
     tests:
       - testkit/probes/versioned/probe_010_put_without_if_match.go
@@ -291,7 +291,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/aql, openehr/client/query]
-    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
     tests:
       - openehr/aql/aql_test.go
       - openehr/client/query/query_test.go
@@ -302,7 +302,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
-    plans: [docs/plans/2026-05-15-rest-api-client.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go

@@ -130,7 +130,7 @@ A package-tree boundary that nothing on the upstream side may import from. The `
 ## Cadasto-platform terms
 
 **CDR (Clinical Data Repository)**
-The Cadasto openEHR-on-Postgres service. The reference CDR implementation (private; first SDK consumer) is its Go codebase.
+An openEHR-conformant backend the SDK talks to over openEHR REST.
 
 **Cadasto Extra API**
 A Cadasto-specific REST surface that complements openEHR REST — convenience aggregates, deployment-specific endpoints. Client lives in `cadasto/extra`.
