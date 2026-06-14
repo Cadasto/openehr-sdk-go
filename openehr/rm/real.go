@@ -2,6 +2,7 @@ package rm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 )
@@ -13,7 +14,7 @@ type Real float64
 // UnmarshalJSON accepts a JSON number or a decimal string.
 func (r *Real) UnmarshalJSON(b []byte) error {
 	if len(b) == 0 {
-		return fmt.Errorf("rm.Real: empty input")
+		return errors.New("rm.Real: empty input")
 	}
 	if b[0] == '"' {
 		var s string

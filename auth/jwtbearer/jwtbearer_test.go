@@ -212,9 +212,9 @@ func TestStaticAssertion(t *testing.T) {
 }
 
 func TestSourceExchangesAssertion(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
 		}
@@ -245,15 +245,15 @@ func TestSourceExchangesAssertion(t *testing.T) {
 	if tok.Value != "at-1" {
 		t.Errorf("Value = %q", tok.Value)
 	}
-	if atomic.LoadInt32(&hits) != 1 {
-		t.Errorf("expected 1 hit, got %d", hits)
+	if got := hits.Load(); got != 1 {
+		t.Errorf("expected 1 hit, got %d", got)
 	}
 }
 
 func TestSourceCachesUntilExpiry(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
 	}))
 	defer srv.Close()
@@ -263,16 +263,16 @@ func TestSourceCachesUntilExpiry(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 hit, got %d", got)
 	}
 }
 
 func TestSourceCoalescesConcurrent(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	gate := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		<-gate
 		_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":3600}`))
 	}))
@@ -290,7 +290,7 @@ func TestSourceCoalescesConcurrent(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	close(gate)
 	wg.Wait()
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 hit, got %d", got)
 	}
 }

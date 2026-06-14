@@ -29,7 +29,7 @@ import (
 func Probe011PutStaleIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, staleIfMatch string, comp *rm.Composition) (Result, error) {
 	r := Result{Probe: "PROBE-011"}
 	if c == nil || ehrID == "" || voID == "" || staleIfMatch == "" || comp == nil {
-		return r, fmt.Errorf("PROBE-011: missing required inputs (client/ehr/voID/staleIfMatch/comp)")
+		return r, errors.New("PROBE-011: missing required inputs (client/ehr/voID/staleIfMatch/comp)")
 	}
 	_, _, err := composition.Update(ctx, c, ehrID, voID, staleIfMatch, comp)
 	if err == nil {

@@ -2,7 +2,6 @@ package query
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -20,10 +19,10 @@ type AQLError struct {
 
 func (e *AQLError) Error() string {
 	if e.Message != "" {
-		return fmt.Sprintf("query: %s", e.Message)
+		return "query: " + e.Message
 	}
 	if e.Code != "" {
-		return fmt.Sprintf("query: %s", e.Code)
+		return "query: " + e.Code
 	}
 	return "query: execution failed"
 }

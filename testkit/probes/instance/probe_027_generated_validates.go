@@ -2,6 +2,7 @@ package instanceprobes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -23,7 +24,7 @@ import (
 func Probe027GeneratedValidates(ctx context.Context, c *templatecompile.Compiled, opts instance.Options) (Result, error) {
 	r := Result{Probe: "PROBE-027"}
 	if c == nil || c.Root() == nil {
-		return r, fmt.Errorf("PROBE-027: nil compiled template")
+		return r, errors.New("PROBE-027: nil compiled template")
 	}
 	rootType := c.Root().RMTypeName()
 	if rootType != "COMPOSITION" {

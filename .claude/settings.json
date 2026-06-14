@@ -6,11 +6,21 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/gofmt-on-save.sh",
+            "command": "bash .claude/hooks/goformat-on-save.sh",
             "timeout": 20000
           }
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "claude-md-management@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "go-coding@cadasto": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
   }
 }

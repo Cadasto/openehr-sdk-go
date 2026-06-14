@@ -29,10 +29,10 @@ import (
 func Probe013CrossEHRIsolation(ctx context.Context, c *transport.Client, ehrAID, ehrBID openehrclient.EHRID, versionUIDFromA openehrclient.VersionUID) (Result, error) {
 	r := Result{Probe: "PROBE-013"}
 	if c == nil || ehrAID == "" || ehrBID == "" || versionUIDFromA == "" {
-		return r, fmt.Errorf("PROBE-013: missing required inputs (client/ehrAID/ehrBID/versionUIDFromA)")
+		return r, errors.New("PROBE-013: missing required inputs (client/ehrAID/ehrBID/versionUIDFromA)")
 	}
 	if ehrAID == ehrBID {
-		return r, fmt.Errorf("PROBE-013: ehrAID and ehrBID MUST differ — probe-framework misuse")
+		return r, errors.New("PROBE-013: ehrAID and ehrBID MUST differ — probe-framework misuse")
 	}
 	_, _, err := composition.Get(ctx, c, ehrBID, openehrclient.VersionOf(versionUIDFromA))
 	if err == nil {

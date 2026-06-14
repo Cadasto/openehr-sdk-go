@@ -318,9 +318,9 @@ func TestDoServerError5xxWrapsServerSentinel(t *testing.T) {
 }
 
 func TestRetryOnRetriableStatus(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n := atomic.AddInt32(&hits, 1)
+		n := hits.Add(1)
 		if n < 3 {
 			w.WriteHeader(503)
 			return
@@ -340,7 +340,7 @@ func TestRetryOnRetriableStatus(t *testing.T) {
 	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&hits); got != 3 {
+	if got := hits.Load(); got != 3 {
 		t.Errorf("expected 3 attempts, got %d", got)
 	}
 }
@@ -365,9 +365,9 @@ func TestRetryNotAppliedToNonRetriableStatus(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var hits int32
+			var hits atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&hits, 1)
+				hits.Add(1)
 				w.WriteHeader(tc.status)
 			}))
 			defer srv.Close()
@@ -379,7 +379,7 @@ func TestRetryNotAppliedToNonRetriableStatus(t *testing.T) {
 				}),
 			)
 			_, _ = c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
-			if got := atomic.LoadInt32(&hits); got != 1 {
+			if got := hits.Load(); got != 1 {
 				t.Errorf("status %d under retry: got %d attempts, want 1 (status not in RetriableStatus)", tc.status, got)
 			}
 		})
@@ -387,9 +387,9 @@ func TestRetryNotAppliedToNonRetriableStatus(t *testing.T) {
 }
 
 func TestRetryNotAppliedToPOSTByDefault(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
@@ -398,15 +398,15 @@ func TestRetryNotAppliedToPOSTByDefault(t *testing.T) {
 		WithRetry(RetryPolicy{MaxAttempts: 5, InitialBackoff: time.Millisecond}),
 	)
 	_, _ = c.Do(context.Background(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 attempt for POST (non-idempotent), got %d", got)
 	}
 }
 
 func TestRetryOptIntoNonIdempotent(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
@@ -415,21 +415,21 @@ func TestRetryOptIntoNonIdempotent(t *testing.T) {
 		WithRetry(RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Millisecond, RetryNonIdempotent: true}),
 	)
 	_, _ = c.Do(context.Background(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
-	if got := atomic.LoadInt32(&hits); got != 3 {
+	if got := hits.Load(); got != 3 {
 		t.Errorf("expected 3 attempts with RetryNonIdempotent, got %d", got)
 	}
 }
 
 func TestRetryDisabledByDefault(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
 	_, _ = c.Do(context.Background(), &Request{Path: "/x"})
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 attempt by default, got %d", got)
 	}
 }
@@ -449,9 +449,9 @@ func TestRetryNoRetrySentinel(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var hits int32
+			var hits atomic.Int32
 			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				atomic.AddInt32(&hits, 1)
+				hits.Add(1)
 				w.WriteHeader(503)
 			}))
 			defer srv.Close()
@@ -460,7 +460,7 @@ func TestRetryNoRetrySentinel(t *testing.T) {
 				WithRetry(tc.policy),
 			)
 			_, _ = c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
-			if got := atomic.LoadInt32(&hits); got != 1 {
+			if got := hits.Load(); got != 1 {
 				t.Errorf("policy %+v: got %d attempts, want 1", tc.policy, got)
 			}
 		})
@@ -468,9 +468,9 @@ func TestRetryNoRetrySentinel(t *testing.T) {
 }
 
 func TestRetryCtxCancellation(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()

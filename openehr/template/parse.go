@@ -175,7 +175,7 @@ func requireEOF(dec *xml.Decoder) error {
 		switch t := tok.(type) {
 		case xml.CharData:
 			if strings.TrimSpace(string(t)) != "" {
-				return fmt.Errorf("unexpected trailing text after root element")
+				return errors.New("unexpected trailing text after root element")
 			}
 		case xml.Comment, xml.ProcInst, xml.Directive:
 			// Permitted as trailing trivia.

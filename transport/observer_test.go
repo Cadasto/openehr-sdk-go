@@ -37,9 +37,9 @@ func (r *recorder) snapshot() []Observation {
 // for REQ-098: the Observer MUST fire exactly once per logical Client.Do
 // call, after retries settle, with retry-aware Attempts and Duration.
 func TestObserverFiresOncePerLogicalCall(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		n := atomic.AddInt32(&hits, 1)
+		n := hits.Add(1)
 		if n < 3 {
 			w.WriteHeader(503)
 			return

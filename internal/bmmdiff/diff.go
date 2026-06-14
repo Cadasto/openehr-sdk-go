@@ -15,6 +15,7 @@ package bmmdiff
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -315,7 +316,7 @@ func cardBounds(c *bmm.Cardinality) (int, string) {
 	}
 	upper := "*"
 	if !c.UpperUnbounded && c.Upper != nil {
-		upper = fmt.Sprintf("%d", *c.Upper)
+		upper = strconv.Itoa(*c.Upper)
 	}
 	return c.Lower, upper
 }

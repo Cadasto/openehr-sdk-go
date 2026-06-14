@@ -2,6 +2,7 @@ package contribution
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -65,7 +66,7 @@ type CommitVersion interface {
 // without paying for marshalling.
 func (s *Submission) Validate() error {
 	if len(s.Versions) == 0 {
-		return fmt.Errorf("Submission.Versions: empty (Contribution_create requires at least one version)")
+		return errors.New("Submission.Versions: empty (Contribution_create requires at least one version)")
 	}
 	for i, v := range s.Versions {
 		if v == nil {

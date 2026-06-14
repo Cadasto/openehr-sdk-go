@@ -19,8 +19,10 @@ func basePath(ehrID openehrclient.EHRID) string {
 	return "/ehr/" + url.PathEscape(string(ehrID)) + "/ehr_status"
 }
 
-const routeTemplate = "/ehr/{ehr_id}/ehr_status"
-const routeVersioned = "/ehr/{ehr_id}/ehr_status/{version_uid}"
+const (
+	routeTemplate  = "/ehr/{ehr_id}/ehr_status"
+	routeVersioned = "/ehr/{ehr_id}/ehr_status/{version_uid}"
+)
 
 // Get returns the latest EHR_STATUS for ehrID.
 //

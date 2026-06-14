@@ -97,7 +97,7 @@ func TestEmptyContainerEncodesAbsent(t *testing.T) {
 func TestDecodeRecursiveFolder(t *testing.T) {
 	// Build a JSON tree 10 folders deep.
 	tail := `{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"leaf"},"archetype_node_id":"at0001"}`
-	for i := 0; i < 9; i++ {
+	for range 9 {
 		tail = `{"_type":"FOLDER","name":{"_type":"DV_TEXT","value":"node"},"archetype_node_id":"at0001","folders":[` + tail + `]}`
 	}
 	var f rm.Folder

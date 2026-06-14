@@ -13,8 +13,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-const routeTemplate = "/ehr/{ehr_id}/directory"
-const routeVersioned = "/ehr/{ehr_id}/directory/{version_uid}"
+const (
+	routeTemplate  = "/ehr/{ehr_id}/directory"
+	routeVersioned = "/ehr/{ehr_id}/directory/{version_uid}"
+)
 
 func basePath(ehrID openehrclient.EHRID) string {
 	return "/ehr/" + url.PathEscape(string(ehrID)) + "/directory"

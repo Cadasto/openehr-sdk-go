@@ -16,6 +16,7 @@ package serializeprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 
@@ -53,7 +54,7 @@ type Result struct {
 func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 	r := Result{Probe: "PROBE-030"}
 	if factory == nil {
-		return r, fmt.Errorf("PROBE-030: factory is nil")
+		return r, errors.New("PROBE-030: factory is nil")
 	}
 	if body == nil {
 		r.Status = "fail"

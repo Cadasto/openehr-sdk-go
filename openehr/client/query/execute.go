@@ -15,7 +15,7 @@ import (
 // Execute runs an ad-hoc AQL query via POST /query/aql (REQ-055).
 func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...ExecuteOption) (*aql.ResultSet, *transport.Metadata, error) {
 	if err := q.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("query.Execute: %w: %v", ErrInvalidConfig, err)
+		return nil, nil, fmt.Errorf("query.Execute: %w: %w", ErrInvalidConfig, err)
 	}
 	cfg := executeConfig{}
 	for _, o := range opts {

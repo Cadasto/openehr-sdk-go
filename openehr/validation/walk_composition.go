@@ -2,6 +2,8 @@ package validation
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -390,11 +392,11 @@ func outOfMultiplicityInterval(count int, m *template.Multiplicity) bool {
 // formatInterval renders a Multiplicity for inclusion in human-
 // readable Issue.Detail strings.
 func formatInterval(m *template.Multiplicity) string {
-	lo := fmt.Sprintf("%d", m.Lower())
+	lo := strconv.Itoa(m.Lower())
 	if m.LowerUnbounded() {
 		lo = "*"
 	}
-	hi := fmt.Sprintf("%d", m.Upper())
+	hi := strconv.Itoa(m.Upper())
 	if m.UpperUnbounded() {
 		hi = "*"
 	}
@@ -559,12 +561,7 @@ func (w *walker) checkRMType(opt *templatecompile.CompiledNode, rmValue any, pat
 // subtypes admitted under each.
 func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 	subtypes := bmmSubtypes[abstract]
-	for _, t := range subtypes {
-		if concrete == t {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(subtypes, concrete)
 }
 
 // bmmSubtypes is the closed lookup of abstract → concrete RM type

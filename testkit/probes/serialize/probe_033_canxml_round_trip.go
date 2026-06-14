@@ -2,6 +2,7 @@ package serializeprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ import (
 func Probe033CanxmlRoundTrip(body []byte, factory func() any) (Result, error) {
 	r := Result{Probe: "PROBE-033"}
 	if factory == nil {
-		return r, fmt.Errorf("PROBE-033: factory is nil")
+		return r, errors.New("PROBE-033: factory is nil")
 	}
 	if body == nil {
 		r.Status = "fail"

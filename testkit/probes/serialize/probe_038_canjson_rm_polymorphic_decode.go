@@ -3,6 +3,7 @@ package serializeprobes
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -37,7 +38,7 @@ import (
 func Probe038CanjsonRMPolymorphicDecode(body []byte, factory func() any) (Result, error) {
 	r := Result{Probe: "PROBE-038"}
 	if factory == nil {
-		return r, fmt.Errorf("PROBE-038: factory is nil")
+		return r, errors.New("PROBE-038: factory is nil")
 	}
 	if body == nil {
 		r.Status = "fail"

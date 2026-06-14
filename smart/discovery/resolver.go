@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -125,7 +126,7 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 		o(&cfg)
 	}
 	if cfg.httpClient == nil {
-		return nil, fmt.Errorf("discovery: %w", &DiscoveryError{Reason: ReasonFetchFailed, Inner: fmt.Errorf("HTTPClient is required (REQ-021)")})
+		return nil, fmt.Errorf("discovery: %w", &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required (REQ-021)")})
 	}
 	if cfg.logger == nil {
 		cfg.logger = slog.Default()
@@ -206,7 +207,7 @@ func (r *Resolver) fetchCoalesced(ctx context.Context, issuer, prevETag string) 
 
 func (r *Resolver) fetch(ctx context.Context, issuer, prevETag string) (*ServiceCatalog, error) {
 	if !r.cfg.allowInsecure && strings.HasPrefix(issuer, "http://") {
-		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: fmt.Errorf("plaintext issuer rejected; use WithAllowInsecure for development")}
+		return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonInsecureURL, Inner: errors.New("plaintext issuer rejected; use WithAllowInsecure for development")}
 	}
 	docURL, err := joinURL(issuer, r.cfg.wellKnownPath)
 	if err != nil {
@@ -328,7 +329,7 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 	services := map[string]ServiceEntry{}
 	for _, s := range wire.Services {
 		if s.ID == "" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: fmt.Errorf("service entry missing id")}
+			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: errors.New("service entry missing id")}
 		}
 		u, err := url.Parse(s.BaseURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
@@ -430,7 +431,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 		return nil
 	}
 	if cat.Auth.AuthorizationEndpoint == nil || cat.Auth.TokenEndpoint == nil {
-		return &DiscoveryError{Issuer: cat.Issuer, Reason: ReasonAuthEndpointsMissing, Inner: fmt.Errorf("authorization_endpoint and token_endpoint are required when any auth fields are present")}
+		return &DiscoveryError{Issuer: cat.Issuer, Reason: ReasonAuthEndpointsMissing, Inner: errors.New("authorization_endpoint and token_endpoint are required when any auth fields are present")}
 	}
 	return nil
 }

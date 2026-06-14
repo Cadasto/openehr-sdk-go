@@ -102,8 +102,8 @@ When MCP is unavailable, fall back to the BMM in [`../openehr-bmm/`](../openehr-
 
 PostToolUse hook in [`.claude/settings.json`](../.claude/settings.json):
 
-- After `Write` / `Edit` on a `*.go` file, [`.claude/hooks/gofmt-on-save.sh`](../.claude/hooks/gofmt-on-save.sh) runs `gofmt -w -s` on that file.
-- **Host-only by design** — gofmt is cheap; a Docker round-trip per save would dominate latency. Contributors without host Go still get formatting on next `make fmt` (which routes through the Dockerfile `dev` stage).
+- After `Write` / `Edit` on a `*.go` file, [`.claude/hooks/goformat-on-save.sh`](../.claude/hooks/goformat-on-save.sh) formats it with gofumpt + goimports (the project formatters; falls back to `gofmt -s`; skips `*_gen.go`).
+- **Host-only by design** — gofumpt/goimports are instantaneous; a Docker round-trip per save would dominate latency. It is a graceful no-op when those tools aren't on the host; `make fmt` (`golangci-lint fmt` via the pinned image) is the authoritative full-tree pass.
 
 ## Sibling-repo references
 

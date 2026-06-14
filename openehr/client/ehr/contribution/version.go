@@ -2,7 +2,7 @@ package contribution
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -73,7 +73,7 @@ type originalVersionJSON[T any] struct {
 func (v *OriginalVersion[T]) MarshalJSON() ([]byte, error) {
 	o := v.Version
 	if o == nil {
-		return nil, fmt.Errorf("contribution.OriginalVersion: Version is nil")
+		return nil, errors.New("contribution.OriginalVersion: Version is nil")
 	}
 	return json.Marshal(&originalVersionJSON[T]{
 		Type:                  "ORIGINAL_VERSION",
@@ -126,7 +126,7 @@ type importedVersionJSON[T any] struct {
 func (v *ImportedVersion[T]) MarshalJSON() ([]byte, error) {
 	i := v.Version
 	if i == nil {
-		return nil, fmt.Errorf("contribution.ImportedVersion: Version is nil")
+		return nil, errors.New("contribution.ImportedVersion: Version is nil")
 	}
 	return json.Marshal(&importedVersionJSON[T]{
 		Type:         "IMPORTED_VERSION",

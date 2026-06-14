@@ -105,9 +105,9 @@ The SDK is **idiomatic Go**, not a port of the PHP SDK. Semantic parity is enfor
 
 ## Code style and conventions
 
-- **Formatting:** `gofmt -w -s` (the Makefile's `make fmt` and the Claude Code save hook both apply it).
-- **Lint:** `golangci-lint` via `make lint` (image pinned in [`Makefile`](Makefile)).
-- **Imports:** standard library first, then third-party, then internal — separated by a blank line; let `gofmt` / `goimports` handle ordering.
+- **Formatting:** gofumpt + goimports via `make fmt` (`golangci-lint fmt`, image pinned in [`Makefile`](Makefile)); the Claude Code save hook applies them per-file. `make fmt-check` gates it.
+- **Lint:** `golangci-lint` v2 via `make lint` (image pinned in [`Makefile`](Makefile)); reference linter set incl. `modernize` + `errorlint` in [`.golangci.yml`](.golangci.yml).
+- **Imports:** standard library first, then third-party, then internal — separated by a blank line; `goimports` enforces the ordering.
 - **Naming:** idiomatic Go — exported `CamelCase`, unexported `camelCase`; package names short, lowercase, no underscores.
 - **Errors:** wrapped with `fmt.Errorf("...: %w", err)` for upward context; typed sentinel errors at boundary checks. No panics in library code.
 - **Generics:** use them where they remove a reflection hop or a type assertion — not as decoration. If a generic API is harder to read than a `T`-specific one, drop the generic.

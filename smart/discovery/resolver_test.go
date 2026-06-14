@@ -114,9 +114,9 @@ func TestResolveAcceptedVersionsWiden(t *testing.T) {
 }
 
 func TestResolveCacheHit(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=300")
 		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
 	}))
@@ -128,15 +128,15 @@ func TestResolveCacheHit(t *testing.T) {
 	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 fetch (cache hit on 2nd), got %d", got)
 	}
 }
 
 func TestResolveCacheExpiry(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
 	}))
 	defer srv.Close()
@@ -151,15 +151,15 @@ func TestResolveCacheExpiry(t *testing.T) {
 	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&hits); got != 2 {
+	if got := hits.Load(); got != 2 {
 		t.Errorf("expected refetch after TTL expiry, got %d hits", got)
 	}
 }
 
 func TestResolveRefreshInvalidates(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.Header().Set("Cache-Control", "max-age=3600")
 		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
 	}))
@@ -171,17 +171,17 @@ func TestResolveRefreshInvalidates(t *testing.T) {
 	if _, err := r.Refresh(context.Background(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&hits); got != 2 {
+	if got := hits.Load(); got != 2 {
 		t.Errorf("expected refresh to refetch, got %d hits", got)
 	}
 }
 
 func TestResolveCoalescesConcurrent(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	gate := make(chan struct{})
 	body := cassetteBytes(t, "smart-configuration.json")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		<-gate
 		_, _ = w.Write(body)
 	}))
@@ -199,7 +199,7 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	close(gate)
 	wg.Wait()
-	if got := atomic.LoadInt32(&hits); got != 1 {
+	if got := hits.Load(); got != 1 {
 		t.Errorf("expected coalesced fetch, got %d", got)
 	}
 }

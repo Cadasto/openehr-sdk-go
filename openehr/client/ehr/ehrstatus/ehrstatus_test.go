@@ -19,8 +19,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-const ehrIDFixture openehrclient.EHRID = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
-const ehrStatusUID openehrclient.VersionUID = "f1e2d3c4-b5a6-4978-89ab-cdef01234567::cdr.example::1"
+const (
+	ehrIDFixture openehrclient.EHRID      = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+	ehrStatusUID openehrclient.VersionUID = "f1e2d3c4-b5a6-4978-89ab-cdef01234567::cdr.example::1"
+)
 
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	t.Helper()

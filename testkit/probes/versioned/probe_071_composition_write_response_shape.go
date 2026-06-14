@@ -2,6 +2,7 @@ package versionedprobes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -31,7 +32,7 @@ import (
 func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition) (Result, error) {
 	r := Result{Probe: "PROBE-071"}
 	if c == nil || ehrID == "" || comp == nil {
-		return r, fmt.Errorf("PROBE-071: missing required inputs (client/ehr/comp)")
+		return r, errors.New("PROBE-071: missing required inputs (client/ehr/comp)")
 	}
 	// POST arm — Save with Prefer=representation must decode bare.
 	postOut, postMeta, err := composition.Save(ctx, c, ehrID, comp,
@@ -72,7 +73,7 @@ func assertBareCompositionResult(out *rm.Composition, meta *openehrclient.Versio
 		return fmt.Sprintf("%s with Prefer=representation failed: %v", method, err)
 	}
 	if out == nil {
-		return fmt.Sprintf("%s returned nil Composition under Prefer=representation (body missing or empty)", method)
+		return method + " returned nil Composition under Prefer=representation (body missing or empty)"
 	}
 	// Bare-body sanity: a Composition payload exposes ArchetypeNodeID
 	// at the top level. An ORIGINAL_VERSION envelope decoded as a
@@ -80,10 +81,10 @@ func assertBareCompositionResult(out *rm.Composition, meta *openehrclient.Versio
 	// Composition under `data`), which catches the asymmetry even if
 	// `_type` discrimination is lenient on a given codec.
 	if out.ArchetypeNodeID == "" {
-		return fmt.Sprintf("%s decoded *rm.Composition has empty archetype_node_id — body shape looks like ORIGINAL_VERSION<COMPOSITION> not bare COMPOSITION", method)
+		return method + " decoded *rm.Composition has empty archetype_node_id — body shape looks like ORIGINAL_VERSION<COMPOSITION> not bare COMPOSITION"
 	}
 	if meta == nil || meta.VersionUID == "" {
-		return fmt.Sprintf("%s returned no VersionUID metadata (Location/ETag missing)", method)
+		return method + " returned no VersionUID metadata (Location/ETag missing)"
 	}
 	return ""
 }

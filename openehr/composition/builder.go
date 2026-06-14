@@ -46,7 +46,7 @@ type pendingAssignment struct {
 // compiled template for path lookups.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
-		return nil, fmt.Errorf("composition.NewBuilder: nil compiled template")
+		return nil, errors.New("composition.NewBuilder: nil compiled template")
 	}
 	skel, err := NewSkeleton(ctx, c, opts...)
 	if err != nil {
@@ -77,7 +77,7 @@ func (b *Builder) TemplateID() string {
 // to react to the first failure inline.
 func (b *Builder) Set(path string, v any) error {
 	if b == nil {
-		return fmt.Errorf("composition: nil Builder")
+		return errors.New("composition: nil Builder")
 	}
 	if v == nil {
 		err := fmt.Errorf("%w: %s: nil value", ErrTypeMismatch, path)
@@ -151,7 +151,7 @@ func (b *Builder) SetCodedText(path, terminology, code, display string) error {
 // per-Set failures that drove the current Build to fail.
 func (b *Builder) Build() (*rm.Composition, error) {
 	if b == nil {
-		return nil, fmt.Errorf("composition: nil Builder")
+		return nil, errors.New("composition: nil Builder")
 	}
 	// Drain accumulated state in one pass — pending consumed via the
 	// range loop snapshot below; errs reset to capture only this
@@ -210,7 +210,7 @@ func (b *Builder) applyAssignment(p pendingAssignment) error {
 	switch leaf.cardinality {
 	case template.Single:
 		if err := rmwrite.EnsureSingle(rmParent, parentRMType(rmParent), leaf.attrName, p.rawValue); err != nil {
-			return fmt.Errorf("%w: %v", ErrInvalidPath, err)
+			return fmt.Errorf("%w: %w", ErrInvalidPath, err)
 		}
 	case template.Multiple:
 		// Replace-vs-append on multi-valued attrs is ambiguous from a
