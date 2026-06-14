@@ -451,3 +451,187 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-21-validation.md
       - docs/plans/archive/2026-05-24-composition-validation-template-driven.md
+
+  # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
+  # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
+  - id: REQ-002
+    title: Go version
+    canonical: docs/specifications/packaging.md#req-002--go-version
+    status: draft
+    implementation: landed
+    packages: [go.mod]
+
+  - id: REQ-003
+    title: License
+    canonical: docs/specifications/packaging.md#req-003--license
+    status: draft
+    implementation: landed
+    packages: [LICENSE]
+
+  - id: REQ-004
+    title: Semantic versioning
+    canonical: docs/specifications/packaging.md#req-004--semantic-versioning
+    status: draft
+    implementation: landed
+    packages: [.github/workflows/release.yml]
+
+  - id: REQ-005
+    title: Internal boundary
+    canonical: docs/specifications/packaging.md#req-005--internal-boundary
+    status: draft
+    implementation: landed
+    packages: [internal]
+
+  - id: REQ-010
+    title: cadasto/ cut line
+    canonical: docs/specifications/module-layout.md#req-010--cadasto-cut-line
+    status: draft
+    implementation: landed
+    packages: [cadasto]
+
+  - id: REQ-011
+    title: No sideways cadasto/ imports
+    canonical: docs/specifications/module-layout.md#req-011--no-sideways-imports-inside-cadasto
+    status: draft
+    implementation: landed
+    packages: [cadasto]
+
+  - id: REQ-012
+    title: Auth layering
+    canonical: docs/specifications/module-layout.md#req-012--auth-layering
+    status: draft
+    implementation: landed
+    packages: [auth]
+
+  - id: REQ-013
+    title: Building-block independence
+    canonical: docs/specifications/module-layout.md#req-013--building-block-independence
+    status: draft
+    implementation: landed
+    packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql]
+
+  - id: REQ-014
+    title: Dependency direction
+    canonical: docs/specifications/module-layout.md#req-014--dependency-direction
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client]
+
+  - id: REQ-020
+    title: Context-first I/O
+    canonical: docs/specifications/idiom.md#context-propagation-req-020
+    status: draft
+    implementation: landed
+    packages: [transport, openehr/client]
+
+  - id: REQ-022
+    title: Functional options
+    canonical: docs/specifications/idiom.md#functional-options-req-022
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-023
+    title: Package-level functions
+    canonical: docs/specifications/idiom.md#surface-shape-req-023
+    status: draft
+    implementation: landed
+    packages: [openehr/client]
+
+  - id: REQ-024
+    title: Generics, no reflection
+    canonical: docs/specifications/idiom.md#generics-policy-req-024
+    status: draft
+    implementation: landed
+    packages: [openehr/rm/typereg, openehr/serialize]
+
+  - id: REQ-025
+    title: Error wrapping
+    canonical: docs/specifications/idiom.md#errors-req-025
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-026
+    title: Goroutine-safe clients
+    canonical: docs/specifications/idiom.md#concurrency-req-026
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-030
+    title: Concrete RM structs
+    canonical: docs/specifications/rm-modeling.md#concrete-types-req-030
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-031
+    title: Embedded base structs
+    canonical: docs/specifications/rm-modeling.md#embedded-base-structs-req-031
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-032
+    title: Interfaces for abstract RM
+    canonical: docs/specifications/rm-modeling.md#abstract-categories-req-032
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-033
+    title: No inheritance emulation
+    canonical: docs/specifications/rm-modeling.md#no-inheritance-emulation-req-033
+    status: draft
+    implementation: landed
+    packages: [openehr/rm, openehr/rm/typereg]
+
+  - id: REQ-043
+    title: P_BMM to Go mapping rules
+    canonical: docs/specifications/bmm-conformance.md#mapping-rules
+    status: draft
+    implementation: landed
+    packages: [internal/bmmgen]
+
+  - id: REQ-044
+    title: Hand-written extensions isolated
+    canonical: docs/specifications/bmm-conformance.md#req-044--hand-written-extensions-are-isolated
+    status: draft
+    implementation: landed
+    packages: [openehr/rm]
+
+  - id: REQ-047
+    title: BMM authoritative on divergence
+    canonical: docs/specifications/bmm-conformance.md#req-047--bmm-spec-divergence-resolution
+    status: draft
+    implementation: landed
+    packages: [internal/bmmgen]
+
+  - id: REQ-058
+    title: Datamap V2
+    canonical: docs/specifications/module-layout.md
+    status: draft
+    implementation: planned
+    packages: [cadasto/datamap]
+
+  - id: REQ-065
+    title: Per-client tenant binding
+    canonical: docs/specifications/auth.md#req-065
+    status: draft
+    implementation: landed
+    packages: [transport]
+
+  - id: REQ-080
+    title: Conformance probe parity
+    canonical: docs/specifications/conformance.md#parity-scope
+    status: draft
+    implementation: planned
+    packages: [testkit/probes]
+
+  - id: REQ-081
+    title: Wire-level parity
+    canonical: docs/specifications/conformance.md#parity-scope
+    status: draft
+    implementation: planned
+    packages: [testkit/probes]

@@ -122,6 +122,13 @@ while IFS= read -r id; do
   grep -qF "| ${id} |" "$REQ_REG" || warn_msg "${id} in traceability.yaml but not in REQ.md registry"
 done < <(grep -E '^[[:space:]]*-[[:space:]]*id:[[:space:]]*REQ-' "$YAML" | sed -E 's/.*id:[[:space:]]*//')
 
+# Every REQ.md registry id has a traceability.yaml entry (completeness — no silent gaps)
+while IFS= read -r id; do
+  [[ -z "$id" ]] && continue
+  grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${id}([[:space:]]|$)" "$YAML" \
+    || die "${id} in REQ.md registry but missing from traceability.yaml"
+done < <(grep -E '^\| REQ-[0-9]{3} ' "$REQ_REG" | sed -E 's/^\| (REQ-[0-9]{3}) .*/\1/')
+
 if [[ $fail -ne 0 ]]; then
   echo "spec-check: FAILED" >&2
   exit 1
