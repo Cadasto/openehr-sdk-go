@@ -212,9 +212,9 @@ func TestStaticAssertion(t *testing.T) {
 }
 
 func TestSourceExchangesAssertion(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		if err := r.ParseForm(); err != nil {
 			t.Fatal(err)
 		}
@@ -245,8 +245,8 @@ func TestSourceExchangesAssertion(t *testing.T) {
 	if tok.Value != "at-1" {
 		t.Errorf("Value = %q", tok.Value)
 	}
-	if atomic.LoadInt32(&hits) != 1 {
-		t.Errorf("expected 1 hit, got %d", hits)
+	if got := hits.Load(); got != 1 {
+		t.Errorf("expected 1 hit, got %d", got)
 	}
 }
 
