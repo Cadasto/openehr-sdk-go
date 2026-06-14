@@ -4,7 +4,7 @@
 
 The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers) and REQ-095 (OpenAPI authoritative source). Transport hygiene (REQ-090–094) lives in [transport.md](transport.md).
 
-The premise: cross-SDK parity is wire-level (REQ-081). Source-level idioms diverge between Go and PHP SDKs; the bytes on the wire and the AQL strings are identical.
+The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
 ## Functional API areas
 
@@ -75,6 +75,8 @@ openEHR REST 1.1.0-development defines a family of `openehr-*` custom headers ca
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
 
+When formatting `openehr-item-tag` header values, the SDK **MUST** reject keys, values, and target paths that contain control characters (bytes `< 0x20` except tab, and `DEL` `0x7F`) — a caller-supplied tag key or value with embedded CR/LF is a caller error, not a sanitisation opportunity (header injection).
+
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
 The SDK **MUST NOT** require consumers to construct the audit envelope by hand — `*rm.AuditDetails` is a generated RM type per REQ-042, serialised via canonical JSON / canonical XML at the codec boundary.
@@ -92,7 +94,7 @@ The SDK's primary write payload **MUST** be openEHR canonical JSON. Read payload
 Canonical-JSON properties:
 
 - Every RM type instance carries `_type`. The encoder **MUST** emit it; the decoder **MUST** consult the type registry (REQ-040).
-- Field order **SHOULD** follow the openEHR canonical-JSON specification when one is published; until then the SDK **MUST** use this deterministic profile (see [`docs/plans/archive/2026-05-15-canonical-json-serialization.md`](../docs/plans/archive/2026-05-15-canonical-json-serialization.md)):
+- Field order **SHOULD** follow the openEHR canonical-JSON specification when one is published; until then the SDK **MUST** use this deterministic profile (see [`docs/plans/archive/2026-05-15-canonical-json-serialization.md`](../plans/archive/2026-05-15-canonical-json-serialization.md)):
   - `_type` is always the first key on every encoded concrete RM value.
   - Remaining object keys follow **BMM property declaration order** (the order code generation emits struct fields).
   - `Hash` (`map[K]V`) keys are serialized in **lexicographic key order** (independent of struct field order).
@@ -103,7 +105,7 @@ Canonical-JSON properties:
 
 Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The SDK **MUST NOT** silently coerce a magnitude through `float32` or a similarly lossy intermediate. If a wire value exceeds JSON's number precision (rare in clinical data), the SDK **MUST** report this on decode as a typed error rather than silently rounding.
 
-Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). Cross-SDK parity (REQ-081) requires every SDK to follow the same asymmetric profile.
+Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). The asymmetric profile is part of the openEHR wire contract this SDK follows (REQ-080).
 
 Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
@@ -126,13 +128,13 @@ The SDK **MUST** provide a canonical XML codec in `openehr/serialize`, symmetric
 
 Canonical XML applies to the same RM surface as canonical JSON: Composition, EHR_STATUS, Directory, Contribution, demographic resources. Polymorphic discrimination uses the `xsi:type` attribute (XML Schema Instance namespace), not the JSON `_type` property. Element names **MUST** be snake_case BMM names (same as canonical JSON keys). The codec **MUST** carry the namespace declarations the openEHR XML schemas require (`http://schemas.openehr.org/v1` default namespace; `xmlns:xsi` when `xsi:type` is present).
 
-Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/archive/2026-05-15-canonical-xml-serialization.md`](../docs/plans/archive/2026-05-15-canonical-xml-serialization.md)):
+Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/archive/2026-05-15-canonical-xml-serialization.md`](../plans/archive/2026-05-15-canonical-xml-serialization.md)):
 
 - Child elements follow **BMM property declaration order** (same order code generation emits struct fields).
 - `xsi:type` is the **first attribute** on every encoded concrete RM value where a polymorphic site is being resolved; the encoder emits it on every concrete value boundary (deterministic profile), the decoder requires it at polymorphic sites unless [`WithRelaxedTypeDispatch`] is set.
 - Nil-pointer optional fields and empty containers with `cardinality.lower == 0` are emitted as **ABSENT** (no element). Both ABSENT and an empty self-closing element are accepted on decode.
 - ISO 8601 dates/times/durations are passed through as element text content; the codec does not parse them at codec layer (REQ-046).
-- Numeric magnitudes use IEEE 754 double-precision (same posture as canonical JSON); decode also accepts quoted decimal strings per [`docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md).
+- Numeric magnitudes use IEEE 754 double-precision (same posture as canonical JSON); decode also accepts quoted decimal strings per [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md).
 - Compact XML (no insignificant inter-element whitespace) is the byte-equality target for round-trip tests.
 - `xmi:type` is **rejected** on decode with `ErrInvalidShape` and an explicit message — only `xsi:type` is recognised.
 
@@ -198,6 +200,8 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 - Sends it as an openEHR REST `POST /query/aql` (or `GET /query/aql/{queryId}` for stored queries).
 - Decodes the response: `meta`, `columns`, `rows`. Row values are typed via generics where the caller pre-declares column types; otherwise they decode to `any` and the call site casts.
 - Surfaces AQL-level errors (parse, path resolution) as typed errors distinct from generic `WireError`.
+
+**AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
 ### Stored AQL
 

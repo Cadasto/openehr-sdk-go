@@ -8,7 +8,7 @@
 **Covers:** [REQ-050](../../specifications/wire.md#req-050), [REQ-095](../../specifications/wire.md#req-095) (OpenAPI authoritative source); proposed addendum to REQ-059 (commit audit on write paths)
 **Probes:** **PROBE-072** (extend or sibling probe for `UPDATE_AUDIT` / `change_type` shape); possible **PROBE-073** (lifecycle_state on `UpdateVersion`)
 **Implementation:** planned
-**Depends on:** Landed [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) + [archive plan](archive/2026-05-26-contribution-submission-shape.md); upstream merge of [openEHR/specifications-ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)
+**Depends on:** Landed [`contribution.Submission`](../../../openehr/client/ehr/contribution/submission.go) + [archive plan](2026-05-26-contribution-submission-shape.md); upstream merge of [openEHR/specifications-ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)
 **Defers:** Demographic contribution client (same schema family — mirror EHR changes when `openehr/client/demographic/` lands); re-pinning bundled OAS artefacts in-repo (SDK consumes spec by reference, not vendored OAS today)
 
 ## Goal
@@ -33,10 +33,10 @@ PR 131 fixes the source schemas:
 
 **SDK today:**
 
-- [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) marshals `{audit, versions[]}` for `Contribution_create`.
-- `Submission.Audit` is [`rm.AuditDetails`](../../openehr/rm/common_generic_gen.go) — the **persisted RM class**, not the REST `UPDATE_AUDIT` DTO.
+- [`contribution.Submission`](../../../openehr/client/ehr/contribution/submission.go) marshals `{audit, versions[]}` for `Contribution_create`.
+- `Submission.Audit` is [`rm.AuditDetails`](../../../openehr/rm/common_generic_gen.go) — the **persisted RM class**, not the REST `UPDATE_AUDIT` DTO.
 - `Version.commit_audit` inside each inline version is also `rm.AuditDetails`.
-- Test helpers and [`testkit/cassettes/submissions/`](../../testkit/cassettes/submissions/) already use **`DV_CODED_TEXT`-shaped** `change_type` (nested `defining_code.terminology_id.value`) — aligned with PR 131's fix, not with the erroneous 1.0.3 `TERMINOLOGY_CODE` schema.
+- Test helpers and [`testkit/cassettes/submissions/`](../../../testkit/cassettes/submissions) already use **`DV_CODED_TEXT`-shaped** `change_type` (nested `defining_code.terminology_id.value`) — aligned with PR 131's fix, not with the erroneous 1.0.3 `TERMINOLOGY_CODE` schema.
 - RM-generated types already model `change_type` as `rm.DVCodedText` on `AUDIT_DETAILS` — the mismatch is **REST DTO semantics** (`UPDATE_AUDIT` vs `AUDIT_DETAILS`, optional/forbidden server fields, `_type` discriminator), not RM codegen.
 
 **Consumers:** reference CDR load harness, seeder tools, MCP servers posting contributions; PROBE-072 conformance consumers.
@@ -112,7 +112,7 @@ PR 131 fixes the source schemas:
   - Request body top-level `audit._type` is `UPDATE_AUDIT` (or document accepted alternates if SDK deliberately omits `_type`).
   - `audit.change_type` matches `DvCodedText` shape (has `defining_code`, not flat terminology-code triple).
   - At least one version's `lifecycle_state` uses coded-text shape when present.
-- [ ] Implement probe in [`testkit/probes/versioned/`](../../testkit/probes/versioned/) — httptest body capture (same pattern as PROBE-072).
+- [ ] Implement probe in [`testkit/probes/versioned/`](../../../testkit/probes/versioned) — httptest body capture (same pattern as PROBE-072).
 - [ ] Update [`docs/specifications/wire.md`](../../specifications/wire.md) § Request vs response asymmetry — add bullet for `UPDATE_AUDIT` vs `AUDIT_DETAILS` on contribution create.
 - [ ] Update [`docs/specifications/REQ.md`](../../specifications/REQ.md) + [`traceability.yaml`](../../specifications/traceability.yaml) if new PROBE or REQ-059 addendum is registered.
 
@@ -124,9 +124,9 @@ PR 131 fixes the source schemas:
 
 **Tasks:**
 
-- [ ] Audit [`testkit/cassettes/submissions/*.json`](../../testkit/cassettes/submissions/) — most already use DV_CODED_TEXT `change_type`; update any that emit wrong `_type` or server-only fields to match PR 131 examples.
-- [ ] Update [`testkit/cassettes/submissions/README.md`](../../testkit/cassettes/submissions/README.md) with `UPDATE_AUDIT` note + link to this plan.
-- [ ] Migrate [`contribution_test.go`](../../openehr/client/ehr/contribution/contribution_test.go) helpers (`newAudit`) to `UpdateAudit` builders.
+- [ ] Audit [`testkit/cassettes/submissions/*.json`](../../../testkit/cassettes/submissions) — most already use DV_CODED_TEXT `change_type`; update any that emit wrong `_type` or server-only fields to match PR 131 examples.
+- [ ] Update [`testkit/cassettes/submissions/README.md`](../../../testkit/cassettes/submissions/README.md) with `UPDATE_AUDIT` note + link to this plan.
+- [ ] Migrate [`contribution_test.go`](../../../openehr/client/ehr/contribution/contribution_test.go) helpers (`newAudit`) to `UpdateAudit` builders.
 - [ ] Coordinate private reference CDR harness if it constructs `Submission` with `rm.AuditDetails` (out-of-tree — note in PR).
 
 **Definition of done:** `go test ./openehr/client/ehr/contribution/...` + probe tests green; cassette README accurate.
@@ -136,7 +136,7 @@ PR 131 fixes the source schemas:
 - [REQ-050](../../specifications/wire.md#req-050) — REST wire surface; contribution create payload
 - [REQ-095](../../specifications/wire.md#req-095) — OpenAPI is authoritative; track ITS-REST amendment 5.9
 - [PROBE-072](../../specifications/conformance.md#probe-072--contribution-submission-body-matches-contribution_create-sdk-gap-10) — submission shape (extend)
-- Archived: [2026-05-26-contribution-submission-shape.md](archive/2026-05-26-contribution-submission-shape.md) — landed `Submission` vs `rm.Contribution`
+- Archived: [2026-05-26-contribution-submission-shape.md](2026-05-26-contribution-submission-shape.md) — landed `Submission` vs `rm.Contribution`
 - Upstream: [specifications-ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131), [Discourse thread](https://discourse.openehr.org/t/contribution-update-audit-change-type-in-rest-api-vs-vendor-implementations/16928)
 
 ## Risk notes
@@ -158,5 +158,5 @@ PR 131 fixes the source schemas:
 
 - ITS-REST PR: https://github.com/openEHR/specifications-ITS-REST/pull/131
 - Ticket: https://specifications.openehr.org/tickets/SPECITS-95
-- SDK submission type: [`openehr/client/ehr/contribution/submission.go`](../../openehr/client/ehr/contribution/submission.go)
-- Example cassette (already DV_CODED_TEXT): [`testkit/cassettes/submissions/contributions_valid_minimal_minimal_admin.contribution.json`](../../testkit/cassettes/submissions/contributions_valid_minimal_minimal_admin.contribution.json)
+- SDK submission type: [`openehr/client/ehr/contribution/submission.go`](../../../openehr/client/ehr/contribution/submission.go)
+- Example cassette (already DV_CODED_TEXT): [`testkit/cassettes/submissions/contributions_valid_minimal_minimal_admin.contribution.json`](../../../testkit/cassettes/submissions/contributions_valid_minimal_minimal_admin.contribution.json)

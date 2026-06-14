@@ -194,7 +194,7 @@ Add `WithMaxResponseBody(n int64) Option` following the `WithRetry` pattern at `
 - [x] **Step 4: Run** — `go test ./auth/... -v` → PASS.
 - [x] **Step 5: Commit** — `fix(auth): generated OAuth state + random JTI entropy` *(01fb841)*
 
-**Deviation (approved):** review surfaced that the project spec ([auth.md:120](../specifications/auth.md) — "the SDK **MUST** verify the `state`", `ErrLaunchInvalidState`) was never implemented, and auto-generating state made the gap acute. Scope was extended (user-approved, breaking change pre-1.0) to **enforce** verification in the SDK: `ExchangeAuthorizationCode` gained a `callbackState` parameter and returns the new `ErrLaunchInvalidState` sentinel on mismatch *before* any token-endpoint call (`a2e7601` + test tightening `83dce0f`). Deferred to Task 16: extract a shared `randBase64URL` helper (dup in `source.go`/`pkce.go`) and migrate `jtiCounter` to `atomic.Uint64`.
+**Deviation (approved):** review surfaced that the project spec ([auth.md:120](../../specifications/auth.md) — "the SDK **MUST** verify the `state`", `ErrLaunchInvalidState`) was never implemented, and auto-generating state made the gap acute. Scope was extended (user-approved, breaking change pre-1.0) to **enforce** verification in the SDK: `ExchangeAuthorizationCode` gained a `callbackState` parameter and returns the new `ErrLaunchInvalidState` sentinel on mismatch *before* any token-endpoint call (`a2e7601` + test tightening `83dce0f`). Deferred to Task 16: extract a shared `randBase64URL` helper (dup in `source.go`/`pkce.go`) and migrate `jtiCounter` to `atomic.Uint64`.
 
 ### Task 6: Sanitize item-tag header values; copy principal claims (S7, S8)
 
@@ -420,7 +420,7 @@ if rel, err := filepath.Rel(outDir, clean); err != nil || strings.HasPrefix(rel,
 
 ## Mapping to specs
 
-- No existing REQ rows cover these findings. If maintainers adopt the flagged `REQ-candidate` items (bounded reads, PHI-free errors), add rows to [docs/specifications/REQ.md](../specifications/REQ.md) and `traceability.yaml` in the same PR as the implementing task, per the [header convention](README.md#header-convention-load-bearing).
+- No existing REQ rows cover these findings. If maintainers adopt the flagged `REQ-candidate` items (bounded reads, PHI-free errors), add rows to [docs/specifications/REQ.md](../../specifications/REQ.md) and `traceability.yaml` in the same PR as the implementing task, per the [header convention](../README.md#header-convention-load-bearing).
 - Phase 1 Task 3 interacts with REQ-09x observability work (error values feed `Observation`); cross-check the observer contract in [2026-05-15-rest-api-client.md](2026-05-15-rest-api-client.md) when landing.
 
 ## Suggested PR slicing

@@ -16,10 +16,10 @@ import (
 // reformatting documented per deployment).
 //
 // The probe accepts the OPT bytes verbatim so the same fixture is
-// reused across SDKs (REQ-082). Round-trip equality is checked by a
+// reused across conformant implementations (REQ-082). Round-trip equality is checked by a
 // byte comparison; backends that reformat the OPT on storage (e.g.
 // normalising whitespace) will not pass and SHOULD document the
-// canonical-form rule for cross-SDK comparison.
+// canonical-form rule for conformance comparison.
 //
 // Inputs:
 //   - opt is the OPT XML body to upload.

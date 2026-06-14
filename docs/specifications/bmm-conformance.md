@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../resources/bmm/). This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
+The SDK's domain types (Reference Model, Archetype Object Model, base + language + terminology types) are **derived from openEHR BMM schemas** pinned in [`../resources/bmm/`](../../resources/bmm). This document is the normative contract between those BMM inputs and the Go code in `openehr/rm/`, `openehr/aom/aom14/`, and related packages.
 
 Covers REQ-041 through REQ-047.
 
@@ -10,7 +10,7 @@ Covers REQ-041 through REQ-047.
 
 openEHR distributes its information and meta-models as **BMM schemas** — Basic Meta-Model files in the `P_BMM` JSON persistence format. Every class, property, generic parameter, function signature, primitive type, cardinality, and documentation string the SDK needs is in those files. The BMM is machine-readable and lossless with respect to UML; it is the substrate the openEHR ecosystem uses for archetype tooling, AQL path resolution, and code generation across implementations.
 
-Pinned schemas live in [`../resources/bmm/`](../resources/bmm/):
+Pinned schemas live in [`../resources/bmm/`](../../resources/bmm):
 
 | File | Schema ID | v1 status | Role |
 |---|---|---|---|
@@ -29,7 +29,7 @@ Pinned schemas live in [`../resources/bmm/`](../resources/bmm/):
 
 The SDK **MUST** treat the BMM files in `resources/bmm/` as the canonical source of truth for the openEHR domain model. Domain-model code (concrete RM types, RM interfaces, AOM types, primitive aliases, type registry entries) **MUST** be derivable from these files alone — no out-of-band information about openEHR types may be embedded in hand-written code.
 
-- **Covered by:** [`../resources/bmm/README.md`](../resources/bmm/README.md)
+- **Covered by:** [`../resources/bmm/README.md`](../../resources/bmm/README.md)
 - **Lives in:** `resources/bmm/*.bmm.json`
 
 ### REQ-042 — Generated code, drift-detected
@@ -150,7 +150,7 @@ type DVQuantity struct {
 }
 ```
 
-**Generator output diverges from this example for abstract ancestors.** Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../docs/adr/0002-bmm-codegen-decisions.md) D4, the generator renders non-generic abstract classes as Go marker interfaces and **flattens their properties** into every concrete descendant struct. So the real `openehr/rm/data_types_quantity_gen.go` carries `DVQuantity` with `DVAmount`'s fields (`Accuracy`, `AccuracyIsPercent`, `MagnitudeStatus`, …) inlined and **no `DVAmount` embed**. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds.
+**Generator output diverges from this example for abstract ancestors.** Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D4, the generator renders non-generic abstract classes as Go marker interfaces and **flattens their properties** into every concrete descendant struct. So the real `openehr/rm/data_types_quantity_gen.go` carries `DVQuantity` with `DVAmount`'s fields (`Accuracy`, `AccuracyIsPercent`, `MagnitudeStatus`, …) inlined and **no `DVAmount` embed**. Only concrete ancestors and whitelisted abstract-generic ancestors (e.g. `EVENT` per ADR 0003) appear as Go-level embeds.
 
 ### Type → Go type expression
 
@@ -173,7 +173,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 
 ### Cardinality
 
-`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) is preserved as a generated constant on the package or as a generated `Validate()` rule — the exact shape is up to the generator's emission strategy and is documented in [`../docs/plans/`](../docs/plans/).
+`P_BMM_CONTAINER_PROPERTY.cardinality` (with `lower`, `upper`, `upper_unbounded`) is preserved as a generated constant on the package or as a generated `Validate()` rule — the exact shape is up to the generator's emission strategy and is documented in [`../docs/plans/`](../plans).
 
 ### Functions
 
@@ -183,7 +183,7 @@ The wire format JSON does not distinguish List/Set/Array — they all serialise 
 - The generator does **not** emit the function body — implementations are hand-written in non-generated files (REQ-044) where they are needed.
 - Functions that have not been hand-implemented **SHOULD** panic with a clear message (e.g. `panic("not implemented: DV_QUANTITY.add — implement in a non-generated file")`); this is one of the rare allowed panics in SDK code, justified by the fact that the function is documented in the BMM but not yet wired in.
 
-For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The method-body backlog is tracked in [`../docs/plans/`](../docs/plans/).
+For SDK v1, the priority is the **types**, not the **methods** — most consumers do not need RM-level arithmetic. The method-body backlog is tracked in [`../docs/plans/`](../plans).
 
 ## Primitive type mapping
 
@@ -192,9 +192,9 @@ The 29 primitives in `openehr_base_1.3.0.bmm.json` map to Go types per the table
 | BMM primitive | Go type | Notes |
 |---|---|---|
 | `Boolean` | `bool` | |
-| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). |
+| `Integer` | `rm.Integer` (underlying `int32`) | Pinned to 32-bit per the BMM spec. Emitted as the defined type `rm.Integer` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
 | `Integer64` | `int64` | |
-| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../docs/adr/0004-numeric-wire-tolerance.md). |
+| `Real` | `rm.Real` (underlying `float64`) | The BMM `Real` is single-precision conceptually but openEHR JSON uses unbounded-precision numbers; `float64` is the safe choice. Emitted as the defined type `rm.Real` so the codec can attach the wire-tolerance rule from [`../docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). |
 | `Double` | `float64` | Same as `Real`, no codec tolerance attached. |
 | `Character` | `rune` | |
 | `String` | `string` | |
@@ -236,7 +236,7 @@ Helpers in `openehr/rm/` (hand-written, non-generated) **SHOULD** offer typed pa
 - Header: every generated file begins with `// Code generated by bmmgen; DO NOT EDIT.` followed by a `// Source: openehr_rm_1.2.0.bmm.json` line for traceability.
 - Hand-written companions: `<package_name>_ext.go` (e.g. `data_types_quantity_ext.go`) hold method bodies, helper functions, and codec hooks.
 - One Go package per BMM top-level package; sub-packages flattened into the same Go package via filename (Go does not require a one-to-one directory mapping with BMM packages).
-- The generator emits `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`) which register every concrete RM/AOM `_type` with its constructor (REQ-040). Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../docs/adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
+- The generator emits `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`) which register every concrete RM/AOM `_type` with its constructor (REQ-040). Per [`../docs/adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md) D3, the registration file lives in the target package — **not** under `openehr/rm/typereg/` — so the constructor closures can reference the target types directly without forming a `typereg → rm` import cycle.
 
 ## Documentation propagation
 
@@ -246,7 +246,7 @@ The BMM `documentation` field on classes, properties, and functions **MUST** be 
 
 | Topic | REQ | Lives in |
 |---|---|---|
-| Pinned BMM sources | REQ-041 | `resources/bmm/`, [`resources/bmm/README.md`](../resources/bmm/README.md) |
+| Pinned BMM sources | REQ-041 | `resources/bmm/`, [`resources/bmm/README.md`](../../resources/bmm/README.md) |
 | Generator + drift detection | REQ-042 | `internal/bmmgen/`, `cmd/bmmgen/`, CI |
 | P_BMM → Go mapping | REQ-043 | this document (§ Mapping rules) |
 | Hand-written separation | REQ-044 | generator output convention; `<pkg>_gen.go` vs `<pkg>_ext.go` |

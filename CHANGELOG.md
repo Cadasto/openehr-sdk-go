@@ -4,7 +4,7 @@ All notable changes to `github.com/cadasto/openehr-sdk-go` are recorded here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — release policy in [`docs/releases.md`](docs/releases.md).
 
-Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dropped experiments fold into the relevant Added bullet (or are omitted) rather than carry separate `### Changed` / `### Fixed` / `### Removed` entries. Bullets are **short and high-level** (artefact class + scope + key REQs/probes) — detail belongs in commit messages and PR bodies (see [`AGENTS.md § CHANGELOG.md`](AGENTS.md#changelogmd)).
+Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dropped experiments fold into the relevant Added bullet (or are omitted) rather than carry separate `### Changed` / `### Fixed` / `### Removed` entries. Bullets are **short and high-level** (artefact class + scope + key REQs/probes) — detail belongs in commit messages and PR bodies (see [`AGENTS.md § Code style and conventions`](AGENTS.md#code-style-and-conventions)).
 
 ## [Unreleased]
 
@@ -75,7 +75,7 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 
 ### Known follow-ups (not landed)
 
-- [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
+- [REQ-094 write-path gaps](docs/plans/archive/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
 - AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
-- Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.
-- CDR benchmark migration ([plan §Phase 9](docs/plans/2026-05-15-rest-api-client.md), STRAND-01).
+- Demographic REST client ([plan](docs/plans/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
+- Benchmark harness migration ([plan §Phase 9](docs/plans/archive/2026-05-15-rest-api-client.md)).

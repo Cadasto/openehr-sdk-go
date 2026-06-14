@@ -8,7 +8,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 | Plan | Scope | Covers REQs / strands |
 |---|---|---|
-| [2026-05-15-rest-api-client.md](2026-05-15-rest-api-client.md) | openEHR REST 1.1.0-development typed client family | REQ-050..057, REQ-013..026, REQ-060..072, REQ-090..092; PROBE-010..013, PROBE-040..049; STRAND-01 |
+| [2026-06-14-demographic-rest-client.md](2026-06-14-demographic-rest-client.md) | openEHR Demographic API (PARTY-hierarchy CRUD) — split from the archived REST client plan | REQ-013, REQ-020..026, REQ-040, REQ-054 |
 
 ### Phase 2 — clinical building blocks (in flight)
 

@@ -1,7 +1,7 @@
-// Package serializeprobes hosts the cross-SDK conformance probes
+// Package serializeprobes hosts the openEHR conformance probes
 // for the openEHR serialization codecs. Each probe corresponds to a
 // PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
-// the Go and PHP SDKs against shared cassettes (REQ-080).
+// any openEHR-conformant implementation against shared cassettes (REQ-080).
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -95,9 +95,9 @@ func Probe030CanjsonRoundTrip(body []byte, factory func() any) (Result, error) {
 }
 
 // Probe030Inputs is the canonical set of inputs exercised by
-// PROBE-030 in sandbox mode. The cross-SDK harness asserts that both
-// Go and PHP produce byte-equal results across this set when fed the
-// same shared cassettes (REQ-081). The set spans leaf RM values and
+// PROBE-030 in sandbox mode. The harness asserts that decode then
+// re-encode produces byte-equal results across this set when fed the
+// vendored cassettes (REQ-080). The set spans leaf RM values and
 // full composition cassettes vendored under
 // `testkit/cassettes/compositions/` and `testkit/cassettes/rm/`. The Event/History polymorphism
 // that initially blocked composition round-trip is resolved in ADR

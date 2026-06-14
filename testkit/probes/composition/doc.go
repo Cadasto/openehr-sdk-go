@@ -1,4 +1,4 @@
-// Package compositionprobes hosts the cross-SDK conformance probes
+// Package compositionprobes hosts the openEHR conformance probes
 // for openehr/composition/ — the OPT-driven composition builder
 // (REQ-101). Probes are plain functions returning (Result, error);
 // they are sandbox-only (no transport) since the builder is a

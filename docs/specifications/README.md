@@ -53,11 +53,11 @@ Every spec file starts with a `Status:` line:
 
 | Status | Meaning |
 |---|---|
-| **Draft** | actively in motion; can change without notice |
-| **Stable** | safe to implement against; changes go through a deprecation cycle |
+| **Draft** | **normative and binding for implementation now**; wording may still change before v1 (no deprecation cycle) |
+| **Stable** | frozen contract; changes go through a deprecation cycle |
 | **Deprecated** | scheduled for removal; new code MUST NOT depend on it |
 
-At v0 scaffolding stage, all specs are **Draft**.
+**`Draft` is binding, not provisional.** Pre-v1.0, every topic spec is `Draft` — that marks the *stability promise* (the text may still change), **not** the authority. A `Draft` REQ is normative **right now**; it is not "planned" or "optional." Whether it is *built* is the separate `Impl.` column in [REQ.md](REQ.md) / `implementation:` in [traceability.yaml](traceability.yaml). Promotion `Draft → Stable` happens at v1.
 
 ## Traceability
 
@@ -103,7 +103,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [REQ.md](REQ.md) | Requirement registry (index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |
-| [transport.md](transport.md) | Transport layer REQ-090–094 |
+| [transport.md](transport.md) | Transport layer REQ-090–094, 096–098 |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |
 | [scope.md](scope.md) | What is in and out of v1 scope |
 | [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, boundary rules, versioning |
@@ -113,9 +113,9 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [auth.md](auth.md) | `auth.TokenSource` contract and the SMART-on-openEHR provider flow |
 | [wire.md](wire.md) | openEHR REST 1.1.0-development pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
 | [service-discovery.md](service-discovery.md) | Service catalog resolution and refresh |
-| [conformance.md](conformance.md) | Probe catalog and cross-SDK parity contract with the PHP SDK |
+| [conformance.md](conformance.md) | openEHR wire-conformance probe catalog |
 | [clinical-modeling.md](clinical-modeling.md) | Clinical-modeling artefacts — OPT parse and paths (REQ-100); composition, validation, AQL paths follow in later REQs |
-| [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, POC extraction scope |
+| [use-cases.md](use-cases.md) | Primary use cases, building-block use cases, delivery sequence |
 | [research-strands.md](research-strands.md) | Open strands awaiting resolution (each becomes an ADR) |
 
 ## Editing rules

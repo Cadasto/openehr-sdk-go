@@ -48,42 +48,45 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-052 | Canonical JSON | [wire.md § REQ-052](wire.md#req-052) | landed |
 | REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | planned |
 | REQ-054 | Optimistic concurrency | [wire.md § REQ-054](wire.md#req-054) | landed |
-| REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055) | landed |
+| REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055--wire-boundary) | landed |
 | REQ-056 | Canonical XML | [wire.md § REQ-056](wire.md#req-056) | landed |
 | REQ-057 | Stored AQL queries | [wire.md § REQ-057](wire.md#req-057) | landed |
 | REQ-058 | Datamap V2 | [module-layout.md](module-layout.md), [scope.md](scope.md) | planned |
 | REQ-059 | openEHR custom headers | [wire.md § REQ-059](wire.md#req-059) | partial |
 | REQ-060 | TokenSource interface | [auth.md § REQ-060](auth.md#req-060) | landed |
-| REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061) | landed |
-| REQ-062 | JWKS rotation | [auth.md § REQ-062](auth.md#req-062) | landed |
-| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063) | partial |
-| REQ-064 | Launch context | [auth.md § REQ-064](auth.md#req-064) | landed |
+| REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061--pkce-flow) | landed |
+| REQ-062 | JWKS rotation | [auth.md § REQ-062](auth.md#req-062--jwks-rotation) | landed |
+| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063--token-refresh) | partial |
+| REQ-064 | Launch context | [auth.md § REQ-064](auth.md#req-064--launch-context) | landed |
 | REQ-065 | Per-client tenant binding | [auth.md § REQ-065](auth.md#req-065) | landed |
 | REQ-066 | Caller attribution | [auth.md § REQ-066](auth.md#req-066) | landed |
 | REQ-067 | Platform principal claims | [auth.md § REQ-067](auth.md#req-067) | landed |
-| REQ-068 | SMART flows and launch modes | [auth.md § REQ-068](auth.md#req-068) | partial |
+| REQ-068 | SMART flows and launch modes | [auth.md § REQ-068](auth.md#req-068--flow-and-launch-mode-coverage) | partial |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md § REQ-069](auth.md#req-069) | landed |
 | REQ-070 | First-class discovery | [service-discovery.md § REQ-070](service-discovery.md#req-070) | landed |
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |
 | REQ-072 | Discovery validation | [service-discovery.md § REQ-072](service-discovery.md#req-072) | landed |
-| REQ-080 | Conformance probe parity | [conformance.md § Parity scope](conformance.md#parity-scope) | planned |
-| REQ-081 | Wire-level parity | [conformance.md § Parity scope](conformance.md#parity-scope) | planned |
-| REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#runnability) | partial |
-| REQ-090 | OpenTelemetry hooks | [transport.md § REQ-090](transport.md#req-090) | landed |
-| REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091) | landed |
-| REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092) | landed |
-| REQ-093 | Error envelope mapping | [transport.md § REQ-093](transport.md#req-093) | landed |
-| REQ-094 | `Prefer` negotiation | [transport.md § REQ-094](transport.md#req-094) | partial |
+| REQ-073 | Discovery trust posture | [service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture) | landed |
+| REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
+| REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
+| REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#req-082--runnability) | partial |
+| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | planned |
+| REQ-090 | OpenTelemetry hooks | [transport.md § REQ-090](transport.md#req-090--opentelemetry-hooks) | landed |
+| REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091--retry-policy) | landed |
+| REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092--tls-posture) | landed |
+| REQ-093 | Error envelope mapping | [transport.md § REQ-093](transport.md#req-093--openehr-error-envelope-mapping) | landed |
+| REQ-094 | `Prefer` negotiation | [transport.md § REQ-094](transport.md#req-094--prefer-response-shape-negotiation) | landed |
 | REQ-095 | OpenAPI authoritative source | [wire.md § REQ-095](wire.md#req-095) | partial |
 | REQ-096 | Unambiguous "disable retry" | [transport.md § REQ-096](transport.md#req-096--unambiguous-disable-retry) | landed |
 | REQ-097 | First-class `Idempotency-Key` (deprecated) | [transport.md § REQ-097](transport.md#req-097--first-class-idempotency-key-deprecated) | deprecated |
 | REQ-098 | Request-level observer hook | [transport.md § REQ-098](transport.md#req-098--request-level-observer-hook) | landed |
 | REQ-099 | ITS-REST Admin client surface | [module-layout.md § REQ-099](module-layout.md#req-099--its-rest-admin-client-surface) | landed |
 | REQ-100 | ADL 1.4 operational template (OPT) parse and paths | [clinical-modeling.md § REQ-100](clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) | landed |
-| REQ-101 | Generic OPT-driven composition builder | [clinical-modeling.md § REQ-101](clinical-modeling.md#req-101--generic-opt-driven-composition-builder) | partial |
+| REQ-101 | Generic OPT-driven composition builder | [clinical-modeling.md § REQ-101](clinical-modeling.md#req-101--generic-opt-driven-composition-builder) | landed |
 | REQ-102 | Composition validation | [clinical-modeling.md § REQ-102](clinical-modeling.md#req-102--composition-validation) | landed |
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) | landed |
-| REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | partial |
+| REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | landed |
+| REQ-108 | Untrusted document bounds | [clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) | landed |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
@@ -100,8 +103,8 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | BMM conformance | 041–047 | 048–049 |
 | Wire format | 050–059 | — |
 | Authentication | 060–068 | 069 |
-| Service discovery | 070–072 | 073–079 |
-| Cross-SDK conformance | 080–082 | 083–089 |
+| Service discovery | 070–073 | 074–079 |
+| openEHR conformance | 080–082 | 083–089 |
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |

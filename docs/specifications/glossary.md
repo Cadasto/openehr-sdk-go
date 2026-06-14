@@ -12,10 +12,10 @@ Terms used in the SDK specifications, source code, and AI-agent prompts. When a 
 The information model that defines the abstract data structures of openEHR — `LOCATABLE`, `PATHABLE`, `COMPOSITION`, `OBSERVATION`, `EVALUATION`, `INSTRUCTION`, `ACTION`, `DATA_VALUE` and its specialisations, the demographic `PARTY` hierarchy, etc. Authoritative definition: openEHR Reference Model specification. In this SDK the RM Go types are **generated** from the pinned `openehr_rm_*.bmm.json` schema (REQ-041, REQ-042).
 
 **BMM (Basic Meta-Model)**
-The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI. Defined in the openEHR LANG specification. In this SDK the BMM files in [`../resources/bmm/`](../resources/bmm/) are the source of truth for the openEHR domain model; see [bmm-conformance.md](bmm-conformance.md).
+The openEHR meta-model that describes information models (RM, AM, BASE, LANG, TERM) as a compact, computable alternative to UML/XMI. Defined in the openEHR LANG specification. In this SDK the BMM files in [`../resources/bmm/`](../../resources/bmm) are the source of truth for the openEHR domain model; see [bmm-conformance.md](bmm-conformance.md).
 
 **P_BMM**
-The persistence (serialisation) form of BMM — typically a JSON document (the `.bmm.json` files in [`../resources/bmm/`](../resources/bmm/)) keyed by `schema_id` (e.g. `openehr_rm_1.2.0`). On-disk attribute names appear as `P_BMM_*` (e.g. `P_BMM_SINGLE_PROPERTY`, `P_BMM_CONTAINER_TYPE`, `P_BMM_GENERIC_PROPERTY`); the in-memory model uses the abstract `BMM_*` equivalents.
+The persistence (serialisation) form of BMM — typically a JSON document (the `.bmm.json` files in [`../resources/bmm/`](../../resources/bmm)) keyed by `schema_id` (e.g. `openehr_rm_1.2.0`). On-disk attribute names appear as `P_BMM_*` (e.g. `P_BMM_SINGLE_PROPERTY`, `P_BMM_CONTAINER_TYPE`, `P_BMM_GENERIC_PROPERTY`); the in-memory model uses the abstract `BMM_*` equivalents.
 
 **Archetype Object Model (AOM)**
 The in-memory model representing an *archetype* after parsing ADL. Sibling of the Reference Model — both are top-level openEHR information models. Two versions exist: **AOM 1.4** (for ADL 1.4 archetypes) and **AOM 2** (for ADL 2). The SDK generates `openehr/aom/aom14/` for v1; AOM 2 is deferred. Templates *consume* AOM (an OPT contains flattened archetype definitions) but do not own it.
@@ -130,7 +130,7 @@ A package-tree boundary that nothing on the upstream side may import from. The `
 ## Cadasto-platform terms
 
 **CDR (Clinical Data Repository)**
-The Cadasto openEHR-on-Postgres service. The reference CDR implementation (private; first SDK consumer) is its Go codebase.
+An openEHR-conformant backend the SDK talks to over openEHR REST.
 
 **Cadasto Extra API**
 A Cadasto-specific REST surface that complements openEHR REST — convenience aggregates, deployment-specific endpoints. Client lives in `cadasto/extra`.
@@ -149,16 +149,13 @@ A consumer pattern: multiple SDK clients pointed at multiple openEHR backends, w
 
 ---
 
-## Cross-language / cross-SDK
+## Conformance and sources
 
 **Cadasto SDK Specification proposal**
 The pre-implementation design document for this SDK, maintained alongside Cadasto architectural sources. Its content is reflected in this `docs/specifications/` tree; this tree is the day-to-day source of truth.
 
-**PHP SDK / Cadasto PHP SDK**
-The sister SDK targeting the same openEHR REST surface, same SMART-on-openEHR conformance probe set, with PHP-idiomatic APIs (repositories + builders, exceptions). Cross-language parity is enforced at the wire level (REQ-081).
-
-**Conformance probe parity**
-The contract that the same `PROBE-NNN` is implementable identically in both Go and PHP SDKs and produces the same pass/fail against a reference deployment (REQ-080).
+**Conformance probe**
+The openEHR wire-conformance assertion behind a stable `PROBE-NNN`: a single-definition check that the SDK's wire output conforms to the openEHR spec against a reference deployment (REQ-080).
 
 ---
 

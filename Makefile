@@ -51,7 +51,7 @@ endef
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
-        spec-check \
+        spec-check spec-context probe-status \
         build clean \
         ci
 
@@ -144,6 +144,12 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 
 spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
 	@bash scripts/spec-check.sh
+
+spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)
+	@bash scripts/spec-context.sh $(REQ)
+
+probe-status: ## Show each PROBE's status and whether its test file exists
+	@bash scripts/probe-status.sh
 
 ##@ Build
 

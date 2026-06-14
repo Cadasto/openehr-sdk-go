@@ -11,7 +11,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 
 ### CI jobs (`ci.yml`)
 
-Jobs run in parallel. All use Go **1.25.x** (`actions/setup-go@v5` with module cache).
+Jobs run in parallel. All use Go **1.25.x** (`actions/setup-go@v6` with module cache).
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
@@ -32,7 +32,7 @@ This complements PR CI: it catches generator-template drift between human-driven
 
 ```bash
 make doctor    # toolchain diagnosis
-make ci        # full PR gate (fmt, mod tidy, vet, test, lint, build)
+make ci        # full PR gate (fmt, mod tidy, vet, test, lint, spec-check, build)
 make test-race # optional; matches main-branch Race job
 ```
 
@@ -43,10 +43,12 @@ Run `make help` for the full grouped list. Common targets:
 | CI | `make ci` | Full PR gate (fmt, mod tidy, vet, test, lint, spec-check, build) |
 | Test | `make test` | Unit tests; depends on `codegen-verify` |
 | Test | `make test-race` | `-race` detector (main-branch job only) |
-| Format | `make fmt-check` | Fail if `gofmt -s` would change any file |
+| Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
+| Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
+| Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |
 | Lint | `make lint` | `golangci-lint` on host if installed, else Docker (`LINT_IMAGE`) |
 
 **Policy:** extend the [Makefile](../Makefile), not ad-hoc shell in workflows. CI and contributors share the same entry points ([AGENTS.md](../AGENTS.md) Tooling policy).
@@ -55,18 +57,7 @@ Run `make help` for the full grouped list. Common targets:
 
 - Config: [`.golangci.yml`](../.golangci.yml)
 - Pin: `golangci/golangci-lint:v2.11.4` (Makefile `LINT_IMAGE` and GitHub Action `version`)
-- Generated `*_gen.go`, `*_jsonmar_gen.go`, `*_jsonunmar_gen.go` have relaxed duplicate/complexity rules
-
-## Recommended branch protection (`main`)
-
-| Check | Required for merge? |
-|---|---|
-| Verify | Yes |
-| Test | Yes |
-| Lint | Yes |
-| Race | Optional (informational until the team promotes it) |
-
-Also enable **Require branches to be up to date before merging** when PR volume warrants it.
+- Generated files (the `// Code generated … DO NOT EDIT.` set) are skipped via `exclusions: generated: lax` in `.golangci.yml`
 
 ## Dependency updates
 

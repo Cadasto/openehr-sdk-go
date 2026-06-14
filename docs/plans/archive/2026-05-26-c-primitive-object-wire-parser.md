@@ -3,7 +3,7 @@
 **Date:** 2026-05-26
 **Status:** Landed
 **Owner:** SDK maintainers
-**Covers:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (wire parser), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance synthesiser UID emission), [REQ-101](../specifications/clinical-modeling.md#req-101) (PROBE-023 widening)
+**Covers:** [REQ-100](../../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (wire parser), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance synthesiser UID emission), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder) (PROBE-023 widening)
 **Probes:** PROBE-023 (widened to full unmarshal round-trip — landed); PROBE-027 (extension to `clinical_note.opt` — landed in PR #20)
 **Implementation:** **landed** — Phase 0 (PR #20) covered the generator-side `materialiseSingle` AOM-short-name fix + EVENT_CONTEXT rmread gap + PROBE-027 fixture extension. Phase 1 lands the wire-parser inner-`<item>` extraction (`xmlCObject.Item` + `C_PRIMITIVE_OBJECT` branch in `buildPrimitive`; lazy float parse on `xmlNumericInterval` to keep XML decode infallible for temporal ranges). Phase 2 lands `newHierObjectID() *rm.HierObjectID` + `Options.UIDSource` test-determinism seam + the PROBE-023 full unmarshal round-trip; normative spec wording restored.
 **Depends on:** REQ-100 follow-ups Phases 1–6 (landed); REQ-107 Phases 0–3 (PR #18 merged, plan archived); REQ-101 Phases 0–2 (PR #19 merged, plan archived); PR #20 follow-ups (merged)

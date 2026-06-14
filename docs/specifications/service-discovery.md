@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and how non-discovering backends are supported. Covers REQ-070 through REQ-072.
+How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and how non-discovering backends are supported. Covers REQ-070 through REQ-073.
 
 A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document. The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
 
@@ -133,6 +133,21 @@ discovery.WithAcceptedSpecVersions("1.1.0-development", "1.1.0", "1.1.1")
 
 The default is **strict** — only the pinned version is accepted.
 
+---
+
+## REQ-073 — Discovery trust posture
+
+SMART configuration documents and their auth endpoints are untrusted input until validated. On every resolution and refresh the SDK **MUST**:
+
+- **Issuer match (OIDC Discovery §4.3).** When the fetched document declares an `"issuer"` field, it **MUST** equal the issuer URL used to fetch the document. A mismatch **MUST** reject the catalog with `DiscoveryError{Reason: ReasonIssuerMismatch}` — the document's issuer **MUST NOT** silently override the caller's requested issuer (that would let a hostile or misconfigured server impersonate another identity provider downstream).
+- **HTTPS on auth endpoints.** `authorization_endpoint`, `token_endpoint`, `jwks_uri`, and `registration_endpoint` (when present) **MUST** use the `https` scheme unless the resolver is constructed with `WithAllowInsecure()`. Plaintext URLs **MUST** produce `DiscoveryError{Reason: ReasonInsecureURL}`. The `allowInsecure` path **MAY** log a warning instead of failing for development deployments.
+- **Service `base_url` entries.** Plaintext `services[].base_url` values **SHOULD** emit the REQ-092 warning when not explicitly marked insecure; hard rejection remains a product decision beyond the auth-endpoint floor (see archived [security-hardening plan](../plans/archive/2026-06-11-security-hardening-and-simplification.md)).
+
+Same-origin JWKS enforcement (rejecting `jwks_uri` hosts that differ from the issuer host) is **deferred** — HTTPS-only is the v1 floor.
+
+- **Lives in:** [`smart/discovery/`](../../smart/discovery)
+- **Tests:** `smart/discovery/resolver_test.go`
+
 ## Refresh API
 
 Consumers **MUST** be able to trigger a refresh explicitly:
@@ -161,12 +176,14 @@ type DiscoveryError struct {
 type DiscoveryErrorReason string
 
 const (
-    DiscoveryReasonFetchFailed         DiscoveryErrorReason = "fetch_failed"
-    DiscoveryReasonParseError          DiscoveryErrorReason = "parse_error"
-    DiscoveryReasonMissingService      DiscoveryErrorReason = "missing_service"
-    DiscoveryReasonSpecVersionMismatch DiscoveryErrorReason = "spec_version_mismatch"
-    DiscoveryReasonMalformedURL        DiscoveryErrorReason = "malformed_url"
-    DiscoveryReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
+    ReasonFetchFailed          DiscoveryErrorReason = "fetch_failed"
+    ReasonParseError           DiscoveryErrorReason = "parse_error"
+    ReasonMissingService       DiscoveryErrorReason = "missing_service"
+    ReasonSpecVersionMismatch  DiscoveryErrorReason = "spec_version_mismatch"
+    ReasonMalformedURL         DiscoveryErrorReason = "malformed_url"
+    ReasonAuthEndpointsMissing DiscoveryErrorReason = "auth_endpoints_missing"
+    ReasonInsecureURL          DiscoveryErrorReason = "insecure_url"
+    ReasonIssuerMismatch       DiscoveryErrorReason = "issuer_mismatch"
 )
 
 func (e *DiscoveryError) Error() string
@@ -190,3 +207,4 @@ Discovery errors **MUST** be distinguishable from wire errors via `errors.As(err
 | First-class catalog | REQ-070 | `smart/discovery/`, every typed client constructor |
 | Cache + refresh | REQ-071 | `smart/discovery/` |
 | Validation | REQ-072 | `smart/discovery/` |
+| Trust posture | REQ-073 | `smart/discovery/` |

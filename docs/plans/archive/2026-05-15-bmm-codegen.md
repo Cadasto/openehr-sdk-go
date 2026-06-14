@@ -14,7 +14,7 @@ Generate the openEHR domain-model Go code from the pinned **primary** BMM schema
 
 - `openehr/rm/` — from `openehr_rm_1.2.0` + `openehr_base_1.3.0`, **excluding** the `org.openehr.rm.ehr_extract` package.
 - `openehr/rm/typereg/` — type registry covering generated `openehr/rm/` concrete types.
-- `openehr/aom/aom14/` — from `openehr_am_1.4.0` + `openehr_base_1.3.0`. **Sibling of `openehr/rm/`** (not under `template/`) — see [bmm-conformance.md § Schema → Go package set](../../docs/specifications/bmm-conformance.md#schema--go-package-set) for the rationale.
+- `openehr/aom/aom14/` — from `openehr_am_1.4.0` + `openehr_base_1.3.0`. **Sibling of `openehr/rm/`** (not under `template/`) — see [bmm-conformance.md § Schema → Go package set](../../specifications/bmm-conformance.md#schema--go-package-set) for the rationale.
 
 **Out of v1 (BMM files kept in `resources/bmm/`, no generated code):** AOM 2, RM EHR Extract package, LANG, TERM. Each becomes a future plan phase when a consumer demands it.
 
@@ -23,7 +23,7 @@ Generate the openEHR domain-model Go code from the pinned **primary** BMM schema
 - The BMM files are the openEHR Foundation's computable form of the spec — using them as source-of-truth eliminates one whole class of transcription drift.
 - The Cadasto PHP `openehr-bmm` library already validates this approach for PHP; mirroring it in Go gives cross-language conformance for free.
 - The RM has ~146 classes; AM 2 has ~75. Hand-writing them is **possible** but locks in transcription errors and creates a maintenance burden every BMM micro-release.
-- The CDR-extraction MVP (Phase 1 per [docs/specifications/use-cases.md § POC extraction](../../docs/specifications/use-cases.md#poc-extraction-scope)) needs real RM types. Writing them by hand is the wrong starting point if generation is also viable.
+- The CDR-extraction MVP (Phase 1 per [docs/specifications/use-cases.md](../../specifications/use-cases.md)) needs real RM types. Writing them by hand is the wrong starting point if generation is also viable.
 
 ## Out of scope
 
@@ -90,11 +90,11 @@ Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM
    - Abstract classes → interfaces with `is<X>()` marker. (REQ-032)
    - Enumerations → typed `string` / `int` with const block.
    - Single properties (mandatory → `T`, optional → `*T`).
-   - Container properties → `[]T` or `map[K]V` per the table in [bmm-conformance.md § Container mapping](../../docs/specifications/bmm-conformance.md#container-mapping).
+   - Container properties → `[]T` or `map[K]V` per the table in [bmm-conformance.md § Container mapping](../../specifications/bmm-conformance.md#container-mapping).
    - Generic properties → generic instantiation `Foo[Bar]`.
    - Open generic parameters → typed via the surrounding class's type parameter.
-   - Primitive type mapping → per [bmm-conformance.md § Primitive type mapping](../../docs/specifications/bmm-conformance.md#primitive-type-mapping).
-3. Emit `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`): an `init()` that registers every concrete `_type` with its constructor. **Path note:** the original plan called for `openehr/rm/typereg/registry_gen.go`; the canonical location is one level up to avoid a `typereg → rm` import cycle (see ADR 0002 D3 / [`../adr/0002-bmm-codegen-decisions.md`](../adr/0002-bmm-codegen-decisions.md)).
+   - Primitive type mapping → per [bmm-conformance.md § Primitive type mapping](../../specifications/bmm-conformance.md#primitive-type-mapping).
+3. Emit `openehr/rm/typereg_gen.go` (and `openehr/aom/aom14/typereg_gen.go`): an `init()` that registers every concrete `_type` with its constructor. **Path note:** the original plan called for `openehr/rm/typereg/registry_gen.go`; the canonical location is one level up to avoid a `typereg → rm` import cycle (see ADR 0002 D3 / [`../adr/0002-bmm-codegen-decisions.md`](../../adr/0002-bmm-codegen-decisions.md)).
 4. Implement `cmd/bmmgen` flags: `-resources`, `-out`, `-verify` (CI mode — diff against working tree, exit non-zero on drift).
 5. CI step: add a `make codegen-verify` target that runs `go run ./cmd/bmmgen -verify`. Wire into the existing `make test` pipeline.
 6. Tests for the generator:
@@ -133,7 +133,7 @@ Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM
 
 1. Re-run the generator on `openehr_am_1.4.0.bmm.json` + `openehr_base_1.3.0.bmm.json`.
 2. Resolve sub-package layout — emit one Go file per AOM 1.4 BMM package under `openehr/aom/aom14/`.
-3. The package sits **next to** `openehr/rm/`, not inside `openehr/template/`. Rationale (per [bmm-conformance.md § Schema → Go package set](../../docs/specifications/bmm-conformance.md#schema--go-package-set)): AOM is the model of an *archetype*; templates *consume* archetypes (an OPT contains flattened archetype definitions). The future `openehr/template/` parser will import `openehr/aom/aom14/`, but does not own it.
+3. The package sits **next to** `openehr/rm/`, not inside `openehr/template/`. Rationale (per [bmm-conformance.md § Schema → Go package set](../../specifications/bmm-conformance.md#schema--go-package-set)): AOM is the model of an *archetype*; templates *consume* archetypes (an OPT contains flattened archetype definitions). The future `openehr/template/` parser will import `openehr/aom/aom14/`, but does not own it.
 4. Tests: same golden-file approach as Phase 2; targeted at a small AOM subset (e.g. `ARCHETYPE`, `C_OBJECT`, `C_ATTRIBUTE`, `ARCHETYPE_SLOT`).
 
 **Definition of done:**
@@ -155,7 +155,7 @@ Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM
 **Tasks:**
 
 1. CI weekly job: re-run the generator on a fresh checkout and post a comment to a tracking issue if drift would occur (catches accidental hand-edits or generator-template changes).
-2. Runbook in [`../adr/`](../adr/) or this plan describing how to bump a BMM file: drop new version next to old, run generator, inspect diff, update [bmm-conformance.md](../../docs/specifications/bmm-conformance.md) and [`../../resources/bmm/README.md`](../../resources/bmm/README.md), CHANGELOG entry, remove old file in same PR.
+2. Runbook in [`../adr/`](../../adr) or this plan describing how to bump a BMM file: drop new version next to old, run generator, inspect diff, update [bmm-conformance.md](../../specifications/bmm-conformance.md) and [`../../resources/bmm/README.md`](../../../resources/bmm/README.md), CHANGELOG entry, remove old file in same PR.
 3. Optional: a small `cmd/bmmdiff` tool that compares two BMM files and prints a human-readable "what changed" diff (added classes, removed classes, property changes per class, cardinality changes). Distinct from `git diff` because it understands the BMM structure.
 
 **Definition of done:**
@@ -175,10 +175,10 @@ Deferred to a later plan: AOM 2 generation, LANG generation, TERM generation, RM
 
 ## Mapping to specs
 
-- [docs/specifications/bmm-conformance.md](../../docs/specifications/bmm-conformance.md) is the contract this plan implements.
-- [docs/specifications/rm-modeling.md](../../docs/specifications/rm-modeling.md) defines the Go shape the generator emits.
-- [docs/specifications/module-layout.md](../../docs/specifications/module-layout.md) places `openehr/bmm/`, `internal/bmmgen/`, `cmd/bmmgen/` in the package taxonomy.
-- [docs/specifications/idiom.md § Generics policy](../../docs/specifications/idiom.md#generics-policy) governs how generic classes (`Interval<T>`, `DVInterval<T>`) are emitted.
+- [docs/specifications/bmm-conformance.md](../../specifications/bmm-conformance.md) is the contract this plan implements.
+- [docs/specifications/rm-modeling.md](../../specifications/rm-modeling.md) defines the Go shape the generator emits.
+- [docs/specifications/module-layout.md](../../specifications/module-layout.md) places `openehr/bmm/`, `internal/bmmgen/`, `cmd/bmmgen/` in the package taxonomy.
+- [docs/specifications/idiom.md § Generics policy](../../specifications/idiom.md#generics-policy-req-024) governs how generic classes (`Interval<T>`, `DVInterval<T>`) are emitted.
 
 ## Out-of-band considerations
 

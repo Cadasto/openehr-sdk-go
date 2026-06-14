@@ -25,8 +25,8 @@ func TestRealQuotedNumberDecodes(t *testing.T) {
 
 // TestRealEncodesAsNumber asserts the strict-encode half of ADR 0004:
 // regardless of how the value was decoded, encode emits a JSON number.
-// This is the load-bearing guarantee for downstream consumers / PHP
-// SDK parity.
+// This is the load-bearing guarantee for downstream consumers and
+// openEHR wire conformance.
 func TestRealEncodesAsNumber(t *testing.T) {
 	in := []byte(`{"_type":"DV_QUANTITY","magnitude":"80.5","units":"kg"}`)
 	var q rm.DVQuantity

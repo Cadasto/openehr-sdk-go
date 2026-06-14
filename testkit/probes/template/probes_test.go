@@ -89,7 +89,7 @@ func TestPathAssertion_PrecedenceContradiction(t *testing.T) {
 }
 
 // PROBE-022 — malformed OPT MUST surface as a failed probe Result
-// (not a Go error), so cross-SDK harnesses can aggregate failures.
+// (not a Go error), so conformance harnesses can aggregate failures.
 func TestProbe022OPTPathResolution_InvalidOPT(t *testing.T) {
 	r, err := probes.Probe022OPTPathResolution([]byte("<bad/>"), []probes.PathAssertion{{Path: "/"}})
 	if err != nil {
@@ -174,7 +174,7 @@ func TestProbe024PrimitiveValidate_RejectsEmptyCases(t *testing.T) {
 }
 
 // PROBE-024 — malformed OPT surfaces as a failed Result, not an error
-// (cross-SDK aggregators bucket Results, not panics).
+// (conformance aggregators bucket Results, not panics).
 func TestProbe024PrimitiveValidate_InvalidOPT(t *testing.T) {
 	r, err := probes.Probe024PrimitiveValidate([]byte("<bad/>"), []probes.ValidateCase{{Path: "/"}})
 	if err != nil {
