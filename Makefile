@@ -15,15 +15,25 @@ COMPOSE_PROJECT ?= openehr-sdk-go
 LINT_IMAGE      ?= golangci/golangci-lint:v2.11.4-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
-HOST_GO_OK := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.25(\.|$$|[[:space:]])' && echo yes)
+HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.25(\.|$$|[[:space:]])' && echo yes)
+HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && echo yes)
 
 ifeq ($(HOST_GO_OK),yes)
-  GO    = go
-  GOFMT = gofmt
+  GO = go
 else
   DOCKER_GO = $(COMPOSE) -p $(COMPOSE_PROJECT) --profile dev run --rm --no-deps go
-  GO    = $(DOCKER_GO) go
-  GOFMT = $(DOCKER_GO) gofmt
+  GO        = $(DOCKER_GO) go
+endif
+
+# golangci-lint shim — host binary (fast path) or the pinned image, which
+# bundles the v2 formatters (gofumpt + goimports), so `fmt` and `lint` share
+# one pinned toolchain. --user keeps rewritten files owned by the host user.
+ifeq ($(HOST_GLCI_OK),yes)
+  GOLANGCI = golangci-lint
+else
+  GOLANGCI = docker run --rm $(DOCKER_MOUNT) --user $$(id -u):$$(id -g) \
+             -e HOME=/tmp -e GOCACHE=/tmp/.gocache -e GOLANGCI_LINT_CACHE=/tmp/.glcache \
+             $(LINT_IMAGE) golangci-lint
 endif
 
 # Grouped help (##@ section, target: ## description). Keep targets in this
@@ -81,14 +91,14 @@ image-dev: ## Build the dev toolchain image (Dockerfile dev stage)
 
 ##@ Format & analyze
 
-fmt: ## Apply gofmt -w -s to the tree
-	@$(GOFMT) -w -s .
+fmt: ## Apply gofumpt + goimports via golangci-lint (formatters in .golangci.yml)
+	@$(GOLANGCI) fmt ./...
 
-fmt-check: ## Fail if any file needs gofmt -s
-	@files=$$($(GOFMT) -l -s .); \
-	if [ -n "$$files" ]; then \
-		echo "gofmt -s needed:"; \
-		echo "$$files"; \
+fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
+	@out=$$($(GOLANGCI) fmt --diff ./... 2>&1); \
+	if [ -n "$$out" ]; then \
+		echo "$$out"; \
+		echo "formatting needed: run 'make fmt'"; \
 		exit 1; \
 	fi
 
@@ -114,11 +124,7 @@ test-race: ## Run unit tests with -race (main-branch CI job)
 ##@ Lint
 
 lint-ci: ## Run golangci-lint (host binary or pinned Docker image)
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run ./...; \
-	else \
-		docker run --rm $(DOCKER_MOUNT) $(LINT_IMAGE) golangci-lint run ./...; \
-	fi
+	@$(GOLANGCI) run ./...
 
 lint: lint-ci ## Alias for lint-ci
 
