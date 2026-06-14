@@ -8,6 +8,15 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-15
+
+Sixth `v0.x` minor — a documentation and developer-tooling cycle: the SDD documentation overhaul plus adoption of the first-party **go-coding** toolchain. **No public API or behaviour change this cycle** — the security-hardening specs REQ-073 / REQ-108 formalise behaviour already shipped in `v0.4.0`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — none this cycle; safe to upgrade from `v0.5.0`.
+
+### Added
+
+- **Go developer tooling — go-coding plugin adoption.** Formatting moves to gofumpt + goimports via `golangci-lint fmt`, and linting to a golangci-lint v2 reference set (`modernize`, `errorlint`, `bodyclose`, `noctx`, `contextcheck`, …), both routed through one pinned shim (`make fmt` / `fmt-check` / `lint`; the dev image carries golangci-lint v2.11.4). Includes a behaviour-preserving `modernize` sweep across the hand-written tree (generated `*_gen.go` untouched). No consumer-visible change.
+- **Documentation — SDD overhaul + agent context routing.** Restructured README / SECURITY / contributor & agent guides; expanded the architecture and roadmap narratives; decoupled the specs from the PoC (research strands 01–03 resolved); dropped PHP-SDK parity framing in favour of openEHR wire conformance; added REQ-083 (Cadasto platform API conformance) and formalised the already-shipped security hardening as REQ-073 (discovery trust posture) + REQ-108 (untrusted document bounds), with [ADR 0006](docs/adr/0006-composition-validation-walker-placement.md) (composition-validation walker placement). New agent helpers `make spec-context REQ=NNN` and `make probe-status`, plus a stricter `spec-check` (full REQ coverage; Draft-is-binding; REQ.md Impl. == traceability implementation).
+
 ## [0.5.0] - 2026-06-13
 
 Fifth `v0.x` minor — completes REQ-094 `Prefer` write-path negotiation on versioned writes (`composition` / `directory` / `ehr_status`): `return=identifier` populates the version identifier slot from the ITS-REST `Identifier` body, and `return=representation` with an empty body now returns `transport.ErrInvalidShape` instead of silently yielding a nil resource. New exported surface: `ehr.Identifier` + `(*VersionMetadata).ResolveIdentifierBody`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the only behavioural change this cycle is the stricter empty-`representation` handling (previously a silent `nil`); no signature changes and no in-tree callers affected. Pin to the exact tag.
