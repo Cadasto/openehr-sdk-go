@@ -39,7 +39,8 @@ func main() {
 		log.Fatalf("struct-builder: %v", err)
 	}
 
-	// Verb-functions style — same logical query, clause order irrelevant.
+	// Verb-functions style — same construction, different entry point; the
+	// emitter fixes clause order, so SELECT/FROM/WHERE land identically.
 	verbQ, err := aql.Select(aql.Col("o")).
 		Where(aql.Gt(magnitude, aql.Real(37.5))).
 		FromEHR("e", aql.Param("ehr_id")).

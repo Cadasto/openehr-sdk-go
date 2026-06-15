@@ -194,7 +194,7 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 
 **Canonicalisation (wire output).** Built queries emit a single stable form so the goldens are deterministic. Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
 
-1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `OFFSET`, `LIMIT`, `ASC`, `DESC`.
+1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `ASC`, `DESC`. (`OFFSET` / `LIMIT` are not emitted in the string — see rule 7.)
 2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
 3. **Paths and archetype ids** — emitted verbatim; no case folding.
 4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
