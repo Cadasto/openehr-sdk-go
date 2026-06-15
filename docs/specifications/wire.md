@@ -192,6 +192,18 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 - Whitespace, casing, and aliasing are subject to canonicalisation in the wire-output path — the SDK **MUST** produce a stable, canonicalised string so wire-output goldens are deterministic.
 - Both styles are tested against the same wire-output golden cassettes; a builder change that produces different output is a breaking change.
 
+**Canonicalisation (wire output).** Built queries emit a single stable form so the goldens are deterministic. Changing any rule below rewrites every golden and is a **semver-major** change to `openehr/aql`:
+
+1. **Keywords** uppercase — `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `OFFSET`, `LIMIT`, `ASC`, `DESC`.
+2. **Whitespace** — exactly one space between tokens; no leading or trailing space on the emitted string.
+3. **Paths and archetype ids** — emitted verbatim; no case folding.
+4. **Parameters** — caller values appear only as `$name` placeholders in the string, never interpolated as literals (the injection guard, below); placeholder keys carry no leading `$`.
+5. **SELECT list** — comma-separated, one space after each comma, no trailing comma.
+6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment. The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause; the standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL but is not what the builders emit.
+7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries. Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
+
+The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) and is asserted by PROBE-020.
+
 ### AQL executor
 
 `openehr/client/query` is the AQL executor. It:
