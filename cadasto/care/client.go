@@ -110,13 +110,13 @@ var ErrNotImplemented = errors.New("cadasto/care: operation not implemented yet"
 // [WithOPTCacheTTL] to override the default OPT cache window.
 func NewClient(cfg Config, opts ...ClientOption) (*Client, error) {
 	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("care: BaseURL is required")
+		return nil, errors.New("care: BaseURL is required")
 	}
 	if cfg.TokenURL == "" {
-		return nil, fmt.Errorf("care: TokenURL is required")
+		return nil, errors.New("care: TokenURL is required")
 	}
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
-		return nil, fmt.Errorf("care: ClientID and ClientSecret are required")
+		return nil, errors.New("care: ClientID and ClientSecret are required")
 	}
 
 	base, err := url.Parse(cfg.BaseURL)
@@ -289,7 +289,7 @@ func (c *Client) CreatePatient(ctx context.Context) (string, error) {
 // FindOrCreateEHR (reads must never mint EHRs). found=false on a clean miss.
 func (c *Client) FindEHR(ctx context.Context, namespace, externalID string) (string, bool, error) {
 	if namespace == "" || externalID == "" {
-		return "", false, fmt.Errorf("care: FindEHR: namespace and externalID are required")
+		return "", false, errors.New("care: FindEHR: namespace and externalID are required")
 	}
 	existing, _, err := ehr.GetBySubject(ctx, c.rest, namespace, externalID)
 	if err != nil {
@@ -306,7 +306,7 @@ func (c *Client) FindEHR(ctx context.Context, namespace, externalID string) (str
 
 func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID string) (string, error) {
 	if namespace == "" || externalID == "" {
-		return "", fmt.Errorf("care: FindOrCreateEHR: namespace and externalID are required")
+		return "", errors.New("care: FindOrCreateEHR: namespace and externalID are required")
 	}
 
 	// 1. Find pad — bestaat een EHR met deze subject-koppeling?
@@ -360,7 +360,7 @@ func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID stri
 // (REQ-102), not yet on the public surface.
 func (c *Client) SaveData(ctx context.Context, patientID, templateID string, datamap map[string]any) (string, error) {
 	if c.codec == nil {
-		return "", fmt.Errorf("care: no Codec configured")
+		return "", errors.New("care: no Codec configured")
 	}
 	opt, err := c.resolveOPT(ctx, templateID)
 	if err != nil {
@@ -394,7 +394,7 @@ func (c *Client) SaveData(ctx context.Context, patientID, templateID string, dat
 // Returns the new version uid (post-PUT etag).
 func (c *Client) UpdateData(ctx context.Context, patientID, voID, ifMatch, templateID string, datamap map[string]any) (string, error) {
 	if c.codec == nil {
-		return "", fmt.Errorf("care: no Codec configured")
+		return "", errors.New("care: no Codec configured")
 	}
 	opt, err := c.resolveOPT(ctx, templateID)
 	if err != nil {
@@ -488,7 +488,7 @@ func (c *Client) ListData(ctx context.Context, patientID, templateID string) ([]
 // version uid; ListData + SaveData cover the write+enumerate flow.
 func (c *Client) GetData(ctx context.Context, patientID, templateID, uid string) (map[string]any, error) {
 	if c.codec == nil {
-		return nil, fmt.Errorf("care: no Codec configured")
+		return nil, errors.New("care: no Codec configured")
 	}
 	return nil, ErrNotImplemented
 }
@@ -629,8 +629,8 @@ func cleanVersionUID(s string) string {
 // rauwe ETag (met quotes/-gzip) ook correct gestript wordt.
 func versionedObjectID(uid string) string {
 	uid = cleanVersionUID(uid)
-	if i := strings.Index(uid, "::"); i >= 0 {
-		return uid[:i]
+	if before, _, ok := strings.Cut(uid, "::"); ok {
+		return before
 	}
 	return uid
 }

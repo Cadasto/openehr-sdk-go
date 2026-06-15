@@ -1,7 +1,9 @@
 package datamap
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -65,7 +67,7 @@ func fromComposition(opt *template.OperationalTemplate, composition map[string]a
 		}
 	}
 	if composition == nil {
-		return nil, fmt.Errorf("datamap.FromComposition: nil composition")
+		return nil, errors.New("datamap.FromComposition: nil composition")
 	}
 	if rmType, _ := composition["_type"].(string); rmType != "COMPOSITION" {
 		return nil, fmt.Errorf("datamap.FromComposition: expected COMPOSITION, got %q", rmType)
@@ -264,17 +266,13 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 		if err != nil {
 			return "", nil, err
 		}
-		for k, v := range items {
-			payload[k] = v
-		}
+		maps.Copy(payload, items)
 	case "EVALUATION", "ADMIN_ENTRY":
 		items, err := decodeItems(structuredItemsList(data), r)
 		if err != nil {
 			return "", nil, err
 		}
-		for k, v := range items {
-			payload[k] = v
-		}
+		maps.Copy(payload, items)
 	default:
 		return "", nil, fmt.Errorf("RM entry type %q not supported", rmType)
 	}
@@ -294,9 +292,7 @@ func decodeActivity(activity map[string]any, r contentRoot) (map[string]any, err
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range items {
-		out[k] = v
-	}
+	maps.Copy(out, items)
 	return out, nil
 }
 
@@ -313,9 +309,7 @@ func decodeEvent(event map[string]any, r contentRoot) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	for k, v := range items {
-		out[k] = v
-	}
+	maps.Copy(out, items)
 	return out, nil
 }
 

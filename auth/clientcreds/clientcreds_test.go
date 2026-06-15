@@ -146,9 +146,9 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 // This is the recovery path transport/ drives after a wire 401 when the
 // authorization server omits expires_in (the observed Cadasto acc behaviour).
 func TestInvalidateForcesRefetchWhenNoExpiry(t *testing.T) {
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		n := atomic.AddInt32(&hits, 1)
+		n := hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "tok-" + string(byte('0'+n)),
@@ -172,7 +172,7 @@ func TestInvalidateForcesRefetchWhenNoExpiry(t *testing.T) {
 	if t3.Value == t1.Value {
 		t.Errorf("expected fresh token after Invalidate; still %q", t3.Value)
 	}
-	if h := atomic.LoadInt32(&hits); h != 2 {
+	if h := hits.Load(); h != 2 {
 		t.Errorf("expected exactly 2 token fetches (initial + post-invalidate), got %d", h)
 	}
 }

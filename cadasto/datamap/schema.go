@@ -1,6 +1,7 @@
 package datamap
 
 import (
+	"maps"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -180,9 +181,7 @@ func buildArchetypeRootSchema(r contentRoot) map[string]any {
 		if descChild, ok := attrFirstObject(descAttr); ok {
 			if itemsAttr := structuredItemsAttr(descChild); itemsAttr != nil {
 				itemsPath := contentPath + "/description[" + descChild.NodeID() + "]"
-				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
-					props[k] = v
-				}
+				maps.Copy(props, buildItemsSchema(itemsAttr, r, itemsPath))
 			}
 		}
 		return map[string]any{"type": "object", "additionalProperties": false, "properties": props}
@@ -273,9 +272,7 @@ func buildActivityItemSchema(act template.ObjectNode, r contentRoot, parentPath 
 		if descChild, ok := attrFirstObject(descAttr); ok {
 			if itemsAttr := structuredItemsAttr(descChild); itemsAttr != nil {
 				itemsPath := actPath + "/description[" + descChild.NodeID() + "]"
-				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
-					props[k] = v
-				}
+				maps.Copy(props, buildItemsSchema(itemsAttr, r, itemsPath))
 			}
 		}
 	}
@@ -318,9 +315,7 @@ func buildEventItemSchema(eventNode template.ObjectNode, r contentRoot, parentPa
 		if dataChild, ok := attrFirstObject(dataAttr); ok {
 			if itemsAttr := structuredItemsAttr(dataChild); itemsAttr != nil {
 				itemsPath := eventPath + "/data[" + dataChild.NodeID() + "]"
-				for k, v := range buildItemsSchema(itemsAttr, r, itemsPath) {
-					props[k] = v
-				}
+				maps.Copy(props, buildItemsSchema(itemsAttr, r, itemsPath))
 			}
 		}
 	}

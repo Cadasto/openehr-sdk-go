@@ -1,7 +1,9 @@
 package datamap
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -86,7 +88,7 @@ func encodeComposer(v any) map[string]any {
 func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (map[string]any, error) {
 	root, ok := opt.Root().(template.ObjectNode)
 	if !ok {
-		return nil, fmt.Errorf("datamap.ToComposition: OPT root is not an object node")
+		return nil, errors.New("datamap.ToComposition: OPT root is not an object node")
 	}
 
 	language := stringOrDefault(payload["language"], "nl")
@@ -96,12 +98,12 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 	contextPayload, _ := payload["context"].(map[string]any)
 	startTime := stringOrDefault(contextPayload["start_time"], "")
 	if startTime == "" {
-		return nil, fmt.Errorf("datamap.ToComposition: context.start_time is required")
+		return nil, errors.New("datamap.ToComposition: context.start_time is required")
 	}
 
 	roots := findContentArchetypeRoots(root)
 	if len(roots) == 0 {
-		return nil, fmt.Errorf("datamap.ToComposition: template has no archetype roots under content")
+		return nil, errors.New("datamap.ToComposition: template has no archetype roots under content")
 	}
 	contentPayload, _ := payload["content"].(map[string]any)
 
@@ -391,9 +393,7 @@ func encodeOtherContext(root template.ObjectNode, payload map[string]any) (map[s
 	for _, c := range itemsAttr.Children() {
 		if ar, ok := c.(*template.ArchetypeRoot); ok {
 			t, _ := termMaps(ar)
-			for k, v := range t {
-				terms[k] = v
-			}
+			maps.Copy(terms, t)
 		}
 	}
 	items, err := encodeItems(itemsAttr, ocPayload, terms)
@@ -516,11 +516,11 @@ func encodeEvent(eventConstraint template.ObjectNode, payload map[string]any, te
 
 	dataNode, ok := attrFirstObject(findAttr(eventConstraint, "data"))
 	if !ok {
-		return nil, fmt.Errorf("event constraint has no data")
+		return nil, errors.New("event constraint has no data")
 	}
 	itemsAttr := structuredItemsAttr(dataNode)
 	if itemsAttr == nil {
-		return nil, fmt.Errorf("event ITEM_TREE has no items")
+		return nil, errors.New("event ITEM_TREE has no items")
 	}
 	items, err := encodeItems(itemsAttr, payload, terms)
 	if err != nil {
@@ -683,9 +683,7 @@ func encodeValue(constraint template.ObjectNode, payload any, terms map[string]s
 func encodeOrdinal(constraint template.ObjectNode, payload any, terms map[string]string) (map[string]any, error) {
 	if m, ok := payload.(map[string]any); ok {
 		out := map[string]any{"_type": "DV_ORDINAL"}
-		for k, v := range m {
-			out[k] = v
-		}
+		maps.Copy(out, m)
 		return out, nil
 	}
 	code, ok := payload.(string)
@@ -735,9 +733,7 @@ func encodeOrdinal(constraint template.ObjectNode, payload any, terms map[string
 func encodeProportion(payload any) (map[string]any, error) {
 	if m, ok := payload.(map[string]any); ok {
 		out := map[string]any{"_type": "DV_PROPORTION"}
-		for k, v := range m {
-			out[k] = v
-		}
+		maps.Copy(out, m)
 		return out, nil
 	}
 	num, ok := toFloat(payload)
@@ -785,9 +781,7 @@ func encodeQuantity(constraint template.ObjectNode, payload any) (map[string]any
 	units, precision := quantityDefault(constraint)
 	if m, ok := payload.(map[string]any); ok {
 		out := map[string]any{"_type": "DV_QUANTITY"}
-		for k, v := range m {
-			out[k] = v
-		}
+		maps.Copy(out, m)
 		if _, has := out["units"]; !has {
 			out["units"] = units
 		}
@@ -806,9 +800,7 @@ func encodeQuantity(constraint template.ObjectNode, payload any) (map[string]any
 func encodeCount(payload any) (map[string]any, error) {
 	if m, ok := payload.(map[string]any); ok {
 		out := map[string]any{"_type": "DV_COUNT"}
-		for k, v := range m {
-			out[k] = v
-		}
+		maps.Copy(out, m)
 		return out, nil
 	}
 	mag, ok := toInt(payload)
@@ -828,9 +820,7 @@ func encodeCodedText(payload any, terms map[string]string) (map[string]any, erro
 			}
 		}
 		out := map[string]any{"_type": "DV_CODED_TEXT"}
-		for k, v := range m {
-			out[k] = v
-		}
+		maps.Copy(out, m)
 		return out, nil
 	}
 	code, ok := payload.(string)

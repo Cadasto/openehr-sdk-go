@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -234,10 +235,8 @@ func collectLeafValues(v any) []any {
 
 func assertContains(t *testing.T, haystack []any, want any) {
 	t.Helper()
-	for _, v := range haystack {
-		if v == want {
-			return
-		}
+	if slices.Contains(haystack, want) {
+		return
 	}
 	t.Errorf("round-trip lost value %v (got leaves %v)", want, haystack)
 }

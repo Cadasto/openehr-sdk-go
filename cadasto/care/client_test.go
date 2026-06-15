@@ -14,6 +14,7 @@ type fakeCodec struct{}
 func (fakeCodec) ToComposition(_ *template.OperationalTemplate, dm map[string]any) (map[string]any, error) {
 	return dm, nil
 }
+
 func (fakeCodec) FromComposition(_ *template.OperationalTemplate, comp map[string]any) (map[string]any, error) {
 	return comp, nil
 }
