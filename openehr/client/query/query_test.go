@@ -252,9 +252,11 @@ func TestExecutePathResolutionError(t *testing.T) {
 		body      string
 		wantIsErr bool
 	}{
-		"path code":        {`{"code":"AQL_PATH_RESOLUTION","message":"x"}`, true},
-		"path message":     {`{"code":"BAD_REQUEST","message":"could not resolve path /foo/bar"}`, true},
-		"generic non-path": {`{"code":"VALIDATION_FAILED","message":"bad request"}`, false},
+		"path code":               {`{"code":"AQL_PATH_RESOLUTION","message":"x"}`, true},
+		"path message":            {`{"code":"BAD_REQUEST","message":"could not resolve path /foo/bar"}`, true},
+		"generic non-path":        {`{"code":"VALIDATION_FAILED","message":"bad request"}`, false},
+		"url path code (not aql)": {`{"code":"INVALID_PATH_PARAMETER","message":"bad path param"}`, false},
+		"resolve non-path msg":    {`{"code":"BAD_REQUEST","message":"could not resolve dependency"}`, false},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

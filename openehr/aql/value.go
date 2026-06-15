@@ -41,7 +41,10 @@ func Int(n int64) Value { return intValue{n: n} }
 
 type realValue struct{ f float64 }
 
-func (v realValue) token() string { return strconv.FormatFloat(v.f, 'g', -1, 64) }
+// token uses 'f' (decimal) notation, never 'g'/'e' — scientific notation
+// (1e+20) is not universally accepted as an AQL REAL literal, and the typed
+// builders must not emit anything a backend could reject syntactically.
+func (v realValue) token() string { return strconv.FormatFloat(v.f, 'f', -1, 64) }
 
 // Real is a floating-point literal.
 func Real(f float64) Value { return realValue{f: f} }

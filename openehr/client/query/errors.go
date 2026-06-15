@@ -67,17 +67,19 @@ func mapQueryError(err error) error {
 
 // isPathResolution classifies a backend AQL error envelope as a path
 // resolution failure. openEHR does not mandate a single code for this, so the
-// match is intentionally conservative and extensible: an error code mentioning
-// PATH, or a message naming a path the server could not resolve. Code is the
-// PHI-free signal and is preferred; the message is consulted only when the
-// client surfaces it (WithRawErrorBodies).
+// match is a best-effort heuristic pending Live ratification (PROBE-021). It is
+// deliberately narrow to avoid false positives: the code must name both a PATH
+// and a resolution failure (e.g. AQL_PATH_RESOLUTION) — not a routing code like
+// INVALID_PATH_PARAMETER — and message clauses are anchored on "path" so a
+// generic "could not resolve <X>" does not match. Code is the PHI-free signal
+// and preferred; the message is consulted only when surfaced (WithRawErrorBodies).
 func isPathResolution(code, message string) bool {
-	if strings.Contains(strings.ToUpper(code), "PATH") {
+	c := strings.ToUpper(code)
+	if strings.Contains(c, "PATH") && (strings.Contains(c, "RESOL") || strings.Contains(c, "UNKNOWN")) {
 		return true
 	}
 	m := strings.ToLower(message)
 	return strings.Contains(m, "resolve path") ||
 		strings.Contains(m, "path resolution") ||
-		strings.Contains(m, "unknown path") ||
-		strings.Contains(m, "could not resolve")
+		strings.Contains(m, "unknown path")
 }

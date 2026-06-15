@@ -205,6 +205,10 @@ func TestBuildRejectsMalformedInput(t *testing.T) {
 		"empty contains":     aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Contains(aql.Archetype("", "o", "")),
 		"nil comparison val": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Where(aql.Eq("o/x", nil)),
 		"empty where path":   aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Where(aql.Eq("", aql.Int(1))),
+		"dup alias from/contains": aql.NewBuilder().Select(aql.Col("o")).From("EHR", "e").
+			Contains(aql.Archetype("OBSERVATION", "e", "")),
+		"dup alias two contains": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
+			Contains(aql.Archetype("COMPOSITION", "c", "")).Contains(aql.Archetype("OBSERVATION", "c", "")),
 	}
 	for name, b := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -230,6 +234,19 @@ func TestBuildClonesParameters(t *testing.T) {
 	}
 	if second.Parameters["x"] != "v1" {
 		t.Fatalf("parameter map aliased: got %v", second.Parameters["x"])
+	}
+}
+
+// TestRealEmitsDecimalNotation locks Real to decimal (not scientific) form, so
+// the builder never emits an exponent literal a backend might reject.
+func TestRealEmitsDecimalNotation(t *testing.T) {
+	q, err := aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
+		Where(aql.Gt("o/x", aql.Real(1e20))).Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(q.String(), "100000000000000000000") || strings.Contains(q.String(), "e+") {
+		t.Fatalf("Real should emit decimal notation, got %q", q.String())
 	}
 }
 

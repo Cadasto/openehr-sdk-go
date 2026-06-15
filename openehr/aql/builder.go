@@ -180,10 +180,15 @@ func (a *ast) build() (Query, error) {
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
 	}
+	seen := map[string]bool{a.from.alias: true}
 	for _, c := range a.contains {
 		if c.rmType == "" || c.alias == "" {
 			return Query{}, fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
 		}
+		if seen[c.alias] {
+			return Query{}, fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
+		}
+		seen[c.alias] = true
 	}
 
 	var sb strings.Builder
