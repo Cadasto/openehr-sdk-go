@@ -8,6 +8,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+### Added
+
+- **AQL builders (REQ-055).** `openehr/aql` gains a struct-builder (`NewBuilder`) and verb-functions (`Select` / `From` / `FromEHR` / `Where`) that emit byte-identical, canonical AQL (PROBE-020); typed values (`Param` + literals, the injection guard), comparisons, and `And` / `Or`; `openehr/client/query` maps backend path-resolution failures to `aql.ErrPathResolution` (PROBE-021). Completes the Phase 2 clinical building blocks.
+
 ## [0.6.0] - 2026-06-15
 
 Sixth `v0.x` minor — a documentation and developer-tooling cycle: the SDD documentation overhaul plus adoption of the first-party **go-coding** toolchain. **No public API or behaviour change this cycle** — the security-hardening specs REQ-073 / REQ-108 formalise behaviour already shipped in `v0.4.0`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — none this cycle; safe to upgrade from `v0.5.0`.
