@@ -115,7 +115,8 @@ func TestRunStoredWithEHRID(t *testing.T) {
 	defer srv.Close()
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
-	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions", nil,
+	_, _, err := query.RunStored(
+		context.Background(), newClient(t, srv), "org.openehr::compositions", nil,
 		query.WithEHRID(ehrID),
 	)
 	if err != nil {
@@ -209,7 +210,8 @@ func TestExecuteAQLError(t *testing.T) {
 				},
 			},
 		})
-		c, err := transport.New(cat,
+		c, err := transport.New(
+			cat,
 			transport.WithHTTPClient(srv.Client()),
 			transport.WithRawErrorBodies(true),
 		)
@@ -239,4 +241,60 @@ func TestExecuteAQLError(t *testing.T) {
 			t.Errorf("Error() = %q, want it to contain the message", aqlErr.Error())
 		}
 	})
+}
+
+// TestExecutePathResolutionError verifies the PROBE-021 mapping: a backend AQL
+// error whose envelope denotes path resolution is surfaced as an *AQLError that
+// also satisfies errors.Is(err, aql.ErrPathResolution), so callers can branch
+// without inspecting CDR-specific codes. A generic validation error must NOT.
+func TestExecutePathResolutionError(t *testing.T) {
+	cases := map[string]struct {
+		body      string
+		wantIsErr bool
+	}{
+		"path code":        {`{"code":"AQL_PATH_RESOLUTION","message":"x"}`, true},
+		"path message":     {`{"code":"BAD_REQUEST","message":"could not resolve path /foo/bar"}`, true},
+		"generic non-path": {`{"code":"VALIDATION_FAILED","message":"bad request"}`, false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+
+			// WithRawErrorBodies so the message-based classifier sees the text.
+			cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
+				Issuer: "https://test.example.com",
+				Services: map[string]discovery.ServiceEntry{
+					discovery.ServiceIDOpenEHRRest: {
+						BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
+						SpecVersion: discovery.SpecVersionPin,
+					},
+				},
+			})
+			c, err := transport.New(
+				cat,
+				transport.WithHTTPClient(srv.Client()),
+				transport.WithRawErrorBodies(true),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			_, _, err = query.Execute(context.Background(), c, aql.NewQuery("SELECT e FROM EHR e"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			var aqlErr *query.AQLError
+			if !errors.As(err, &aqlErr) {
+				t.Fatalf("expected *query.AQLError, got %T", err)
+			}
+			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantIsErr {
+				t.Errorf("errors.Is(err, aql.ErrPathResolution) = %v, want %v", got, tc.wantIsErr)
+			}
+		})
+	}
 }
