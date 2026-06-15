@@ -1,6 +1,9 @@
 package aql
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // WhereExpr is a boolean expression in a WHERE clause. The interface is sealed;
 // construct expressions with the comparison helpers ([Eq], [Ne], [Gt], [Ge],
@@ -8,6 +11,10 @@ import "strings"
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
+	// validate reports a malformed predicate (empty path, nil value) so
+	// [Builder.Build] can surface it as ErrInvalidQuery instead of panicking
+	// or emitting invalid AQL.
+	validate() error
 }
 
 type comparison struct {
@@ -17,6 +24,16 @@ type comparison struct {
 }
 
 func (c comparison) expr() string { return c.path + " " + c.op + " " + c.val.token() }
+
+func (c comparison) validate() error {
+	if strings.TrimSpace(c.path) == "" {
+		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, c.op)
+	}
+	if c.val == nil {
+		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.path)
+	}
+	return nil
+}
 
 // Eq is `path = value`.
 func Eq(path string, v Value) WhereExpr { return comparison{path: path, op: "=", val: v} }
@@ -53,6 +70,15 @@ func (j junction) expr() string {
 		parts[i] = t.expr()
 	}
 	return strings.Join(parts, " "+j.op+" ")
+}
+
+func (j junction) validate() error {
+	for _, t := range j.terms {
+		if err := t.validate(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // And joins predicates with AND. nil terms are dropped; a single surviving term

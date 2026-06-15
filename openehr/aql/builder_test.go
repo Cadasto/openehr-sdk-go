@@ -170,6 +170,69 @@ func TestBuilderBuildErrors(t *testing.T) {
 	}
 }
 
+// TestFromClearsStaleEHRFilter locks the rescope/clear semantics: replacing or
+// re-scoping the FROM source must not leave a dangling ehr_id WHERE condition.
+func TestFromClearsStaleEHRFilter(t *testing.T) {
+	t.Run("rescope to non-EHR drops filter", func(t *testing.T) {
+		q, err := aql.NewBuilder().Select(aql.Col("o")).
+			FromEHR("e", aql.Param("x")).From("COMPOSITION", "c").Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := q.String(); got != "SELECT o FROM COMPOSITION c" {
+			t.Fatalf("got %q", got)
+		}
+	})
+	t.Run("FromEHR(nil) clears prior filter", func(t *testing.T) {
+		q, err := aql.NewBuilder().Select(aql.Col("o")).
+			FromEHR("e", aql.Param("x")).FromEHR("e", nil).Build()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := q.String(); got != "SELECT o FROM EHR e" {
+			t.Fatalf("got %q", got)
+		}
+	})
+}
+
+// TestBuildRejectsMalformedInput locks the PROBE-021 structural guarantee for
+// consumer-supplied empties and nils — Build errors rather than emitting
+// invalid AQL or panicking.
+func TestBuildRejectsMalformedInput(t *testing.T) {
+	tests := map[string]*aql.Builder{
+		"empty select field": aql.NewBuilder().Select(aql.Col("")).FromEHR("e", nil),
+		"empty from alias":   aql.NewBuilder().Select(aql.Col("o")).From("EHR", ""),
+		"empty contains":     aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Contains(aql.Archetype("", "o", "")),
+		"nil comparison val": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Where(aql.Eq("o/x", nil)),
+		"empty where path":   aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).Where(aql.Eq("", aql.Int(1))),
+	}
+	for name, b := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := b.Build(); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+}
+
+// TestBuildClonesParameters verifies the built query does not alias the
+// builder's internal parameter map.
+func TestBuildClonesParameters(t *testing.T) {
+	b := aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", aql.Param("x")).Bind("x", "v1")
+	first, err := b.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Parameters["x"] = "mutated"
+	second, err := b.Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Parameters["x"] != "v1" {
+		t.Fatalf("parameter map aliased: got %v", second.Parameters["x"])
+	}
+}
+
 func readGolden(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "wire", name))

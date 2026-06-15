@@ -2,6 +2,7 @@ package aql
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 )
@@ -35,6 +36,7 @@ func (b *Builder) Select(cols ...SelectField) *Builder {
 // case.
 func (b *Builder) From(rmType, alias string) *Builder {
 	b.ast.from = &fromClause{rmType: rmType, alias: alias}
+	b.ast.ehrFilter = nil // re-scoping the source drops any prior FromEHR filter
 	return b
 }
 
@@ -48,6 +50,7 @@ func (b *Builder) From(rmType, alias string) *Builder {
 // with other conditions in one clause.
 func (b *Builder) FromEHR(alias string, id Value) *Builder {
 	b.ast.from = &fromClause{rmType: "EHR", alias: alias}
+	b.ast.ehrFilter = nil // reset first so FromEHR(alias, nil) clears a prior filter
 	if id != nil {
 		b.ast.ehrFilter = Eq(alias+"/ehr_id/value", id)
 	}
@@ -166,8 +169,21 @@ func (a *ast) build() (Query, error) {
 	if len(a.sel) == 0 {
 		return Query{}, fmt.Errorf("%w: no SELECT fields", ErrInvalidQuery)
 	}
+	for _, c := range a.sel {
+		if c.path == "" {
+			return Query{}, fmt.Errorf("%w: empty SELECT field", ErrInvalidQuery)
+		}
+	}
 	if a.from == nil {
 		return Query{}, fmt.Errorf("%w: no FROM source", ErrInvalidQuery)
+	}
+	if a.from.rmType == "" || a.from.alias == "" {
+		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
+	}
+	for _, c := range a.contains {
+		if c.rmType == "" || c.alias == "" {
+			return Query{}, fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
+		}
 	}
 
 	var sb strings.Builder
@@ -200,9 +216,13 @@ func (a *ast) build() (Query, error) {
 	// WHERE predicate so a single canonical WHERE clause results.
 	where := a.effectiveWhere()
 	if where != nil {
+		// Reject malformed predicates (nil values, empty paths) before emitting
+		// so the typed builders can never produce invalid AQL (PROBE-021).
+		if err := where.validate(); err != nil {
+			return Query{}, err
+		}
 		// A non-nil predicate that emits nothing (e.g. And() with no terms)
-		// would yield a trailing, syntactically invalid WHERE. Reject it so
-		// the typed builders can never emit invalid AQL (PROBE-021).
+		// would yield a trailing, syntactically invalid WHERE.
 		pred := where.expr()
 		if strings.TrimSpace(pred) == "" {
 			return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
@@ -226,7 +246,8 @@ func (a *ast) build() (Query, error) {
 	// OFFSET / LIMIT are carried in the request envelope (Query.Offset /
 	// Query.Fetch), not the AQL string — a single paging channel the executor
 	// already maps.
-	return Query{Q: sb.String(), Offset: a.offset, Fetch: a.limit, Parameters: a.params}, nil
+	// Clone so the built query does not alias the builder's internal map.
+	return Query{Q: sb.String(), Offset: a.offset, Fetch: a.limit, Parameters: maps.Clone(a.params)}, nil
 }
 
 // effectiveWhere combines the implicit ehr_id filter (from FromEHR) with any
