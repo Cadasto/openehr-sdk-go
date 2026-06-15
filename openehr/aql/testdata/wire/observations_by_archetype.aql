@@ -1,0 +1,1 @@
+SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id

@@ -1,6 +1,6 @@
-// Package aql provides AQL request and result models usable without an
-// HTTP executor (REQ-055). Full struct- and verb-function builders
-// land in a later phase; today callers pass literal AQL strings.
+// Query and result models for AQL (REQ-055). Construct queries with the
+// builders ([Builder] / the verb-functions) or pass a literal string via
+// [NewQuery]; the package doc (doc.go) is the canonical overview.
 package aql
 
 import (

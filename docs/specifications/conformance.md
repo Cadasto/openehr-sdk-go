@@ -207,18 +207,18 @@ The catalog is the normative list. Each entry has:
 #### PROBE-020 — AQL builder string stability
 
 - **Title:** The struct-builder and verb-functions produce byte-identical AQL strings for the same logical query.
-- **Preconditions:** A reference query (e.g. "all OBSERVATIONs of archetype foo for a given EHR").
-- **Wire assertion:** `aql.NewQuery(...).String()` and `aql.From(...).Select(...).String()` are equal, byte for byte, for the reference query.
+- **Preconditions:** A reference query ("all OBSERVATIONs of archetype `body_temperature` for a given EHR"); canonical golden in [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/).
+- **Wire assertion:** The struct-builder (`aql.NewBuilder().Select(…).FromEHR(…).Contains(…).Build()`) and the verb-functions (`aql.Select(…).FromEHR(…).Contains(…).Build()`) emit equal strings, byte for byte, and both equal the golden — `SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[…] WHERE e/ehr_id/value = $ehr_id` (the builders emit EHR scoping via WHERE; the standing-predicate form is equally valid AQL).
 - **Modes:** Sandbox (no network).
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/).
 
 #### PROBE-021 — AQL parse error mapping
 
 - **Title:** A syntactically invalid AQL string produced by a typed builder is impossible; a syntactically valid but semantically invalid one produces a typed `AQLError` on execution.
 - **Preconditions:** Reference deployment that validates AQL against templates.
-- **Wire assertion:** Execution of a query referencing a non-existent path returns the backend's AQL error envelope; SDK maps to `aql.ErrPathResolution`.
+- **Wire assertion:** The typed builders cannot emit syntactically invalid AQL (structural guarantee). Execution of a query referencing a non-existent path returns the backend's AQL error envelope; the SDK maps it to `*query.AQLError`, which satisfies `errors.Is(err, aql.ErrPathResolution)`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — error mapping tested against a synthesised backend envelope ([`openehr/client/query/`](../../openehr/client/query/)); Cassette/Live ratification pending a reference deployment.
 
 #### PROBE-022 — OPT path resolution
 
@@ -506,7 +506,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
-| AQL | PROBE-020 … 021 | *planned* — `testkit/probes/aql/` |
+| AQL | PROBE-020 … 021 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
 | Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |
