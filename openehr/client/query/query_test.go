@@ -298,3 +298,79 @@ func TestExecutePathResolutionError(t *testing.T) {
 		})
 	}
 }
+
+// TestExecutePathResolutionCodeOnly verifies classification works from the
+// PHI-free error code alone — the default client suppresses the message, so a
+// message-only signal ("could not resolve path…") must NOT classify, while the
+// code (AQL_PATH_RESOLUTION) must.
+func TestExecutePathResolutionCodeOnly(t *testing.T) {
+	cases := map[string]struct {
+		code   string
+		wantIs bool
+	}{
+		"path code":    {"AQL_PATH_RESOLUTION", true},
+		"generic code": {"VALIDATION_FAILED", false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"code":"` + tc.code + `","message":"could not resolve path for patient 1234"}`))
+			}))
+			defer srv.Close()
+
+			// Default client: message suppressed (PHI), so only the code is seen.
+			_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantIs {
+				t.Errorf("errors.Is = %v, want %v", got, tc.wantIs)
+			}
+		})
+	}
+}
+
+// TestExecuteBuiltQueryEnvelope verifies a query produced by the aql builder
+// reaches the wire body intact: the canonical AQL string, envelope paging
+// (Offset/Fetch), and bound parameters.
+func TestExecuteBuiltQueryEnvelope(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	built, err := aql.NewBuilder().
+		Select(aql.Col("o")).
+		FromEHR("e", aql.Param("ehr_id")).
+		Contains(aql.Archetype("OBSERVATION", "o", "openEHR-EHR-OBSERVATION.body_temperature.v2")).
+		Bind("ehr_id", "7d44b88c-4199-4bad-97dc-d78268e01398").
+		Offset(10).
+		Limit(20).
+		Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := query.Execute(context.Background(), newClient(t, srv), built); err != nil {
+		t.Fatal(err)
+	}
+	if body["q"] != built.String() {
+		t.Errorf("q = %v, want %q", body["q"], built.String())
+	}
+	// JSON numbers decode to float64.
+	if body["offset"] != float64(10) {
+		t.Errorf("offset = %v, want 10", body["offset"])
+	}
+	if body["fetch"] != float64(20) {
+		t.Errorf("fetch = %v, want 20", body["fetch"])
+	}
+	qp, ok := body["query_parameters"].(map[string]any)
+	if !ok || qp["ehr_id"] != "7d44b88c-4199-4bad-97dc-d78268e01398" {
+		t.Errorf("query_parameters = %v", body["query_parameters"])
+	}
+}
