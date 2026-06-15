@@ -2,6 +2,7 @@ package smart
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -284,7 +285,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	if refreshTok != "" {
 		tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
 	} else {
-		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: fmt.Errorf("no token or refresh_token")}
+		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
 	}
 
 	s.mu.Lock()
@@ -369,7 +370,7 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: err}
 	}
 	if parsed.AccessToken == "" {
-		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: fmt.Errorf("empty access_token")}
+		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, StatusCode: resp.StatusCode, Inner: errors.New("empty access_token")}
 	}
 	tok := tokenFromResponse(parsed, s.cfg.Issuer)
 	refresh := parsed.RefreshToken

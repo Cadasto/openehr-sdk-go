@@ -3,6 +3,7 @@ package compositionprobes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -40,13 +41,13 @@ type Assignment struct {
 // REQ-101 + PROBE-023 normative round-trip (REQ-107 UID emission
 // landed via the archived
 // [`docs/plans/archive/2026-05-26-c-primitive-object-wire-parser.md`]).
-// The probe is sandbox-only (no transport dependency); cross-SDK
+// The probe is sandbox-only (no transport dependency); openEHR conformance
 // parity means another implementation of REQ-101 against the same
 // OPT + assignments MUST produce the same pass outcome.
 func Probe023BuilderRoundTrip(ctx context.Context, c *templatecompile.Compiled, opts []composition.Option, assigns []Assignment) (Result, error) {
 	r := Result{Probe: "PROBE-023"}
 	if c == nil || c.Root() == nil {
-		return r, fmt.Errorf("PROBE-023: nil compiled template")
+		return r, errors.New("PROBE-023: nil compiled template")
 	}
 	if rt := c.Root().RMTypeName(); rt != "COMPOSITION" {
 		r.Status = "skip"

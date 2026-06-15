@@ -6,7 +6,7 @@
 // Named testkit (not testing) to avoid collision with the
 // standard-library testing package.
 //
-// Conformance probes are the cross-SDK contract with the PHP SDK:
+// Conformance probes are the openEHR wire-conformance contract:
 // defined once, implemented in each language, exercised against
 // sandbox, recorded cassette, or a live deployment.
 //

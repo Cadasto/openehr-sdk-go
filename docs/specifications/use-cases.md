@@ -2,13 +2,13 @@
 
 **Status:** Draft
 
-The SDK's primary consumers, building-block consumers, and the POC-extraction scope that informs early phasing.
+The SDK's primary consumers, building-block consumers, and the delivery sequence that informs early phasing.
 
 The SDK is not built in a vacuum: every public-surface decision is justified by at least one named consumer. If a feature has no consumer, it does not ship in v1.
 
 ## Primary use cases
 
-Four named consumers drive the SDK's primary surface. For each: what the SDK provides, what stays bespoke in the consumer.
+Five named consumers drive the SDK's primary surface. For each: what the SDK provides, what stays bespoke in the consumer.
 
 ### Benchmark
 
@@ -18,11 +18,11 @@ A high-concurrency CRUD-against-the-openEHR-API tool for capacity planning and C
 |---|---|
 | Typed REST methods (`composition.Save`, `query.Execute`, …) | Workload shaping (Poisson arrivals, mixed read/write ratios, locality patterns) |
 | Injected `*http.Client` for connection-pool tuning | Percentile and tail-latency collection (the SDK exposes the raw timings via OTel; the benchmark aggregates) |
-| Retry-off mode (REQ-091 — retries off by default) | PostgreSQL storage snapshots (`pg_stat_*`); not the SDK's job |
+| Retry-off mode (REQ-091 — retries off by default) | Backend storage metrics; not the SDK's job |
 | OTel hooks for tracing inside the SDK | Report renderer (HTML/CSV/JSON output) |
 | `context.Context` for cancellation / deadline plumbing | Run orchestration (worker pool, ramp-up, ramp-down) |
 
-The current Cadasto CDR benchmark CLI is the **first consumer** of the SDK once the v1 extraction lands.
+A high-concurrency benchmark harness is a natural early consumer of the typed REST surface.
 
 ### Synthetic data seeder
 
@@ -62,6 +62,17 @@ Fan-out over multiple openEHR backends with per-node spec pinning, partial-failu
 
 Federation policy is the subject of a separate research track once MPI lands. The SDK provides the *primitives*; the policy is bespoke.
 
+### openEHR SMART app (Go backend)
+
+A server-side web or API service that performs a SMART-on-openEHR launch, handles tokens, and makes CDR calls on the user's behalf — the Go backend behind a clinical app.
+
+| SDK provides | Stays bespoke |
+|---|---|
+| SMART-on-openEHR launch + PKCE flow (`auth/smart`, REQ-060–069) | Web framework, routing, and the redirect/callback wiring for the deployment |
+| Discovery of service base URLs and auth endpoints (`smart/discovery`, REQ-070–073) | Session store and how tokens are persisted across a user session |
+| ID-token validation / JWKS handling and coalesced token refresh (`auth/`, `smart/`) | Scope-to-feature authorization policy inside the app |
+| Typed REST methods for CDR calls behind the launch (`openehr/client/ehr/…`) | Front-end / UI and product-specific workflow |
+
 ## Building-block use cases
 
 REQ-013 mandates that each core package be importable and useful without constructing an authenticated client. These five building-block consumers exist today and motivate the rule:
@@ -76,31 +87,17 @@ REQ-013 mandates that each core package be importable and useful without constru
 
 These consumers **MUST NOT** be forced to import `transport/`, `auth/`, or `smart/`. Their dependency graph stops at the leaf package they use.
 
-## POC extraction scope
+## Sequencing
 
-The path to v1 starts with extracting the SDK from the reference CDR load harness. The POC milestones, in order:
+Sequencing follows **consumer demand**, one capability slice at a time:
 
-1. **Inventory the CDR's HTTP layer, RM mapping, benchmark scaffolding.** Decide per file what moves to the SDK vs what stays bespoke in `cmd/benchmark`. Result: an extraction map.
-2. **Extract a first SDK skeleton.** Covers `auth/` (TokenSource interface + a stub `clientcreds` provider for benchmark use), `transport/` (HTTP wrapper), `openehr/rm/` (the RM types the benchmark touches), `openehr/client/ehr/` (EHR + EHR_STATUS endpoints).
-3. **Migrate `cmd/benchmark` to the SDK.** Reroute the benchmark's HTTP calls through `openehr/client/*`. Run the benchmark suite; confirm percentiles match the raw-HTTP baseline within an agreed tolerance (no measurable regression).
-4. **SMART + PKCE end-to-end against a reference deployment.** Implement `auth/smart` covering REQ-061..064. Run the auth probes (PROBE-001..007).
-5. **Spike an MCP server.** Expose 3–4 SDK methods as MCP tools using a third-party MCP framework. Validate per-request `TokenSource` plumbing.
-6. **Spike a federator over 2 mock backends.** Run the conformance probes per node; validate the discovery flow against two distinct issuers; confirm partial-failure behaviour is observable.
-7. **Run the full conformance probe set** against the Go client and confirm probe parity with the PHP SDK.
+- **Phase 1** — core REST + auth slice: `auth/clientcreds`, `transport/`, `openehr/rm/`, `openehr/client/ehr/` (unblocks the benchmark and any CRUD consumer).
+- **Phase 2** — MCP and SMART consumers: `auth/smart`, `smart/`, `smart/discovery`.
+- **Phase 3** — federator: multi-issuer, multi-catalog, partial-failure.
+- **Phase 4** — Cadasto extras (Extra, Datamap, MPI preview, Admin, Care aggregates).
+- **Phase 5** — openEHR conformance-probe ratification, `v1.0.0`.
 
-Each milestone produces a plan in [`../docs/plans/`](../docs/plans/) that cites the REQ-IDs and PROBE-IDs it addresses.
-
-## Sequencing principle
-
-The SDK does not pursue feature parity with the PHP SDK in lockstep. Sequencing follows **consumer demand**:
-
-- Phase 1 (POC extraction milestones 1–3): unblock the CDR benchmark — `auth/clientcreds`, `transport/`, `openehr/rm/`, `openehr/client/ehr/`.
-- Phase 2 (POC milestones 4–5): unblock MCP and SMART consumers — `auth/smart`, `smart/`, `smart/discovery`.
-- Phase 3 (POC milestone 6): unblock federator — multi-issuer, multi-catalog, partial-failure.
-- Phase 4: Cadasto extras (Extra, Datamap, MPI preview, Admin, Care aggregates).
-- Phase 5: cross-SDK probe ratification, v1.0.0.
-
-Each phase ends with the corresponding probes transitioning from `Draft` → `Implemented` → `Ratified` in [conformance.md](conformance.md).
+Each phase ends with the corresponding probes transitioning `Draft` → `Implemented` → `Ratified` in [conformance.md](conformance.md); each milestone produces a plan in [`../docs/plans/`](../plans) citing the REQ-IDs and PROBE-IDs it addresses.
 
 ## Out-of-scope use cases
 

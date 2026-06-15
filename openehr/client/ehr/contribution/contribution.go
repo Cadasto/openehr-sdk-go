@@ -53,7 +53,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		return nil, nil, fmt.Errorf("contribution.Commit: %w: nil Submission", transport.ErrInvalidConfig)
 	}
 	if err := batch.Validate(); err != nil {
-		return nil, nil, fmt.Errorf("contribution.Commit: %w: %v", transport.ErrInvalidConfig, err)
+		return nil, nil, fmt.Errorf("contribution.Commit: %w: %w", transport.ErrInvalidConfig, err)
 	}
 	cfg := commitConfig{prefer: transport.PreferMinimal}
 	for _, o := range opts {

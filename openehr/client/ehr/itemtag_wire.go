@@ -1,6 +1,7 @@
 package ehr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -105,18 +106,18 @@ func parseItemTagSegment(seg string) (ItemTag, error) {
 		}
 	}
 	if t.Key == "" {
-		return ItemTag{}, fmt.Errorf("missing key")
+		return ItemTag{}, errors.New("missing key")
 	}
 	return t, nil
 }
 
 func readItemTagPair(seg string) (key, val, rest string, err error) {
-	eq := strings.Index(seg, "=")
-	if eq < 0 {
-		return "", "", "", fmt.Errorf("expected key=value")
+	before, after, ok := strings.Cut(seg, "=")
+	if !ok {
+		return "", "", "", errors.New("expected key=value")
 	}
-	key = strings.TrimSpace(seg[:eq])
-	valPart := strings.TrimSpace(seg[eq+1:])
+	key = strings.TrimSpace(before)
+	valPart := strings.TrimSpace(after)
 	val, rest, err = readQuotedItemTagValue(valPart)
 	if err != nil {
 		return "", "", "", err
@@ -126,7 +127,7 @@ func readItemTagPair(seg string) (key, val, rest string, err error) {
 
 func readQuotedItemTagValue(valPart string) (val, rest string, err error) {
 	if !strings.HasPrefix(valPart, `"`) {
-		return "", "", fmt.Errorf("value must be quoted")
+		return "", "", errors.New("value must be quoted")
 	}
 	var b strings.Builder
 	i := 1
@@ -142,7 +143,7 @@ func readQuotedItemTagValue(valPart string) (val, rest string, err error) {
 		b.WriteByte(valPart[i])
 		i++
 	}
-	return "", "", fmt.Errorf("unterminated quoted value")
+	return "", "", errors.New("unterminated quoted value")
 }
 
 func escapeItemTagValue(s string) string {

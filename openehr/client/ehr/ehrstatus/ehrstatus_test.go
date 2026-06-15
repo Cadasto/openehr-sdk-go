@@ -19,8 +19,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-const ehrIDFixture openehrclient.EHRID = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
-const ehrStatusUID openehrclient.VersionUID = "f1e2d3c4-b5a6-4978-89ab-cdef01234567::cdr.example::1"
+const (
+	ehrIDFixture openehrclient.EHRID      = "bf0b2ad8-7b0e-4f4d-9d33-6a8de69f0a64"
+	ehrStatusUID openehrclient.VersionUID = "f1e2d3c4-b5a6-4978-89ab-cdef01234567::cdr.example::1"
+)
 
 func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 	t.Helper()
@@ -189,6 +191,71 @@ func TestPutMinimal(t *testing.T) {
 	}
 	if meta.VersionUID != "new-version-uid" {
 		t.Errorf("VersionUID parsed from Location = %q", meta.VersionUID)
+	}
+}
+
+// TestPutRepresentationEmptyBodyErrors pins REQ-094 on the ehr_status
+// leaf (same shared doWrite pattern as composition/directory): an empty
+// body under Prefer=return=representation MUST surface
+// transport.ErrInvalidShape, not a silent nil EHR_STATUS.
+func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+string(ehrStatusUID)+`"`)
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/ehr_status/"+string(ehrStatusUID))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject:         rm.PartySelf{},
+	}
+	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		ehrstatus.WithPrefer(transport.PreferRepresentation),
+	)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	}
+	if out != nil {
+		t.Errorf("expected nil EHR_STATUS on empty representation body, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != ehrStatusUID {
+		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+}
+
+// TestPutIdentifierPopulatesVersionUIDFromBody pins REQ-094 Phase 2 on
+// the ehr_status leaf: the ITS-REST Identifier body populates the
+// identifier slot when Location is absent.
+func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
+	const idVUID openehrclient.VersionUID = "cccc3333-4444-5555-6666-777788889999::cdr.example::2"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"uid":"` + string(idVUID) + `"}`))
+	}))
+	defer srv.Close()
+
+	status := &rm.EHRStatus{
+		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Status"},
+		IsModifiable:    true,
+		IsQueryable:     true,
+		Subject:         rm.PartySelf{},
+	}
+	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		ehrstatus.WithPrefer(transport.PreferIdentifier),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != nil {
+		t.Errorf("expected nil EHR_STATUS in identifier mode, got %+v", out)
+	}
+	if meta == nil || meta.VersionUID != idVUID {
+		t.Fatalf("expected VersionUID %q from identifier body, got %+v", idVUID, meta)
 	}
 }
 

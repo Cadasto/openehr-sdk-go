@@ -1,4 +1,4 @@
-// Package validationprobes hosts the cross-SDK conformance probes
+// Package validationprobes hosts the openEHR conformance probes
 // for openehr/validation/ — composition validation against a
 // compiled OPT (REQ-102). Probes are plain functions returning
 // (Result, error); they are sandbox-only (no transport) since the

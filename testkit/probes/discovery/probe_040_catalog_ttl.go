@@ -1,7 +1,7 @@
-// Package discoveryprobes hosts the cross-SDK conformance probes for
+// Package discoveryprobes hosts the openEHR conformance probes for
 // the openEHR service-discovery layer. Each probe corresponds to a
 // PROBE-NNN entry in docs/specifications/conformance.md and is implemented in both
-// the Go and PHP SDKs against shared cassettes (REQ-080).
+// any openEHR-conformant implementation against shared cassettes (REQ-080).
 //
 // Probes are plain Go functions returning (Result, error) and are
 // designed to be invocable from:
@@ -16,6 +16,7 @@ package discoveryprobes
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -51,11 +52,11 @@ type Result struct {
 func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error) {
 	r := Result{Probe: "PROBE-040"}
 	if len(cassetteBody) == 0 {
-		return r, fmt.Errorf("PROBE-040: cassetteBody is empty")
+		return r, errors.New("PROBE-040: cassetteBody is empty")
 	}
-	var hits int32
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&hits, 1)
+		hits.Add(1)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "max-age=300")
 		_, _ = w.Write(cassetteBody)
@@ -80,7 +81,7 @@ func Probe040CatalogTTL(ctx context.Context, cassetteBody []byte) (Result, error
 		r.Detail = fmt.Sprintf("second Resolve failed: %v", err)
 		return r, nil
 	}
-	got := atomic.LoadInt32(&hits)
+	got := hits.Load()
 	if got != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("expected 1 discovery fetch within TTL window, got %d", got)

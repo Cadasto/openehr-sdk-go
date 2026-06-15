@@ -10,6 +10,7 @@ REQ_REG="${ROOT}/docs/specifications/REQ.md"
 
 fail=0
 warn=0
+declare -A trace_impl   # REQ id -> implementation, captured from traceability.yaml
 
 die() { echo "spec-check: error: $*" >&2; fail=1; }
 warn_msg() { echo "spec-check: warning: $*" >&2; warn=$((warn + 1)); }
@@ -29,6 +30,7 @@ in_plans=0
 
 flush_req() {
   [[ -n "$current_id" ]] || return 0
+  trace_impl["$current_id"]="$current_impl"
   if [[ "$current_impl" == "landed" || "$current_impl" == "partial" ]]; then
     if [[ ${#pkg_paths[@]} -eq 0 && ${#test_paths[@]} -eq 0 ]]; then
       die "$current_id ($current_impl): no packages or tests listed"
@@ -121,6 +123,20 @@ while IFS= read -r id; do
   [[ -z "$id" ]] && continue
   grep -qF "| ${id} |" "$REQ_REG" || warn_msg "${id} in traceability.yaml but not in REQ.md registry"
 done < <(grep -E '^[[:space:]]*-[[:space:]]*id:[[:space:]]*REQ-' "$YAML" | sed -E 's/.*id:[[:space:]]*//')
+
+# Every REQ.md registry id has a traceability.yaml entry (completeness — no silent gaps)
+while IFS= read -r id; do
+  [[ -z "$id" ]] && continue
+  grep -qE "^[[:space:]]*-[[:space:]]*id:[[:space:]]*${id}([[:space:]]|$)" "$YAML" \
+    || die "${id} in REQ.md registry but missing from traceability.yaml"
+done < <(grep -E '^\| REQ-[0-9]{3} ' "$REQ_REG" | sed -E 's/^\| (REQ-[0-9]{3}) .*/\1/')
+
+# REQ.md Impl. column must agree with traceability.yaml implementation (no drift)
+while read -r id impl; do
+  ti="${trace_impl[$id]:-}"
+  [[ -z "$ti" ]] && continue   # missing entry already reported by the completeness check
+  [[ "$impl" == "$ti" ]] || die "${id}: REQ.md Impl '${impl}' disagrees with traceability implementation '${ti}'"
+done < <(awk -F'|' '/^\| REQ-[0-9]{3} /{id=$2; impl=$(NF-1); gsub(/ /,"",id); gsub(/ /,"",impl); print id, impl}' "$REQ_REG")
 
 if [[ $fail -ne 0 ]]; then
   echo "spec-check: FAILED" >&2

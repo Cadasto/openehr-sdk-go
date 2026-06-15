@@ -3,9 +3,9 @@
 **Date:** 2026-05-22
 **Status:** Draft (deferred — no committed delivery window)
 **Owner:** SDK maintainers
-**Covers:** proposed REQ-106 (WebTemplate JSON export). **REQ-107** is reserved for OPT→RM instance synthesis — [`2026-05-24-template-instance-example-generator.md`](2026-05-24-template-instance-example-generator.md).
+**Covers:** proposed REQ-106 (WebTemplate JSON export). **REQ-107** is reserved for OPT→RM instance synthesis — [`2026-05-24-template-instance-example-generator.md`](archive/2026-05-24-template-instance-example-generator.md).
 **Implementation:** planned
-**Depends on:** [2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitive constraints) — both are prerequisites
+**Depends on:** [archive/2026-05-22-template-req100-followups.md](archive/2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitive constraints) — both are prerequisites
 **Defers:** Round-trip from WebTemplate JSON back to OPT; JSON-schema-conformant validation against a reference implementation
 
 ## Goal
@@ -69,7 +69,7 @@ Open this plan for active development when **any** of:
 
 - A direct consumer requests JSON-format template output (typical demand: form-generation tooling, FHIR-mapping UIs).
 - Composition builder (REQ-101) is landed and a UI consumer needs the same template metadata client-side.
-- A cross-SDK conformance probe is needed against an existing reference implementation.
+- A conformance probe against an existing reference implementation is needed.
 
 Until then this plan is a placeholder reserving the design space, the proposed REQ-106 identifier, and a clear deferral path for reviewers asking "where does WebTemplate fit?".
 
@@ -92,7 +92,7 @@ Until then this plan is a placeholder reserving the design space, the proposed R
 ## Mapping to specs
 
 - Pending: REQ-106 (JSON-format simplified template export)
-- Foundation: [REQ-100 follow-up plan](2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitives)
+- Foundation: [REQ-100 follow-up plan](archive/2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitives)
 
 ## References (informational)
 

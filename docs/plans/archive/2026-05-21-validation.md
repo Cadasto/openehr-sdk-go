@@ -6,7 +6,7 @@
 **Covers:** REQ-013, REQ-014; **REQ-102** composition validation → see [`2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md) (**landed**)
 **Probes:** PROBE-024 (landed under template — REQ-103); PROBE-025/026 (landed — [composition validation plan](2026-05-24-composition-validation-template-driven.md)); PROBE-021 partially (AQL path errors at execute time — query plan owns syntax)
 **Implementation:** partial — REQ-102 composition validator **landed** ([composition validation plan](2026-05-24-composition-validation-template-driven.md)); demographic + AQL lint **planned**
-**Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](../2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 + 6 (compiled template + RMInfoLookup + walker + REQ-103 primitives); [`2026-05-21-composition-builder.md`](../2026-05-21-composition-builder.md) Phase 1 (fixture compositions); [`2026-05-21-aql-builders.md`](../2026-05-21-aql-builders.md) optional for AQL lint subset
+**Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 + 6 (compiled template + RMInfoLookup + walker + REQ-103 primitives); [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) Phase 1 (fixture compositions); [`2026-05-21-aql-builders.md`](../2026-05-21-aql-builders.md) optional for AQL lint subset
 **Defers:** Full ADL2 / AOM 2 validation surface; terminology server checks (external code-list verification); validate wire bytes / canonical JSON (no `serialize/` import); cross-archetype reference integrity (slot-fill linker)
 
 ## Goal
@@ -196,7 +196,7 @@ const (
 |---|---|
 | Depends-on: REQ-100 follow-up plan Phases 4 + 4-bis + 5 + 6 | |
 | Phase 0 REQ-102 spec + sentinels + interfaces + import-guard test | landed |
-| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [archive/2026-05-24-composition-validation-template-driven.md](archive/2026-05-24-composition-validation-template-driven.md)) |
+| Phase 1 Composition validator (structural + primitive dispatchers) | landed (RM-guided intermediate; superseded by v2 — see [archive/2026-05-24-composition-validation-template-driven.md](2026-05-24-composition-validation-template-driven.md)) |
 | Phase 2 Demographic validator | |
 | Phase 2 AQL lint subset | |
 | PROBE-024 sandbox probe | |
@@ -212,12 +212,12 @@ The [composition validation plan](2026-05-24-composition-validation-template-dri
 
 ## Mapping to specs
 
-- [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) — validation must not import serialize
-- [`docs/specifications/rm-modeling.md`](../../docs/specifications/rm-modeling.md) — concrete types, typereg
-- [`openehr/validation/doc.go`](../../openehr/validation/doc.go) — package intent
-- [`docs/specifications/clinical-modeling.md`](../../docs/specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
+- [`docs/specifications/module-layout.md`](../../specifications/module-layout.md) — validation must not import serialize
+- [`docs/specifications/rm-modeling.md`](../../specifications/rm-modeling.md) — concrete types, typereg
+- [`openehr/validation/doc.go`](../../../openehr/validation/doc.go) — package intent
+- [`docs/specifications/clinical-modeling.md`](../../specifications/clinical-modeling.md) § REQ-100 — OPT parse + paths (landed)
 - Proposed: `docs/specifications/clinical-modeling.md` § REQ-102 — validation surfaces
-- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)
+- [`docs/specifications/conformance.md`](../../specifications/conformance.md) — PROBE-021 (execute), PROBE-024 (proposed)
 
 ## References (research baseline, informational)
 

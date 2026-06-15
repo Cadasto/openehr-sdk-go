@@ -2,7 +2,7 @@
 
 Get from zero to a working import in a few minutes. This guide targets **application developers** integrating the SDK — not contributors editing normative specs. For the full contract and package map, see [architecture.md](architecture.md) and [specifications/](specifications/).
 
-> **Version:** pin an exact tag while the SDK is pre-1.0. As of `v0.3.0`, minors may break public API. See [releases.md](releases.md).
+> **Version:** the SDK is pre-1.0 — pin an exact tag; minors may break public API. See [releases.md](releases.md).
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ Get from zero to a working import in a few minutes. This guide targets **applica
 Add the module to your project:
 
 ```bash
-go get github.com/cadasto/openehr-sdk-go@v0.3.0
+go get github.com/cadasto/openehr-sdk-go@latest   # pre-1.0: pin an exact tag (see releases.md)
 ```
 
 Clone this repository if you want to run the bundled examples or contribute:
@@ -197,7 +197,7 @@ From the repo root:
 
 ```bash
 make help     # discover targets
-make fmt      # gofmt the tree
+make fmt      # gofumpt + goimports
 make test     # unit tests + codegen drift check
 make lint     # golangci-lint (same config as CI)
 make ci       # full PR gate — run before opening a PR

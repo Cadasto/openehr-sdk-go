@@ -4,18 +4,44 @@ All notable changes to `github.com/cadasto/openehr-sdk-go` are recorded here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) — release policy in [`docs/releases.md`](docs/releases.md).
 
-Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dropped experiments fold into the relevant Added bullet (or are omitted) rather than carry separate `### Changed` / `### Fixed` / `### Removed` entries. Bullets are **short and high-level** (artefact class + scope + key REQs/probes) — detail belongs in commit messages and PR bodies (see [`AGENTS.md § CHANGELOG.md`](AGENTS.md#changelogmd)).
+Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dropped experiments fold into the relevant Added bullet (or are omitted) rather than carry separate `### Changed` / `### Fixed` / `### Removed` entries. Bullets are **short and high-level** (artefact class + scope + key REQs/probes) — detail belongs in commit messages and PR bodies (see [`AGENTS.md § Code style and conventions`](AGENTS.md#code-style-and-conventions)).
 
 ## [Unreleased]
 
 ### Added
 
 - Transport-layer 401 → re-auth via optional `auth.Invalidatable` capability: `transport/` invalidates the active TokenSource on a wire 401 and retries once with a fresh token; `auth/clientcreds` implements it, recovering tokens minted without `expires_in` (REQ-063, PROBE-073/074).
+- **AQL builders (REQ-055).** `openehr/aql` gains a struct-builder (`NewBuilder`) and verb-functions (`Select` / `From` / `FromEHR` / `Where`) that emit byte-identical, canonical AQL (PROBE-020); typed values (`Param` + literals, the injection guard), comparisons, and `And` / `Or`; `openehr/client/query` maps backend path-resolution failures to `aql.ErrPathResolution` (PROBE-021). Completes the Phase 2 clinical building blocks.
+
+## [0.6.0] - 2026-06-15
+
+Sixth `v0.x` minor — a documentation and developer-tooling cycle: the SDD documentation overhaul plus adoption of the first-party **go-coding** toolchain. **No public API or behaviour change this cycle** — the security-hardening specs REQ-073 / REQ-108 formalise behaviour already shipped in `v0.4.0`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — none this cycle; safe to upgrade from `v0.5.0`.
+
+### Added
+
+- **Go developer tooling — go-coding plugin adoption.** Formatting moves to gofumpt + goimports via `golangci-lint fmt`, and linting to a golangci-lint v2 reference set (`modernize`, `errorlint`, `bodyclose`, `noctx`, `contextcheck`, …), both routed through one pinned shim (`make fmt` / `fmt-check` / `lint`; the dev image carries golangci-lint v2.11.4). Includes a behaviour-preserving `modernize` sweep across the hand-written tree (generated `*_gen.go` untouched). No consumer-visible change.
+- **Documentation — SDD overhaul + agent context routing.** Restructured README / SECURITY / contributor & agent guides; expanded the architecture and roadmap narratives; decoupled the specs from the PoC (research strands 01–03 resolved); dropped PHP-SDK parity framing in favour of openEHR wire conformance; added REQ-083 (Cadasto platform API conformance) and formalised the already-shipped security hardening as REQ-073 (discovery trust posture) + REQ-108 (untrusted document bounds), with [ADR 0006](docs/adr/0006-composition-validation-walker-placement.md) (composition-validation walker placement). New agent helpers `make spec-context REQ=NNN` and `make probe-status`, plus a stricter `spec-check` (full REQ coverage; Draft-is-binding; REQ.md Impl. == traceability implementation).
+
+## [0.5.0] - 2026-06-13
+
+Fifth `v0.x` minor — completes REQ-094 `Prefer` write-path negotiation on versioned writes (`composition` / `directory` / `ehr_status`): `return=identifier` populates the version identifier slot from the ITS-REST `Identifier` body, and `return=representation` with an empty body now returns `transport.ErrInvalidShape` instead of silently yielding a nil resource. New exported surface: `ehr.Identifier` + `(*VersionMetadata).ResolveIdentifierBody`. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — the only behavioural change this cycle is the stricter empty-`representation` handling (previously a silent `nil`); no signature changes and no in-tree callers affected. Pin to the exact tag.
+
+### Added
+
+- **REQ-094 `Prefer` write-path negotiation completed.** Versioned writes (`composition` / `directory` / `ehr_status`) now honour `Prefer: return=identifier` — the ITS-REST `Identifier` body (`{"uid": …}`) populates the `VersionMetadata` identifier slot (via `ehr.ResolveIdentifierBody`, with the `Location` header staying canonical) — and `return=representation` with an empty body now returns `transport.ErrInvalidShape` instead of silently yielding a nil resource ("MUST NOT silently downgrade").
+
+## [0.4.0] - 2026-06-12
+
+Fourth `v0.x` minor — security hardening across auth / transport / SMART / OPT + BMM input, SMART launch-state verification (REQ-061), the contribution write-audit shape correction (SPECITS-95 / ITS-REST PR 131), plus deduplication and least-privilege release tooling and a `lang` BMM pin sync. Per [`docs/releases.md`](docs/releases.md), `v0.x` minors may break public API — two breaks this cycle, both with no in-tree callers: (1) `smart.Source.ExchangeAuthorizationCode` gains a `callbackState` argument verified before any token-endpoint call (migrate by passing the redirect's `state` query parameter; `BeginAuthorization("")` now self-generates state); (2) the contribution submission write shape — `Submission.Audit` is now `contribution.UpdateAudit` and `Submission.Versions` entries are the `OriginalVersion[T]` / `ImportedVersion[T]` write-wrappers (migrate via `WrapOriginalVersion` / `WrapImportedVersion`). Pin to the exact tag.
+
+### Added
+
 - **Developer onboarding** — quick-start and runnable examples catalog under `docs/`.
 - **Security hardening (auth / transport / SMART / OPT + BMM input).** SMART discovery rejects issuer mismatch and non-https catalog endpoints; `transport.WireError` keeps the openEHR error *message* and raw body out of `Error()` by default (opt in via `transport.WithRawErrorBodies`); transport caps response bodies (`transport.WithMaxResponseBody`, default `transport.DefaultMaxResponseBody` 64 MiB); OPT / BMM / template-upload reads are size-bounded (`bmm.ErrInputTooLarge`) and OPT tree, path, and polymorphic-JSON decode are depth-bounded (`typereg.ErrMaxDepthExceeded`); item-tag header values reject control characters; principal / launch-context claim maps are defensively copied; `crypto/rand` entropy added to the JWT-bearer JTI; `C_STRING` patterns compile once (`constraints.NewCString`).
 - **SMART launch state verification (REQ-061).** Breaking change: `smart.Source.ExchangeAuthorizationCode` gains a `callbackState` parameter and verifies it against the issued state *before* any token-endpoint call, returning the new `smart.ErrLaunchInvalidState` on mismatch; `BeginAuthorization("")` now generates a cryptographically random state. Migrate by passing the `state` query parameter received at the redirect URI as `callbackState`.
 - **Simplification & tooling.** Deduplicated the OAuth2-error parser and audit-details marshaller (`ehr.MarshalAuditDetails`); cached `rminfo.KnownRMTypes`; release workflow split into a read-only verify job and a write-scoped publish job; `bmmgen` confines generated output paths; Dockerfile pins the Go patch version.
 - **BMM `lang` pin synced to upstream.** Replaced the pinned `openehr_lang_1.1.0` schema with the canonical modular publisher form (it now includes `base` rather than inlining it). The BMM loader gained diamond-include support: a definition reached via two include paths (e.g. `am2.4 → base` and `am2.4 → lang → base`) merges once when identical, instead of erroring. Reference-only schema — no generated code changes.
+- **Contribution write-audit shape (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).** The contribution submission request now carries the write-side commit-audit shape — server-assigned `time_committed` omitted, `change_type` kept as `DV_CODED_TEXT` — defaulting to `_type:"AUDIT_DETAILS"` with a settable `UPDATE_AUDIT` fallback for non-conformant servers. Breaking change: `Submission.Audit` becomes `contribution.UpdateAudit`, and `Submission.Versions` entries become the `OriginalVersion[T]` / `ImportedVersion[T]` write-wrappers (`WrapOriginalVersion` / `WrapImportedVersion`); no in-tree callers outside the package. PROBE-072 extended; REQ-050 / REQ-095.
 
 ## [0.3.0] - 2026-05-28
 
@@ -63,7 +89,7 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 
 ### Known follow-ups (not landed)
 
-- [REQ-094 write-path gaps](docs/plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
+- [REQ-094 write-path gaps](docs/plans/archive/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
 - AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
-- Demographic REST client ([plan §Phase 7](docs/plans/2026-05-15-rest-api-client.md)) — `doc.go` stub only.
-- CDR benchmark migration ([plan §Phase 9](docs/plans/2026-05-15-rest-api-client.md), STRAND-01).
+- Demographic REST client ([plan](docs/plans/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
+- Benchmark harness migration ([plan §Phase 9](docs/plans/archive/2026-05-15-rest-api-client.md)).

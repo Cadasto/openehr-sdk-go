@@ -2,6 +2,7 @@ package bmm
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -21,7 +22,7 @@ var maxBMMBytes int64 = 32 << 20
 // use [LoadAll] with a [Resolver].
 func Load(r io.Reader) (*Schema, error) {
 	if r == nil {
-		return nil, fmt.Errorf("bmm.Load: reader is nil")
+		return nil, errors.New("bmm.Load: reader is nil")
 	}
 	data, err := io.ReadAll(io.LimitReader(r, maxBMMBytes+1))
 	if err != nil {
@@ -35,7 +36,7 @@ func Load(r io.Reader) (*Schema, error) {
 
 func loadFromBytes(data []byte) (*Schema, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("bmm.Load: empty input")
+		return nil, errors.New("bmm.Load: empty input")
 	}
 	var aux struct {
 		BMMVersion           string                     `json:"bmm_version"`

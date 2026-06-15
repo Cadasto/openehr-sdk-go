@@ -190,7 +190,7 @@ func String() string
 **Tasks:**
 
 1. Add [`docs/releases.md`](../../releases.md) — semver rules, `v0.x` break policy, consumer pinning examples, v1.0.0 checklist link.
-2. Link from [`README.md`](../../README.md), [`AGENTS.md`](../../AGENTS.md), [`docs/ci.md`](../../ci.md).
+2. Link from [`README.md`](../../../README.md), [`AGENTS.md`](../../../AGENTS.md), [`docs/ci.md`](../../ci.md).
 3. Add row to [`docs/specifications/traceability.yaml`](../../specifications/traceability.yaml) if a REQ for release stamping is desired (optional **REQ-107** “Release metadata package”).
 
 **Definition of done:** Contributors know when to bump what without reading this plan.

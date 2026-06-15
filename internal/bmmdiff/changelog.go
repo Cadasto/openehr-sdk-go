@@ -170,7 +170,7 @@ func changedClassSummary(cc ClassChange) string {
 		}
 		// Mention the first few; if longer, fall back to a count.
 		if len(names) <= 3 {
-			parts = append(parts, fmt.Sprintf("gains optional property %s", strings.Join(names, ", ")))
+			parts = append(parts, "gains optional property "+strings.Join(names, ", "))
 		} else {
 			parts = append(parts, fmt.Sprintf("gains %d properties", len(names)))
 		}

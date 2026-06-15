@@ -120,7 +120,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	}
 	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidConfig, err)
+		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
 	tracer := otel.GetTracerProvider().Tracer(tracerName)
@@ -479,7 +479,7 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 
 func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) {
 	if base == nil {
-		return nil, fmt.Errorf("nil base URL")
+		return nil, errors.New("nil base URL")
 	}
 	out := *base
 	out.Path = joinPaths(base.Path, path)

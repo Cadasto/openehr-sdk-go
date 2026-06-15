@@ -1,11 +1,11 @@
 # Plan — openEHR REST API client (1.1.0-development)
 
 **Date:** 2026-05-15
-**Status:** Implemented (Partial) — Phases 1–6 + 8 landed; Phase 7 (Demographic) and Phase 9 (CDR benchmark, STRAND-01) open.
+**Status:** Archived — Phases 1–6 + 8 landed (the openEHR REST client family). Phase 7 (Demographic) split out to the active plan [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md); Phase 9 (benchmark harness) is optional/deferred.
 **Owner:** SDK maintainers
 **Covers:** REQ-050, REQ-051, REQ-054, REQ-055, REQ-057, REQ-058, **REQ-059 (openEHR custom headers)**, REQ-013, REQ-014, REQ-020, REQ-021, REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-060..068 (auth integration), REQ-070..072 (discovery integration), REQ-090..092 (observability/retry/TLS), **REQ-093 (error envelope)**, **REQ-094 (`Prefer` negotiation)**, **REQ-095 (OpenAPI authoritative source)**; PROBE-010..013 implement; reserves PROBE-040..049 (REST-binding probes)
-**Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](archive/2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)
-**Defers:** SMART OAuth2/PKCE flow implementation (covered separately by the SMART plan when it lands); federator policy (separate proposal); FLAT/STRUCTURED simplified-format clients (separate plan); cassette recording infrastructure (testkit work); REQ-094 write-path gaps (`Prefer=identifier`, `representation` + empty body) — **[`2026-05-25-req094-prefer-followups.md`](2026-05-25-req094-prefer-followups.md)** (**Implementation: not landed**)
+**Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)
+**Defers:** SMART OAuth2/PKCE flow implementation (covered separately by the SMART plan when it lands); federator policy (separate proposal); FLAT/STRUCTURED simplified-format clients (separate plan); cassette recording infrastructure (testkit work); REQ-094 write-path gaps (`Prefer=identifier`, `representation` + empty body) — **[`2026-05-25-req094-prefer-followups.md`](2026-05-25-req094-prefer-followups.md)** (**landed**)
 
 ## Implementation progress (normative detail stays in `docs/specifications/`)
 
@@ -17,9 +17,9 @@
 | 4 — EHR versioned writes | PUT/POST/DELETE, `contribution`, PROBE-010–012 | **Done** |
 | 5 — Query API | `openehr/client/query/` | **Done** |
 | 6 — Definition API | templates, stored queries | **Done** (ADL 1.4 templates + stored AQL CRUD; PROBE-067) |
-| 7 — Demographic API | `openehr/client/demographic/` | **Open** (`doc.go` only) |
+| 7 — Demographic API | **split out** → [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md) | Open |
 | 8 — Admin API | `openehr/client/admin/` ITS-REST housekeeping | **Done** (REQ-099; PROBE-070) |
-| 9 — CDR benchmark (STRAND-01) | migrate reference CDR load harness | Open |
+| 9 — Benchmark harness | load/benchmark consumer over the client | Open |
 
 ## Goal
 
@@ -41,7 +41,7 @@ Consumers import the leaves they need (REQ-013) — e.g. `openehr/client/ehr/com
 | Sandbox | `sandbox/` | In-memory + cassette transports that implement the same client interfaces |
 | Testkit | `testkit/` | Test doubles, cassette runners, conformance probes |
 
-The client does **not** introduce new building-block dependencies. It composes existing ones per the SDK's dependency direction (REQ-014, [`docs/specifications/module-layout.md § Dependency direction`](../../docs/specifications/module-layout.md#dependency-direction)).
+The client does **not** introduce new building-block dependencies. It composes existing ones per the SDK's dependency direction (REQ-014, [`docs/specifications/module-layout.md § Dependency direction`](../../../docs/specifications/module-layout.md#dependency-direction)).
 
 ## What "REST 1.1.0-development" means here
 
@@ -68,8 +68,8 @@ Per the openEHR ITS-REST overview and per the per-area OpenAPI YAML sources (the
 ## Why now
 
 - The BMM codegen, canonical JSON codec, and `transport/` building blocks are complete (or scheduled). The client is the bridge that ties them to consumers.
-- The four primary use cases (benchmark, seeder, MCP server, federator — [`docs/specifications/use-cases.md § Primary use cases`](../../docs/specifications/use-cases.md#primary-use-cases)) **all** need the REST client. Without it, every use case rebuilds HTTP, auth, RM serialization, and error mapping in isolation — exactly the drift problem the SDK was created to prevent.
-- STRAND-01 (CDR extraction) closes when the existing CDR benchmark routes through this client and reproduces percentiles within tolerance.
+- The four primary use cases (benchmark, seeder, MCP server, federator — [`docs/specifications/use-cases.md § Primary use cases`](../../../docs/specifications/use-cases.md#primary-use-cases)) **all** need the REST client. Without it, every use case rebuilds HTTP, auth, RM serialization, and error mapping in isolation — exactly the drift problem the SDK was created to prevent.
+- A benchmark harness exercises the client under realistic load — deferred to Phase 9 (optional).
 - PROBE-010..013 (versioned-write conformance — REQ-054) cannot be implemented in code without a real client.
 
 ## Out of scope
@@ -78,14 +78,14 @@ Per the openEHR ITS-REST overview and per the per-area OpenAPI YAML sources (the
 - **Federator policy** (authority, merge, partial-failure semantics) — separate proposal pending MPI research outcomes. The client provides per-node primitives; policy is the consumer's.
 - **MCP framework integration** — the client is consumable from an MCP server; the wiring is the MCP server's concern.
 - **FLAT / STRUCTURED / Web-Template format clients** — separate plan. Each format has different semantics, different content types, different OPT-driven assembly logic. This plan covers canonical JSON (default) and canonical XML (negotiable).
-- **EHR Extract API** — deferred per existing scope decision (RM `ehr_extract` package skipped — see [`docs/specifications/scope.md`](../../docs/specifications/scope.md) and the BMM codegen plan).
+- **EHR Extract API** — deferred per existing scope decision (RM `ehr_extract` package skipped — see [`docs/specifications/scope.md`](../../../docs/specifications/scope.md) and the BMM codegen plan).
 - **AQL builder design** — that's `openehr/aql/`. This plan's `client/query` package consumes the builder but does not redesign it.
 - **Cassette recording infrastructure** — depends on the testkit work; this plan declares the dependency but does not implement the recorder.
 - **Cadasto Extra / Datamap / Care / MPI / Admin** — those live under `cadasto/...` and have their own plans. This plan covers only standard openEHR ITS-REST.
 
 ## Package layout (additive to existing module layout)
 
-Already present as stubs (per [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md)):
+Already present as stubs (per [`docs/specifications/module-layout.md`](../../../docs/specifications/module-layout.md)):
 
 ```
 openehr/client/
@@ -142,10 +142,10 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 **Tasks:**
 
-1. **Specs updates landed alongside this plan (already in `docs/specifications/`):** REQ-059 (openEHR custom header family), REQ-093 (error envelope), REQ-094 (`Prefer` negotiation), REQ-095 (OpenAPI YAML authoritative source); [`wire.md`](../../docs/specifications/wire.md) sections "Functional API areas", "Authoritative source", "openEHR custom header family", "`Prefer` negotiation", "Error envelope"; [`module-layout.md`](../../docs/specifications/module-layout.md) — added `openehr/client/admin/` and `openehr/client/ehr/<sub-leaves>/` (composition, contribution, directory, ehrstatus, itemtags); [`glossary.md`](../../docs/specifications/glossary.md) — `Prefer`, `openehr-audit-details`, expanded ItemTag, error envelope, OpenAPI authoritative source entries.
-2. **Reserve probes in [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)** (Draft placeholders):
+1. **Specs updates landed alongside this plan (already in `docs/specifications/`):** REQ-059 (openEHR custom header family), REQ-093 (error envelope), REQ-094 (`Prefer` negotiation), REQ-095 (OpenAPI YAML authoritative source); [`wire.md`](../../../docs/specifications/wire.md) sections "Functional API areas", "Authoritative source", "openEHR custom header family", "`Prefer` negotiation", "Error envelope"; [`module-layout.md`](../../../docs/specifications/module-layout.md) — added `openehr/client/admin/` and `openehr/client/ehr/<sub-leaves>/` (composition, contribution, directory, ehrstatus, itemtags); [`glossary.md`](../../../docs/specifications/glossary.md) — `Prefer`, `openehr-audit-details`, expanded ItemTag, error envelope, OpenAPI authoritative source entries.
+2. **Reserve probes in [`docs/specifications/conformance.md`](../../../docs/specifications/conformance.md)** (Draft placeholders):
    - **PROBE-040** — EHR creation round-trip (POST `/ehr` → EHR_STATUS body → 201 → `ehr_id` extracted).
-   - **PROBE-041** — Composition versioned write — `Prefer: return=representation` returns a bare `COMPOSITION` body with new `ETag` (SDK-GAP-09); renumbered to PROBE-061 + PROBE-071 in the REST-binding range. See [`conformance.md`](../specifications/conformance.md#probe-061--composition-versioned-write-with-prefer-returnrepresentation).
+   - **PROBE-041** — Composition versioned write — `Prefer: return=representation` returns a bare `COMPOSITION` body with new `ETag` (SDK-GAP-09); renumbered to PROBE-061 + PROBE-071 in the REST-binding range. See [`conformance.md`](../../specifications/conformance.md#probe-061--composition-versioned-write-with-prefer-returnrepresentation).
    - **PROBE-042** — `openehr-audit-details` header round-trip (write → read back via Contribution).
    - **PROBE-043** — Discovery-routed request — client uses `org.openehr.rest` base URL from `ServiceCatalog`, not a hard-coded value.
    - **PROBE-044** — Per-request `auth.TokenSource` (via `ctx`) overrides client-default `TokenSource` for the duration of one request.
@@ -212,7 +212,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
    - `openehr-audit-details` set from a `transport.WithAuditDetails(...)` per-call option.
    - `Prefer` from a `transport.WithPrefer("return=representation")` option.
    - W3C `traceparent`/`tracestate` from OTel propagation (REQ-090).
-6. **Error mapping** — status code → typed sentinel from [`docs/specifications/idiom.md § Errors`](../../docs/specifications/idiom.md#errors):
+6. **Error mapping** — status code → typed sentinel from [`docs/specifications/idiom.md § Errors`](../../../docs/specifications/idiom.md#errors-req-025):
    - `404` → `ErrNotFound`
    - `401` → `ErrUnauthorized`
    - `403` → `ErrForbidden`
@@ -297,7 +297,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 9. **Typed errors propagated:** `transport.ErrPreconditionFailed`, `transport.ErrPreconditionRequired`, `transport.ErrVersionConflict` — verified via probes.
 10. Tests:
     - Round-trip POST + PUT (with `If-Match` from initial POST response) + GET (returns updated body) + DELETE (returns 204).
-    - PROBE-010 / PROBE-011 / PROBE-012 implemented as probe code (per [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md)).
+    - PROBE-010 / PROBE-011 / PROBE-012 implemented as probe code (per [`docs/specifications/conformance.md`](../../../docs/specifications/conformance.md)).
 
 **Definition of done:**
 
@@ -351,22 +351,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 ### Phase 7 — Demographic API
 
-**Outcome:** Demographic resource CRUD — the openEHR Demographic RM-side mirror of EHR ops.
-
-**Tasks:**
-
-1. `openehr/client/demographic/`:
-   - `demographic.Create(ctx, c, party *rm.Party, opts ...CreateOption) (*VersionMetadata, error)`.
-   - `demographic.Get(ctx, c, ref Ref) (*rm.Party, *VersionMetadata, error)`.
-   - `demographic.Update(ctx, c, partyID, ifMatch string, party *rm.Party, opts...) (*VersionMetadata, error)`.
-   - `demographic.Delete(ctx, c, partyID, ifMatch string) error`.
-2. `Party` is the `rm.Party` abstract interface; concrete types `Person`, `Organisation`, `Group`, `Agent` discriminated via `_type` (REQ-040 in action).
-3. Relationships and identities — covered via the same generic surface (`demographic.PartyRelationship`, etc.).
-4. The Demographic API in ITS-REST 1.1.0-development is `Status: development` — so we mirror that maturity in `openehr/client/demographic/`'s `doc.go`: API SHOULD be considered Draft, breaking changes possible between SDK minor versions until the upstream stabilises.
-
-**Definition of done:**
-
-- Demographic CRUD compiles and passes cassette tests.
+**Split out** to its own active plan: [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md). The Demographic API (PARTY-hierarchy CRUD) was `doc.go`-only when this plan was archived; it is tracked there.
 
 ### Phase 8 — Admin API
 
@@ -386,9 +371,9 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 - Admin API compiles; cassette tests exercise physical-delete flows.
 
-### Phase 9 — CDR-extraction milestone (closes STRAND-01)
+### Phase 9 — Benchmark harness (optional)
 
-**Outcome:** The reference CDR load harness runs via this SDK with no measurable percentile regression vs the current raw-HTTP baseline.
+**Outcome:** A load/benchmark harness runs via this SDK with no measurable percentile regression vs a raw-HTTP baseline.
 
 **Tasks:**
 
@@ -397,20 +382,18 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
    - The leaf clients here (`system`, `ehr/composition`, `ehr/ehrstatus`, `ehr/directory`, `definition`).
 2. Confirm: the `BuildEHRStatusBody` / `BuildDirectoryBody` `map[string]any` body builders disappear from the benchmark; the benchmark builds typed `rm.EhrStatus` / `rm.Folder` values and the codec emits bytes.
 3. Run the full benchmark; capture p50/p95/p99 against the raw-HTTP baseline. Document the comparison.
-4. Update [`docs/specifications/research-strands.md § STRAND-01`](../../docs/specifications/research-strands.md) to **Resolved** with the comparison evidence cited.
 
 **Definition of done:**
 
 - Benchmark builds on the SDK.
 - p50, p95, p99 within 5% of the raw-HTTP baseline (or a documented justification for any larger delta).
-- STRAND-01 marked Resolved.
 
 ## Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
 | ITS-REST 1.1.0-development endpoint paths drift between development and final 1.1.0 | The SDK pins to the OpenAPI YAML at a specific upstream commit (recorded in `testkit/cassettes/its_rest/README.md`). When 1.1.0 final ships, bump the pin in one commit; CI catches drift via the cassette set. |
-| Cadasto deployment headers (`X-Tenant-Id`, `X-Subject-Id`) leak into the openEHR-core client | The standard client never sets Cadasto headers. Tenant routing is handled by the deployment gateway (per [`docs/specifications/auth.md § Per-client tenant binding`](../../docs/specifications/auth.md) — one client = one tenant). If a Cadasto-specific header is required, it goes via `transport.WithCadastoSpecVersionHeader(true)` (REQ-051) or under `cadasto/extra/`. |
+| Cadasto deployment headers (`X-Tenant-Id`, `X-Subject-Id`) leak into the openEHR-core client | The standard client never sets Cadasto headers. Tenant routing is handled by the deployment gateway (per [`docs/specifications/auth.md § Per-client tenant binding`](../../../docs/specifications/auth.md) — one client = one tenant). If a Cadasto-specific header is required, it goes via `transport.WithCadastoSpecVersionHeader(true)` (REQ-051) or under `cadasto/extra/`. |
 | `Prefer: return=representation` doubles wire bandwidth on writes | Documented; default for writes is `minimal`. Consumers opt in per call. The benchmark's POST shape (return-minimal-then-GET-for-ETag) is preserved by default. |
 | Versioned-write semantics confuse consumers (when to send If-Match vs not) | Typed PUT functions REQUIRE `ifMatch string` as a non-optional parameter — the type system enforces it. Forgetting it is a compile error, not a 428 at runtime. |
 | The `_type` field appears in the wrong RM shape after decoding via typereg | Caught by canjson Phase 2 round-trip tests; orthogonal to this plan but a dependency. |
@@ -423,23 +406,23 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 ## Mapping to specs
 
-- [docs/specifications/wire.md § REST version pin](../../docs/specifications/wire.md#req-050) — REQ-050; the contract.
-- [docs/specifications/wire.md § Cadasto spec-version header](../../docs/specifications/wire.md#req-051) — REQ-051; opt-in plumbing in `transport/`.
-- [docs/specifications/wire.md § Optimistic concurrency](../../docs/specifications/wire.md#req-054) — REQ-054; the versioned-write contract.
-- [docs/specifications/wire.md § AQL](../../docs/specifications/wire.md#req-055) — REQ-055; consumed by `client/query/`.
-- [docs/specifications/wire.md § Stored AQL](../../docs/specifications/wire.md#req-057) — REQ-057; consumed by `client/definition/` and `client/query/`.
-- [docs/specifications/idiom.md](../../docs/specifications/idiom.md) — REQ-020..026; followed by every leaf client.
-- [docs/specifications/auth.md](../../docs/specifications/auth.md) — REQ-060..068; integrated via `transport.WithTokenSource` and per-request `auth.WithTokenSource(ctx, ts)`.
-- [docs/specifications/service-discovery.md](../../docs/specifications/service-discovery.md) — REQ-070..072; integrated via `transport.WithServiceCatalog`.
-- [docs/specifications/conformance.md](../../docs/specifications/conformance.md) — PROBE-010..013 implemented; PROBE-040..049 reserved/implemented.
-- [docs/specifications/research-strands.md STRAND-01](../../docs/specifications/research-strands.md) — closes in Phase 9.
+- [docs/specifications/wire.md § REST version pin](../../../docs/specifications/wire.md#req-050) — REQ-050; the contract.
+- [docs/specifications/wire.md § Cadasto spec-version header](../../../docs/specifications/wire.md#req-051) — REQ-051; opt-in plumbing in `transport/`.
+- [docs/specifications/wire.md § Optimistic concurrency](../../../docs/specifications/wire.md#req-054) — REQ-054; the versioned-write contract.
+- [docs/specifications/wire.md § AQL](../../../docs/specifications/wire.md#req-055--wire-boundary) — REQ-055; consumed by `client/query/`.
+- [docs/specifications/wire.md § Stored AQL](../../../docs/specifications/wire.md#req-057) — REQ-057; consumed by `client/definition/` and `client/query/`.
+- [docs/specifications/idiom.md](../../../docs/specifications/idiom.md) — REQ-020..026; followed by every leaf client.
+- [docs/specifications/auth.md](../../../docs/specifications/auth.md) — REQ-060..068; integrated via `transport.WithTokenSource` and per-request `auth.WithTokenSource(ctx, ts)`.
+- [docs/specifications/service-discovery.md](../../../docs/specifications/service-discovery.md) — REQ-070..072; integrated via `transport.WithServiceCatalog`.
+- [docs/specifications/conformance.md](../../../docs/specifications/conformance.md) — PROBE-010..013 implemented; PROBE-040..049 reserved/implemented.
+- [docs/specifications/research-strands.md § STRAND-01](../../../docs/specifications/research-strands.md) — Resolved; the SDK is independent, so the Phase 9 benchmark harness is optional.
 
 ## Out-of-band considerations
 
 - **Cross-SDK parity (REQ-080, REQ-081).** The PHP SDK's wire request for the same SDK call MUST be byte-equivalent (modulo header order / case). Cassettes are shared across SDKs once the cassette format stabilises.
 - **CDR benchmark as the reference consumer.** The CDR's `cmd/benchmark/internal/client/client.go` (currently on `claude/implement-v4`) is the closest existing code to what this plan produces. It demonstrates: HTTP transport tuning per worker, ETag round-trip, `If-Match` quoting, version-UID extraction, and Cadasto-specific `X-Tenant-Id` / `X-Subject-Id` headers. The SDK extracts the **patterns** (transport tuning is consumer config; ETag/If-Match plumbing is in `transport/`); it does not lift Cadasto-specific headers into the openEHR-core surface.
 - **Sandbox transport equivalence.** Every leaf client MUST be testable against `sandbox/` without code changes — `sandbox.NewInMemory()` implements the same `transport.Client`-like interface so the leaf clients can swap transports at construction time. This is the building block for hermetic SDK-consumer tests.
-- **Federator implications.** Phase 1's `transport.Client` is per-issuer / per-tenant (REQ-065). The federator constructs multiple clients with independent `*http.Client`, `ServiceCatalog`, and `TokenSource` configurations — see [`docs/specifications/research-strands.md § STRAND-06`](../../docs/specifications/research-strands.md). This plan does not resolve STRAND-06 but it does provide the per-node primitive.
+- **Federator implications.** Phase 1's `transport.Client` is per-issuer / per-tenant (REQ-065). The federator constructs multiple clients with independent `*http.Client`, `ServiceCatalog`, and `TokenSource` configurations — see [`docs/specifications/research-strands.md § STRAND-06`](../../../docs/specifications/research-strands.md). This plan does not resolve STRAND-06 but it does provide the per-node primitive.
 - **Future: streaming bodies.** Out of scope. Large composition payloads (>10 MB) are rare in v1; if a use case appears, add a `transport.WithStreaming(...)` option later.
 - **Future: HTTP/2 multiplexing.** The injected `*http.Client` transport governs HTTP/2 use. The SDK does not configure it.
 - **Future: Conformance test against EHRbase.** The openEHR-core part of this client is in theory vendor-neutral. STRAND-08 (Cadasto extras boundary) tracks whether to formalise EHRbase as a tested backend; this plan does not commit to it but does not preclude it (the standard openEHR REST endpoints, headers, and error envelopes are EHRbase-compatible).

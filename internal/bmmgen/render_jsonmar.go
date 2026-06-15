@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -131,12 +132,7 @@ func needsExternalImportForJSONMar(plan *Plan, chunks []string) bool {
 		return false
 	}
 	re := qualifierClassRE(plan.Target.ExternalQualifier)
-	for _, c := range chunks {
-		if re.MatchString(c) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(chunks, re.MatchString)
 }
 
 // concreteClassesIn returns the subset of file.Classes that should

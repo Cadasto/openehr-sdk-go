@@ -6,8 +6,8 @@
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
 **Implementation:** partial — landed: OPT parser (REQ-100) including the C_PRIMITIVE_OBJECT inner-`<item>` wire parser, compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, REQ-102 composition validation, REQ-107 template-driven instance generator (with full PROBE-023 unmarshal round-trip), REQ-101 composition builder; open: AQL builders ([plan](2026-05-21-aql-builders.md)); demographic/AQL validators still planned (umbrella validation plan)
-**Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
-**Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full cross-SDK probe ratification (REQ-080–081)
+**Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
+**Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full openEHR conformance-probe ratification (REQ-080)
 
 ## Goal
 
@@ -26,7 +26,7 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 | 5 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | open |
 | 6 | [`archive/2026-05-26-c-primitive-object-wire-parser.md`](archive/2026-05-26-c-primitive-object-wire-parser.md) | `openehr/template/` parser + `openehr/instance/` UID emission | (landed) |
 
-Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).
+Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).
 
 ## Dependency graph
 
@@ -87,16 +87,16 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 2. **Package-level API (REQ-023).** Prefer functions + options; optional `Repository` only where the REST client already established the pattern.
 3. **No reflection for type dispatch (REQ-024).** Template/composition paths use generics or closed switches over known RM categories — not `reflect` for clinical data.
 4. **Traceability.** Land code → update [`docs/specifications/traceability.yaml`](../../docs/specifications/traceability.yaml) + [`docs/specifications/REQ.md`](../../docs/specifications/REQ.md) in the **same PR** as the child plan phase completes.
-5. **Probes.** Sandbox-first probes under `testkit/probes/{template,composition,validation,aql}/` when wire assertions exist; ratification (REQ-081) stays out of scope until PHP SDK parity.
+5. **Probes.** Sandbox-first probes under `testkit/probes/{template,composition,validation,aql}/` when wire assertions exist; Live-mode ratification (REQ-082) stays out of scope for now.
 
 ## Umbrella progress
 
 | Child plan | Phase 0 (spec/fixtures) | Phase 1 (MVP) | Phase 2 (hardening) | Status |
 |---|---|---|---|---|
 | OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
-| Composition builder | | | | **Open** |
+| Composition builder | Done | Done | — | **Done** — REQ-101 `NewSkeleton` + `Builder.Set/Build`; PROBE-023 full round-trip. [archive](archive/2026-05-21-composition-builder.md) |
 | Validation (REQ-102 composition) | Done | Done | — | **Done** — [composition validation plan](archive/2026-05-24-composition-validation-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](archive/2026-05-21-validation.md)) |
-| AQL builders | | | | **Open** (wire models **Done**) |
+| AQL builders | Done | Done | Done | **Done** — REQ-055 struct + verb builders, shared emitter, PROBE-020/021 (Sandbox). [plan](2026-05-21-aql-builders.md) |
 
 Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md) milestone **Phase 2** flips when all four child Phase 1 rows are **Done**.
 

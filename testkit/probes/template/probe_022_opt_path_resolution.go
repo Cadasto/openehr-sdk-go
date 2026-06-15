@@ -50,10 +50,10 @@ type PathAssertion struct {
 func Probe022OPTPathResolution(opt []byte, assertions []PathAssertion) (Result, error) {
 	r := Result{Probe: "PROBE-022"}
 	if len(opt) == 0 {
-		return r, fmt.Errorf("PROBE-022: empty OPT body")
+		return r, errors.New("PROBE-022: empty OPT body")
 	}
 	if len(assertions) == 0 {
-		return r, fmt.Errorf("PROBE-022: at least one assertion required")
+		return r, errors.New("PROBE-022: at least one assertion required")
 	}
 
 	tmpl, err := template.ParseOPT(bytes.NewReader(opt))

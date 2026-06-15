@@ -2,63 +2,42 @@
 
 ## Reporting a vulnerability
 
-`openehr-sdk-go` ships under [MIT](LICENSE) and currently has **no commercial support contract**. Vulnerability reports are still taken seriously — please follow this flow.
+`openehr-sdk-go` ships under [MIT](LICENSE) with no commercial support contract, but security reports are taken seriously.
 
-### How to report
+**Do not open a public issue or PR for a security bug.**
 
-Do **NOT** open a public issue or PR for security bugs.
+Report privately through GitHub (private vulnerability reporting is enabled on this repo): **Security → Report a vulnerability**, or go straight to <https://github.com/Cadasto/openehr-sdk-go/security/advisories/new>. Anyone with a GitHub account can use it, and the report stays private to maintainers. No GitHub account? Email the repository owner via the contact on their GitHub profile.
 
-**Repository collaborators (private repo today):**
+Helpful to include: SDK version (git tag, or `go list -m github.com/cadasto/openehr-sdk-go`), Go version and OS, a minimal reproduction (snippet / OPT / composition body), impact (data exposure / auth bypass / DoS / …), and a suggested fix if you have one.
 
-1. Open **Security → Advisories → New draft security advisory** in the GitHub UI, or go to <https://github.com/Cadasto/openehr-sdk-go/security/advisories/new>.
-2. Include:
-   - Go version, OS, and SDK version (`go list -m github.com/cadasto/openehr-sdk-go` or the git tag).
-   - A minimal reproduction — the smallest snippet, OPT, or composition body that exposes the issue.
-   - Impact assessment (data exposure / auth bypass / DoS / etc.).
-   - Suggested fix, if you have one.
-
-**External reporters (no repo access):** email the repository owner via the contact on their GitHub profile. We coordinate disclosure the same way as for advisory reports.
-
-**When this repository is public:** enable **Settings → Code security and analysis → Private vulnerability reporting** so non-collaborators can use GitHub's reporter form at the same advisory URL. Until then, the advisory URL is for maintainers drafting advisories only — not a public intake form.
-
-### What to expect
-
-- **Acknowledgment**: within 5 working days.
-- **Initial triage**: within 10 working days — severity, affected versions, whether we can reproduce.
-- **Fix + disclosure**: timing depends on severity and complexity. We coordinate disclosure with the reporter before publishing the advisory.
-
-We are an early-stage SDK (pre-1.0). We do not currently issue CVEs ourselves; we may request one through GitHub's CNA process for any high-severity issue.
+**What happens next:** we'll acknowledge the report, work with you to confirm and assess the issue, and coordinate a fix and disclosure before any advisory is published. As a pre-1.0, volunteer-maintained SDK we can't commit to fixed response times, but security issues take priority. We don't issue CVEs ourselves, though we may request one through GitHub's CNA process for a high-severity issue.
 
 ## Scope
 
 In scope:
 
-- Bugs that allow incorrect or unauthorised behaviour in the SDK itself.
-- Wire-protocol bugs (canonical JSON / XML codec mis-encoding) that lead to data confusion or injection.
-- AuthN/Z handling in `auth/` and `auth/smart/` — token leak, audience confusion, scope escalation, JWKS handling.
-- Build / supply-chain issues affecting consumers (e.g. a malicious dependency surfacing through `go.mod`).
+- Incorrect or unauthorised behaviour in the SDK itself.
+- Wire-codec bugs (canonical JSON / XML) causing data confusion or injection.
+- AuthN/Z in `auth/` and `auth/smart/` — token leak, audience confusion, scope escalation, JWKS handling.
+- Supply-chain issues reaching consumers through `go.mod`.
 
-Out of scope:
+Out of scope — report upstream, or not an SDK vulnerability:
 
-- Issues in the upstream openEHR specification itself — report those to the [openEHR specification editors](https://specifications.openehr.org/).
-- Issues in third-party openEHR CDR implementations — report to the CDR vendor.
-- Misconfiguration in consumer applications using the SDK (we are happy to advise but the SDK code is the scope of this policy).
-- Best-practice or hardening suggestions without a concrete vulnerability — open a public issue or discussion instead.
+- The openEHR specification itself → [openEHR editors](https://specifications.openehr.org/).
+- Third-party CDR implementations → the CDR vendor.
+- Misconfiguration in consumer applications (happy to advise).
+- Hardening suggestions without a concrete vulnerability → open a public issue or discussion.
 
 ## Supported versions
 
-While pre-1.0, **only the latest tagged release** receives security fixes. `main` carries unreleased work; consumer pinning to an unreleased commit is at their own risk.
-
-Once we reach `v1.0.0`, this section will be updated with a multi-line support window.
+Pre-1.0: **only the latest tagged release** receives security fixes. `main` carries unreleased work — pinning to it is at your own risk. A multi-version support window arrives with `v1.0.0`.
 
 ## Hardening guidance
 
-Defaults the SDK ships with that consumers should be aware of:
+SDK defaults consumers should be aware of:
 
-- **TLS** ([REQ-092](docs/specifications/transport.md#req-092--tls-posture)): the SDK respects the caller's `*http.Client`. If the caller provides a permissive `tls.Config`, the SDK does not override it. Production consumers MUST inject a strict-mode client.
-- **Token handling** ([REQ-060..069](docs/specifications/auth.md)): tokens live in `auth.TokenSource`. The SDK does not log tokens; consumers SHOULD NOT add their own logging that does.
-- **Spec-version pin** ([REQ-050](docs/specifications/wire.md#req-050)): discovery responses with a mismatched `spec_version` fail fast at construction (PROBE-003). Do not disable this.
+- **TLS** ([REQ-092](docs/specifications/transport.md#req-092--tls-posture)): the SDK uses the caller's `*http.Client` and never overrides its `tls.Config`. Inject a strict-mode client in production.
+- **Tokens** ([REQ-060..069](docs/specifications/auth.md)): held in `auth.TokenSource`; the SDK never logs them — don't add logging that does.
+- **Spec-version pin** ([REQ-050](docs/specifications/wire.md#req-050)): a mismatched discovery `spec_version` fails fast at construction (PROBE-003). Don't disable it.
 
-## Acknowledgments
-
-We thank the security community in advance for any responsible disclosure. Reporters who wish credit in the advisory will be credited; those who prefer anonymity are respected.
+Reporters who want credit in the advisory are credited; those who prefer anonymity are respected.

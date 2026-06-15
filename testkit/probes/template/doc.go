@@ -1,4 +1,4 @@
-// Package templateprobes hosts the cross-SDK conformance probes for
+// Package templateprobes hosts the openEHR conformance probes for
 // the openehr/template/ surface — local ADL 1.4 operational template
 // parsing and path resolution (PROBE-022). Probes are plain functions
 // returning (Result, error); the template probes are sandbox-only

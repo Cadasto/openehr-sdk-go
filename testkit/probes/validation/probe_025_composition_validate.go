@@ -2,6 +2,7 @@ package validationprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,10 +14,10 @@ import (
 )
 
 // ValidateCase describes one fixture tuple consumed by the
-// composition-validate probes. Cross-SDK probes assert the issue
+// composition-validate probes. The probes assert the issue
 // code MULTISET produced by ValidateComposition — not the exact
-// Detail text, not the path strings — so that wire-compatible SDKs
-// in other languages can satisfy the same probe.
+// Detail text, not the path strings — so the assertion stays at the
+// observable-behaviour level.
 type ValidateCase struct {
 	// Name labels the case for diagnostic output.
 	Name string
@@ -35,13 +36,13 @@ type ValidateCase struct {
 
 // Probe025CompositionValidate runs each fixture tuple through
 // ValidateComposition and asserts the resulting issue codes match
-// the case's WantCodes multiset. Cross-SDK parity: another SDK
-// implementing REQ-102 v2 with the same OPT + composition shape
-// MUST produce the same multiset.
+// the case's WantCodes multiset — a stable openEHR-conformance
+// assertion: any implementation of REQ-102 with the same OPT +
+// composition shape MUST produce the same multiset.
 func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-025"}
 	if len(cases) == 0 {
-		return r, fmt.Errorf("PROBE-025: at least one case required")
+		return r, errors.New("PROBE-025: at least one case required")
 	}
 	var failures []string
 	for _, tc := range cases {
@@ -62,11 +63,11 @@ func Probe025CompositionValidate(cases []ValidateCase) (Result, error) {
 // as PROBE-025 but the cases focus on structural completion:
 // missing required nodes, cardinality violations,
 // alternative_mismatch, RM-type mismatch. Code multiset
-// expectations are stable across SDKs.
+// expectations are stable across conformant implementations.
 func Probe026MissingNodes(cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-026"}
 	if len(cases) == 0 {
-		return r, fmt.Errorf("PROBE-026: at least one case required")
+		return r, errors.New("PROBE-026: at least one case required")
 	}
 	var failures []string
 	for _, tc := range cases {

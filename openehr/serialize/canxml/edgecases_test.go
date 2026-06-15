@@ -111,7 +111,7 @@ func TestDeepFolderTreeStackSafe(t *testing.T) {
 	const depth = 128
 	root := &rm.Folder{Name: rm.DVText{Value: "root"}, ArchetypeNodeID: "root"}
 	cur := root
-	for i := 0; i < depth; i++ {
+	for range depth {
 		child := &rm.Folder{Name: rm.DVText{Value: "child"}, ArchetypeNodeID: "child"}
 		cur.Folders = append(cur.Folders, *child)
 		cur = &cur.Folders[len(cur.Folders)-1]
@@ -126,7 +126,7 @@ func TestDeepFolderTreeStackSafe(t *testing.T) {
 	}
 	// Walk down to confirm depth survives the round trip.
 	got := &decoded
-	for i := 0; i < depth; i++ {
+	for i := range depth {
 		if len(got.Folders) != 1 {
 			t.Fatalf("depth %d: got %d children; want 1", i, len(got.Folders))
 		}

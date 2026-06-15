@@ -2,6 +2,7 @@ package templateprobes
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -53,10 +54,10 @@ type ValidateCase struct {
 func Probe024PrimitiveValidate(opt []byte, cases []ValidateCase) (Result, error) {
 	r := Result{Probe: "PROBE-024"}
 	if len(opt) == 0 {
-		return r, fmt.Errorf("PROBE-024: empty OPT body")
+		return r, errors.New("PROBE-024: empty OPT body")
 	}
 	if len(cases) == 0 {
-		return r, fmt.Errorf("PROBE-024: at least one case required")
+		return r, errors.New("PROBE-024: at least one case required")
 	}
 
 	tmpl, err := template.ParseOPT(bytes.NewReader(opt))

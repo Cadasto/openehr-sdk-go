@@ -12,7 +12,7 @@ The SDK **MUST** be published as the Go module `github.com/cadasto/openehr-sdk-g
 
 The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login. Consumer imports **MUST** use this exact spelling.
 
-- **Lives in:** [`go.mod`](../go.mod), all package import paths
+- **Lives in:** [`go.mod`](../../go.mod), all package import paths
 - **Related:** [module-layout.md § Module identity](module-layout.md#module-identity)
 
 ---
@@ -21,7 +21,7 @@ The path is all lowercase, matching idiomatic Go module naming and the GitHub or
 
 The SDK **MUST** declare `go 1.25` (or later patch within the 1.25 line) in `go.mod` and **MUST NOT** require a more recent Go release than is currently on the upstream supported line (N-1 policy).
 
-- **Lives in:** [`go.mod`](../go.mod)
+- **Lives in:** [`go.mod`](../../go.mod)
 - **Related:** [module-layout.md § Versioning](module-layout.md#versioning)
 
 ---
@@ -30,7 +30,7 @@ The SDK **MUST** declare `go 1.25` (or later patch within the 1.25 line) in `go.
 
 The SDK **MUST** be distributed under the MIT License.
 
-- **Lives in:** [`LICENSE`](../LICENSE)
+- **Lives in:** [`LICENSE`](../../LICENSE)
 
 ---
 

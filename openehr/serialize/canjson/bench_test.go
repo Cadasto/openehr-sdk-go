@@ -29,7 +29,7 @@ func benchCompositionPayload(b *testing.B, width int) []byte {
 		"category": {"_type":"DV_CODED_TEXT","value":"event","defining_code":{"_type":"CODE_PHRASE","code_string":"433","terminology_id":{"_type":"TERMINOLOGY_ID","value":"openehr"}}},
 		"composer": {"_type":"PARTY_SELF"},
 		"content": [`)
-	for i := 0; i < width; i++ {
+	for i := range width {
 		if i > 0 {
 			sb.WriteString(",")
 		}

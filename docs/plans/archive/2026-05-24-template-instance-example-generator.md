@@ -5,8 +5,8 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-013, REQ-024, REQ-030–033, REQ-040; **REQ-107** (generic OPT → RM instance synthesis)
 **Probes:** **PROBE-027** (Implemented Sandbox — generate → `validation.ValidateComposition` on `vital_signs.opt` + `clinical_note.opt`)
-**Implementation:** landed (Phases 0–3: spec + `ExampleValue()` + `rmwrite` + `instance.Generate` + non-composition accessors + PROBE-027; Phase 4 REQ-101 integration covered in [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md))
-**Depends on:** [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103); [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) (shared template-driven walk + `rmread`/`rmwrite`); [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md) (REQ-101 — composition authoring API; consumes this engine). Follow-up: [`2026-05-26-c-primitive-object-wire-parser.md`](2026-05-26-c-primitive-object-wire-parser.md) covers the `C_PRIMITIVE_OBJECT.<item>` parser gap + UID emission needed to widen PROBE-023 to full round-trip.
+**Implementation:** landed (Phases 0–3: spec + `ExampleValue()` + `rmwrite` + `instance.Generate` + non-composition accessors + PROBE-027; Phase 4 REQ-101 integration covered in [`archive/2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md))
+**Depends on:** [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4–6 (compiled template + walker + REQ-103); [`archive/2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md) (shared template-driven walk + `rmread`/`rmwrite`); [`archive/2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) (REQ-101 — composition authoring API; consumes this engine). Follow-up: [`2026-05-26-c-primitive-object-wire-parser.md`](2026-05-26-c-primitive-object-wire-parser.md) covers the `C_PRIMITIVE_OBJECT.<item>` parser gap + UID emission needed to widen PROBE-023 to full round-trip.
 **Defers:** Per-template generated Go structs; FLAT/STRUCTURED export; OET authoring; runtime federated slot-fill repository; clinically realistic synthetic data (FHIR Synthea-style); multi-language term translation
 
 ## Goal
@@ -35,7 +35,7 @@ The output is **synthetic example data** — structurally and constraint-valid f
 |---|---|---|
 | Hand-built test helpers (`validVitalSignsComposition`, `bloodPressureComposition`) | Per-fixture | Do not scale to every OPT |
 | [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) (REQ-101, planned) | `*rm.Composition` + path `Set` API | Not landed; composition-only surface |
-| [`openehr/validation/`](../../openehr/validation/) (REQ-102) | Validates existing graphs | Does not create instances |
+| [`openehr/validation/`](../../../openehr/validation) (REQ-102) | Validates existing graphs | Does not create instances |
 | `typereg` + BMM codegen | Construct empty RM types by name | No OPT-aware tree assembly |
 
 ### What is required
@@ -44,7 +44,7 @@ A single engine that answers:
 
 > Given `*templatecompile.Compiled`, produce an RM value whose shape and leaf values satisfy the OPT's structural rules and REQ-103 primitive constraints.
 
-That requires the **same trust model as validation v2** ([`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md)): the **OPT walk is authoritative**; the RM graph is assembled attribute-by-attribute from compiled metadata, not by guessing paths from an empty composition.
+That requires the **same trust model as validation v2** ([`archive/2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md)): the **OPT walk is authoritative**; the RM graph is assembled attribute-by-attribute from compiled metadata, not by guessing paths from an empty composition.
 
 ---
 
@@ -146,7 +146,7 @@ Slot handling (v1): when the OPT pins concrete archetype roots under a slot, syn
 
 ## Package layout
 
-Per [`docs/specifications/module-layout.md`](../../docs/specifications/module-layout.md) and REQ-013:
+Per [`docs/specifications/module-layout.md`](../../specifications/module-layout.md) and REQ-013:
 
 | Package | Role |
 |---|---|
@@ -210,7 +210,7 @@ func NewExample(c *templatecompile.Compiled, opts ...Option) (*rm.Composition, e
 | `internal/templatecompile/walk` | Landed | OPT DFS |
 | Validation v2 `rmread` / lockstep walk design | Plan | Shared attribute naming table |
 | Parse `<default_value>` / `<assumed_value>` on constraints | Follow-up plan / Phase 0 | Override example factory |
-| Attribute `<cardinality>` interval on `C_MULTIPLE_ATTRIBUTE` | [composition validation plan](archive/2026-05-24-composition-validation-template-driven.md) Phase 0 | Correct child counts |
+| Attribute `<cardinality>` interval on `C_MULTIPLE_ATTRIBUTE` | [composition validation plan](2026-05-24-composition-validation-template-driven.md) Phase 0 | Correct child counts |
 
 ---
 
@@ -366,6 +366,6 @@ A single design session for both plans avoids divergent `(RMType, attrName)` tab
 ## Cross-references
 
 - [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) — REQ-101 authoring API
-- [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) — inverse walk; share `rmread`/`rmwrite`
+- [`archive/2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md) — inverse walk; share `rmread`/`rmwrite`
 - [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) — compiled template foundation
-- [`docs/adr/0005-compiled-template-foundation.md`](../adr/0005-compiled-template-foundation.md) — public `Compiled` promotion timing
+- [`docs/adr/0005-compiled-template-foundation.md`](../../adr/0005-compiled-template-foundation.md) — public `Compiled` promotion timing

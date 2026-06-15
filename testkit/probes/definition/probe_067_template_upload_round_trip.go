@@ -3,6 +3,7 @@ package definitionprobes
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -15,10 +16,10 @@ import (
 // reformatting documented per deployment).
 //
 // The probe accepts the OPT bytes verbatim so the same fixture is
-// reused across SDKs (REQ-082). Round-trip equality is checked by a
+// reused across conformant implementations (REQ-082). Round-trip equality is checked by a
 // byte comparison; backends that reformat the OPT on storage (e.g.
 // normalising whitespace) will not pass and SHOULD document the
-// canonical-form rule for cross-SDK comparison.
+// canonical-form rule for conformance comparison.
 //
 // Inputs:
 //   - opt is the OPT XML body to upload.
@@ -28,10 +29,10 @@ import (
 func Probe067TemplateUploadRoundTrip(ctx context.Context, c *transport.Client, opt []byte, templateID string) (Result, error) {
 	r := Result{Probe: "PROBE-067"}
 	if c == nil {
-		return r, fmt.Errorf("PROBE-067: nil transport.Client")
+		return r, errors.New("PROBE-067: nil transport.Client")
 	}
 	if len(opt) == 0 {
-		return r, fmt.Errorf("PROBE-067: empty OPT")
+		return r, errors.New("PROBE-067: empty OPT")
 	}
 
 	uploaded, _, err := definition.UploadTemplate(ctx, c, definition.FormatADL14, bytes.NewReader(opt))

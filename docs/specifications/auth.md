@@ -126,7 +126,7 @@ The PKCE implementation **MUST**:
 
 - Use `S256` as the challenge method; `plain` is prohibited.
 - Generate cryptographically random verifiers (`crypto/rand`).
-- Validate `state` before exchanging the code.
+- **Generate or validate OAuth `state`.** When the application calls `BeginAuthorization` with an empty `state`, the SDK **MUST** generate a cryptographically random value (minimum 32 bytes before base64url encoding). When exchanging the authorization code, the SDK **MUST** verify that the callback `state` equals the value sent in step 3 **before** any token-endpoint call; mismatch **MUST** return `ErrLaunchInvalidState`.
 
 ### REQ-062 — JWKS rotation
 

@@ -18,7 +18,7 @@ openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.m
 
 Metrics and logs **MAY** be added later once the OTel SDK stabilises a metrics surface and the SDK has a benchmarked basis for which metrics to emit.
 
-- **Lives in:** [`transport/`](../transport/)
+- **Lives in:** [`transport/`](../../transport)
 - **Probes:** PROBE-050, PROBE-051
 
 ---
@@ -46,7 +46,7 @@ Rules:
 - Retries **MUST** respect `ctx` cancellation.
 - The retry budget **MUST** be observable via the OTel span (`retry.attempt`, `retry.backoff_ms`).
 
-- **Lives in:** [`transport/`](../transport/)
+- **Lives in:** [`transport/`](../../transport)
 
 ---
 
@@ -60,7 +60,7 @@ The SDK does not allocate its own `*http.Client` (REQ-021), so TLS configuration
 
 The SDK **MUST NOT** silently override or relax the consumer's `*http.Client` TLS config.
 
-- **Lives in:** [`transport/`](../transport/), [`smart/discovery/`](../smart/discovery/)
+- **Lives in:** [`transport/`](../../transport), [`smart/discovery/`](../../smart/discovery)
 
 ---
 
@@ -83,9 +83,13 @@ The SDK **MUST**:
 - Decode this envelope on every non-2xx response (best-effort; missing fields default to zero values).
 - Attach the parsed envelope to `transport.WireError` as `OpenEHRErrorDetail{Message, Code, CodedText}`.
 - Map the HTTP status to typed sentinels per [idiom.md § Errors](idiom.md#errors-req-025): `ErrNotFound` (404), `ErrUnauthorized` (401), `ErrForbidden` (403), `ErrVersionConflict` (409), `ErrPreconditionFailed` (412), `ErrPreconditionRequired` (428).
-- Preserve the raw response body on `WireError.RawBody`.
+- **PHI-safe error surfaces by default.** openEHR error bodies routinely carry patient identifiers and clinical detail. `WireError.Error()` **MUST NOT** interpolate `OpenEHR.Message` or the raw response bytes. It **MUST** carry HTTP status, route template, and the openEHR error *code* (codes are not PHI). Callers that need the full server payload for diagnostics **MUST** opt in via `transport.WithRawErrorBodies(true)`; only then are `OpenEHR.Message` and `WireError.RawBody` populated. `OpenEHR.Code` and `OpenEHR.CodedText` remain available via `errors.As` regardless of the opt-in (structured codes, not free-text clinical narrative).
+- **Bounded response reads.** Every `Client.Do` **MUST** cap how many bytes are read from the response body. The default limit is `transport.DefaultMaxResponseBody` (64 MiB). `transport.WithMaxResponseBody(n)` overrides the cap: `0` means default, a positive value sets an explicit limit, a negative value disables the cap (documented escape hatch for trusted backends). Exceeding the limit **MUST** fail the request with an error mentioning the limit — not an unbounded `io.ReadAll`.
 
-- **Lives in:** [`transport/`](../transport/)
+`WireError.Error()` values flow into REQ-098 observers and REQ-090 OTel span status; the PHI-safe default applies there too unless the consumer opts into raw bodies.
+
+- **Lives in:** [`transport/`](../../transport)
+- **Tests:** `transport/client_test.go` (`TestWireError*`, `TestMaxResponseBody*`)
 
 ---
 
@@ -105,9 +109,9 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-**Follow-up (not landed):** [`docs/plans/2026-05-25-req094-prefer-followups.md`](../plans/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` slot population on write returns and strict empty-body handling for `representation`. Search **`NOT LANDED`** in that plan before assuming REQ-094 is complete on write paths.
+All three write-path modes are landed across `composition` / `directory` / `ehr_status`: `representation` decodes the bare resource (SDK-GAP-09) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
 
-- **Lives in:** [`transport/`](../transport/), [`openehr/client/ehr/`](../openehr/client/ehr/)
+- **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr)
 
 ---
 
@@ -126,7 +130,7 @@ Rules:
 
 Rationale: benchmark / load-tool consumers that measure server-observed latency **MUST** be able to express "no retries" at construction without reading the implementation. This clarification is non-breaking — callers that previously passed `MaxAttempts: N` for N ≥ 2 see no behavioural change.
 
-- **Lives in:** [`transport/`](../transport/)
+- **Lives in:** [`transport/`](../../transport)
 - **Probes:** unit test `TestRetryNoRetrySentinel` in `transport/client_test.go`
 
 ---
@@ -177,7 +181,7 @@ Out of scope:
 - Per-observer filtering / sampling (composition concern).
 - Body-level observation (PII risk; wrap the injected `*http.Client` if needed).
 
-- **Lives in:** [`transport/`](../transport/)
+- **Lives in:** [`transport/`](../../transport)
 - **Probes:** unit tests `TestObserver*` and `TestObservation*` in `transport/observer_test.go`
 
 ---

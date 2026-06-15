@@ -1,4 +1,5 @@
-# golangci-lint v2 — keep in sync with LINT_IMAGE in the Makefile (v2.11.4).
+# golangci-lint v2 — keep in sync with LINT_IMAGE in the Makefile (v2.11.4)
+# and the go-coding plugin reference (references/golangci.v2.yml).
 version: "2"
 
 run:
@@ -6,34 +7,35 @@ run:
   tests: true
 
 linters:
-  default: standard
+  default: standard          # errcheck, govet, ineffassign, staticcheck, unused
   enable:
-    - bodyclose
+    # go-coding plugin reference set
+    - modernize              # range-int, min/max, slices/maps, strings.Cut … (go fix engine)
+    - errorlint              # %w + errors.Is/As discipline
+    - bodyclose              # unclosed http.Response.Body
+    - rowserrcheck           # unchecked sql.Rows.Err
+    - sqlclosecheck          # unclosed sql.Rows/Stmt
+    - noctx                  # HTTP/SQL issued without a context
+    - contextcheck           # context not propagated through the call chain
+    - containedctx           # context.Context stored in a struct field
+    - perfsprint             # fmt.Sprintf where a cheaper call exists
+    # revive (reference set) is deferred: its default ruleset surfaces ~40
+    # `exported` doc-comment gaps in openehr/bmm + openehr/rm plus intentional
+    # BMM-schema underscore naming. Enabling it needs a doc-comment/naming
+    # policy decision — track separately before turning on.
+    # - revive
+    # repo additions retained on top of the reference set
     - copyloopvar
     - misspell
     - unconvert
   disable:
-    - depguard # no third-party deps yet; enable when the module grows
+    - depguard               # no third-party deps yet; enable when the module grows
   exclusions:
-    rules:
-      - path: '_gen\.go$'
-        linters:
-          - dupl
-          - gocyclo
-          - funlen
-          - revive
-      - path: '_jsonmar_gen\.go$'
-        linters:
-          - dupl
-          - gocyclo
-          - funlen
-      - path: '_jsonunmar_gen\.go$'
-        linters:
-          - dupl
-          - gocyclo
-          - funlen
-      - path: '_xmlmar_gen\.go$'
-        linters:
-          - dupl
-          - gocyclo
-          - funlen
+    generated: lax           # skip bmmgen output (// Code generated … DO NOT EDIT.)
+
+formatters:
+  enable:
+    - gofumpt                # stricter gofmt superset
+    - goimports              # import grouping + formatting
+  exclusions:
+    generated: lax

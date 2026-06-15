@@ -1,4 +1,4 @@
-// Package instanceprobes hosts the cross-SDK conformance probes for
+// Package instanceprobes hosts the openEHR conformance probes for
 // openehr/instance/ — template-driven RM instance synthesis
 // (REQ-107). Probes are plain functions returning (Result, error);
 // they are sandbox-only (no transport) since the generator is a

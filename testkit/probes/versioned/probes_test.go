@@ -229,25 +229,16 @@ func TestProbe071CompositionWriteResponseShape_RejectsOriginalVersion_PUT(t *tes
 	}
 }
 
-// auditBase unwraps a rm.AuditDetailsLike interface back to its
-// concrete rm.AuditDetails value. Post-SDK-GAP-11 the Version-family
-// CommitAudit field is a narrow interface so subtype payloads
-// (ATTESTATION) survive decode/re-marshal; the contribution.Submission
-// envelope still types Audit concretely.
-func auditBase(v rm.AuditDetailsLike) rm.AuditDetails {
-	a, _ := rm.AuditDetailsBase(v)
-	return a
-}
-
 // newOriginalVersionFixture builds a minimal ORIGINAL_VERSION<COMPOSITION>
 // for the PROBE-072 server fakes — the probe doesn't care about clinical
 // content, only the wire shape, so ArchetypeNodeID is the only Composition
-// field set.
-func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
+// field set. Returns the contribution write-side wrapper so commit_audit
+// drops the server-assigned time_committed.
+func newOriginalVersionFixture() *contribution.OriginalVersion[rm.Composition] {
 	name := "alice"
 	audit := rm.AuditDetails{
 		SystemID:  "cdr.example",
-		Committer: rm.PartyIdentified{Name: &name},
+		Committer: &rm.PartyIdentified{Name: &name},
 		ChangeType: rm.DVCodedText{
 			DVText:       rm.DVText{Value: "creation"},
 			DefiningCode: rm.CodePhrase{CodeString: "249"},
@@ -255,12 +246,12 @@ func newOriginalVersionFixture() *rm.OriginalVersion[rm.Composition] {
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
-	return &rm.OriginalVersion[rm.Composition]{
+	return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
 		Version:        rm.Version[rm.Composition]{CommitAudit: audit},
 		UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
 		LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
 		Data:           &comp,
-	}
+	})
 }
 
 func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
@@ -274,7 +265,7 @@ func TestProbe072ContributionSubmissionShapePass(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    auditBase(ov.CommitAudit),
+		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &capturedBody, ehrIDFixture, sub)
@@ -303,7 +294,7 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	defer srv.Close()
 	ov := newOriginalVersionFixture()
 	sub := &contribution.Submission{
-		Audit:    auditBase(ov.CommitAudit),
+		Audit:    ov.CommitAudit,
 		Versions: []contribution.CommitVersion{ov},
 	}
 	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
@@ -312,6 +303,30 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	}
 	if r.Status != "fail" {
 		t.Errorf("PROBE-072 status = %q (expected fail for OBJECT_REF body, detail=%q)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe072RejectsTimeCommittedAudit(t *testing.T) {
+	// Planted body: a Contribution_create shape whose batch audit carries a
+	// server-assigned time_committed — the extended PROBE-072 MUST flag it
+	// (SPECITS-95 / ITS-REST PR 131).
+	planted := []byte(`{"audit":{"_type":"AUDIT_DETAILS","system_id":"x","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}},"time_committed":{"value":"2026-01-01T00:00:00Z"}},"versions":[{"_type":"ORIGINAL_VERSION","data":{"_type":"COMPOSITION"},"commit_audit":{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"249"}}}}]}`)
+	var captured []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.ReadAll(r.Body)
+		captured = planted
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	ov := newOriginalVersionFixture()
+	sub := &contribution.Submission{Audit: ov.CommitAudit, Versions: []contribution.CommitVersion{ov}}
+	r, err := probes.Probe072ContributionSubmissionShape(context.Background(), newClient(t, srv), &captured, ehrIDFixture, sub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" || !contains(r.Detail, "time_committed") {
+		t.Errorf("PROBE-072 status=%q detail=%q (want fail mentioning time_committed)", r.Status, r.Detail)
 	}
 }
 

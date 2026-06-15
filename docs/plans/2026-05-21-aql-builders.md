@@ -1,11 +1,11 @@
 # Plan — AQL struct-builder and verb-function builders
 
 **Date:** 2026-05-21
-**Status:** Draft
+**Status:** Landed
 **Owner:** SDK maintainers
 **Covers:** REQ-055 (builders complete wire contract); PROBE-020, PROBE-021
-**Implementation:** partial — `Query`, `ResultSet`, `NewQuery`, `Validate` **landed**; builders **planned**
-**Depends on:** [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
+**Implementation:** **landed** — struct-builder (`Builder`) + verb-functions (`Select`/`From`/`FromEHR`/`Where`) share one emitter and produce byte-identical canonical AQL; PROBE-020 (Sandbox) and PROBE-021 (`aql.ErrPathResolution` mapping, Sandbox) green
+**Depends on:** [`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Full AQL parser / pretty-printer; stored-query builder (use `definition` client + execute by id); query optimiser
 
 ## Goal
@@ -30,14 +30,15 @@ Execution stays in **`openehr/client/query/`** — this plan does not change the
 
 ## Canonicalisation rules (implement in Phase 0)
 
-Pin in `docs/specifications/wire.md` amendment (same PR as builder Phase 1) so goldens are stable:
+**As shipped, the canonical rules live in [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary)** (seven rules). Summary of the form the builders emit:
 
-1. **Keywords** — uppercase: `SELECT`, `FROM`, `WHERE`, `ORDER BY`, `OFFSET`, `LIMIT`, `CONTAINS`, `AND`, `OR`.
+1. **Keywords** — uppercase: `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `OFFSET`, `LIMIT`, `ASC`, `DESC`.
 2. **Whitespace** — single space between tokens; no leading/trailing space on `Query.Q`.
-3. **Paths** — as authored (no case folding on archetype ids).
-4. **Parameters** — placeholders `$name` in `Q`; values only in `Query.Parameters` (never interpolated into string — prevents injection; REQ-055 security note).
+3. **Paths / archetype ids** — emitted verbatim (no case folding).
+4. **Parameters** — placeholders `$name` in `Q`; bound values via `Builder.Bind` → `Query.Parameters` (never interpolated — injection guard).
 5. **SELECT list** — comma-separated, single space after comma.
-6. **FROM** — `EHR[ehr_id/value=$ehr_id]` style; document EHR vs composition containment patterns in plan examples only (normative minimum in spec).
+6. **FROM / CONTAINS** — every class aliased; consecutive `CONTAINS` nest. EHR scoping is emitted as a `WHERE <alias>/ehr_id/value = $param` condition (the standing-predicate form `EHR e[ehr_id/value=$param]` is equally valid AQL but not what the builder emits).
+7. **Paging** — `OFFSET` / `LIMIT` ride the request envelope (`Query.Offset` / `Query.Fetch`), not the AQL string.
 
 Breaking change policy: changing canonicalisation requires updating **all** wire goldens and is semver-major for `aql` package.
 
@@ -126,12 +127,12 @@ q2, err := aql.Select(aql.Field{"o", "data"}).
 
 | Step | Status |
 |---|---|
-| REQ-055 canonicalisation amend + goldens | |
-| Struct-builder + tests | |
-| Verb-functions + shared emitter | |
-| PROBE-020 probe | |
-| PROBE-021 integration note / test | |
-| `make ci` | |
+| REQ-055 canonicalisation amend + goldens | ✅ `wire.md` § REQ-055 rules + `openehr/aql/testdata/wire/observations_by_archetype.aql` |
+| Struct-builder + tests | ✅ `openehr/aql/builder.go`, `value.go`, `where.go`; `builder_test.go` |
+| Verb-functions + shared emitter | ✅ `openehr/aql/verb.go` — both styles emit via the unexported `ast.build()` |
+| PROBE-020 probe | ✅ `testkit/probes/aql/probe_020_builder_stability.go` (Sandbox) |
+| PROBE-021 integration note / test | ✅ `aql.ErrPathResolution` + executor mapping + sandbox test; Cassette/Live ratification pending |
+| `make ci` | ✅ green, 0 lint issues |
 
 ## Mapping to specs
 

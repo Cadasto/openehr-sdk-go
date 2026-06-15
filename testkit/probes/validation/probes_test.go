@@ -35,7 +35,7 @@ func TestProbe025CompositionValidate_Positive(t *testing.T) {
 
 // PROBE-025 — primitive-violation case. Out-of-range systolic
 // magnitude triggers a single primitive_out_of_range issue. Stable
-// across SDKs that implement REQ-103 + REQ-102 v2.
+// across implementations of REQ-103 + REQ-102 v2.
 func TestProbe025CompositionValidate_PrimitiveOutOfRange(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
@@ -180,7 +180,7 @@ func TestProbe026MissingNodes_PrimitiveNotInList(t *testing.T) {
 // is empty fires BOTH `required` (existence lower ≥ 1) AND
 // `cardinality` (the OPT pins child-count lower ≥ 1) at
 // /data/events. Both constraints are independent — multiset
-// reflects both for cross-SDK parity.
+// reflects both for openEHR conformance.
 func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 	body := loadFixture(t, "vital_signs")
 	comp := validBloodPressureComposition()
@@ -208,7 +208,7 @@ func TestProbe026MissingNodes_EmptyEvents(t *testing.T) {
 // at occurrences 0..1; supplying two copies of the systolic
 // element fires `cardinality` at the child path. Mirrors the
 // unit-level TestValidateComposition_DuplicateSystolicOccurrences
-// so cross-SDK implementations are bound to the same code
+// so other conformant implementations are bound to the same code
 // multiset for the occurrences-upper-bound clause.
 func TestProbe026MissingNodes_DuplicateSystolicOccurrences(t *testing.T) {
 	body := loadFixture(t, "vital_signs")

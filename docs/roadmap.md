@@ -1,8 +1,8 @@
 # SDK roadmap — landed vs planned
 
-**Status:** Living checklist (2026-05). Tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
+**Status:** Living checklist — tracks **implementation reality** against the normative contract in [`docs/specifications/`](../docs/specifications/). When this file and `docs/specifications/` disagree, **`docs/specifications/` wins** — update this roadmap.
 
-**Also see:** phase table in [AGENTS.md](../AGENTS.md#status-and-active-scope), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
+**Also see:** [AGENTS.md § Project](../AGENTS.md#project), REQ registry [`docs/specifications/REQ.md`](../docs/specifications/REQ.md), machine traceability [`docs/specifications/traceability.yaml`](../docs/specifications/traceability.yaml), sequenced delivery in [`docs/plans/`](plans/).
 
 ## Legend
 
@@ -22,8 +22,8 @@
 | **0** | Scaffolding — module layout, specs, Makefile, CI | **Complete** |
 | **0.5** | BMM loader, codegen (RM + AOM 1.4), typereg, canonical JSON | **Landed** |
 | **1a** | Transport, auth (clientcreds, jwtbearer, basic), discovery, System + EHR REST | **Landed** |
-| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, CDR benchmark (STRAND-01) | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; CDR benchmark deferred) |
-| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Partial** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation landed; **REQ-102 composition validation landed** ([archive](plans/archive/2026-05-24-composition-validation-template-driven.md)); **REQ-107 template-driven instance generator landed** ([archive](plans/archive/2026-05-24-template-instance-example-generator.md)); **REQ-101 composition builder landed** ([archive](plans/archive/2026-05-21-composition-builder.md)); **C_PRIMITIVE_OBJECT wire-parser + UID emission landed** ([archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md)) — PROBE-023 now does full unmarshal round-trip. Open: AQL builders. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
+| **1b** | SMART PKCE (`auth/smart`), Query client, Definition stored AQL, ID-token validation, benchmark harness | **Partial** (PKCE, Query, stored AQL, ID-token validation landed; benchmark harness deferred) |
+| **2** | Composition builder, template parser, validation, AQL builders (+ executor landed) | **Landed** — OPT parser (REQ-100) + follow-ups + REQ-103 + compiled template foundation; **REQ-102 composition validation** ([archive](plans/archive/2026-05-24-composition-validation-template-driven.md)); **REQ-107 template-driven instance generator** ([archive](plans/archive/2026-05-24-template-instance-example-generator.md)); **REQ-101 composition builder** ([archive](plans/archive/2026-05-21-composition-builder.md)); **C_PRIMITIVE_OBJECT wire-parser + UID emission** ([archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md)) — PROBE-023 full unmarshal round-trip; **REQ-055 AQL builders** (struct + verb, PROBE-020/021) — all four child Phase 1 rows done. Remaining tail tracked separately: demographic / AQL-lint validators. See [plans/2026-05-21-phase-2-clinical-building-blocks.md](plans/2026-05-21-phase-2-clinical-building-blocks.md). |
 | **3** | Application SMART (`smart/` AppContext) on discovery | **Partial** (discovery + launch context REQ-064/067) |
 | **4** | Cadasto extras (`cadasto/*`) | **Not started** |
 | **5** | Sandbox transports + full conformance probe ratification | **Partial** |
@@ -42,13 +42,13 @@
 | Canonical JSON | **Landed** | `openehr/serialize/canjson/` REQ-052 | PROBE-030/031/038; SDK-GAP-11 narrow polymorphic decode (`<Parent>Like` interfaces) [archived plan](plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md) |
 | Canonical XML | **Landed** | `openehr/serialize/canxml/` REQ-056 | PROBE-033/034; traceability indexed |
 | FLAT / STRUCTURED | **Planned** | `openehr/serialize/` REQ-053 | Parent package is placeholder |
-| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/2026-05-22-template-req100-followups.md) |
-| Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/2026-05-22-template-req100-followups.md) |
+| OPT parser (ADL 1.4 `.opt`) | **Landed** | `openehr/template/` REQ-100 | Parse + path utilities + PROBE-022; follow-up Phases 1–3 landed: strict-mode parse (`ParseOPTStrict` / `ParseFileStrict`), `WithStrictPaths` + `ErrAmbiguousPath`, `ValidatePath`, `Description()` / `Annotations()`, `ObjectNode` walker supertype, `Cardinality.String`/`IsValid`; OET out of scope. [plan](plans/archive/2026-05-22-template-req100-followups.md) |
+| Primitive constraint introspection | **Landed** | `openehr/template/constraints/` REQ-103 | Closed-set `PrimitiveConstraint` types (`CBoolean`, `CInteger`, `CReal`, `CString`, `CDate`, `CTime`, `CDateTime`, `CDuration`, `CodePhrase`, `DvQuantity`, `CDvOrdinal`); typed `Violation` payloads; pure `Validate(value any)`. Threaded through `ComplexObject.PrimitiveConstraint()` + `CompiledNode.PrimitiveConstraint()`; PROBE-024. AOM partial-pattern enforcement deferred. [plan](plans/archive/2026-05-22-template-req100-followups.md) |
 | RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Internal until public shape stabilises. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
 | Demographic + AQL lint validators | **Planned** | `openehr/validation/` | Umbrella scope still open — [archived umbrella plan](plans/archive/2026-05-21-validation.md) |
-| AQL wire models | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; [builders plan](plans/2026-05-21-aql-builders.md) |
+| AQL wire models + builders | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; struct-builder + verb-functions emit byte-identical canonical AQL (PROBE-020); `ErrPathResolution` mapping (PROBE-021). [builders plan](plans/2026-05-21-aql-builders.md) |
 | OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` + closed-root accessors + `internal/templateinstance/rmwrite/`; PROBE-027 on `vital_signs.opt` + `clinical_note.opt`; `Options.UIDSource` test-determinism seam; canjson-polymorphic `Composition.uid`. [archive](plans/archive/2026-05-24-template-instance-example-generator.md) + [wire-parser archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md). |
 | Composition builder | **Landed** | `openehr/composition/` REQ-101 | `NewSkeleton` + `Builder.Set/SetText/SetQuantity/SetCodedText/Build`; PROBE-023 (full unmarshal round-trip). [archive](plans/archive/2026-05-21-composition-builder.md) |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
@@ -70,7 +70,7 @@
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
 | Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–093, REQ-096–098 | |
-| `Prefer` negotiation (REQ-094) | **Partial** | `transport/`, `openehr/client/ehr/composition/`, `directory/` | `return=representation` bare-body decode landed (SDK-GAP-09); `identifier` + empty-body guard **not landed** — [plan](plans/2026-05-25-req094-prefer-followups.md) |
+| `Prefer` negotiation (REQ-094) | **Landed** | `transport/`, `openehr/client/ehr/composition/`, `directory/`, `ehrstatus/` | All three write-path modes landed: `return=representation` bare-body decode (SDK-GAP-09), `return=identifier` slot population, and `representation` + empty body → `ErrInvalidShape`. [Archived plan](plans/archive/2026-05-25-req094-prefer-followups.md); PROBE-065 round-trip deferred |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
 | Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
@@ -84,9 +84,9 @@
 | System | **Landed** | `openehr/client/system/` | Capabilities, version |
 | EHR (create, get, delete) | **Landed** | `openehr/client/ehr/` | |
 | EHR_STATUS | **Landed** | `openehr/client/ehr/ehrstatus/` | |
-| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 write gaps → followups plan |
+| Composition CRUD | **Landed** | `openehr/client/ehr/composition/` | REQ-054 If-Match; SDK-GAP-09 representation decode; REQ-094 `Prefer` write-path complete |
 | Directory | **Landed** | `openehr/client/ehr/directory/` | Same REQ-094 / SDK-GAP-09 notes as composition |
-| Contribution | **Landed** | `openehr/client/ehr/contribution/` | Submission body is `Contribution_create` (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); response remains persisted `rm.Contribution`. PROBE-072 / SDK-GAP-10. [Archived plan](plans/archive/2026-05-26-contribution-submission-shape.md). |
+| Contribution | **Landed** | `openehr/client/ehr/contribution/` | Submission body is `Contribution_create` (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); response remains persisted `rm.Contribution`. Write-side commit audit drops server-assigned `time_committed`, keeps `DV_CODED_TEXT` `change_type`, defaults to `AUDIT_DETAILS` with an `UPDATE_AUDIT` fallback (SPECITS-95 / ITS-REST PR 131). PROBE-072 / SDK-GAP-10. Archived plans: [submission shape](plans/archive/2026-05-26-contribution-submission-shape.md), [write-audit](plans/archive/2026-06-11-contribution-update-audit-dv-coded-text.md). |
 | ItemTags | **Landed** | `openehr/client/ehr/itemtags/` | REQ-059; header codec + composition/ehrstatus/directory GET, composition PUT |
 | Query (AQL execute) | **Landed** | `openehr/client/query/` | Ad-hoc + stored execute; REQ-055 |
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
@@ -95,7 +95,7 @@
 | Demographic | **Planned** | `openehr/client/demographic/` | `doc.go` only |
 | Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
 
-REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-client.md) (plan table may lag — this roadmap reflects the tree).
+REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-rest-api-client.md) (archived; this roadmap reflects the tree). Demographic follow-up: [2026-06-14-demographic-rest-client.md](plans/2026-06-14-demographic-rest-client.md).
 
 ---
 
@@ -122,12 +122,14 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 | Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 (REQ-102) |
 | Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 (REQ-107) on `vital_signs.opt` + `clinical_note.opt` |
 | Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023 (REQ-101) — full marshal → unmarshal → re-marshal round-trip |
+| AQL builder probe | **Landed** | `testkit/probes/aql/` | PROBE-020 (REQ-055) — struct vs verb byte-identical, both match golden; PROBE-021 mapping sandbox-tested |
 | Definition probe | **Landed** | `testkit/probes/definition/` | PROBE-067 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
 | Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed; `sandbox/` cassette runner open (REQ-082) |
-| PHP SDK wire parity | **Planned** | — | REQ-080–081 |
+| openEHR conformance ratification | **Planned** | — | REQ-080, REQ-082 |
+| Cadasto API conformance | **Planned** | `testkit/cassettes/cadasto/` | REQ-083 — `cadasto/*` extras anchored to the Cadasto platform API contract (Phase 4) |
 | OpenAPI cassettes | **Partial** | `testkit/cassettes/` REQ-095 | Not all surfaces covered |
 
 ---
@@ -138,9 +140,10 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/2026-05-15-rest-api-
 |---------|--------|-------|
 | `make ci` / grouped `make help` | **Landed** | |
 | `make spec-check` | **Landed** | Traceability subset only |
-| Release / semver strategy | **Landed (2026-05-26)** | `v0.1.0` tag; [`release.yml`](../.github/workflows/release.yml) | [archived plan](plans/archive/2026-05-25-versioning-strategy.md) — policy docs + tag-driven release workflow; `v1.0.0` ceremony tracked separately |
+| Release / semver strategy | **Landed** | Tag-driven [`release.yml`](../.github/workflows/release.yml); policy in [`releases.md`](releases.md), `v1.0.0` ceremony tracked separately ([archived plan](plans/archive/2026-05-25-versioning-strategy.md)) |
+| Developer onboarding | **Landed** | [`quick-start.md`](quick-start.md) + [`examples.md`](examples.md) — install, REST wiring, catalog of all `cmd/examples/` programs |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Landed** | `cmd/examples/{canonical_json,canxml_roundtrip,ehr_create,opt-parse,validate-composition,validate-from-json,primitive-validate}` |
+| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — `canonical_json`, `canxml_roundtrip`, `ehr_create`, `generate-example`, `opt-parse`, `primitive-validate`, `validate-composition`, `validate-from-json`; catalog in [`examples.md`](examples.md) |
 
 ---
 

@@ -23,10 +23,10 @@ import (
 func Probe010PutWithoutIfMatch(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID) (Result, error) {
 	r := Result{Probe: "PROBE-010"}
 	if c == nil {
-		return r, fmt.Errorf("PROBE-010: nil transport.Client")
+		return r, errors.New("PROBE-010: nil transport.Client")
 	}
 	if ehrID == "" {
-		return r, fmt.Errorf("PROBE-010: empty EHRID")
+		return r, errors.New("PROBE-010: empty EHRID")
 	}
 	_, _, err := ehrstatus.Put(ctx, c, ehrID, "", nil)
 	if err == nil {

@@ -10,12 +10,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canxml"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
-	"log"
-	"os"
 )
 
 func main() {

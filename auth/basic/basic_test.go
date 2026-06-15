@@ -72,13 +72,11 @@ func TestTokenConcurrent(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	for range 32 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if _, err := src.Token(context.Background()); err != nil {
 				t.Errorf("Token: %v", err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }
