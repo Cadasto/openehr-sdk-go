@@ -53,6 +53,16 @@ type Document struct {
 	HasWhere   bool
 	HasOrderBy bool
 	HasLimit   bool
+
+	// Classes are the class expressions bound in the FROM / CONTAINS tree,
+	// flattened to document order.
+	Classes []ClassExpr
+	// Paths are every alias-qualified identified path across the SELECT,
+	// WHERE, and ORDER BY clauses, in document order.
+	Paths []IdentifiedPath
+	// Params are the distinct $parameter names referenced anywhere in the
+	// query, in first-seen order, with the leading `$` stripped.
+	Params []string
 }
 
 // Parse validates q against the SDK grammar profile and returns the parsed
@@ -76,6 +86,7 @@ func Parse(q string) (*Document, error) {
 
 	doc := &Document{tree: tree}
 	doc.populate()
+	doc.extract()
 	return doc, nil
 }
 
