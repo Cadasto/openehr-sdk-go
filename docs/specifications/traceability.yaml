@@ -115,6 +115,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST
@@ -132,6 +133,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-071
     title: Discovery cache
@@ -139,6 +141,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-072
     title: Discovery validation
@@ -146,6 +149,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-073
     title: Discovery trust posture
@@ -335,7 +339,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [auth/smart]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-16-auth-smart-conformance-audit.md]
     tests:
       - auth/smart/smart_test.go
       - auth/smart/pkce.go
@@ -346,6 +350,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [auth/smart]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
     tests:
       - auth/smart/smart_test.go
 
@@ -355,6 +360,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [auth/smart]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
     tests:
       - auth/smart/smart_test.go
 
@@ -364,6 +370,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart, auth/smart]
+    plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
     tests:
       - smart/launch_test.go
       - auth/smart/exchange_test.go

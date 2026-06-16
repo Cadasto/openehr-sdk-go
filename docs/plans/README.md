@@ -6,7 +6,9 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
-No standalone active plans — the demographic REST client ([REQ-040/054](archive/2026-06-14-demographic-rest-client.md)), validation beyond COMPOSITION ([REQ-110](archive/2026-06-17-validation-non-composition-roots.md)), and REQ-104/105 template modelling ([archive](archive/2026-06-12-template-req104-req105-deferred.md)) all landed and moved to `archive/`. Remaining work is the Phase 2 deferred scope below.
+| Plan | Scope | Covers REQs / strands |
+|---|---|---|
+| [2026-06-16-auth-smart-conformance-audit.md](2026-06-16-auth-smart-conformance-audit.md) | Auth / SMART-on-openEHR conformance audit & polish — discovery `services` shape, `ehrId`/`episodeId` context, asymmetric client auth (RS384/ES384 + `private_key_jwt` + Backend Services), id-token alg agility, 401→reauth, auth probes, introspection, ADRs 0008/0009 (STRAND-05) | REQ-061, REQ-062, REQ-063, REQ-064, REQ-068, REQ-070, REQ-071, REQ-072; PROBE-001..009, PROBE-007, PROBE-041; STRAND-05 |
 
 ### Phase 2 — clinical building blocks (in flight)
 

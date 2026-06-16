@@ -65,18 +65,18 @@
 |---------|--------|---------------|-------|
 | `TokenSource` + per-request ctx | **Landed** | `auth/` REQ-060 | |
 | Client credentials | **Landed** | `auth/clientcreds/` REQ-068 | |
-| JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | |
+| JWT Bearer | **Landed** | `auth/jwtbearer/` REQ-068 | RS256 today; RS384/ES384 + `private_key_jwt` + SMART Backend Services sequenced in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) |
 | HTTP Basic on openEHR REST | **Landed** | `auth/basic/` REQ-069 | |
 | Caller attribution | **Landed** | `transport/` REQ-066 | |
 | SMART PKCE + launch | **Landed** | `auth/smart/` REQ-061–063 | PKCE, code exchange, refresh, JWKS cache (REQ-063 transport-401 → refresh wiring remains the partial sub-point) |
-| Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims |
+| Application launch context | **Landed** | `smart/` REQ-064, REQ-067 | LaunchContext, ID-token validation, principal claims. openEHR-native `ehrId`/`episodeId` surfacing + id-token alg agility (RS384/ES384) sequenced in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) |
 | JWKS rotation | **Landed** | `auth/smart/` REQ-062 | Cache + refresh-on-miss |
-| Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired |
+| Token refresh (SMART provider) | **Partial** | `auth/smart/` REQ-063 | Proactive refresh on `TokenSource`; transport 401 → refresh not wired. Polish sequenced in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) (401→reauth, terminal-vs-transient clearing, configurable early-expiry) |
 | Transport (HTTP, retry, OTel, errors) | **Landed** | `transport/` REQ-090–093, REQ-096–098 | |
 | `Prefer` negotiation (REQ-094) | **Landed** | `transport/`, `openehr/client/ehr/composition/`, `directory/`, `ehrstatus/` | All three write-path modes landed: `return=representation` bare-body decode (SDK-GAP-09), `return=identifier` slot population, and `representation` + empty body → `ErrInvalidShape`. [Archived plan](plans/archive/2026-05-25-req094-prefer-followups.md); PROBE-065 round-trip deferred |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
-| Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | |
+| Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | `services` wire-shape fix (object vs array) + extra endpoint/alg metadata sequenced in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) (ADR 0008) |
 
 ---
 
@@ -107,7 +107,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | Feature | Status | Package | Notes |
 |---------|--------|---------|-------|
 | Discovery resolver + cache | **Landed** | `smart/discovery/` | |
-| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067); App Registration open (STRAND-05) |
+| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067); App Registration open (STRAND-05) — to be resolved via ADR 0009 in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) |
 | Cadasto Extra API | **Planned** | `cadasto/extra/` | |
 | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 | |
 | MPI preview | **Planned** | `cadasto/mpi/` | |
@@ -128,7 +128,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | AQL builder probe | **Landed** | `testkit/probes/aql/` | PROBE-020 (REQ-055) — struct vs verb byte-identical, both match golden; PROBE-021 mapping sandbox-tested |
 | Definition probe | **Landed** | `testkit/probes/definition/` | PROBE-067 |
 | Discovery probes | **Landed** | `testkit/probes/discovery/` | PROBE-040/041 |
-| Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned |
+| Auth / REST probes | **Partial** | `testkit/probes/versioned/`, leaf `*_test.go` | PROBE-061/071 landed; PROBE-060+ mostly Draft; PROBE-001–009 planned in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) (new `testkit/probes/auth/`) |
 | Sandbox transport | **Planned** | `sandbox/` | `doc.go` only |
 | Testkit helpers + probe runner | **Partial** | `testkit/` | Probe packages landed; `sandbox/` cassette runner open (REQ-082) |
 | openEHR conformance ratification | **Planned** | — | REQ-080, REQ-082 |
