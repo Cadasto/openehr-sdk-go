@@ -153,7 +153,9 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 // typically the prior [openehrclient.VersionMetadata.VersionUID] / ETag.
 //
 // Wire: PUT /demographic/{type}/{voID} with If-Match. Errors per REQ-093:
-// 412 → [transport.ErrPreconditionFailed]. Forgetting ifMatch returns
+// 412 → [transport.ErrPreconditionFailed]. Status→sentinel mapping is
+// endpoint-agnostic, so a 409 (should the deployment emit one) still maps to
+// [transport.ErrVersionConflict]. Forgetting ifMatch returns
 // [transport.ErrInvalidConfig] without issuing a request. Response shape
 // matches [Create].
 func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
@@ -242,7 +244,7 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	}
 	party, err := typereg.DecodeAs[rm.Party](resp.Body)
 	if err != nil {
-		return nil, meta, fmt.Errorf("demographic: decode PARTY: %w", err)
+		return nil, meta, fmt.Errorf("demographic: decode PARTY body: %w", err)
 	}
 	return party, meta, nil
 }
@@ -268,7 +270,7 @@ func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, p
 		}
 		party, err := typereg.DecodeAs[rm.Party](resp.Body)
 		if err != nil {
-			return nil, meta, fmt.Errorf("demographic: decode PARTY: %w", err)
+			return nil, meta, fmt.Errorf("demographic: decode PARTY body: %w", err)
 		}
 		return party, meta, nil
 	case transport.PreferIdentifier:

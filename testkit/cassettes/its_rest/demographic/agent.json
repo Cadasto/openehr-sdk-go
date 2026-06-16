@@ -1,0 +1,8 @@
+{
+  "_type": "AGENT",
+  "archetype_node_id": "openEHR-DEMOGRAPHIC-AGENT.agent.v1",
+  "name": { "_type": "DV_TEXT", "value": "Triage Bot" },
+  "identities": [
+    { "_type": "PARTY_IDENTITY", "name": { "_type": "DV_TEXT", "value": "system id" } }
+  ]
+}

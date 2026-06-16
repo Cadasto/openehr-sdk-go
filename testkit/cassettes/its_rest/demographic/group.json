@@ -1,0 +1,8 @@
+{
+  "_type": "GROUP",
+  "archetype_node_id": "openEHR-DEMOGRAPHIC-GROUP.group.v1",
+  "name": { "_type": "DV_TEXT", "value": "Cardiology Team" },
+  "identities": [
+    { "_type": "PARTY_IDENTITY", "name": { "_type": "DV_TEXT", "value": "team name" } }
+  ]
+}
