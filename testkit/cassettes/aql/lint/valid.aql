@@ -1,0 +1,1 @@
+SELECT o/data[at0001]/events[at0006]/data[at0003]/items[at0004]/value/magnitude FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]
