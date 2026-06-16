@@ -245,19 +245,19 @@ The SDK **MUST** ship a `ValidateComposition(comp *rm.Composition, c *templateco
 - **Result shape:**
   ```go
   type Result struct {
-      OK     bool      // true ⇔ len(Issues) == 0
+      OK     bool      // true when no Error-severity issue (Warnings alone leave OK true)
       Issues []Issue
   }
   type Issue struct {
       Path     string   // AQL path of the offending node (empty for global issues)
       Code     string   // stable programmatic identifier — see code taxonomy below
       Detail   string   // human-readable message
-      Severity Severity // Error in v1; Warning reserved
+      Severity Severity // Error for normative violations; Warning for advisories
   }
   type Severity int
   const (
       Error   Severity = iota
-      Warning              // reserved; not emitted in v1
+      Warning              // advisory; does not flip Result.OK ([ValidateAQL] emits these)
   )
   ```
 

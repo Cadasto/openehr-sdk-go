@@ -417,7 +417,7 @@ requirements:
   - id: REQ-109
     title: AQL static lint
     canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
-    status: draft
+    status: landed
     implementation: landed
     packages:
       - openehr/aql/parse
