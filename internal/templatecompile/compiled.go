@@ -24,9 +24,10 @@ type Compiled struct {
 	// canonical AQL path string to the node; byNodeID groups nodes
 	// by archetype node id (at-code); byRMType groups nodes by RM
 	// type name. All three are non-nil after a successful compile.
-	byPath   map[string]*CompiledNode
-	byNodeID map[string][]*CompiledNode
-	byRMType map[string][]*CompiledNode
+	byPath        map[string]*CompiledNode
+	byNodeID      map[string][]*CompiledNode
+	byRMType      map[string][]*CompiledNode
+	byArchetypeID map[string][]*CompiledNode
 
 	// Flat list of every term-binding record reached during compile,
 	// in depth-first OPT order. Per-archetype-root term *definitions*
@@ -85,6 +86,22 @@ func (c *Compiled) AllByRMType(rm string) []*CompiledNode {
 // AllByRMType.
 func (c *Compiled) AllByNodeID(nodeID string) []*CompiledNode {
 	return slices.Clone(c.byNodeID[nodeID])
+}
+
+// AllByArchetypeID returns the archetype root node(s) whose
+// archetype id equals hrid. Only ArchetypeRoot-derived nodes carry an
+// archetype id (descendants do not), so this indexes roots — typically
+// one per hrid, but more when the same archetype fills several slots.
+// Same iteration / copy semantics as AllByRMType. An unknown hrid
+// yields a nil slice (len 0).
+//
+// Lint (REQ-109) uses this for two checks: membership
+// (aql_archetype_not_in_template — does the template contain the
+// archetype the query names?) and archetype-scoped path resolution
+// (aql_path_not_in_template — walking the returned root's subtree to
+// confirm the query's path structure exists).
+func (c *Compiled) AllByArchetypeID(hrid string) []*CompiledNode {
+	return slices.Clone(c.byArchetypeID[hrid])
 }
 
 // NumNodes returns the total number of unique [CompiledNode] entries

@@ -12,5 +12,6 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | [0004](0004-numeric-wire-tolerance.md) | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted (2026-05-16) |
 | [0005](0005-compiled-template-foundation.md) | Compiled OPT foundation (`rminfo` + `internal/templatecompile`) | Accepted (2026-05-22) |
 | [0006](0006-composition-validation-walker-placement.md) | Composition validation walker package placement | Accepted (2026-06-11) |
+| [0007](0007-aql-antlr-grammar-profile.md) | AQL parser: ANTLR + SDK grammar profile | Accepted (2026-06-15) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

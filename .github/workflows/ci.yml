@@ -40,6 +40,9 @@ jobs:
       - name: Codegen verify
         run: make codegen-verify
 
+      - name: AQL parser verify
+        run: make aqlgen-verify
+
       - name: Vet
         run: make vet
 

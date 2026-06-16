@@ -92,9 +92,11 @@ flowchart TD
 
 The SDK is built for a minimal, auditable dependency surface:
 
-- **One direct third-party runtime dependency: OpenTelemetry** (`go.opentelemetry.io/otel`, `/trace`), used **only** by `transport/` for distributed tracing (REQ-090). It pulls a handful of transitive deps (logr, xxhash); nothing else is direct.
+- **Two direct third-party runtime dependencies, both narrowly scoped:**
+  - **OpenTelemetry** (`go.opentelemetry.io/otel`, `/trace`), used **only** by `transport/` for distributed tracing (REQ-090). It pulls a handful of transitive deps (logr, xxhash).
+  - **The ANTLR Go runtime** (`github.com/antlr4-go/antlr/v4`, pure Go, no transitive deps), used **only** by `openehr/aql/parse` to run the committed, generated AQL parser (REQ-109, ADR [0007](adr/0007-aql-antlr-grammar-profile.md)). The generator (Java) is containerised and codegen-only — never on the build/test path.
 - **Everything else is the standard library** — `net/http` for the (injected) HTTP client, `encoding/json` and `encoding/xml` for the canonical codecs, `crypto/*` + `encoding` for JWT/JWKS handling in `auth/smart`, and `context` threaded throughout.
-- **Building blocks pull zero external code.** Importing `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, or `openehr/validation` brings in no third-party packages at all — only the OTel-carrying `transport/` path does. This keeps CLI validators, fakers, and mapping prototypes lightweight and is the practical payoff of the building-block boundary (REQ-013).
+- **Most building blocks pull zero external code.** Importing `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, or `openehr/validation` brings in no third-party packages at all. The exceptions are the OTel-carrying `transport/` path and the AQL lint path (`openehr/aql/parse` → ANTLR runtime; `openehr/aql/lint` and `validation.ValidateAQL` transitively). This keeps CLI validators, fakers, and mapping prototypes lightweight and is the practical payoff of the building-block boundary (REQ-013).
 - **No HTTP-client library** (the SDK wraps stdlib `net/http`) and **no OAuth/identity library** (`auth/smart` is hand-rolled against the SMART-on-openEHR contract).
 
 ## Integrating the SDK

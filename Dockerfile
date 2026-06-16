@@ -19,8 +19,23 @@
 ARG GO_VERSION=1.25.0
 ARG ALPINE_VERSION=3.20
 ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.11.4-alpine
+# ANTLR generator (Java) version — MUST track the antlr4-go/antlr runtime in
+# go.mod (lockstep; see resources/aql/grammar/baseline/PIN).
+ARG ANTLR_VERSION=4.13.2
 
 FROM ${GOLANGCI_IMAGE} AS golangci
+
+# ANTLR code generator — codegen-only, consumed solely by `make aqlgen` to
+# regenerate the AQL parser from resources/aql/grammar/active/. It is NEVER part
+# of build / test / `make ci`: the generated Go is committed and compiles against
+# the pure-Go antlr4-go runtime, so neither the host nor the `dev` image needs a
+# JRE. Java lives only in this transient stage.
+FROM eclipse-temurin:21-jre-alpine AS antlr
+ARG ANTLR_VERSION
+# --chmod=0644 so `make aqlgen` (which runs --user $(id -u) for host file
+# ownership) can read the jar; ADD-from-URL defaults to 0600 (root-only).
+ADD --chmod=0644 https://www.antlr.org/download/antlr-${ANTLR_VERSION}-complete.jar /antlr.jar
+ENTRYPOINT ["java", "-jar", "/antlr.jar"]
 
 FROM golang:${GO_VERSION}-alpine AS dev
 

@@ -15,8 +15,8 @@ Jobs run in parallel. All use Go **1.25.x** (`actions/setup-go@v6` with module c
 
 | Job | Makefile targets | Purpose |
 |---|---|---|
-| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `vet`, `spec-check`, `build` | Static checks and compile-all without running tests |
-| **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` |
+| **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `vet`, `spec-check`, `build` | Static checks and compile-all without running tests |
+| **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` and `aqlgen-verify` |
 | **Lint** | (via `golangci-lint-action` v2.11.4, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
@@ -46,6 +46,7 @@ Run `make help` for the full grouped list. Common targets:
 | Format | `make fmt-check` | Fail if `golangci-lint fmt --diff` (gofumpt + goimports) would change any file |
 | Modules | `make mod-tidy-check` | Fail if `go mod tidy` would change `go.mod` / `go.sum` |
 | Codegen | `make codegen-verify` | BMM-generated tree matches `resources/bmm/` |
+| Codegen | `make aqlgen-verify` | Committed AQL parser matches `resources/aql/grammar/active/` (needs Docker) |
 | Specs | `make spec-check` | `docs/specifications/traceability.yaml` paths and probes match the tree |
 | Specs | `make spec-context REQ=NNN` | Assemble the SDD context bundle for a REQ (dev/agent helper; not a CI gate) |
 | Specs | `make probe-status` | Each PROBE's status and whether its test file exists (dev helper; not a CI gate) |

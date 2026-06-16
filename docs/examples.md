@@ -25,6 +25,7 @@ make build
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
+| [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 
 ---
@@ -197,6 +198,27 @@ byte-identical : true
 ```
 
 **What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`.
+
+### lint-aql
+
+**Purpose:** Statically lint AQL before it reaches the CDR (REQ-109): parse against the SDK grammar profile (ADR 0007), then run the three lint layers — syntax, shape (alias binding, parameter binding), and template-aware archetype / path checks against a compiled OPT. Shown via `validation.ValidateAQL`; the building block is `openehr/aql/lint` (`LintString` / `Lint`). Pure building block: no transport, no auth. Lint-clean is **not** spec-conformance and not execute-success — the CDR remains the path authority (PROBE-021).
+
+```bash
+go run ./cmd/examples/lint-aql
+```
+
+**Packages:** `openehr/aql`, `openehr/aql/parse`, `openehr/aql/lint`, `openehr/validation`
+
+**Sample output:**
+
+```text
+== broken query ==
+SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/events/value/magnitude > $threshold
+  [error] aql_unbound_param (-): $threshold is referenced but not bound in Query.Parameters
+  [error] aql_archetype_not_in_template (openEHR-EHR-OBSERVATION.lab_result.v1): archetype openEHR-EHR-OBSERVATION.lab_result.v1 is not in template vital_signs
+```
+
+**What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures.
 
 ---
 
