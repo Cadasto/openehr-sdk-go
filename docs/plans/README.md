@@ -18,9 +18,9 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 | [2026-06-12-template-req104-req105-deferred.md](2026-06-12-template-req104-req105-deferred.md) | REQ-104 slot assertions, REQ-105 terminology bindings (deferred) | REQ-104, REQ-105 |
 | [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md) | WebTemplate JSON export (deferred) | proposed REQ-106 |
 | [2026-05-21-aql-builders.md](2026-05-21-aql-builders.md) | AQL struct + verb builders | REQ-055; PROBE-020, PROBE-021 |
-| [2026-06-15-aql-lint.md](2026-06-15-aql-lint.md) | AQL parse + lint (`ValidateAQL`, SDK grammar profile) | proposed REQ-109; PROBE-028 |
+| [2026-06-15-aql-lint.md](2026-06-15-aql-lint.md) | AQL parse + lint (`ValidateAQL`, SDK grammar profile) — landed | REQ-109; PROBE-028 |
 
-**Landed (archived):** OPT parser, REQ-100 follow-ups (Phases 1–6), composition validation (REQ-102), composition builder (REQ-101), template-driven instance generator (REQ-107), C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission, BMM codegen, canonical JSON/XML — see [archive/](archive/README.md). **Remaining validation scope** (demographic, AQL lint) is noted in the archived [umbrella validation plan](archive/2026-05-21-validation.md) and tracked under the Phase 2 umbrella.
+**Landed (archived):** OPT parser, REQ-100 follow-ups (Phases 1–6), composition validation (REQ-102), composition builder (REQ-101), template-driven instance generator (REQ-107), C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission, BMM codegen, canonical JSON/XML — see [archive/](archive/README.md). AQL static lint (REQ-109) landed — see the [aql-lint plan](2026-06-15-aql-lint.md). **Remaining validation scope** (demographic validator) is noted in the archived [umbrella validation plan](archive/2026-05-21-validation.md) and tracked under the Phase 2 umbrella.
 
 ## Header convention (load-bearing)
 

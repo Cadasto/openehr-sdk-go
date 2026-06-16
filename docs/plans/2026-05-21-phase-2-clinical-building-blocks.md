@@ -22,9 +22,9 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 | 1 | [`archive/2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation (landed) |
 | 2 | [`archive/2026-05-24-template-instance-example-generator.md`](archive/2026-05-24-template-instance-example-generator.md) | `openehr/instance/` | composition builder, tests (landed) |
 | 3 | [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md) | `openehr/composition/` | (landed) |
-| 4 | [`archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) + [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) | `openehr/validation/` | (landed for composition; demographic / AQL lint still planned) |
+| 4 | [`archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) + [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) | `openehr/validation/` | (landed for composition + AQL lint; demographic still planned) |
 | 5 | [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | landed |
-| 6 | [`2026-06-15-aql-lint.md`](2026-06-15-aql-lint.md) | `openehr/aql/parse/`, `openehr/aql/lint/`, `validation.ValidateAQL` | open |
+| 6 | [`2026-06-15-aql-lint.md`](2026-06-15-aql-lint.md) | `openehr/aql/parse/`, `openehr/aql/lint/`, `validation.ValidateAQL` | landed (REQ-109; PROBE-028) |
 | 7 | [`archive/2026-05-26-c-primitive-object-wire-parser.md`](archive/2026-05-26-c-primitive-object-wire-parser.md) | `openehr/template/` parser + `openehr/instance/` UID emission | (landed) |
 
 Executor for AQL is **already landed** at `openehr/client/query/` ([`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phase 5). Phase 2 item 4 adds **builders only** on top of existing wire models (`Query`, `ResultSet`).

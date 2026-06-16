@@ -414,6 +414,31 @@ requirements:
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
 
+  - id: REQ-109
+    title: AQL static lint
+    canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
+    status: draft
+    implementation: landed
+    packages:
+      - openehr/aql/parse
+      - openehr/aql/parse/gen
+      - openehr/aql/lint
+      - openehr/validation
+      - internal/templatecompile
+      - testkit/probes/aql
+    probes: [PROBE-028]
+    plans: [docs/plans/2026-06-15-aql-lint.md]
+    tests:
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/imports_test.go
+      - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/lint_test.go
+      - openehr/aql/lint/imports_test.go
+      - openehr/validation/aql_test.go
+      - internal/templatecompile/compile_test.go
+      - testkit/probes/aql/probes_test.go
+
   - id: REQ-103
     title: Primitive constraint introspection
     canonical: docs/specifications/clinical-modeling.md#req-103--primitive-constraint-introspection
