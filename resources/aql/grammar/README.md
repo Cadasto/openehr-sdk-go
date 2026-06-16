@@ -3,7 +3,7 @@
 The SDK parses AQL with an ANTLR grammar maintained here: the **official openEHR
 grammar** plus a small, documented set of deltas (the *SDK grammar profile*,
 REQ-109). See [ADR 0007](../../../docs/adr/0007-aql-antlr-grammar-profile.md) for
-the strategy and [`../../../docs/plans/2026-06-15-aql-lint.md`](../../../docs/plans/2026-06-15-aql-lint.md)
+the strategy and [`../../../docs/plans/archive/2026-06-15-aql-lint.md`](../../../docs/plans/archive/2026-06-15-aql-lint.md)
 for the full plan.
 
 ## Layout

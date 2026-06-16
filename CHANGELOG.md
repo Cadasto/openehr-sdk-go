@@ -11,6 +11,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 ### Added
 
 - **AQL builders (REQ-055).** `openehr/aql` gains a struct-builder (`NewBuilder`) and verb-functions (`Select` / `From` / `FromEHR` / `Where`) that emit byte-identical, canonical AQL (PROBE-020); typed values (`Param` + literals, the injection guard), comparisons, and `And` / `Or`; `openehr/client/query` maps backend path-resolution failures to `aql.ErrPathResolution` (PROBE-021). Completes the Phase 2 clinical building blocks.
+- **AQL static lint (REQ-109).** New building-block packages `openehr/aql/parse` (syntax → generated-type-free AST against the SDK grammar profile — official openEHR AQL plus documented `SDK-AQL-NNN` deltas, [ADR 0007](docs/adr/0007-aql-antlr-grammar-profile.md)) and `openehr/aql/lint` (three-layer collect-all lint: syntax, shape, and template-aware archetype/path checks), bridged into the shared validation model by `validation.ValidateAQL`; new `aql.ErrSyntax` sentinel and `Compiled.AllByArchetypeID`; PROBE-028. The ANTLR Go runtime (`github.com/antlr4-go/antlr/v4`) is a new, narrowly-scoped runtime dependency confined to `aql/parse`; the Java generator is containerised (`make aqlgen`) and never on the build/test path.
 
 ## [0.6.0] - 2026-06-15
 
@@ -89,6 +90,6 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 ### Known follow-ups (not landed)
 
 - [REQ-094 write-path gaps](docs/plans/archive/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
-- AQL verb-style builders ([plan](docs/plans/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
+- AQL verb-style builders ([plan](docs/plans/archive/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
 - Demographic REST client ([plan](docs/plans/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
 - Benchmark harness migration ([plan §Phase 9](docs/plans/archive/2026-05-15-rest-api-client.md)).

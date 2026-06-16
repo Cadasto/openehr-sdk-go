@@ -528,5 +528,5 @@ SELECT-present-with-≥1-projection and FROM-present are guaranteed by a success
 
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
-- **Plan:** [`docs/plans/2026-06-15-aql-lint.md`](../plans/2026-06-15-aql-lint.md)
+- **Plan:** [`docs/plans/archive/2026-06-15-aql-lint.md`](../plans/archive/2026-06-15-aql-lint.md)
 

@@ -308,7 +308,7 @@ requirements:
     probes: [PROBE-020, PROBE-021]
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
-      - docs/plans/2026-05-21-aql-builders.md
+      - docs/plans/archive/2026-05-21-aql-builders.md
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go
@@ -427,7 +427,7 @@ requirements:
       - internal/templatecompile
       - testkit/probes/aql
     probes: [PROBE-028]
-    plans: [docs/plans/2026-06-15-aql-lint.md]
+    plans: [docs/plans/archive/2026-06-15-aql-lint.md]
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go

@@ -85,6 +85,7 @@ Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Vet / lint | `make vet` / `make lint` |
 | Unit / race tests | `make test` / `make test-race` |
 | BMM codegen verify | `make codegen-verify` |
+| AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen`. Both run under `make test` / `make ci`. |
 | Spec traceability | `make spec-check` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |

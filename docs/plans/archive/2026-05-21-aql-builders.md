@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-055 (builders complete wire contract); PROBE-020, PROBE-021
 **Implementation:** **landed** — struct-builder (`Builder`) + verb-functions (`Select`/`From`/`FromEHR`/`Where`) share one emitter and produce byte-identical canonical AQL; PROBE-020 (Sandbox) and PROBE-021 (`aql.ErrPathResolution` mapping, Sandbox) green
-**Depends on:** [`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
+**Depends on:** [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](../2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Full AQL parser / pretty-printer; stored-query builder (use `definition` client + execute by id); query optimiser
 
 ## Goal
@@ -15,7 +15,7 @@ Complete **REQ-055** by implementing both builder styles in `openehr/aql/`:
 - **Struct-builder** — compose typed `Select`, `From`, `Where`, … into an `aql.Query`.
 - **Verb-functions** — `aql.Select(...)`, `aql.From(...)`, chained fluently.
 
-Both **MUST** produce **byte-identical** `Query.Q` strings for the same logical query (PROBE-020). Canonicalisation rules live in [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary).
+Both **MUST** produce **byte-identical** `Query.Q` strings for the same logical query (PROBE-020). Canonicalisation rules live in [`docs/specifications/wire.md` § REQ-055](../../../docs/specifications/wire.md#req-055--wire-boundary).
 
 Execution stays in **`openehr/client/query/`** — this plan does not change the executor.
 
@@ -30,7 +30,7 @@ Execution stays in **`openehr/client/query/`** — this plan does not change the
 
 ## Canonicalisation rules (implement in Phase 0)
 
-**As shipped, the canonical rules live in [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary)** (seven rules). Summary of the form the builders emit:
+**As shipped, the canonical rules live in [`docs/specifications/wire.md` § REQ-055](../../../docs/specifications/wire.md#req-055--wire-boundary)** (seven rules). Summary of the form the builders emit:
 
 1. **Keywords** — uppercase: `SELECT`, `FROM`, `WHERE`, `CONTAINS`, `AND`, `OR`, `ORDER BY`, `OFFSET`, `LIMIT`, `ASC`, `DESC`.
 2. **Whitespace** — single space between tokens; no leading/trailing space on `Query.Q`.
@@ -56,7 +56,7 @@ Breaking change policy: changing canonicalisation requires updating **all** wire
 
 **Tasks:**
 
-1. **Amend [`docs/specifications/wire.md`](../../docs/specifications/wire.md) REQ-055** — add canonicalisation subsection (six rules above).
+1. **Amend [`docs/specifications/wire.md`](../../../docs/specifications/wire.md) REQ-055** — add canonicalisation subsection (six rules above).
 2. **Cassettes** — `testkit/cassettes/aql/` or `openehr/aql/testdata/wire/`:
    - Reference query: "all OBSERVATIONs of archetype X for EHR" (from PROBE-020 preconditions).
    - Expected `Q` string golden file.
@@ -96,13 +96,13 @@ Breaking change policy: changing canonicalisation requires updating **all** wire
 3. **PROBE-020** — `testkit/probes/aql/probe_020_builder_stability.go` compares both builders to golden.
 4. **PROBE-021** — document: builder cannot emit syntax errors; integration test in `openehr/client/query/` with invalid path uses backend error → `errors.Is(err, aql.ErrPathResolution)` (may already exist — extend if needed).
 5. **Example** — `cmd/examples/aql-build/main.go` prints `Q` for reference query both ways.
-6. **REQ-055** — traceability: builders `landed`; update [`docs/roadmap.md`](../roadmap.md) AQL row.
+6. **REQ-055** — traceability: builders `landed`; update [`docs/roadmap.md`](../../roadmap.md) AQL row.
 
 **Definition of done:**
 
 - PROBE-020 Implemented (Sandbox).
 - `make ci` green.
-- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) table row AQL probes updated.
+- [`docs/specifications/conformance.md`](../../../docs/specifications/conformance.md) table row AQL probes updated.
 
 ## Public API (target)
 
@@ -136,6 +136,6 @@ q2, err := aql.Select(aql.Field{"o", "data"}).
 
 ## Mapping to specs
 
-- [`docs/specifications/wire.md` § REQ-055](../../docs/specifications/wire.md#req-055--wire-boundary)
-- [`docs/specifications/conformance.md`](../../docs/specifications/conformance.md) — PROBE-020, PROBE-021
-- [`openehr/aql/query.go`](../../openehr/aql/query.go) — current partial implementation
+- [`docs/specifications/wire.md` § REQ-055](../../../docs/specifications/wire.md#req-055--wire-boundary)
+- [`docs/specifications/conformance.md`](../../../docs/specifications/conformance.md) — PROBE-020, PROBE-021
+- [`openehr/aql/query.go`](../../../openehr/aql/query.go) — current partial implementation
