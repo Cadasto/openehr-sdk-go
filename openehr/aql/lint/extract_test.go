@@ -56,6 +56,17 @@ func TestExtractMetadata(t *testing.T) {
 	}
 }
 
+// TestExtractDoesNotAliasDocumentSlices ensures mutating Metadata paths does
+// not corrupt the parsed document.
+func TestExtractDoesNotAliasDocumentSlices(t *testing.T) {
+	doc := mustParse(t, query)
+	md := lint.Extract(doc)
+	md.Paths = append(md.Paths, parse.IdentifiedPath{Alias: "z"})
+	if len(doc.Paths) == len(md.Paths) {
+		t.Fatal("document paths aliased metadata paths slice")
+	}
+}
+
 func TestNormalise(t *testing.T) {
 	doc := mustParse(t, query)
 	// First path is the SELECT projection rooted at alias o.

@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// Severity is the typed severity attached to every [Issue]. Only
-// [Error] is emitted in v1; [Warning] is reserved for follow-up REQs
-// that surface advisory checks (e.g. open-list pattern hints).
+// Severity is the typed severity attached to every [Issue]. [ValidateComposition]
+// emits [Error] only in v1. [ValidateAQL] may also emit [Warning] for REQ-109
+// advisories (aql_from_archetype, aql_unused_param, aql_path_not_in_template).
 type Severity int
 
 const (
@@ -54,7 +54,8 @@ type Issue struct {
 	// Includes the offending value where reasonable; not localised.
 	Detail string
 
-	// Severity classifies the issue. Always [Error] in v1.
+	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
+	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
 	Severity Severity
 }
 

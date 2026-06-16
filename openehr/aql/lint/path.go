@@ -14,8 +14,8 @@ import (
 var ErrEmptyPath = errors.New("lint: identified path has no alias")
 
 // Path is an alias-stripped identified path. Suffix is the canonical,
-// alias-free path string (`/attr[pred]/attr...`) used to match against a
-// compiled template's AQL paths in Layer 3.
+// alias-free path string (`/attr[pred]/attr...`) for diagnostics; Layer 3
+// walks Segments against the archetype-scoped compiled subtree.
 type Path struct {
 	// Alias is the original root binding (e.g. "o").
 	Alias string

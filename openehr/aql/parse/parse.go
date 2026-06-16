@@ -37,9 +37,8 @@ func (e *SyntaxError) Error() string {
 
 func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 
-// Document is a parsed, syntactically valid AQL query. Phase 1 exposes clause
-// presence and projection shape; structured extraction of archetypes, paths,
-// and parameters is the lint extractor's responsibility (it walks tree()).
+// Document is a parsed, syntactically valid AQL query. Clause presence,
+// classes, paths, and parameters are extracted during [Parse].
 type Document struct {
 	tree gen.ISelectQueryContext
 
@@ -89,6 +88,9 @@ func Parse(q string) (*Document, error) {
 	doc.extract()
 	return doc, nil
 }
+
+// Parsed reports whether d is the result of a successful [Parse] call.
+func (d *Document) Parsed() bool { return d != nil && d.tree != nil }
 
 func (d *Document) populate() {
 	if sc := d.tree.SelectClause(); sc != nil {

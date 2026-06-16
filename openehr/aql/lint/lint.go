@@ -93,24 +93,36 @@ func LintString(q string, opts *Options) Result {
 	}
 	doc, err := parse.Parse(q)
 	if err != nil {
-		var se *parse.SyntaxError
-		detail := err.Error()
-		if errors.As(err, &se) {
-			detail = se.Msg
-		}
 		return Result{Issues: []Issue{{
 			Code:     "aql_syntax",
-			Detail:   detail,
+			Detail:   syntaxDetail(err),
 			Severity: Error,
 		}}}
 	}
 	return Lint(doc, opts)
 }
 
+// syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
+// line/column in Detail for aql_syntax; [parse.SyntaxError] carries position.
+func syntaxDetail(err error) string {
+	var se *parse.SyntaxError
+	if errors.As(err, &se) {
+		return fmt.Sprintf("%d:%d: %s", se.Pos.Line, se.Pos.Col, se.Msg)
+	}
+	return err.Error()
+}
+
 // Lint runs Layers 2–3 on an already-parsed document (Layer 1 — syntax —
 // having succeeded by virtue of doc existing). opts may be nil. Lint is
 // collect-all: it returns every issue across every enabled layer.
 func Lint(doc *parse.Document, opts *Options) Result {
+	if doc == nil || !doc.Parsed() {
+		return Result{Issues: []Issue{{
+			Code:     "aql_syntax",
+			Detail:   "not a parsed document",
+			Severity: Error,
+		}}}
+	}
 	if opts == nil {
 		opts = &Options{}
 	}

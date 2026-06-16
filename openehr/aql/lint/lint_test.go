@@ -1,11 +1,13 @@
 package lint_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
@@ -53,6 +55,20 @@ func TestLintStringSyntax(t *testing.T) {
 	r := lint.LintString("SELECT FROM EHR e", nil)
 	if r.OK() || !has(r, "aql_syntax") {
 		t.Fatalf("want aql_syntax error, got %v", codes(r))
+	}
+	if len(r.Issues) == 0 {
+		t.Fatal("expected issues")
+	}
+	// REQ-109: Detail carries line:column before the ANTLR message.
+	if !strings.Contains(r.Issues[0].Detail, "1:") {
+		t.Fatalf("Detail missing position: %q", r.Issues[0].Detail)
+	}
+}
+
+func TestLintUnparsedDocument(t *testing.T) {
+	r := lint.Lint(&parse.Document{}, nil)
+	if r.OK() || !has(r, "aql_syntax") {
+		t.Fatalf("want aql_syntax for unparsed document, got %v", codes(r))
 	}
 }
 
@@ -169,5 +185,20 @@ func TestLintBadPathWarns(t *testing.T) {
 	}
 	if !r.OK() {
 		t.Fatalf("path warning must not make result not-OK: %v", codes(r))
+	}
+}
+
+// TestLintWrongAtCodeLenientFallback documents Layer-3 predicate resolution:
+// an unknown at-code on a multi-child segment falls back to the first child
+// (mirroring template.NodeAt), so no path warning is emitted.
+func TestLintWrongAtCodeLenientFallback(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT o/data[at0001]/events[at9999]/data/items[at0004]/value/magnitude "+
+			"FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+		&lint.Options{Compiled: c},
+	)
+	if has(r, "aql_path_not_in_template") {
+		t.Fatalf("wrong at-code with first-child fallback must not warn, got %v", codes(r))
 	}
 }

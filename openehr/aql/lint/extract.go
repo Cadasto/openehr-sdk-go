@@ -11,7 +11,11 @@
 // "lint-clean" never means "spec-conformant".
 package lint
 
-import "github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
+import (
+	"slices"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
+)
 
 // Metadata is the set of facts extracted from a parsed query that the lint
 // rules (and future tooling) reason over. It carries no diagnostics of its
@@ -45,7 +49,7 @@ func Extract(doc *parse.Document) Metadata {
 			md.Archetypes = append(md.Archetypes, ce.Archetype)
 		}
 	}
-	md.Paths = doc.Paths
-	md.Params = doc.Params
+	md.Paths = slices.Clone(doc.Paths)
+	md.Params = slices.Clone(doc.Params)
 	return md
 }
