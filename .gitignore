@@ -46,6 +46,7 @@ _scratch*
 
 # Build output
 bin/
+/lint-aql
 
 # OS
 .DS_Store
@@ -55,3 +56,6 @@ tmp/
 
 # bmmgen / gofmt atomic-write tempfiles
 *.tmp
+# AQL parser codegen scratch dirs (make aqlgen / aqlgen-verify)
+openehr/aql/parse/gen.tmp/
+openehr/aql/parse/gen.verify/

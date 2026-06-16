@@ -5,9 +5,9 @@ import (
 	"strings"
 )
 
-// Severity is the typed severity attached to every [Issue]. Only
-// [Error] is emitted in v1; [Warning] is reserved for follow-up REQs
-// that surface advisory checks (e.g. open-list pattern hints).
+// Severity is the typed severity attached to every [Issue]. [ValidateComposition]
+// emits [Error] only in v1. [ValidateAQL] may also emit [Warning] for REQ-109
+// advisories (aql_from_archetype, aql_unused_param, aql_path_not_in_template).
 type Severity int
 
 const (
@@ -15,9 +15,10 @@ const (
 	// Callers SHOULD treat any Error-severity issue as a hard fail.
 	Error Severity = iota
 
-	// Warning is reserved for v1; no validator currently emits it.
-	// Future versions MAY use it for advisory checks (open-list
-	// hints, deprecated patterns, etc.).
+	// Warning is an advisory issue that does NOT make a [Result]
+	// not-OK. [ValidateAQL] emits it for REQ-109 advisories
+	// (aql_from_archetype, aql_unused_param, aql_path_not_in_template);
+	// [ValidateComposition] emits only [Error] in v1.
 	Warning
 )
 
@@ -53,7 +54,8 @@ type Issue struct {
 	// Includes the offending value where reasonable; not localised.
 	Detail string
 
-	// Severity classifies the issue. Always [Error] in v1.
+	// Severity classifies the issue. [ValidateComposition] emits [Error] only;
+	// [ValidateAQL] may emit [Warning] advisories that do not flip [Result.OK].
 	Severity Severity
 }
 
@@ -67,6 +69,7 @@ type Issue struct {
 //     "archetype_id_mismatch" / "node_id_mismatch"        → [ErrTypeMismatch]
 //   - "primitive_*" (any primitive_-prefixed code)        → [ErrPrimitive]
 //   - "slot_fill"                                         → [ErrSlotFill]
+//   - "aql_syntax" / "aql_empty"                          → [ErrAQLSyntax]
 //
 // Global guard codes (`nil_composition`, `nil_template`) return
 // nil — those represent caller-side argument errors rather than
@@ -89,6 +92,10 @@ func (i Issue) Err() error {
 		return ErrTypeMismatch
 	case "slot_fill":
 		return ErrSlotFill
+	case "aql_syntax", "aql_empty":
+		// Codes minted by openehr/aql/lint (REQ-109) and carried verbatim
+		// through ValidateAQL; keep this in sync with the lint code strings.
+		return ErrAQLSyntax
 	}
 	if strings.HasPrefix(i.Code, "primitive_") {
 		return ErrPrimitive
@@ -97,28 +104,44 @@ func (i Issue) Err() error {
 }
 
 // Result aggregates every [Issue] from a single validator call.
-// OK is the convenience boolean — true exactly when Issues is empty.
+// OK is the convenience boolean — true exactly when no Error-severity
+// issue is present.
 type Result struct {
-	// OK is true when no issues were found. Defensive: callers MAY
-	// also use len(r.Issues) == 0.
+	// OK is true when the validator found no [Error]-severity issue.
+	// [Warning]-severity advisories (emitted by [ValidateAQL], e.g.
+	// aql_from_archetype) do NOT make OK false — treat OK as the
+	// pass/fail gate and inspect Severity for advisories. For
+	// [ValidateComposition], which emits only Error issues, OK is
+	// equivalent to len(r.Issues) == 0.
 	OK bool
 
-	// Issues is the full list of failing clauses in walk order.
-	// Empty when OK; never nil after a validator call (zero-length
-	// allocation is acceptable).
+	// Issues is the full list of issues in a stable per-validator order
+	// (composition walk order for [ValidateComposition]; lint layer order
+	// for [ValidateAQL]). Empty when a validator found nothing; never nil
+	// after a validator call (zero-length allocation is acceptable). May be
+	// non-empty while OK is true when it holds only Warning-severity issues.
 	Issues []Issue
 }
 
 // resultFromIssues builds a [Result] from a slice of issues. Used by
 // validators that accumulate into a local slice and return at the
-// end of the walk. The Issues field is never nil — callers can range
-// over it without a nil guard, matching the doc on [Result.Issues].
+// end of the walk. OK is true unless an Error-severity issue is
+// present (Warnings do not flip it). The Issues field is never nil —
+// callers can range over it without a nil guard, matching the doc on
+// [Result.Issues].
 func resultFromIssues(issues []Issue) Result {
 	if issues == nil {
 		issues = []Issue{}
 	}
+	ok := true
+	for _, i := range issues {
+		if i.Severity == Error {
+			ok = false
+			break
+		}
+	}
 	return Result{
-		OK:     len(issues) == 0,
+		OK:     ok,
 		Issues: issues,
 	}
 }

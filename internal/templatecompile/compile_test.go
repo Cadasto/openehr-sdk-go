@@ -97,6 +97,31 @@ func TestCompile_Indexes(t *testing.T) {
 	}
 }
 
+// AllByArchetypeID indexes the archetype root nodes by their HRID
+// (archetypeID is carried only by ArchetypeRoot-derived nodes, not their
+// descendants). vital_signs slots in five archetype roots; querying one
+// returns that root node, whose subtree the lint layer then walks. An
+// absent HRID yields an empty slice.
+func TestCompile_AllByArchetypeID(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+
+	bp := c.AllByArchetypeID("openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if len(bp) != 1 {
+		t.Fatalf("AllByArchetypeID(blood_pressure) = %d roots, want 1", len(bp))
+	}
+	root := bp[0]
+	if root.ArchetypeID() != "openEHR-EHR-OBSERVATION.blood_pressure.v1" {
+		t.Errorf("root ArchetypeID = %q, want blood_pressure.v1", root.ArchetypeID())
+	}
+	if root.AQLPath() != "/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]" {
+		t.Errorf("root AQLPath = %q", root.AQLPath())
+	}
+
+	if got := c.AllByArchetypeID("openEHR-EHR-OBSERVATION.absent.v9"); len(got) != 0 {
+		t.Errorf("AllByArchetypeID(absent) = %d nodes, want 0", len(got))
+	}
+}
+
 // Phase 4 — implicit attribute injection: COMPOSITION's RM-mandatory
 // fields the OPT did NOT declare (composer, language, territory) are
 // injected via rminfo. OPT-declared fields (category, content) appear

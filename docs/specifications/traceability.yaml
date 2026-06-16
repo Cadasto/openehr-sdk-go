@@ -308,7 +308,7 @@ requirements:
     probes: [PROBE-020, PROBE-021]
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
-      - docs/plans/2026-05-21-aql-builders.md
+      - docs/plans/archive/2026-05-21-aql-builders.md
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go
@@ -429,6 +429,31 @@ requirements:
       - openehr/template/parse_depth_test.go
       - openehr/bmm/load_test.go
       - openehr/rm/typereg/registry_test.go
+
+  - id: REQ-109
+    title: AQL static lint
+    canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
+    status: landed
+    implementation: landed
+    packages:
+      - openehr/aql/parse
+      - openehr/aql/parse/gen
+      - openehr/aql/lint
+      - openehr/validation
+      - internal/templatecompile
+      - testkit/probes/aql
+    probes: [PROBE-028]
+    plans: [docs/plans/archive/2026-06-15-aql-lint.md]
+    tests:
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/imports_test.go
+      - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/lint_test.go
+      - openehr/aql/lint/imports_test.go
+      - openehr/validation/aql_test.go
+      - internal/templatecompile/compile_test.go
+      - testkit/probes/aql/probes_test.go
 
   - id: REQ-103
     title: Primitive constraint introspection

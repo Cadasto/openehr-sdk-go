@@ -1,0 +1,1 @@
+SELECT CONTAINS_STR('hello world', 'world') FROM EHR e

@@ -1,0 +1,8 @@
+{
+  "_type": "ROLE",
+  "archetype_node_id": "openEHR-DEMOGRAPHIC-ROLE.role.v1",
+  "name": { "_type": "DV_TEXT", "value": "Attending Physician" },
+  "identities": [
+    { "_type": "PARTY_IDENTITY", "name": { "_type": "DV_TEXT", "value": "role id" } }
+  ]
+}

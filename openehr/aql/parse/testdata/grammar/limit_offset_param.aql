@@ -1,0 +1,1 @@
+SELECT c FROM EHR e CONTAINS COMPOSITION c ORDER BY c/uid/value LIMIT $count OFFSET $start

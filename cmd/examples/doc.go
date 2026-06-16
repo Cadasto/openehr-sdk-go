@@ -21,4 +21,5 @@
 //   - cmd/examples/ehr_create           — REST EHR create (transport + client)
 //   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
 //   - cmd/examples/aql-build            — AQL struct + verb builders (REQ-055)
+//   - cmd/examples/lint-aql             — AQL static lint + ValidateAQL (REQ-109)
 package examples

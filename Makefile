@@ -15,6 +15,14 @@ COMPOSE_PROJECT ?= openehr-sdk-go
 LINT_IMAGE      ?= golangci/golangci-lint:v2.11.4-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
+# ANTLR codegen (maintainer-only). The generator is Java, confined to the
+# Dockerfile `antlr` stage; the runtime is pure Go. Keep ANTLR_VERSION in
+# lockstep with the antlr4-go/antlr runtime in go.mod (see grammar PIN).
+ANTLR_VERSION   ?= 4.13.2
+ANTLR_IMAGE     ?= openehr-sdk-go/antlr:$(ANTLR_VERSION)
+AQL_GRAMMAR_DIR := resources/aql/grammar/active
+AQL_GEN_DIR     := openehr/aql/parse/gen
+
 HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.25(\.|$$|[[:space:]])' && echo yes)
 HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && echo yes)
 
@@ -47,7 +55,7 @@ endef
 
 .PHONY: help doctor go-version image-dev \
         fmt fmt-check vet \
-        codegen codegen-verify \
+        codegen codegen-verify antlr-image aqlgen aqlgen-verify \
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
@@ -104,8 +112,11 @@ fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
 		exit 1; \
 	}
 
-vet: ## Run go vet ./...
-	@$(GO) vet ./...
+vet: ## Run go vet (excludes the generated ANTLR parser)
+	@# The generated parser (openehr/aql/parse/gen) emits unreachable code after
+	@# panics — inherent to ANTLR's Go target, not a defect. golangci-lint already
+	@# skips generated files (generated: lax); mirror that for plain `go vet`.
+	@$(GO) vet $$($(GO) list ./... | grep -v '/openehr/aql/parse/gen$$')
 
 ##@ Codegen
 
@@ -115,9 +126,28 @@ codegen: ## Regenerate RM and AOM 1.4 from pinned BMM sources
 codegen-verify: ## Fail if generated code drifts from resources/bmm
 	@$(GO) run ./cmd/bmmgen -resources ./resources/bmm -out . -verify
 
+antlr-image: ## Build the ANTLR codegen image (maintainer-only; needs Docker + network)
+	@docker build --target antlr --build-arg ANTLR_VERSION=$(ANTLR_VERSION) -t $(ANTLR_IMAGE) .
+
+aqlgen: antlr-image ## Regenerate the AQL parser from active/ grammar (maintainer-only; needs Docker)
+	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
+	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).tmp -package gen AqlLexer.g4 AqlParser.g4
+	@rm -f $(AQL_GEN_DIR)/*.go && cp $(AQL_GEN_DIR).tmp/*.go $(AQL_GEN_DIR)/ && rm -rf $(AQL_GEN_DIR).tmp
+	@echo "regenerated $(AQL_GEN_DIR)/ from $(AQL_GRAMMAR_DIR)/"
+
+aqlgen-verify: antlr-image ## Fail if the committed AQL parser drifts from active/ grammar
+	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
+	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).verify -package gen AqlLexer.g4 AqlParser.g4
+	@status=0; for f in $(AQL_GEN_DIR)/*.go; do \
+	  diff -u "$$f" "$(AQL_GEN_DIR).verify/$$(basename $$f)" || status=1; \
+	done; \
+	rm -rf $(AQL_GEN_DIR).verify; \
+	if [ $$status -ne 0 ]; then echo "aqlgen-verify: AQL parser drifts from active/ — run 'make aqlgen'"; exit 1; fi; \
+	echo "aqlgen-verify: OK"
+
 ##@ Test
 
-test: codegen-verify ## Run unit tests (includes codegen drift check)
+test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
 	@$(GO) test ./... -count=1
 
 test-race: ## Run unit tests with -race (main-branch CI job)

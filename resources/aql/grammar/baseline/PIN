@@ -1,0 +1,12 @@
+# Baseline provenance — openEHR AQL grammar (frozen; do not hand-edit).
+# Re-import only on a QUERY release bump, per ADR 0007 and ../README.md.
+
+source:        https://github.com/openEHR/specifications-QUERY/tree/Release-1.1.0/docs/AQL/grammar
+query_release: Release-1.1.0
+files:         AqlLexer.g4, AqlParser.g4
+fetched_from:  https://raw.githubusercontent.com/openEHR/specifications-QUERY/Release-1.1.0/docs/AQL/grammar/
+
+# Generator + runtime travel in lockstep (a mismatch produces Go that will not
+# compile against the runtime). Bump both together; see ADR 0007.
+antlr_tool:    4.13.2                                  # Java generator (Dockerfile `antlr` stage)
+antlr_runtime: github.com/antlr4-go/antlr/v4 v4.13.1   # pure-Go runtime (go.mod)

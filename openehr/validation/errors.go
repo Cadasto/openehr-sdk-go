@@ -39,7 +39,10 @@ var (
 	// swap in the parsed assertion grammar.
 	ErrSlotFill = errors.New("validation: slot fill")
 
-	// ErrAQLSyntax is reserved for the [ValidateAQL] surface (not
-	// implemented in v1).
+	// ErrAQLSyntax is the sentinel for a Layer-1 lint failure surfaced by
+	// [ValidateAQL] — an empty query (code "aql_empty") or one that does
+	// not parse against the SDK grammar profile (code "aql_syntax",
+	// REQ-109). Map via [Issue.Err]; the parse layer's own aql.ErrSyntax
+	// is the building-block equivalent.
 	ErrAQLSyntax = errors.New("validation: aql syntax")
 )

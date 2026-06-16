@@ -220,6 +220,15 @@ The catalog is the normative list. Each entry has:
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — error mapping tested against a synthesised backend envelope ([`openehr/client/query/`](../../openehr/client/query/)); Cassette/Live ratification pending a reference deployment.
 
+#### PROBE-028 — AQL lint stability
+
+- **Title:** Linting fixed AQL strings against the SDK grammar profile (and, for Layer 3, a compiled OPT) yields a stable issue-code multiset.
+- **Preconditions:** A compiled OPT (`vital_signs.opt`) and cassette query strings in [`testkit/cassettes/aql/lint/`](../../testkit/cassettes/aql/lint/) (`valid.aql`, `missing_archetype.aql`, `bad_syntax.aql`).
+- **Wire assertion:** Sandbox-only — `lint.LintString(q, &lint.Options{Compiled: c})` over each cassette MUST produce exactly the expected `lint.Issue.Code` multiset: `valid.aql` → none; `missing_archetype.aql` → `aql_archetype_not_in_template`; `bad_syntax.aql` → `aql_syntax`. Any implementation of REQ-109 over the same grammar profile + template MUST report the same codes. Detail text and path strings are not asserted (observable-behaviour level).
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go).
+- **Satisfies:** REQ-109.
+
 #### PROBE-022 — OPT path resolution
 
 - **Title:** Parsing an ADL 1.4 operational template (OPT) and resolving a fixture-defined list of openEHR paths returns nodes whose RM type, archetype node id, and (for archetype roots) archetype id match the expected values; explicitly unknown attributes and unmatched predicates produce `ErrPathNotFound`.
@@ -506,7 +515,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
-| AQL | PROBE-020 … 021 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending |
+| AQL | PROBE-020 … 021, PROBE-028 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go) |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
 | Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |

@@ -37,6 +37,8 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/aom/aom14/` | AOM 1.4 types (ADL 1.4). **Generated** from `openehr_am_1.4.0.bmm.json` + `openehr_base_1.3.0.bmm.json` (REQ-042). |
 | `openehr/aom/aom2/` | AOM 2 types (ADL 2). **Deferred for v1** — BMM file kept in `resources/bmm/`. |
 | `openehr/aql/` | AQL builders (struct-builder + verb-functions) and request / result models, independent of an executor. |
+| `openehr/aql/parse/` | AQL syntax parser against the SDK grammar profile (ADR 0007) → generated-type-free AST (REQ-109). The generated ANTLR parser lives under `openehr/aql/parse/gen/`; the pure-Go ANTLR runtime is its only third-party dependency. |
+| `openehr/aql/lint/` | Three-layer AQL static lint (syntax, shape, template-aware archetype/path checks) over `parse` (REQ-109). Bridged into the validation model by `validation.ValidateAQL`; never imports `openehr/validation`. |
 | `openehr/composition/` | Generic OPT-driven Composition builder (path-value assignment). Template-specific generated structs do **not** live here — they belong in the consuming project. |
 | `openehr/client/` | REST clients grouped per openEHR resource. |
 | `openehr/client/system/` | System API — capabilities, version, infrastructure discovery. |
@@ -131,7 +133,7 @@ No `cadasto/<X>` package **MAY** import another `cadasto/<Y>` package directly. 
 
 ## REQ-013 — Building-block independence
 
-Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, and `openehr/aql` (models only) **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`.
+Each of `openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/template`, `openehr/aql` (models only), and the AQL lint building blocks `openehr/aql/parse` + `openehr/aql/lint` **MUST** be importable and useful without constructing an authenticated client or instantiating `transport/` or `auth/`. (`aql/parse` pulls the pure-Go ANTLR runtime — its sole third-party dependency — but neither it nor `aql/lint` imports `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`; enforced by `TestAQLParseForbiddenImports` / `TestAQLLintForbiddenImports`.)
 
 See [use-cases.md § Building-block use cases](use-cases.md#building-block-use-cases).
 

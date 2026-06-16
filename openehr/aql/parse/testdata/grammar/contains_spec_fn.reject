@@ -1,0 +1,1 @@
+SELECT CONTAINS('a', 'b') FROM EHR e

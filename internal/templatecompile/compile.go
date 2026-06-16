@@ -52,13 +52,14 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 	}
 
 	c := &Compiled{
-		templateID: opt.TemplateID(),
-		concept:    opt.Concept(),
-		uid:        opt.UID(),
-		language:   opt.Language(),
-		byPath:     make(map[string]*CompiledNode),
-		byNodeID:   make(map[string][]*CompiledNode),
-		byRMType:   make(map[string][]*CompiledNode),
+		templateID:    opt.TemplateID(),
+		concept:       opt.Concept(),
+		uid:           opt.UID(),
+		language:      opt.Language(),
+		byPath:        make(map[string]*CompiledNode),
+		byNodeID:      make(map[string][]*CompiledNode),
+		byRMType:      make(map[string][]*CompiledNode),
+		byArchetypeID: make(map[string][]*CompiledNode),
 	}
 
 	w := walker{
@@ -169,6 +170,9 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 	}
 	if cn.rmTypeName != "" {
 		w.compiled.byRMType[cn.rmTypeName] = append(w.compiled.byRMType[cn.rmTypeName], cn)
+	}
+	if cn.archetypeID != "" {
+		w.compiled.byArchetypeID[cn.archetypeID] = append(w.compiled.byArchetypeID[cn.archetypeID], cn)
 	}
 	return cn, nil
 }
