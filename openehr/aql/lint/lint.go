@@ -3,6 +3,8 @@ package lint
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -188,7 +190,9 @@ func paramIssues(md Metadata, q *aql.Query) []Issue {
 	for _, name := range md.Params {
 		referenced[name] = true
 	}
-	for key := range q.Parameters {
+	// Sort keys: map iteration order is random, but Result.Issues is
+	// documented to be in deterministic discovery order.
+	for _, key := range slices.Sorted(maps.Keys(q.Parameters)) {
 		if !referenced[key] {
 			issues = append(issues, Issue{
 				Code:     "aql_unused_param",

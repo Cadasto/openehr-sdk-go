@@ -82,6 +82,22 @@ func TestValidateAQL_Clean(t *testing.T) {
 	}
 }
 
+// A warning-only lint result (no Error-severity issue) bridges to Result.OK
+// == true: aql_from_archetype is advisory and must not flip the gate.
+func TestValidateAQL_WarningOnlyIsOK(t *testing.T) {
+	c := compileVitalSigns(t)
+	r := validation.ValidateAQL(aql.NewQuery("SELECT c FROM COMPOSITION c"), c)
+	if !r.OK {
+		t.Fatalf("warning-only result must be OK, got %+v", r.Issues)
+	}
+	if !hasCode(r, "aql_from_archetype") {
+		t.Fatalf("want aql_from_archetype warning present; issues = %+v", r.Issues)
+	}
+	if r.Issues[0].Severity != validation.Warning {
+		t.Errorf("issue severity = %v, want warning", r.Issues[0].Severity)
+	}
+}
+
 // Parameter binding bridges through: an unbound $param is an Error-severity
 // issue carried into the validation Result.
 func TestValidateAQL_UnboundParam(t *testing.T) {

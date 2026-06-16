@@ -44,7 +44,21 @@ func templateIssues(md Metadata, c *templatecompile.Compiled) []Issue {
 		if err != nil || len(norm.Segments) == 0 {
 			continue // bare alias root — nothing to resolve
 		}
-		if bad, diverged := pathDivergence(roots[0], norm.Segments); diverged {
+		// The same archetype may fill several slots (several roots). Warn
+		// only when the path diverges under EVERY root; report the first
+		// divergence. A path valid under any one root is not flagged.
+		bad, divergedAll := "", true
+		for _, root := range roots {
+			seg, diverged := pathDivergence(root, norm.Segments)
+			if !diverged {
+				divergedAll = false
+				break
+			}
+			if bad == "" {
+				bad = seg
+			}
+		}
+		if divergedAll {
 			issues = append(issues, Issue{
 				Code: "aql_path_not_in_template",
 				Path: p.Raw,

@@ -2,6 +2,7 @@ package lint
 
 import (
 	"errors"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
@@ -41,5 +42,5 @@ func Normalise(p parse.IdentifiedPath) (Path, error) {
 			sb.WriteByte(']')
 		}
 	}
-	return Path{Alias: p.Alias, Segments: p.Segments, Suffix: sb.String()}, nil
+	return Path{Alias: p.Alias, Segments: slices.Clone(p.Segments), Suffix: sb.String()}, nil
 }

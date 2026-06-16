@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -96,7 +96,7 @@ func codesMatch(got, want []string) bool {
 }
 
 func sortedCopy(in []string) []string {
-	out := append([]string(nil), in...)
-	sort.Strings(out)
+	out := slices.Clone(in)
+	slices.Sort(out)
 	return out
 }
