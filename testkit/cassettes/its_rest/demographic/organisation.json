@@ -1,0 +1,8 @@
+{
+  "_type": "ORGANISATION",
+  "archetype_node_id": "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
+  "name": { "_type": "DV_TEXT", "value": "Acme Hospital" },
+  "identities": [
+    { "_type": "PARTY_IDENTITY", "name": { "_type": "DV_TEXT", "value": "registered name" } }
+  ]
+}
