@@ -65,7 +65,8 @@ func basePath(t Type) string { return "/demographic/" + string(t) }
 // polymorphically by its `_type` discriminator (REQ-040).
 //
 // Wire: GET /demographic/{type}/{uid_based_id} [?version_at_time=...]. A 204
-// (no version at the requested time) yields a nil Party and nil error.
+// (no version at the requested time) yields a nil Party and nil error; any
+// other empty-body 2xx is surfaced as [transport.ErrInvalidShape].
 func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, nil, fmt.Errorf("demographic.Get: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
@@ -195,13 +196,30 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	return doWrite(ctx, c, req, cfg.prefer)
 }
 
+// deleteConfig is the resolved option set for [Delete]. A logical delete is a
+// versioned commit but returns no body, so it shares only the audit-details
+// option with the writes.
+type deleteConfig struct {
+	auditDetails *rm.AuditDetails
+}
+
+// DeleteOption mutates [Delete]'s request shape.
+type DeleteOption func(*deleteConfig)
+
+// WithDeleteAudit attaches the commit-time audit envelope as the
+// `openehr-audit-details` header on a logical delete (REQ-059). Nil omits it.
+func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
+	return func(c *deleteConfig) { c.auditDetails = a }
+}
+
 // Delete logically deletes the PARTY version addressed by versionUID,
 // attaching the preceding version's id as If-Match (REQ-054). The server
-// responds 204 No Content on success.
+// responds 204 No Content on success. Forgetting ifMatch returns
+// [transport.ErrInvalidConfig] without issuing a request.
 //
 // Wire: DELETE /demographic/{type}/{version_uid} with If-Match. A
 // referential-integrity conflict maps to [transport.ErrVersionConflict] (409).
-func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehrclient.VersionUID, ifMatch string) (*openehrclient.VersionMetadata, error) {
+func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
 	if !t.valid() {
 		return nil, fmt.Errorf("demographic.Delete: %w: invalid PARTY type %q", transport.ErrInvalidConfig, t)
 	}
@@ -211,11 +229,20 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 	if ifMatch == "" {
 		return nil, fmt.Errorf("demographic.Delete: %w: empty If-Match (REQ-054)", transport.ErrInvalidConfig)
 	}
+	cfg := deleteConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	if err != nil {
+		return nil, fmt.Errorf("demographic.Delete: %w", err)
+	}
 	req := &transport.Request{
-		Method:  http.MethodDelete,
-		Path:    basePath(t) + "/" + url.PathEscape(string(versionUID)),
-		Route:   basePath(t) + "/{version_uid}",
-		IfMatch: ifMatch,
+		Method:             http.MethodDelete,
+		Path:               basePath(t) + "/" + url.PathEscape(string(versionUID)),
+		Route:              basePath(t) + "/{version_uid}",
+		IfMatch:            ifMatch,
+		AuditDetailsHeader: auditHeader,
 	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -228,8 +255,9 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 }
 
 // getParty issues a read request and decodes the bare PARTY body
-// polymorphically via the type registry (REQ-040). An empty body (e.g. a 204
-// for a version_at_time with no matching version) yields a nil Party.
+// polymorphically via the type registry (REQ-040). A 204 (e.g. a
+// version_at_time with no matching version) yields a nil Party; any other
+// empty-body 2xx is a wire anomaly surfaced as [transport.ErrInvalidShape].
 func getParty(ctx context.Context, c *transport.Client, req *transport.Request) (rm.Party, *openehrclient.VersionMetadata, error) {
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -240,7 +268,17 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	}
 	meta := openehrclient.NewVersionMetadata(resp.Metadata)
 	if len(resp.Body) == 0 {
-		return nil, meta, nil
+		// Only a 204 legitimately carries no version body (e.g. a
+		// version_at_time with no matching version). Any other empty-body 2xx
+		// is a wire anomaly — surface it as ErrInvalidShape rather than
+		// masquerading as "no version". (The concrete read leaves route through
+		// transport.Decode, which rejects every empty body; this leaf decodes
+		// rm.Party polymorphically so it can't, and instead applies the same
+		// strictness while carving out the legitimate 204.)
+		if resp.StatusCode == http.StatusNoContent {
+			return nil, meta, nil
+		}
+		return nil, meta, fmt.Errorf("demographic: %w: %d response with empty body", transport.ErrInvalidShape, resp.StatusCode)
 	}
 	party, err := typereg.DecodeAs[rm.Party](resp.Body)
 	if err != nil {
@@ -288,7 +326,7 @@ type Repository interface {
 	Get(ctx context.Context, t Type, ref openehrclient.Ref) (rm.Party, *openehrclient.VersionMetadata, error)
 	Create(ctx context.Context, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
 	Update(ctx context.Context, t Type, voID openehrclient.VersionedObjectID, ifMatch string, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error)
-	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string) (*openehrclient.VersionMetadata, error)
+	Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -308,6 +346,6 @@ func (r *repository) Update(ctx context.Context, t Type, voID openehrclient.Vers
 	return Update(ctx, r.c, t, voID, ifMatch, party, opts...)
 }
 
-func (r *repository) Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string) (*openehrclient.VersionMetadata, error) {
-	return Delete(ctx, r.c, t, versionUID, ifMatch)
+func (r *repository) Delete(ctx context.Context, t Type, versionUID openehrclient.VersionUID, ifMatch string, opts ...DeleteOption) (*openehrclient.VersionMetadata, error) {
+	return Delete(ctx, r.c, t, versionUID, ifMatch, opts...)
 }

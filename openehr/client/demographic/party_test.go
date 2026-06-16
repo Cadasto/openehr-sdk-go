@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/demographic"
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -346,5 +349,184 @@ func TestGetInvalidType(t *testing.T) {
 		demographic.Type("widget"), openehrclient.LatestOf(personVOID))
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("invalid type: err = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestGetRejectsNilRef(t *testing.T) {
+	_, _, err := demographic.Get(context.Background(), nil, demographic.Person, nil)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Fatalf("nil Ref: err = %v, want ErrInvalidConfig", err)
+	}
+}
+
+func TestUpdateRejectsNilParty(t *testing.T) {
+	_, _, err := demographic.Update(context.Background(), nil,
+		demographic.Person, personVOID, personVersion, nil)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Fatalf("nil Party: err = %v, want ErrInvalidConfig", err)
+	}
+}
+
+// TestGetAtTimeNoVersion pins the documented "204 → nil Party, nil error,
+// metadata still returned" contract for a version_at_time with no matching
+// version, and asserts the version_at_time query param is actually emitted
+// (the LatestAtTime Ref variant — otherwise an as-of-time read would silently
+// degrade to a latest read).
+func TestGetAtTimeNoVersion(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	at := time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC)
+	got, meta, err := demographic.Get(context.Background(), newClient(t, srv),
+		demographic.Person, openehrclient.LatestAtTime(personVOID, at))
+	if err != nil {
+		t.Fatalf("204 read: unexpected error %v", err)
+	}
+	if got != nil {
+		t.Errorf("204 read: got %T, want nil Party", got)
+	}
+	if meta == nil {
+		t.Error("204 read: expected non-nil metadata")
+	}
+	if q := captured.URL.Query().Get("version_at_time"); q != at.Format(time.RFC3339) {
+		t.Errorf("version_at_time = %q, want %q", q, at.Format(time.RFC3339))
+	}
+}
+
+// TestGetEmptyBodyAnomaly guards the silent-failure fix: an empty body on a
+// non-204 2xx is a wire anomaly and must surface as ErrInvalidShape rather
+// than masquerading as "no version found".
+func TestGetEmptyBodyAnomaly(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK) // 200 with no body
+	}))
+	defer srv.Close()
+
+	_, _, err := demographic.Get(context.Background(), newClient(t, srv),
+		demographic.Person, openehrclient.LatestOf(personVOID))
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("empty 200 read: err = %v, want ErrInvalidShape", err)
+	}
+}
+
+// TestGetSpecificVersion covers the VersionOf Ref variant: the version UID is
+// the path tail and no query param is sent.
+func TestGetSpecificVersion(t *testing.T) {
+	body := cassette(t, "person.json")
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("ETag", `"`+personVersion+`"`)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	if _, _, err := demographic.Get(context.Background(), newClient(t, srv),
+		demographic.Person, openehrclient.VersionOf(personVersion)); err != nil {
+		t.Fatal(err)
+	}
+	if want := "/openehr/v1/demographic/person/" + personVersion; captured.URL.Path != want {
+		t.Errorf("path = %q, want %q", captured.URL.Path, want)
+	}
+	if captured.URL.RawQuery != "" {
+		t.Errorf("VersionOf must not send a query, got %q", captured.URL.RawQuery)
+	}
+}
+
+// TestCreateSendsAuditAndPreferHeaders exercises WithAuditDetails (REQ-059) and
+// asserts both the openehr-audit-details header and the default Prefer header
+// reach the wire, plus that the request body carries the _type discriminator.
+func TestCreateSendsAuditAndPreferHeaders(t *testing.T) {
+	var (
+		captured     *http.Request
+		capturedBody []byte
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedBody, _ = io.ReadAll(r.Body)
+		captured = r.Clone(r.Context())
+		w.Header().Set("Location", "/demographic/person/"+personVersion)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+
+	committer := "alice"
+	audit := &rm.AuditDetails{
+		SystemID:  "cdr.example",
+		Committer: rm.PartyIdentified{Name: &committer},
+		ChangeType: rm.DVCodedText{
+			DVText:       rm.DVText{Value: "creation"},
+			DefiningCode: rm.CodePhrase{CodeString: "249"},
+		},
+		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
+	}
+	if _, _, err := demographic.Create(context.Background(), newClient(t, srv),
+		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
+		demographic.WithAuditDetails(audit)); err != nil {
+		t.Fatal(err)
+	}
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+		t.Errorf("openehr-audit-details header = %q", h)
+	}
+	if h := captured.Header.Get("Prefer"); h != "return=minimal" {
+		t.Errorf("Prefer = %q, want return=minimal", h)
+	}
+	if !strings.Contains(string(capturedBody), `"_type"`) {
+		t.Errorf("Create body missing _type discriminator: %s", capturedBody)
+	}
+}
+
+// TestCreatePreferRepresentationEmptyBody pins the REQ-094 strict guard: a
+// caller that asks for representation but gets no body must see
+// ErrInvalidShape, never a silently-nil Party.
+func TestCreatePreferRepresentationEmptyBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("ETag", `"`+personVersion+`"`)
+		w.WriteHeader(http.StatusCreated) // representation requested, but empty body
+	}))
+	defer srv.Close()
+
+	_, meta, err := demographic.Create(context.Background(), newClient(t, srv),
+		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
+		demographic.WithPrefer(transport.PreferRepresentation))
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("representation empty body: err = %v, want ErrInvalidShape", err)
+	}
+	if meta == nil {
+		t.Error("expected metadata alongside ErrInvalidShape")
+	}
+}
+
+// TestDeleteSendsAuditDetails covers the WithDeleteAudit option (REQ-059): a
+// logical delete is a versioned commit and must be able to carry the audit
+// envelope, matching the composition sibling.
+func TestDeleteSendsAuditDetails(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	committer := "alice"
+	audit := &rm.AuditDetails{
+		SystemID:  "cdr.example",
+		Committer: rm.PartyIdentified{Name: &committer},
+		ChangeType: rm.DVCodedText{
+			DVText:       rm.DVText{Value: "deleted"},
+			DefiningCode: rm.CodePhrase{CodeString: "523"},
+		},
+		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
+	}
+	if _, err := demographic.Delete(context.Background(), newClient(t, srv),
+		demographic.Person, personVersion, personVersion,
+		demographic.WithDeleteAudit(audit)); err != nil {
+		t.Fatal(err)
+	}
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+		t.Errorf("openehr-audit-details header = %q", h)
 	}
 }
