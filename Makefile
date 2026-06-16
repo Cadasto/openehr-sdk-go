@@ -129,7 +129,7 @@ codegen-verify: ## Fail if generated code drifts from resources/bmm
 antlr-image: ## Build the ANTLR codegen image (maintainer-only; needs Docker + network)
 	@docker build --target antlr --build-arg ANTLR_VERSION=$(ANTLR_VERSION) -t $(ANTLR_IMAGE) .
 
-aqlgen: antlr-image ## Regenerate the AQL parser from active/ grammar (maintainer-only; not in CI)
+aqlgen: antlr-image ## Regenerate the AQL parser from active/ grammar (maintainer-only; needs Docker)
 	@docker run --rm -v $(CURDIR):/app -w /app/$(AQL_GRAMMAR_DIR) --user $$(id -u):$$(id -g) \
 	  $(ANTLR_IMAGE) -Dlanguage=Go -o /app/$(AQL_GEN_DIR).tmp -package gen AqlLexer.g4 AqlParser.g4
 	@rm -f $(AQL_GEN_DIR)/*.go && cp $(AQL_GEN_DIR).tmp/*.go $(AQL_GEN_DIR)/ && rm -rf $(AQL_GEN_DIR).tmp
@@ -147,7 +147,7 @@ aqlgen-verify: antlr-image ## Fail if the committed AQL parser drifts from activ
 
 ##@ Test
 
-test: codegen-verify ## Run unit tests (includes codegen drift check)
+test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
 	@$(GO) test ./... -count=1
 
 test-race: ## Run unit tests with -race (main-branch CI job)
