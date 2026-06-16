@@ -46,6 +46,7 @@ _scratch*
 
 # Build output
 bin/
+/lint-aql
 
 # OS
 .DS_Store
