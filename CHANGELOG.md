@@ -8,6 +8,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-16
+
+Seventh `v0.x` minor — the **AQL building-block cycle**: the typed builders (REQ-055) and the static parse + lint pipeline (REQ-109) land together, completing the Phase 2 AQL surface. **Additive only — no public API or behaviour breaks this cycle**; per [`docs/releases.md`](docs/releases.md), `v0.x` minors *may* break public API, but none do here — safe to upgrade from `v0.6.0`. One new runtime dependency: the pure-Go ANTLR runtime (`github.com/antlr4-go/antlr/v4`), confined to `openehr/aql/parse` — the generator (Java) is containerised and never on the build/test path (see [architecture.md § Dependencies](docs/architecture.md#dependencies)).
+
 ### Added
 
 - **AQL builders (REQ-055).** `openehr/aql` gains a struct-builder (`NewBuilder`) and verb-functions (`Select` / `From` / `FromEHR` / `Where`) that emit byte-identical, canonical AQL (PROBE-020); typed values (`Param` + literals, the injection guard), comparisons, and `And` / `Or`; `openehr/client/query` maps backend path-resolution failures to `aql.ErrPathResolution` (PROBE-021). Completes the Phase 2 clinical building blocks.
