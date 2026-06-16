@@ -67,6 +67,7 @@ type Issue struct {
 //     "archetype_id_mismatch" / "node_id_mismatch"        → [ErrTypeMismatch]
 //   - "primitive_*" (any primitive_-prefixed code)        → [ErrPrimitive]
 //   - "slot_fill"                                         → [ErrSlotFill]
+//   - "aql_syntax" / "aql_empty"                          → [ErrAQLSyntax]
 //
 // Global guard codes (`nil_composition`, `nil_template`) return
 // nil — those represent caller-side argument errors rather than
@@ -89,6 +90,8 @@ func (i Issue) Err() error {
 		return ErrTypeMismatch
 	case "slot_fill":
 		return ErrSlotFill
+	case "aql_syntax", "aql_empty":
+		return ErrAQLSyntax
 	}
 	if strings.HasPrefix(i.Code, "primitive_") {
 		return ErrPrimitive
