@@ -53,8 +53,17 @@ func TestValidateAQL_Syntax(t *testing.T) {
 
 func TestValidateAQL_Empty(t *testing.T) {
 	r := validation.ValidateAQL(aql.NewQuery("   "), nil)
-	if !hasCode(r, "aql_empty") {
-		t.Fatalf("want aql_empty; issues = %+v", r.Issues)
+	if r.OK {
+		t.Fatal("expected not-OK for an empty query")
+	}
+	var matched bool
+	for _, i := range r.Issues {
+		if i.Code == "aql_empty" && errors.Is(i.Err(), validation.ErrAQLSyntax) {
+			matched = true
+		}
+	}
+	if !matched {
+		t.Fatalf("want aql_empty → ErrAQLSyntax; issues = %+v", r.Issues)
 	}
 }
 

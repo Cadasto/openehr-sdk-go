@@ -1,6 +1,7 @@
 package lint_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -172,12 +173,13 @@ func TestLintValidPathNoWarning(t *testing.T) {
 	}
 }
 
-// A path with a wrong structural attribute (eventz) must warn.
+// A path with a wrong structural attribute (eventz) must warn, localised to
+// the offending segment and path (GAP-5: payload assertion).
 func TestLintBadPathWarns(t *testing.T) {
+	const rawPath = "o/data[at0001]/eventz/value"
 	c := mustCompile(t, "vital_signs")
 	r := lint.LintString(
-		"SELECT o/data[at0001]/eventz/value "+
-			"FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
+		"SELECT "+rawPath+" FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]",
 		&lint.Options{Compiled: c},
 	)
 	if !has(r, "aql_path_not_in_template") {
@@ -185,6 +187,22 @@ func TestLintBadPathWarns(t *testing.T) {
 	}
 	if !r.OK() {
 		t.Fatalf("path warning must not make result not-OK: %v", codes(r))
+	}
+	var found bool
+	for _, i := range r.Issues {
+		if i.Code != "aql_path_not_in_template" {
+			continue
+		}
+		found = true
+		if i.Path != rawPath {
+			t.Errorf("issue Path = %q, want %q", i.Path, rawPath)
+		}
+		if !strings.Contains(i.Detail, "eventz") {
+			t.Errorf("Detail should name the diverging segment, got %q", i.Detail)
+		}
+	}
+	if !found {
+		t.Fatal("no aql_path_not_in_template issue to inspect")
 	}
 }
 
@@ -200,5 +218,87 @@ func TestLintWrongAtCodeLenientFallback(t *testing.T) {
 	)
 	if has(r, "aql_path_not_in_template") {
 		t.Fatalf("wrong at-code with first-child fallback must not warn, got %v", codes(r))
+	}
+}
+
+// --- Review-driven coverage additions ---------------------------------------
+
+// GAP-2: a referenced $param that IS bound produces no aql_unbound_param (the
+// negative of TestLintUnboundParam — guards against an inverted condition).
+func TestLintBoundParamClean(t *testing.T) {
+	q := aql.NewQuery(
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
+			"WHERE e/ehr_id/value = $ehr_id",
+	)
+	q.Parameters = map[string]any{"ehr_id": "x"}
+	r := lint.Lint(mustParse(t, q.Q), &lint.Options{Query: &q})
+	if has(r, "aql_unbound_param") || has(r, "aql_unused_param") {
+		t.Fatalf("bound+used param must be clean, got %v", codes(r))
+	}
+	if !r.OK() {
+		t.Fatalf("expected OK, got %v", codes(r))
+	}
+}
+
+// GAP-3: each hasIdentifiableScope disjunct (param-archetype, VERSION) on its
+// own suppresses aql_from_archetype — guards the OR-chain against losing a
+// disjunct. (Literal archetype and EHR are already covered elsewhere.)
+func TestLintIdentifiableScopeSuppressesWarning(t *testing.T) {
+	for _, q := range []string{
+		"SELECT c FROM COMPOSITION c[$arch]",    // ParamArchetype
+		"SELECT v FROM VERSION v[all_versions]", // Version (no EHR)
+	} {
+		r := lint.LintString(q, nil)
+		if has(r, "aql_from_archetype") {
+			t.Errorf("%q: must not warn aql_from_archetype, got %v", q, codes(r))
+		}
+	}
+}
+
+// GAP-4: with multiple unused params, the aql_unused_param issues appear in
+// deterministic sorted-key order (the sort is a no-op with a single param).
+func TestLintUnusedParamsSorted(t *testing.T) {
+	q := aql.NewQuery("SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
+	q.Parameters = map[string]any{"zeta": 1, "alpha": 2, "mike": 3}
+	r := lint.Lint(mustParse(t, q.Q), &lint.Options{Query: &q})
+	var details []string
+	for _, i := range r.Issues {
+		if i.Code == "aql_unused_param" {
+			details = append(details, i.Detail)
+		}
+	}
+	if len(details) != 3 {
+		t.Fatalf("want 3 aql_unused_param issues, got %d: %v", len(details), codes(r))
+	}
+	// Detail embeds the key after a shared prefix, so lexicographic order of
+	// Details == sorted-key order.
+	if !slices.IsSorted(details) {
+		t.Fatalf("aql_unused_param not in sorted order: %v", details)
+	}
+}
+
+// GAP-6: Lint is collect-all — one query tripping Layer-2 alias, Layer-2
+// param, and Layer-3 archetype checks returns all three in a single pass.
+func TestLintCollectAll(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	q := aql.NewQuery(
+		"SELECT x/foo FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] " +
+			"WHERE o/data = $p",
+	)
+	r := lint.Lint(mustParse(t, q.Q), &lint.Options{Compiled: c, Query: &q})
+	for _, want := range []string{
+		"aql_unknown_alias", "aql_unbound_param", "aql_archetype_not_in_template",
+	} {
+		if !has(r, want) {
+			t.Errorf("collect-all missing %s; got %v", want, codes(r))
+		}
+	}
+}
+
+// GAP-7: a nil *Document is guarded (no panic) and yields aql_syntax.
+func TestLintNilDocument(t *testing.T) {
+	r := lint.Lint(nil, nil)
+	if r.OK() || !has(r, "aql_syntax") {
+		t.Fatalf("Lint(nil) want aql_syntax, got %v", codes(r))
 	}
 }

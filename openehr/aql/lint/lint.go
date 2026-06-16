@@ -53,8 +53,11 @@ type Issue struct {
 
 // Result aggregates every [Issue] from one [Lint] / [LintString] call.
 type Result struct {
-	// Issues is the full list of findings, in discovery order. Never nil
-	// after a lint call (zero-length when clean).
+	// Issues is the full list of findings in a stable, deterministic
+	// order: by layer, then document order within a layer (aql_unused_param
+	// is sorted by parameter key, since unreferenced params have no
+	// document position). Never nil after a lint call (zero-length when
+	// clean).
 	Issues []Issue
 }
 
@@ -69,7 +72,9 @@ func (r Result) OK() bool {
 	return true
 }
 
-// Options tunes a lint pass. The zero value (or nil) runs Layers 1–2 only.
+// Options tunes a lint pass. The zero value (or nil) runs the AST-shape
+// checks only: Layer 3 needs Compiled, and the Layer-2 parameter-binding
+// checks need Query.
 type Options struct {
 	// Compiled, when non-nil, enables Layer 3 (archetype / path checks
 	// against a compiled OPT).
@@ -112,9 +117,11 @@ func syntaxDetail(err error) string {
 	return err.Error()
 }
 
-// Lint runs Layers 2–3 on an already-parsed document (Layer 1 — syntax —
-// having succeeded by virtue of doc existing). opts may be nil. Lint is
-// collect-all: it returns every issue across every enabled layer.
+// Lint runs Layers 2–3 on a document obtained from a successful
+// [parse.Parse] (Layer 1). opts may be nil. As a guard, a nil or unparsed
+// (zero-value) document yields a single aql_syntax issue rather than an
+// empty result. Lint is collect-all: it returns every issue across every
+// enabled layer.
 func Lint(doc *parse.Document, opts *Options) Result {
 	if doc == nil || !doc.Parsed() {
 		return Result{Issues: []Issue{{

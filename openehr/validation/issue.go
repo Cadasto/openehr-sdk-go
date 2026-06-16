@@ -93,6 +93,8 @@ func (i Issue) Err() error {
 	case "slot_fill":
 		return ErrSlotFill
 	case "aql_syntax", "aql_empty":
+		// Codes minted by openehr/aql/lint (REQ-109) and carried verbatim
+		// through ValidateAQL; keep this in sync with the lint code strings.
 		return ErrAQLSyntax
 	}
 	if strings.HasPrefix(i.Code, "primitive_") {
@@ -113,10 +115,11 @@ type Result struct {
 	// equivalent to len(r.Issues) == 0.
 	OK bool
 
-	// Issues is the full list of issues in walk order. Empty when a
-	// validator found nothing; never nil after a validator call
-	// (zero-length allocation is acceptable). May be non-empty while
-	// OK is true when it holds only Warning-severity issues.
+	// Issues is the full list of issues in a stable per-validator order
+	// (composition walk order for [ValidateComposition]; lint layer order
+	// for [ValidateAQL]). Empty when a validator found nothing; never nil
+	// after a validator call (zero-length allocation is acceptable). May be
+	// non-empty while OK is true when it holds only Warning-severity issues.
 	Issues []Issue
 }
 

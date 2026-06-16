@@ -47,15 +47,24 @@ func templateIssues(md Metadata, c *templatecompile.Compiled) []Issue {
 		// The same archetype may fill several slots (several roots). Warn
 		// only when the path diverges under EVERY root; report the first
 		// divergence. A path valid under any one root is not flagged.
-		bad, divergedAll := "", true
+		//
+		// NOTE: every OPT fixture in the suite compiles each archetype to a
+		// single root, so the multi-root (len(roots) > 1) path is exercised
+		// by construction only — no fixture covers it. A synthetic
+		// multi-slot OPT would be needed to test it directly.
+		var (
+			bad         string
+			found       bool
+			divergedAll = true
+		)
 		for _, root := range roots {
 			seg, diverged := pathDivergence(root, norm.Segments)
 			if !diverged {
 				divergedAll = false
 				break
 			}
-			if bad == "" {
-				bad = seg
+			if !found {
+				bad, found = seg, true
 			}
 		}
 		if divergedAll {

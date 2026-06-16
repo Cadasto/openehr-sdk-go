@@ -38,7 +38,9 @@ func (e *SyntaxError) Error() string {
 func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 
 // Document is a parsed, syntactically valid AQL query. Clause presence,
-// classes, paths, and parameters are extracted during [Parse].
+// classes, paths, and parameters are extracted during [Parse]. The
+// exported slice fields are an owned, read-only view — callers MUST NOT
+// mutate them (lint clones what it carries across its own boundary).
 type Document struct {
 	tree gen.ISelectQueryContext
 
