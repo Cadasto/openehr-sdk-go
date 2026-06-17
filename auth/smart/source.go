@@ -395,6 +395,18 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		if refreshedTR.AccessToken != "" {
 			s.lastTR = refreshedTR
 		}
+	} else {
+		// F-L: on a terminal failure clear the refresh token and the cached
+		// access token so that subsequent Token() calls deterministically
+		// return ErrReauthRequired without issuing another doomed POST.
+		// On transient failures (5xx, network, ctx) retain both so callers
+		// may retry (REQ-063).
+		var ex2 *auth.ExchangeError
+		if errors.As(err, &ex2) && ex2.Terminal() {
+			s.refresh = ""
+			s.cur = auth.Token{}
+			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
+		}
 	}
 	s.inflight = nil
 	s.mu.Unlock()
@@ -402,6 +414,34 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	ex.err = err
 	close(ex.done)
 	return tok, err
+}
+
+// RefreshIfNeeded refreshes the access token only when it is within the
+// configured threshold (i.e. stale) and a refresh token is present. It is a
+// no-op returning nil when the current token is still fresh. On failure it
+// returns the same error contract as Token (REQ-063).
+func (s *Source) RefreshIfNeeded(ctx context.Context) error {
+	s.mu.Lock()
+	if !s.staleLocked() || s.refresh == "" {
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
+	return err
+}
+
+// Reauth forces a refresh regardless of the current token's freshness. It is
+// used by transport layers to recover from a wire 401 even when the cached
+// token has not yet crossed the proactive-refresh threshold (REQ-063). On
+// terminal failure it clears the refresh token and returns ErrReauthRequired.
+func (s *Source) Reauth(ctx context.Context) error {
+	s.mu.Lock()
+	// Mark the current token stale so that Token() will execute the refresh.
+	s.cur = auth.Token{}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
+	return err
 }
 
 func (s *Source) staleLocked() bool {

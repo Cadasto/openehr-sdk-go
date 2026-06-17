@@ -414,9 +414,15 @@ requirements:
     canonical: docs/specifications/auth.md#req-063
     status: draft
     implementation: partial
-    packages: [auth/smart]
+    packages: [auth, auth/smart]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    notes: >
+      Phase 4a landed: ExchangeError.Terminal(), F-L refresh-token clearing
+      (clear only on invalid_grant/invalid_client 4xx), RefreshIfNeeded,
+      Reauther interface, Reauth on *smart.Source. Transport 401→Reauth wiring
+      (Phase 4b) not yet connected.
     tests:
+      - auth/errors_test.go
       - auth/smart/smart_test.go
 
   - id: REQ-064

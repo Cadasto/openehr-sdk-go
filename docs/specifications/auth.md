@@ -231,9 +231,38 @@ Refresh uses the stored `refresh_token` against the deployment's `token_endpoint
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
 
+#### Implementation — Phase 4a (Source/error side)
+
+**Terminal vs. transient refresh classification (`ExchangeError.Terminal()`).**
+`auth.ExchangeError` exposes a `Terminal() bool` method. A failure is terminal when the HTTP status is 4xx **and** the OAuth2 error code is `invalid_grant` or `invalid_client`. All other failures (5xx, network, context, unparsed) are transient and return `false`. The distinction drives the F-L refresh-clearing rule below.
+
+**F-L: clear refresh token only on terminal failure.**
+When a `refresh_token` grant fails, `Source.Token` classifies the returned `*auth.ExchangeError`:
+
+- **Terminal** (`invalid_grant` / `invalid_client` with 4xx) → clear `s.refresh` and `s.cur`, then return `ErrReauthRequired`. A subsequent `Token()` call will short-circuit to `ErrReauthRequired` without issuing another POST.
+- **Transient** (5xx, network, ctx) → retain `s.refresh` and `s.cur`, return `ErrRefreshFailed`. The consumer may retry; the refresh token is still valid.
+
+Both state mutations happen under `s.mu` (the same mutex used by all of `Token`).
+
+**Configurable early-expiry buffer (G-2).**
+`WithRefreshThreshold(d time.Duration)` sets the proactive-refresh window (default: 30 seconds). A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= RefreshThreshold`. This is the sole configurable early-expiry buffer; no duplicate option exists.
+
+**`RefreshIfNeeded(ctx context.Context) error`.**
+A non-request-bound refresh trigger: checks `staleLocked()` and whether a refresh token is present; if both are true it calls through to `Token()` to execute the refresh; otherwise it is a no-op returning `nil`. Error contract is identical to `Token()`.
+
+**`Reauther` interface (`auth.Reauther`).**
+```go
+// auth/reauth.go
+type Reauther interface {
+    Reauth(ctx context.Context) error
+}
+```
+`*smart.Source` implements `Reauther`. `Reauth(ctx)` forces a refresh regardless of the current token's freshness by zeroing `s.cur` and calling `Token()`. It applies the same F-L terminal/transient classification as a regular refresh failure. The transport-layer 401→`Reauth` wiring (Phase 4b) is not yet connected.
+
 Out of scope (v1 implementation status):
 
 - **Transport-layer 401 → refresh:** `transport/` maps `401 Unauthorized` to `ErrUnauthorized` and does **not** invoke `auth/smart` refresh automatically. Proactive refresh on `TokenSource.Token()` before expiry is implemented; wire-triggered re-auth after an expired access token on an in-flight REST call is the consumer's responsibility (call `Token()` again or restart the launch flow). `auth/clientcreds` and `auth/jwtbearer` have no refresh path.
+- **Phase 4b** will wire the transport 401 hook to call `Reauth` on the token source and add integration probes.
 
 ### REQ-064 — Launch context
 

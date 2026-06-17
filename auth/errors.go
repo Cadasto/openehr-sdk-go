@@ -97,3 +97,18 @@ func (e *ExchangeError) Unwrap() []error {
 	}
 	return out
 }
+
+// Terminal reports whether the token-endpoint failure is permanent — a 4xx
+// response whose OAuth2 envelope is invalid_grant or invalid_client. Transient
+// failures (5xx, network, context, unparsed) return false so callers retain
+// the refresh token and may retry (REQ-063).
+func (e *ExchangeError) Terminal() bool {
+	if e == nil || e.StatusCode < 400 || e.StatusCode >= 500 || e.OAuth2 == nil {
+		return false
+	}
+	switch e.OAuth2.Code {
+	case "invalid_grant", "invalid_client":
+		return true
+	}
+	return false
+}

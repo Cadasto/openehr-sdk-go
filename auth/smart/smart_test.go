@@ -559,3 +559,242 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 		t.Fatal("concurrent Token deadlocked")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// REQ-063: F-L refresh clearing
+// ---------------------------------------------------------------------------
+
+// TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal verifies that:
+//   - a terminal refresh failure (400 invalid_grant) clears s.refresh so that
+//     the next Token() call returns ErrReauthRequired without hitting the endpoint;
+//   - a transient refresh failure (503) retains s.refresh and returns ErrRefreshFailed.
+//
+// (REQ-063)
+func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ-063
+	t.Run("terminal_clears_refresh", func(t *testing.T) {
+		calls := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/token" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			calls++
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"error":"invalid_grant","error_description":"token revoked"}`))
+		}))
+		defer srv.Close()
+
+		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Seed a stale access token + a refresh token.
+		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
+
+		// First call: should hit the endpoint, get 400 invalid_grant, classify as terminal.
+		_, firstErr := src.Token(context.Background())
+		if !errors.Is(firstErr, auth.ErrReauthRequired) {
+			t.Fatalf("Token() after terminal refresh failure: got %v, want ErrReauthRequired", firstErr)
+		}
+		if calls != 1 {
+			t.Fatalf("expected 1 endpoint call, got %d", calls)
+		}
+
+		// Second call: refresh token should be cleared — must return ErrReauthRequired
+		// immediately without a second endpoint call.
+		_, secondErr := src.Token(context.Background())
+		if !errors.Is(secondErr, auth.ErrReauthRequired) {
+			t.Fatalf("second Token() after terminal: got %v, want ErrReauthRequired", secondErr)
+		}
+		if calls != 1 {
+			t.Fatalf("second Token() must not hit endpoint; calls = %d", calls)
+		}
+	})
+
+	t.Run("transient_retains_refresh", func(t *testing.T) {
+		calls := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/token" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			calls++
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}))
+		defer srv.Close()
+
+		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
+
+		_, firstErr := src.Token(context.Background())
+		if !errors.Is(firstErr, auth.ErrRefreshFailed) {
+			t.Fatalf("Token() after 503: got %v, want ErrRefreshFailed", firstErr)
+		}
+		// A second Token() call must retry the endpoint (refresh retained).
+		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
+		_, _ = src.Token(context.Background())
+		if calls < 2 {
+			t.Fatalf("expected at least 2 endpoint calls (refresh retained), got %d", calls)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// REQ-063: RefreshIfNeeded
+// ---------------------------------------------------------------------------
+
+// TestRefreshIfNeeded verifies that:
+//   - a fresh token produces no endpoint call (no-op);
+//   - a stale token with a refresh token triggers a refresh POST.
+//
+// (REQ-063)
+func TestRefreshIfNeeded(t *testing.T) { // REQ-063
+	t.Run("fresh_no_call", func(t *testing.T) {
+		calls := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			t.Errorf("unexpected endpoint call to %s", r.URL.Path)
+		}))
+		defer srv.Close()
+
+		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Seed a non-stale token (expires well in the future).
+		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "rt-1")
+
+		if err := src.RefreshIfNeeded(context.Background()); err != nil {
+			t.Fatalf("RefreshIfNeeded on fresh token: %v", err)
+		}
+		if calls != 0 {
+			t.Fatalf("expected 0 endpoint calls, got %d", calls)
+		}
+	})
+
+	t.Run("stale_triggers_refresh", func(t *testing.T) {
+		calls := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/token" {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			calls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"at-new","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-2"}`))
+		}))
+		defer srv.Close()
+
+		src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
+
+		if err := src.RefreshIfNeeded(context.Background()); err != nil {
+			t.Fatalf("RefreshIfNeeded on stale token: %v", err)
+		}
+		if calls != 1 {
+			t.Fatalf("expected 1 endpoint call, got %d", calls)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
+// REQ-063: WithRefreshThreshold configurable early-expiry buffer
+// ---------------------------------------------------------------------------
+
+// TestRefreshThresholdConfigurable verifies that WithRefreshThreshold sets the
+// proactive-refresh window: a token expiring within the configured threshold is
+// considered stale and triggers a refresh POST (REQ-063 / G-2).
+func TestRefreshThresholdConfigurable(t *testing.T) { // REQ-063
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"at-new","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-2"}`))
+	}))
+	defer srv.Close()
+
+	src, err := smart.New(
+		"c", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://cb"),
+		smart.WithRefreshThreshold(2*time.Minute),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Token expires in 90s — fresh under the default 30s threshold, but stale
+	// under the 2-minute threshold we configured.
+	src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(90 * time.Second)}, "rt-1")
+
+	tok, err := src.Token(context.Background())
+	if err != nil {
+		t.Fatalf("Token() = %v", err)
+	}
+	if tok.Value != "at-new" {
+		t.Fatalf("expected refreshed token, got %q", tok.Value)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 endpoint call, got %d", calls)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// REQ-063: Reauth
+// ---------------------------------------------------------------------------
+
+// TestSourceReauthForcesRefresh verifies that Reauth forces a refresh POST even
+// when the current token is not yet stale, updates the cached token, and that
+// *smart.Source satisfies the auth.Reauther interface (REQ-063).
+func TestSourceReauthForcesRefresh(t *testing.T) { // REQ-063
+	// Compile-time interface check.
+	var _ auth.Reauther = (*smart.Source)(nil)
+
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/token" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"at-reauthed","token_type":"Bearer","expires_in":3600,"refresh_token":"rt-2"}`))
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Seed a non-stale token — Token() would normally return it without a network call.
+	src.SetTokens(auth.Token{Value: "at-old", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "rt-1")
+
+	// Reauth must ignore freshness and force a refresh POST.
+	if err := src.Reauth(context.Background()); err != nil {
+		t.Fatalf("Reauth: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 endpoint call from Reauth, got %d", calls)
+	}
+	// After Reauth, Token() should return the new token without another call.
+	tok, err := src.Token(context.Background())
+	if err != nil {
+		t.Fatalf("Token() after Reauth: %v", err)
+	}
+	if tok.Value != "at-reauthed" {
+		t.Fatalf("expected at-reauthed, got %q", tok.Value)
+	}
+	if calls != 1 {
+		t.Fatalf("Token() after Reauth must not make an extra call; calls = %d", calls)
+	}
+}
