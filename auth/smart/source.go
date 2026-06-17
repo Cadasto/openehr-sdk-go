@@ -2,18 +2,41 @@ package smart
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
+
+const (
+	// clientAssertionType is the RFC 7523 client-assertion-type for
+	// private_key_jwt client authentication.
+	clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+	// methodPrivateKeyJWT and methodClientSecretBasic are the
+	// token_endpoint_auth_method names used for the discovery cross-check
+	// (RFC 8414 / SMART client-confidential-asymmetric).
+	methodPrivateKeyJWT     = "private_key_jwt"
+	methodClientSecretBasic = "client_secret_basic"
+)
+
+// clientAssertionKey holds the asymmetric credential for private_key_jwt
+// client authentication on the token endpoint (SMART
+// client-confidential-asymmetric profile, REQ-068).
+type clientAssertionKey struct {
+	signer crypto.Signer
+	alg    string
+	kid    string
+}
 
 // Config carries SMART-on-openEHR OAuth2 settings (REQ-061–063).
 type Config struct {
@@ -27,6 +50,14 @@ type Config struct {
 	Issuer           string
 	RefreshThreshold time.Duration
 	JWKS             *JWKS
+
+	// clientAssertion carries the asymmetric private_key_jwt credential, set
+	// via WithClientAssertionKey. Mutually exclusive with ClientSecret.
+	clientAssertion *clientAssertionKey
+	// assertionSource is built in FromConfig from clientAssertion once the
+	// ClientID and token endpoint are known. When non-nil, postToken emits a
+	// signed client_assertion instead of HTTP Basic auth (REQ-068).
+	assertionSource jwtbearer.AssertionSource
 }
 
 // Option mutates Config during construction.
@@ -37,9 +68,24 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
 
-// WithClientSecret enables confidential-client token exchange.
+// WithClientSecret enables confidential-client token exchange using
+// client_secret_basic (symmetric secret). Mutually exclusive with
+// WithClientAssertionKey.
 func WithClientSecret(secret string) Option {
 	return func(cfg *Config) { cfg.ClientSecret = secret }
+}
+
+// WithClientAssertionKey enables confidential-client token exchange using
+// private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric, REQ-068).
+// The signed client_assertion authenticates the client at the token endpoint
+// in place of an HTTP Basic header. alg is the JOSE algorithm (RS384 default
+// per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
+// when set, is emitted as the JWS "kid" header. Mutually exclusive with
+// WithClientSecret — configuring both is rejected at construction.
+func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
+	return func(cfg *Config) {
+		cfg.clientAssertion = &clientAssertionKey{signer: signer, alg: alg, kid: kid}
+	}
 }
 
 // WithRedirectURI sets the registered redirect URI.
@@ -119,6 +165,9 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
 	}
+	if err := configureClientAuth(&cfg); err != nil {
+		return nil, err
+	}
 	if cfg.Auth.JWKSURI != nil && cfg.JWKS == nil {
 		jwks, err := NewJWKS(cfg.HTTPClient, cfg.Auth.JWKSURI.String())
 		if err != nil {
@@ -127,6 +176,55 @@ func FromConfig(cfg Config) (*Source, error) {
 		cfg.JWKS = jwks
 	}
 	return &Source{cfg: cfg}, nil
+}
+
+// configureClientAuth resolves the confidential-client authentication method
+// for the token endpoint (REQ-068). It rejects ambiguous configuration (both an
+// assertion key and a client secret), builds the jwtbearer.ClaimsSigner for
+// private_key_jwt, and performs the G-3 discovery cross-check: when the
+// authorization server advertises token_endpoint_auth_methods_supported, the
+// method implied by the configured credential MUST be listed; an empty/absent
+// list is not constraining (skip).
+func configureClientAuth(cfg *Config) error {
+	hasSecret := cfg.ClientSecret != ""
+	hasAssertion := cfg.clientAssertion != nil
+	if hasSecret && hasAssertion {
+		return fmt.Errorf("%w: configure either WithClientSecret or WithClientAssertionKey, not both", auth.ErrInvalidConfig)
+	}
+
+	var method string
+	switch {
+	case hasAssertion:
+		method = methodPrivateKeyJWT
+		signer, err := jwtbearer.NewClaimsSigner(
+			jwtbearer.ClaimsTemplate{
+				Issuer:   cfg.ClientID,
+				Subject:  cfg.ClientID,
+				Audience: cfg.Auth.TokenEndpoint.String(),
+			},
+			cfg.clientAssertion.signer,
+			jwtbearer.WithAlgorithm(cfg.clientAssertion.alg),
+			jwtbearer.WithKeyID(cfg.clientAssertion.kid),
+		)
+		if err != nil {
+			return err
+		}
+		cfg.assertionSource = signer
+	case hasSecret:
+		method = methodClientSecretBasic
+	default:
+		// Public client — no client authentication to cross-check.
+		return nil
+	}
+
+	// G-3: fail fast only when the server advertises methods and the
+	// configured one is absent. Empty/absent list is not constraining.
+	if advertised := cfg.Auth.TokenEndpointAuthMethodsSupported; len(advertised) > 0 &&
+		!slices.Contains(advertised, method) {
+		return fmt.Errorf("%w: configured client auth method %q is not in the server's advertised token_endpoint_auth_methods_supported %v",
+			auth.ErrInvalidConfig, method, advertised)
+	}
+	return nil
 }
 
 // NewFromCatalog builds a Source from a resolved ServiceCatalog.
@@ -335,13 +433,29 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 }
 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+	// Client authentication is selected deterministically (REQ-068):
+	//   - assertion signer configured → private_key_jwt (signed client_assertion)
+	//   - else client secret set      → client_secret_basic (HTTP Basic)
+	//   - else                        → public client (no client auth)
+	useBasic := false
+	if s.cfg.assertionSource != nil {
+		assertion, err := s.cfg.assertionSource.Assertion(ctx)
+		if err != nil {
+			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+		}
+		form.Set("client_assertion_type", clientAssertionType)
+		form.Set("client_assertion", assertion)
+	} else if s.cfg.ClientSecret != "" {
+		useBasic = true
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	if s.cfg.ClientSecret != "" {
+	if useBasic {
 		req.SetBasicAuth(s.cfg.ClientID, s.cfg.ClientSecret)
 	}
 	resp, err := s.cfg.HTTPClient.Do(req)

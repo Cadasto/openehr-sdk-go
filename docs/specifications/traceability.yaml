@@ -122,8 +122,15 @@ requirements:
       ES384 are fully supported; RS256 and ES256 retained for back-compat. Key/alg
       mismatch rejected at construction (ErrInvalidConfig). Opaque ECDSA signers
       not yet supported for ES* — requires concrete *ecdsa.PrivateKey.
+      Phase 3b (F-C): auth/smart authorization-code exchange can now authenticate
+      with private_key_jwt via WithClientAssertionKey, reusing jwtbearer.ClaimsSigner
+      (client_assertion + jwt-bearer assertion type, no HTTP Basic). Method selection
+      is deterministic; assertion-key and client-secret are mutually exclusive.
+      G-3: when the server advertises token_endpoint_auth_methods_supported, the
+      configured method is cross-checked at construction (ErrInvalidConfig on absence).
     tests:
       - auth/jwtbearer/jwtbearer_test.go
+      - auth/smart/smart_test.go
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST

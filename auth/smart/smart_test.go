@@ -2,11 +2,16 @@ package smart_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,7 +32,8 @@ func TestBeginAuthorizationEmptyStateGeneratesRandom(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -63,7 +69,8 @@ func TestBeginAuthorizationNonEmptyStatePreserved(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -85,7 +92,8 @@ func TestPKCEAndAuthorizeURL(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 		smart.WithScopes("openid", "patient/*.read"),
@@ -140,7 +148,8 @@ func TestExchangeAndRefresh(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -227,7 +236,8 @@ func TestExchangeAuthorizationCodeStateMismatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -257,7 +267,8 @@ func TestExchangeAuthorizationCodeStateMatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -283,7 +294,8 @@ func TestAuthorizeURLStateReachesURL(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 
-	src, err := smart.New("client-id", testAuthEndpoints(srv),
+	src, err := smart.New(
+		"client-id", testAuthEndpoints(srv),
 		smart.WithHTTPClient(srv.Client()),
 		smart.WithRedirectURI("https://app.example/callback"),
 	)
@@ -339,6 +351,107 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	}
 	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {
 		t.Fatalf("verifiers = %v, want %q then %q", seen, reqA.PKCE.Verifier, reqB.PKCE.Verifier)
+	}
+}
+
+// REQ-068 — asymmetric confidential authorization-code flow
+// (SMART client-confidential-asymmetric profile). The code exchange MUST
+// authenticate with private_key_jwt: a signed client_assertion plus the
+// jwt-bearer client_assertion_type, and NO HTTP Basic header.
+func TestExchangeWithPrivateKeyJWT(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var capturedForm url.Values
+	var capturedAuthHeader string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			b, _ := io.ReadAll(r.Body)
+			capturedForm, _ = url.ParseQuery(string(b))
+			capturedAuthHeader = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"at-pkjwt","token_type":"Bearer","expires_in":3600}`))
+		case "/jwks":
+			_, _ = w.Write(readJWKS())
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	const clientID = "confidential-asym-client"
+	src, err := smart.New(
+		clientID, testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := src.BeginAuthorization("state-pkjwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-1", "state-pkjwt", req)
+	if err != nil {
+		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
+	}
+	if tok.Value != "at-pkjwt" {
+		t.Fatalf("access = %q, want at-pkjwt", tok.Value)
+	}
+
+	// No HTTP Basic header — confidential auth is by assertion, not secret.
+	if capturedAuthHeader != "" {
+		t.Fatalf("Authorization header = %q, want empty (no client_secret_basic)", capturedAuthHeader)
+	}
+
+	if got := capturedForm.Get("client_assertion_type"); got != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+		t.Fatalf("client_assertion_type = %q", got)
+	}
+	assertion := capturedForm.Get("client_assertion")
+	if assertion == "" {
+		t.Fatal("client_assertion is empty, want a signed JWT")
+	}
+
+	// Decode the JWT payload (header.payload.signature) and verify claims.
+	parts := strings.Split(assertion, ".")
+	if len(parts) != 3 {
+		t.Fatalf("client_assertion has %d segments, want 3", len(parts))
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode assertion payload: %v", err)
+	}
+	var claims struct {
+		Iss string `json:"iss"`
+		Sub string `json:"sub"`
+		Aud string `json:"aud"`
+		Jti string `json:"jti"`
+		Exp int64  `json:"exp"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("unmarshal assertion claims: %v", err)
+	}
+	if claims.Iss != clientID || claims.Sub != clientID {
+		t.Errorf("iss/sub = %q/%q, want %q for both", claims.Iss, claims.Sub, clientID)
+	}
+	wantAud := testAuthEndpoints(srv).TokenEndpoint.String()
+	if claims.Aud != wantAud {
+		t.Errorf("aud = %q, want token endpoint %q", claims.Aud, wantAud)
+	}
+	if claims.Jti == "" {
+		t.Error("jti is empty, want a unique identifier")
+	}
+	if maxExp := time.Now().Add(5 * time.Minute).Unix(); claims.Exp > maxExp {
+		t.Errorf("exp = %d, want <= now+300s (%d)", claims.Exp, maxExp)
+	}
+	if claims.Exp <= time.Now().Unix() {
+		t.Errorf("exp = %d, want in the future", claims.Exp)
 	}
 }
 
