@@ -1,7 +1,7 @@
 # Plan — Demographic REST client (`openehr/client/demographic/`)
 
 **Date:** 2026-06-14
-**Status:** Phases 1–2 landed — `Create / Get / Update / Delete` over the five typed PARTY resources (Phase 1) + the read-only `versioned_party` family (`GetVersionedParty / GetRevisionHistory / GetVersion[AtTime|ByID]`, Phase 2), polymorphic decode via `typereg.DecodeAs[rm.Party]`, cassette tests. Phase 3 (conformance probes) open.
+**Status:** Complete (Phases 1–3) — `Create / Get / Update / Delete` over the five typed PARTY resources (Phase 1) + the read-only `versioned_party` family (Phase 2), polymorphic decode via `typereg.DecodeAs[rm.Party]`, and PROBE-073 (Phase 3). Deferred to separate tracks: demographic-specific AQL helpers; MPI / identity-federation.
 **Owner:** SDK maintainers
 **Covers:** the openEHR **Demographic** API (PARTY hierarchy CRUD) over the existing transport stack; REQ-013, REQ-020..026 (idiom + building-block), REQ-040 (`_type` registry / RM polymorphism), REQ-054 (optimistic concurrency). Reserves Demographic conformance probes.
 **Depends on:** the landed REST client foundation — `transport/`, `auth/`, `smart/discovery/`, `openehr/rm/`, `openehr/serialize/canjson/` — and the canonical client shape established in [`archive/2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) (Phases 1–6). Split out of that plan (its Phase 7) so the landed client family could be archived.
@@ -54,9 +54,9 @@ The read-only `versioned_party` family (no client precedent — net-new):
 
 (`PARTY_RELATIONSHIP` / `PARTY_IDENTITY` need no work — they round-trip inside the PARTY body, already covered by Phase 1.)
 
-### Phase 3 — Conformance probes (open)
+### Phase 3 — Conformance probes ✅ landed
 
-1. Reserve + implement Demographic probes in [`../../docs/specifications/conformance.md`](../../docs/specifications/conformance.md) (round-trip create→get; polymorphic decode of each PARTY subtype).
+1. PROBE-073 (Demographic PARTY polymorphic round-trip) in [`../../docs/specifications/conformance.md`](../../docs/specifications/conformance.md) + [`testkit/probes/demographic/`](../../testkit/probes/demographic/): create → get → get-version for each PARTY subtype decodes the `_type` discriminator back to the same concrete type (REQ-040), across the typed body (Phase 1) and the `ORIGINAL_VERSION<PARTY>` envelope (Phase 2). Wired into `traceability.yaml` (REQ-040 / REQ-050). ✅
 
 ## Definition of done
 
