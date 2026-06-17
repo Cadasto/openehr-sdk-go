@@ -38,7 +38,7 @@
 // OPT-required node is flagged at the parent attribute's path
 // (no descent), rather than silently bypassed.
 //
-// See [docs/plans/2026-05-24-validation-v2-template-driven.md]
+// See [docs/plans/archive/2026-05-24-composition-validation-template-driven.md]
 // for the migration's phase split.
 //
 // # Collect-all

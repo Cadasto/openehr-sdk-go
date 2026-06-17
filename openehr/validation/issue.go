@@ -71,10 +71,11 @@ type Issue struct {
 //   - "slot_fill"                                         → [ErrSlotFill]
 //   - "aql_syntax" / "aql_empty"                          → [ErrAQLSyntax]
 //
-// Global guard codes (`nil_composition`, `nil_template`) return
-// nil — those represent caller-side argument errors rather than
-// validation failures. Callers wanting `errors.Is` dispatch wrap
-// via this method:
+// Global guard codes (`nil_composition`, `nil_template`, and the
+// REQ-110 root guards `nil_root` / `nil_party` / `nil_folder` /
+// `nil_ehr_status`) return nil — those represent caller-side argument
+// errors rather than validation failures. Callers wanting `errors.Is`
+// dispatch wrap via this method:
 //
 //	for _, i := range r.Issues {
 //	    if errors.Is(i.Err(), validation.ErrRequired) { ... }

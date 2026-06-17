@@ -54,12 +54,13 @@ die() {
 }
 
 # api <path> — GET the GitHub REST API, honouring GITHUB_TOKEN when set.
+# --retry survives transient network blips / secondary rate limits.
 api() {
   local url="https://api.github.com/repos/$REPO/$1"
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-    curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$url"
+    curl -fsSL --retry 3 --retry-all-errors -H "Authorization: Bearer $GITHUB_TOKEN" "$url"
   else
-    curl -fsSL "$url"
+    curl -fsSL --retry 3 --retry-all-errors "$url"
   fi
 }
 
@@ -117,8 +118,11 @@ cmd_sync() {
   local name
   while IFS= read -r name; do
     echo "  fetch $name"
-    curl -fsSL "$(raw_url "$commit" "$name")" -o "$DEST/$name" \
+    curl -fsSL --retry 3 --retry-all-errors "$(raw_url "$commit" "$name")" -o "$DEST/$name" \
       || die "download failed: $name"
+    # Guard against a truncated/empty body that still returned HTTP 200 —
+    # don't let a corrupt file become the canonical (hashed) copy.
+    [[ -s "$DEST/$name" ]] || die "download produced an empty file: $name"
   done <<<"$names"
 
   # Drop vendored specs no longer present upstream.

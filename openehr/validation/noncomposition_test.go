@@ -76,7 +76,7 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	r := validation.ValidateDemographic(&person, c)
 
-	sawContacts, sawDetailsCluster := false, false
+	sawContacts, sawDetailsCluster, sawCardinality := false, false, false
 	for _, iss := range r.Issues {
 		switch iss.Code {
 		case "rm_type_mismatch":
@@ -84,7 +84,7 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 				t.Errorf("unexpected rm_type_mismatch at %s — %s", iss.Path, iss.Detail)
 			}
 		case "cardinality":
-			// genuine instance non-conformance (relationships >= 1); accept.
+			sawCardinality = true // genuine instance non-conformance (relationships >= 1)
 		default:
 			t.Errorf("unexpected %s issue at %s — %s", iss.Code, iss.Path, iss.Detail)
 		}
@@ -102,6 +102,11 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 	}
 	if !sawDetailsCluster {
 		t.Error("walk did not descend into PERSON.details cluster trees")
+	}
+	// Enforce the "genuine relationships finding" the comment claims, so a
+	// regression that drops it does not pass silently.
+	if !sawCardinality {
+		t.Error("expected the genuine /relationships cardinality finding")
 	}
 }
 
@@ -250,9 +255,42 @@ func TestValidate_NilGuards(t *testing.T) {
 	if r := validation.Validate(nil, c); r.OK || !containsCode(r.Issues, "nil_root") {
 		t.Errorf("Validate(nil) want nil_root, got %+v", r.Issues)
 	}
-	// Typed-nil PARTY behind the interface must not panic and yields nil_root.
-	var typedNil *rm.Person
-	if r := validation.ValidateDemographic(typedNil, c); r.OK {
-		t.Error("ValidateDemographic(typed-nil *Person) unexpectedly OK")
+	// Typed-nil PARTY behind the interface must not panic and must honour
+	// the wrapper's advertised nil_party contract (not the generic nil_root).
+	var typedNilPerson *rm.Person
+	if r := validation.ValidateDemographic(typedNilPerson, c); r.OK || !containsCode(r.Issues, "nil_party") {
+		t.Errorf("ValidateDemographic(typed-nil *Person) want nil_party, got %+v", r.Issues)
+	}
+	// Typed-nil concrete behind the generic Validate(any) must not panic.
+	var typedNilFolder *rm.Folder
+	if r := validation.Validate(typedNilFolder, c); r.OK || !containsCode(r.Issues, "nil_root") {
+		t.Errorf("Validate(typed-nil *Folder) want nil_root, got %+v", r.Issues)
+	}
+}
+
+// REQ-110 — an ORGANISATION instance validates clean against its own
+// ORGANISATION-rooted OPT (the positive counterpart to the
+// PERSON-under-ORGANISATION rm_type_mismatch), proving the ACTOR
+// subtype routing accepts a matching root.
+func TestValidateDemographic_OrganisationRootClean(t *testing.T) {
+	const body = `<?xml version="1.0"?>
+<template xmlns="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <template_id><value>org-clean</value></template_id>
+  <concept>org-clean</concept>
+  <language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language>
+  <definition>
+    <rm_type_name>ORGANISATION</rm_type_name>
+    <node_id>at0000</node_id>
+    <archetype_id><value>openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1</value></archetype_id>
+  </definition>
+</template>`
+	c := mustCompileInline(t, body)
+	org := &rm.Organisation{
+		ArchetypeNodeID: "openEHR-DEMOGRAPHIC-ORGANISATION.organisation.v1",
+		Name:            rm.DVText{Value: "Org"},
+		Identities:      []rm.PartyIdentity{{ArchetypeNodeID: "at0001"}},
+	}
+	if r := validation.ValidateDemographic(org, c); !r.OK {
+		t.Errorf("ValidateDemographic(ORGANISATION) not OK: %+v", r.Issues)
 	}
 }

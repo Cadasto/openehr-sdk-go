@@ -127,6 +127,114 @@ func TestReadFolder(t *testing.T) {
 	}
 }
 
+// REQ-110 — the four ACTOR subtypes share readActorLike* helpers but have
+// SEPARATE dispatch arms in ReadSingle/ReadMultiple. One representative
+// case per type guards those arms against a copy-paste slip (an arm wired
+// to the wrong reader, or a missing value-case) that PERSON coverage alone
+// would not catch.
+func TestReadActorDispatch(t *testing.T) {
+	tree := &rm.ItemTree{ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "t"}}
+	id := rm.PartyIdentity{ArchetypeNodeID: "openEHR-DEMOGRAPHIC-PARTY_IDENTITY.x.v1"}
+	org := &rm.Organisation{ArchetypeNodeID: "org", Name: rm.DVText{Value: "O"}, Details: tree, Identities: []rm.PartyIdentity{id}}
+	grp := &rm.Group{ArchetypeNodeID: "grp", Name: rm.DVText{Value: "G"}, Details: tree, Identities: []rm.PartyIdentity{id}}
+	agt := &rm.Agent{ArchetypeNodeID: "agt", Name: rm.DVText{Value: "A"}, Details: tree, Identities: []rm.PartyIdentity{id}}
+
+	cases := []struct {
+		typ  string
+		root any
+	}{
+		{"ORGANISATION", org},
+		{"GROUP", grp},
+		{"AGENT", agt},
+	}
+	for _, tc := range cases {
+		t.Run(tc.typ, func(t *testing.T) {
+			if _, ok := rmread.ReadSingle(tc.root, tc.typ, "details"); !ok {
+				t.Errorf("ReadSingle(%s, details) ok=false, want true", tc.typ)
+			}
+			items, ok := rmread.ReadMultiple(tc.root, tc.typ, "identities")
+			if !ok || len(items) != 1 {
+				t.Fatalf("ReadMultiple(%s, identities) = %d,%v want 1,true", tc.typ, len(items), ok)
+			}
+			if _, ok := items[0].(*rm.PartyIdentity); !ok {
+				t.Errorf("ReadMultiple(%s, identities)[0] type = %T, want *rm.PartyIdentity", tc.typ, items[0])
+			}
+		})
+	}
+}
+
+// REQ-110 — boxIfaces boxes interface-slice elements as-is (not pointer-
+// boxed). Exercise the non-empty path (languages, FOLDER.items) so the
+// boxPtrs-vs-boxIfaces distinction the readers rely on is asserted, not
+// just observed empty.
+func TestReadActorLanguagesBoxIfaces(t *testing.T) {
+	p := &rm.Person{Languages: []rm.DVTextLike{rm.DVText{Value: "nl"}}}
+	langs, ok := rmread.ReadMultiple(p, "PERSON", "languages")
+	if !ok || len(langs) != 1 {
+		t.Fatalf("ReadMultiple(PERSON, languages) = %d,%v want 1,true", len(langs), ok)
+	}
+	// Element is the interface value (DVText), not a pointer-to-element.
+	if _, ok := langs[0].(rm.DVText); !ok {
+		t.Errorf("languages[0] type = %T, want rm.DVText (interface value, not *T)", langs[0])
+	}
+
+	f := &rm.Folder{Items: []rm.ObjectRefLike{rm.ObjectRef{Namespace: "local", Type: "PERSON"}}}
+	items, ok := rmread.ReadMultiple(f, "FOLDER", "items")
+	if !ok || len(items) != 1 {
+		t.Fatalf("ReadMultiple(FOLDER, items) = %d,%v want 1,true", len(items), ok)
+	}
+}
+
+// REQ-110 — the primitive-bearing DataValue leaf readers. Each populated
+// value reports present (so the C_PRIMITIVE child validates); each empty
+// optional value reports absent (so a mandated leaf surfaces `required`).
+func TestReadDataValueLeaves(t *testing.T) {
+	strptr := func(s string) *string { return &s }
+
+	present := []struct {
+		name string
+		dv   any
+		typ  string
+		attr string
+	}{
+		{"DV_DATE.value", &rm.DVDate{Value: "1980-01-01"}, "DV_DATE", "value"},
+		{"DV_TIME.value", &rm.DVTime{Value: "10:00:00"}, "DV_TIME", "value"},
+		{"DV_DATE_TIME.value", &rm.DVDateTime{Value: "1980-01-01T10:00:00Z"}, "DV_DATE_TIME", "value"},
+		{"DV_DURATION.value", &rm.DVDuration{Value: "P1Y"}, "DV_DURATION", "value"},
+		{"DV_BOOLEAN.value(false)", &rm.DVBoolean{Value: false}, "DV_BOOLEAN", "value"}, // value-typed: always present
+		{"DV_IDENTIFIER.id", &rm.DVIdentifier{ID: "abc"}, "DV_IDENTIFIER", "id"},
+		{"DV_IDENTIFIER.issuer", &rm.DVIdentifier{ID: "abc", Issuer: strptr("X")}, "DV_IDENTIFIER", "issuer"},
+		{"DV_MULTIMEDIA.size", &rm.DVMultimedia{Size: 10}, "DV_MULTIMEDIA", "size"}, // value-typed: always present
+		{"DV_MULTIMEDIA.media_type", &rm.DVMultimedia{MediaType: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "IANA_media-types"}, CodeString: "application/pdf"}}, "DV_MULTIMEDIA", "media_type"},
+	}
+	for _, tc := range present {
+		t.Run("present/"+tc.name, func(t *testing.T) {
+			if _, ok := rmread.ReadSingle(tc.dv, tc.typ, tc.attr); !ok {
+				t.Errorf("ReadSingle(%s, %s) ok=false, want true (populated)", tc.typ, tc.attr)
+			}
+		})
+	}
+
+	absent := []struct {
+		name string
+		dv   any
+		typ  string
+		attr string
+	}{
+		{"DV_DATE.value", &rm.DVDate{}, "DV_DATE", "value"},
+		{"DV_IDENTIFIER.id", &rm.DVIdentifier{}, "DV_IDENTIFIER", "id"},
+		{"DV_IDENTIFIER.issuer", &rm.DVIdentifier{ID: "abc"}, "DV_IDENTIFIER", "issuer"}, // nil *string
+		{"DV_MULTIMEDIA.media_type", &rm.DVMultimedia{}, "DV_MULTIMEDIA", "media_type"},
+	}
+	for _, tc := range absent {
+		t.Run("absent/"+tc.name, func(t *testing.T) {
+			if _, ok := rmread.ReadSingle(tc.dv, tc.typ, tc.attr); ok {
+				t.Errorf("ReadSingle(%s, %s) ok=true, want false (empty)", tc.typ, tc.attr)
+			}
+		})
+	}
+}
+
 func TestReadEHRStatus(t *testing.T) {
 	s := &rm.EHRStatus{
 		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",

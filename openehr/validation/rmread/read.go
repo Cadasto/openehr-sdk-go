@@ -1188,9 +1188,9 @@ func ptrPresent[T any](p *T) (any, bool) {
 // (rmread.ReadSingle on pointer cases, dataValueInput) would
 // dereference and panic.
 //
-// REQ-024 compliant: a closed type switch over the RM pointer
-// concretes that can appear behind a Go interface in the v2
-// content-type closed set. No reflection.
+// REQ-024 compliant: the typed-nil test delegates to [IsTypedNilPointer],
+// a closed type switch over the RM pointer concretes that can appear
+// behind a Go interface in the v2 content-type closed set. No reflection.
 func ifacePresent(v any) (any, bool) {
 	if v == nil {
 		return v, false
@@ -1219,9 +1219,17 @@ func IsTypedNilPointer(v any) bool {
 // PartyProxy). Value-typed concretes never trigger the typed-nil
 // problem (a struct stored by value cannot be nil).
 //
-// Adding a new RM type means adding one switch case here, in
-// rmread.ReadSingle/ReadMultiple, and in the parent validator's
-// rmTypeInfo — the three switches are kept in lock-step.
+// Adding a new RM type may touch up to three switches, but they are
+// deliberately NOT the same set — membership depends on how the type is
+// stored:
+//   - this switch: only types pointer-stored behind an RM interface
+//     (so a typed-nil can arise); value-typed and root types are absent.
+//   - rmread.ReadSingle/ReadMultiple: only types with descendable
+//     attributes the walker reads.
+//   - the parent validator's rmTypeInfo: every type the walker routes
+//     (for RM-type name + archetype_node_id).
+//
+// Keep the relevant ones in step when adding a type; don't assume 1:1:1.
 func isTypedNilPointer(v any) bool {
 	switch p := v.(type) {
 	// DataValue concretes (Element.Value, etc.).

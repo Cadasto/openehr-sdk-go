@@ -59,8 +59,13 @@ func Validate(root any, c *templatecompile.Compiled) Result {
 // [Validate]. The PARTY sub-components (ADDRESS, CONTACT, PARTY_IDENTITY,
 // PARTY_RELATIONSHIP, CAPABILITY) are validated in place as the walk
 // descends, or as roots in their own right via [Validate].
+//
+// Because rm.Party is an interface, the guard catches BOTH a bare-nil
+// interface and a typed-nil concrete behind it (e.g. a (*rm.Person)(nil)
+// argument) — both yield nil_party rather than the generic nil_root, so
+// the wrapper's advertised contract holds for either nil shape.
 func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result {
-	if party == nil {
+	if party == nil || rmread.IsTypedNilPointer(party) {
 		return resultFromIssues([]Issue{{
 			Path:     "",
 			Code:     "nil_party",
