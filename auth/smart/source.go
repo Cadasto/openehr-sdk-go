@@ -82,6 +82,8 @@ func WithClientSecret(secret string) Option {
 // per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
 // when set, is emitted as the JWS "kid" header. Mutually exclusive with
 // WithClientSecret — configuring both is rejected at construction.
+// signer must be non-nil; a nil signer is rejected at construction with
+// [auth.ErrInvalidConfig].
 func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
 	return func(cfg *Config) {
 		cfg.clientAssertion = &clientAssertionKey{signer: signer, alg: alg, kid: kid}
@@ -441,7 +443,10 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 	if s.cfg.assertionSource != nil {
 		assertion, err := s.cfg.assertionSource.Assertion(ctx)
 		if err != nil {
-			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
+			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
+				Sentinel: auth.ErrTokenExchangeFailed,
+				Inner:    fmt.Errorf("client_assertion signing: %w", err),
+			}
 		}
 		form.Set("client_assertion_type", clientAssertionType)
 		form.Set("client_assertion", assertion)

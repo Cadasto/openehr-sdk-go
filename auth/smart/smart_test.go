@@ -455,6 +455,88 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 	}
 }
 
+// TestClientAssertionAndSecretBothRejected verifies that configuring both
+// WithClientSecret and WithClientAssertionKey is rejected at construction
+// with ErrInvalidConfig (REQ-068).
+func TestClientAssertionAndSecretBothRejected(t *testing.T) { // REQ-068
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	_, err = smart.New(
+		"client-id", testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithClientSecret("some-secret"),
+		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
+	)
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Fatalf("expected ErrInvalidConfig when both secret and assertion key configured, got %v", err)
+	}
+}
+
+// TestG3CrossCheckRejectsUnsupportedMethod verifies the G-3 discovery
+// cross-check: when the server advertises token_endpoint_auth_methods_supported
+// that does NOT include private_key_jwt, construction must fail with
+// ErrInvalidConfig. Also verifies that when the list includes private_key_jwt
+// (or is empty), construction succeeds (REQ-068).
+func TestG3CrossCheckRejectsUnsupportedMethod(t *testing.T) { // REQ-068
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+
+	// Negative case: server only advertises client_secret_basic — private_key_jwt absent.
+	epReject := discovery.AuthEndpoints{
+		AuthorizationEndpoint:             discovery.MustParseURL(srv.URL + "/authorize"),
+		TokenEndpoint:                     discovery.MustParseURL(srv.URL + "/token"),
+		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic"},
+	}
+	_, err = smart.New(
+		"client-id", epReject,
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
+	)
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Fatalf("G-3 negative: expected ErrInvalidConfig when server does not advertise private_key_jwt, got %v", err)
+	}
+
+	// Positive case: server advertises private_key_jwt — construction must succeed.
+	epAllow := discovery.AuthEndpoints{
+		AuthorizationEndpoint:             discovery.MustParseURL(srv.URL + "/authorize"),
+		TokenEndpoint:                     discovery.MustParseURL(srv.URL + "/token"),
+		TokenEndpointAuthMethodsSupported: []string{"client_secret_basic", "private_key_jwt"},
+	}
+	_, err = smart.New(
+		"client-id", epAllow,
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
+	)
+	if err != nil {
+		t.Fatalf("G-3 positive: expected no error when server advertises private_key_jwt, got %v", err)
+	}
+
+	// Positive case: empty advertised list is not constraining — must also succeed.
+	epEmpty := discovery.AuthEndpoints{
+		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+		TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+	}
+	_, err = smart.New(
+		"client-id", epEmpty,
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithClientAssertionKey(key, "RS384", "kid-1"),
+	)
+	if err != nil {
+		t.Fatalf("G-3 positive (empty list): expected no error when methods list is empty, got %v", err)
+	}
+}
+
 func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
