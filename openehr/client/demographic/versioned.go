@@ -33,8 +33,14 @@ const (
 // (ORIGINAL_VERSION) plus the polymorphically-decoded PARTY payload. The
 // envelope's `data` is decoded by `_type` into [Party]; the audit / lifecycle
 // / version-id fields come straight from the envelope.
+//
+// It is a curated projection of ORIGINAL_VERSION: the envelope's
+// `attestations`, `other_input_version_uids`, and `signature` are
+// intentionally not surfaced (the read family is not signature-/merge-aware
+// yet). Read the raw VERSION via the CDR if those are needed.
 type PartyVersion struct {
-	// UID is this version's OBJECT_VERSION_ID.
+	// UID is this version's OBJECT_VERSION_ID. Its Value is the wire string
+	// you pass back as an [ehr.VersionUID]; see [PartyVersion.VersionUID].
 	UID rm.ObjectVersionID
 	// PrecedingVersionUID is the prior version, or nil for the first.
 	PrecedingVersionUID *rm.ObjectVersionID
@@ -46,8 +52,16 @@ type PartyVersion struct {
 	// Contribution is the contribution this version was committed under; nil
 	// if the VERSION omitted contribution.
 	Contribution rm.ObjectRefLike
-	// Party is the decoded version content (the concrete PARTY type).
+	// Party is the decoded version content (the concrete PARTY type), or nil
+	// when the envelope carried no data (e.g. a content-free version).
 	Party rm.Party
+}
+
+// VersionUID returns this version's id as an [ehr.VersionUID] — the string
+// newtype the read paths take (e.g. [GetVersionByID]) — closing the
+// round-trip from a read back to a targeted fetch.
+func (pv *PartyVersion) VersionUID() openehrclient.VersionUID {
+	return openehrclient.VersionUID(pv.UID.Value)
 }
 
 // GetVersionedParty retrieves the VERSIONED_PARTY container for voUID — the

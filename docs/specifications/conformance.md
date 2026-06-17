@@ -477,7 +477,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Wire assertion:** Sandbox — `demographic.Create` (Prefer=representation), `demographic.Get`, and `demographic.GetVersion` each MUST decode the response into the same concrete Go type as the input PARTY (REQ-040). The VERSION hop additionally exercises the `ORIGINAL_VERSION<PARTY>` envelope whose generic `data` cannot decode into the abstract `rm.Party` interface and is re-decoded by `_type` through the type registry. A body whose `_type` decodes to a different concrete type is non-conformant.
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); the leaf is covered by the `openehr/client/demographic` unit tests. Demographic API maturity is Draft (upstream ITS-REST `x-status: DEVELOPMENT`).
-- **Satisfies:** REQ-040, REQ-050, REQ-054.
+- **Satisfies:** REQ-040, REQ-050.
 
 ### Observability
 
