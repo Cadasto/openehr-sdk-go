@@ -111,7 +111,7 @@ func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any)
 	// empty and the caller composes them via REQ-101 builder Set
 	// calls. The parsed REQ-104 grammar is used only to stamp a
 	// conforming archetype id when a lower-bound top-up forces a
-	// slot fill (see stampSlotFill).
+	// slot fill and a safe example can be derived (see stampSlotFill).
 	if optNode.IsSlot() {
 		return nil
 	}
@@ -439,9 +439,8 @@ func (g *generator) materialiseMultiple(
 	// When every OPT child is a slot we synthesise a slot-shaped
 	// fill: an RM value of the slot's RMTypeName stamped (by
 	// stampSlotFill) with an archetype id drawn from the parsed
-	// REQ-104 include grammar, falling back to
-	// "openEHR-EHR-<RMType>.example.v1" which satisfies the
-	// validator's RM-type-prefix slotFit heuristic.
+	// REQ-104 include grammar, or from the RM-type-prefix fallback
+	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
 		seed := firstNonSlot(children)
 		if seed == nil && len(children) > 0 {
@@ -479,12 +478,18 @@ func (g *generator) materialiseMultiple(
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
-// on a freshly-constructed RM value so it satisfies the slot's
-// REQ-104 assertion rules (or the RM-type-prefix fallback).
+// on a freshly-constructed RM value when a valid slot-fill archetype
+// id can be synthesized. It falls back to the RM-type-prefix example
+// only for slots without parsed includes; parsed includes must be
+// satisfied explicitly.
 func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNode) {
-	archetypeID := slot.ExampleSlotFillArchetypeID()
-	if archetypeID == "" {
+	rules := slot.SlotRules()
+	archetypeID := rules.ExampleArchetypeID()
+	if archetypeID == "" && !rules.HasParsedIncludes() {
 		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
+	}
+	if archetypeID == "" {
+		return
 	}
 	ad := &rm.Archetyped{
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},

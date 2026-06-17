@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -22,8 +23,8 @@ type SlotAssertion struct {
 	re      *regexp.Regexp
 }
 
-// NewSlotAssertion compiles pattern as a Go regexp (POSIX-flavoured,
-// as in other REQ-103 string constraints). Returns an error when the
+// NewSlotAssertion compiles pattern as a Go regexp / RE2 expression
+// (as in other REQ-103 string constraints). Returns an error when the
 // pattern is empty or does not compile.
 //
 // The pattern is matched against a candidate archetype id in full:
@@ -91,6 +92,16 @@ type SlotRules struct {
 	RawIncludeCount int
 }
 
+// Clone returns a copy whose exported slices do not alias the
+// receiver. SlotRules is a value object, but Includes / Excludes are
+// exported for inspection and therefore need defensive copies at API
+// boundaries.
+func (r SlotRules) Clone() SlotRules {
+	r.Includes = slices.Clone(r.Includes)
+	r.Excludes = slices.Clone(r.Excludes)
+	return r
+}
+
 // IncludesDroppedUnparsed reports the fail-open case: the OPT
 // declared include assertions but none compiled, so the slot widens
 // to the RM-type-prefix fallback instead of the authored constraint.
@@ -133,9 +144,8 @@ func (r SlotRules) AllowsArchetypeID(archetypeID string) bool {
 // fallback exclusively.
 func (r SlotRules) HasParsedIncludes() bool { return len(r.Includes) > 0 }
 
-// AllowsRMTypePrefix is the v1 pragmatic fallback: archetype ids of
-// the form openEHR-EHR-<RMType>.<concept>.v<n> fit a slot constrained
-// to RMType.
+// AllowsRMTypePrefix is the v1 pragmatic fallback: archetype ids with
+// prefix openEHR-EHR-<RMType>. fit a slot constrained to RMType.
 func (r SlotRules) AllowsRMTypePrefix(archetypeID string) bool {
 	if r.RMTypeName == "" {
 		return false
@@ -143,14 +153,17 @@ func (r SlotRules) AllowsRMTypePrefix(archetypeID string) bool {
 	return strings.HasPrefix(archetypeID, "openEHR-EHR-"+r.RMTypeName+".")
 }
 
-// ExampleArchetypeID returns a synthetic archetype id guaranteed to
-// match the first include assertion, or the prefix-fallback example
-// when no includes were parsed. Used by the instance synthesiser.
+// ExampleArchetypeID returns a synthetic archetype id that matches
+// the first include assertion when one can be synthesized safely. If
+// includes exist but are too complex to synthesize, returns "". When
+// no includes were parsed, returns the RM-type-prefix fallback
+// example. Used by the instance synthesiser.
 func (r SlotRules) ExampleArchetypeID() string {
 	if len(r.Includes) > 0 {
 		if id := exampleFromPattern(r.Includes[0].pattern); id != "" {
 			return id
 		}
+		return ""
 	}
 	if r.RMTypeName != "" {
 		return "openEHR-EHR-" + r.RMTypeName + ".example.v1"
@@ -174,8 +187,8 @@ func exampleFromPattern(pattern string) string {
 	}
 	// Flat alternation (A|B|…) is the common closed-includes shape:
 	// synthesise from the first alternative.
-	if i := strings.IndexByte(pattern, '|'); i >= 0 {
-		return exampleFromPattern(pattern[:i])
+	if before, _, ok := strings.Cut(pattern, "|"); ok {
+		return exampleFromPattern(before)
 	}
 	// Drop the optional ADL suffix group, then unescape literal dots.
 	simplified := strings.ReplaceAll(pattern, `(-[a-zA-Z0-9_]+)*`, "")

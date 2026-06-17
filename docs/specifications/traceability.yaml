@@ -466,6 +466,9 @@ requirements:
     tests:
       - openehr/template/constraints/slot_test.go
       - openehr/template/slot_assertion_test.go
+      - internal/templatecompile/compile_test.go
+      - openehr/validation/composition_test.go
+      - openehr/instance/instance_test.go
     plans:
       - docs/plans/2026-06-12-template-req104-req105-deferred.md
 

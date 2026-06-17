@@ -182,14 +182,19 @@ func TestSlotRules_ExampleArchetypeID(t *testing.T) {
 		t.Errorf("ExampleArchetypeID()=%q does not satisfy its own include", got)
 	}
 
-	// Unsynthesisable pattern (unbounded wildcard) → bail out to the
-	// RM-type-prefix example rather than emit a non-conforming id.
+	// Unsynthesisable pattern (unbounded wildcard) → bail out rather
+	// than emit a prefix-fallback id that parsed includes may reject.
 	wild, err := constraints.NewSlotAssertion(`openEHR-EHR-CLUSTER\..*`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wildRules := constraints.SlotRules{RMTypeName: "CLUSTER", Includes: []constraints.SlotAssertion{wild}}
-	if got := wildRules.ExampleArchetypeID(); got != "openEHR-EHR-CLUSTER.example.v1" {
-		t.Errorf("ExampleArchetypeID()=%q, want prefix-fallback example", got)
+	if got := wildRules.ExampleArchetypeID(); got != "" {
+		t.Errorf("ExampleArchetypeID()=%q, want empty for unsynthesisable parsed include", got)
+	}
+
+	fallbackRules := constraints.SlotRules{RMTypeName: "CLUSTER"}
+	if got := fallbackRules.ExampleArchetypeID(); got != "openEHR-EHR-CLUSTER.example.v1" {
+		t.Errorf("ExampleArchetypeID()=%q, want prefix-fallback example when no includes parsed", got)
 	}
 }

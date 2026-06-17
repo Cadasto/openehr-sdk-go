@@ -445,6 +445,7 @@ func (s *Slot) AllowsRMType(archetypeID string) bool {
 }
 
 // SlotRules returns the parsed REQ-104 assertion rules for this slot.
+// The returned rule slices are defensive copies.
 func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies parsed

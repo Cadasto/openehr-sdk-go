@@ -1,9 +1,12 @@
 package template_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -87,6 +90,61 @@ func TestParseFile_Demonstration_ExcludesParsed(t *testing.T) {
 	}
 }
 
+func TestParseFile_TextSlotAssertionWithRegexQuantifier(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "slot-quantifier.opt")
+	if err := os.WriteFile(path, []byte(textSlotAssertionWithQuantifierOPT), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	opt, err := template.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	var slot *template.Slot
+	walkSlots(opt.Root(), func(s *template.Slot) {
+		if slot == nil && len(s.Includes()) > 0 {
+			slot = s
+		}
+	})
+	if slot == nil {
+		t.Fatal("expected synthetic OPT to contain a slot")
+	}
+	if got := len(slot.ParsedIncludes()); got != 1 {
+		t.Fatalf("len(ParsedIncludes()) = %d, want 1", got)
+	}
+	if !slot.AllowsArchetypeID("openEHR-EHR-CLUSTER.device.v12") {
+		t.Error("expected quantifier pattern to allow v12")
+	}
+	if slot.AllowsArchetypeID("openEHR-EHR-CLUSTER.device.v123") {
+		t.Error("expected quantifier pattern to reject v123")
+	}
+}
+
+func TestSlot_SlotRulesReturnsDefensiveCopies(t *testing.T) {
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	var slot *template.Slot
+	walkSlots(opt.Root(), func(s *template.Slot) {
+		if slot == nil && len(s.ParsedIncludes()) > 0 {
+			slot = s
+		}
+	})
+	if slot == nil {
+		t.Fatal("expected a slot with parsed includes")
+	}
+	const id = "openEHR-EHR-CLUSTER.device.v1"
+	if !slot.AllowsArchetypeID(id) {
+		t.Fatalf("fixture slot should allow %q before mutation attempt", id)
+	}
+
+	rules := slot.SlotRules()
+	rules.Includes[0] = constraints.SlotAssertion{}
+	if !slot.AllowsArchetypeID(id) {
+		t.Fatal("mutating returned SlotRules.Includes changed the slot's internal parsed rules")
+	}
+}
+
 func walkSlots(n template.Node, fn func(*template.Slot)) {
 	switch v := n.(type) {
 	case template.ObjectNode:
@@ -100,3 +158,25 @@ func walkSlots(n template.Node, fn func(*template.Slot)) {
 		}
 	}
 }
+
+const textSlotAssertionWithQuantifierOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>slot_quantifier</value></template_id>
+  <concept>slot_quantifier</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="ARCHETYPE_SLOT">
+        <rm_type_name>CLUSTER</rm_type_name>
+        <node_id>at9000</node_id>
+        <includes>archetype_id matches {openEHR-EHR-CLUSTER\.device\.v[0-9]{1,2}}</includes>
+      </children>
+    </attributes>
+  </definition>
+</template>`

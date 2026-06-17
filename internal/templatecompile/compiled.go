@@ -143,8 +143,8 @@ func (c *Compiled) TermBindings() []template.TermBinding {
 }
 
 // TermBindingsForNode returns every flattened term-binding whose
-// NodeOrPath equals nodeID or whose AQL-like path ends with the
-// at-code predicate [nodeID]. REQ-105.
+// NodeOrPath equals nodeID, contains the AQL-like at-code predicate
+// [nodeID], or ends with /nodeID. REQ-105.
 func (c *Compiled) TermBindingsForNode(nodeID string) []template.TermBinding {
 	if nodeID == "" {
 		return nil

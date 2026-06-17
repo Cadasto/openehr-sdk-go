@@ -134,6 +134,18 @@ func (w *walker) walkSingleAttribute(
 		return
 	}
 	child := matchSingleAlternative(children, val)
+	if child != nil && child.IsSlot() {
+		archetypeID := locatableArchetypeNodeID(val)
+		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "slot_fill",
+				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
+				Severity: Error,
+			})
+			return
+		}
+	}
 	if child == nil {
 		// With multiple OPT children the OPT declared AnyOf
 		// alternatives; with a single child it is a plain type

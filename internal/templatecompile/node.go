@@ -117,8 +117,9 @@ func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotInclu
 func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
 
 // SlotRules returns the parsed REQ-104 assertion rules for this
-// slot. Zero value for non-slot nodes.
-func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules }
+// slot. Zero value for non-slot nodes. The returned rule slices are
+// defensive copies.
+func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules.Clone() }
 
 // AllowsArchetypeID reports whether archetypeID satisfies this
 // slot's include / exclude rules (REQ-104), including the
@@ -132,7 +133,9 @@ func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
 }
 
 // ExampleSlotFillArchetypeID returns a synthetic archetype id for
-// instance generation that satisfies this slot's rules.
+// instance generation when one can be derived from this slot's rules.
+// Returns "" for non-slot nodes, or when parsed includes are too
+// complex to synthesize safely.
 func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
 	if !n.isSlot {
 		return ""

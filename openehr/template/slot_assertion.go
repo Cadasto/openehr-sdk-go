@@ -8,10 +8,9 @@ import (
 )
 
 var (
-	slotTextMatchesRE = regexp.MustCompile(`(?is)archetype_id\s+matches\s*\{([^}]+)\}`)
-	slotXMLPatternRE  = regexp.MustCompile(`(?is)<pattern>([^<]*)</pattern>`)
-	slotStringExprRE  = regexp.MustCompile(`(?is)<string_expression>([^<]*)</string_expression>`)
-	slotValueRE       = regexp.MustCompile(`(?is)<value>(.*?)</value>`)
+	slotXMLPatternRE = regexp.MustCompile(`(?is)<pattern>([^<]*)</pattern>`)
+	slotStringExprRE = regexp.MustCompile(`(?is)<string_expression>([^<]*)</string_expression>`)
+	slotValueRE      = regexp.MustCompile(`(?is)<value>(.*?)</value>`)
 )
 
 // parseSlotAssertions parses raw OPT slot assertion XML / text blobs
@@ -44,13 +43,13 @@ func extractSlotPatterns(raw string) []string {
 		return nil
 	}
 	var patterns []string
-	if m := slotTextMatchesRE.FindStringSubmatch(raw); len(m) == 2 {
-		patterns = append(patterns, normalizeSlotPattern(m[1]))
+	if p := extractTextSlotPattern(raw); p != "" {
+		patterns = append(patterns, normalizeSlotPattern(p))
 	}
 	// Ocean Template Designer <string_expression> shape.
 	if m := slotStringExprRE.FindStringSubmatch(raw); len(m) == 2 {
-		if sub := slotTextMatchesRE.FindStringSubmatch(m[1]); len(sub) == 2 {
-			patterns = append(patterns, normalizeSlotPattern(sub[1]))
+		if p := extractTextSlotPattern(m[1]); p != "" {
+			patterns = append(patterns, normalizeSlotPattern(p))
 		}
 	}
 	for _, m := range slotXMLPatternRE.FindAllStringSubmatch(raw, -1) {
@@ -60,12 +59,51 @@ func extractSlotPatterns(raw string) []string {
 	}
 	if len(patterns) == 0 {
 		if v := extractXMLChardataValue(raw); v != "" {
-			if m := slotTextMatchesRE.FindStringSubmatch(v); len(m) == 2 {
-				patterns = append(patterns, normalizeSlotPattern(m[1]))
+			if p := extractTextSlotPattern(v); p != "" {
+				patterns = append(patterns, normalizeSlotPattern(p))
 			}
 		}
 	}
 	return patterns
+}
+
+func extractTextSlotPattern(raw string) string {
+	const prefix = "archetype_id"
+	lower := strings.ToLower(raw)
+	i := strings.Index(lower, prefix)
+	if i < 0 {
+		return ""
+	}
+	rest := lower[i+len(prefix):]
+	matchesAt := strings.Index(rest, "matches")
+	if matchesAt < 0 {
+		return ""
+	}
+	openAt := i + len(prefix) + matchesAt + len("matches")
+	openRel := strings.IndexByte(raw[openAt:], '{')
+	if openRel < 0 {
+		return ""
+	}
+	start := openAt + openRel + 1
+	depth := 1
+	escaped := false
+	for pos := start; pos < len(raw); pos++ {
+		ch := raw[pos]
+		switch {
+		case escaped:
+			escaped = false
+		case ch == '\\':
+			escaped = true
+		case ch == '{':
+			depth++
+		case ch == '}':
+			depth--
+			if depth == 0 {
+				return strings.TrimSpace(raw[start:pos])
+			}
+		}
+	}
+	return ""
 }
 
 func normalizeSlotPattern(p string) string {
@@ -92,5 +130,5 @@ func (s *Slot) slotRules() constraints.SlotRules {
 		Includes:        s.parsedIncludes,
 		Excludes:        s.parsedExcludes,
 		RawIncludeCount: len(s.includes),
-	}
+	}.Clone()
 }
