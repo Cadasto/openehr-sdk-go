@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -461,6 +462,7 @@ func acceptedVersionsString(m map[string]struct{}) string {
 	for k := range m {
 		out = append(out, k)
 	}
+	sort.Strings(out)
 	return strings.Join(out, ",")
 }
 
@@ -484,6 +486,6 @@ func (r *Resolver) warnInsecure(cat *ServiceCatalog) {
 	check("jwks_uri", cat.Auth.JWKSURI)
 	check("registration_endpoint", cat.Auth.RegistrationEndpoint)
 	for id, s := range cat.Services {
-		check("services["+id+"].base_url", s.BaseURL)
+		check("services["+id+"].baseUrl", s.BaseURL)
 	}
 }

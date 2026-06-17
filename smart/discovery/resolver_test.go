@@ -457,7 +457,7 @@ func TestResolveCanonicalServicesMap(t *testing.T) {
 		}`, srv.URL, srv.URL+"/authorize", srv.URL+"/token", srv.URL+"/openehr/v1")
 	}))
 	defer srv.Close()
-	res, err := NewResolver(nil, WithHTTPClient(srv.Client()), WithAcceptedSpecVersions("1.1.0-development", ""))
+	res, err := NewResolver(nil, WithHTTPClient(srv.Client()))
 	if err != nil {
 		t.Fatal(err)
 	}
