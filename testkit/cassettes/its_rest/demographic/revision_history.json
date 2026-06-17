@@ -1,0 +1,10 @@
+{
+  "_type": "REVISION_HISTORY",
+  "items": [
+    {
+      "_type": "REVISION_HISTORY_ITEM",
+      "version_id": { "_type": "OBJECT_VERSION_ID", "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example.com::1" },
+      "audits": []
+    }
+  ]
+}
