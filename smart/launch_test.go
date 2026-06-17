@@ -75,7 +75,8 @@ func TestLaunchContextValidatesIDToken(t *testing.T) {
 		IDToken:     idTok,
 		Scope:       "openid",
 	}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr,
+	lc, err := smart.LaunchContextFromTokenResponse(
+		context.Background(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -207,7 +208,8 @@ func TestPrincipalFromCustomClaimNames(t *testing.T) {
 		"custom_type": "AGENT",
 	})
 	tr := authsmart.TokenResponse{IDToken: idTok}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr,
+	lc, err := smart.LaunchContextFromTokenResponse(
+		context.Background(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -245,7 +247,8 @@ func TestPrincipalFromFHIRUserClaimName(t *testing.T) {
 		"fhirUser": "Practitioner/custom",
 	})
 	tr := authsmart.TokenResponse{IDToken: idTok}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr,
+	lc, err := smart.LaunchContextFromTokenResponse(
+		context.Background(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -268,6 +271,55 @@ func TestPrincipalAbsentWhenNoClaims(t *testing.T) {
 	}
 	if lc.Principal != nil {
 		t.Fatalf("principal = %#v", lc.Principal)
+	}
+}
+
+// TestLaunchContextOpenEHRClaims asserts that the openEHR-native ehrId and
+// episodeId claims are mapped onto LaunchContext typed fields. REQ-064
+func TestLaunchContextOpenEHRClaims(t *testing.T) {
+	tr := authsmart.TokenResponse{
+		AccessToken: "tok",
+		EHRID:       "ehr-1",
+		EpisodeID:   "ep-9",
+	}
+	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.EHRID != "ehr-1" {
+		t.Fatalf("EHRID = %q, want %q", lc.EHRID, "ehr-1")
+	}
+	if lc.EpisodeID != "ep-9" {
+		t.Fatalf("EpisodeID = %q, want %q", lc.EpisodeID, "ep-9")
+	}
+}
+
+// TestLaunchContextSMARTCompatExtras asserts that the SMART-compat extras
+// (intent, smart_style_url, need_patient_banner, tenant) are mapped onto
+// LaunchContext typed fields. REQ-064
+func TestLaunchContextSMARTCompatExtras(t *testing.T) {
+	tr := authsmart.TokenResponse{
+		AccessToken:       "tok",
+		Intent:            "patient-search",
+		SMARTStyleURL:     "https://example.com/style.json",
+		NeedPatientBanner: true,
+		Tenant:            "tenant-42",
+	}
+	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lc.Intent != "patient-search" {
+		t.Fatalf("Intent = %q, want %q", lc.Intent, "patient-search")
+	}
+	if lc.SMARTStyleURL != "https://example.com/style.json" {
+		t.Fatalf("SMARTStyleURL = %q, want %q", lc.SMARTStyleURL, "https://example.com/style.json")
+	}
+	if !lc.NeedPatientBanner {
+		t.Fatalf("NeedPatientBanner = false, want true")
+	}
+	if lc.Tenant != "tenant-42" {
+		t.Fatalf("Tenant = %q, want %q", lc.Tenant, "tenant-42")
 	}
 }
 

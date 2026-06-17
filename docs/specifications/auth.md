@@ -174,12 +174,25 @@ package smart
 import "context"
 
 type LaunchContext struct {
+    // FHIR-compat launch-context claims (SMART App Launch §7.1).
     Patient     string         // SMART "patient" launch parameter — opaque to SDK
     Encounter   string         // SMART "encounter" launch parameter
     User        string         // SMART "fhirUser" / openEHR equivalent
     Scopes      []string       // granted scopes (post-token-exchange)
     IDToken     *IDTokenClaims // parsed ID-token claims (sub, aud, iss, iat, exp, custom)
     Issuer      string         // deployment issuer URL
+
+    // openEHR-native launch-context claims, per the openEHR SMART App Launch spec
+    // (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+    EHRID     string // "ehrId" token claim — EHR-level context, requested via "launch/patient"
+    EpisodeID string // "episodeId" token claim — Episode context (experimental), via "launch/episode"
+
+    // SMART-compat extras surfaced by reference SMART clients.
+    Intent            string // "intent" — suggested workflow for the app
+    SMARTStyleURL     string // "smart_style_url" — EHR style sheet URL
+    NeedPatientBanner bool   // "need_patient_banner" — whether to render a patient banner
+    Tenant            string // "tenant" — multi-tenant EHR deployment identifier
+
     Raw         map[string]any // verbatim token-response payload for custom claims
 }
 
@@ -188,6 +201,8 @@ func LaunchContextFromContext(ctx context.Context) (*LaunchContext, bool)
 ```
 
 Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange.
+
+The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification. The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present. All of these fields are also available untyped via `Raw`.
 
 ## Platform principal claims
 

@@ -62,11 +62,17 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		o(&cfg)
 	}
 	lc := &LaunchContext{
-		Patient:   tr.Patient,
-		Encounter: tr.Encounter,
-		User:      tr.FHIRUser,
-		Issuer:    cfg.Issuer,
-		Raw:       maps.Clone(tr.Raw),
+		Patient:           tr.Patient,
+		Encounter:         tr.Encounter,
+		User:              tr.FHIRUser,
+		Issuer:            cfg.Issuer,
+		EHRID:             tr.EHRID,
+		EpisodeID:         tr.EpisodeID,
+		Intent:            tr.Intent,
+		SMARTStyleURL:     tr.SMARTStyleURL,
+		NeedPatientBanner: tr.NeedPatientBanner,
+		Tenant:            tr.Tenant,
+		Raw:               maps.Clone(tr.Raw),
 	}
 	if tr.Scope != "" {
 		lc.Scopes = strings.Fields(tr.Scope)

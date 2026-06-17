@@ -19,10 +19,24 @@ type TokenResponse struct {
 	RefreshToken string
 	Scope        string
 	IDToken      string
-	Patient      string
-	Encounter    string
-	FHIRUser     string
-	Raw          map[string]any
+	// FHIR-compat launch-context claims.
+	Patient   string
+	Encounter string
+	FHIRUser  string
+	// openEHR-native launch-context claims (REQ-064).
+	// EHRID is the EHR identifier conveyed via the "ehrId" token claim,
+	// requested via the "launch/patient" scope in the openEHR SMART spec
+	// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+	EHRID string
+	// EpisodeID is the episode identifier conveyed via the "episodeId" token
+	// claim, requested via the "launch/episode" scope (experimental).
+	EpisodeID string
+	// SMART-compat extras surfaced by reference SMART clients.
+	Intent            string
+	SMARTStyleURL     string
+	NeedPatientBanner bool
+	Tenant            string
+	Raw               map[string]any
 }
 
 // ParseTokenResponse decodes a token-endpoint JSON body into
@@ -37,15 +51,21 @@ func ParseTokenResponse(body []byte) (TokenResponse, error) {
 		return TokenResponse{}, fmt.Errorf("token response: %w", err)
 	}
 	out := TokenResponse{
-		AccessToken:  tr.AccessToken,
-		TokenType:    tr.TokenType,
-		RefreshToken: tr.RefreshToken,
-		Scope:        tr.Scope,
-		IDToken:      tr.IDToken,
-		Patient:      tr.Patient,
-		Encounter:    tr.Encounter,
-		FHIRUser:     tr.FHIRUser,
-		Raw:          rawJSONToAny(raw),
+		AccessToken:       tr.AccessToken,
+		TokenType:         tr.TokenType,
+		RefreshToken:      tr.RefreshToken,
+		Scope:             tr.Scope,
+		IDToken:           tr.IDToken,
+		Patient:           tr.Patient,
+		Encounter:         tr.Encounter,
+		FHIRUser:          tr.FHIRUser,
+		EHRID:             tr.EHRID,
+		EpisodeID:         tr.EpisodeID,
+		Intent:            tr.Intent,
+		SMARTStyleURL:     tr.SMARTStyleURL,
+		NeedPatientBanner: tr.NeedPatientBanner,
+		Tenant:            tr.Tenant,
+		Raw:               rawJSONToAny(raw),
 	}
 	if tr.ExpiresIn != "" {
 		sec, err := strconv.ParseInt(string(tr.ExpiresIn), 10, 64)
@@ -95,7 +115,16 @@ type tokenResponse struct {
 	RefreshToken string      `json:"refresh_token"`
 	Scope        string      `json:"scope"`
 	IDToken      string      `json:"id_token"`
-	Patient      string      `json:"patient"`
-	Encounter    string      `json:"encounter"`
-	FHIRUser     string      `json:"fhirUser"`
+	// FHIR-compat launch-context claims.
+	Patient   string `json:"patient"`
+	Encounter string `json:"encounter"`
+	FHIRUser  string `json:"fhirUser"`
+	// openEHR-native launch-context claims (REQ-064).
+	EHRID     string `json:"ehrId"`
+	EpisodeID string `json:"episodeId"`
+	// SMART-compat extras.
+	Intent            string `json:"intent"`
+	SMARTStyleURL     string `json:"smart_style_url"`
+	NeedPatientBanner bool   `json:"need_patient_banner"`
+	Tenant            string `json:"tenant"`
 }
