@@ -1,6 +1,6 @@
 // Package validation checks in-memory openEHR Reference Model
 // artefacts against a compiled OPT and reports every issue in one
-// pass — REQ-102.
+// pass — REQ-102 (COMPOSITION) and REQ-110 (any archetypeable root).
 //
 // Public entry:
 //
@@ -10,6 +10,14 @@
 //	        log.Printf("%s: %s — %s", issue.Path, issue.Code, issue.Detail)
 //	    }
 //	}
+//
+// The walker is value-source-generic: [Validate] runs it over any RM
+// root the closed RM set recognises, and the typed wrappers
+// [ValidateComposition], [ValidateDemographic] (PERSON / ORGANISATION /
+// GROUP / AGENT / ROLE), [ValidateFolder], and [ValidateEHRStatus]
+// delegate to it (REQ-110). PARTY sub-components (ADDRESS, CONTACT,
+// PARTY_IDENTITY, PARTY_RELATIONSHIP, CAPABILITY) validate in place
+// during a PARTY walk or as roots via [Validate].
 //
 // # Trust model
 //

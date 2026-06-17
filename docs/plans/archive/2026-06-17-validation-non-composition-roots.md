@@ -1,7 +1,7 @@
 # Plan — Template-driven validation beyond COMPOSITION (demographic + EHR-IM roots)
 
 **Date:** 2026-06-17
-**Status:** In progress
+**Status:** Landed — archived. REQ-110 + PROBE-074 shipped; generic `Validate` + `ValidateDemographic` / `ValidateFolder` / `ValidateEHRStatus`.
 **Owner:** SDK maintainers
 **Covers:** generalising the REQ-102 template-driven validation walker so it validates **any** archetypeable RM root, not only `COMPOSITION`. Adds the demographic PARTY hierarchy (`PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`) plus its archetypeable sub-components (`ADDRESS`, `CONTACT`, `PARTY_IDENTITY`, `PARTY_RELATIONSHIP`, `CAPABILITY`) and the EHR-IM roots `FOLDER` and `EHR_STATUS`. New requirement **REQ-110**; conformance **PROBE-074**.
 **Depends on:** REQ-100 (OPT parse) + REQ-102 (composition validation walker) + REQ-103 (primitive constraints) — all landed. Complements the demographic REST client ([`2026-06-14-demographic-rest-client.md`](2026-06-14-demographic-rest-client.md)).
@@ -76,6 +76,6 @@ Update `roadmap.md` (demographic-validator line → landed; FOLDER/EHR_STATUS no
 
 ## Mapping to specs
 
-- [`../specifications/clinical-modeling.md`](../specifications/clinical-modeling.md) — REQ-102 (extended), REQ-110.
-- [`../specifications/rm-modeling.md`](../specifications/rm-modeling.md) — PARTY/ACTOR hierarchy, FOLDER, EHR_STATUS.
-- [`../specifications/module-layout.md`](../specifications/module-layout.md) — `openehr/validation` building-block independence (REQ-013) unchanged.
+- [`../../specifications/clinical-modeling.md`](../../specifications/clinical-modeling.md) — REQ-102 (extended), REQ-110.
+- [`../../specifications/rm-modeling.md`](../../specifications/rm-modeling.md) — PARTY/ACTOR hierarchy, FOLDER, EHR_STATUS.
+- [`../../specifications/module-layout.md`](../../specifications/module-layout.md) — `openehr/validation` building-block independence (REQ-013) unchanged.

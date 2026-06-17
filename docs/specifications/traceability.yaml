@@ -163,7 +163,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/system, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/query, openehr/client/definition, openehr/client/admin, openehr/client/demographic]
-    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/2026-06-14-demographic-rest-client.md]
+    plans: [docs/plans/archive/2026-05-15-rest-api-client.md, docs/plans/archive/2026-05-26-contribution-submission-shape.md, docs/plans/archive/2026-06-14-demographic-rest-client.md]
     probes: [PROBE-072, PROBE-073]
     tests:
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
@@ -529,7 +529,7 @@ requirements:
     # typed wrappers (ValidateDemographic/ValidateFolder/
     # ValidateEHRStatus); ValidateComposition delegates. Lockstep
     # extension of rmTypeInfo/bmmSubtypes/rmread + DataValue-leaf readers.
-    # PROBE-074. See docs/plans/2026-06-17-validation-non-composition-roots.md.
+    # PROBE-074. See docs/plans/archive/2026-06-17-validation-non-composition-roots.md.
     implementation: landed
     packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
     adrs: [docs/adr/0006-composition-validation-walker-placement.md]
@@ -540,7 +540,7 @@ requirements:
       - openehr/validation/constraint_cassettes_test.go
       - testkit/probes/validation/probe_074_test.go
     plans:
-      - docs/plans/2026-06-17-validation-non-composition-roots.md
+      - docs/plans/archive/2026-06-17-validation-non-composition-roots.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
