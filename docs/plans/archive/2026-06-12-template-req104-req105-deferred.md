@@ -42,12 +42,12 @@ The OPT XSD exposes slot assertions as XML expression trees:
 
 ## Phase 2 — REQ-105 terminology bindings
 
-**Outcome:** Consumers can resolve archetype-node-id (`at0001`) to display text in any of the OPT's languages, and follow `term_bindings` to external terminologies (SNOMED, LOINC, ICD-10).
+**Outcome:** Consumers can resolve archetype-node-id (`at0001`) to display text in the OPT's document language, and follow `term_bindings` to external terminologies (SNOMED, LOINC, ICD-10). Multi-language selection is forward-compatible only (`lang` accepted but currently ignored).
 
 **Delivered:**
 
 1. **Spec REQ-105** documenting the `ArchetypeTerm` / `TermBinding` surface, the per-language map shape, and the fallback rule when the requested language is missing.
-2. **Compile-time flattening** — already prescribed in the archived follow-up plan Phase 4; this REQ formalises the public accessor (`compiled.Term(nodeID, lang)`, `compiled.TermBindings(nodeID)`).
+2. **Compile-time flattening** — already prescribed in the archived follow-up plan Phase 4; this REQ formalises the public accessors (`Compiled.Term(code)`, `Compiled.TermLang(nodeID, lang)`, `Compiled.TermBindings()`, `Compiled.TermBindingsForNode(nodeID)`).
 3. **External terminology lookup** is **out of scope** — REQ-105 only exposes the bindings the OPT carries.
 
 ## Implementation checklist
