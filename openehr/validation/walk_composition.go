@@ -576,12 +576,14 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 // surface as the same false positive on a polymorphic OPT slot.
 // Extend in lock-step.
 //
-// Out of scope for v2: FOLDER / EHR_STATUS (not reachable from
-// COMPOSITION through the Phase 1 content-type closed set);
-// DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA / DV_PROPORTION /
-// DV_SCALE / DV_STATE / time-specifications (DataValue subtypes
-// outside the closed REQ-103 primitive set). Add when an OPT
+// Out of scope for v2: DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA /
+// DV_PROPORTION / DV_SCALE / DV_STATE / time-specifications (DataValue
+// subtypes outside the closed REQ-103 primitive set). Add when an OPT
 // surfaces a real consumer for them.
+//
+// REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
+// the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
+// through the same walker.
 var bmmSubtypes = map[string][]string{
 	"LOCATABLE": {
 		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
@@ -589,6 +591,19 @@ var bmmSubtypes = map[string][]string{
 		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
 		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
 		"CLUSTER", "ELEMENT",
+		// REQ-110: demographic + EHR-IM LOCATABLE concretes.
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+		"ADDRESS", "CONTACT", "PARTY_IDENTITY", "PARTY_RELATIONSHIP", "CAPABILITY",
+		"FOLDER", "EHR_STATUS",
+	},
+	// PARTY hierarchy (org.openehr.rm.demographic): PARTY is the common
+	// ancestor; ACTOR adds the real-world-entity subtypes (PERSON,
+	// ORGANISATION, GROUP, AGENT). ROLE is a PARTY but not an ACTOR.
+	"PARTY": {
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+	},
+	"ACTOR": {
+		"PERSON", "ORGANISATION", "GROUP", "AGENT",
 	},
 	"CONTENT_ITEM": {
 		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",

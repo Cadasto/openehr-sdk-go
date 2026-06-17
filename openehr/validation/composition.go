@@ -24,6 +24,12 @@ import (
 //
 // Returns a [Result] whose Issues slice is never nil (zero-length
 // allocation when no issues fire).
+//
+// ValidateComposition is the COMPOSITION-typed convenience over the
+// generic [Validate]: it guards the nil composition (yielding
+// nil_composition), then delegates. Other archetypeable RM roots are
+// validated through [Validate] or its siblings [ValidateDemographic],
+// [ValidateFolder], [ValidateEHRStatus] (REQ-110).
 func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Result {
 	if comp == nil {
 		return resultFromIssues([]Issue{{
@@ -33,26 +39,7 @@ func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Resu
 			Severity: Error,
 		}})
 	}
-	if c == nil {
-		return resultFromIssues([]Issue{{
-			Path:     "",
-			Code:     "nil_template",
-			Detail:   "ValidateComposition called with a nil compiled template argument",
-			Severity: Error,
-		}})
-	}
-	if c.Root() == nil {
-		return resultFromIssues([]Issue{{
-			Path:     "",
-			Code:     "nil_template",
-			Detail:   "compiled template has no root node",
-			Severity: Error,
-		}})
-	}
-
-	w := newWalker(c)
-	w.walkNode(c.Root(), comp, "/")
-	return resultFromIssues(w.issues)
+	return Validate(comp, c)
 }
 
 // walker carries the issue accumulator and any per-call state for
@@ -226,6 +213,59 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 		return "PARTY_IDENTIFIED", "", true
 	case *rm.PartyRelated, rm.PartyRelated:
 		return "PARTY_RELATED", "", true
+
+	// LOCATABLE demographic concretes — PARTY hierarchy + sub-components
+	// (REQ-110). All carry archetype_node_id.
+	case *rm.Person:
+		return "PERSON", x.ArchetypeNodeID, true
+	case rm.Person:
+		return "PERSON", x.ArchetypeNodeID, true
+	case *rm.Organisation:
+		return "ORGANISATION", x.ArchetypeNodeID, true
+	case rm.Organisation:
+		return "ORGANISATION", x.ArchetypeNodeID, true
+	case *rm.Group:
+		return "GROUP", x.ArchetypeNodeID, true
+	case rm.Group:
+		return "GROUP", x.ArchetypeNodeID, true
+	case *rm.Agent:
+		return "AGENT", x.ArchetypeNodeID, true
+	case rm.Agent:
+		return "AGENT", x.ArchetypeNodeID, true
+	case *rm.Role:
+		return "ROLE", x.ArchetypeNodeID, true
+	case rm.Role:
+		return "ROLE", x.ArchetypeNodeID, true
+	case *rm.Address:
+		return "ADDRESS", x.ArchetypeNodeID, true
+	case rm.Address:
+		return "ADDRESS", x.ArchetypeNodeID, true
+	case *rm.Contact:
+		return "CONTACT", x.ArchetypeNodeID, true
+	case rm.Contact:
+		return "CONTACT", x.ArchetypeNodeID, true
+	case *rm.PartyIdentity:
+		return "PARTY_IDENTITY", x.ArchetypeNodeID, true
+	case rm.PartyIdentity:
+		return "PARTY_IDENTITY", x.ArchetypeNodeID, true
+	case *rm.PartyRelationship:
+		return "PARTY_RELATIONSHIP", x.ArchetypeNodeID, true
+	case rm.PartyRelationship:
+		return "PARTY_RELATIONSHIP", x.ArchetypeNodeID, true
+	case *rm.Capability:
+		return "CAPABILITY", x.ArchetypeNodeID, true
+	case rm.Capability:
+		return "CAPABILITY", x.ArchetypeNodeID, true
+
+	// LOCATABLE EHR-IM roots (REQ-110).
+	case *rm.Folder:
+		return "FOLDER", x.ArchetypeNodeID, true
+	case rm.Folder:
+		return "FOLDER", x.ArchetypeNodeID, true
+	case *rm.EHRStatus:
+		return "EHR_STATUS", x.ArchetypeNodeID, true
+	case rm.EHRStatus:
+		return "EHR_STATUS", x.ArchetypeNodeID, true
 	}
 	return "", "", false
 }

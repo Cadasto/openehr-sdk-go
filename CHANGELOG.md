@@ -8,6 +8,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ## [Unreleased]
 
+### Added
+
+- **Template-driven validation beyond COMPOSITION (REQ-110).** `openehr/validation` gains a generic `Validate(root, c)` plus typed wrappers `ValidateDemographic` (PERSON / ORGANISATION / GROUP / AGENT / ROLE), `ValidateFolder`, and `ValidateEHRStatus`; `ValidateComposition` now delegates to `Validate`. The lockstep walker (and `rmread`) extend to the demographic PARTY hierarchy + sub-components (ADDRESS / CONTACT / PARTY_IDENTITY / PARTY_RELATIONSHIP / CAPABILITY) and the EHR-IM roots FOLDER / EHR_STATUS, plus primitive-bearing DataValue leaf readers (DV_DATE/TIME/DATE_TIME/DURATION/BOOLEAN, DV_IDENTIFIER, DV_MULTIMEDIA) so explicit-`value` C_PRIMITIVE constraints validate rather than report a false `required`. PROBE-074. Additive — no public API or behaviour break (`ValidateComposition` unchanged).
+
 ## [0.7.0] - 2026-06-16
 
 Seventh `v0.x` minor — the **AQL building-block cycle**: the typed builders (REQ-055) and the static parse + lint pipeline (REQ-109) land together, completing the Phase 2 AQL surface. **Additive only — no public API or behaviour breaks this cycle**; per [`docs/releases.md`](docs/releases.md), `v0.x` minors *may* break public API, but none do here — safe to upgrade from `v0.6.0`. One new runtime dependency: the pure-Go ANTLR runtime (`github.com/antlr4-go/antlr/v4`), confined to `openehr/aql/parse` — the generator (Java) is containerised and never on the build/test path (see [architecture.md § Dependencies](docs/architecture.md#dependencies)).
@@ -95,5 +99,5 @@ First tagged release. Covers the openEHR-first Go SDK adoption slice: REST 1.1.0
 
 - [REQ-094 write-path gaps](docs/plans/archive/2026-05-25-req094-prefer-followups.md) — `Prefer=identifier` + `representation`+empty-body guard.
 - AQL verb-style builders ([plan](docs/plans/archive/2026-05-21-aql-builders.md)) — Query/ResultSet wire models landed; verb builders open.
-- Demographic REST client ([plan](docs/plans/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
+- Demographic REST client ([plan](docs/plans/archive/2026-06-14-demographic-rest-client.md)) — `doc.go` stub only.
 - Benchmark harness migration ([plan §Phase 9](docs/plans/archive/2026-05-15-rest-api-client.md)).

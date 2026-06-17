@@ -99,6 +99,8 @@ Test framework is stdlib `testing` + helpers in `testkit/`. The only third-party
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
+**REST API schema.** The machine-readable openEHR REST API contract is vendored in [`resources/its-rest/`](resources/its-rest/README.md) — the upstream `*-validation.openapi.yaml` OpenAPI 3.0 documents (EHR, Query, Definition, Admin, Demographic, System). When you need endpoint paths, request/response bodies, headers, or status codes for any REST resource, read those files rather than guessing. Refresh / verify the pin with `make its-rest-sync` / `make its-rest-check`.
+
 ## Do not touch (yet)
 
 - Promoting new numbered ADRs without updating [`docs/adr/README.md`](docs/adr/README.md), [`REQ.md`](docs/specifications/REQ.md), and [`traceability.yaml`](docs/specifications/traceability.yaml). Open decisions stay as [research strands](docs/specifications/research-strands.md) until an ADR lands.
