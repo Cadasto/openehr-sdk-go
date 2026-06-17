@@ -199,7 +199,7 @@ The PKCE implementation **MUST**:
 The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
 
 - **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
-- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). Phase 3e ID-token verification will use this as an allowlist when selecting a verification algorithm; in v0.8 the field is populated but not yet consumed.
+- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below). `TokenEndpointAuthSigningAlgValuesSupported` remains surface-only in v0.8 (Phase 3b client-credential alg selection).
 
 The SDK validates ID tokens (and, in some deployments, opaque access tokens via introspection or signature verification) against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
@@ -207,6 +207,15 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 - The cache **MUST** honour a documented TTL (default: 5 minutes).
 - On a verification miss (`kid` not in cache), the SDK **MUST** refresh the JWKS once before reporting the verification as failed. This handles silent rotation by the authorization server.
 - The refresh path **MUST** coalesce concurrent attempts (REQ-026).
+
+#### ID-token verification algorithm agility (REQ-062, REQ-064) — landed in Phase 3e
+
+`smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
+
+- **Supported algorithms:** `RS256`, `RS384`, `ES256`, `ES384`. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
+- **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). When non-empty it is intersected with the supported set — the discovery list can narrow but never widen the SDK's support, and an empty intersection falls back to the full supported set rather than go-oidc's RS256-only default. When the caller passes nothing, the full supported set applies.
+- **Rejected:** the unsecured `none` algorithm is always rejected (explicitly, and because it is never in the allowlist); any algorithm outside the effective allowlist is rejected; an `alg`/key-type mismatch is rejected by go-jose key matching. All rejections surface as `auth.ErrJWKSValidationFailed` (preserved sentinel — `errors.Is` keeps working).
+- **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The returned `*IDTokenClaims` shape is unchanged.
 
 ### REQ-063 — Token refresh
 
@@ -264,7 +273,7 @@ func WithLaunchContext(ctx context.Context, lc *LaunchContext) context.Context
 func LaunchContextFromContext(ctx context.Context) (*LaunchContext, bool)
 ```
 
-Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange.
+Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange. Signature verification supports RS256/RS384/ES256/ES384 and is constrained by the deployment's advertised `id_token_signing_alg_values_supported` when supplied — see _ID-token verification algorithm agility_ under REQ-062.
 
 The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification. The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present. All of these fields are also available untyped via `Raw`.
 

@@ -136,6 +136,10 @@ requirements:
       is optional when assertion source is provided. Signing errors surfaced as
       ErrTokenExchangeFailed. Distinct from auth/jwtbearer (which is the JWT Bearer
       Token Grant, not client auth).
+      Phase 3d/3e close-out: the RS384/ES384 asymmetric baseline (client-auth signing,
+      F-I/F-C; G-3 method selection) and id_token verification alg agility (F-M, see
+      REQ-062/REQ-064) have all landed. REQ-068 remains partial: live wire probes for
+      the SMART flows land in Phase 5.
     tests:
       - auth/jwtbearer/jwtbearer_test.go
       - auth/smart/smart_test.go
@@ -388,13 +392,22 @@ requirements:
     notes: >
       alg allowlists (token_endpoint_auth_signing_alg_values_supported,
       id_token_signing_alg_values_supported) and introspection_endpoint are
-      now surfaced onto AuthEndpoints (surface-only; consuming logic deferred
-      to later phases)
+      surfaced onto AuthEndpoints. token_endpoint_auth_signing_alg_values_supported
+      and the introspection endpoint remain surface-only (later phases).
+      Phase 3e (F-M): id_token verification gained algorithm agility — smart.ValidateIDToken
+      now verifies via github.com/coreos/go-oidc/v3 (go-jose) supporting RS256/RS384/ES256/ES384,
+      constrained to the server's id_token_signing_alg_values_supported when supplied
+      (smart.WithIDTokenSigningAlgs); rejects alg:none and unlisted algs as
+      ErrJWKSValidationFailed. JWK->crypto.PublicKey via go-jose JSONWebKey (RSA+ECDSA).
+      Hand-rolled RSA verify and rsaPublicKeyFromJWK removed. SDK's stricter claim
+      semantics (claimsFromMap: iss/aud/exp/nbf/iat with 30s skew + nonce) preserved
+      after signature verification.
     fixtures:
       - testkit/cassettes/its_rest/discovery/smart-configuration.json
     tests:
       - auth/smart/smart_test.go
       - smart/discovery/resolver_test.go
+      - smart/idtoken_test.go
 
   - id: REQ-063
     title: Token refresh
@@ -413,8 +426,15 @@ requirements:
     implementation: landed
     packages: [smart, auth/smart]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    notes: >
+      Phase 3e (F-M): id_token signature verification gained algorithm agility
+      (RS256/RS384/ES256/ES384) via go-oidc/v3, constrained by the discovery
+      id_token_signing_alg_values_supported allowlist (smart.WithIDTokenSigningAlgs).
+      IDTokenClaims shape unchanged; nonce + 30s skew claim semantics preserved.
+      See REQ-062 for verification details.
     tests:
       - smart/launch_test.go
+      - smart/idtoken_test.go
       - auth/smart/exchange_test.go
 
   - id: REQ-067

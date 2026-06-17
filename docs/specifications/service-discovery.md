@@ -58,7 +58,7 @@ type AuthEndpoints struct {
     GrantTypesSupported   []string
     TokenEndpointAuthMethodsSupported          []string // feeds Phase 3b G-3
     TokenEndpointAuthSigningAlgValuesSupported []string // feeds Phase 3b alg selection (REQ-062)
-    IDTokenSigningAlgValuesSupported           []string // feeds Phase 3e verify allowlist (REQ-062)
+    IDTokenSigningAlgValuesSupported           []string // ID-token verify allowlist, consumed by ValidateIDToken (REQ-062, REQ-064)
     Capabilities []string
 }
 ```
@@ -219,10 +219,10 @@ The resolver parses and surfaces the following SMART authorization-server metada
 | `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation |
 | `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
 | `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds Phase 3b G-3 selection |
-| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion JWS alg list; feeds Phase 3b alg selection (REQ-062) |
-| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | ID-token verify allowlist; feeds Phase 3e (REQ-062) |
+| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; feeds Phase 3b alg selection (REQ-062) — surface-only in v0.8 |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist** — pass it to `smart.WithIDTokenSigningAlgs` so `ValidateIDToken` constrains accepted signature algorithms (RS256/RS384/ES256/ES384). Consumed as of Phase 3e (REQ-062, REQ-064; see [auth.md](auth.md#req-062--jwks-rotation)) |
 
-These fields are **surface-only** in v0.8: the resolver populates them but no consuming logic (alg selection, method selection, introspection calls) is wired in this release. Consuming logic is added in later phases.
+Most of these fields remain **surface-only** in v0.8: the resolver populates `token_endpoint_auth_signing_alg_values_supported` (client-auth alg selection), `token_endpoint_auth_methods_supported` (method selection), and the introspection/revocation/management endpoints, but no consuming logic for those is wired in this release — that lands in later phases. The exception is `id_token_signing_alg_values_supported`, which the ID-token verifier consumes as of Phase 3e (see the table note above).
 
 The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
 

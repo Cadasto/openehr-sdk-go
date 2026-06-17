@@ -19,6 +19,11 @@ type ValidateConfig struct {
 	Nonce           string
 	PrincipalClaims PrincipalClaimNames
 	Now             time.Time
+	// AllowedIDTokenAlgs constrains the accepted id_token signature
+	// algorithms (REQ-062, REQ-064). Set it to the authorization server's
+	// id_token_signing_alg_values_supported from discovery. When empty the
+	// SDK default set (RS256/RS384/ES256/ES384) applies.
+	AllowedIDTokenAlgs []string
 }
 
 // ValidateOption mutates [ValidateConfig].
@@ -42,6 +47,14 @@ func WithClientID(clientID string) ValidateOption {
 // WithExpectedNonce sets the nonce claim required on the ID token.
 func WithExpectedNonce(nonce string) ValidateOption {
 	return func(c *ValidateConfig) { c.Nonce = nonce }
+}
+
+// WithIDTokenSigningAlgs constrains the id_token signature algorithms to the
+// authorization server's advertised id_token_signing_alg_values_supported
+// (REQ-062, REQ-064). When unset or empty the SDK default set applies
+// (RS256/RS384/ES256/ES384).
+func WithIDTokenSigningAlgs(algs []string) ValidateOption {
+	return func(c *ValidateConfig) { c.AllowedIDTokenAlgs = algs }
 }
 
 // WithPrincipalClaimNames overrides principal_uid / principal_type keys.
@@ -81,7 +94,7 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 		if err := requireIDTokenTrustAnchors(cfg.JWKS, cfg.Issuer, cfg.ClientID); err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}
-		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now)
+		claims, err := ValidateIDToken(ctx, tr.IDToken, cfg.JWKS, cfg.Issuer, cfg.ClientID, cfg.Nonce, cfg.Now, cfg.AllowedIDTokenAlgs)
 		if err != nil {
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}

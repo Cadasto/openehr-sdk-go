@@ -114,7 +114,7 @@ func TestValidateIDTokenRejectsExpired(t *testing.T) {
 		"iat": now.Add(-2 * time.Hour).Unix(),
 	}
 	idTok := signJWT(t, priv, "test-kid", claims)
-	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now)
+	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("err = %v", err)
 	}
@@ -164,7 +164,7 @@ func TestValidateIDTokenRejectsFutureNBF(t *testing.T) {
 		"nbf": now.Add(2 * time.Hour).Unix(),
 	}
 	idTok := signJWT(t, priv, "test-kid", claims)
-	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now)
+	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("err = %v", err)
 	}
