@@ -16,6 +16,7 @@ import (
 	"time"
 
 	gojose "github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/cryptosigner"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
@@ -187,8 +188,18 @@ func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("marshal JWT claims: %w", err)
 	}
 
-	joseAlg, _ := toJoseAlg(s.Algorithm) // validated at construction
-	signingKey := gojose.SigningKey{Algorithm: joseAlg, Key: s.Signer}
+	joseAlg, err := toJoseAlg(s.Algorithm)
+	if err != nil {
+		return "", err // ErrInvalidConfig-wrapped; consistent whether or not NewClaimsSigner was used
+	}
+	var key any
+	switch s.Signer.(type) {
+	case *rsa.PrivateKey, *ecdsa.PrivateKey:
+		key = s.Signer // concrete keys: go-jose handles natively
+	default:
+		key = cryptosigner.Opaque(s.Signer) // opaque/KMS signers (RSA + ECDSA)
+	}
+	signingKey := gojose.SigningKey{Algorithm: joseAlg, Key: key}
 	signerOpts := (&gojose.SignerOptions{}).WithType("JWT")
 	if s.KeyID != "" {
 		signerOpts = signerOpts.WithHeader("kid", s.KeyID)
@@ -228,12 +239,15 @@ func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
 // validateKeyAlg checks that the signer's public key type and curve match
 // the requested algorithm family. For opaque crypto.Signer implementations
 // whose Public() does not return a concrete *rsa.PublicKey or *ecdsa.PublicKey
-// (e.g. KMS handles wrapped in an adapter), validation is skipped; the
-// go-jose signing call will fail at runtime if the key is incompatible.
+// (e.g. KMS handles wrapped in an adapter), validation is skipped here.
 //
-// NOTE: opaque ECDSA signers are not yet supported for ES* algorithms because
-// go-jose requires the concrete *ecdsa.PrivateKey to perform correct JOSE r‖s
-// encoding. Use a concrete *ecdsa.PrivateKey for ES256/ES384. (REQ-068)
+// Opaque crypto.Signer implementations (e.g. KMS/HSM adapters) are supported:
+// at signing time a non-concrete signer is wrapped with
+// github.com/go-jose/go-jose/v4/cryptosigner, which handles both RSA and
+// ECDSA (including ES256/ES384). validateKeyAlg only inspects Public(); when
+// Public() returns a concrete *rsa.PublicKey / *ecdsa.PublicKey the key/alg
+// pairing is checked here, otherwise the pairing is enforced by go-jose at
+// sign time. (REQ-068)
 func validateKeyAlg(signer crypto.Signer, alg string) error {
 	pub := signer.Public()
 	switch alg {

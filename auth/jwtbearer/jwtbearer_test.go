@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -262,6 +263,7 @@ func newECKey(t *testing.T, curve elliptic.Curve) *ecdsa.PrivateKey {
 func TestClaimsSignerValidates(t *testing.T) {
 	rsaKey := newKey(t)
 	ecKey := newECKey(t, elliptic.P384())
+	ecKey256 := newECKey(t, elliptic.P256())
 	tests := []struct {
 		name string
 		tmpl ClaimsTemplate
@@ -278,6 +280,7 @@ func TestClaimsSignerValidates(t *testing.T) {
 		{"ES384 with RSA key", ClaimsTemplate{Issuer: "i", Audience: "a"}, rsaKey, "ES384"},
 		{"RS384 with EC key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey, "RS384"},
 		{"ES256 with P-384 key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey, "ES256"},
+		{"ES384 with P-256 key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey256, "ES384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -290,6 +293,67 @@ func TestClaimsSignerValidates(t *testing.T) {
 				t.Errorf("expected ErrInvalidConfig, got %v", err)
 			}
 		})
+	}
+}
+
+// opaqueRSASigner wraps a *rsa.PrivateKey without being *rsa.PrivateKey-typed,
+// simulating a KMS/HSM adapter that implements crypto.Signer opaquely.
+type opaqueRSASigner struct{ key *rsa.PrivateKey }
+
+func (o *opaqueRSASigner) Public() crypto.PublicKey { return &o.key.PublicKey }
+func (o *opaqueRSASigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return o.key.Sign(rand, digest, opts)
+}
+
+// TestClaimsSignerOpaqueSigner verifies that a crypto.Signer that is NOT a
+// concrete *rsa.PrivateKey (i.e. an opaque KMS/HSM adapter) works end-to-end
+// via cryptosigner.Opaque. The produced JWT signature must verify against the
+// underlying RSA public key. (REQ-068, fix 1)
+func TestClaimsSignerOpaqueSigner(t *testing.T) {
+	rawKey := newKey(t)
+	opaque := &opaqueRSASigner{key: rawKey}
+
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "kms-client", Audience: "https://as.example/token"},
+		opaque,
+		WithAlgorithm("RS384"),
+		WithKeyID("kms-kid"),
+	)
+	if err != nil {
+		t.Fatalf("NewClaimsSigner with opaque signer: %v", err)
+	}
+
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatalf("Assertion with opaque signer: %v", err)
+	}
+
+	header, claims, _ := decodeJWT(t, jwt)
+	if header["alg"] != "RS384" {
+		t.Errorf("alg = %v, want RS384", header["alg"])
+	}
+	if header["kid"] != "kms-kid" {
+		t.Errorf("kid = %v, want kms-kid", header["kid"])
+	}
+	if claims["iss"] != "kms-client" {
+		t.Errorf("iss = %v, want kms-client", claims["iss"])
+	}
+	verifyRSA(t, "RS384", &rawKey.PublicKey, jwt)
+}
+
+// TestClaimsSignerBypassedAlgValidation verifies that Assertion returns
+// ErrInvalidConfig even when ClaimsSigner is constructed directly (bypassing
+// NewClaimsSigner) with an unsupported algorithm. (fix 2)
+func TestClaimsSignerBypassedAlgValidation(t *testing.T) {
+	key := newKey(t)
+	s := &ClaimsSigner{
+		Template:  ClaimsTemplate{Issuer: "i", Subject: "i", Audience: "a", Lifetime: 5 * time.Minute},
+		Signer:    key,
+		Algorithm: "HS256", // unsupported
+	}
+	_, err := s.Assertion(context.Background())
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig for bypassed alg, got %v", err)
 	}
 }
 
