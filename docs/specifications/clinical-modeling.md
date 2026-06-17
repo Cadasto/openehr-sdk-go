@@ -392,7 +392,7 @@ This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-temp
 - **AQL lint** (`ValidateAQL`) — **landed** as a separate entry point under REQ-109 (see below); it does not change the composition-validation surface. **Demographic validator** (`ValidateDemographic`) remains deferred.
 - **Validating wire bytes / canonical JSON** — the validator never imports `serialize/`. Callers decode first, validate second.
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services. REQ-103 closed-code-list checking is the v1 ceiling.
-- **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit uses the RM-type-prefix fallback.
+- **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit is local to parsed REQ-104 assertions, with RM-type-prefix fallback only when no include assertions were parsed.
 - **Full ADL2 / AOM 2 validation semantics.**
 
 - **Lives in:** [`openehr/validation/`](../../openehr/validation/)

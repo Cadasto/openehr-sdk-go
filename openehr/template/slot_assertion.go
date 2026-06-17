@@ -1,6 +1,7 @@
 package template
 
 import (
+	"encoding/xml"
 	"regexp"
 	"strings"
 
@@ -8,7 +9,6 @@ import (
 )
 
 var (
-	slotXMLPatternRE = regexp.MustCompile(`(?is)<pattern>([^<]*)</pattern>`)
 	slotStringExprRE = regexp.MustCompile(`(?is)<string_expression>([^<]*)</string_expression>`)
 	slotValueRE      = regexp.MustCompile(`(?is)<value>(.*?)</value>`)
 )
@@ -52,10 +52,8 @@ func extractSlotPatterns(raw string) []string {
 			patterns = append(patterns, normalizeSlotPattern(p))
 		}
 	}
-	for _, m := range slotXMLPatternRE.FindAllStringSubmatch(raw, -1) {
-		if p := strings.TrimSpace(m[1]); p != "" {
-			patterns = append(patterns, normalizeSlotPattern(p))
-		}
+	for _, p := range extractXMLSlotPatterns(raw) {
+		patterns = append(patterns, normalizeSlotPattern(p))
 	}
 	if len(patterns) == 0 {
 		if v := extractXMLChardataValue(raw); v != "" {
@@ -65,6 +63,54 @@ func extractSlotPatterns(raw string) []string {
 		}
 	}
 	return patterns
+}
+
+type slotExpressionWrapper struct {
+	Expressions []slotExpression `xml:"expression"`
+}
+
+type slotExpression struct {
+	Operator string      `xml:"operator"`
+	Left     slotOperand `xml:"left_operand"`
+	Right    slotOperand `xml:"right_operand"`
+}
+
+type slotOperand struct {
+	Type          string          `xml:"type"`
+	Item          slotOperandItem `xml:"item"`
+	ReferenceType string          `xml:"reference_type"`
+}
+
+type slotOperandItem struct {
+	Text    string `xml:",chardata"`
+	Pattern string `xml:"pattern"`
+}
+
+func extractXMLSlotPatterns(raw string) []string {
+	wrapped := `<root xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">` + raw + `</root>`
+	var w slotExpressionWrapper
+	if err := xml.Unmarshal([]byte(wrapped), &w); err != nil {
+		return nil
+	}
+	var patterns []string
+	for _, expr := range w.Expressions {
+		if !expr.isSupportedSlotMatch() {
+			continue
+		}
+		if p := strings.TrimSpace(expr.Right.Item.Pattern); p != "" {
+			patterns = append(patterns, p)
+		}
+	}
+	return patterns
+}
+
+func (e slotExpression) isSupportedSlotMatch() bool {
+	return strings.TrimSpace(e.Operator) == "2007" &&
+		strings.EqualFold(strings.TrimSpace(e.Left.Type), "String") &&
+		strings.TrimSpace(e.Left.Item.Text) == "archetype_id/value" &&
+		strings.EqualFold(strings.TrimSpace(e.Left.ReferenceType), "attribute") &&
+		strings.EqualFold(strings.TrimSpace(e.Right.Type), "C_STRING") &&
+		strings.EqualFold(strings.TrimSpace(e.Right.ReferenceType), "constraint")
 }
 
 func extractTextSlotPattern(raw string) string {

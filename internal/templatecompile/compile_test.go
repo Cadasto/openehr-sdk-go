@@ -337,6 +337,30 @@ func TestCompile_SlotRulesParsed(t *testing.T) {
 	}
 }
 
+func TestCompile_SlotRulesReturnsDefensiveCopies(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	var slot *templatecompile.CompiledNode
+	for _, n := range c.AllByRMType("CLUSTER") {
+		if n.IsSlot() && n.SlotRules().HasParsedIncludes() {
+			slot = n
+			break
+		}
+	}
+	if slot == nil {
+		t.Fatal("expected at least one CLUSTER slot with parsed includes")
+	}
+	const id = "openEHR-EHR-CLUSTER.device.v1"
+	if !slot.AllowsArchetypeID(id) {
+		t.Fatalf("compiled slot should allow %q before mutation attempt", id)
+	}
+
+	rules := slot.SlotRules()
+	rules.Includes[0] = constraints.SlotAssertion{}
+	if !slot.AllowsArchetypeID(id) {
+		t.Fatal("mutating returned SlotRules.Includes changed compiled node internals")
+	}
+}
+
 // REQ-104 — clinical_note DV_DURATION primitive lands on nested value/value.
 func TestCompile_ClinicalNoteDurationPrimitive(t *testing.T) {
 	c := mustCompile(t, "clinical_note")

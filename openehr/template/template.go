@@ -277,7 +277,14 @@ func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
 // Returns nil when none were declared. The returned map is a
 // defensive copy.
 func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
-	return maps.Clone(a.terms)
+	if len(a.terms) == 0 {
+		return nil
+	}
+	out := make(map[string]ArchetypeTerm, len(a.terms))
+	for code, t := range a.terms {
+		out[code] = ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}
+	}
+	return out
 }
 
 // Term returns the term definition for the given at-code, or

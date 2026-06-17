@@ -119,6 +119,32 @@ func TestParseFile_TextSlotAssertionWithRegexQuantifier(t *testing.T) {
 	}
 }
 
+func TestParseFile_XMLSlotAssertionRequiresSupportedShape(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "slot-unsupported-xml.opt")
+	if err := os.WriteFile(path, []byte(xmlSlotAssertionUnsupportedShapeOPT), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	opt, err := template.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	var slot *template.Slot
+	walkSlots(opt.Root(), func(s *template.Slot) {
+		if slot == nil && len(s.Includes()) > 0 {
+			slot = s
+		}
+	})
+	if slot == nil {
+		t.Fatal("expected synthetic OPT to contain a slot")
+	}
+	if got := len(slot.ParsedIncludes()); got != 0 {
+		t.Fatalf("len(ParsedIncludes()) = %d, want 0 for unsupported XML expression shape", got)
+	}
+	if !slot.SlotRules().IncludesDroppedUnparsed() {
+		t.Fatal("expected raw include to be retained as dropped/unparsed")
+	}
+}
+
 func TestSlot_SlotRulesReturnsDefensiveCopies(t *testing.T) {
 	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
 	if err != nil {
@@ -142,6 +168,33 @@ func TestSlot_SlotRulesReturnsDefensiveCopies(t *testing.T) {
 	rules.Includes[0] = constraints.SlotAssertion{}
 	if !slot.AllowsArchetypeID(id) {
 		t.Fatal("mutating returned SlotRules.Includes changed the slot's internal parsed rules")
+	}
+}
+
+func TestArchetypeRoot_TermsReturnsDeepCopy(t *testing.T) {
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	root, ok := opt.Root().(*template.ArchetypeRoot)
+	if !ok {
+		t.Fatalf("Root() = %T, want *ArchetypeRoot", opt.Root())
+	}
+	terms := root.Terms()
+	if terms["at0000"].Items["text"] == "" {
+		t.Fatal("fixture root term at0000.text is empty")
+	}
+
+	term := terms["at0000"]
+	term.Items["text"] = "mutated"
+	terms["at0000"] = term
+
+	fresh, ok := root.Term("at0000")
+	if !ok {
+		t.Fatal("root.Term(at0000) missing after mutation attempt")
+	}
+	if fresh.Items["text"] == "mutated" {
+		t.Fatal("mutating Terms()[at0000].Items changed parsed template internals")
 	}
 }
 
@@ -176,6 +229,46 @@ const textSlotAssertionWithQuantifierOPT = `<?xml version="1.0" encoding="utf-8"
         <rm_type_name>CLUSTER</rm_type_name>
         <node_id>at9000</node_id>
         <includes>archetype_id matches {openEHR-EHR-CLUSTER\.device\.v[0-9]{1,2}}</includes>
+      </children>
+    </attributes>
+  </definition>
+</template>`
+
+const xmlSlotAssertionUnsupportedShapeOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>slot_unsupported_xml</value></template_id>
+  <concept>slot_unsupported_xml</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="ARCHETYPE_SLOT">
+        <rm_type_name>CLUSTER</rm_type_name>
+        <node_id>at9000</node_id>
+        <includes>
+          <expression xsi:type="EXPR_BINARY_OPERATOR">
+            <type>Boolean</type>
+            <operator>2007</operator>
+            <precedence_overridden>false</precedence_overridden>
+            <left_operand xsi:type="EXPR_LEAF">
+              <type>String</type>
+              <item xsi:type="xsd:string">other_attribute/value</item>
+              <reference_type>attribute</reference_type>
+            </left_operand>
+            <right_operand xsi:type="EXPR_LEAF">
+              <type>C_STRING</type>
+              <item xsi:type="C_STRING">
+                <pattern>openEHR-EHR-CLUSTER\.device\.v1</pattern>
+              </item>
+              <reference_type>constraint</reference_type>
+            </right_operand>
+          </expression>
+        </includes>
       </children>
     </attributes>
   </definition>

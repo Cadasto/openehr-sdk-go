@@ -222,6 +222,9 @@ func (g *generator) materialiseSingle(
 	// constraint IS present, applyPrimitiveExample inside walkNode
 	// overwrites the default. No-op for non-primitive wrappers.
 	g.populatePrimitiveDefault(rmChild)
+	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
+		return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
+	}
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
@@ -455,7 +458,9 @@ func (g *generator) materialiseMultiple(
 				return err
 			}
 			if seed.IsSlot() {
-				g.stampSlotFill(rmChild, seed)
+				if !g.stampSlotFill(rmChild, seed) {
+					return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, seed.AQLPath())
+				}
 			}
 			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
@@ -481,21 +486,22 @@ func (g *generator) materialiseMultiple(
 // on a freshly-constructed RM value when a valid slot-fill archetype
 // id can be synthesized. It falls back to the RM-type-prefix example
 // only for slots without parsed includes; parsed includes must be
-// satisfied explicitly.
-func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNode) {
+// satisfied explicitly. Returns false when no safe id can be derived.
+func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNode) bool {
 	rules := slot.SlotRules()
 	archetypeID := rules.ExampleArchetypeID()
 	if archetypeID == "" && !rules.HasParsedIncludes() {
 		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
 	}
-	if archetypeID == "" {
-		return
+	if archetypeID == "" || !rules.AllowsArchetypeID(archetypeID) {
+		return false
 	}
 	ad := &rm.Archetyped{
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   "1.1.0",
 	}
 	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
+	return true
 }
 
 // firstNonSlot returns the first OPT child that is not a slot, or
