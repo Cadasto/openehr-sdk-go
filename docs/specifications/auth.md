@@ -190,7 +190,7 @@ type LaunchContext struct {
     // SMART-compat extras surfaced by reference SMART clients.
     Intent            string // "intent" — suggested workflow for the app
     SMARTStyleURL     string // "smart_style_url" — EHR style sheet URL
-    NeedPatientBanner bool   // "need_patient_banner" — whether to render a patient banner
+    NeedPatientBanner *bool  // "need_patient_banner" — nil: server silent, caller shows banner; non-nil: server's explicit value
     Tenant            string // "tenant" — multi-tenant EHR deployment identifier
 
     Raw         map[string]any // verbatim token-response payload for custom claims

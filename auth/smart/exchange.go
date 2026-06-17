@@ -32,11 +32,18 @@ type TokenResponse struct {
 	// claim, requested via the "launch/episode" scope (experimental).
 	EpisodeID string
 	// SMART-compat extras surfaced by reference SMART clients.
-	Intent            string
-	SMARTStyleURL     string
-	NeedPatientBanner bool
-	Tenant            string
-	Raw               map[string]any
+	// Intent is the optional "intent" launch-context parameter (SMART v2).
+	Intent string
+	// SMARTStyleURL is the optional "smart_style_url" launch-context parameter (SMART v2).
+	SMARTStyleURL string
+	// NeedPatientBanner is the optional "need_patient_banner" launch-context parameter
+	// (SMART v2). nil means the server did not express a preference — the caller should
+	// apply the SMART default of showing the patient banner. Non-nil points to the
+	// server's explicit value.
+	NeedPatientBanner *bool
+	// Tenant is the optional "tenant" launch-context parameter (SMART v2).
+	Tenant string
+	Raw    map[string]any
 }
 
 // ParseTokenResponse decodes a token-endpoint JSON body into
@@ -125,6 +132,6 @@ type tokenResponse struct {
 	// SMART-compat extras.
 	Intent            string `json:"intent"`
 	SMARTStyleURL     string `json:"smart_style_url"`
-	NeedPatientBanner bool   `json:"need_patient_banner"`
+	NeedPatientBanner *bool  `json:"need_patient_banner"`
 	Tenant            string `json:"tenant"`
 }

@@ -298,11 +298,12 @@ func TestLaunchContextOpenEHRClaims(t *testing.T) {
 // (intent, smart_style_url, need_patient_banner, tenant) are mapped onto
 // LaunchContext typed fields. REQ-064
 func TestLaunchContextSMARTCompatExtras(t *testing.T) {
+	wantBanner := true
 	tr := authsmart.TokenResponse{
 		AccessToken:       "tok",
 		Intent:            "patient-search",
 		SMARTStyleURL:     "https://example.com/style.json",
-		NeedPatientBanner: true,
+		NeedPatientBanner: &wantBanner,
 		Tenant:            "tenant-42",
 	}
 	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
@@ -315,8 +316,8 @@ func TestLaunchContextSMARTCompatExtras(t *testing.T) {
 	if lc.SMARTStyleURL != "https://example.com/style.json" {
 		t.Fatalf("SMARTStyleURL = %q, want %q", lc.SMARTStyleURL, "https://example.com/style.json")
 	}
-	if !lc.NeedPatientBanner {
-		t.Fatalf("NeedPatientBanner = false, want true")
+	if lc.NeedPatientBanner == nil || !*lc.NeedPatientBanner {
+		t.Fatalf("NeedPatientBanner = %v, want non-nil true", lc.NeedPatientBanner)
 	}
 	if lc.Tenant != "tenant-42" {
 		t.Fatalf("Tenant = %q, want %q", lc.Tenant, "tenant-42")

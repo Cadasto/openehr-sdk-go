@@ -44,6 +44,13 @@ func TestParseTokenResponseOpenEHRClaims(t *testing.T) {
 	if tr.EpisodeID != "ep-9" {
 		t.Fatalf("EpisodeID = %q, want %q", tr.EpisodeID, "ep-9")
 	}
+	// Raw passthrough: openEHR-native keys must survive in the untyped map.
+	if tr.Raw["ehrId"] != "ehr-1" {
+		t.Fatalf("Raw[ehrId] = %v, want %q", tr.Raw["ehrId"], "ehr-1")
+	}
+	if tr.Raw["episodeId"] != "ep-9" {
+		t.Fatalf("Raw[episodeId] = %v, want %q", tr.Raw["episodeId"], "ep-9")
+	}
 }
 
 // TestParseTokenResponseSMARTCompatExtras asserts that the SMART-compat extras
@@ -67,8 +74,8 @@ func TestParseTokenResponseSMARTCompatExtras(t *testing.T) {
 	if tr.SMARTStyleURL != "https://example.com/style.json" {
 		t.Fatalf("SMARTStyleURL = %q, want %q", tr.SMARTStyleURL, "https://example.com/style.json")
 	}
-	if !tr.NeedPatientBanner {
-		t.Fatalf("NeedPatientBanner = false, want true")
+	if tr.NeedPatientBanner == nil || !*tr.NeedPatientBanner {
+		t.Fatalf("NeedPatientBanner = %v, want non-nil true", tr.NeedPatientBanner)
 	}
 	if tr.Tenant != "tenant-42" {
 		t.Fatalf("Tenant = %q, want %q", tr.Tenant, "tenant-42")
