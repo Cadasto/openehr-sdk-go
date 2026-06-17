@@ -11,6 +11,8 @@
 **Depends on:** landed `auth/`, `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/`, `smart/`, `smart/discovery/`, `transport/`
 **Defers:** dynamic client registration, MTLS/FAPI/JAR/PAR, token revocation client, UDAP/DPoP refresh-token binding, SMART App State
 
+> **Decision update (2026-06-17):** The owner relaxed the OTel-only dependency rule for this work. `golang.org/x/oauth2` and `github.com/coreos/go-oidc/v3` (transitively `go-jose/v4`) are adopted. Phases 3/3e/4/5 therefore USE these libraries (go-oidc for id-token verification, go-jose for `client_assertion` JWS signing, x/oauth2 for token-source/PKCE/`RetrieveError` patterns) rather than hand-rolling — superseding the "no new deps / hand-roll" framing in the Go-idiom cross-check section below. G-6's x/oauth2 adapter is no longer blocked. Recorded formally in ADR 0009 (Phase 6).
+
 ## Goal
 
 Close the gap between the SDK's auth/SMART implementation and the **canonical openEHR "SMART on openEHR" specification** (`specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html`) and the HL7 **SMART App Launch v2.2** framework it profiles. Fix one wire-shape interop bug (discovery `services`), surface openEHR-specific launch context (`ehrId`/`episodeId`), complete confidential-client and 401→refresh coverage flagged by REQ-063/REQ-068, and record the canonical sources + an ADR so the open SMART strand is closed against evidence.
