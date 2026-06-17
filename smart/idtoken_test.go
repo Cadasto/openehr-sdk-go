@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -16,6 +17,7 @@ import (
 
 	gojose "github.com/go-jose/go-jose/v4"
 
+	"github.com/cadasto/openehr-sdk-go/auth"
 	authsmart "github.com/cadasto/openehr-sdk-go/auth/smart"
 	"github.com/cadasto/openehr-sdk-go/smart"
 )
@@ -214,5 +216,110 @@ func TestValidateIDTokenRejectsBadNonce(t *testing.T) {
 		"https://issuer.example", "client-id", "wrong-nonce", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("nonce mismatch should be rejected, got %v", err)
+	}
+}
+
+// TestValidateIDTokenRejectsSymmetricJWK confirms that a JWKS entry whose kty
+// is "oct" (symmetric) is rejected with ErrJWKSValidationFailed instead of
+// reaching go-oidc and producing a confusing internal error. Fix 1 / REQ-062.
+func TestValidateIDTokenRejectsSymmetricJWK(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+
+	// Build a JWKS that serves an oct (symmetric) key under the same kid the
+	// token header will reference, simulating a compromised/malicious JWKS.
+	octKey := []byte("this-is-a-symmetric-hmac-secret!")
+	jwk := gojose.JSONWebKey{Key: octKey, KeyID: "kid-oct", Algorithm: "HS256", Use: "sig"}
+	set := gojose.JSONWebKeySet{Keys: []gojose.JSONWebKey{jwk}}
+	body, err := json.Marshal(set)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	octJWKS, err := authsmart.NewJWKS(srv.Client(), srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sign with the real RSA key but reference kid-oct so the JWKS lookup
+	// returns the symmetric key entry.
+	tok := joseSign(t, gojose.RS256, priv, "kid-oct", defaultIDClaims(now))
+
+	_, gotErr := smart.ValidateIDToken(context.Background(), tok, octJWKS,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	if gotErr == nil {
+		t.Fatal("expected error for symmetric JWK, got nil")
+	}
+	if !errors.Is(gotErr, auth.ErrJWKSValidationFailed) {
+		t.Fatalf("expected ErrJWKSValidationFailed, got %v", gotErr)
+	}
+}
+
+// TestValidateIDTokenWithinExpirySkew confirms that a token whose exp is within
+// the 30s clockSkew window past expiry is still accepted by claimsFromMap.
+// Fix 2 / REQ-062.
+func TestValidateIDTokenWithinExpirySkew(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	// exp is 10s in the past relative to now — within the 30s skew window.
+	claims := defaultIDClaims(now)
+	claims["exp"] = now.Add(-10 * time.Second).Unix()
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	if err != nil {
+		t.Fatalf("token 10s past exp should be accepted within 30s skew, got: %v", err)
+	}
+}
+
+// TestValidateIDTokenExpiredBeyondSkew confirms that a token expired well
+// beyond the 30s skew window is rejected. Fix 2 / REQ-062.
+func TestValidateIDTokenExpiredBeyondSkew(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	// exp is 1h in the past — far outside the skew window.
+	claims := defaultIDClaims(now)
+	claims["exp"] = now.Add(-time.Hour).Unix()
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
+
+	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+	if err == nil || !isJWKSFail(err) {
+		t.Fatalf("token expired 1h ago should be rejected, got %v", err)
+	}
+}
+
+// TestValidateIDTokenRejectsAlgNoneCaseVariants extends alg:none rejection to
+// cover case variants NONE and None. Fix 3 / REQ-062.
+func TestValidateIDTokenRejectsAlgNoneCaseVariants(t *testing.T) {
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+
+	for _, algVariant := range []string{"NONE", "None"} {
+		t.Run("alg="+algVariant, func(t *testing.T) {
+			hdr, _ := json.Marshal(map[string]string{"alg": algVariant, "typ": "JWT", "kid": "kid-rs256"})
+			pl, _ := json.Marshal(defaultIDClaims(now))
+			tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
+				base64.RawURLEncoding.EncodeToString(pl) + "."
+
+			_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
+			if err == nil {
+				t.Fatalf("alg:%s should be rejected, got nil", algVariant)
+			}
+			if !errors.Is(err, auth.ErrJWKSValidationFailed) {
+				t.Fatalf("alg:%s expected ErrJWKSValidationFailed, got %v", algVariant, err)
+			}
+		})
 	}
 }

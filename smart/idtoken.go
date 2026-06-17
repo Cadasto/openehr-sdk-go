@@ -3,6 +3,9 @@ package smart
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -93,6 +96,11 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 		ClientID:             clientID,
 		SupportedSigningAlgs: resolveIDTokenAlgs(allowedAlgs),
 		Now:                  func() time.Time { return now },
+		// SkipExpiryCheck delegates expiry enforcement (with 30s clockSkew) to
+		// claimsFromMap below, avoiding go-oidc's zero-tolerance expiry check
+		// which would reject tokens in the [exp, exp+30s) skew window. Issuer,
+		// audience, and signature checks remain active.
+		SkipExpiryCheck: true,
 	})
 	idt, err := verifier.Verify(ctx, raw)
 	if err != nil {
@@ -124,8 +132,8 @@ func resolveIDTokenAlgs(allowedAlgs []string) []string {
 		if strings.EqualFold(a, "none") {
 			continue
 		}
-		if slices.Contains(defaultIDTokenAlgs, a) {
-			out = append(out, a)
+		if slices.Contains(defaultIDTokenAlgs, strings.ToUpper(strings.TrimSpace(a))) {
+			out = append(out, strings.ToUpper(strings.TrimSpace(a)))
 		}
 	}
 	if len(out) == 0 {
@@ -144,6 +152,12 @@ func publicKeyFromJWK(jwkRaw json.RawMessage) (crypto.PublicKey, error) {
 	}
 	if k.Key == nil {
 		return nil, errors.New("JWK has no key material")
+	}
+	switch k.Key.(type) {
+	case *rsa.PublicKey, *ecdsa.PublicKey, ed25519.PublicKey:
+		// ok — asymmetric public key
+	default:
+		return nil, fmt.Errorf("%w: JWK key type %T is not a supported asymmetric public key", auth.ErrJWKSValidationFailed, k.Key)
 	}
 	return k.Key, nil
 }
