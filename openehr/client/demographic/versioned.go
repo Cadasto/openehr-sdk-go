@@ -40,9 +40,11 @@ type PartyVersion struct {
 	PrecedingVersionUID *rm.ObjectVersionID
 	// LifecycleState is the openEHR version-lifecycle code.
 	LifecycleState rm.DVCodedText
-	// CommitAudit is the commit-time audit envelope.
+	// CommitAudit is the commit-time audit envelope; nil if the VERSION
+	// omitted commit_audit.
 	CommitAudit rm.AuditDetailsLike
-	// Contribution is the contribution this version was committed under.
+	// Contribution is the contribution this version was committed under; nil
+	// if the VERSION omitted contribution.
 	Contribution rm.ObjectRefLike
 	// Party is the decoded version content (the concrete PARTY type).
 	Party rm.Party

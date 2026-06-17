@@ -124,3 +124,43 @@ func TestProbe073DetectsTypeDrift(t *testing.T) {
 		t.Fatalf("expected fail on type drift, got status=%q", r.Status)
 	}
 }
+
+// TestProbe073DetectsVersionDataDrift drives a server whose typed body matches
+// the input (PERSON) but whose ORIGINAL_VERSION envelope `data` drifts to a
+// different concrete type. Create/Get pass; only the VERSION-envelope hop —
+// the novel Phase-2 polymorphic-decode surface — must catch the drift.
+func TestProbe073DetectsVersionDataDrift(t *testing.T) {
+	person := cassette(t, "person.json")
+	org := cassette(t, "organisation.json")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"`+demographicprobes073VOID+`::cdr::1"`)
+		w.Header().Set("Location", r.URL.Path)
+		if strings.Contains(r.URL.Path, "/version") {
+			env := fmt.Sprintf(
+				`{"_type":"ORIGINAL_VERSION","uid":{"_type":"OBJECT_VERSION_ID","value":"%s::cdr::1"},"data":%s}`,
+				demographicprobes073VOID, org,
+			)
+			_, _ = w.Write([]byte(env))
+			return
+		}
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusCreated)
+		}
+		_, _ = w.Write(person)
+	}))
+	defer srv.Close()
+
+	r, err := demographicprobes.Probe073DemographicRoundTrip(
+		context.Background(), newClient(t, srv),
+		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}}, demographic.Person,
+	)
+	if err != nil {
+		t.Fatalf("Probe073: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Fatalf("expected fail on VERSION-data drift, got status=%q", r.Status)
+	}
+	if !strings.Contains(r.Detail, "VERSION") {
+		t.Errorf("detail %q should reference the VERSION hop", r.Detail)
+	}
+}
