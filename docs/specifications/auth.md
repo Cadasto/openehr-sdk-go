@@ -130,6 +130,13 @@ The PKCE implementation **MUST**:
 
 ### REQ-062 — JWKS rotation
 
+#### Algorithm allowlists (surface-only in v0.8)
+
+The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
+
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
+- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). Phase 3e ID-token verification will use this as an allowlist when selecting a verification algorithm; in v0.8 the field is populated but not yet consumed.
+
 The SDK validates ID tokens (and, in some deployments, opaque access tokens via introspection or signature verification) against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
 - The JWKS document **MUST** be fetched on first use and cached.

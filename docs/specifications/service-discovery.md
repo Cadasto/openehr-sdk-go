@@ -48,9 +48,18 @@ type AuthEndpoints struct {
     TokenEndpoint         *url.URL
     JWKSURI               *url.URL
     RegistrationEndpoint  *url.URL // optional
+    // Optional endpoints — nil when absent; no error.
+    IntrospectionEndpoint *url.URL // RFC 7662; feeds Phase 5b
+    RevocationEndpoint    *url.URL // RFC 7009
+    ManagementEndpoint    *url.URL // SMART management endpoint
     ScopesSupported       []string
     ResponseTypesSupported []string
     CodeChallengeMethodsSupported []string
+    GrantTypesSupported   []string
+    TokenEndpointAuthMethodsSupported          []string // feeds Phase 3b G-3
+    TokenEndpointAuthSigningAlgValuesSupported []string // feeds Phase 3b alg selection (REQ-062)
+    IDTokenSigningAlgValuesSupported           []string // feeds Phase 3e verify allowlist (REQ-062)
+    Capabilities []string
 }
 ```
 
@@ -200,11 +209,29 @@ Discovery errors **MUST** be distinguishable from wire errors via `errors.As(err
 - **Cross-issuer aggregation.** The federator use case constructs one client per issuer (REQ-065); the SDK does not aggregate catalogs across issuers.
 - **FHIR-side service consumption.** Even when the discovery document advertises `org.fhir.rest`, the SDK ignores it. A sibling FHIR SDK consumes that service.
 
+## Surfaced authorization-server metadata (REQ-070, REQ-062)
+
+The resolver parses and surfaces the following SMART authorization-server metadata fields onto `AuthEndpoints`. All fields are optional — absent fields resolve to nil/empty with no error.
+
+| Wire field | `AuthEndpoints` field | Notes |
+|---|---|---|
+| `introspection_endpoint` | `IntrospectionEndpoint *url.URL` | RFC 7662; feeds Phase 5b introspection client (REQ-062) |
+| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation |
+| `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
+| `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds Phase 3b G-3 selection |
+| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion JWS alg list; feeds Phase 3b alg selection (REQ-062) |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | ID-token verify allowlist; feeds Phase 3e (REQ-062) |
+
+These fields are **surface-only** in v0.8: the resolver populates them but no consuming logic (alg selection, method selection, introspection calls) is wired in this release. Consuming logic is added in later phases.
+
+The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
+
 ## Coverage matrix
 
 | Topic | REQ | Lives in |
 |---|---|---|
 | First-class catalog | REQ-070 | `smart/discovery/`, every typed client constructor |
+| Auth-server metadata surface | REQ-070, REQ-062 | `smart/discovery/` |
 | Cache + refresh | REQ-071 | `smart/discovery/` |
 | Validation | REQ-072 | `smart/discovery/` |
 | Trust posture | REQ-073 | `smart/discovery/` |

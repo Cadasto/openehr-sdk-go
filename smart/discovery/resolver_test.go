@@ -474,6 +474,77 @@ func TestResolveCanonicalServicesMap(t *testing.T) {
 	}
 }
 
+// TestResolveSurfacesAuthMetadata verifies that the resolver surfaces all
+// SMART authorization-server metadata fields onto AuthEndpoints (REQ-062,
+// REQ-070): the three optional endpoint URLs (introspection, revocation,
+// management), the token-endpoint auth signing-alg list, the id-token
+// signing-alg list, and the token-endpoint auth-methods list.
+//
+// This is surface-only: the test asserts the values are parsed and
+// propagated — no consuming logic (alg selection, method selection, etc.)
+// is tested here.
+func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := `{
+			"issuer": "` + srv.URL + `",
+			"authorization_endpoint": "https://auth.example.com/authorize",
+			"token_endpoint": "https://auth.example.com/token",
+			"jwks_uri": "https://auth.example.com/jwks",
+			"introspection_endpoint": "https://auth.example.com/introspect",
+			"revocation_endpoint": "https://auth.example.com/revoke",
+			"management_endpoint": "https://auth.example.com/manage",
+			"token_endpoint_auth_methods_supported": ["private_key_jwt", "client_secret_basic"],
+			"token_endpoint_auth_signing_alg_values_supported": ["RS384", "ES384"],
+			"id_token_signing_alg_values_supported": ["RS256", "ES384"],
+			"services": {"org.openehr.rest": {"baseUrl": "https://api.example.com/openehr/v1"}}
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	srv.Start()
+	defer srv.Close()
+
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	auth := cat.Auth
+
+	// --- three optional endpoint URLs ---
+	if auth.IntrospectionEndpoint == nil || auth.IntrospectionEndpoint.Host != "auth.example.com" {
+		t.Errorf("IntrospectionEndpoint = %v, want https://auth.example.com/introspect", auth.IntrospectionEndpoint)
+	}
+	if auth.RevocationEndpoint == nil || auth.RevocationEndpoint.Path != "/revoke" {
+		t.Errorf("RevocationEndpoint = %v, want https://auth.example.com/revoke", auth.RevocationEndpoint)
+	}
+	if auth.ManagementEndpoint == nil || auth.ManagementEndpoint.Path != "/manage" {
+		t.Errorf("ManagementEndpoint = %v, want https://auth.example.com/manage", auth.ManagementEndpoint)
+	}
+
+	// --- auth-methods list (may already be surfaced by Phase 1; verify value) ---
+	if !containsString(auth.TokenEndpointAuthMethodsSupported, "private_key_jwt") {
+		t.Errorf("TokenEndpointAuthMethodsSupported = %v, want [private_key_jwt ...]", auth.TokenEndpointAuthMethodsSupported)
+	}
+
+	// --- token-endpoint signing-alg list (feeds Phase 3b G-3; surface only) ---
+	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "RS384") {
+		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
+	}
+	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "ES384") {
+		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
+	}
+
+	// --- id-token signing-alg list (feeds Phase 3e verify allowlist; surface only) ---
+	if !containsString(auth.IDTokenSigningAlgValuesSupported, "RS256") {
+		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
+	}
+	if !containsString(auth.IDTokenSigningAlgValuesSupported, "ES384") {
+		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
+	}
+}
+
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) {

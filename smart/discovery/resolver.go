@@ -307,21 +307,23 @@ func computeExpiry(h http.Header, fallback time.Duration, now time.Time) time.Ti
 // See ADR 0008 for the decision to adopt the canonical map shape and drop
 // the non-canonical array form.
 type smartConfigWire struct {
-	Issuer                            string                      `json:"issuer"`
-	AuthorizationEndpoint             string                      `json:"authorization_endpoint"`
-	TokenEndpoint                     string                      `json:"token_endpoint"`
-	JWKSURI                           string                      `json:"jwks_uri"`
-	RegistrationEndpoint              string                      `json:"registration_endpoint"`
-	IntrospectionEndpoint             string                      `json:"introspection_endpoint"`
-	RevocationEndpoint                string                      `json:"revocation_endpoint"`
-	ManagementEndpoint                string                      `json:"management_endpoint"`
-	ScopesSupported                   []string                    `json:"scopes_supported"`
-	ResponseTypesSupported            []string                    `json:"response_types_supported"`
-	CodeChallengeMethodsSupported     []string                    `json:"code_challenge_methods_supported"`
-	GrantTypesSupported               []string                    `json:"grant_types_supported"`
-	TokenEndpointAuthMethodsSupported []string                    `json:"token_endpoint_auth_methods_supported"`
-	Capabilities                      []string                    `json:"capabilities"`
-	Services                          map[string]serviceEntryWire `json:"services"`
+	Issuer                                     string                      `json:"issuer"`
+	AuthorizationEndpoint                      string                      `json:"authorization_endpoint"`
+	TokenEndpoint                              string                      `json:"token_endpoint"`
+	JWKSURI                                    string                      `json:"jwks_uri"`
+	RegistrationEndpoint                       string                      `json:"registration_endpoint"`
+	IntrospectionEndpoint                      string                      `json:"introspection_endpoint"`
+	RevocationEndpoint                         string                      `json:"revocation_endpoint"`
+	ManagementEndpoint                         string                      `json:"management_endpoint"`
+	ScopesSupported                            []string                    `json:"scopes_supported"`
+	ResponseTypesSupported                     []string                    `json:"response_types_supported"`
+	CodeChallengeMethodsSupported              []string                    `json:"code_challenge_methods_supported"`
+	GrantTypesSupported                        []string                    `json:"grant_types_supported"`
+	TokenEndpointAuthMethodsSupported          []string                    `json:"token_endpoint_auth_methods_supported"`
+	TokenEndpointAuthSigningAlgValuesSupported []string                    `json:"token_endpoint_auth_signing_alg_values_supported"`
+	IDTokenSigningAlgValuesSupported           []string                    `json:"id_token_signing_alg_values_supported"`
+	Capabilities                               []string                    `json:"capabilities"`
+	Services                                   map[string]serviceEntryWire `json:"services"`
 }
 
 type serviceEntryWire struct {
@@ -405,11 +407,23 @@ func parseAuthEndpoints(issuer string, w smartConfigWire, allowInsecure bool) (A
 	if out.RegistrationEndpoint, err = parse("registration_endpoint", w.RegistrationEndpoint); err != nil {
 		return out, err
 	}
+	// Optional endpoints: absence (empty string) → nil, no error.
+	if out.IntrospectionEndpoint, err = parse("introspection_endpoint", w.IntrospectionEndpoint); err != nil {
+		return out, err
+	}
+	if out.RevocationEndpoint, err = parse("revocation_endpoint", w.RevocationEndpoint); err != nil {
+		return out, err
+	}
+	if out.ManagementEndpoint, err = parse("management_endpoint", w.ManagementEndpoint); err != nil {
+		return out, err
+	}
 	out.ScopesSupported = append([]string(nil), w.ScopesSupported...)
 	out.ResponseTypesSupported = append([]string(nil), w.ResponseTypesSupported...)
 	out.CodeChallengeMethodsSupported = append([]string(nil), w.CodeChallengeMethodsSupported...)
 	out.GrantTypesSupported = append([]string(nil), w.GrantTypesSupported...)
 	out.TokenEndpointAuthMethodsSupported = append([]string(nil), w.TokenEndpointAuthMethodsSupported...)
+	out.TokenEndpointAuthSigningAlgValuesSupported = append([]string(nil), w.TokenEndpointAuthSigningAlgValuesSupported...)
+	out.IDTokenSigningAlgValuesSupported = append([]string(nil), w.IDTokenSigningAlgValuesSupported...)
 	out.Capabilities = append([]string(nil), w.Capabilities...)
 	return out, nil
 }

@@ -359,10 +359,18 @@ requirements:
     canonical: docs/specifications/auth.md#req-062
     status: draft
     implementation: landed
-    packages: [auth/smart]
+    packages: [auth/smart, smart/discovery]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    notes: >
+      alg allowlists (token_endpoint_auth_signing_alg_values_supported,
+      id_token_signing_alg_values_supported) and introspection_endpoint are
+      now surfaced onto AuthEndpoints (surface-only; consuming logic deferred
+      to later phases)
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration.json
     tests:
       - auth/smart/smart_test.go
+      - smart/discovery/resolver_test.go
 
   - id: REQ-063
     title: Token refresh
