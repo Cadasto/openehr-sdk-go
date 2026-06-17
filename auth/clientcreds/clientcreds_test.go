@@ -379,22 +379,12 @@ func TestClientCredentialsWithClientAssertion(t *testing.T) {
 // TestFromConfigRejectsSecretAndAssertion verifies that providing both a client
 // secret and a client assertion source is rejected with ErrInvalidConfig. (REQ-068)
 func TestFromConfigRejectsSecretAndAssertion(t *testing.T) {
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate RSA key: %v", err)
-	}
-	signer, err := jwtbearer.NewClaimsSigner(
-		jwtbearer.ClaimsTemplate{Issuer: "c", Audience: "https://auth.example.com/token"},
-		rsaKey,
-	)
-	if err != nil {
-		t.Fatalf("NewClaimsSigner: %v", err)
-	}
+	stub := jwtbearer.AssertionFunc(func(ctx context.Context) (string, error) { return "stub", nil })
 
-	_, err = New(
+	_, err := New(
 		"c", "s", "https://auth.example.com/token",
 		WithHTTPClient(http.DefaultClient),
-		WithClientAssertion(signer),
+		WithClientAssertion(stub),
 	)
 	if err == nil {
 		t.Fatal("expected error when both secret and assertion are set, got nil")
@@ -407,24 +397,32 @@ func TestFromConfigRejectsSecretAndAssertion(t *testing.T) {
 // TestFromConfigAssertionNoSecretRequired verifies that ClientSecret is not required
 // when a client assertion source is provided. (REQ-068)
 func TestFromConfigAssertionNoSecretRequired(t *testing.T) {
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate RSA key: %v", err)
-	}
-	signer, err := jwtbearer.NewClaimsSigner(
-		jwtbearer.ClaimsTemplate{Issuer: "c", Audience: "https://auth.example.com/token"},
-		rsaKey,
-	)
-	if err != nil {
-		t.Fatalf("NewClaimsSigner: %v", err)
-	}
+	stub := jwtbearer.AssertionFunc(func(ctx context.Context) (string, error) { return "stub", nil })
 
-	_, err = New(
+	_, err := New(
 		"c", "", "https://auth.example.com/token",
 		WithHTTPClient(http.DefaultClient),
-		WithClientAssertion(signer),
+		WithClientAssertion(stub),
 	)
 	if err != nil {
 		t.Errorf("expected no error when assertion is set and secret is empty, got %v", err)
+	}
+}
+
+// TestFromConfigRejectsPrivateKeyJWTWithoutAssertion verifies that setting
+// AuthPrivateKeyJWT without also providing a ClientAssertion source is rejected
+// with ErrInvalidConfig. (REQ-068)
+func TestFromConfigRejectsPrivateKeyJWTWithoutAssertion(t *testing.T) {
+	c := &http.Client{}
+	_, err := New(
+		"c", "", "https://auth.example.com/token",
+		WithHTTPClient(c),
+		WithAuthMethod(AuthPrivateKeyJWT),
+	)
+	if err == nil {
+		t.Fatal("expected ErrInvalidConfig when AuthPrivateKeyJWT is set without ClientAssertion, got nil")
+	}
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
 }

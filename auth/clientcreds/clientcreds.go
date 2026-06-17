@@ -45,8 +45,11 @@ const (
 	// rejects Basic auth (some legacy authorization servers).
 	AuthPost
 	// AuthPrivateKeyJWT uses a signed JWT client_assertion (RFC 7523 /
-	// SMART Backend Services). Set automatically when WithClientAssertion
-	// is used; callers do not need to set this directly.
+	// SMART Backend Services). FromConfig sets this automatically when
+	// WithClientAssertion is used — the field then reflects the actual
+	// auth method in use. Setting AuthPrivateKeyJWT manually without
+	// also calling WithClientAssertion is an error: FromConfig will
+	// return auth.ErrInvalidConfig.
 	AuthPrivateKeyJWT
 )
 
@@ -169,8 +172,14 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.ClientSecret != "" && cfg.ClientAssertion != nil {
 		return nil, fmt.Errorf("%w: ClientSecret and ClientAssertion are mutually exclusive", auth.ErrInvalidConfig)
 	}
+	if cfg.AuthMethod == AuthPrivateKeyJWT && cfg.ClientAssertion == nil {
+		return nil, fmt.Errorf("%w: AuthPrivateKeyJWT requires WithClientAssertion", auth.ErrInvalidConfig)
+	}
 	if cfg.ClientSecret == "" && cfg.ClientAssertion == nil {
 		return nil, fmt.Errorf("%w: ClientSecret is required (or provide ClientAssertion for SMART Backend Services)", auth.ErrInvalidConfig)
+	}
+	if cfg.ClientAssertion != nil {
+		cfg.AuthMethod = AuthPrivateKeyJWT
 	}
 	if cfg.TokenURL == "" {
 		return nil, fmt.Errorf("%w: TokenURL is required", auth.ErrInvalidConfig)
