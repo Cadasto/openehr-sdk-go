@@ -12,6 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -243,6 +244,30 @@ func TestGenerateClinicalNoteMinimal(t *testing.T) {
 	}
 	if dur.Value != "P0D" {
 		t.Errorf("DV_DURATION.value = %q, want %q (default sentinel)", dur.Value, "P0D")
+	}
+}
+
+func TestGenerateClinicalNoteValidates(t *testing.T) {
+	c := compileFixture(t, "clinical_note")
+	name := "Test Composer"
+	out, err := instance.Generate(context.Background(), c, instance.Options{
+		Policy:    instance.Example,
+		Territory: "NL",
+		Composer:  &rm.PartyIdentified{Name: &name},
+	})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("AsComposition: %v", err)
+	}
+	r := validation.ValidateComposition(comp, c)
+	if !r.OK {
+		for _, iss := range r.Issues {
+			t.Logf("%s @ %s", iss.Code, iss.Path)
+		}
+		t.Fatalf("validation failed: %d issues", len(r.Issues))
 	}
 }
 

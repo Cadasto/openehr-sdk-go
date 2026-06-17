@@ -52,6 +52,15 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	// root, identity is checked inline against COMPOSITION's
 	// archetype_node_id (not via a separate attribute descent).
 	w.checkLocatableIdentity(optNode, rmValue, path)
+	// AOM 1.4 primitive short-name leaf reached via a DV wrapper's
+	// .value string channel (clinical_note.opt shape). Validate the
+	// string against the REQ-103 constraint without an RM-type check.
+	if pc := optNode.PrimitiveConstraint(); pc != nil && isAOMPrimitiveShortName(optNode.RMTypeName()) {
+		if _, ok := rmValue.(string); ok {
+			w.applyPrimitive(optNode, rmValue, path, pc)
+			return
+		}
+	}
 	w.checkRMType(optNode, rmValue, path)
 
 	if optNode.IsSlot() {
@@ -168,8 +177,25 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 		if gotType == want || rmTypeIsSubtypeOf(gotType, want) {
 			return c
 		}
+		// AOM 1.4 primitive short name (DURATION, DATE, …) pinned
+		// under a DV wrapper's .value string channel — the RM value
+		// is a Go string while the OPT child rm_type_name is the
+		// primitive short name. Mirrors instance.isAOMPrimitiveShortName.
+		if isAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
+			if _, ok := val.(string); ok {
+				return c
+			}
+		}
 	}
 	return nil
+}
+
+func isAOMPrimitiveShortName(s string) bool {
+	switch s {
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
+		return true
+	}
+	return false
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -444,18 +470,17 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 		return nil
 	}
 	for _, c := range children {
+		if c.IsSlot() {
+			continue
+		}
 		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
 			return c
 		}
 		if c.NodeID() != "" && c.NodeID() == id {
 			return c
 		}
-		// Slot: RM-type-prefix fallback. The slot's RMTypeName is
-		// the RM class it gates; an archetype id of the shape
-		// "openEHR-EHR-<rmType>.<concept>.v<n>" satisfies it when
-		// the rmType matches. v2 keeps this fallback to maintain
-		// parity with the existing v1 behaviour until REQ-104
-		// supplies a parsed assertion grammar.
+	}
+	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
 			return c
 		}
@@ -463,13 +488,11 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 	return nil
 }
 
-// slotFitsArchetypeID checks the RM-type-prefix fallback: an
-// archetype id `openEHR-EHR-<RMType>.<concept>.v<n>` fits a slot
-// constrained to `<RMType>` when their RM type segments match.
-// Used until REQ-104 parses the OPT's <includes>/<excludes>
-// grammar.
+// slotFitsArchetypeID checks whether archetypeID satisfies the
+// slot's REQ-104 include / exclude rules, including the RM-type-
+// prefix fallback when no includes were parsed.
 func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
-	return strings.HasPrefix(archetypeID, "openEHR-EHR-"+slot.RMTypeName()+".")
+	return slot.AllowsArchetypeID(archetypeID)
 }
 
 // locatableArchetypeNodeID extracts archetype_node_id from any RM

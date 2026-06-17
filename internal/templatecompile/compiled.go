@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
@@ -114,20 +115,26 @@ func (c *Compiled) NumNodes() int { return len(c.byPath) }
 
 // Term looks up the at-code's term definition under the root
 // archetype's terminology. Equivalent to [CompiledNode.Term] called
-// on the root — convenience for callers operating at the
-// COMPOSITION level. Returns (zero, false) when the code is not
-// defined on the root archetype.
+// on the root with the compiled document language — convenience for
+// callers operating at the COMPOSITION level. Returns (zero, false)
+// when the code is not defined on the root archetype.
 //
-// Note: at-codes are scoped to their enclosing archetype root; the
-// same code can have different meanings under different roots
-// (e.g. at0004 = "Systolic" under blood_pressure but "Rate" under
-// heart_rate). Use [CompiledNode.Term] for context-sensitive
-// lookup, or [Compiled.NodeAt] to position first.
+// For language-aware lookup at any node, use [Compiled.Term] or
+// [CompiledNode.Term].
 func (c *Compiled) Term(code string) (template.ArchetypeTerm, bool) {
+	return c.TermLang(code, c.language)
+}
+
+// TermLang resolves an at-code's term definition scoped to the
+// composition root archetype in the requested language. REQ-105.
+func (c *Compiled) TermLang(nodeID, lang string) (template.ArchetypeTerm, bool) {
 	if c.root == nil {
 		return template.ArchetypeTerm{}, false
 	}
-	return c.root.Term(code)
+	if lang == "" {
+		lang = c.language
+	}
+	return c.root.Term(nodeID, lang)
 }
 
 // TermBindings returns a defensive copy of every term-binding
@@ -135,6 +142,33 @@ func (c *Compiled) Term(code string) (template.ArchetypeTerm, bool) {
 // Order matches the depth-first walk of archetype roots.
 func (c *Compiled) TermBindings() []template.TermBinding {
 	return slices.Clone(c.termBindings)
+}
+
+// TermBindingsForNode returns every flattened term-binding whose
+// NodeOrPath equals nodeID or whose AQL-like path ends with the
+// at-code predicate [nodeID]. REQ-105.
+func (c *Compiled) TermBindingsForNode(nodeID string) []template.TermBinding {
+	if nodeID == "" {
+		return nil
+	}
+	var out []template.TermBinding
+	for _, b := range c.termBindings {
+		if termBindingMatchesNode(b, nodeID) {
+			out = append(out, b)
+		}
+	}
+	return slices.Clone(out)
+}
+
+func termBindingMatchesNode(b template.TermBinding, nodeID string) bool {
+	if b.NodeOrPath == nodeID {
+		return true
+	}
+	// Path-shaped locators: .../events[at0006]/...
+	if strings.Contains(b.NodeOrPath, "["+nodeID+"]") {
+		return true
+	}
+	return strings.HasSuffix(b.NodeOrPath, "/"+nodeID)
 }
 
 // ErrPathNotFound is returned by [Compiled.NodeAt] when the path

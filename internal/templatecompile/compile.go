@@ -108,7 +108,7 @@ type walker struct {
 // segment is the path delta from parent to this node ("" for the
 // root). The two-arg shape avoids re-concatenating per-call.
 func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment string) (*CompiledNode, error) {
-	cn := &CompiledNode{parent: parent}
+	cn := &CompiledNode{parent: parent, docLang: w.compiled.language}
 
 	parentPath := ""
 	if parent != nil {
@@ -158,6 +158,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		cn.isSlot = true
 		cn.slotIncludes = v.Includes()
 		cn.slotExcludes = v.Excludes()
+		cn.slotRules = v.SlotRules()
 	default:
 		return nil, fmt.Errorf("templatecompile: unhandled wire node type %T", n)
 	}

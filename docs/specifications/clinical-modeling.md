@@ -217,8 +217,8 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 - **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string but `Validate` performs only an ISO 8601 sanity check. Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
 - **`C_STRING.list_open`** — AOM 1.4 declares this mandatory flag on `C_STRING` to distinguish open enumerations (the list is *exemplars*, not the closed set) from closed ones. v1 `CString` does not capture it; `Validate` treats every non-empty `List` as closed. Surfacing the flag (and weakening `Validate` to "advisory" when `list_open=true`) is a follow-up REQ.
-- **`ARCHETYPE_SLOT` assertion grammar** — separate REQ-104. The current `Slot.Includes()` / `Slot.Excludes()` raw-string surface remains the only addressable slot constraint.
-- **External terminology lookup** — REQ-105 surfaces bindings, but neither it nor REQ-103 calls into a remote terminology service during `Validate`.
+- **`ARCHETYPE_SLOT` assertion grammar** — landed under REQ-104 (see below).
+- **External terminology lookup** — REQ-105 surfaces bindings carried in the OPT; neither REQ-103 nor REQ-105 calls into a remote terminology service during `Validate`.
 - **AOM 2 `tuple_constraint`** — not used by ADL 1.4.
 
 ### Building-block independence (REQ-013)
@@ -231,6 +231,52 @@ Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a mini
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
+
+---
+
+## REQ-104 — Slot assertion grammar
+
+The SDK **MUST** parse the ADL 1.4 `ARCHETYPE_SLOT` include / exclude assertion subset sufficient for slot-fit checking in validators and instance synthesis.
+
+### Supported grammar (v1)
+
+v1 supports the `archetype_id matches {regex}` expression form, including:
+
+- Plain text assertions embedded in OPT XML (`archetype_id matches {/openEHR-EHR-OBSERVATION\.body_weight\..*/}`)
+- The OPT XML expression tree where operator `2007` (`matches`) binds `archetype_id/value` to a `C_STRING` `<pattern>` (the Ocean Template Designer shape)
+
+Unparseable assertion blobs are retained on [`Slot.RawIncludes`](../../openehr/template/template.go) / [`Slot.RawExcludes`](../../openehr/template/template.go) and ignored by the structured matcher.
+
+### Contract
+
+- [`constraints.SlotAssertion`](../../openehr/template/constraints/slot.go) carries a compiled Go `regexp` and exposes `MatchesArchetypeID(string) bool`.
+- [`constraints.SlotRules`](../../openehr/template/constraints/slot.go) aggregates includes and excludes for one slot. `AllowsArchetypeID` applies excludes first, then requires a match against at least one include when includes are present; when no includes were parsed it **MUST** fall back to the RM-type-prefix rule (`openEHR-EHR-<rmType>.`).
+- Wire-side [`Slot`](../../openehr/template/template.go) exposes `ParsedIncludes`, `ParsedExcludes`, `AllowsRMType` (prefix fallback), `AllowsArchetypeID`, and `SlotRules`.
+- [`templatecompile.CompiledNode`](../../internal/templatecompile/node.go) copies parsed rules at compile time and exposes `AllowsArchetypeID` / `ExampleSlotFillArchetypeID` for validators and the instance synthesiser.
+
+### Building-block independence (REQ-013)
+
+`openehr/template/constraints/` remains stdlib-only. Slot assertion types live alongside primitive constraints.
+
+- **Lives in:** [`openehr/template/constraints/slot.go`](../../openehr/template/constraints/slot.go), [`openehr/template/slot_assertion.go`](../../openehr/template/slot_assertion.go), [`internal/templatecompile/`](../../internal/templatecompile/), [`openehr/validation/walk_composition.go`](../../openehr/validation/walk_composition.go)
+- **Tests:** [`openehr/template/constraints/slot_test.go`](../../openehr/template/constraints/slot_test.go), [`openehr/template/slot_assertion_test.go`](../../openehr/template/slot_assertion_test.go)
+
+---
+
+## REQ-105 — Terminology bindings
+
+The SDK **MUST** expose structured accessors for archetype term definitions and external terminology bindings carried in an OPT, without performing live terminology resolution.
+
+### Contract
+
+- [`ArchetypeTerm`](../../openehr/template/template.go) and [`TermBinding`](../../openehr/template/template.go) remain the wire-side records parsed from `<term_definitions>` and `<term_bindings>`.
+- [`templatecompile.Compiled.TermLang(nodeID, lang)`](../../internal/templatecompile/compiled.go) resolves an at-code's term text scoped to the composition root archetype. [`CompiledNode.Term(code, lang)`](../../internal/templatecompile/node.go) walks parent archetype roots for context-sensitive lookup.
+- **Language fallback:** ADL 1.4 OPTs carry a single document language (`Compiled.Language()`). When the requested `lang` is empty or equals the document language, the OPT's `Items` map (`text`, `description`, …) is returned. When `lang` differs and no translation exists in the OPT, the document-language term **MUST** be returned (no error — callers distinguish absence via the `ok` bool only).
+- [`Compiled.TermBindingsForNode(nodeID)`](../../internal/templatecompile/compiled.go) filters the compile-time flattened binding list to entries whose `NodeOrPath` equals the at-code or whose AQL-like locator contains `[nodeID]`.
+- External SNOMED / LOINC / ICD lookup is **out of scope** — REQ-105 only surfaces bindings the OPT carries.
+
+- **Lives in:** [`openehr/template/`](../../openehr/template/), [`internal/templatecompile/compiled.go`](../../internal/templatecompile/compiled.go)
+- **Tests:** [`internal/templatecompile/compile_test.go`](../../internal/templatecompile/compile_test.go)
 
 ---
 
@@ -280,10 +326,9 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 | **Structural — RM type match** | the RM instance's concrete type must satisfy the OPT child's `RMTypeName` (with abstract supertype admission per BMM); single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
 | **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
 | **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk |
-| **Slot fit — RM-type prefix fallback** | each `Content[i].ArchetypeNodeID` must match one of the OPT's archetype-root or slot-include archetype ids (or, when no slot constraint applies, share the slot's RM-type prefix `openEHR-EHR-<rmType>.`) |
-| **Slot assertion grammar** | deferred — REQ-104 |
+| **Slot fit — assertion grammar** | REQ-104 `CompiledNode.AllowsArchetypeID` (includes / excludes with RM-type-prefix fallback when no includes parsed) |
 | **Extra RM nodes not declared in OPT** | not flagged in v2; optional `warning` policy is a follow-up |
-| **Terminology binding value-set** | deferred — REQ-105 |
+| **Terminology binding value-set** | deferred — live external terminology lookup; REQ-105 surfaces OPT bindings only |
 
 ### Issue codes
 

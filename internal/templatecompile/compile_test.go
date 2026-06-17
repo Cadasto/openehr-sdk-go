@@ -201,7 +201,7 @@ func TestCompile_PerArchetypeRootTermScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NodeAt blood_pressure: %v", err)
 	}
-	bpTerm, ok := bp.Term("at0004")
+	bpTerm, ok := bp.Term("at0004", "")
 	if !ok {
 		t.Fatal("blood_pressure Term(at0004) missing")
 	}
@@ -213,7 +213,7 @@ func TestCompile_PerArchetypeRootTermScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NodeAt heart_rate: %v", err)
 	}
-	hrTerm, ok := hr.Term("at0004")
+	hrTerm, ok := hr.Term("at0004", "")
 	if !ok {
 		t.Fatal("heart_rate Term(at0004) missing")
 	}
@@ -241,6 +241,83 @@ func TestCompile_FlattenTermBindings(t *testing.T) {
 	}
 	if !hasSnomed {
 		t.Errorf("no SNOMED-CT binding flattened; have %d bindings", len(bindings))
+	}
+}
+
+// REQ-105 — TermBindingsForNode filters by at-code / path locator.
+func TestCompile_TermBindingsForNode(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	all := c.TermBindings()
+	if len(all) == 0 {
+		t.Fatal("no term bindings")
+	}
+	// Pick the first binding's NodeOrPath and assert filter returns it.
+	ref := all[0].NodeOrPath
+	if ref == "" {
+		t.Fatal("binding missing NodeOrPath")
+	}
+	// Use bare at-code when the locator is path-shaped.
+	nodeID := ref
+	if i := strings.LastIndex(ref, "["); i >= 0 {
+		nodeID = strings.TrimSuffix(ref[i+1:], "]")
+	}
+	filtered := c.TermBindingsForNode(nodeID)
+	if len(filtered) == 0 {
+		t.Fatalf("TermBindingsForNode(%q) empty; ref=%q", nodeID, ref)
+	}
+}
+
+// REQ-105 — language-aware term lookup on compiled nodes.
+func TestCompile_TermLang(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	bp, err := c.NodeAt("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
+	if err != nil {
+		t.Fatalf("NodeAt blood_pressure: %v", err)
+	}
+	term, ok := bp.Term("at0004", c.Language())
+	if !ok {
+		t.Fatal("Term(at0004) missing on blood_pressure root")
+	}
+	if term.Items["text"] == "" {
+		t.Error("expected non-empty text for at0004")
+	}
+}
+
+// REQ-104 — parsed slot rules survive compile.
+func TestCompile_SlotRulesParsed(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	var withRules bool
+	for _, n := range c.AllByRMType("CLUSTER") {
+		if !n.IsSlot() {
+			continue
+		}
+		rules := n.SlotRules()
+		if rules.HasParsedIncludes() {
+			withRules = true
+			if !n.AllowsArchetypeID("openEHR-EHR-CLUSTER.device.v1") &&
+				!rules.AllowsRMTypePrefix("openEHR-EHR-CLUSTER.example.v1") {
+				t.Errorf("slot %s: AllowsArchetypeID failed for known fills", n.AQLPath())
+			}
+		}
+	}
+	if !withRules {
+		t.Fatal("expected at least one CLUSTER slot with parsed includes")
+	}
+}
+
+// REQ-104 — clinical_note DV_DURATION primitive lands on nested value/value.
+func TestCompile_ClinicalNoteDurationPrimitive(t *testing.T) {
+	c := mustCompile(t, "clinical_note")
+	path := "/content[openEHR-EHR-INSTRUCTION.medication_order.v3]/activities[at0001]/description/items[openEHR-EHR-CLUSTER.therapeutic_direction.v1]/items[at0066]/value/value"
+	n, err := c.NodeAt(path)
+	if err != nil {
+		t.Fatalf("NodeAt: %v", err)
+	}
+	if n.RMTypeName() != "DURATION" {
+		t.Fatalf("rm type %q, want DURATION", n.RMTypeName())
+	}
+	if _, ok := n.PrimitiveConstraint().(constraints.CDuration); !ok {
+		t.Fatalf("primitive %T, want CDuration", n.PrimitiveConstraint())
 	}
 }
 

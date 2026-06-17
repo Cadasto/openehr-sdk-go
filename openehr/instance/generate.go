@@ -467,7 +467,7 @@ func (g *generator) materialiseMultiple(
 				return err
 			}
 			if seed.IsSlot() {
-				g.stampSlotFill(rmChild, seed.RMTypeName())
+				g.stampSlotFill(rmChild, seed)
 			}
 			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
@@ -490,18 +490,18 @@ func (g *generator) materialiseMultiple(
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
-// on a freshly-constructed RM value so it satisfies the validator's
-// RM-type-prefix slotFit heuristic
-// ("openEHR-EHR-<RMType>.example.v1"). A v1 stop-gap until REQ-104
-// supplies a parsed slot grammar — synthesiser picks a synthetic
-// archetype id that the validator accepts as a legitimate fill.
-func (g *generator) stampSlotFill(rmValue any, slotRMType string) {
-	archetypeID := "openEHR-EHR-" + slotRMType + ".example.v1"
+// on a freshly-constructed RM value so it satisfies the slot's
+// REQ-104 assertion rules (or the RM-type-prefix fallback).
+func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNode) {
+	archetypeID := slot.ExampleSlotFillArchetypeID()
+	if archetypeID == "" {
+		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
+	}
 	ad := &rm.Archetyped{
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   "1.1.0",
 	}
-	applyLocatableIdentity(rmValue, archetypeID, slotRMType, ad, g.nextUID)
+	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
 }
 
 // firstNonSlot returns the first OPT child that is not a slot, or
@@ -648,7 +648,7 @@ func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmVa
 	// definitions when available; the RM type acts as the fallback.
 	name := opt.RMTypeName()
 	if id != "" {
-		if t, ok := opt.Term(id); ok {
+		if t, ok := opt.Term(id, ""); ok {
 			if text, found := t.Items["text"]; found && text != "" {
 				name = text
 			}

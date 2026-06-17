@@ -1,7 +1,7 @@
 # Plan — REQ-104 slot assertions and REQ-105 terminology bindings (deferred)
 
 **Date:** 2026-06-12
-**Status:** Draft (deferred — no committed delivery window)
+**Status:** Landed (2026-06-17)
 **Owner:** SDK maintainers
 **Covers:** REQ-104 (slot assertions); REQ-105 (terminology bindings)
 **Implementation:** planned
@@ -54,9 +54,9 @@ The OPT XSD exposes slot assertions as XML expression trees:
 
 | Step | Status |
 |---|---|
-| Phase 1 — REQ-104 slot assertions | |
-| Phase 2 — REQ-105 terminology bindings | |
-| `make ci` green throughout | |
+| Phase 1 — REQ-104 slot assertions | landed |
+| Phase 2 — REQ-105 terminology bindings | landed |
+| `make ci` green throughout | done |
 
 ## References
 

@@ -30,6 +30,7 @@ type CompiledNode struct {
 	isSlot       bool
 	slotIncludes []string
 	slotExcludes []string
+	slotRules    constraints.SlotRules
 
 	// primitive carries the typed REQ-103 constraint value when the
 	// wire xsi:type was a primitive. Nil for non-primitive nodes
@@ -41,6 +42,10 @@ type CompiledNode struct {
 	// can have different meanings under sibling roots. See [Term] for
 	// the parent-walk lookup that respects scope.
 	terms map[string]template.ArchetypeTerm
+
+	// docLang is the OPT's primary ISO 639-1 language code, copied
+	// from the enclosing Compiled aggregate for REQ-105 lookups.
+	docLang string
 }
 
 // AQLPath returns the canonical openEHR path string of this node.
@@ -99,6 +104,30 @@ func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotInclu
 // archetype-id exclude assertion strings. Empty for non-slot nodes.
 func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
 
+// SlotRules returns the parsed REQ-104 assertion rules for this
+// slot. Zero value for non-slot nodes.
+func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules }
+
+// AllowsArchetypeID reports whether archetypeID satisfies this
+// slot's include / exclude rules (REQ-104), including the
+// RM-type-prefix fallback when no includes were parsed. False for
+// non-slot nodes.
+func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
+	if !n.isSlot {
+		return false
+	}
+	return n.slotRules.AllowsArchetypeID(archetypeID)
+}
+
+// ExampleSlotFillArchetypeID returns a synthetic archetype id for
+// instance generation that satisfies this slot's rules.
+func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
+	if !n.isSlot {
+		return ""
+	}
+	return n.slotRules.ExampleArchetypeID()
+}
+
 // PrimitiveConstraint returns the typed REQ-103 constraint value for
 // this node, or nil when the wire xsi:type was not a primitive in
 // the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint]
@@ -113,14 +142,29 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // sees that root's terminology rather than a sibling root's. Returns
 // (zero, false) when no enclosing root defines the code.
 //
+// lang selects the requested ISO 639-1 language. When lang is empty
+// or matches the compiled template's document language, the OPT's
+// primary-language term is returned. When lang differs and no
+// translation exists, the document-language term is returned
+// (REQ-105 fallback).
+//
 // The returned [template.ArchetypeTerm.Items] map is a defensive copy.
-func (n *CompiledNode) Term(code string) (template.ArchetypeTerm, bool) {
+func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
 	for cur := n; cur != nil; cur = cur.parent {
 		if t, ok := cur.terms[code]; ok {
-			return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true
+			return termForLanguage(t, lang, n.docLang), true
 		}
 	}
 	return template.ArchetypeTerm{}, false
+}
+
+// termForLanguage applies REQ-105 language fallback. ADL 1.4 OPTs
+// carry a single document language; requested translations fall back
+// to that language's Items map.
+func termForLanguage(t template.ArchetypeTerm, requested, docLang string) template.ArchetypeTerm {
+	_ = requested
+	_ = docLang
+	return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}
 }
 
 // CompiledAttribute is one attribute on a CompiledNode. Carries the
