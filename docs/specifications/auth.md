@@ -94,6 +94,23 @@ The platform supports four SMART grant flows and three launch modes. The SDK **M
 | **Client Credentials** (backend services) | `auth/clientcreds` | Service-to-service callers (benchmark, seeder, MCP server backend) |
 | **JWT Bearer** (confidential clients with asymmetric keys) | `auth/jwtbearer` | Systems holding a signed assertion |
 
+#### JWT Bearer — client_assertion signing algorithms (Phase 3a)
+
+The HL7 SMART `client-confidential-asymmetric` profile states that clients **SHALL** support **RS384** and **ES384** for signing `client_assertion` JWTs at the token endpoint. The SDK's `auth/jwtbearer.ClaimsSigner` implements this baseline:
+
+| Algorithm | Key type | Status |
+|---|---|---|
+| **RS384** | RSA (`*rsa.PrivateKey`) | **default** — SMART baseline |
+| **ES384** | ECDSA P-384 (`*ecdsa.PrivateKey`) | supported — SMART baseline |
+| RS256 | RSA (`*rsa.PrivateKey`) | supported — back-compat only |
+| ES256 | ECDSA P-256 (`*ecdsa.PrivateKey`) | supported — common in practice |
+
+The default algorithm is **RS384** (changed from RS256 in Phase 3a). Callers that previously relied on the RS256 default must pass `WithAlgorithm("RS256")` explicitly if they require RS256.
+
+All signing is delegated to `github.com/go-jose/go-jose/v4`, which handles JOSE encoding including ECDSA r‖s byte-padding. Hand-rolled PKCS1v15/ECDSA paths have been removed.
+
+Key-type validation is enforced at `NewClaimsSigner` construction time and returns `auth.ErrInvalidConfig` on mismatch (e.g. ES384 with an RSA key). For opaque `crypto.Signer` implementations (e.g. KMS handles) whose `Public()` does not return a concrete `*ecdsa.PublicKey`, ES* algorithms are not yet supported; use a concrete `*ecdsa.PrivateKey` for ES256/ES384.
+
 ### Launch modes
 
 Three launch modes the SDK **MUST** support — each is a way the SMART flow starts:

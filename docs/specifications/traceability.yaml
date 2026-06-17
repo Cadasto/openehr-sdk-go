@@ -116,6 +116,14 @@ requirements:
     implementation: partial
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    notes: >
+      Phase 3a (F-I): ClaimsSigner now signs via go-jose/v4. Default alg changed
+      from RS256 to RS384 (SMART client-confidential-asymmetric SHALL). RS384 and
+      ES384 are fully supported; RS256 and ES256 retained for back-compat. Key/alg
+      mismatch rejected at construction (ErrInvalidConfig). Opaque ECDSA signers
+      not yet supported for ES* — requires concrete *ecdsa.PrivateKey.
+    tests:
+      - auth/jwtbearer/jwtbearer_test.go
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST

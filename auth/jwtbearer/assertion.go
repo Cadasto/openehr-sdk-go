@@ -3,17 +3,19 @@ package jwtbearer
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"maps"
 	"sync/atomic"
 	"time"
+
+	gojose "github.com/go-jose/go-jose/v4"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
@@ -77,13 +79,21 @@ type ClaimsTemplate struct {
 // crypto.Signer for each call. KeyID, when set, is emitted as the "kid"
 // header so the authorization server can identify the signing key
 // across the deployment's JWKS.
+//
+// Supported algorithms (SMART client-confidential-asymmetric baseline):
+//   - RS384 (default) — RSA PKCS1v15 with SHA-384; mandated by HL7 SMART
+//   - ES384 — ECDSA P-384 with SHA-384; mandated by HL7 SMART
+//   - RS256 — RSA PKCS1v15 with SHA-256; accepted for back-compat
+//   - ES256 — ECDSA P-256 with SHA-256; common in practice
+//
+// Signing is delegated to go-jose/v4, which handles correct JOSE encoding
+// (including ECDSA r‖s padding) internally. (REQ-068)
 type ClaimsSigner struct {
 	Template ClaimsTemplate
 	// Signer is the private-key signer. Required.
 	Signer crypto.Signer
-	// Algorithm is the JOSE "alg" name (RS256 is the only built-in
-	// option in v1). To use a different algorithm, sign externally
-	// and pass via StaticAssertion / AssertionFunc.
+	// Algorithm is the JOSE "alg" name. Default: RS384 (SMART baseline).
+	// Supported: RS384, ES384, RS256, ES256.
 	Algorithm string
 	// KeyID is the "kid" JWS header.
 	KeyID string
@@ -92,9 +102,15 @@ type ClaimsSigner struct {
 }
 
 // NewClaimsSigner constructs a ClaimsSigner. Returns ErrInvalidConfig
-// when required fields are missing or the algorithm is unsupported.
+// when required fields are missing, the algorithm is unsupported, or the
+// signer's key type does not match the algorithm family.
+//
+// Key requirements per algorithm:
+//   - RS256, RS384: *rsa.PrivateKey
+//   - ES256: *ecdsa.PrivateKey on P-256
+//   - ES384: *ecdsa.PrivateKey on P-384
 func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...SignerOption) (*ClaimsSigner, error) {
-	s := &ClaimsSigner{Template: template, Signer: signer, Algorithm: "RS256"}
+	s := &ClaimsSigner{Template: template, Signer: signer, Algorithm: "RS384"}
 	for _, o := range opts {
 		o(s)
 	}
@@ -110,11 +126,11 @@ func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...Sign
 	if s.Template.Lifetime == 0 {
 		s.Template.Lifetime = 5 * time.Minute
 	}
-	if s.Algorithm != "RS256" {
-		return nil, fmt.Errorf("%w: algorithm %q is not built in (use AssertionFunc for external signers)", auth.ErrInvalidConfig, s.Algorithm)
+	if _, err := toJoseAlg(s.Algorithm); err != nil {
+		return nil, err
 	}
-	if _, ok := s.Signer.Public().(*rsa.PublicKey); !ok {
-		return nil, fmt.Errorf("%w: RS256 requires an RSA signer", auth.ErrInvalidConfig)
+	if err := validateKeyAlg(s.Signer, s.Algorithm); err != nil {
+		return nil, err
 	}
 	return s, nil
 }
@@ -127,8 +143,10 @@ func WithKeyID(kid string) SignerOption {
 	return func(s *ClaimsSigner) { s.KeyID = kid }
 }
 
-// WithAlgorithm overrides the JOSE "alg" name. The built-in implementation
-// only supports RS256; other values are rejected at construction.
+// WithAlgorithm overrides the JOSE "alg" name. Supported values:
+// RS384 (default, SMART baseline), ES384, RS256 (back-compat), ES256.
+// The key type must match the algorithm family; mismatches are rejected
+// at construction with ErrInvalidConfig.
 func WithAlgorithm(alg string) SignerOption {
 	return func(s *ClaimsSigner) { s.Algorithm = alg }
 }
@@ -137,6 +155,9 @@ func WithAlgorithm(alg string) SignerOption {
 // allocates a new "iat"/"exp"/"jti" so two assertions from the same
 // signer are never identical (RFC 7523 § 3 requires jti to be unique
 // within the assertion's lifetime).
+//
+// Signing is performed by go-jose/v4, which handles all JOSE encoding
+// including ECDSA r‖s byte padding. (REQ-068)
 func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -161,39 +182,83 @@ func (s *ClaimsSigner) Assertion(ctx context.Context) (string, error) {
 	claims["exp"] = now.Add(s.Template.Lifetime).Unix()
 	claims["jti"] = jti
 
-	header := map[string]any{"alg": s.Algorithm, "typ": "JWT"}
-	if s.KeyID != "" {
-		header["kid"] = s.KeyID
-	}
-
-	headerBytes, err := json.Marshal(header)
-	if err != nil {
-		return "", fmt.Errorf("marshal JWS header: %w", err)
-	}
 	claimsBytes, err := json.Marshal(claims)
 	if err != nil {
 		return "", fmt.Errorf("marshal JWT claims: %w", err)
 	}
-	enc := base64.RawURLEncoding
-	signingInput := enc.EncodeToString(headerBytes) + "." + enc.EncodeToString(claimsBytes)
 
-	sig, err := signRS256(s.Signer, signingInput)
-	if err != nil {
-		return "", err
+	joseAlg, _ := toJoseAlg(s.Algorithm) // validated at construction
+	signingKey := gojose.SigningKey{Algorithm: joseAlg, Key: s.Signer}
+	signerOpts := (&gojose.SignerOptions{}).WithType("JWT")
+	if s.KeyID != "" {
+		signerOpts = signerOpts.WithHeader("kid", s.KeyID)
 	}
-	return signingInput + "." + enc.EncodeToString(sig), nil
+	joseSigner, err := gojose.NewSigner(signingKey, signerOpts)
+	if err != nil {
+		return "", fmt.Errorf("create JWS signer: %w", err)
+	}
+	jws, err := joseSigner.Sign(claimsBytes)
+	if err != nil {
+		return "", fmt.Errorf("JWS sign: %w", err)
+	}
+	compact, err := jws.CompactSerialize()
+	if err != nil {
+		return "", fmt.Errorf("JWS compact serialize: %w", err)
+	}
+	return compact, nil
 }
 
-func signRS256(signer crypto.Signer, input string) ([]byte, error) {
-	if signer == nil {
-		return nil, errors.New("nil signer")
+// toJoseAlg maps a JOSE algorithm string to the go-jose constant.
+// Returns ErrInvalidConfig for unsupported algorithms.
+func toJoseAlg(alg string) (gojose.SignatureAlgorithm, error) {
+	switch alg {
+	case "RS256":
+		return gojose.RS256, nil
+	case "RS384":
+		return gojose.RS384, nil
+	case "ES256":
+		return gojose.ES256, nil
+	case "ES384":
+		return gojose.ES384, nil
+	default:
+		return "", fmt.Errorf("%w: algorithm %q is not supported (supported: RS384, ES384, RS256, ES256)", auth.ErrInvalidConfig, alg)
 	}
-	sum := sha256.Sum256([]byte(input))
-	sig, err := signer.Sign(rand.Reader, sum[:], crypto.SHA256)
-	if err != nil {
-		return nil, fmt.Errorf("RS256 sign: %w", err)
+}
+
+// validateKeyAlg checks that the signer's public key type and curve match
+// the requested algorithm family. For opaque crypto.Signer implementations
+// whose Public() does not return a concrete *rsa.PublicKey or *ecdsa.PublicKey
+// (e.g. KMS handles wrapped in an adapter), validation is skipped; the
+// go-jose signing call will fail at runtime if the key is incompatible.
+//
+// NOTE: opaque ECDSA signers are not yet supported for ES* algorithms because
+// go-jose requires the concrete *ecdsa.PrivateKey to perform correct JOSE r‖s
+// encoding. Use a concrete *ecdsa.PrivateKey for ES256/ES384. (REQ-068)
+func validateKeyAlg(signer crypto.Signer, alg string) error {
+	pub := signer.Public()
+	switch alg {
+	case "RS256", "RS384":
+		if _, ok := pub.(*rsa.PublicKey); !ok {
+			return fmt.Errorf("%w: %s requires an RSA signer, got %T", auth.ErrInvalidConfig, alg, pub)
+		}
+	case "ES256":
+		ecPub, ok := pub.(*ecdsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("%w: ES256 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
+		}
+		if ecPub.Curve != elliptic.P256() {
+			return fmt.Errorf("%w: ES256 requires a P-256 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
+		}
+	case "ES384":
+		ecPub, ok := pub.(*ecdsa.PublicKey)
+		if !ok {
+			return fmt.Errorf("%w: ES384 requires an ECDSA signer, got %T", auth.ErrInvalidConfig, pub)
+		}
+		if ecPub.Curve != elliptic.P384() {
+			return fmt.Errorf("%w: ES384 requires a P-384 key, got %s", auth.ErrInvalidConfig, ecPub.Curve.Params().Name)
+		}
 	}
-	return sig, nil
+	return nil
 }
 
 // newJTI returns a per-assertion unique identifier composed of three
