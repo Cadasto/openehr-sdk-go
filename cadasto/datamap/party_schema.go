@@ -2,39 +2,9 @@ package datamap
 
 import (
 	"maps"
-	"regexp"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 )
-
-// lenientItemTree is the schema for a demographic ITEM_TREE subtree (PARTY
-// details, identity details, address details). FromParty decodes these loosely
-// — global per-nodeID array detection, empty-value skipping, and nested
-// archetype CLUSTERs (person_identifier.v2 variants, annotations, …) — so a
-// strict OPT-derived schema false-rejects valid data. We validate the
-// structural envelope (it is an object) and accept the decoded contents. The
-// strict modelling stays on the composition path (buildItemsSchema), which is
-// not loose in this way.
-func lenientItemTree() map[string]any {
-	obj := map[string]any{"type": "object", "additionalProperties": true}
-	// FromParty arrays a node when its at-code is multi-occurrence ANYWHERE
-	// (global per-nodeID detection) or the data repeats it — so the same slot
-	// can decode as an object or an array of objects. Accept both.
-	return map[string]any{
-		"anyOf": []any{
-			obj,
-			map[string]any{"type": "array", "items": obj},
-		},
-	}
-}
-
-// archetypeKeyPattern matches a datamap key of "<archetypeId>" or
-// "<archetypeId>|<label>". FromParty labels identities/addresses by the
-// instance's coded purpose ("Officiële naam", "Hoofdadres"), which the static
-// archetype label cannot predict — so match by the stable archetype-id prefix.
-func archetypeKeyPattern(archetypeID string) string {
-	return "^" + regexp.QuoteMeta(archetypeID) + `(\|.*)?$`
-}
 
 // partySection carries OPT term maps and array-node metadata for one demographic
 // subtree (identities entry, details ITEM_TREE, address archetype root, …).
@@ -148,38 +118,70 @@ func buildPartyIdentitiesSchema(root template.ObjectNode) map[string]any {
 	if idAttr == nil {
 		return nil
 	}
-	patterns := map[string]any{}
+	props := map[string]any{}
+	var required []string
 	for _, c := range idAttr.Children() {
 		ar, ok := c.(*template.ArchetypeRoot)
 		if !ok {
 			continue
 		}
-		// Key by archetype-id pattern: FromParty appends the instance's coded
-		// purpose label (e.g. "|Officiële naam"), not the static archetype label.
-		patterns[archetypeKeyPattern(ar.ArchetypeID())] = lenientItemTree()
+		sec := partySectionFromNode(ar)
+		if details, ok := attrFirstObject(findAttr(ar, "details")); ok {
+			if itemsAttr := structuredItemsAttr(details); itemsAttr != nil {
+				items, req := buildItemsSchemaWithRequired(itemsAttr, contentRootFromParty(sec), "identities")
+				schema := map[string]any{
+					"type":                 "object",
+					"additionalProperties": false,
+					"properties":           items,
+				}
+				if len(req) > 0 {
+					schema["required"] = req
+				}
+				key := sec.id + "|" + sec.label
+				props[key] = schema
+				occ := fromMultiplicity(ar.Occurrences())
+				if occ.lower != nil && *occ.lower > 0 {
+					required = append(required, key)
+				}
+			}
+		}
 	}
-	if len(patterns) == 0 {
+	if len(props) == 0 {
 		return nil
 	}
-	return map[string]any{
+	out := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"patternProperties":    patterns,
+		"properties":           props,
 	}
+	if len(required) > 0 {
+		out["required"] = required
+	}
+	return out
 }
 
-func buildPartyDetailsSchema(root template.ObjectNode, _ partySection) map[string]any {
+func buildPartyDetailsSchema(root template.ObjectNode, sec partySection) map[string]any {
 	detAttr := findAttr(root, "details")
 	if detAttr == nil {
 		return nil
 	}
-	if _, ok := attrFirstObject(detAttr); !ok {
+	details, ok := attrFirstObject(detAttr)
+	if !ok {
 		return nil
 	}
-	// Lenient: FromParty decodes details loosely (global array detection, empty
-	// skipping, nested person_identifier/annotations CLUSTERs). A strict
-	// OPT-derived schema false-rejects valid patients.
-	return lenientItemTree()
+	if itemsAttr := structuredItemsAttr(details); itemsAttr != nil {
+		items, req := buildItemsSchemaWithRequired(itemsAttr, contentRootFromParty(sec), "details")
+		out := map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties":           items,
+		}
+		if len(req) > 0 {
+			out["required"] = req
+		}
+		return out
+	}
+	return nil
 }
 
 func buildPartyContactsSchema(root template.ObjectNode) map[string]any {
@@ -192,7 +194,7 @@ func buildPartyContactsSchema(root template.ObjectNode) map[string]any {
 		return nil
 	}
 	sec := partySectionFromNode(contactNode)
-	addrPatterns := map[string]any{}
+	addrProps := map[string]any{}
 	addrAttr := findAttr(contactNode, "addresses")
 	if addrAttr != nil {
 		for _, c := range addrAttr.Children() {
@@ -200,22 +202,31 @@ func buildPartyContactsSchema(root template.ObjectNode) map[string]any {
 			if !ok {
 				continue
 			}
-			// Key by archetype-id pattern: FromParty appends the address's coded
-			// purpose label (e.g. "|Hoofdadres"), not the static archetype label.
-			addrPatterns[archetypeKeyPattern(ar.ArchetypeID())] = lenientItemTree()
+			addrSec := partySectionFromNode(ar)
+			if details, ok := attrFirstObject(findAttr(ar, "details")); ok {
+				if itemsAttr := structuredItemsAttr(details); itemsAttr != nil {
+					items, _ := buildItemsSchemaWithRequired(itemsAttr, contentRootFromParty(addrSec), "contacts/addresses")
+					key := addrSec.id + "|" + addrSec.label
+					addrProps[key] = map[string]any{
+						"type":                 "object",
+						"additionalProperties": false,
+						"properties":           items,
+					}
+				}
+			}
 		}
 	}
-	contactInner := map[string]any{"type": "object", "additionalProperties": true}
-	if len(addrPatterns) > 0 {
-		contactInner["patternProperties"] = addrPatterns
-		contactInner["additionalProperties"] = false
-	}
-	// CONTACT wrapper keyed by "<contactId>|<label>"; match by archetype-id
-	// pattern to be robust to label drift.
+	contactKey := sec.id + "|" + sec.label
 	itemSchema := map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"patternProperties":    map[string]any{archetypeKeyPattern(sec.id): contactInner},
+		"properties": map[string]any{
+			contactKey: map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties":           addrProps,
+			},
+		},
 	}
 	return map[string]any{"type": "array", "items": itemSchema}
 }
