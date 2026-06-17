@@ -128,9 +128,18 @@ requirements:
       is deterministic; assertion-key and client-secret are mutually exclusive.
       G-3: when the server advertises token_endpoint_auth_methods_supported, the
       configured method is cross-checked at construction (ErrInvalidConfig on absence).
+      Phase 3c (F-C): auth/clientcreds now supports SMART Backend Services asymmetric
+      client auth via WithClientAssertion(jwtbearer.AssertionSource). Wire shape:
+      grant_type=client_credentials + client_assertion_type=jwt-bearer + signed
+      client_assertion; no HTTP Basic, no client_secret. ClientSecret and
+      ClientAssertion are mutually exclusive (ErrInvalidConfig if both set); secret
+      is optional when assertion source is provided. Signing errors surfaced as
+      ErrTokenExchangeFailed. Distinct from auth/jwtbearer (which is the JWT Bearer
+      Token Grant, not client auth).
     tests:
       - auth/jwtbearer/jwtbearer_test.go
       - auth/smart/smart_test.go
+      - auth/clientcreds/clientcreds_test.go
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST

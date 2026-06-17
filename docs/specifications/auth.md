@@ -136,6 +136,28 @@ Configuring **both** an assertion key and a client secret is ambiguous and is re
 
 When the authorization server advertises `token_endpoint_auth_methods_supported` (RFC 8414), `FromConfig` cross-checks the method implied by the configured credential against that list. If the list is non-empty and does **not** contain the configured method (`private_key_jwt` when a signer is set, `client_secret_basic` when only a secret is set), construction fails fast with `auth.ErrInvalidConfig` rather than deferring the failure to a rejected token request. When the list is empty or absent, the check is skipped (the server has not constrained the method).
 
+#### Backend Services asymmetric client auth — `client_credentials` + `client_assertion` (Phase 3c, F-C)
+
+The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-services.html) profile specifies that a backend service authenticates at the token endpoint with:
+
+- `grant_type=client_credentials`
+- `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`
+- A freshly signed `client_assertion` JWT (RFC 7523)
+- **No** HTTP Basic `Authorization` header and **no** `client_secret`
+
+`auth/clientcreds` implements this via `WithClientAssertion(src jwtbearer.AssertionSource)`. When configured, `fetch` calls `src.Assertion(ctx)` on every token exchange, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`. Signing errors are wrapped as `auth.ErrTokenExchangeFailed` with the message prefix `"client_assertion signing: ..."`.
+
+**Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
+
+**Configuration rules** (enforced at `FromConfig`):
+
+| Configuration | Behaviour |
+|---|---|
+| `WithClientAssertion` set, no `ClientSecret` | `private_key_jwt` — signed `client_assertion` form fields; no Basic header |
+| `ClientSecret` set (only) | `client_secret_basic` (default) or `client_secret_post` |
+| Both `ClientSecret` and `WithClientAssertion` | Rejected with `auth.ErrInvalidConfig` (ambiguous) |
+| Neither | Rejected with `auth.ErrInvalidConfig` (no credentials) |
+
 ### Launch modes
 
 Three launch modes the SDK **MUST** support — each is a way the SMART flow starts:

@@ -2,6 +2,8 @@ package clientcreds
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -14,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 )
 
 func TestNewValidatesConfig(t *testing.T) {
@@ -72,7 +75,8 @@ func TestTokenSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := New("client", "secret", srv.URL,
+	src, err := New(
+		"client", "secret", srv.URL,
 		WithHTTPClient(srv.Client()),
 		WithScope("patient/*.read"),
 		WithIssuer("https://auth.example.com"),
@@ -123,7 +127,8 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := New("c", "s", srv.URL,
+	src, err := New(
+		"c", "s", srv.URL,
 		WithHTTPClient(srv.Client()),
 		WithRefreshThreshold(5*time.Second), // 1s expiry < 5s threshold => always stale
 	)
@@ -181,7 +186,8 @@ func TestTokenAuthMethodPost(t *testing.T) {
 		_, _ = w.Write([]byte(`{"access_token":"x","token_type":"Bearer","expires_in":60}`))
 	}))
 	defer srv.Close()
-	src, err := New("c", "s", srv.URL,
+	src, err := New(
+		"c", "s", srv.URL,
 		WithHTTPClient(srv.Client()),
 		WithAuthMethod(AuthPost),
 	)
@@ -286,5 +292,139 @@ func TestTokenMissingAccessToken(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "access_token") == false {
 		t.Errorf("expected access_token in error, got %v", err)
+	}
+}
+
+// TestClientCredentialsWithClientAssertion verifies SMART Backend Services wire shape:
+// grant_type=client_credentials + client_assertion_type (jwt-bearer) + signed client_assertion,
+// with no client secret and no HTTP Basic header. (REQ-068)
+func TestClientCredentialsWithClientAssertion(t *testing.T) {
+	// Capture the raw form body and headers from the token endpoint.
+	var capturedForm url.Values
+	var capturedAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedAuth = r.Header.Get("Authorization")
+		if err := r.ParseForm(); err != nil {
+			t.Fatalf("parse form: %v", err)
+		}
+		capturedForm = r.PostForm
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": "smart-backend-tok",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+			"scope":        "system/*.read",
+		})
+	}))
+	defer srv.Close()
+
+	// Build a ClaimsSigner with an RSA key. iss = sub = clientID, aud = token endpoint URL.
+	const clientID = "my-backend-client"
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	signer, err := jwtbearer.NewClaimsSigner(
+		jwtbearer.ClaimsTemplate{
+			Issuer:   clientID,
+			Subject:  clientID,
+			Audience: srv.URL,
+		},
+		rsaKey,
+		jwtbearer.WithAlgorithm("RS384"),
+	)
+	if err != nil {
+		t.Fatalf("NewClaimsSigner: %v", err)
+	}
+
+	// Construct the Source using the new WithClientAssertion option; no client secret.
+	src, err := New(
+		clientID, "", srv.URL,
+		WithHTTPClient(srv.Client()),
+		WithScope("system/*.read"),
+		WithClientAssertion(signer),
+	)
+	if err != nil {
+		t.Fatalf("New with client assertion: %v", err)
+	}
+
+	tok, err := src.Token(context.Background())
+	if err != nil {
+		t.Fatalf("Token: %v", err)
+	}
+	if tok.Value != "smart-backend-tok" {
+		t.Errorf("Value = %q, want smart-backend-tok", tok.Value)
+	}
+
+	// Assert required form fields.
+	if g := capturedForm.Get("grant_type"); g != "client_credentials" {
+		t.Errorf("grant_type = %q, want client_credentials", g)
+	}
+	if g := capturedForm.Get("client_assertion_type"); g != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+		t.Errorf("client_assertion_type = %q, want urn:ietf:params:oauth:client-assertion-type:jwt-bearer", g)
+	}
+	if g := capturedForm.Get("client_assertion"); g == "" {
+		t.Error("client_assertion must be non-empty")
+	}
+	if g := capturedForm.Get("scope"); g != "system/*.read" {
+		t.Errorf("scope = %q, want system/*.read", g)
+	}
+
+	// Assert no HTTP Basic Authorization header was sent.
+	if strings.HasPrefix(capturedAuth, "Basic ") {
+		t.Errorf("expected no Basic Authorization header, got %q", capturedAuth)
+	}
+}
+
+// TestFromConfigRejectsSecretAndAssertion verifies that providing both a client
+// secret and a client assertion source is rejected with ErrInvalidConfig. (REQ-068)
+func TestFromConfigRejectsSecretAndAssertion(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	signer, err := jwtbearer.NewClaimsSigner(
+		jwtbearer.ClaimsTemplate{Issuer: "c", Audience: "https://auth.example.com/token"},
+		rsaKey,
+	)
+	if err != nil {
+		t.Fatalf("NewClaimsSigner: %v", err)
+	}
+
+	_, err = New(
+		"c", "s", "https://auth.example.com/token",
+		WithHTTPClient(http.DefaultClient),
+		WithClientAssertion(signer),
+	)
+	if err == nil {
+		t.Fatal("expected error when both secret and assertion are set, got nil")
+	}
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+// TestFromConfigAssertionNoSecretRequired verifies that ClientSecret is not required
+// when a client assertion source is provided. (REQ-068)
+func TestFromConfigAssertionNoSecretRequired(t *testing.T) {
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatalf("generate RSA key: %v", err)
+	}
+	signer, err := jwtbearer.NewClaimsSigner(
+		jwtbearer.ClaimsTemplate{Issuer: "c", Audience: "https://auth.example.com/token"},
+		rsaKey,
+	)
+	if err != nil {
+		t.Fatalf("NewClaimsSigner: %v", err)
+	}
+
+	_, err = New(
+		"c", "", "https://auth.example.com/token",
+		WithHTTPClient(http.DefaultClient),
+		WithClientAssertion(signer),
+	)
+	if err != nil {
+		t.Errorf("expected no error when assertion is set and secret is empty, got %v", err)
 	}
 }
