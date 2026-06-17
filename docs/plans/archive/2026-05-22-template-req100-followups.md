@@ -1,7 +1,7 @@
 # Plan — REQ-100 template parser follow-ups and clinical-modeling foundation
 
 **Date:** 2026-05-22
-**Status:** Implemented — Phases 1–6 + 4-bis landed; Phases 7–8 deferred to [`2026-06-12-template-req104-req105-deferred.md`](../2026-06-12-template-req104-req105-deferred.md)
+**Status:** Implemented — Phases 1–8 + 4-bis landed; Phases 7–8 delivered in [`2026-06-12-template-req104-req105-deferred.md`](2026-06-12-template-req104-req105-deferred.md) (PR #43)
 **Owner:** SDK maintainers
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** landed — Phases 1–6 + 4-bis (parser hardening through REQ-103 primitives); Phases 7–8 tracked in the deferred follow-up plan
@@ -407,14 +407,14 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 | Phase 4 Compiled template (internal/templatecompile, AQL paths, implicit attrs, term flattening) | landed ([ADR 0005](../../adr/0005-compiled-template-foundation.md); public `template.Compile` deferred) |
 | Phase 5 Walker pattern + composition walker | landed (Walk / WalkSubtree / SkipSubtree + templatedump reference visitors; WalkComposition + Choice handling deferred to REQ-101/102 surface) |
 | Phase 6 REQ-103 primitive constraints (spec + types + Validate + PROBE-024) | landed (constraints sub-package, wire-parse extension, compile-time threading, PROBE-024; AOM partial-pattern enforcement deferred) |
-| Phase 7 REQ-104 slot assertions (when REQ-101 / REQ-102 surfaces real call sites) | deferred — see [2026-06-12-template-req104-req105-deferred.md](../2026-06-12-template-req104-req105-deferred.md) |
-| Phase 8 REQ-105 terminology bindings (when renderer / FHIR consumer arrives) | deferred — see [2026-06-12-template-req104-req105-deferred.md](../2026-06-12-template-req104-req105-deferred.md) |
+| Phase 7 REQ-104 slot assertions | landed — [2026-06-12-template-req104-req105-deferred.md](2026-06-12-template-req104-req105-deferred.md) (PR #43) |
+| Phase 8 REQ-105 terminology bindings | landed — [2026-06-12-template-req104-req105-deferred.md](2026-06-12-template-req104-req105-deferred.md) (PR #43) |
 | `make ci` green throughout | |
 
 ## Mapping to specs
 
 - [`docs/specifications/clinical-modeling.md` § REQ-100](../../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) — current
-- Landed: REQ-101 ([plan](2026-05-21-composition-builder.md)), REQ-102 ([plan](2026-05-24-composition-validation-template-driven.md)), REQ-103 (primitive constraints). Deferred: REQ-104 / REQ-105 — [follow-up plan](../2026-06-12-template-req104-req105-deferred.md)
+- Landed: REQ-101 ([plan](2026-05-21-composition-builder.md)), REQ-102 ([plan](2026-05-24-composition-validation-template-driven.md)), REQ-103 (primitive constraints), REQ-104 / REQ-105 ([follow-up plan](2026-06-12-template-req104-req105-deferred.md), PR #43)
 
 ## References (research baseline, informational)
 

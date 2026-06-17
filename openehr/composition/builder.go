@@ -345,8 +345,10 @@ func descendOne(cur any, s pathSegment) (any, error) {
 		// (skeleton at-code vs path archetype id, multiple siblings,
 		// slot-fill mismatch). The skeleton's slot-fill stamping (the
 		// REQ-107 ".example.v1" heuristic) is exposed here as
-		// ErrInvalidPath until REQ-104 grammar parsing replaces the
-		// heuristic with the OPT's actual archetype-id assertion.
+		// ErrInvalidPath. The REQ-104 assertion grammar now drives
+		// slot-fit in validation and instance synthesis; this builder
+		// routing still matches by archetype-id equality and does not
+		// yet consult that grammar.
 		return nil, fmt.Errorf("%w: no sibling under %q matches predicate %q (siblings: %s)",
 			ErrInvalidPath, s.attrName, s.matchID, siblingIDs(items))
 	}

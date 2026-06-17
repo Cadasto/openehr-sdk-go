@@ -82,3 +82,7 @@ var ErrTypeMismatch = errors.New("instance: root type does not match requested a
 
 // ErrNilCompiled signals a nil compiled-template argument.
 var ErrNilCompiled = errors.New("instance.Generate: nil compiled template")
+
+// ErrSlotFillUnsupported signals that a required ARCHETYPE_SLOT fill
+// could not be synthesized safely from the parsed slot assertions.
+var ErrSlotFillUnsupported = errors.New("instance.Generate: required slot fill cannot be synthesized")

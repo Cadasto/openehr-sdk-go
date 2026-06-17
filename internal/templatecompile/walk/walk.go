@@ -177,7 +177,9 @@ func walk(
 		return err
 	}
 	// *Slot leaves carry no descendable children — their slot-fill
-	// semantics are opaque to the walker (REQ-104 surfaces them).
+	// semantics are opaque to this generic walker; the parsed
+	// REQ-104 assertion grammar is surfaced on the compiled node
+	// itself for consumers that need it.
 	if !node.IsSlot() {
 		for _, attr := range node.Attributes() {
 			for _, child := range attr.Children() {

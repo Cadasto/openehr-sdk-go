@@ -277,7 +277,14 @@ func (a *ArchetypeRoot) ArchetypeID() string { return a.archetypeID }
 // Returns nil when none were declared. The returned map is a
 // defensive copy.
 func (a *ArchetypeRoot) Terms() map[string]ArchetypeTerm {
-	return maps.Clone(a.terms)
+	if len(a.terms) == 0 {
+		return nil
+	}
+	out := make(map[string]ArchetypeTerm, len(a.terms))
+	for code, t := range a.terms {
+		out[code] = ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}
+	}
+	return out
 }
 
 // Term returns the term definition for the given at-code, or
@@ -397,13 +404,17 @@ func (*Attribute) NodeID() string { return "" }
 func (a *Attribute) isNode() {}
 
 // Slot is xsi:type="ARCHETYPE_SLOT". Includes and Excludes carry the
-// archetype-id assertion strings as raw text from the OPT; v1 does
-// not interpret the assertion grammar.
+// archetype-id assertion strings as raw text from the OPT. REQ-104
+// additionally parses the `archetype_id matches {regex}` subset
+// (and the OPT XML expression shape) into [constraints.SlotAssertion]
+// values at parse time.
 type Slot struct {
-	rmTypeName string
-	nodeID     string
-	includes   []string
-	excludes   []string
+	rmTypeName     string
+	nodeID         string
+	includes       []string
+	excludes       []string
+	parsedIncludes []constraints.SlotAssertion
+	parsedExcludes []constraints.SlotAssertion
 }
 
 // RMTypeName implements Node — typically the slot-constrained RM
@@ -413,12 +424,42 @@ func (s *Slot) RMTypeName() string { return s.rmTypeName }
 // NodeID implements Node.
 func (s *Slot) NodeID() string { return s.nodeID }
 
-// Includes returns a defensive copy of the raw archetype-id include
-// assertion strings.
+// Includes returns a defensive copy of the raw (unparsed) archetype-id
+// include assertion blobs as written in the OPT. For the structured
+// REQ-104 form use [Slot.ParsedIncludes].
 func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 
-// Excludes returns a defensive copy of the raw archetype-id exclude
-// assertion strings.
+// Excludes returns a defensive copy of the raw (unparsed) archetype-id
+// exclude assertion blobs. For the structured form see
+// [Slot.ParsedExcludes].
 func (s *Slot) Excludes() []string { return slices.Clone(s.excludes) }
+
+// ParsedIncludes returns the REQ-104 compiled include assertions.
+// Empty when the OPT carried no parseable include expressions.
+func (s *Slot) ParsedIncludes() []constraints.SlotAssertion {
+	return slices.Clone(s.parsedIncludes)
+}
+
+// ParsedExcludes returns the REQ-104 compiled exclude assertions.
+func (s *Slot) ParsedExcludes() []constraints.SlotAssertion {
+	return slices.Clone(s.parsedExcludes)
+}
+
+// AllowsRMType reports whether archetypeID satisfies the RM-type-
+// prefix fallback (openEHR-EHR-<this slot's RMTypeName>.). REQ-104.
+func (s *Slot) AllowsRMType(archetypeID string) bool {
+	return s.slotRules().AllowsRMTypePrefix(archetypeID)
+}
+
+// SlotRules returns the parsed REQ-104 assertion rules for this slot.
+// The returned rule slices are defensive copies.
+func (s *Slot) SlotRules() constraints.SlotRules { return s.slotRules() }
+
+// AllowsArchetypeID reports whether archetypeID satisfies parsed
+// include / exclude rules, falling back to [Slot.AllowsRMType] when
+// no include assertions were parsed. REQ-104.
+func (s *Slot) AllowsArchetypeID(archetypeID string) bool {
+	return s.slotRules().AllowsArchetypeID(archetypeID)
+}
 
 func (s *Slot) isNode() {}

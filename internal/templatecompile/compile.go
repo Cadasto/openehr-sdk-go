@@ -158,6 +158,7 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		cn.isSlot = true
 		cn.slotIncludes = v.Includes()
 		cn.slotExcludes = v.Excludes()
+		cn.slotRules = v.SlotRules()
 	default:
 		return nil, fmt.Errorf("templatecompile: unhandled wire node type %T", n)
 	}

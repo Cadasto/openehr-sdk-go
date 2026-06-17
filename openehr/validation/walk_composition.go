@@ -52,6 +52,15 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	// root, identity is checked inline against COMPOSITION's
 	// archetype_node_id (not via a separate attribute descent).
 	w.checkLocatableIdentity(optNode, rmValue, path)
+	// AOM 1.4 primitive short-name leaf reached via a DV wrapper's
+	// .value string channel (clinical_note.opt shape). Validate the
+	// string against the REQ-103 constraint without an RM-type check.
+	if pc := optNode.PrimitiveConstraint(); pc != nil && templatecompile.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
+		if _, ok := rmValue.(string); ok {
+			w.applyPrimitive(optNode, rmValue, path, pc)
+			return
+		}
+	}
 	w.checkRMType(optNode, rmValue, path)
 
 	if optNode.IsSlot() {
@@ -125,6 +134,18 @@ func (w *walker) walkSingleAttribute(
 		return
 	}
 	child := matchSingleAlternative(children, val)
+	if child != nil && child.IsSlot() {
+		archetypeID := locatableArchetypeNodeID(val)
+		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "slot_fill",
+				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
+				Severity: Error,
+			})
+			return
+		}
+	}
 	if child == nil {
 		// With multiple OPT children the OPT declared AnyOf
 		// alternatives; with a single child it is a plain type
@@ -168,6 +189,15 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 		if gotType == want || rmTypeIsSubtypeOf(gotType, want) {
 			return c
 		}
+		// AOM 1.4 primitive short name (DURATION, DATE, …) pinned
+		// under a DV wrapper's .value string channel — the RM value
+		// is a Go string while the OPT child rm_type_name is the
+		// primitive short name.
+		if templatecompile.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
+			if _, ok := val.(string); ok {
+				return c
+			}
+		}
 	}
 	return nil
 }
@@ -185,8 +215,9 @@ func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to the OPT child
 // whose archetype_node_id matches. Items without a matching OPT
-// child surface as slot_fill issues (archetype-id equality today;
-// REQ-104 will swap in the parsed slot grammar).
+// child surface as slot_fill issues; matching pins exact
+// archetype/node ids first, then evaluates the parsed REQ-104 slot
+// grammar (see [matchChildByID]).
 func (w *walker) walkMultipleAttribute(
 	opt *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -444,18 +475,17 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 		return nil
 	}
 	for _, c := range children {
+		if c.IsSlot() {
+			continue
+		}
 		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
 			return c
 		}
 		if c.NodeID() != "" && c.NodeID() == id {
 			return c
 		}
-		// Slot: RM-type-prefix fallback. The slot's RMTypeName is
-		// the RM class it gates; an archetype id of the shape
-		// "openEHR-EHR-<rmType>.<concept>.v<n>" satisfies it when
-		// the rmType matches. v2 keeps this fallback to maintain
-		// parity with the existing v1 behaviour until REQ-104
-		// supplies a parsed assertion grammar.
+	}
+	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
 			return c
 		}
@@ -463,13 +493,11 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 	return nil
 }
 
-// slotFitsArchetypeID checks the RM-type-prefix fallback: an
-// archetype id `openEHR-EHR-<RMType>.<concept>.v<n>` fits a slot
-// constrained to `<RMType>` when their RM type segments match.
-// Used until REQ-104 parses the OPT's <includes>/<excludes>
-// grammar.
+// slotFitsArchetypeID checks whether archetypeID satisfies the
+// slot's REQ-104 include / exclude rules, including the RM-type-
+// prefix fallback when no includes were parsed.
 func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
-	return strings.HasPrefix(archetypeID, "openEHR-EHR-"+slot.RMTypeName()+".")
+	return slot.AllowsArchetypeID(archetypeID)
 }
 
 // locatableArchetypeNodeID extracts archetype_node_id from any RM
@@ -497,9 +525,10 @@ func describeLocatableID(v any) string {
 // inner nodes (at-code-pinned) compare against NodeID().
 func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, path string) {
 	if opt.IsSlot() {
-		// Slot fit is by archetype-id assertion (RM-type-prefix
-		// fallback in v2; REQ-104 grammar to come). The slot's
-		// NodeID is the OPT's own at-code for the slot point — it
+		// Slot fit is by the parsed REQ-104 archetype-id assertion
+		// grammar (RM-type-prefix fallback when no includes parsed).
+		// The slot's NodeID is the OPT's own at-code for the slot
+		// point — it
 		// is not expected to match the filling archetype's
 		// archetype_node_id, so a direct identity check here would
 		// false-positive on every legitimate slot fill.
