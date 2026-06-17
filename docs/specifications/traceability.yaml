@@ -327,6 +327,7 @@ requirements:
       - cadasto/datamap/fromcomposition_test.go
       - cadasto/datamap/schema_test.go
       - cadasto/datamap/validate_test.go
+      - cadasto/datamap/party_test.go
 
   - id: REQ-057
     title: Stored AQL queries

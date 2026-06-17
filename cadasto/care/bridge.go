@@ -2,9 +2,11 @@ package care
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
@@ -26,6 +28,36 @@ func compositionFromMap(m map[string]any) (*rm.Composition, error) {
 		return nil, fmt.Errorf("care: decode composition: %w", err)
 	}
 	return &comp, nil
+}
+
+// partyFromMap decodes canonical demographic PARTY JSON (as produced by a
+// PartyCodec's ToParty) into a typed rm.Party via the type registry.
+func partyFromMap(m map[string]any) (rm.Party, error) {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return nil, fmt.Errorf("care: marshal party map: %w", err)
+	}
+	party, err := typereg.DecodeAs[rm.Party](b)
+	if err != nil {
+		return nil, fmt.Errorf("care: decode party: %w", err)
+	}
+	return party, nil
+}
+
+// partyToMap marshals a typed rm.Party to canonical JSON as map[string]any.
+func partyToMap(party rm.Party) (map[string]any, error) {
+	if party == nil {
+		return nil, errors.New("care: nil party")
+	}
+	b, err := canjson.Marshal(party)
+	if err != nil {
+		return nil, fmt.Errorf("care: marshal party: %w", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, fmt.Errorf("care: party to map: %w", err)
+	}
+	return m, nil
 }
 
 // compositionToMap marshals a typed *rm.Composition back to canonical JSON as a

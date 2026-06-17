@@ -339,7 +339,11 @@ func decodeItems(items []any, r contentRoot) (map[string]any, error) {
 		var decoded any
 		switch item["_type"] {
 		case "CLUSTER":
-			sub, err := decodeItems(asList(item["items"]), r)
+			// A CLUSTER that is itself an archetype root (slot fill) carries its
+			// own term dictionary — re-scope so its at-codes resolve against the
+			// right archetype, not an ancestor's (at-codes recur across archetypes).
+			childR := rescopeForArchetype(r, archetypeIDOf(item))
+			sub, err := decodeItems(asList(item["items"]), childR)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", nodeID, err)
 			}

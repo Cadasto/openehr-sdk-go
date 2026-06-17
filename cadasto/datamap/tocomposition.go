@@ -86,6 +86,9 @@ func encodeComposer(v any) map[string]any {
 }
 
 func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (map[string]any, error) {
+	if IsPartyTemplate(opt) {
+		return nil, errors.New("datamap.ToComposition: template roots a demographic PARTY type; use ToParty")
+	}
 	root, ok := opt.Root().(template.ObjectNode)
 	if !ok {
 		return nil, errors.New("datamap.ToComposition: OPT root is not an object node")
@@ -671,8 +674,39 @@ func encodeValue(constraint template.ObjectNode, payload any, terms map[string]s
 		return encodeOrdinal(constraint, payload, terms)
 	case "DV_PROPORTION":
 		return encodeProportion(payload)
+	case "DV_IDENTIFIER":
+		return encodeIdentifier(payload), nil
 	default:
 		return nil, fmt.Errorf("RM value type %q not supported", rmType)
+	}
+}
+
+// encodeIdentifier builds a DV_IDENTIFIER from a bare id string or an object
+// {id, issuer?, assigner?, type?}. id is mandatory; the optional fields are
+// only emitted when non-empty — Cadasto rejects a DV_IDENTIFIER carrying empty
+// issuer/assigner/type (see encodeExpandedValue note). Returns nil for an
+// empty id so the caller can omit the element entirely.
+func encodeIdentifier(payload any) map[string]any {
+	switch v := payload.(type) {
+	case string:
+		if v == "" {
+			return nil
+		}
+		return map[string]any{"_type": "DV_IDENTIFIER", "id": v}
+	case map[string]any:
+		id := stringOrDefault(v["id"], "")
+		if id == "" {
+			return nil
+		}
+		out := map[string]any{"_type": "DV_IDENTIFIER", "id": id}
+		for _, k := range []string{"issuer", "assigner", "type"} {
+			if s := stringOrDefault(v[k], ""); s != "" {
+				out[k] = s
+			}
+		}
+		return out
+	default:
+		return nil
 	}
 }
 

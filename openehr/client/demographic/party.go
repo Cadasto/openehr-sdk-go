@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -57,6 +58,18 @@ func resourceType(p rm.Party) (Type, error) {
 
 func basePath(t Type) string { return "/demographic/" + string(t) }
 
+// uidBasedIDPathSegment formats {uid_based_id} for GET/PUT/DELETE paths per
+// ITS-REST demographics: either a HIER_OBJECT_ID (bare uuid → latest version,
+// optional ?version_at_time) or an OBJECT_VERSION_ID (uuid::system::n → that
+// version). Colons in OBJECT_VERSION_ID are grammar separators and must not be
+// percent-encoded — Cadasto returns 404 on %3A%3A.
+func uidBasedIDPathSegment(id string) string {
+	if strings.Contains(id, "::") {
+		return id
+	}
+	return url.PathEscape(id)
+}
+
 // Get retrieves a PARTY of the given type. The Ref selects the target:
 // [ehr.LatestOf](voID) for the latest version of a versioned-object family,
 // [ehr.LatestAtTime](voID, t) for the as-of-time variant, or
@@ -80,7 +93,7 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   basePath(t) + "/" + url.PathEscape(seg),
+		Path:   basePath(t) + "/" + uidBasedIDPathSegment(seg),
 		Route:  basePath(t) + "/{uid_based_id}",
 	}
 	if qk, qv := ref.Query(); qk != "" {
@@ -186,7 +199,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
-		Path:               basePath(t) + "/" + url.PathEscape(string(voID)),
+		Path:               basePath(t) + "/" + uidBasedIDPathSegment(string(voID)),
 		Route:              basePath(t) + "/{uid_based_id}",
 		Body:               body,
 		IfMatch:            ifMatch,
@@ -239,7 +252,7 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 	}
 	req := &transport.Request{
 		Method:             http.MethodDelete,
-		Path:               basePath(t) + "/" + url.PathEscape(string(versionUID)),
+		Path:               basePath(t) + "/" + uidBasedIDPathSegment(string(versionUID)),
 		Route:              basePath(t) + "/{version_uid}",
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,

@@ -14,7 +14,13 @@ import (
 // emits map[string]any (key order is not significant — compare structurally).
 
 // Schema builds the datamap JSON Schema for an operational template.
+// Demographic PARTY templates (PERSON, ORGANISATION, AGENT, GROUP, ROLE, …)
+// emit the party profile schema; clinical COMPOSITION templates emit the
+// composition profile (REQ-058 Option B).
 func Schema(opt *template.OperationalTemplate) map[string]any {
+	if IsPartyTemplate(opt) {
+		return buildPartySchemaObject(opt)
+	}
 	return buildSchemaObject(opt)
 }
 
@@ -61,6 +67,12 @@ type contentRoot struct {
 	node       template.ObjectNode
 	arrayNodes map[string]bool // at-code -> true when occurrences allow >1 (array-valued)
 	expanded   bool            // FromComposition: emit expanded ({rmType,…}) instead of short scalars
+	// opt enables per-archetype term re-scoping during decode: an at-code such
+	// as at0010 means different things in different archetypes (person_name →
+	// "Volledige naam", person_details → "Geboortedatum"), so when the decoder
+	// enters an archetype subtree it must use THAT archetype's terms, not an
+	// ancestor's merged dictionary. nil = no re-scoping (labels stay as-is).
+	opt *template.OperationalTemplate
 }
 
 // collectArrayNodes records every descendant at-code whose occurrences allow

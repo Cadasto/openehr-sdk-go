@@ -9,7 +9,26 @@ Datamap is the Cadasto-specific **resource-free** payload format used to read an
 Two boundaries to remember:
 
 - **Datamap is not openEHR canonical JSON.** It uses `archetype-id|Label` keys, lifts at-codes to labelled keys (`at0005|Test result name`), and accepts "bare" payload shapes for primitive values that the encoder expands against the OPT.
-- **The codec maps Datamap V2 ↔ canonical JSON COMPOSITION.** The codec is the OPT-aware boundary; consumers stay in either shape and let the codec do the typed translation.
+- **The codec maps Datamap V2 ↔ canonical JSON.** Two profiles share the wire conventions:
+  - **Composition profile** — `ToComposition` / `FromComposition` for `COMPOSITION` OPTs.
+  - **Party profile (Option B)** — `ToParty` / `FromParty` for demographic PARTY OPTs (`PERSON`, `ORGANISATION`, `AGENT`, `GROUP`, `ROLE`, …). `Schema(opt)` and `Empty(opt)` auto-select via `IsPartyTemplate(opt)`.
+
+## Party profile (Option B)
+
+Demographic templates root on a PARTY subtype instead of `COMPOSITION`. The party datamap uses the same labelled-key and short/expanded value rules as compositions, but top-level structure follows the RM party attributes:
+
+| Datamap key | RM attribute | Notes |
+|-------------|--------------|-------|
+| `identities` | `identities[]` | Keyed by `PARTY_IDENTITY` archetype id \| purpose label |
+| `details` | `details` | Party-level ITEM_TREE |
+| `contacts` | `contacts[]` | Array; each entry keyed by contact node \| label, holding address archetypes |
+| `relationships` | `relationships[]` | `source` / `target` party refs + optional details tree |
+| `roles` | `roles[]` | Party ref objects (`id`, `namespace`, `type`) |
+| `languages` | `languages[]` | Plain strings |
+
+Coded runtime names on ADDRESS and PARTY_IDENTITY use `_code` / `_name` (same as cluster names in compositions).
+
+See [`../plans/2026-06-16-datamap-demographics.md`](../plans/2026-06-16-datamap-demographics.md) for the implementation plan and phase breakdown.
 
 ## Terminology binding: short form vs expanded form
 

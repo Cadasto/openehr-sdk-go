@@ -33,6 +33,14 @@ type Codec interface {
 	FromComposition(opt *template.OperationalTemplate, comp map[string]any) (map[string]any, error)
 }
 
+// PartyCodec is the demographics counterpart of [Codec]: datamap ↔ canonical
+// PARTY JSON for PERSON / ORGANISATION / AGENT / GROUP / ROLE templates.
+// Consumers wire it the same way (typically the same adapter struct as Codec).
+type PartyCodec interface {
+	ToParty(opt *template.OperationalTemplate, datamap map[string]any) (map[string]any, error)
+	FromParty(opt *template.OperationalTemplate, party map[string]any) (map[string]any, error)
+}
+
 // Config configures a Cadasto care Client. The Lab24 platform-side per-tenant
 // configuration (PROP-0032: cadasto_tenant_config) maps onto these fields — the
 // platform resolves endpoint/credentials and constructs this Config per tenant.
@@ -55,6 +63,15 @@ type Config struct {
 	HTTPClient *http.Client
 	// Codec converts between datamap payloads and RM compositions.
 	Codec Codec
+	// PartyCodec converts between datamap payloads and demographic PARTY JSON.
+	// When nil, [Client.partyCodec] falls back to Codec if it also implements
+	// PartyCodec (same adapter struct pattern as libs/cadasto).
+	PartyCodec PartyCodec
+	// RawErrorBodies opts the transport into preserving the upstream openEHR
+	// error message + raw body on a WireError (otherwise suppressed by default
+	// for PHI-safety). Diagnostic use only — e.g. the admin Cadasto playground
+	// surfacing a CDR 4xx reason. Leave false on production read/write paths.
+	RawErrorBodies bool
 }
 
 // Client is a thin Cadasto domain client over the openEHR REST surface.
@@ -62,6 +79,7 @@ type Config struct {
 type Client struct {
 	rest  *transport.Client
 	codec Codec
+	party PartyCodec
 
 	// OPT-cache (REQ-058 § perf): OPTs change rarely (admin-driven
 	// template-edits). Re-fetching the canonical XML on every
@@ -158,7 +176,11 @@ func NewClient(cfg Config, opts ...ClientOption) (*Client, error) {
 		return nil, fmt.Errorf("care: token source: %w", err)
 	}
 
-	rest, err := transport.New(catalog, transport.WithHTTPClient(hc), transport.WithTokenSource(src))
+	transportOpts := []transport.Option{transport.WithHTTPClient(hc), transport.WithTokenSource(src)}
+	if cfg.RawErrorBodies {
+		transportOpts = append(transportOpts, transport.WithRawErrorBodies(true))
+	}
+	rest, err := transport.New(catalog, transportOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("care: transport: %w", err)
 	}
@@ -166,6 +188,7 @@ func NewClient(cfg Config, opts ...ClientOption) (*Client, error) {
 	c := &Client{
 		rest:        rest,
 		codec:       cfg.Codec,
+		party:       cfg.PartyCodec,
 		optCacheTTL: defaultOPTCacheTTL,
 	}
 	for _, opt := range opts {
