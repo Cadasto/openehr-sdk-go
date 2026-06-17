@@ -4,7 +4,7 @@
 
 How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and how non-discovering backends are supported. Covers REQ-070 through REQ-073.
 
-A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document. The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
+A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document (canonical spec: [ITS-REST/development § SMART App Launch](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html)). The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
 
 The SDK treats discovery as a **first-class step**, not an implementation detail of constructor convenience.
 
@@ -122,7 +122,7 @@ type Cache interface {
 On every resolution and every refresh, the SDK **MUST**:
 
 - Verify required services are present. Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
-- Verify spec-version compatibility. The advertised `spec_version` on a required service **MUST** match the SDK's pinned target (REQ-050). A mismatch **MUST** produce a typed `DiscoveryError` — do **not** fall through to the first request and discover the mismatch as a `400 Bad Request`.
+- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or the caller-widened set; a mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly.
 - Validate URL well-formedness. Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
 
 Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:

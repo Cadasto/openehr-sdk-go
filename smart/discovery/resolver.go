@@ -52,13 +52,14 @@ type resolveCall struct {
 }
 
 type resolverConfig struct {
-	httpClient       *http.Client
-	requiredServices []string
-	acceptedVersions map[string]struct{}
-	defaultTTL       time.Duration
-	allowInsecure    bool
-	logger           *slog.Logger
-	wellKnownPath    string
+	httpClient             *http.Client
+	requiredServices       []string
+	acceptedVersions       map[string]struct{}
+	acceptedVersionsLocked bool // true when caller explicitly called WithAcceptedSpecVersions
+	defaultTTL             time.Duration
+	allowInsecure          bool
+	logger                 *slog.Logger
+	wellKnownPath          string
 }
 
 // Option mutates a Resolver during construction.
@@ -80,12 +81,16 @@ func WithRequiredServices(ids ...string) Option {
 
 // WithAcceptedSpecVersions widens the version set the resolver accepts
 // on a required service. Default is {SpecVersionPin} (strict).
+// Calling this option marks the accepted set as explicitly locked — the
+// per-service spec_version check will be enforced even when the advertised
+// version is empty (ADR 0008, version-gate softening).
 func WithAcceptedSpecVersions(versions ...string) Option {
 	return func(cfg *resolverConfig) {
 		cfg.acceptedVersions = map[string]struct{}{}
 		for _, v := range versions {
 			cfg.acceptedVersions[v] = struct{}{}
 		}
+		cfg.acceptedVersionsLocked = true
 	}
 }
 
@@ -295,26 +300,36 @@ func computeExpiry(h http.Header, fallback time.Duration, now time.Time) time.Ti
 // smartConfigWire mirrors the SMART configuration document shape (plus
 // the openEHR "services" extension). Unknown fields are tolerated; only
 // the fields the SDK consumes are decoded.
+//
+// The canonical openEHR SMART spec defines "services" as a JSON object/hash
+// map keyed by reverse-domain id, each value carrying camelCase "baseUrl".
+// See ADR 0008 for the decision to adopt the canonical map shape and drop
+// the non-canonical array form.
 type smartConfigWire struct {
-	Issuer                            string             `json:"issuer"`
-	AuthorizationEndpoint             string             `json:"authorization_endpoint"`
-	TokenEndpoint                     string             `json:"token_endpoint"`
-	JWKSURI                           string             `json:"jwks_uri"`
-	RegistrationEndpoint              string             `json:"registration_endpoint"`
-	ScopesSupported                   []string           `json:"scopes_supported"`
-	ResponseTypesSupported            []string           `json:"response_types_supported"`
-	CodeChallengeMethodsSupported     []string           `json:"code_challenge_methods_supported"`
-	GrantTypesSupported               []string           `json:"grant_types_supported"`
-	TokenEndpointAuthMethodsSupported []string           `json:"token_endpoint_auth_methods_supported"`
-	Capabilities                      []string           `json:"capabilities"`
-	Services                          []serviceEntryWire `json:"services"`
+	Issuer                            string                      `json:"issuer"`
+	AuthorizationEndpoint             string                      `json:"authorization_endpoint"`
+	TokenEndpoint                     string                      `json:"token_endpoint"`
+	JWKSURI                           string                      `json:"jwks_uri"`
+	RegistrationEndpoint              string                      `json:"registration_endpoint"`
+	IntrospectionEndpoint             string                      `json:"introspection_endpoint"`
+	RevocationEndpoint                string                      `json:"revocation_endpoint"`
+	ManagementEndpoint                string                      `json:"management_endpoint"`
+	ScopesSupported                   []string                    `json:"scopes_supported"`
+	ResponseTypesSupported            []string                    `json:"response_types_supported"`
+	CodeChallengeMethodsSupported     []string                    `json:"code_challenge_methods_supported"`
+	GrantTypesSupported               []string                    `json:"grant_types_supported"`
+	TokenEndpointAuthMethodsSupported []string                    `json:"token_endpoint_auth_methods_supported"`
+	Capabilities                      []string                    `json:"capabilities"`
+	Services                          map[string]serviceEntryWire `json:"services"`
 }
 
 type serviceEntryWire struct {
-	ID           string   `json:"id"`
-	BaseURL      string   `json:"base_url"`
-	SpecVersion  string   `json:"spec_version"`
-	Capabilities []string `json:"capabilities"`
+	BaseURL       string   `json:"baseUrl"`
+	SpecVersion   string   `json:"spec_version"` // non-canonical extension; tolerated when present
+	Description   string   `json:"description"`
+	Documentation string   `json:"documentation"`
+	OpenAPI       string   `json:"openapi"`
+	Capabilities  []string `json:"capabilities"`
 }
 
 func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
@@ -327,16 +342,13 @@ func (r *Resolver) parse(issuer string, body []byte) (*ServiceCatalog, error) {
 		return nil, err
 	}
 	services := map[string]ServiceEntry{}
-	for _, s := range wire.Services {
-		if s.ID == "" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonParseError, Inner: errors.New("service entry missing id")}
-		}
+	for id, s := range wire.Services {
 		u, err := url.Parse(s.BaseURL)
 		if err != nil || u.Scheme == "" || u.Host == "" {
-			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q base_url %q invalid", s.ID, s.BaseURL)}
+			return nil, &DiscoveryError{Issuer: issuer, Reason: ReasonMalformedURL, Inner: fmt.Errorf("service %q baseUrl %q invalid", id, s.BaseURL)}
 		}
-		services[s.ID] = ServiceEntry{
-			ID:           s.ID,
+		services[id] = ServiceEntry{
+			ID:           id,
 			BaseURL:      u,
 			SpecVersion:  s.SpecVersion,
 			Capabilities: append([]string(nil), s.Capabilities...),
@@ -412,9 +424,17 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 	if len(missing) > 0 {
 		return &DiscoveryError{Issuer: cat.Issuer, Reason: ReasonMissingService, MissingServices: missing}
 	}
-	// 2. Spec-version match per required service.
+	// 2. Spec-version match per required service (REQ-072, softened per ADR 0008).
+	// When a service entry advertises no spec_version AND the caller has not
+	// explicitly locked the accepted set via WithAcceptedSpecVersions, skip the
+	// check — the entry's absence of a version is treated as acceptable. Strict
+	// enforcement applies when (a) the entry advertises a version, or (b) the
+	// caller explicitly narrowed the accepted set.
 	for _, id := range r.cfg.requiredServices {
 		e := cat.Services[id]
+		if e.SpecVersion == "" && !r.cfg.acceptedVersionsLocked {
+			continue
+		}
 		if _, ok := r.cfg.acceptedVersions[e.SpecVersion]; !ok {
 			return &DiscoveryError{
 				Issuer:          cat.Issuer,

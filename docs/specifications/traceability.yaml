@@ -134,6 +134,11 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0008-smart-discovery-services-shape.md]
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration.json
+    tests:
+      - smart/discovery/resolver_test.go
 
   - id: REQ-071
     title: Discovery cache
@@ -150,6 +155,11 @@ requirements:
     implementation: landed
     packages: [smart/discovery]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0008-smart-discovery-services-shape.md]
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration-mismatch.json
+    tests:
+      - smart/discovery/resolver_test.go
 
   - id: REQ-073
     title: Discovery trust posture

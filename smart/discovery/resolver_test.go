@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -104,7 +105,8 @@ func TestResolveSpecVersionMismatch(t *testing.T) {
 func TestResolveAcceptedVersionsWiden(t *testing.T) {
 	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
-	r := mustResolver(t,
+	r := mustResolver(
+		t,
 		WithHTTPClient(srv.Client()),
 		WithAcceptedSpecVersions(SpecVersionPin, "1.0.3"),
 	)
@@ -140,7 +142,8 @@ func TestResolveCacheExpiry(t *testing.T) {
 		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
 	}))
 	defer srv.Close()
-	r := mustResolver(t,
+	r := mustResolver(
+		t,
 		WithHTTPClient(srv.Client()),
 		WithDefaultTTL(1*time.Millisecond),
 	)
@@ -228,7 +231,7 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 
 func TestResolveMalformedURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
+		_, _ = io.WriteString(w, `{"services":{"org.openehr.rest":{"baseUrl":"::not a url"}}}`)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -337,7 +340,7 @@ func TestResolveIssuerMismatch(t *testing.T) {
 		"issuer":"https://evil.example.com",
 		"authorization_endpoint":"https://evil.example.com/auth",
 		"token_endpoint":"https://evil.example.com/token",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -362,7 +365,7 @@ func TestResolveIssuerMatch(t *testing.T) {
 			"issuer":"` + srv.URL + `",
 			"authorization_endpoint":"https://auth.example.com/auth",
 			"token_endpoint":"https://auth.example.com/token",
-			"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+			"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 		}`
 		_, _ = io.WriteString(w, body)
 	}))
@@ -388,7 +391,7 @@ func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 		"authorization_endpoint":"http://attacker.example/auth",
 		"token_endpoint":"http://attacker.example/token",
 		"jwks_uri":"http://attacker.example/keys",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -418,7 +421,7 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 		"authorization_endpoint":"http://dev.example/auth",
 		"token_endpoint":"http://dev.example/token",
 		"jwks_uri":"http://dev.example/keys",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -433,6 +436,41 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 	}
 	if cat == nil {
 		t.Fatal("expected non-nil catalog")
+	}
+}
+
+// TestResolveCanonicalServicesMap verifies that the resolver correctly parses
+// a SMART configuration document whose "services" field uses the canonical
+// JSON object/map shape with camelCase "baseUrl" key (REQ-070).
+//
+// The SDK previously decoded "services" as an array with snake_case "base_url",
+// which is non-canonical and causes discovery to fail against real platforms.
+// This test uses the correct canonical shape and must fail before the fix.
+func TestResolveCanonicalServicesMap(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintf(w, `{
+		  "issuer": %q,
+		  "authorization_endpoint": %q,
+		  "token_endpoint": %q,
+		  "services": {"org.openehr.rest": {"baseUrl": %q}}
+		}`, srv.URL, srv.URL+"/authorize", srv.URL+"/token", srv.URL+"/openehr/v1")
+	}))
+	defer srv.Close()
+	res, err := NewResolver(nil, WithHTTPClient(srv.Client()), WithAcceptedSpecVersions("1.1.0-development", ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := res.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	e, ok := cat.OpenEHRRest()
+	if !ok || e.BaseURL == nil {
+		t.Fatalf("org.openehr.rest missing or no BaseURL: %#v", cat.Services)
+	}
+	if e.BaseURL.String() != srv.URL+"/openehr/v1" {
+		t.Errorf("BaseURL = %q, want %q", e.BaseURL.String(), srv.URL+"/openehr/v1")
 	}
 }
 

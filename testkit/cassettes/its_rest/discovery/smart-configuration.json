@@ -36,12 +36,11 @@
     "context-passthrough-banner",
     "context-passthrough-style"
   ],
-  "services": [
-    {
-      "id": "org.openehr.rest",
-      "base_url": "https://api.example.com/openehr/v1",
+  "services": {
+    "org.openehr.rest": {
+      "baseUrl": "https://api.example.com/openehr/v1",
       "spec_version": "1.1.0-development",
       "capabilities": ["composition", "ehr_status", "directory", "contribution", "itemtags", "query"]
     }
-  ]
+  }
 }
