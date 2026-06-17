@@ -10,6 +10,12 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+## [0.8.0] - 2026-06-17
+
+Eighth `v0.x` minor — the **template modelling cycle**: REQ-104 slot assertion grammar and REQ-105 terminology bindings land together with REQ-110 validation beyond COMPOSITION, completing the deferred tail of the REQ-100 follow-up plan. **Additive only — no public API or behaviour breaks this cycle**; per [`docs/releases.md`](docs/releases.md), `v0.x` minors *may* break public API, but none do here — safe to upgrade from `v0.7.0`.
+
+### Added
+
 - **Slot assertion grammar (REQ-104).** `openehr/template/constraints` gains `SlotAssertion` / `SlotRules` with anchored `archetype_id matches {regex}` parsing from OPT `<includes>` / `<excludes>` (plain-text and Ocean operator-2007 XML shapes); `Slot.SlotRules()` and `CompiledNode.SlotRules()` return defensive copies; `openehr/validation` and `openehr/instance` (`ErrSlotFillUnsupported`) enforce parsed slot-fit with RM-type-prefix fallback only when no includes were parsed; catch-all `.*` exclude ignored when closed includes are present. PROBE-027 slot-fill path updated. Additive.
 - **Terminology bindings (REQ-105).** `ArchetypeRoot.Terms()` / `TermBindings()` on `openehr/template` deep-copy OPT `term_definitions` and `term_bindings`; compiled `Term`, `TermLang`, `TermBindings`, and `TermBindingsForNode` on `internal/templatecompile` surface per-node display text and external code bindings (single document language — `lang` accepted for forward compatibility). Additive.
 - **Template-driven validation beyond COMPOSITION (REQ-110).** `openehr/validation` gains a generic `Validate(root, c)` plus typed wrappers `ValidateDemographic` (PERSON / ORGANISATION / GROUP / AGENT / ROLE), `ValidateFolder`, and `ValidateEHRStatus`; `ValidateComposition` now delegates to `Validate`. The lockstep walker (and `rmread`) extend to the demographic PARTY hierarchy + sub-components (ADDRESS / CONTACT / PARTY_IDENTITY / PARTY_RELATIONSHIP / CAPABILITY) and the EHR-IM roots FOLDER / EHR_STATUS, plus primitive-bearing DataValue leaf readers (DV_DATE/TIME/DATE_TIME/DURATION/BOOLEAN, DV_IDENTIFIER, DV_MULTIMEDIA) so explicit-`value` C_PRIMITIVE constraints validate rather than report a false `required`. PROBE-074. Additive — no public API or behaviour break (`ValidateComposition` unchanged).
