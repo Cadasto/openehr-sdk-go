@@ -512,15 +512,15 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 	}
 	auth := cat.Auth
 
-	// --- three optional endpoint URLs ---
-	if auth.IntrospectionEndpoint == nil || auth.IntrospectionEndpoint.Host != "auth.example.com" {
-		t.Errorf("IntrospectionEndpoint = %v, want https://auth.example.com/introspect", auth.IntrospectionEndpoint)
+	// --- three optional endpoint URLs (full serialized URL, not partial field) ---
+	if got := auth.IntrospectionEndpoint.String(); got != "https://auth.example.com/introspect" {
+		t.Errorf("IntrospectionEndpoint = %v, want https://auth.example.com/introspect", got)
 	}
-	if auth.RevocationEndpoint == nil || auth.RevocationEndpoint.Path != "/revoke" {
-		t.Errorf("RevocationEndpoint = %v, want https://auth.example.com/revoke", auth.RevocationEndpoint)
+	if got := auth.RevocationEndpoint.String(); got != "https://auth.example.com/revoke" {
+		t.Errorf("RevocationEndpoint = %v, want https://auth.example.com/revoke", got)
 	}
-	if auth.ManagementEndpoint == nil || auth.ManagementEndpoint.Path != "/manage" {
-		t.Errorf("ManagementEndpoint = %v, want https://auth.example.com/manage", auth.ManagementEndpoint)
+	if got := auth.ManagementEndpoint.String(); got != "https://auth.example.com/manage" {
+		t.Errorf("ManagementEndpoint = %v, want https://auth.example.com/manage", got)
 	}
 
 	// --- auth-methods list (may already be surfaced by Phase 1; verify value) ---
@@ -543,6 +543,47 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 	if !containsString(auth.IDTokenSigningAlgValuesSupported, "ES384") {
 		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
 	}
+}
+
+// TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil verifies that optional
+// endpoint fields are nil when the discovery document omits them (REQ-062).
+// This solidifies the "Nil when absent" contract for IntrospectionEndpoint,
+// RevocationEndpoint, and ManagementEndpoint.
+func TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil(t *testing.T) { // REQ-062
+	t.Run("absent endpoints are nil", func(t *testing.T) {
+		var srv *httptest.Server
+		srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Minimal valid discovery doc — no introspection/revocation/management.
+			body := `{
+				"issuer": "` + srv.URL + `",
+				"authorization_endpoint": "https://auth.example.com/authorize",
+				"token_endpoint": "https://auth.example.com/token",
+				"jwks_uri": "https://auth.example.com/jwks",
+				"services": {"org.openehr.rest": {"baseUrl": "https://api.example.com/openehr/v1"}}
+			}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, body)
+		}))
+		srv.Start()
+		defer srv.Close()
+
+		r := mustResolver(t, WithHTTPClient(srv.Client()))
+		cat, err := r.Resolve(context.Background(), srv.URL)
+		if err != nil {
+			t.Fatalf("resolve: %v", err)
+		}
+		auth := cat.Auth
+
+		if auth.IntrospectionEndpoint != nil {
+			t.Errorf("IntrospectionEndpoint = %v, want nil when absent from discovery doc", auth.IntrospectionEndpoint)
+		}
+		if auth.RevocationEndpoint != nil {
+			t.Errorf("RevocationEndpoint = %v, want nil when absent from discovery doc", auth.RevocationEndpoint)
+		}
+		if auth.ManagementEndpoint != nil {
+			t.Errorf("ManagementEndpoint = %v, want nil when absent from discovery doc", auth.ManagementEndpoint)
+		}
+	})
 }
 
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
