@@ -107,6 +107,52 @@ func TestValidateComposition_SlotFillUnknownArchetype(t *testing.T) {
 	}
 }
 
+// REQ-104 — a CLUSTER filling the protocol slot whose archetype id
+// fails the slot's parsed include assertions surfaces slot_fill. This
+// is the reject path of the parsed grammar (distinct from the
+// unknown-root case above, which never matches any OPT child).
+func TestValidateComposition_SlotFillParsedIncludeRejects(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+
+	const badID = "openEHR-EHR-CLUSTER.not_an_allowed_device.v1"
+	// Guard: only meaningful when some CLUSTER slot carries parsed
+	// includes that reject badID. If every slot falls back to the
+	// RM-type prefix rule, any CLUSTER id fits and there is nothing
+	// to assert.
+	var rejects bool
+	for _, n := range c.AllByRMType("CLUSTER") {
+		if n.IsSlot() && n.SlotRules().HasParsedIncludes() && !n.AllowsArchetypeID(badID) {
+			rejects = true
+			break
+		}
+	}
+	if !rejects {
+		t.Skip("no CLUSTER slot with parsed includes rejects the test id")
+	}
+
+	comp := validVitalSignsComposition()
+	obs := validBloodPressureObservation()
+	obs.Protocol = &rm.ItemTree{
+		ArchetypeNodeID: "at0011",
+		Name:            rm.DVText{Value: "protocol"},
+		Items: []rm.Item{
+			&rm.Cluster{
+				ArchetypeNodeID: badID,
+				Name:            rm.DVText{Value: "Device"},
+			},
+		},
+	}
+	comp.Content = []rm.ContentItem{obs}
+
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected slot_fill for non-conforming CLUSTER in protocol slot, got OK")
+	}
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Errorf("expected slot_fill issue, got %+v", r.Issues)
+	}
+}
+
 // REQ-102 v2 — nil composition argument surfaces a global
 // nil_composition issue (no panic).
 func TestValidateComposition_NilComposition(t *testing.T) {
@@ -729,10 +775,11 @@ func validBloodPressureObservation() *rm.Observation {
 			},
 		},
 		// The OPT pins /protocol/items to an ARCHETYPE_SLOT
-		// constrained to CLUSTER. v2 Phase 2 uses the RM-type-prefix
-		// fallback (REQ-104 will swap in the parsed slot grammar);
-		// any archetype id of the shape "openEHR-EHR-CLUSTER.<concept>.v<n>"
-		// satisfies the slot match.
+		// constrained to CLUSTER. Slot fit is evaluated against the
+		// parsed REQ-104 assertion grammar, falling back to the
+		// RM-type-prefix rule when the OPT carried no parseable
+		// includes; an archetype id of the shape
+		// "openEHR-EHR-CLUSTER.<concept>.v<n>" satisfies the match.
 		Protocol: &rm.ItemTree{
 			ArchetypeNodeID: "at0011",
 			Name:            rm.DVText{Value: "protocol"},

@@ -213,7 +213,7 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // TestGenerateClinicalNoteMinimal pins the PR #18 re-review finding:
 // clinical_note.opt uses the AOM 1.4 primitive-short-name shape
 // (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
-// Before the materialiseSingle / isAOMPrimitiveShortName fix, the
+// Before the materialiseSingle / IsAOMPrimitiveShortName fix, the
 // generator tried to attach a fresh *DVDuration to the parent DV's
 // .value (a String slot) and failed; this regression keeps the
 // generator end-to-end on the second vendored OPT fixture.

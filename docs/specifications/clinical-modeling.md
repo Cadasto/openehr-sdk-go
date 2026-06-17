@@ -245,12 +245,12 @@ v1 supports the `archetype_id matches {regex}` expression form, including:
 - Plain text assertions embedded in OPT XML (`archetype_id matches {/openEHR-EHR-OBSERVATION\.body_weight\..*/}`)
 - The OPT XML expression tree where operator `2007` (`matches`) binds `archetype_id/value` to a `C_STRING` `<pattern>` (the Ocean Template Designer shape)
 
-Unparseable assertion blobs are retained on [`Slot.RawIncludes`](../../openehr/template/template.go) / [`Slot.RawExcludes`](../../openehr/template/template.go) and ignored by the structured matcher.
+Unparseable assertion blobs are retained on [`Slot.Includes`](../../openehr/template/template.go) / [`Slot.Excludes`](../../openehr/template/template.go) and ignored by the structured matcher; when every include blob fails to compile the slot widens to the RM-type-prefix fallback (observable via `SlotRules.IncludesDroppedUnparsed`).
 
 ### Contract
 
 - [`constraints.SlotAssertion`](../../openehr/template/constraints/slot.go) carries a compiled Go `regexp` and exposes `MatchesArchetypeID(string) bool`.
-- [`constraints.SlotRules`](../../openehr/template/constraints/slot.go) aggregates includes and excludes for one slot. `AllowsArchetypeID` applies excludes first, then requires a match against at least one include when includes are present; when no includes were parsed it **MUST** fall back to the RM-type-prefix rule (`openEHR-EHR-<rmType>.`).
+- [`constraints.SlotRules`](../../openehr/template/constraints/slot.go) aggregates includes and excludes for one slot. `AllowsArchetypeID` applies excludes first, then requires a match against at least one include when includes are present; when no includes were parsed it **MUST** fall back to the RM-type-prefix rule (`openEHR-EHR-<rmType>.`). A catch-all exclude (`.*`) is **ignored when includes are present** — template editors auto-generate it as the complement of a closed includes list, so applying it literally would reject the slot's own includes.
 - Wire-side [`Slot`](../../openehr/template/template.go) exposes `ParsedIncludes`, `ParsedExcludes`, `AllowsRMType` (prefix fallback), `AllowsArchetypeID`, and `SlotRules`.
 - [`templatecompile.CompiledNode`](../../internal/templatecompile/node.go) copies parsed rules at compile time and exposes `AllowsArchetypeID` / `ExampleSlotFillArchetypeID` for validators and the instance synthesiser.
 

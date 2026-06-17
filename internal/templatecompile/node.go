@@ -8,6 +8,22 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
+// IsAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
+// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
+// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
+// BMM-typed primitive attributes (e.g. DV_DURATION.value). Shared by
+// the validator and the instance synthesiser so both agree on which
+// leaves carry a primitive constraint rather than an RM wrapper.
+// REQ-024: closed switch, no reflection.
+func IsAOMPrimitiveShortName(s string) bool {
+	switch s {
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
+		return true
+	default:
+		return false
+	}
+}
+
 // CompiledNode is one node in the compiled OPT tree. Mirrors the
 // OPT's [template.Node] taxonomy (ComplexObject / ArchetypeRoot /
 // Slot) collapsed into a single struct because walker code rarely
@@ -42,10 +58,6 @@ type CompiledNode struct {
 	// can have different meanings under sibling roots. See [Term] for
 	// the parent-walk lookup that respects scope.
 	terms map[string]template.ArchetypeTerm
-
-	// docLang is the OPT's primary ISO 639-1 language code, copied
-	// from the enclosing Compiled aggregate for REQ-105 lookups.
-	docLang string
 }
 
 // AQLPath returns the canonical openEHR path string of this node.
@@ -142,29 +154,23 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // sees that root's terminology rather than a sibling root's. Returns
 // (zero, false) when no enclosing root defines the code.
 //
-// lang selects the requested ISO 639-1 language. When lang is empty
-// or matches the compiled template's document language, the OPT's
-// primary-language term is returned. When lang differs and no
-// translation exists, the document-language term is returned
-// (REQ-105 fallback).
+// The lang parameter is accepted for forward compatibility but is
+// currently ignored: an ADL 1.4 OPT carries a single document
+// language ([Compiled.Language]), so there is only one set of term
+// definitions to return. Per REQ-105 a future multi-language OPT
+// would select lang and fall back to the document language when the
+// requested translation is absent; until then every lang resolves
+// to the document-language term.
 //
 // The returned [template.ArchetypeTerm.Items] map is a defensive copy.
 func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
+	_ = lang // single-language OPT (REQ-105); see doc comment.
 	for cur := n; cur != nil; cur = cur.parent {
 		if t, ok := cur.terms[code]; ok {
-			return termForLanguage(t, lang, n.docLang), true
+			return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true
 		}
 	}
 	return template.ArchetypeTerm{}, false
-}
-
-// termForLanguage applies REQ-105 language fallback. ADL 1.4 OPTs
-// carry a single document language; requested translations fall back
-// to that language's Items map.
-func termForLanguage(t template.ArchetypeTerm, requested, docLang string) template.ArchetypeTerm {
-	_ = requested
-	_ = docLang
-	return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}
 }
 
 // CompiledAttribute is one attribute on a CompiledNode. Carries the

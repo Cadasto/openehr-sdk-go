@@ -11,11 +11,12 @@ var (
 	slotTextMatchesRE = regexp.MustCompile(`(?is)archetype_id\s+matches\s*\{([^}]+)\}`)
 	slotXMLPatternRE  = regexp.MustCompile(`(?is)<pattern>([^<]*)</pattern>`)
 	slotStringExprRE  = regexp.MustCompile(`(?is)<string_expression>([^<]*)</string_expression>`)
+	slotValueRE       = regexp.MustCompile(`(?is)<value>(.*?)</value>`)
 )
 
 // parseSlotAssertions parses raw OPT slot assertion XML / text blobs
 // into compiled [constraints.SlotAssertion] values. Unparseable
-// entries are skipped (best-effort); callers retain [Slot.RawIncludes]
+// entries are skipped (best-effort); callers retain [Slot.Includes]
 // for the original wire form.
 func parseSlotAssertions(raw []string) []constraints.SlotAssertion {
 	if len(raw) == 0 {
@@ -75,25 +76,21 @@ func normalizeSlotPattern(p string) string {
 }
 
 func extractXMLChardataValue(raw string) string {
-	const open = "<value>"
-	const close = "</value>"
-	i := strings.Index(strings.ToLower(raw), open)
-	if i < 0 {
+	m := slotValueRE.FindStringSubmatch(raw)
+	if len(m) != 2 {
 		return ""
 	}
-	start := i + len(open)
-	j := strings.Index(strings.ToLower(raw[start:]), close)
-	if j < 0 {
-		return ""
-	}
-	return strings.TrimSpace(raw[start : start+j])
+	return strings.TrimSpace(m[1])
 }
 
 // slotRules builds [constraints.SlotRules] for a wire-side slot.
+// RawIncludeCount carries the pre-parse blob count so consumers can
+// detect the fail-open case where every include failed to compile.
 func (s *Slot) slotRules() constraints.SlotRules {
 	return constraints.SlotRules{
-		RMTypeName: s.rmTypeName,
-		Includes:   s.parsedIncludes,
-		Excludes:   s.parsedExcludes,
+		RMTypeName:      s.rmTypeName,
+		Includes:        s.parsedIncludes,
+		Excludes:        s.parsedExcludes,
+		RawIncludeCount: len(s.includes),
 	}
 }

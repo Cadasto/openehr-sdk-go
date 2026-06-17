@@ -55,7 +55,7 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	// AOM 1.4 primitive short-name leaf reached via a DV wrapper's
 	// .value string channel (clinical_note.opt shape). Validate the
 	// string against the REQ-103 constraint without an RM-type check.
-	if pc := optNode.PrimitiveConstraint(); pc != nil && isAOMPrimitiveShortName(optNode.RMTypeName()) {
+	if pc := optNode.PrimitiveConstraint(); pc != nil && templatecompile.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
 		if _, ok := rmValue.(string); ok {
 			w.applyPrimitive(optNode, rmValue, path, pc)
 			return
@@ -180,22 +180,14 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 		// AOM 1.4 primitive short name (DURATION, DATE, …) pinned
 		// under a DV wrapper's .value string channel — the RM value
 		// is a Go string while the OPT child rm_type_name is the
-		// primitive short name. Mirrors instance.isAOMPrimitiveShortName.
-		if isAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
+		// primitive short name.
+		if templatecompile.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
 			if _, ok := val.(string); ok {
 				return c
 			}
 		}
 	}
 	return nil
-}
-
-func isAOMPrimitiveShortName(s string) bool {
-	switch s {
-	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
-		return true
-	}
-	return false
 }
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
@@ -211,8 +203,9 @@ func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to the OPT child
 // whose archetype_node_id matches. Items without a matching OPT
-// child surface as slot_fill issues (archetype-id equality today;
-// REQ-104 will swap in the parsed slot grammar).
+// child surface as slot_fill issues; matching pins exact
+// archetype/node ids first, then evaluates the parsed REQ-104 slot
+// grammar (see [matchChildByID]).
 func (w *walker) walkMultipleAttribute(
 	opt *templatecompile.CompiledNode,
 	attr *templatecompile.CompiledAttribute,
@@ -520,9 +513,10 @@ func describeLocatableID(v any) string {
 // inner nodes (at-code-pinned) compare against NodeID().
 func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, path string) {
 	if opt.IsSlot() {
-		// Slot fit is by archetype-id assertion (RM-type-prefix
-		// fallback in v2; REQ-104 grammar to come). The slot's
-		// NodeID is the OPT's own at-code for the slot point — it
+		// Slot fit is by the parsed REQ-104 archetype-id assertion
+		// grammar (RM-type-prefix fallback when no includes parsed).
+		// The slot's NodeID is the OPT's own at-code for the slot
+		// point — it
 		// is not expected to match the filling archetype's
 		// archetype_node_id, so a direct identity check here would
 		// false-positive on every legitimate slot fill.

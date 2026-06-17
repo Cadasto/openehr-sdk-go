@@ -265,9 +265,27 @@ func TestCompile_TermBindingsForNode(t *testing.T) {
 	if len(filtered) == 0 {
 		t.Fatalf("TermBindingsForNode(%q) empty; ref=%q", nodeID, ref)
 	}
+	// Every returned binding must actually reference the queried node
+	// (exact NodeOrPath or an [at-code] predicate in a path locator),
+	// not just leak the whole list.
+	for _, b := range filtered {
+		if b.NodeOrPath != nodeID && !strings.Contains(b.NodeOrPath, "["+nodeID+"]") {
+			t.Errorf("TermBindingsForNode(%q) returned unrelated binding %q", nodeID, b.NodeOrPath)
+		}
+	}
+	// A node id that no binding references returns nothing, and the
+	// empty query is rejected (would otherwise match nothing anyway).
+	if got := c.TermBindingsForNode("at999999"); got != nil {
+		t.Errorf("TermBindingsForNode(unknown) = %v, want nil", got)
+	}
+	if got := c.TermBindingsForNode(""); got != nil {
+		t.Errorf("TermBindingsForNode(\"\") = %v, want nil", got)
+	}
 }
 
-// REQ-105 — language-aware term lookup on compiled nodes.
+// REQ-105 — term lookup on compiled nodes. ADL 1.4 OPTs are
+// single-language, so the lang argument is currently accepted but
+// ignored: every language resolves to the document-language term.
 func TestCompile_TermLang(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	bp, err := c.NodeAt("/content[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
@@ -280,6 +298,20 @@ func TestCompile_TermLang(t *testing.T) {
 	}
 	if term.Items["text"] == "" {
 		t.Error("expected non-empty text for at0004")
+	}
+	// A different (or empty) language returns the same document-
+	// language term rather than a miss — the documented single-
+	// language contract.
+	for _, lang := range []string{"", "fr", "zz"} {
+		other, ok := bp.Term("at0004", lang)
+		if !ok {
+			t.Errorf("Term(at0004, %q) missing; want document-language fallback", lang)
+			continue
+		}
+		if other.Items["text"] != term.Items["text"] {
+			t.Errorf("Term(at0004, %q).text = %q, want %q (single-language fallback)",
+				lang, other.Items["text"], term.Items["text"])
+		}
 	}
 }
 

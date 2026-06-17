@@ -114,25 +114,23 @@ func (c *Compiled) AllByArchetypeID(hrid string) []*CompiledNode {
 func (c *Compiled) NumNodes() int { return len(c.byPath) }
 
 // Term looks up the at-code's term definition under the root
-// archetype's terminology. Equivalent to [CompiledNode.Term] called
-// on the root with the compiled document language — convenience for
-// callers operating at the COMPOSITION level. Returns (zero, false)
-// when the code is not defined on the root archetype.
+// archetype's terminology — convenience for callers operating at the
+// COMPOSITION level. Returns (zero, false) when the code is not
+// defined on the root archetype.
 //
-// For language-aware lookup at any node, use [Compiled.Term] or
-// [CompiledNode.Term].
+// For lookup scoped to an arbitrary node, use [CompiledNode.Term].
 func (c *Compiled) Term(code string) (template.ArchetypeTerm, bool) {
 	return c.TermLang(code, c.language)
 }
 
 // TermLang resolves an at-code's term definition scoped to the
-// composition root archetype in the requested language. REQ-105.
+// composition root archetype. The lang parameter is accepted for
+// forward compatibility but currently ignored — an ADL 1.4 OPT
+// carries a single document language; see [CompiledNode.Term].
+// REQ-105.
 func (c *Compiled) TermLang(nodeID, lang string) (template.ArchetypeTerm, bool) {
 	if c.root == nil {
 		return template.ArchetypeTerm{}, false
-	}
-	if lang == "" {
-		lang = c.language
 	}
 	return c.root.Term(nodeID, lang)
 }

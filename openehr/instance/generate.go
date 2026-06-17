@@ -107,9 +107,11 @@ func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any)
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
-	// Slots are leaf fill-points — REQ-104 will parse the include
-	// grammar. v1 leaves slot bodies empty; the caller composes them
-	// via REQ-101 builder Set calls.
+	// Slots are leaf fill-points: the synthesiser leaves slot bodies
+	// empty and the caller composes them via REQ-101 builder Set
+	// calls. The parsed REQ-104 grammar is used only to stamp a
+	// conforming archetype id when a lower-bound top-up forces a
+	// slot fill (see stampSlotFill).
 	if optNode.IsSlot() {
 		return nil
 	}
@@ -202,7 +204,7 @@ func (g *generator) materialiseSingle(
 	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
 	// omitted, or an unknown xsi:type the parser admitted leniently),
 	// the populatePrimitiveDefault sentinel holds.
-	if isAOMPrimitiveShortName(child.RMTypeName()) {
+	if templatecompile.IsAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
 			return g.applyPrimitiveExample(child, parentRM, pc)
 		}
@@ -227,19 +229,6 @@ func (g *generator) materialiseSingle(
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
-}
-
-// isAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
-// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
-// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
-// BMM-typed primitive attributes (e.g. DV_DURATION.value). REQ-024:
-// closed switch, no reflection.
-func isAOMPrimitiveShortName(s string) bool {
-	switch s {
-	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
-		return true
-	}
-	return false
 }
 
 // materialiseImplicitSingle creates a default value for a
@@ -404,10 +393,10 @@ func (g *generator) materialiseMultiple(
 	}
 	total := 0
 	for _, child := range children {
-		// Slots are caller-filled (REQ-104 will surface a grammar);
-		// the synthesiser does not invent archetype roots to fill
-		// them and instead leaves the count to satisfy the slot's
-		// occurrences.lower (often 0 — most slots are optional).
+		// Slots are caller-filled; the synthesiser does not invent
+		// archetype roots to fill them and instead leaves the count
+		// to satisfy the slot's occurrences.lower (often 0 — most
+		// slots are optional).
 		if child.IsSlot() {
 			continue
 		}
@@ -448,11 +437,11 @@ func (g *generator) materialiseMultiple(
 	// nothing was appended (e.g. all OPT children had occurrence
 	// lower 0 under Example with no top-level cardinality block).
 	// When every OPT child is a slot we synthesise a slot-shaped
-	// fill: an RM value of the slot's RMTypeName stamped with a
-	// matching archetype id ("openEHR-EHR-<RMType>.example.v1"),
-	// which satisfies the validator's RM-type-prefix slotFit
-	// heuristic. REQ-104 slot grammar parsing replaces this when it
-	// lands.
+	// fill: an RM value of the slot's RMTypeName stamped (by
+	// stampSlotFill) with an archetype id drawn from the parsed
+	// REQ-104 include grammar, falling back to
+	// "openEHR-EHR-<RMType>.example.v1" which satisfies the
+	// validator's RM-type-prefix slotFit heuristic.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
 		seed := firstNonSlot(children)
 		if seed == nil && len(children) > 0 {

@@ -417,20 +417,15 @@ func (s *Slot) RMTypeName() string { return s.rmTypeName }
 // NodeID implements Node.
 func (s *Slot) NodeID() string { return s.nodeID }
 
-// Includes returns a defensive copy of the raw archetype-id include
-// assertion strings.
+// Includes returns a defensive copy of the raw (unparsed) archetype-id
+// include assertion blobs as written in the OPT. For the structured
+// REQ-104 form use [Slot.ParsedIncludes].
 func (s *Slot) Includes() []string { return slices.Clone(s.includes) }
 
-// RawIncludes is an alias for [Slot.Includes] — the unparsed wire
-// assertion blobs retained for diagnostics and forward compatibility.
-func (s *Slot) RawIncludes() []string { return s.Includes() }
-
-// Excludes returns a defensive copy of the raw archetype-id exclude
-// assertion strings.
+// Excludes returns a defensive copy of the raw (unparsed) archetype-id
+// exclude assertion blobs. For the structured form see
+// [Slot.ParsedExcludes].
 func (s *Slot) Excludes() []string { return slices.Clone(s.excludes) }
-
-// RawExcludes is an alias for [Slot.Excludes].
-func (s *Slot) RawExcludes() []string { return s.Excludes() }
 
 // ParsedIncludes returns the REQ-104 compiled include assertions.
 // Empty when the OPT carried no parseable include expressions.

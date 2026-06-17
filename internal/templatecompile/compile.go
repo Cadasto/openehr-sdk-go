@@ -108,7 +108,7 @@ type walker struct {
 // segment is the path delta from parent to this node ("" for the
 // root). The two-arg shape avoids re-concatenating per-call.
 func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment string) (*CompiledNode, error) {
-	cn := &CompiledNode{parent: parent, docLang: w.compiled.language}
+	cn := &CompiledNode{parent: parent}
 
 	parentPath := ""
 	if parent != nil {

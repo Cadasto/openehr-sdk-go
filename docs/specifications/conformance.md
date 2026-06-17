@@ -279,7 +279,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
 - **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. v1 stop-gap: slot fills synthesise `openEHR-EHR-<RMType>.example.v1` archetype ids matching the validator's RM-type-prefix `slotFitsArchetypeID` heuristic until REQ-104 supplies a parsed slot grammar.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. Slot fills draw a conforming archetype id from the parsed REQ-104 include grammar, falling back to `openEHR-EHR-<RMType>.example.v1` (the validator's RM-type-prefix `slotFitsArchetypeID` rule) when the OPT carried no parseable includes.
 - **Satisfies:** REQ-107.
 
 #### PROBE-074 — Template-driven validation of non-COMPOSITION roots

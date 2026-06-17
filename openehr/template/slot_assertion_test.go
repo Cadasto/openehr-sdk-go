@@ -52,6 +52,41 @@ func TestSlot_AllowsRMTypePrefix(t *testing.T) {
 	}
 }
 
+// Demonstration.v1.opt is the only fixture carrying <excludes>: an
+// ELEMENT slot pairs a closed includes list with the editor's
+// auto-generated catch-all `.*` exclude. The catch-all must be parsed
+// but must not reject the slot's own includes.
+func TestParseFile_Demonstration_ExcludesParsed(t *testing.T) {
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("Demonstration.v1"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	const included = "openEHR-EHR-ELEMENT.ctg_codes.v1"
+	var slot *template.Slot
+	walkSlots(opt.Root(), func(s *template.Slot) {
+		if slot != nil || len(s.ParsedExcludes()) == 0 {
+			return
+		}
+		for _, inc := range s.ParsedIncludes() {
+			if inc.MatchesArchetypeID(included) {
+				slot = s
+				return
+			}
+		}
+	})
+	if slot == nil {
+		t.Fatal("expected a slot with parsed includes and excludes in Demonstration.v1.opt")
+	}
+	// The included id fits despite the catch-all exclude.
+	if !slot.AllowsArchetypeID(included) {
+		t.Errorf("AllowsArchetypeID(%q) = false, want true (catch-all exclude must not reject includes)", included)
+	}
+	// A non-included id is still rejected.
+	if slot.AllowsArchetypeID("openEHR-EHR-ELEMENT.something_else.v1") {
+		t.Error("non-included archetype id should be rejected")
+	}
+}
+
 func walkSlots(n template.Node, fn func(*template.Slot)) {
 	switch v := n.(type) {
 	case template.ObjectNode:

@@ -12,6 +12,10 @@ import (
 // and the OPT XML expression shape that carries a C_STRING pattern
 // (operator 2007 / "matches").
 //
+// Construct only via [NewSlotAssertion]; the zero value carries no
+// compiled regex and [SlotAssertion.MatchesArchetypeID] reports
+// false for it (it is not a valid assertion, not a match-all).
+//
 // REQ-104.
 type SlotAssertion struct {
 	pattern string
@@ -21,23 +25,36 @@ type SlotAssertion struct {
 // NewSlotAssertion compiles pattern as a Go regexp (POSIX-flavoured,
 // as in other REQ-103 string constraints). Returns an error when the
 // pattern is empty or does not compile.
+//
+// The pattern is matched against a candidate archetype id in full:
+// ADL `archetype_id matches {regex}` semantics are whole-string, so
+// the compiled regex is anchored (`\A(?:…)\z`). Storing the raw
+// source separately keeps [SlotAssertion.Pattern] (diagnostics) and
+// example synthesis honest about what the OPT author wrote.
 func NewSlotAssertion(pattern string) (SlotAssertion, error) {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
 		return SlotAssertion{}, errors.New("slot assertion: empty pattern")
 	}
-	re, err := regexp.Compile(pattern)
+	re, err := regexp.Compile(anchorPattern(pattern))
 	if err != nil {
 		return SlotAssertion{}, fmt.Errorf("slot assertion: %w", err)
 	}
 	return SlotAssertion{pattern: pattern, re: re}, nil
 }
 
-// Pattern returns the compiled regular expression source string.
+// anchorPattern wraps a raw archetype-id pattern so it matches the
+// whole candidate string rather than any substring.
+func anchorPattern(pattern string) string {
+	return `\A(?:` + pattern + `)\z`
+}
+
+// Pattern returns the raw (unanchored) regular expression source
+// string as written in the OPT.
 func (a SlotAssertion) Pattern() string { return a.pattern }
 
 // MatchesArchetypeID reports whether archetypeID satisfies the
-// assertion pattern.
+// assertion pattern in full (whole-string match).
 func (a SlotAssertion) MatchesArchetypeID(archetypeID string) bool {
 	if a.re == nil {
 		return false
@@ -45,25 +62,62 @@ func (a SlotAssertion) MatchesArchetypeID(archetypeID string) bool {
 	return a.re.MatchString(archetypeID)
 }
 
+// isUniversal reports whether the assertion matches every archetype
+// id — the `.*` (or `.+`) catch-all that template editors emit as
+// the auto-generated complement of an includes list. See
+// [SlotRules.AllowsArchetypeID] for why it is treated specially.
+func (a SlotAssertion) isUniversal() bool {
+	switch a.pattern {
+	case ".*", "(.*)", ".+", "(.+)":
+		return true
+	default:
+		return false
+	}
+}
+
 // SlotRules is the parsed include / exclude assertion set for one
 // ARCHETYPE_SLOT. When Includes is empty the caller MUST apply the
 // RM-type-prefix fallback via [SlotRules.AllowsRMTypePrefix].
+//
+// RawIncludeCount records how many include assertion blobs the OPT
+// carried before parsing. When it is non-zero but Includes is empty
+// every include failed to compile and [AllowsArchetypeID] degrades
+// to the permissive prefix fallback — a known fail-open limitation
+// surfaced via [SlotRules.IncludesDroppedUnparsed].
 type SlotRules struct {
-	RMTypeName string
-	Includes   []SlotAssertion
-	Excludes   []SlotAssertion
+	RMTypeName      string
+	Includes        []SlotAssertion
+	Excludes        []SlotAssertion
+	RawIncludeCount int
+}
+
+// IncludesDroppedUnparsed reports the fail-open case: the OPT
+// declared include assertions but none compiled, so the slot widens
+// to the RM-type-prefix fallback instead of the authored constraint.
+func (r SlotRules) IncludesDroppedUnparsed() bool {
+	return len(r.Includes) == 0 && r.RawIncludeCount > 0
 }
 
 // AllowsArchetypeID reports whether archetypeID satisfies the slot's
 // include / exclude rules. When no include assertions were parsed,
-// falls back to the RM-type-prefix heuristic.
+// falls back to the RM-type-prefix heuristic — including the
+// fail-open case flagged by [SlotRules.IncludesDroppedUnparsed].
+//
+// A catch-all exclude (`.*`) is ignored when includes are present:
+// template editors auto-generate such an exclude as the complement
+// of an includes list ("fill with only these"), so applying it
+// literally would reject the slot's own includes.
 func (r SlotRules) AllowsArchetypeID(archetypeID string) bool {
+	hasIncludes := len(r.Includes) > 0
 	for _, ex := range r.Excludes {
+		if hasIncludes && ex.isUniversal() {
+			continue
+		}
 		if ex.MatchesArchetypeID(archetypeID) {
 			return false
 		}
 	}
-	if len(r.Includes) > 0 {
+	if hasIncludes {
 		for _, inc := range r.Includes {
 			if inc.MatchesArchetypeID(archetypeID) {
 				return true
@@ -104,28 +158,35 @@ func (r SlotRules) ExampleArchetypeID() string {
 	return ""
 }
 
+// archetypeIDShapeRE is the canonical openEHR archetype-id shape
+// (openEHR-<rm>-<class>.<concept>.v<n>). A synthesised example must
+// match it, otherwise exampleFromPattern bails out rather than emit
+// an id that merely satisfies the source regex (e.g. a literal `.*`).
+var archetypeIDShapeRE = regexp.MustCompile(`^openEHR-[A-Za-z]+-[A-Za-z0-9_]+\.[A-Za-z0-9_-]+\.v[0-9]+$`)
+
 // exampleFromPattern derives a literal archetype id that satisfies
 // simple OPT patterns (no unbounded repetition). Returns "" when the
-// pattern is too complex to synthesise safely.
+// pattern is too complex to synthesise a conforming id from.
 func exampleFromPattern(pattern string) string {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
 		return ""
 	}
-	// Common OPT shape: openEHR-EHR-CLUSTER.device(-suffix)*\.v1
-	if strings.Contains(pattern, "(") || strings.Contains(pattern, "|") ||
-		strings.Contains(pattern, "[") || strings.Contains(pattern, "*") ||
-		strings.Contains(pattern, "+") || strings.Contains(pattern, "?") {
-		simplified := strings.ReplaceAll(pattern, `\.`, ".")
-		simplified = strings.ReplaceAll(simplified, `(-[a-zA-Z0-9_]+)*`, "")
-		simplified = strings.ReplaceAll(simplified, "(-[a-zA-Z0-9_]+)*", "")
-		if re, err := regexp.Compile(pattern); err == nil && re.MatchString(simplified) {
-			return simplified
-		}
+	// Flat alternation (A|B|…) is the common closed-includes shape:
+	// synthesise from the first alternative.
+	if i := strings.IndexByte(pattern, '|'); i >= 0 {
+		return exampleFromPattern(pattern[:i])
+	}
+	// Drop the optional ADL suffix group, then unescape literal dots.
+	simplified := strings.ReplaceAll(pattern, `(-[a-zA-Z0-9_]+)*`, "")
+	simplified = strings.ReplaceAll(simplified, `\.`, ".")
+	// Reject anything that still carries regex structure: the result
+	// must be a literal, well-shaped archetype id and must satisfy the
+	// source pattern.
+	if !archetypeIDShapeRE.MatchString(simplified) {
 		return ""
 	}
-	simplified := strings.ReplaceAll(pattern, `\.`, ".")
-	if re, err := regexp.Compile(pattern); err == nil && re.MatchString(simplified) {
+	if re, err := regexp.Compile(anchorPattern(pattern)); err == nil && re.MatchString(simplified) {
 		return simplified
 	}
 	return ""
