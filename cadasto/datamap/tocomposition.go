@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -676,9 +677,78 @@ func encodeValue(constraint template.ObjectNode, payload any, terms map[string]s
 		return encodeProportion(payload)
 	case "DV_IDENTIFIER":
 		return encodeIdentifier(payload), nil
+	case "DV_MULTIMEDIA":
+		return encodeMultimedia(payload), nil
 	default:
+		// Unsupported RM value type. The blank datamap skeleton carries empty
+		// optional slots of exotic types (DV_INTERVAL<DV_DATE> validity windows,
+		// …) that we never populate — omit those rather than fail the whole
+		// encode. Only a value that actually carries content is a real error.
+		if !valueHasContent(payload) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("RM value type %q not supported", rmType)
 	}
+}
+
+// valueHasContent reports whether payload carries a real value worth encoding.
+// Structural/bookkeeping keys (prefixed "_", e.g. _type) and unset defaults
+// (empty strings, false, zero) do not count, so an empty DV_INTERVAL or other
+// blank skeleton slot reads as contentless.
+func valueHasContent(payload any) bool {
+	switch v := payload.(type) {
+	case nil:
+		return false
+	case string:
+		return v != ""
+	case bool:
+		return false
+	case float64:
+		return v != 0
+	case int:
+		return v != 0
+	case map[string]any:
+		for k, child := range v {
+			if strings.HasPrefix(k, "_") {
+				continue
+			}
+			if valueHasContent(child) {
+				return true
+			}
+		}
+		return false
+	case []any:
+		return slices.ContainsFunc(v, valueHasContent)
+	default:
+		return true
+	}
+}
+
+// encodeMultimedia builds a DV_MULTIMEDIA from an object payload, or returns nil
+// when there is no actual media (no data / uri) so the element is omitted. The
+// blank datamap skeleton carries empty photo slots (media_type with an empty
+// code, size 0) that we never populate; emitting them would fail the encode.
+func encodeMultimedia(payload any) map[string]any {
+	m, ok := payload.(map[string]any)
+	if !ok {
+		return nil
+	}
+	hasMedia := false
+	for _, k := range []string{"data", "uri", "alternate_text"} {
+		if s, _ := m[k].(string); s != "" {
+			hasMedia = true
+		}
+	}
+	if !hasMedia {
+		return nil
+	}
+	out := map[string]any{"_type": "DV_MULTIMEDIA"}
+	for k, v := range m {
+		if k != "rmType" {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // encodeIdentifier builds a DV_IDENTIFIER from a bare id string or an object
@@ -942,6 +1012,15 @@ func encodeStructuredContainer(container template.ObjectNode, items []any, fallb
 		"_type":             rmType,
 		"archetype_node_id": container.NodeID(),
 		"name":              dvText(termOrFallback(terms, container.NodeID(), fallbackName)),
+	}
+	// An archetype-root container (the person_details ITEM_TREE, a slotted
+	// CLUSTER archetype like person_identifier.v2) is addressed by its
+	// archetype id — not the bare at0000 root node — and must carry
+	// archetype_details. Cadasto rejects the bare node id ("Invalid archetype
+	// node ID at0000").
+	if ar, ok := container.(*template.ArchetypeRoot); ok && ar.ArchetypeID() != "" {
+		out["archetype_node_id"] = ar.ArchetypeID()
+		out["archetype_details"] = archetypeDetails(ar.ArchetypeID(), "")
 	}
 	switch rmType {
 	case "ITEM_SINGLE":

@@ -168,6 +168,10 @@ func identityName(node template.ObjectNode, payload map[string]any, sec partySec
 			if label == "" {
 				if n, ok := payload["_name"].(string); ok && n != "" {
 					label = n
+				} else if t := sec.terms[code]; t != "" {
+					// The coded name's display must be the term for the code
+					// (at0027 → "Officiële naam"), not the archetype label.
+					label = t
 				} else {
 					label = sec.label
 				}
@@ -352,6 +356,10 @@ func addressName(payload map[string]any, sec partySection) map[string]any {
 			if label == "" {
 				if n, ok := payload["_name"].(string); ok && n != "" {
 					label = n
+				} else if t := sec.terms[code]; t != "" {
+					// The coded name's display must be the term for the code
+					// (at0027 → "Officiële naam"), not the archetype label.
+					label = t
 				} else {
 					label = sec.label
 				}
