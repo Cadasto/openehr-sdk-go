@@ -377,9 +377,15 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
 	}
 	if refreshTok == "" && !cur.IsZero() {
-		// Stale but no refresh_token — return the cached access token
-		// without claiming inflight (REQ-026).
 		s.mu.Unlock()
+		// No refresh_token, and the cached token is stale (within the proactive
+		// refresh threshold). If it is past ExpiresAt it MUST NOT be returned
+		// silently (REQ-063) — there is nothing to refresh with, so signal
+		// re-authentication. A still-valid token (near expiry but not yet past
+		// it) is returned as-is without claiming inflight (REQ-026).
+		if !cur.ExpiresAt.IsZero() && time.Until(cur.ExpiresAt) <= 0 {
+			return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
+		}
 		return cur, nil
 	}
 	ex := &tokenExchange{done: make(chan struct{})}

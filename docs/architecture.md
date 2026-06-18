@@ -98,7 +98,7 @@ Runtime dependencies are kept deliberately minimal and reviewed. The current set
 |---|---|---|
 | `go.opentelemetry.io/otel`, `/trace` | `transport/` only | Distributed tracing (REQ-090). Pulls logr, xxhash transitively. |
 | `github.com/antlr4-go/antlr/v4` | `openehr/aql/parse` only | AQL parser runtime — pure Go, no transitive deps (REQ-109, ADR [0007](adr/0007-aql-antlr-grammar-profile.md)). The generator (Java) is containerised, never on the build/test path. |
-| `golang.org/x/oauth2` | `auth/`, `smart/` | Token-source/PKCE/`RetrieveError` patterns for SMART auth conformance (ADR [0009](adr/0009-smart-auth-library-scope.md)). |
+| `golang.org/x/oauth2` | `auth/smart` (+ probes) | RFC 7636 PKCE `code_verifier`/`code_challenge` generation; parity cross-check in PROBE-004 (ADR [0009](adr/0009-smart-auth-library-scope.md)). Token sources/refresh/errors are the SDK's own `auth` types. |
 | `github.com/coreos/go-oidc/v3` | `smart/` (id-token verify) | ID-token verification for SMART App Launch (ADR [0009](adr/0009-smart-auth-library-scope.md)). Brings `go-jose/v4` transitively (also used directly by `auth/jwtbearer` for `client_assertion` JWS signing). |
 
 - **Everything else is the standard library** — `net/http` for the (injected) HTTP client, `encoding/json` and `encoding/xml` for the canonical codecs, and `context` threaded throughout.

@@ -144,6 +144,16 @@ func WithMaxResponseBody(n int64) Option {
 // This is a complementary safety net — proactive expiry-based refresh
 // in TokenSource.Token is the primary mechanism.
 //
+// All HTTP methods are retried, including non-idempotent writes (POST/PUT).
+// This is safe because a 401 means the request was rejected at the
+// authentication layer and therefore NOT processed by the resource — re-driving
+// it once after refreshing the credential cannot double-apply a write. Note,
+// however, that a 401 may also indicate insufficient scope rather than an
+// expired token; in that case the reauth-and-retry simply 401s again and the
+// caller still receives ErrUnauthorized (one wasted round-trip, no harm). Enable
+// the hook when your deployment returns 401 for token expiry; if a server
+// distinguishes expiry (401) from authorization (403), this targets the former.
+//
 // A discovery-catalog-refresh closure can satisfy the interface via
 // auth.ReautherFunc (REQ-071 bullet 3).
 func WithReauthOn401(r auth.Reauther) Option {

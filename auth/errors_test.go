@@ -45,6 +45,15 @@ func TestExchangeErrorTerminalClassification(t *testing.T) { // REQ-063
 			wantTermin: true,
 		},
 		{
+			name: "400_invalid_token",
+			err: &auth.ExchangeError{
+				Sentinel:   auth.ErrRefreshFailed,
+				StatusCode: 400,
+				OAuth2:     &auth.OAuth2Error{Code: "invalid_token"},
+			},
+			wantTermin: true,
+		},
+		{
 			name: "400_other_code",
 			err: &auth.ExchangeError{
 				Sentinel:   auth.ErrRefreshFailed,

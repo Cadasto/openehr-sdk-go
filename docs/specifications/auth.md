@@ -118,7 +118,7 @@ The default algorithm is **RS384** (changed from RS256 in Phase 3a). Callers tha
 
 All signing is delegated to `github.com/go-jose/go-jose/v4`, which handles JOSE encoding including ECDSA r‖s byte-padding. Hand-rolled PKCS1v15/ECDSA paths have been removed.
 
-Key-type validation is enforced at `NewClaimsSigner` construction time and returns `auth.ErrInvalidConfig` on mismatch (e.g. ES384 with an RSA key). For opaque `crypto.Signer` implementations (e.g. KMS handles) whose `Public()` does not return a concrete `*ecdsa.PublicKey`, ES* algorithms are not yet supported; use a concrete `*ecdsa.PrivateKey` for ES256/ES384.
+Key-type validation is enforced at `NewClaimsSigner` construction time and returns `auth.ErrInvalidConfig` on mismatch (e.g. ES384 with an RSA key). Opaque `crypto.Signer` implementations (e.g. KMS/HSM handles) are supported for both RSA and ECDSA: a non-concrete signer is wrapped at signing time with `go-jose/v4`'s `cryptosigner.Opaque`, which handles the JOSE encoding (including ECDSA r‖s) — no concrete-key requirement.
 
 #### Authorization Code with asymmetric client auth — `private_key_jwt` (Phase 3b, F-C)
 
@@ -308,6 +308,8 @@ When `WithReauthOn401` is **not** set, the existing contract is unchanged: a wir
 
 This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism. The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
 
+The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` arising from insufficient *scope* (rather than token expiry) will simply `401` again and surface `transport.ErrUnauthorized` after the single retry (one wasted round-trip, no harm). Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
+
 Out of scope (v1 implementation status):
 
 - `auth/clientcreds` and `auth/jwtbearer` do not implement `Reauther`; they have no refresh path. Callers using those providers may wire a custom `ReautherFunc` closure.
@@ -492,18 +494,31 @@ The SDK **MUST NOT** enforce, parse, or validate scope strings as application po
 
 ## Error mapping
 
-Auth errors **MUST** surface as typed values:
+Auth errors **MUST** surface as typed sentinels. The shared classes live in
+package `auth` (`auth/errors.go`); the SMART-launch-specific state-mismatch
+sentinel lives in package `smart` (`auth/smart/errors.go`):
 
 ```go
+// package auth — shared across all providers
 var (
-    ErrLaunchInvalidState     = errors.New("SMART launch: state mismatch")
-    ErrLaunchPKCEMismatch     = errors.New("SMART launch: PKCE verifier mismatch")
-    ErrTokenExchangeFailed    = errors.New("SMART launch: token exchange failed")
-    ErrRefreshFailed          = errors.New("SMART launch: token refresh failed")
-    ErrReauthRequired         = errors.New("SMART launch: re-authentication required")
-    ErrJWKSValidationFailed   = errors.New("auth: JWKS validation failed")
+    ErrInvalidConfig        = errors.New("auth: invalid configuration")
+    ErrTokenExchangeFailed  = errors.New("auth: token exchange failed")
+    ErrRefreshFailed        = errors.New("auth: token refresh failed")
+    ErrReauthRequired       = errors.New("auth: re-authentication required")
+    ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
 )
+
+// package smart — SMART App Launch specific
+var ErrLaunchInvalidState = errors.New("SMART launch: state mismatch")
 ```
+
+A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
+verifier is sent to the token endpoint, and a mismatch is rejected **server-side**,
+surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange and refresh failures
+are wrapped in `*auth.ExchangeError`, which carries the HTTP `StatusCode`, the
+parsed RFC 6749 `OAuth2` envelope, and a `Terminal()` predicate (4xx
+`invalid_grant`/`invalid_client`/`invalid_token`) that drives refresh-token
+clearing (REQ-063, F-L).
 
 Consumers detect classes via `errors.Is`. The underlying wire error is preserved via `errors.Unwrap`.
 

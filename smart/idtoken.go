@@ -91,10 +91,19 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 		return nil, fmt.Errorf("%w: %w", auth.ErrJWKSValidationFailed, err)
 	}
 
+	algs := resolveIDTokenAlgs(allowedAlgs)
+	if len(algs) == 0 {
+		// The caller supplied a non-empty advertised set (e.g. discovery's
+		// id_token_signing_alg_values_supported) but none of its algorithms are
+		// supported. Fail closed — honour the server's constraint rather than
+		// silently falling back to the default RS/ES set (REQ-062).
+		return nil, fmt.Errorf("%w: no supported id_token signing algorithm in the advertised set %v (supported: %v)", auth.ErrJWKSValidationFailed, allowedAlgs, defaultIDTokenAlgs)
+	}
+
 	keySet := &oidc.StaticKeySet{PublicKeys: []crypto.PublicKey{pub}}
 	verifier := oidc.NewVerifier(issuer, keySet, &oidc.Config{
 		ClientID:             clientID,
-		SupportedSigningAlgs: resolveIDTokenAlgs(allowedAlgs),
+		SupportedSigningAlgs: algs,
 		Now:                  func() time.Time { return now },
 		// SkipExpiryCheck delegates expiry enforcement (with 30s clockSkew) to
 		// claimsFromMap below, avoiding go-oidc's zero-tolerance expiry check
@@ -123,21 +132,26 @@ func ValidateIDToken(ctx context.Context, raw string, jwks *authsmart.JWKS, issu
 // caller passing the discovery list cannot widen the SDK's support, and an
 // empty intersection falls back to the default set rather than the go-oidc
 // RS256-only default.
+// resolveIDTokenAlgs returns the effective id_token signing-alg allowlist.
+// With no caller-supplied list it returns the full default set
+// (RS256/RS384/ES256/ES384). With a non-empty list it returns the
+// case-normalised intersection with the default set ("none" always dropped); a
+// non-empty input that intersects nothing returns an EMPTY slice, which
+// ValidateIDToken treats as a fail-closed configuration error rather than
+// silently widening back to the defaults.
 func resolveIDTokenAlgs(allowedAlgs []string) []string {
 	if len(allowedAlgs) == 0 {
 		return defaultIDTokenAlgs
 	}
 	out := make([]string, 0, len(allowedAlgs))
 	for _, a := range allowedAlgs {
-		if strings.EqualFold(a, "none") {
+		norm := strings.ToUpper(strings.TrimSpace(a))
+		if norm == "NONE" {
 			continue
 		}
-		if slices.Contains(defaultIDTokenAlgs, strings.ToUpper(strings.TrimSpace(a))) {
-			out = append(out, strings.ToUpper(strings.TrimSpace(a)))
+		if slices.Contains(defaultIDTokenAlgs, norm) {
+			out = append(out, norm)
 		}
-	}
-	if len(out) == 0 {
-		return defaultIDTokenAlgs
 	}
 	return out
 }

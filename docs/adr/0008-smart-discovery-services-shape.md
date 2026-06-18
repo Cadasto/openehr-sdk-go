@@ -53,8 +53,11 @@ the invented `"id"` field (the key is the ID). `parse` ranges over the map;
 struct (`json:"spec_version"`) — some internal deployments may emit it.
 
 New top-level wire fields (`introspection_endpoint`, `revocation_endpoint`,
-`management_endpoint`) are decoded but not yet surfaced onto `AuthEndpoints`;
-that belongs to Phase 1 task F-K.
+`management_endpoint`) are surfaced onto `AuthEndpoints` (finding F-K, landed —
+see `smart/discovery/resolver.go`, tested in `resolver_test.go`).
+`introspection_endpoint` is consumed by the opt-in RFC 7662 client
+`auth/introspect` (REQ-062); `revocation_endpoint` and `management_endpoint`
+remain surface-only (no client wired yet).
 
 ### (b) Version gate: soften — only enforce when version is advertised or caller is strict
 

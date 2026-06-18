@@ -125,8 +125,9 @@ requirements:
       Phase 3a (F-I): ClaimsSigner now signs via go-jose/v4. Default alg changed
       from RS256 to RS384 (SMART client-confidential-asymmetric SHALL). RS384 and
       ES384 are fully supported; RS256 and ES256 retained for back-compat. Key/alg
-      mismatch rejected at construction (ErrInvalidConfig). Opaque ECDSA signers
-      not yet supported for ES* — requires concrete *ecdsa.PrivateKey.
+      mismatch rejected at construction (ErrInvalidConfig). Opaque crypto.Signer
+      implementations (KMS/HSM) are supported for both RSA and ECDSA via
+      go-jose/v4 cryptosigner.Opaque (no concrete-key requirement).
       Phase 3b (F-C): auth/smart authorization-code exchange can now authenticate
       with private_key_jwt via WithClientAssertionKey, reusing jwtbearer.ClaimsSigner
       (client_assertion + jwt-bearer assertion type, no HTTP Basic). Method selection
@@ -422,8 +423,10 @@ requirements:
     notes: >
       alg allowlists (token_endpoint_auth_signing_alg_values_supported,
       id_token_signing_alg_values_supported) and introspection_endpoint are
-      surfaced onto AuthEndpoints. token_endpoint_auth_signing_alg_values_supported
-      and the introspection endpoint remain surface-only (later phases).
+      surfaced onto AuthEndpoints. introspection_endpoint is consumed by the opt-in
+      RFC 7662 client auth/introspect, and token_endpoint_auth_methods_supported by
+      auth/smart.FromConfig (G-3 cross-check); only
+      token_endpoint_auth_signing_alg_values_supported remains surface-only.
       Phase 3e (F-M): id_token verification gained algorithm agility — smart.ValidateIDToken
       now verifies via github.com/coreos/go-oidc/v3 (go-jose) supporting RS256/RS384/ES256/ES384,
       constrained to the server's id_token_signing_alg_values_supported when supplied

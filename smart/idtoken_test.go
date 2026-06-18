@@ -185,6 +185,25 @@ func TestValidateIDTokenRejectsUnlistedAlg(t *testing.T) {
 	}
 }
 
+// TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs verifies that when
+// the caller passes a non-empty advertised alg set that the SDK supports none
+// of (e.g. an AS advertising only HS256), validation FAILS CLOSED rather than
+// silently widening back to the default RS/ES set and accepting an RS256 token. REQ-062
+func TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs(t *testing.T) { // REQ-062
+	now := time.Unix(1_700_000_000, 0)
+	priv := newRSAKey(t)
+	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
+	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
+
+	// AS advertises only HS256/HS384 (unsupported). The RS256 token would verify
+	// against the default set, but the advertised constraint must be honoured.
+	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+		"https://issuer.example", "client-id", "nonce-xyz", now, []string{"HS256", "HS384"})
+	if err == nil || !isJWKSFail(err) {
+		t.Fatalf("unsupported advertised alg set must fail closed with JWKS failure, got %v", err)
+	}
+}
+
 // TestValidateIDTokenRejectsAlgNone confirms an unsigned (alg:none) token is
 // rejected. REQ-062 REQ-064
 func TestValidateIDTokenRejectsAlgNone(t *testing.T) {

@@ -240,7 +240,13 @@ The resolver parses and surfaces the following SMART authorization-server metada
 | `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; feeds Phase 3b alg selection (REQ-062) — surface-only in v0.8 |
 | `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist** — pass it to `smart.WithIDTokenSigningAlgs` so `ValidateIDToken` constrains accepted signature algorithms (RS256/RS384/ES256/ES384). Consumed as of Phase 3e (REQ-062, REQ-064; see [auth.md](auth.md#req-062--jwks-rotation)) |
 
-Most of these fields remain **surface-only** in v0.8: the resolver populates `token_endpoint_auth_signing_alg_values_supported` (client-auth alg selection), `token_endpoint_auth_methods_supported` (method selection), and the introspection/revocation/management endpoints, but no consuming logic for those is wired in this release — that lands in later phases. The exception is `id_token_signing_alg_values_supported`, which the ID-token verifier consumes as of Phase 3e (see the table note above).
+Most of these fields are now **consumed**, not merely surfaced:
+
+- `id_token_signing_alg_values_supported` → the ID-token verifier's accepted-algorithm allowlist (Phase 3e; pass via `smart.WithIDTokenSigningAlgs`).
+- `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (G-3; a mismatch is rejected with `auth.ErrInvalidConfig`).
+- `introspection_endpoint` → the opt-in RFC 7662 client `auth/introspect` (REQ-062).
+
+Two remain **surface-only** in v0.8 (populated but with no consuming logic wired): `token_endpoint_auth_signing_alg_values_supported` (client-assertion alg auto-selection) and `revocation_endpoint` / `management_endpoint` (no revocation/management client yet).
 
 The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
 

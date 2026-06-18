@@ -647,7 +647,10 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	src.SetTokens(auth.Token{Value: "cached", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
+	// Stale but NOT expired (within the 30s proactive-refresh threshold), no
+	// refresh token: Token() returns the still-valid cached token without
+	// deadlocking on concurrent calls.
+	src.SetTokens(auth.Token{Value: "cached", Type: "Bearer", ExpiresAt: time.Now().Add(10 * time.Second)}, "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -663,6 +666,24 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	case <-done:
 	case <-ctx.Done():
 		t.Fatal("concurrent Token deadlocked")
+	}
+}
+
+// TestTokenExpiredWithoutRefreshReturnsReauthRequired asserts that a cached
+// access token past its ExpiresAt with no refresh_token is NOT returned
+// silently — Token() returns ErrReauthRequired (REQ-063).
+func TestTokenExpiredWithoutRefreshReturnsReauthRequired(t *testing.T) { // REQ-063
+	srv := httptest.NewServer(http.NotFoundHandler())
+	defer srv.Close()
+	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	src.SetTokens(auth.Token{Value: "stale", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
+
+	tok, err := src.Token(context.Background())
+	if !errors.Is(err, auth.ErrReauthRequired) {
+		t.Fatalf("Token() err = %v, want ErrReauthRequired", err)
+	}
+	if tok.Value != "" {
+		t.Errorf("expected zero token, got %q", tok.Value)
 	}
 }
 

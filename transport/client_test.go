@@ -18,6 +18,7 @@ import (
 
 	"github.com/cadasto/openehr-sdk-go/auth"
 	"github.com/cadasto/openehr-sdk-go/auth/basic"
+	"github.com/cadasto/openehr-sdk-go/auth/smart"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
 
@@ -973,6 +974,91 @@ func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
 	}
 	if n := hits.Load(); n != 1 {
 		t.Errorf("upstream calls = %d, want exactly 1 (no reauther, no retry)", n)
+	}
+}
+
+// TestDoReauthReturnsError — REQ-063: when the configured Reauther fails on a
+// 401, transport surfaces the (wrapped) reauth error rather than retrying or
+// swallowing it, and makes no second upstream call.
+func TestDoReauthReturnsError(t *testing.T) { // REQ-063
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	errBoom := errors.New("reauth boom")
+	stub := &stubTokenSource{tokens: []string{"tok"}}
+	c, _ := New(
+		newCatalog(t, srv),
+		WithHTTPClient(srv.Client()),
+		WithTokenSource(stub),
+		WithReauthOn401(auth.ReautherFunc(func(context.Context) error { return errBoom })),
+	)
+	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if !errors.Is(err, errBoom) {
+		t.Fatalf("expected wrapped reauth error, got %v", err)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Errorf("upstream calls = %d, want exactly 1 (reauth failed → no retry)", n)
+	}
+}
+
+// TestDoReauthWithRealSmartSource — REQ-063: end-to-end proof that a real
+// *smart.Source satisfies auth.Reauther and recovers from a wire 401 by running
+// its refresh_token grant. The cached token looks valid (far-future expiry, so
+// no proactive refresh fires), but the resource rejects it once — simulating
+// server-side revocation — and transport drives Source.Reauth, which POSTs a
+// refresh grant to the token endpoint, then retries with the fresh bearer.
+func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
+	var resourceHits atomic.Int32
+	var secondBearer atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/token" {
+			_ = r.ParseForm()
+			if r.Form.Get("grant_type") == "refresh_token" && r.Form.Get("refresh_token") != "" {
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"access_token":"fresh-tok","token_type":"Bearer","expires_in":3600}`))
+				return
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// Resource path: reject the stale bearer once, accept the refreshed one.
+		if int(resourceHits.Add(1)) == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		secondBearer.Store(r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("client-id", discovery.AuthEndpoints{
+		AuthorizationEndpoint: discovery.MustParseURL(srv.URL + "/authorize"),
+		TokenEndpoint:         discovery.MustParseURL(srv.URL + "/token"),
+	}, smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Non-stale access token (far-future expiry → no proactive refresh) plus a
+	// refresh token, so the 401→reauth safety net is what drives the refresh.
+	src.SetTokens(auth.Token{Value: "stale-tok", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "refresh-xyz")
+
+	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()), WithTokenSource(src), WithReauthOn401(src))
+	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if err != nil {
+		t.Fatalf("expected success after real-Source reauth, got %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+	if got, _ := secondBearer.Load().(string); got != "Bearer fresh-tok" {
+		t.Errorf("retry Authorization = %q, want Bearer fresh-tok", got)
+	}
+	if n := resourceHits.Load(); n != 2 {
+		t.Errorf("resource calls = %d, want 2 (401 then 200)", n)
 	}
 }
 
