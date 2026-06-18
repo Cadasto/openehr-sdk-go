@@ -2,18 +2,42 @@ package smart
 
 import (
 	"context"
+	"crypto"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 )
+
+const (
+	// clientAssertionType is the RFC 7523 client-assertion-type for
+	// private_key_jwt client authentication.
+	clientAssertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
+	// methodPrivateKeyJWT and methodClientSecretBasic are the
+	// token_endpoint_auth_method names used for the discovery cross-check
+	// (RFC 8414 / SMART client-confidential-asymmetric).
+	methodPrivateKeyJWT     = "private_key_jwt"
+	methodClientSecretBasic = "client_secret_basic"
+	methodClientSecretPost  = "client_secret_post"
+)
+
+// clientAssertionKey holds the asymmetric credential for private_key_jwt
+// client authentication on the token endpoint (SMART
+// client-confidential-asymmetric profile, REQ-068).
+type clientAssertionKey struct {
+	signer crypto.Signer
+	alg    string
+	kid    string
+}
 
 // Config carries SMART-on-openEHR OAuth2 settings (REQ-061–063).
 type Config struct {
@@ -27,6 +51,19 @@ type Config struct {
 	Issuer           string
 	RefreshThreshold time.Duration
 	JWKS             *JWKS
+
+	// clientAssertion carries the asymmetric private_key_jwt credential, set
+	// via WithClientAssertionKey. Mutually exclusive with ClientSecret.
+	clientAssertion *clientAssertionKey
+	// assertionSource is built in FromConfig from clientAssertion once the
+	// ClientID and token endpoint are known. When non-nil, postToken emits a
+	// signed client_assertion instead of HTTP Basic auth (REQ-068).
+	assertionSource jwtbearer.AssertionSource
+	// secretAuthMethod records how a configured ClientSecret is presented at
+	// the token endpoint — client_secret_basic (HTTP Basic, the default) or
+	// client_secret_post (credentials in the form body). Resolved by
+	// configureClientAuth from the server's advertised methods (REQ-068).
+	secretAuthMethod string
 }
 
 // Option mutates Config during construction.
@@ -37,9 +74,26 @@ func WithHTTPClient(c *http.Client) Option {
 	return func(cfg *Config) { cfg.HTTPClient = c }
 }
 
-// WithClientSecret enables confidential-client token exchange.
+// WithClientSecret enables confidential-client token exchange using
+// client_secret_basic (symmetric secret). Mutually exclusive with
+// WithClientAssertionKey.
 func WithClientSecret(secret string) Option {
 	return func(cfg *Config) { cfg.ClientSecret = secret }
+}
+
+// WithClientAssertionKey enables confidential-client token exchange using
+// private_key_jwt (RFC 7523 / SMART client-confidential-asymmetric, REQ-068).
+// The signed client_assertion authenticates the client at the token endpoint
+// in place of an HTTP Basic header. alg is the JOSE algorithm (RS384 default
+// per SMART; RS256/ES256/ES384 also supported by jwtbearer.ClaimsSigner); kid,
+// when set, is emitted as the JWS "kid" header. Mutually exclusive with
+// WithClientSecret — configuring both is rejected at construction.
+// signer must be non-nil; a nil signer is rejected at construction with
+// [auth.ErrInvalidConfig].
+func WithClientAssertionKey(signer crypto.Signer, alg, kid string) Option {
+	return func(cfg *Config) {
+		cfg.clientAssertion = &clientAssertionKey{signer: signer, alg: alg, kid: kid}
+	}
 }
 
 // WithRedirectURI sets the registered redirect URI.
@@ -119,6 +173,9 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.RefreshThreshold == 0 {
 		cfg.RefreshThreshold = 30 * time.Second
 	}
+	if err := configureClientAuth(&cfg); err != nil {
+		return nil, err
+	}
 	if cfg.Auth.JWKSURI != nil && cfg.JWKS == nil {
 		jwks, err := NewJWKS(cfg.HTTPClient, cfg.Auth.JWKSURI.String())
 		if err != nil {
@@ -127,6 +184,64 @@ func FromConfig(cfg Config) (*Source, error) {
 		cfg.JWKS = jwks
 	}
 	return &Source{cfg: cfg}, nil
+}
+
+// configureClientAuth resolves the confidential-client authentication method
+// for the token endpoint (REQ-068). It rejects ambiguous configuration (both an
+// assertion key and a client secret), builds the jwtbearer.ClaimsSigner for
+// private_key_jwt, and performs the G-3 discovery cross-check: when the
+// authorization server advertises token_endpoint_auth_methods_supported, the
+// method implied by the configured credential MUST be listed; an empty/absent
+// list is not constraining (skip).
+func configureClientAuth(cfg *Config) error {
+	hasSecret := cfg.ClientSecret != ""
+	hasAssertion := cfg.clientAssertion != nil
+	if hasSecret && hasAssertion {
+		return fmt.Errorf("%w: configure either WithClientSecret or WithClientAssertionKey, not both", auth.ErrInvalidConfig)
+	}
+
+	var method string
+	switch {
+	case hasAssertion:
+		method = methodPrivateKeyJWT
+		signer, err := jwtbearer.NewClaimsSigner(
+			jwtbearer.ClaimsTemplate{
+				Issuer:   cfg.ClientID,
+				Subject:  cfg.ClientID,
+				Audience: cfg.Auth.TokenEndpoint.String(),
+			},
+			cfg.clientAssertion.signer,
+			jwtbearer.WithAlgorithm(cfg.clientAssertion.alg),
+			jwtbearer.WithKeyID(cfg.clientAssertion.kid),
+		)
+		if err != nil {
+			return err
+		}
+		cfg.assertionSource = signer
+	case hasSecret:
+		// Default to client_secret_basic. When the server advertises methods
+		// but not basic, fall back to client_secret_post if it is offered, so
+		// a deployment that only accepts post-style credentials still works.
+		method = methodClientSecretBasic
+		if advertised := cfg.Auth.TokenEndpointAuthMethodsSupported; len(advertised) > 0 &&
+			!slices.Contains(advertised, methodClientSecretBasic) &&
+			slices.Contains(advertised, methodClientSecretPost) {
+			method = methodClientSecretPost
+		}
+		cfg.secretAuthMethod = method
+	default:
+		// Public client — no client authentication to cross-check.
+		return nil
+	}
+
+	// G-3: fail fast only when the server advertises methods and the
+	// configured one is absent. Empty/absent list is not constraining.
+	if advertised := cfg.Auth.TokenEndpointAuthMethodsSupported; len(advertised) > 0 &&
+		!slices.Contains(advertised, method) {
+		return fmt.Errorf("%w: configured client auth method %q is not in the server's advertised token_endpoint_auth_methods_supported %v",
+			auth.ErrInvalidConfig, method, advertised)
+	}
+	return nil
 }
 
 // NewFromCatalog builds a Source from a resolved ServiceCatalog.
@@ -269,10 +384,23 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	}
 	refreshTok := s.refresh
 	cur := s.cur
-	if refreshTok == "" && !cur.IsZero() {
-		// Stale but no refresh_token — return the cached access token
-		// without claiming inflight (REQ-026).
+	if refreshTok == "" && cur.IsZero() {
+		// Post-terminal state: both the access token and the refresh token have
+		// been cleared by a prior terminal failure (F-L). Return immediately
+		// without touching inflight — there is nothing to exchange (REQ-063).
 		s.mu.Unlock()
+		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
+	}
+	if refreshTok == "" && !cur.IsZero() {
+		s.mu.Unlock()
+		// No refresh_token, and the cached token is stale (within the proactive
+		// refresh threshold). If it is past ExpiresAt it MUST NOT be returned
+		// silently (REQ-063) — there is nothing to refresh with, so signal
+		// re-authentication. A still-valid token (near expiry but not yet past
+		// it) is returned as-is without claiming inflight (REQ-026).
+		if !cur.ExpiresAt.IsZero() && time.Until(cur.ExpiresAt) <= 0 {
+			return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("access token expired and no refresh_token")}
+		}
 		return cur, nil
 	}
 	ex := &tokenExchange{done: make(chan struct{})}
@@ -282,11 +410,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	var tok auth.Token
 	var err error
 	var refreshedTR TokenResponse
-	if refreshTok != "" {
-		tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
-	} else {
-		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
-	}
+	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
 
 	s.mu.Lock()
 	if err == nil {
@@ -295,6 +419,18 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		if refreshedTR.AccessToken != "" {
 			s.lastTR = refreshedTR
 		}
+	} else {
+		// F-L: on a terminal failure clear the refresh token and the cached
+		// access token so that subsequent Token() calls deterministically
+		// return ErrReauthRequired without issuing another doomed POST.
+		// On transient failures (5xx, network, ctx) retain both so callers
+		// may retry (REQ-063).
+		var ex2 *auth.ExchangeError
+		if errors.As(err, &ex2) && ex2.Terminal() {
+			s.refresh = ""
+			s.cur = auth.Token{}
+			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}
+		}
 	}
 	s.inflight = nil
 	s.mu.Unlock()
@@ -302,6 +438,53 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	ex.err = err
 	close(ex.done)
 	return tok, err
+}
+
+// RefreshIfNeeded refreshes the access token only when it is within the
+// configured threshold (i.e. stale) and a refresh token is present. It is a
+// no-op returning nil when the current token is still fresh. On failure it
+// returns the same error contract as Token (REQ-063).
+func (s *Source) RefreshIfNeeded(ctx context.Context) error {
+	s.mu.Lock()
+	if !s.staleLocked() || s.refresh == "" {
+		s.mu.Unlock()
+		return nil
+	}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
+	return err
+}
+
+// Reauth forces the cached access token to be treated as stale and drives a
+// refresh on the next token acquisition, even when the token has not yet crossed
+// the proactive-refresh threshold. Use it to recover from a wire 401. If a
+// refresh is already in flight (e.g. concurrent 401 recovery), Reauth coalesces
+// onto it rather than issuing a duplicate request (single-flight, REQ-026). On a
+// terminal refresh failure it clears the refresh token and returns
+// ErrReauthRequired.
+//
+// When no refresh_token is available there is nothing to exchange, so Reauth
+// does NOT discard the cached access token (a wire 401 may be scope-related
+// rather than an expiry, and a public client has no other credential to fall
+// back on). It returns ErrReauthRequired, clearing the cached token only when
+// it is already past ExpiresAt — which MUST NOT be used silently (REQ-063).
+func (s *Source) Reauth(ctx context.Context) error {
+	s.mu.Lock()
+	if s.refresh == "" {
+		expired := !s.cur.IsZero() && !s.cur.ExpiresAt.IsZero() && time.Until(s.cur.ExpiresAt) <= 0
+		if expired {
+			s.cur = auth.Token{}
+		}
+		s.mu.Unlock()
+		return &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no refresh_token; re-authentication required")}
+	}
+	// A refresh_token is available: mark the current token stale so the next
+	// Token() executes the refresh even if it has not yet crossed the
+	// proactive-refresh threshold.
+	s.cur = auth.Token{}
+	s.mu.Unlock()
+	_, err := s.Token(ctx)
+	return err
 }
 
 func (s *Source) staleLocked() bool {
@@ -335,13 +518,39 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 }
 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
+	// Client authentication is selected deterministically (REQ-068):
+	//   - assertion signer configured → private_key_jwt (signed client_assertion)
+	//   - else client secret set      → client_secret_basic (HTTP Basic) or
+	//     client_secret_post (credentials in the form body), per the method
+	//     resolved by configureClientAuth from the server's advertised methods
+	//   - else                        → public client (no client auth)
+	useBasic := false
+	if s.cfg.assertionSource != nil {
+		assertion, err := s.cfg.assertionSource.Assertion(ctx)
+		if err != nil {
+			return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{
+				Sentinel: auth.ErrTokenExchangeFailed,
+				Inner:    fmt.Errorf("client_assertion signing: %w", err),
+			}
+		}
+		form.Set("client_assertion_type", clientAssertionType)
+		form.Set("client_assertion", assertion)
+	} else if s.cfg.ClientSecret != "" {
+		if s.cfg.secretAuthMethod == methodClientSecretPost {
+			form.Set("client_id", s.cfg.ClientID)
+			form.Set("client_secret", s.cfg.ClientSecret)
+		} else {
+			useBasic = true
+		}
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return auth.Token{}, TokenResponse{}, "", &auth.ExchangeError{Sentinel: auth.ErrTokenExchangeFailed, Inner: err}
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	if s.cfg.ClientSecret != "" {
+	if useBasic {
 		req.SetBasicAuth(s.cfg.ClientID, s.cfg.ClientSecret)
 	}
 	resp, err := s.cfg.HTTPClient.Do(req)

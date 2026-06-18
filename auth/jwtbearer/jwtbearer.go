@@ -5,7 +5,9 @@
 // Two signing modes are offered:
 //
 //   - ClaimsSigner — the SDK signs claims with a held crypto.Signer
-//     (RS256 in v1). Use when the consumer owns the private key.
+//     (default RS384; SMART client-confidential-asymmetric baseline —
+//     RS256/ES256/ES384 also supported). Use when the consumer owns the
+//     private key, including opaque KMS/HSM adapters.
 //   - AssertionFunc / StaticAssertion — the consumer supplies a
 //     pre-signed assertion. Use when the assertion is minted by an
 //     upstream identity broker.

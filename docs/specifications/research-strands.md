@@ -73,21 +73,17 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-05 — SMART-on-openEHR auth library
 
-**Status:** Open.
+**Status:** Resolved. See [ADR 0009](../adr/0009-smart-auth-library-scope.md).
 
-**Question:** There is no batteries-included Go substrate for OAuth2 / SMART-on-openEHR; implementing `auth/smart` is first-party work. What's the implementation plan and how is it validated?
+**Question (resolved):** There is no batteries-included Go substrate for OAuth2 / SMART-on-openEHR; implementing `auth/smart` is first-party work. What's the implementation plan and how is it validated?
 
-**Why it's open:** REQ-061..064 describe the *contract*. The implementation is non-trivial: PKCE, JWKS rotation, refresh, launch context, error mapping. There is risk of subtle drift from the SMART App Launch specification.
+**Decision summary:**
 
-**Evidence needed:**
+- Built the full SMART-on-openEHR auth library across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, `auth/introspect`, and `smart/discovery`. Four flows (PKCE public, confidential symmetric, confidential asymmetric `private_key_jwt`, Backend Services) and three launch modes (standalone, embedded, backend) are covered and exercised by PROBE-001..009.
+- Relaxed the OTel-only dependency rule: adopted `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and (transitively) `github.com/go-jose/go-jose/v4` for security-sensitive JOSE/OIDC crypto, scoped to `auth/` and `smart/`. Hand-rolling JWS signing and ID-token verification at the RS384/ES384/RS256/ES256 multi-alg level was rejected as a correctness and maintenance risk.
+- `auth.FromOAuth2TokenSource` adapter and an issuer-matching multi-EHR helper are recorded as available follow-ups (not built — no current consumer need). See ADR 0009 § (c).
 
-- Implement against a reference SMART-on-openEHR deployment.
-- Validate against PROBE-001..007 (the auth probes).
-- Compare wire output to the expected envelopes from a reference deployment.
-
-**Resolution form:** ADR-NNN documenting the auth library scope, dependencies (e.g. `golang.org/x/oauth2` vs hand-rolled), and the conformance-probe pass evidence. Amends REQ-061..064.
-
-**Implementation gate:** Phase 2 — affects every consumer that isn't already using `auth/clientcreds`.
+**Codified in:** [ADR 0009](../adr/0009-smart-auth-library-scope.md). Amends REQ-061..064.
 
 ---
 
@@ -159,7 +155,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-02](#strand-02--shared-contract-source-of-truth-php--go) | Shared contract source-of-truth | **Cancelled** | — |
 | [STRAND-03](#strand-03--go-idiomatic-surface-validation) | Go-idiomatic surface | **Resolved** | REQ-021..024 |
 | [STRAND-04](#strand-04--rm-polymorphism-and-codec-performance) | RM polymorphism + codec perf | **Partially resolved** | REQ-024, REQ-040, REQ-052..053 |
-| [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | Open | REQ-061..064 |
+| [STRAND-05](#strand-05--smart-on-openehr-auth-library) | SMART-on-openEHR auth library | **Resolved** ([ADR 0009](../adr/0009-smart-auth-library-scope.md)) | REQ-061..064 |
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |

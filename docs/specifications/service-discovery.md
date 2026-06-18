@@ -4,9 +4,16 @@
 
 How the SDK resolves service base URLs from a SMART-on-openEHR deployment, and how non-discovering backends are supported. Covers REQ-070 through REQ-073.
 
-A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document. The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
+A SMART-on-openEHR deployment advertises **service base URLs** via a discovery document (canonical spec: [ITS-REST/development § SMART App Launch](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html)). The relevant service identifiers for this SDK include `org.openehr.rest` (the openEHR REST API) plus deployment-specific identifiers for Cadasto Extra, Datamap, Admin, and other extras. On a Cadasto deployment, the same discovery document advertises **`org.openehr.rest`** *and* **`org.fhir.rest`** — the openEHR-side SDK consumes the former and ignores the latter, while a FHIR-side SDK does the reverse.
 
 The SDK treats discovery as a **first-class step**, not an implementation detail of constructor convenience.
+
+## Canonical sources
+
+- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — normative definition of the SMART discovery document shape for openEHR deployments, the `services` map, and openEHR-specific service identifiers.
+- **HL7 SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the `/.well-known/smart-configuration` endpoint, required and optional metadata fields (including `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `scopes_supported`, and algorithm-support lists).
+
+See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency decisions that underpin the discovery implementation.
 
 ## ServiceCatalog
 
@@ -48,9 +55,18 @@ type AuthEndpoints struct {
     TokenEndpoint         *url.URL
     JWKSURI               *url.URL
     RegistrationEndpoint  *url.URL // optional
+    // Optional endpoints — nil when absent; no error.
+    IntrospectionEndpoint *url.URL // RFC 7662; feeds Phase 5b
+    RevocationEndpoint    *url.URL // RFC 7009
+    ManagementEndpoint    *url.URL // SMART management endpoint
     ScopesSupported       []string
     ResponseTypesSupported []string
     CodeChallengeMethodsSupported []string
+    GrantTypesSupported   []string
+    TokenEndpointAuthMethodsSupported          []string // feeds Phase 3b G-3
+    TokenEndpointAuthSigningAlgValuesSupported []string // feeds Phase 3b alg selection (REQ-062)
+    IDTokenSigningAlgValuesSupported           []string // ID-token verify allowlist, consumed by ValidateIDToken (REQ-062, REQ-064)
+    Capabilities []string
 }
 ```
 
@@ -102,6 +118,17 @@ The discovery cache **MUST**:
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
 
+**Bullet 3 — catalog refresh on 401 via transport hook (Phase 4b).** A consumer that wants the transport layer to drive a catalog refresh on a wire `401` can supply a `ReautherFunc` closure to `transport.WithReauthOn401`:
+
+```go
+transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
+    _, err := resolver.Refresh(ctx, issuer)
+    return err
+}))
+```
+
+`auth.ReautherFunc` satisfies `auth.Reauther` without importing `smart/discovery` into `transport/`. The transport calls the closure at most once per `Do` invocation; on a second `401` after the retry it surfaces `transport.ErrUnauthorized`. This wires REQ-071 bullet 3 (invalidate on 401 + retry once) through the opt-in transport safety net described in [auth.md § REQ-063](auth.md#req-063--token-refresh).
+
 Cache implementation:
 
 - The default cache is in-process (a `sync.Map` keyed by issuer URL).
@@ -122,7 +149,7 @@ type Cache interface {
 On every resolution and every refresh, the SDK **MUST**:
 
 - Verify required services are present. Missing required services **MUST** produce a typed `DiscoveryError` with the missing service IDs enumerated.
-- Verify spec-version compatibility. The advertised `spec_version` on a required service **MUST** match the SDK's pinned target (REQ-050). A mismatch **MUST** produce a typed `DiscoveryError` — do **not** fall through to the first request and discover the mismatch as a `400 Bad Request`.
+- Verify spec-version compatibility. When a service entry advertises a `spec_version`, it **MUST** match the SDK's pinned target (REQ-050) or the caller-widened set; a mismatch **MUST** produce a typed `DiscoveryError`. When a service entry does **not** advertise `spec_version` (field absent or empty) and the caller has not explicitly narrowed the accepted set via `WithAcceptedSpecVersions`, the check is **skipped** — absence is treated as acceptable (ADR 0008). This preserves strict behaviour for callers that pin versions explicitly.
 - Validate URL well-formedness. Malformed `BaseURL` / `AuthorizationEndpoint` / etc. **MUST** produce a typed `DiscoveryError`.
 
 Soft compatibility (forward-compatible spec micro-versions) **MAY** be allowed via a functional option:
@@ -200,11 +227,35 @@ Discovery errors **MUST** be distinguishable from wire errors via `errors.As(err
 - **Cross-issuer aggregation.** The federator use case constructs one client per issuer (REQ-065); the SDK does not aggregate catalogs across issuers.
 - **FHIR-side service consumption.** Even when the discovery document advertises `org.fhir.rest`, the SDK ignores it. A sibling FHIR SDK consumes that service.
 
+## Surfaced authorization-server metadata (REQ-070, REQ-062)
+
+The resolver parses and surfaces the following SMART authorization-server metadata fields onto `AuthEndpoints`. All fields are optional — absent fields resolve to nil/empty with no error.
+
+| Wire field | `AuthEndpoints` field | Notes |
+|---|---|---|
+| `introspection_endpoint` | `IntrospectionEndpoint *url.URL` | RFC 7662; feeds Phase 5b introspection client (REQ-062) |
+| `revocation_endpoint` | `RevocationEndpoint *url.URL` | RFC 7009 token revocation |
+| `management_endpoint` | `ManagementEndpoint *url.URL` | SMART management endpoint |
+| `token_endpoint_auth_methods_supported` | `TokenEndpointAuthMethodsSupported []string` | Client-auth method list; feeds Phase 3b G-3 selection |
+| `token_endpoint_auth_signing_alg_values_supported` | `TokenEndpointAuthSigningAlgValuesSupported []string` | Client-assertion (client-auth) JWS alg list; feeds Phase 3b alg selection (REQ-062) — surface-only in v0.8 |
+| `id_token_signing_alg_values_supported` | `IDTokenSigningAlgValuesSupported []string` | Selects the **ID-token verify allowlist** — pass it to `smart.WithIDTokenSigningAlgs` so `ValidateIDToken` constrains accepted signature algorithms (RS256/RS384/ES256/ES384). Consumed as of Phase 3e (REQ-062, REQ-064; see [auth.md](auth.md#req-062--jwks-rotation)) |
+
+Most of these fields are now **consumed**, not merely surfaced:
+
+- `id_token_signing_alg_values_supported` → the ID-token verifier's accepted-algorithm allowlist (Phase 3e; pass via `smart.WithIDTokenSigningAlgs`).
+- `token_endpoint_auth_methods_supported` → `auth/smart.FromConfig` cross-checks it against the configured credential's implied method (G-3; a mismatch is rejected with `auth.ErrInvalidConfig`).
+- `introspection_endpoint` → the opt-in RFC 7662 client `auth/introspect` (REQ-062).
+
+Two remain **surface-only** in v0.8 (populated but with no consuming logic wired): `token_endpoint_auth_signing_alg_values_supported` (client-assertion alg auto-selection) and `revocation_endpoint` / `management_endpoint` (no revocation/management client yet).
+
+The `smart/discovery` package also exports openEHR SMART capability string constants (`CapabilityContextOpenEHREHR`, `CapabilityContextOpenEHREpisode`, `CapabilityOpenEHRPermissionV1`, `CapabilityLaunchBase64JSON`) for consumers that need to branch on the `capabilities` array.
+
 ## Coverage matrix
 
 | Topic | REQ | Lives in |
 |---|---|---|
 | First-class catalog | REQ-070 | `smart/discovery/`, every typed client constructor |
+| Auth-server metadata surface | REQ-070, REQ-062 | `smart/discovery/` |
 | Cache + refresh | REQ-071 | `smart/discovery/` |
 | Validation | REQ-072 | `smart/discovery/` |
 | Trust posture | REQ-073 | `smart/discovery/` |

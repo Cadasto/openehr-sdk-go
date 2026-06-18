@@ -2,13 +2,12 @@ package smart
 
 import (
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
-	"fmt"
+
+	"golang.org/x/oauth2"
 )
 
 const (
-	codeVerifierLen = 64
 	challengeMethod = "S256"
 	stateLen        = 32 // 256-bit CSRF state entropy (RFC 6749 §10.10)
 )
@@ -19,18 +18,17 @@ type PKCEPair struct {
 	Challenge string
 }
 
-// NewPKCEPair generates a cryptographically random code_verifier and
-// its S256 code_challenge (REQ-061). Plain challenge method is
-// prohibited.
+// NewPKCEPair generates a cryptographically random code_verifier and its S256
+// code_challenge (REQ-061), delegating to golang.org/x/oauth2's RFC 7636
+// helpers (GenerateVerifier — 32 octets of entropy — and
+// S256ChallengeFromVerifier). The plain challenge method is never used. The
+// error return is retained for API stability; the current implementation does
+// not fail.
 func NewPKCEPair() (PKCEPair, error) {
-	verifier, err := randBase64URL(codeVerifierLen)
-	if err != nil {
-		return PKCEPair{}, fmt.Errorf("smart: generate code_verifier: %w", err)
-	}
-	sum := sha256.Sum256([]byte(verifier))
+	v := oauth2.GenerateVerifier()
 	return PKCEPair{
-		Verifier:  verifier,
-		Challenge: base64URLEncode(sum[:]),
+		Verifier:  v,
+		Challenge: oauth2.S256ChallengeFromVerifier(v),
 	}, nil
 }
 
@@ -39,7 +37,7 @@ func base64URLEncode(b []byte) string {
 }
 
 // randBase64URL returns n cryptographically random bytes encoded as an
-// unpadded base64url string.
+// unpadded base64url string. Used for the OAuth `state` (CSRF) value.
 func randBase64URL(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

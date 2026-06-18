@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -104,7 +105,8 @@ func TestResolveSpecVersionMismatch(t *testing.T) {
 func TestResolveAcceptedVersionsWiden(t *testing.T) {
 	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
-	r := mustResolver(t,
+	r := mustResolver(
+		t,
 		WithHTTPClient(srv.Client()),
 		WithAcceptedSpecVersions(SpecVersionPin, "1.0.3"),
 	)
@@ -140,7 +142,8 @@ func TestResolveCacheExpiry(t *testing.T) {
 		_, _ = w.Write(cassetteBytes(t, "smart-configuration.json"))
 	}))
 	defer srv.Close()
-	r := mustResolver(t,
+	r := mustResolver(
+		t,
 		WithHTTPClient(srv.Client()),
 		WithDefaultTTL(1*time.Millisecond),
 	)
@@ -228,7 +231,7 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 
 func TestResolveMalformedURL(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.WriteString(w, `{"services":[{"id":"org.openehr.rest","base_url":"::not a url"}]}`)
+		_, _ = io.WriteString(w, `{"services":{"org.openehr.rest":{"baseUrl":"::not a url"}}}`)
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
@@ -337,7 +340,7 @@ func TestResolveIssuerMismatch(t *testing.T) {
 		"issuer":"https://evil.example.com",
 		"authorization_endpoint":"https://evil.example.com/auth",
 		"token_endpoint":"https://evil.example.com/token",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -362,7 +365,7 @@ func TestResolveIssuerMatch(t *testing.T) {
 			"issuer":"` + srv.URL + `",
 			"authorization_endpoint":"https://auth.example.com/auth",
 			"token_endpoint":"https://auth.example.com/token",
-			"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+			"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 		}`
 		_, _ = io.WriteString(w, body)
 	}))
@@ -388,7 +391,7 @@ func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 		"authorization_endpoint":"http://attacker.example/auth",
 		"token_endpoint":"http://attacker.example/token",
 		"jwks_uri":"http://attacker.example/keys",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -418,7 +421,7 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 		"authorization_endpoint":"http://dev.example/auth",
 		"token_endpoint":"http://dev.example/token",
 		"jwks_uri":"http://dev.example/keys",
-		"services":[{"id":"org.openehr.rest","base_url":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}]
+		"services":{"org.openehr.rest":{"baseUrl":"https://api.example.com/openehr/v1","spec_version":"1.1.0-development"}}
 	}`
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, body)
@@ -434,6 +437,153 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 	if cat == nil {
 		t.Fatal("expected non-nil catalog")
 	}
+}
+
+// TestResolveCanonicalServicesMap verifies that the resolver correctly parses
+// a SMART configuration document whose "services" field uses the canonical
+// JSON object/map shape with camelCase "baseUrl" key (REQ-070).
+//
+// The SDK previously decoded "services" as an array with snake_case "base_url",
+// which is non-canonical and causes discovery to fail against real platforms.
+// This test uses the correct canonical shape and must fail before the fix.
+func TestResolveCanonicalServicesMap(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprintf(w, `{
+		  "issuer": %q,
+		  "authorization_endpoint": %q,
+		  "token_endpoint": %q,
+		  "services": {"org.openehr.rest": {"baseUrl": %q}}
+		}`, srv.URL, srv.URL+"/authorize", srv.URL+"/token", srv.URL+"/openehr/v1")
+	}))
+	defer srv.Close()
+	res, err := NewResolver(nil, WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cat, err := res.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	e, ok := cat.OpenEHRRest()
+	if !ok || e.BaseURL == nil {
+		t.Fatalf("org.openehr.rest missing or no BaseURL: %#v", cat.Services)
+	}
+	if e.BaseURL.String() != srv.URL+"/openehr/v1" {
+		t.Errorf("BaseURL = %q, want %q", e.BaseURL.String(), srv.URL+"/openehr/v1")
+	}
+}
+
+// TestResolveSurfacesAuthMetadata verifies that the resolver surfaces all
+// SMART authorization-server metadata fields onto AuthEndpoints (REQ-062,
+// REQ-070): the three optional endpoint URLs (introspection, revocation,
+// management), the token-endpoint auth signing-alg list, the id-token
+// signing-alg list, and the token-endpoint auth-methods list.
+//
+// This is surface-only: the test asserts the values are parsed and
+// propagated — no consuming logic (alg selection, method selection, etc.)
+// is tested here.
+func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
+	var srv *httptest.Server
+	srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body := `{
+			"issuer": "` + srv.URL + `",
+			"authorization_endpoint": "https://auth.example.com/authorize",
+			"token_endpoint": "https://auth.example.com/token",
+			"jwks_uri": "https://auth.example.com/jwks",
+			"introspection_endpoint": "https://auth.example.com/introspect",
+			"revocation_endpoint": "https://auth.example.com/revoke",
+			"management_endpoint": "https://auth.example.com/manage",
+			"token_endpoint_auth_methods_supported": ["private_key_jwt", "client_secret_basic"],
+			"token_endpoint_auth_signing_alg_values_supported": ["RS384", "ES384"],
+			"id_token_signing_alg_values_supported": ["RS256", "ES384"],
+			"services": {"org.openehr.rest": {"baseUrl": "https://api.example.com/openehr/v1"}}
+		}`
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, body)
+	}))
+	srv.Start()
+	defer srv.Close()
+
+	r := mustResolver(t, WithHTTPClient(srv.Client()))
+	cat, err := r.Resolve(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	auth := cat.Auth
+
+	// --- three optional endpoint URLs (full serialized URL, not partial field) ---
+	if got := auth.IntrospectionEndpoint.String(); got != "https://auth.example.com/introspect" {
+		t.Errorf("IntrospectionEndpoint = %v, want https://auth.example.com/introspect", got)
+	}
+	if got := auth.RevocationEndpoint.String(); got != "https://auth.example.com/revoke" {
+		t.Errorf("RevocationEndpoint = %v, want https://auth.example.com/revoke", got)
+	}
+	if got := auth.ManagementEndpoint.String(); got != "https://auth.example.com/manage" {
+		t.Errorf("ManagementEndpoint = %v, want https://auth.example.com/manage", got)
+	}
+
+	// --- auth-methods list (may already be surfaced by Phase 1; verify value) ---
+	if !containsString(auth.TokenEndpointAuthMethodsSupported, "private_key_jwt") {
+		t.Errorf("TokenEndpointAuthMethodsSupported = %v, want [private_key_jwt ...]", auth.TokenEndpointAuthMethodsSupported)
+	}
+
+	// --- token-endpoint signing-alg list (feeds Phase 3b G-3; surface only) ---
+	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "RS384") {
+		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
+	}
+	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "ES384") {
+		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
+	}
+
+	// --- id-token signing-alg list (feeds Phase 3e verify allowlist; surface only) ---
+	if !containsString(auth.IDTokenSigningAlgValuesSupported, "RS256") {
+		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
+	}
+	if !containsString(auth.IDTokenSigningAlgValuesSupported, "ES384") {
+		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
+	}
+}
+
+// TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil verifies that optional
+// endpoint fields are nil when the discovery document omits them (REQ-062).
+// This solidifies the "Nil when absent" contract for IntrospectionEndpoint,
+// RevocationEndpoint, and ManagementEndpoint.
+func TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil(t *testing.T) { // REQ-062
+	t.Run("absent endpoints are nil", func(t *testing.T) {
+		var srv *httptest.Server
+		srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Minimal valid discovery doc — no introspection/revocation/management.
+			body := `{
+				"issuer": "` + srv.URL + `",
+				"authorization_endpoint": "https://auth.example.com/authorize",
+				"token_endpoint": "https://auth.example.com/token",
+				"jwks_uri": "https://auth.example.com/jwks",
+				"services": {"org.openehr.rest": {"baseUrl": "https://api.example.com/openehr/v1"}}
+			}`
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, body)
+		}))
+		srv.Start()
+		defer srv.Close()
+
+		r := mustResolver(t, WithHTTPClient(srv.Client()))
+		cat, err := r.Resolve(context.Background(), srv.URL)
+		if err != nil {
+			t.Fatalf("resolve: %v", err)
+		}
+		auth := cat.Auth
+
+		if auth.IntrospectionEndpoint != nil {
+			t.Errorf("IntrospectionEndpoint = %v, want nil when absent from discovery doc", auth.IntrospectionEndpoint)
+		}
+		if auth.RevocationEndpoint != nil {
+			t.Errorf("RevocationEndpoint = %v, want nil when absent from discovery doc", auth.RevocationEndpoint)
+		}
+		if auth.ManagementEndpoint != nil {
+			t.Errorf("ManagementEndpoint = %v, want nil when absent from discovery doc", auth.ManagementEndpoint)
+		}
+	})
 }
 
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {

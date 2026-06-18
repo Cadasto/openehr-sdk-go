@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/auth"
+	"github.com/cadasto/openehr-sdk-go/auth/jwtbearer"
 )
 
 // AuthMethod selects how the client authenticates to the token
@@ -43,6 +44,13 @@ const (
 	// request body ("client_secret_post"). Use when the deployment
 	// rejects Basic auth (some legacy authorization servers).
 	AuthPost
+	// AuthPrivateKeyJWT uses a signed JWT client_assertion (RFC 7523 /
+	// SMART Backend Services). FromConfig sets this automatically when
+	// WithClientAssertion is used — the field then reflects the actual
+	// auth method in use. Setting AuthPrivateKeyJWT manually without
+	// also calling WithClientAssertion is an error: FromConfig will
+	// return auth.ErrInvalidConfig.
+	AuthPrivateKeyJWT
 )
 
 // Config carries the constructor inputs. Use New(...Option) for the
@@ -56,7 +64,8 @@ type Config struct {
 	TokenURL string
 	// ClientID identifies the registered confidential client.
 	ClientID string
-	// ClientSecret is the corresponding secret. Required.
+	// ClientSecret is the shared secret. Required unless ClientAssertion is set.
+	// Mutually exclusive with ClientAssertion.
 	ClientSecret string
 	// Scope is the space-separated scope to request; empty omits the
 	// scope parameter (deployment-defined default scope applies).
@@ -65,7 +74,13 @@ type Config struct {
 	// authorization servers that require explicit audience binding.
 	Audience string
 	// AuthMethod selects HTTP Basic vs form-body credentialing.
+	// Ignored when ClientAssertion is set (AuthPrivateKeyJWT is used instead).
 	AuthMethod AuthMethod
+	// ClientAssertion, when set, enables SMART Backend Services asymmetric
+	// client authentication (RFC 7523). The source is called once per token
+	// exchange to produce a freshly signed JWT. Mutually exclusive with
+	// ClientSecret. (REQ-068)
+	ClientAssertion jwtbearer.AssertionSource
 	// RefreshThreshold is how long before ExpiresAt the source treats
 	// the cached token as stale and triggers a refresh. Default 30s
 	// (matches docs/specifications/auth.md REQ-063).
@@ -100,6 +115,15 @@ func WithRefreshThreshold(d time.Duration) Option {
 
 // WithIssuer sets the issuer URL recorded on produced tokens.
 func WithIssuer(iss string) Option { return func(cfg *Config) { cfg.Issuer = iss } }
+
+// WithClientAssertion enables SMART Backend Services asymmetric client
+// authentication (RFC 7523). The provided AssertionSource is called once per
+// token exchange to produce a freshly signed JWT bearer assertion. When set,
+// ClientSecret MUST be empty (the two methods are mutually exclusive; both set
+// is rejected by FromConfig with auth.ErrInvalidConfig). (REQ-068)
+func WithClientAssertion(src jwtbearer.AssertionSource) Option {
+	return func(cfg *Config) { cfg.ClientAssertion = src }
+}
 
 // Source is the client_credentials TokenSource. Safe for concurrent
 // use; concurrent Token() callers coalesce around one outgoing
@@ -145,8 +169,17 @@ func FromConfig(cfg Config) (*Source, error) {
 	if cfg.ClientID == "" {
 		return nil, fmt.Errorf("%w: ClientID is required", auth.ErrInvalidConfig)
 	}
-	if cfg.ClientSecret == "" {
-		return nil, fmt.Errorf("%w: ClientSecret is required", auth.ErrInvalidConfig)
+	if cfg.ClientSecret != "" && cfg.ClientAssertion != nil {
+		return nil, fmt.Errorf("%w: ClientSecret and ClientAssertion are mutually exclusive", auth.ErrInvalidConfig)
+	}
+	if cfg.AuthMethod == AuthPrivateKeyJWT && cfg.ClientAssertion == nil {
+		return nil, fmt.Errorf("%w: AuthPrivateKeyJWT requires WithClientAssertion", auth.ErrInvalidConfig)
+	}
+	if cfg.ClientSecret == "" && cfg.ClientAssertion == nil {
+		return nil, fmt.Errorf("%w: ClientSecret is required (or provide ClientAssertion for SMART Backend Services)", auth.ErrInvalidConfig)
+	}
+	if cfg.ClientAssertion != nil {
+		cfg.AuthMethod = AuthPrivateKeyJWT
 	}
 	if cfg.TokenURL == "" {
 		return nil, fmt.Errorf("%w: TokenURL is required", auth.ErrInvalidConfig)
@@ -236,9 +269,31 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	if s.cfg.Audience != "" {
 		form.Set("audience", s.cfg.Audience)
 	}
-	if s.cfg.AuthMethod == AuthPost {
+
+	// Credential emission: private_key_jwt (SMART Backend Services) takes
+	// priority; otherwise fall back to client_secret_post or client_secret_basic.
+	var basicAuth bool
+	if s.cfg.ClientAssertion != nil {
+		// SMART Backend Services: RFC 7523 asymmetric client authentication.
+		// Call Assertion within fetch (outside the mutex) to avoid holding the
+		// lock during a potentially slow signing/network operation. This is safe
+		// because fetch is only called by Token() after releasing the mutex and
+		// setting the in-flight exchange sentinel.
+		assertionVal, err := s.cfg.ClientAssertion.Assertion(ctx)
+		if err != nil {
+			return auth.Token{}, &auth.ExchangeError{
+				Sentinel: auth.ErrTokenExchangeFailed,
+				Inner:    fmt.Errorf("client_assertion signing: %w", err),
+			}
+		}
+		form.Set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+		form.Set("client_assertion", assertionVal)
+	} else if s.cfg.AuthMethod == AuthPost {
 		form.Set("client_id", s.cfg.ClientID)
 		form.Set("client_secret", s.cfg.ClientSecret)
+	} else {
+		// AuthBasic (default): set Basic auth header after building the request.
+		basicAuth = true
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.tokenURL.String(), strings.NewReader(form.Encode()))
@@ -247,7 +302,7 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	if s.cfg.AuthMethod == AuthBasic {
+	if basicAuth {
 		// RFC 6749 §2.3.1: client_id and client_secret are form-encoded
 		// (Appendix B) before use as the Basic username and password.
 		// net/http documents the same requirement for OAuth2.

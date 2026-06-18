@@ -123,9 +123,14 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
-	tracer := otel.GetTracerProvider().Tracer(tracerName)
+	tp := c.cfg.tracerProvider
+	if tp == nil {
+		tp = otel.GetTracerProvider()
+	}
+	tracer := tp.Tracer(tracerName)
 	spanName := req.effectiveMethod() + " " + req.effectiveRoute()
-	ctx, span := tracer.Start(ctx, spanName,
+	ctx, span := tracer.Start(
+		ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("http.method", req.effectiveMethod()),
@@ -145,15 +150,43 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		start = time.Now()
 	}
 	var (
-		resp    *Response
-		lastErr error
-		attempt int
+		resp        *Response
+		lastErr     error
+		attempt     int // retry-policy attempt index; may be capped at reauth
+		otelAttempt int // monotonically-increasing total attempt index (never reset)
+		reauthed    bool
 	)
 	for {
 		attempt++
-		span.SetAttributes(attribute.Int("retry.attempt", attempt-1))
+		otelAttempt++
+		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
 		if !c.shouldRetry(req, resp, lastErr, attempt) {
+			// 401→reauth safety net (REQ-063, opt-in): if the final error is
+			// a wire 401, a Reauther is configured, and this Do call has not
+			// yet reauthed, invoke Reauth once and retry the request once.
+			// The retry re-fetches the token via tokenSourceFor → now fresh.
+			// On a second 401 (or if Reauth itself fails) the error is
+			// surfaced unchanged. This guard fires at most once per Do call.
+			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) {
+				reauthed = true
+				if raErr := c.cfg.reauther.Reauth(ctx); raErr != nil {
+					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
+					break
+				}
+				// Single reauth-retry: cap attempt at MaxAttempts so that
+				// shouldRetry returns false on the very next iteration,
+				// granting exactly one additional upstream call without
+				// reopening the 5xx retry budget (REQ-063, REQ-091).
+				// When retry is disabled (MaxAttempts ≤ 1), attempt is
+				// already beyond the budget — shouldRetry still returns
+				// false and the loop runs once more before the inner guard
+				// (reauthed==true) prevents further reauth loops.
+				if c.cfg.retry.enabled() {
+					attempt = c.cfg.retry.MaxAttempts
+				}
+				continue
+			}
 			break
 		}
 		wait := c.cfg.retry.backoff(attempt)
@@ -167,7 +200,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
 		if c.cfg.observer != nil {
-			c.emitObservation(ctx, req, target, resp, lastErr, attempt, time.Since(start))
+			c.emitObservation(ctx, req, target, resp, lastErr, otelAttempt, time.Since(start))
 		}
 		return resp, lastErr
 	}
@@ -178,7 +211,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 	}
 	if c.cfg.observer != nil {
-		c.emitObservation(ctx, req, target, resp, nil, attempt, time.Since(start))
+		c.emitObservation(ctx, req, target, resp, nil, otelAttempt, time.Since(start))
 	}
 	return resp, nil
 }
@@ -422,6 +455,13 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 	return &d, true
 }
 
+// isWire401 reports whether err is a *WireError whose StatusCode is 401.
+// Used by the opt-in 401→reauth guard in Do (REQ-063).
+func isWire401(err error) bool {
+	var we *WireError
+	return errors.As(err, &we) && we.StatusCode == 401
+}
+
 // shouldRetry consults the configured RetryPolicy. Network errors are
 // retried in addition to retriable HTTP statuses (mirroring the
 // "transport-level transient failures" rationale of REQ-091).
@@ -435,12 +475,19 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 	if err != nil {
 		// A *WireError carries a status — defer to the status-based
 		// retriable check so RetriableStatus is the single gate.
-		// Anything else is a network / transport / token error;
-		// retry per the method's idempotency.
 		var we *WireError
 		if errors.As(err, &we) {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
 		}
+		// Token-source errors that are deterministically terminal (the config
+		// is invalid, or re-authentication is required and nothing can refresh
+		// it) will fail identically on every attempt — retrying only burns the
+		// budget and re-invokes Token(). Treat them as non-retriable.
+		if errors.Is(err, auth.ErrReauthRequired) || errors.Is(err, auth.ErrInvalidConfig) {
+			return false
+		}
+		// Anything else is a network / transport / transient token error;
+		// retry per the method's idempotency.
 		return true
 	}
 	if resp == nil {

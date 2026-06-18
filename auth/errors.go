@@ -97,3 +97,26 @@ func (e *ExchangeError) Unwrap() []error {
 	}
 	return out
 }
+
+// Terminal reports whether the token-endpoint failure is permanent — a 4xx
+// response whose OAuth2 envelope is invalid_grant, invalid_client, or
+// invalid_token. Transient failures (5xx, network, context, unparsed) return
+// false so callers retain the refresh token and may retry (REQ-063). Reach this
+// method via errors.As(err, &ex) rather than a direct type assertion; it is
+// nil-receiver safe.
+func (e *ExchangeError) Terminal() bool {
+	if e == nil || e.StatusCode < 400 || e.StatusCode >= 500 || e.OAuth2 == nil {
+		return false
+	}
+	switch e.OAuth2.Code {
+	case "invalid_grant", "invalid_client":
+		return true
+	case "invalid_token":
+		// Not an RFC 6749 §5.2 token-endpoint code (it belongs to RFC 6750
+		// resource-server responses), but some authorization servers return it
+		// on a rejected refresh_token grant. Treat it as terminal so the stored
+		// refresh token is cleared rather than re-POSTed in a loop (F-L).
+		return true
+	}
+	return false
+}

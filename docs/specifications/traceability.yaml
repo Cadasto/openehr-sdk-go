@@ -108,13 +108,58 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, auth]
+    probes: [PROBE-009]
+    tests:
+      - transport/client_test.go
+      - testkit/probes/auth/probe_009_caller_attribution.go
 
   - id: REQ-068
     title: SMART flows and launch modes
     canonical: docs/specifications/auth.md#req-068
     status: draft
-    implementation: partial
+    implementation: landed
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    probes: [PROBE-004, PROBE-005]
+    notes: >
+      Phase 3a (F-I): ClaimsSigner now signs via go-jose/v4. Default alg changed
+      from RS256 to RS384 (SMART client-confidential-asymmetric SHALL). RS384 and
+      ES384 are fully supported; RS256 and ES256 retained for back-compat. Key/alg
+      mismatch rejected at construction (ErrInvalidConfig). Opaque crypto.Signer
+      implementations (KMS/HSM) are supported for both RSA and ECDSA via
+      go-jose/v4 cryptosigner.Opaque (no concrete-key requirement).
+      Phase 3b (F-C): auth/smart authorization-code exchange can now authenticate
+      with private_key_jwt via WithClientAssertionKey, reusing jwtbearer.ClaimsSigner
+      (client_assertion + jwt-bearer assertion type, no HTTP Basic). Method selection
+      is deterministic; assertion-key and client-secret are mutually exclusive.
+      G-3: when the server advertises token_endpoint_auth_methods_supported, the
+      configured method is cross-checked at construction (ErrInvalidConfig on absence).
+      Phase 3c (F-C): auth/clientcreds now supports SMART Backend Services asymmetric
+      client auth via WithClientAssertion(jwtbearer.AssertionSource). Wire shape:
+      grant_type=client_credentials + client_assertion_type=jwt-bearer + signed
+      client_assertion; no HTTP Basic, no client_secret. ClientSecret and
+      ClientAssertion are mutually exclusive (ErrInvalidConfig if both set); secret
+      is optional when assertion source is provided. Signing errors surfaced as
+      ErrTokenExchangeFailed. Distinct from auth/jwtbearer (which is the JWT Bearer
+      Token Grant, not client auth).
+      Phase 3d/3e close-out: the RS384/ES384 asymmetric baseline (client-auth signing,
+      F-I/F-C; G-3 method selection) and id_token verification alg agility (F-M, see
+      REQ-062/REQ-064) have all landed.
+      Phase 5 (F-E): the four SMART grant flows (PKCE public, confidential symmetric
+      client_secret, confidential asymmetric private_key_jwt, client-credentials/backend
+      + jwt-bearer) and all three launch modes (standalone, embedded/EHR-launch, backend)
+      are now exercised in Sandbox by the auth probe suite (PROBE-001..009) plus the
+      launch-mode coverage in testkit/probes/auth/launch_modes.go. REQ-068 flips to
+      landed on this Sandbox coverage (same posture as the other landed auth REQs).
+      Recorded follow-ups: Cassette/Live ratification against a reference authorization
+      server is deferred; the backend launch-mode coverage exercises the RS384 default
+      only (an ES* client-assertion arm is a possible follow-up). See the Inferno
+      STU2.2 Client-suite cross-check in conformance.md.
+    tests:
+      - auth/jwtbearer/jwtbearer_test.go
+      - auth/smart/smart_test.go
+      - auth/clientcreds/clientcreds_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-069
     title: HTTP Basic on openEHR REST
@@ -132,6 +177,14 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0008-smart-discovery-services-shape.md]
+    probes: [PROBE-002]
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration.json
+    tests:
+      - smart/discovery/resolver_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-071
     title: Discovery cache
@@ -139,6 +192,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-072
     title: Discovery validation
@@ -146,6 +200,14 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0008-smart-discovery-services-shape.md]
+    probes: [PROBE-002, PROBE-003]
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration-mismatch.json
+    tests:
+      - smart/discovery/resolver_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-073
     title: Discovery trust posture
@@ -334,29 +396,86 @@ requirements:
     canonical: docs/specifications/auth.md#req-061--pkce-flow
     status: draft
     implementation: landed
-    packages: [auth/smart]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    packages: [auth/smart, auth]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-001, PROBE-004, PROBE-005]
+    notes: >
+      Phase 5 (F-E): the PKCE flow is now exercised as conformance probes —
+      PROBE-001 (discovery declares code + S256), PROBE-004 (S256 verifier
+      round-trip with the G-7 RFC 7636 / x/oauth2 parity assertion:
+      >=32 bytes entropy, base64.RawURLEncoding, challenge ==
+      base64url(SHA256(verifier))), and PROBE-005 (openEHR scope round-trip).
     tests:
       - auth/smart/smart_test.go
       - auth/smart/pkce.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-062
     title: JWKS rotation
     canonical: docs/specifications/auth.md#req-062
     status: draft
     implementation: landed
-    packages: [auth/smart]
+    packages: [auth/smart, smart/discovery, auth/introspect]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-006]
+    notes: >
+      alg allowlists (token_endpoint_auth_signing_alg_values_supported,
+      id_token_signing_alg_values_supported) and introspection_endpoint are
+      surfaced onto AuthEndpoints. introspection_endpoint is consumed by the opt-in
+      RFC 7662 client auth/introspect, and token_endpoint_auth_methods_supported by
+      auth/smart.FromConfig (G-3 cross-check); only
+      token_endpoint_auth_signing_alg_values_supported remains surface-only.
+      Phase 3e (F-M): id_token verification gained algorithm agility — smart.ValidateIDToken
+      now verifies via github.com/coreos/go-oidc/v3 (go-jose) supporting RS256/RS384/ES256/ES384,
+      constrained to the server's id_token_signing_alg_values_supported when supplied
+      (smart.WithIDTokenSigningAlgs); rejects alg:none and unlisted algs as
+      ErrJWKSValidationFailed. JWK->crypto.PublicKey via go-jose JSONWebKey (RSA+ECDSA).
+      Hand-rolled RSA verify and rsaPublicKeyFromJWK removed. SDK's stricter claim
+      semantics (claimsFromMap: iss/aud/exp/nbf/iat with 30s skew + nonce) preserved
+      after signature verification.
+      Phase 5b (F-J): opt-in RFC 7662 token introspection client landed in
+      auth/introspect — resource-server / MCP-gateway scope, not wired into the
+      default client path. Implements introspect.New (endpoint + injected
+      *http.Client) and (*Client).Introspect (form-POST per RFC 7662 §2.1,
+      active:false is success not error, non-2xx wrapped as ExchangeError).
+    fixtures:
+      - testkit/cassettes/its_rest/discovery/smart-configuration.json
     tests:
       - auth/smart/smart_test.go
+      - smart/discovery/resolver_test.go
+      - smart/idtoken_test.go
+      - testkit/probes/auth/probes_test.go
+      - auth/introspect/introspect_test.go
 
   - id: REQ-063
     title: Token refresh
     canonical: docs/specifications/auth.md#req-063
     status: draft
-    implementation: partial
-    packages: [auth/smart]
+    implementation: landed
+    packages: [auth, auth/smart, transport]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    probes: [PROBE-007]
+    notes: >
+      Phase 4a+4b landed. Phase 4a: ExchangeError.Terminal(), F-L
+      refresh-token clearing (clear only on invalid_grant/invalid_client 4xx),
+      RefreshIfNeeded, Reauther interface, ReautherFunc adapter, Reauth on
+      *smart.Source. Phase 4b: transport.WithReauthOn401 opt-in 401→reauth
+      safety net — wire 401 triggers Reauth once, retries once with refreshed
+      bearer; second 401 surfaces ErrUnauthorized; no-reauther path unchanged.
+      PROBE-007 passes in Sandbox for BOTH halves: the transport-401 safety
+      net (probe_007_transport_refresh.go) and, as of Phase 5, the proactive
+      expiry-based refresh on the wire (probe_007_proactive_refresh.go drives
+      Source.Token over an expired token and asserts the token endpoint
+      receives exactly one grant_type=refresh_token exchange). Full
+      cassette/live ratification deferred.
     tests:
+      - auth/errors_test.go
       - auth/smart/smart_test.go
+      - transport/client_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-064
     title: Launch context
@@ -364,8 +483,17 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart, auth/smart]
+    plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
+    notes: >
+      Phase 3e (F-M): id_token signature verification gained algorithm agility
+      (RS256/RS384/ES256/ES384) via go-oidc/v3, constrained by the discovery
+      id_token_signing_alg_values_supported allowlist (smart.WithIDTokenSigningAlgs).
+      IDTokenClaims shape unchanged; nonce + 30s skew claim semantics preserved.
+      See REQ-062 for verification details.
     tests:
       - smart/launch_test.go
+      - smart/idtoken_test.go
       - auth/smart/exchange_test.go
 
   - id: REQ-067
@@ -374,8 +502,10 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart]
+    probes: [PROBE-008]
     tests:
       - smart/launch_test.go
+      - testkit/probes/auth/probes_test.go
 
   - id: REQ-082
     title: Probe runnability
@@ -383,7 +513,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
-    probes: [PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
+    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
 
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths
@@ -601,7 +731,7 @@ requirements:
       - cmd/examples/compile-build-validate/main.go
       - cmd/examples/template-explore/main.go
     plans:
-      - docs/plans/2026-06-17-public-compiled-template-bridge.md
+      - docs/plans/archive/2026-06-17-public-compiled-template-bridge.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.

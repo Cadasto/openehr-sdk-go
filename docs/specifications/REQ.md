@@ -56,12 +56,12 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-060 | TokenSource interface | [auth.md § REQ-060](auth.md#req-060) | landed |
 | REQ-061 | SMART-on-openEHR PKCE | [auth.md § REQ-061](auth.md#req-061--pkce-flow) | landed |
 | REQ-062 | JWKS rotation | [auth.md § REQ-062](auth.md#req-062--jwks-rotation) | landed |
-| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063--token-refresh) | partial |
+| REQ-063 | Token refresh | [auth.md § REQ-063](auth.md#req-063--token-refresh) | landed |
 | REQ-064 | Launch context | [auth.md § REQ-064](auth.md#req-064--launch-context) | landed |
 | REQ-065 | Per-client tenant binding | [auth.md § REQ-065](auth.md#req-065) | landed |
 | REQ-066 | Caller attribution | [auth.md § REQ-066](auth.md#req-066) | landed |
 | REQ-067 | Platform principal claims | [auth.md § REQ-067](auth.md#req-067) | landed |
-| REQ-068 | SMART flows and launch modes | [auth.md § REQ-068](auth.md#req-068--flow-and-launch-mode-coverage) | partial |
+| REQ-068 | SMART flows and launch modes | [auth.md § REQ-068](auth.md#req-068--flow-and-launch-mode-coverage) | landed |
 | REQ-069 | HTTP Basic on openEHR REST | [auth.md § REQ-069](auth.md#req-069) | landed |
 | REQ-070 | First-class discovery | [service-discovery.md § REQ-070](service-discovery.md#req-070) | landed |
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |

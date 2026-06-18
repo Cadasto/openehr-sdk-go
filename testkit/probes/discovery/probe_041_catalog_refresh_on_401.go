@@ -18,8 +18,9 @@ import (
 // driven retry-on-401 leg (REQ-071 bullet 3 — transport sees 401,
 // asks discovery to refresh, retries once, second 401 → typed
 // `transport.ErrUnauthorized`) is asserted at the discovery boundary
-// here; the transport-level half lives under
-// `testkit/probes/auth/` once that probe range is wired.
+// here; the transport-level half (opt-in via
+// `transport.WithReauthOn401` + `auth.ReautherFunc`) is covered by
+// PROBE-007 in `testkit/probes/auth/probe_007_transport_refresh.go`.
 //
 // The probe primes the cache via a successful Resolve, then flips
 // the upstream to 401 and calls Refresh. The Refresh MUST:
