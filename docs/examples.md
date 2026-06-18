@@ -27,6 +27,7 @@ make build
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
+| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
 ---
 
@@ -253,6 +254,48 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 
 ---
 
+### smart-launch
+
+**Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server — no external network, no secrets, works offline.
+
+The key teaching point is the **state + PKCE code_verifier persistence** across the redirect: `auth/smart.AuthorizationRequest` (returned by `BeginAuthorization`) must be stored server-side between the initial redirect and the callback, then retrieved by `state` and passed unchanged to `ExchangeAuthorizationCode`.
+
+```bash
+go run ./cmd/examples/smart-launch
+```
+
+**Packages:** `auth/smart`, `auth` (scope constants), `smart/discovery`
+
+**Sample output:**
+
+```text
+step 1: Source built (public client, PKCE, standalone)
+step 2: BeginAuthorization → state="…"  verifier="…"
+step 3: authorize URL built (len=306)
+step 4: AuthorizationRequest stored in session map (key="…")
+step 5: redirect received  code="stub-code-…"  state="…"
+step 6: AuthorizationRequest retrieved from session map (state validated)
+step 7: token exchange complete
+  access_token : stub-access-token-001
+  token_type   : Bearer
+  scope        : openid launch/patient offline_access
+  expires_at   : …
+  refresh_token: stub-refresh-token-001
+  ehrId        : 00000000-0000-0000-0000-000000000001
+OK: standalone SMART PKCE launch flow completed (in-process stub)
+```
+
+**What to copy into your app:**
+
+1. Call `BeginAuthorization("")` to get an `AuthorizationRequest` with a random `state` and PKCE pair.
+2. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
+3. On the redirect callback, retrieve the stored `AuthorizationRequest` by `callbackState`, delete it (replay prevention), and pass it to `ExchangeAuthorizationCode`.
+4. `ExchangeAuthorizationCode` re-validates `state` internally (CSRF guard) and sends the `code_verifier` to the token endpoint (PKCE proof).
+
+See [specifications/auth.md § REQ-061](specifications/auth.md#req-061--pkce-flow) for the normative rules.
+
+---
+
 ## Suggested learning order
 
 ```text
@@ -261,6 +304,7 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 3. validate-from-json      ← wire bytes + validation (CI pattern)
 4. generate-example        ← synthesise data from templates
 5. ehr_create              ← REST wiring (mock first, then real CDR)
+6. smart-launch            ← SMART PKCE auth (standalone, public client)
 ```
 
 Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction).

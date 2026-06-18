@@ -22,4 +22,5 @@
 //   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
 //   - cmd/examples/aql-build            — AQL struct + verb builders (REQ-055)
 //   - cmd/examples/lint-aql             — AQL static lint + ValidateAQL (REQ-109)
+//   - cmd/examples/smart-launch         — standalone SMART PKCE launch, state+verifier persistence (REQ-061)
 package examples
