@@ -217,6 +217,18 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 - **Rejected:** the unsecured `none` algorithm is always rejected (explicitly, and because it is never in the allowlist); any algorithm outside the effective allowlist is rejected; an `alg`/key-type mismatch is rejected by go-jose key matching. All rejections surface as `auth.ErrJWKSValidationFailed` (preserved sentinel — `errors.Is` keeps working).
 - **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The returned `*IDTokenClaims` shape is unchanged.
 
+#### RFC 7662 token introspection client (F-J) — opt-in, resource-server scope — landed in Phase 5b
+
+The `auth/introspect` package provides a standalone, opt-in RFC 7662 token introspection client. It is a **resource-server / MCP-gateway concern**, not wired into the default `auth/smart` client path — reference SMART client SDKs deliberately omit introspection (it is not a client-side operation). Consumers acting as resource servers that need to validate opaque access tokens at runtime can use it independently.
+
+**Standards:** [RFC 7662 — OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662) and the [HL7 SMART App Launch token-introspection profile](https://www.hl7.org/fhir/smart-app-launch/token-introspection.html).
+
+**Construction.** `introspect.New(endpoint string, httpClient *http.Client, opts ...Option) (*Client, error)` — injects the `*http.Client` (REQ-021; nil is rejected with `auth.ErrInvalidConfig`); validates that `endpoint` is a non-empty, parseable absolute URL (also `auth.ErrInvalidConfig` on failure). The `introspection_endpoint` URL is surfaced from the authorization server's discovery document via `smart/discovery` (see REQ-070 / `AuthEndpoints.IntrospectionEndpoint`) and can be passed directly.
+
+**Introspection call.** `(*Client).Introspect(ctx context.Context, token string, bearer string) (Result, error)` — POSTs `token=<value>` form-encoded to the endpoint (RFC 7662 §2.1) with `Authorization: Bearer <bearer>` (the resource server authenticates using its own access credential). `ctx` is threaded (REQ-020). An `{"active":false}` response is a **successful** introspection — returned as `(Result{Active:false}, nil)`; inactive tokens are **not** treated as errors. Non-2xx responses are returned as a wrapped `*auth.ExchangeError` (sentinel `auth.ErrTokenExchangeFailed`; `OAuth2` field populated when the body matches RFC 6749 §5.2).
+
+**`Result` fields (RFC 7662 §2.2).** `Active bool` (required). Optional/conditional: `Scope`, `ClientID`, `Username`, `TokenType`, `Exp`/`Iat`/`Nbf` (RFC 7662 numeric dates parsed to `time.Time` from the float64 JSON number), `Sub`, `Aud` (string or JSON array — array values joined with a space), `Iss`, `Jti`. SMART/openEHR launch-context extras when present: `Patient`, `FHIRUser` (`fhirUser`), `EHRID` (`ehrId`), `EpisodeID` (`episodeId`). `Raw map[string]any` carries the complete decoded body including vendor-extension claims.
+
 ### REQ-063 — Token refresh
 
 The `auth/smart` `TokenSource` **MUST** transparently refresh access tokens when:

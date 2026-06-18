@@ -414,7 +414,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-062
     status: draft
     implementation: landed
-    packages: [auth/smart, smart/discovery]
+    packages: [auth/smart, smart/discovery, auth/introspect]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
     probes: [PROBE-006]
     notes: >
@@ -430,6 +430,11 @@ requirements:
       Hand-rolled RSA verify and rsaPublicKeyFromJWK removed. SDK's stricter claim
       semantics (claimsFromMap: iss/aud/exp/nbf/iat with 30s skew + nonce) preserved
       after signature verification.
+      Phase 5b (F-J): opt-in RFC 7662 token introspection client landed in
+      auth/introspect — resource-server / MCP-gateway scope, not wired into the
+      default client path. Implements introspect.New (endpoint + injected
+      *http.Client) and (*Client).Introspect (form-POST per RFC 7662 §2.1,
+      active:false is success not error, non-2xx wrapped as ExchangeError).
     fixtures:
       - testkit/cassettes/its_rest/discovery/smart-configuration.json
     tests:
@@ -437,6 +442,7 @@ requirements:
       - smart/discovery/resolver_test.go
       - smart/idtoken_test.go
       - testkit/probes/auth/probes_test.go
+      - auth/introspect/introspect_test.go
 
   - id: REQ-063
     title: Token refresh
