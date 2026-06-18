@@ -80,7 +80,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 **Decision summary:**
 
 - Built the full SMART-on-openEHR auth library across `auth/smart`, `auth/clientcreds`, `auth/jwtbearer`, `auth/basic`, `auth/introspect`, and `smart/discovery`. Four flows (PKCE public, confidential symmetric, confidential asymmetric `private_key_jwt`, Backend Services) and three launch modes (standalone, embedded, backend) are covered and exercised by PROBE-001..009.
-- Relaxed the OTel-only dependency rule: adopted `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and (transitively) `github.com/go-jose/go-jose/v4` for security-sensitive JOSE/OIDC crypto, scoped to `auth/` and `smart/`. Hand-rolling JWS signing and ID-token verification at the RS384/ES384/RS256/ES256 multi-alg level was rejected as a correctness and maintenance risk.
+- Relaxed the OTel-only dependency rule: adopted `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and `github.com/go-jose/go-jose/v4` (directly imported for JWS signing; also required by `go-oidc/v3`) for security-sensitive JOSE/OIDC crypto, scoped to `auth/` and `smart/`. Hand-rolling JWS signing and ID-token verification at the RS384/ES384/RS256/ES256 multi-alg level was rejected as a correctness and maintenance risk.
 - `auth.FromOAuth2TokenSource` adapter and an issuer-matching multi-EHR helper are recorded as available follow-ups (not built — no current consumer need). See ADR 0009 § (c).
 
 **Codified in:** [ADR 0009](../adr/0009-smart-auth-library-scope.md). Amends REQ-061..064.
