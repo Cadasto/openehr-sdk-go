@@ -146,14 +146,16 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		start = time.Now()
 	}
 	var (
-		resp     *Response
-		lastErr  error
-		attempt  int
-		reauthed bool
+		resp        *Response
+		lastErr     error
+		attempt     int // retry-policy attempt index; may be capped at reauth
+		otelAttempt int // monotonically-increasing total attempt index (never reset)
+		reauthed    bool
 	)
 	for {
 		attempt++
-		span.SetAttributes(attribute.Int("retry.attempt", attempt-1))
+		otelAttempt++
+		span.SetAttributes(attribute.Int("retry.attempt", otelAttempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
 		if !c.shouldRetry(req, resp, lastErr, attempt) {
 			// 401→reauth safety net (REQ-063, opt-in): if the final error is
@@ -168,11 +170,17 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
 					break
 				}
-				// Single reauth-retry: reset attempt counter so the loop
-				// runs exactly once more (shouldRetry will not fire on an
-				// attempt count of 1 unless a new RetryPolicy applies, but
-				// we always break after doOnce here via the inner guard).
-				attempt = 0
+				// Single reauth-retry: cap attempt at MaxAttempts so that
+				// shouldRetry returns false on the very next iteration,
+				// granting exactly one additional upstream call without
+				// reopening the 5xx retry budget (REQ-063, REQ-091).
+				// When retry is disabled (MaxAttempts ≤ 1), attempt is
+				// already beyond the budget — shouldRetry still returns
+				// false and the loop runs once more before the inner guard
+				// (reauthed==true) prevents further reauth loops.
+				if c.cfg.retry.enabled() {
+					attempt = c.cfg.retry.MaxAttempts
+				}
 				continue
 			}
 			break
@@ -188,7 +196,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		span.SetStatus(codes.Error, lastErr.Error())
 		span.RecordError(lastErr)
 		if c.cfg.observer != nil {
-			c.emitObservation(ctx, req, target, resp, lastErr, attempt, time.Since(start))
+			c.emitObservation(ctx, req, target, resp, lastErr, otelAttempt, time.Since(start))
 		}
 		return resp, lastErr
 	}
@@ -199,7 +207,7 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		}
 	}
 	if c.cfg.observer != nil {
-		c.emitObservation(ctx, req, target, resp, nil, attempt, time.Since(start))
+		c.emitObservation(ctx, req, target, resp, nil, otelAttempt, time.Since(start))
 	}
 	return resp, nil
 }

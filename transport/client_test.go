@@ -866,18 +866,26 @@ func (s *stubTokenSource) Reauth(_ context.Context) error {
 	return nil
 }
 
+// Reauths returns the number of times Reauth was called.
+// Safe for concurrent use: reads under the same mutex as Reauth.
+func (s *stubTokenSource) Reauths() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.reauths
+}
+
 // TestDoReauthOn401 — REQ-063: on a wire 401, if a Reauther is configured
 // and this Do has not yet reauthed, transport calls Reauth once then retries.
 // Assert: exactly 2 upstream calls, second carries refreshed bearer, final err=nil.
 func TestDoReauthOn401(t *testing.T) { // REQ-063
 	var (
 		hits     atomic.Int32
-		captured [2]string
+		captured [2]atomic.Value // Store/Load from handler and test goroutines
 	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := int(hits.Add(1))
 		if n <= 2 {
-			captured[n-1] = r.Header.Get("Authorization")
+			captured[n-1].Store(r.Header.Get("Authorization"))
 		}
 		if n == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -904,14 +912,16 @@ func TestDoReauthOn401(t *testing.T) { // REQ-063
 	if n := hits.Load(); n != 2 {
 		t.Errorf("upstream calls = %d, want exactly 2", n)
 	}
-	if captured[0] != "Bearer old-tok" {
-		t.Errorf("first request Authorization = %q, want Bearer old-tok", captured[0])
+	first, _ := captured[0].Load().(string)
+	second, _ := captured[1].Load().(string)
+	if first != "Bearer old-tok" {
+		t.Errorf("first request Authorization = %q, want Bearer old-tok", first)
 	}
-	if captured[1] != "Bearer fresh-tok" {
-		t.Errorf("second request Authorization = %q, want Bearer fresh-tok (refreshed)", captured[1])
+	if second != "Bearer fresh-tok" {
+		t.Errorf("second request Authorization = %q, want Bearer fresh-tok (refreshed)", second)
 	}
-	if stub.reauths != 1 {
-		t.Errorf("Reauth called %d times, want exactly 1", stub.reauths)
+	if n := stub.Reauths(); n != 1 {
+		t.Errorf("Reauth called %d times, want exactly 1", n)
 	}
 }
 
@@ -940,8 +950,8 @@ func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-063
 	if n := hits.Load(); n != 2 {
 		t.Errorf("upstream calls = %d, want exactly 2 (original + one retry)", n)
 	}
-	if stub.reauths != 1 {
-		t.Errorf("Reauth called %d times, want exactly 1 (no infinite loop)", stub.reauths)
+	if n := stub.Reauths(); n != 1 {
+		t.Errorf("Reauth called %d times, want exactly 1 (no infinite loop)", n)
 	}
 }
 
@@ -963,6 +973,68 @@ func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
 	}
 	if n := hits.Load(); n != 1 {
 		t.Errorf("upstream calls = %d, want exactly 1 (no reauther, no retry)", n)
+	}
+}
+
+// TestDoReauthDoesNotRestartRetryBudget — REQ-063: when WithReauthOn401 and a
+// RetryPolicy are both configured, a 401 encountered mid-5xx-sequence MUST
+// grant exactly ONE additional attempt and MUST NOT reopen the 5xx retry
+// budget.
+//
+// Sequence: attempt-1→503 (retried), attempt-2→503 (budget exhausted at
+// MaxAttempts=3 means attempt 3 is the last one per policy, so 503 twice uses
+// attempts 1 and 2), attempt-3→401 (budget exhausted; reauth fires for one
+// extra attempt), attempt-4→200.
+//
+// Total upstream calls = 4: 3 within the retry budget + 1 reauth-extra.
+// The 5xx budget is NOT restarted, so no further 503 retries happen.
+func TestDoReauthDoesNotRestartRetryBudget(t *testing.T) { // REQ-063
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := int(hits.Add(1))
+		switch n {
+		case 1, 2:
+			// 503 — within the retry budget (MaxAttempts=3, so attempts 1 and 2
+			// are retried; attempt 3 is the last policy attempt).
+			w.WriteHeader(http.StatusServiceUnavailable)
+		case 3:
+			// 401 on the last budget attempt — triggers one reauth-extra.
+			w.WriteHeader(http.StatusUnauthorized)
+		case 4:
+			// Reauth-extra attempt — succeeds.
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			// Any further call proves the budget was incorrectly reopened.
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer srv.Close()
+
+	stub := &stubTokenSource{tokens: []string{"tok", "fresh-tok"}}
+	c, _ := New(
+		newCatalog(t, srv),
+		WithHTTPClient(srv.Client()),
+		WithTokenSource(stub),
+		WithReauthOn401(stub),
+		WithRetry(RetryPolicy{
+			MaxAttempts:     3,
+			InitialBackoff:  time.Millisecond,
+			RetriableStatus: []int{503},
+		}),
+	)
+	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if err != nil {
+		t.Fatalf("expected success after reauth; got %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+	// Must be exactly 4: 3 budget attempts (2×503 + 1×401) + 1 reauth-extra.
+	if n := hits.Load(); n != 4 {
+		t.Errorf("upstream calls = %d, want exactly 4 (3 budget + 1 reauth-extra); 5xx budget was incorrectly restarted", n)
+	}
+	if n := stub.Reauths(); n != 1 {
+		t.Errorf("Reauth called %d times, want exactly 1", n)
 	}
 }
 

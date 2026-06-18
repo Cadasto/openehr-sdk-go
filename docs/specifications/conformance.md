@@ -364,7 +364,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached catalog; backend rotates and returns `401` on the cached token.
 - **Wire assertion:** SDK refreshes JWKS/catalog once, retries once. On second `401`, returns `transport.ErrUnauthorized`.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The full transport-driven retry-on-401 + `transport.ErrUnauthorized` mapping (REQ-071 bullet 3) lands once the transport calls into `Resolver.Refresh` on 401 — currently transport surfaces 401 directly without re-driving discovery.
+- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The transport-layer 401→reauth hook is wired (opt-in via `transport.WithReauthOn401` + `auth.ReautherFunc`; see PROBE-007 in [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go)); the REQ-071-bullet-3 application pattern (discovery-catalog-refresh on 401) remains the pending closure.
 - **Satisfies:** REQ-071 (discovery half), REQ-072
 
 ### REST binding
