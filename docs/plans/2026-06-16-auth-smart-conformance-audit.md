@@ -189,7 +189,7 @@ Validated the plan against the SMART-maintained reference clients `smart-on-fhir
 - ADR: `docs/adr/0008-smart-discovery-services-shape.md` (Create) + `docs/adr/README.md` (Modify)
 - Specs: `docs/specifications/service-discovery.md`, `docs/specifications/REQ.md` (REQ-070/072 rows), `docs/specifications/traceability.yaml`
 
-- [ ] **Step 1: Write the failing test.** Add `TestResolveCanonicalServicesMap` to `resolver_test.go` that serves a document whose `services` is the canonical **object** form (`"services": {"org.openehr.rest": {"baseUrl": "<srv>/openehr/v1"}}`) and asserts `cat.Service("org.openehr.rest")` is present with the parsed `BaseURL`.
+- [x] **Step 1: Write the failing test.** Add `TestResolveCanonicalServicesMap` to `resolver_test.go` that serves a document whose `services` is the canonical **object** form (`"services": {"org.openehr.rest": {"baseUrl": "<srv>/openehr/v1"}}`) and asserts `cat.Service("org.openehr.rest")` is present with the parsed `BaseURL`.
 
 ```go
 func TestResolveCanonicalServicesMap(t *testing.T) {
@@ -212,9 +212,9 @@ func TestResolveCanonicalServicesMap(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run it; verify it fails.** `cd .worktrees/auth-smart-audit && go test ./smart/discovery/ -run TestResolveCanonicalServicesMap -v` — expect FAIL (services empty → `ReasonMissingService`).
+- [x] **Step 2: Run it; verify it fails.** `cd .worktrees/auth-smart-audit && go test ./smart/discovery/ -run TestResolveCanonicalServicesMap -v` — expect FAIL (services empty → `ReasonMissingService`).
 
-- [ ] **Step 3: Change the wire decoder to a map.** In `smart/discovery/resolver.go`:
+- [x] **Step 3: Change the wire decoder to a map.** In `smart/discovery/resolver.go`:
 
 ```go
 type smartConfigWire struct {
@@ -247,15 +247,15 @@ type serviceEntryWire struct {
 
 Update `parse` to range over the map (`for id, s := range wire.Services`), use `s.BaseURL`, set `ServiceEntry.ID = id`. Reject an empty `baseUrl` with `ReasonMalformedURL`.
 
-- [ ] **Step 4: Soften the per-service version gate (decision from ADR).** In `validate`, when `e.SpecVersion == ""` and the accepted set was not explicitly narrowed by the caller, do **not** raise `ReasonSpecVersionMismatch`; only enforce when the entry advertises a version. Keep strict behaviour reachable for callers that pass `WithAcceptedSpecVersions(...)`. Document this in `service-discovery.md` REQ-072 section.
+- [x] **Step 4: Soften the per-service version gate (decision from ADR).** In `validate`, when `e.SpecVersion == ""` and the accepted set was not explicitly narrowed by the caller, do **not** raise `ReasonSpecVersionMismatch`; only enforce when the entry advertises a version. Keep strict behaviour reachable for callers that pass `WithAcceptedSpecVersions(...)`. Document this in `service-discovery.md` REQ-072 section.
 
-- [ ] **Step 5: Update the default fixture to canonical shape.** Rewrite `testkit/cassettes/its_rest/discovery/smart-configuration.json` so `services` is the object form with `baseUrl`. If back-compat is kept (ADR decision), add `smart-configuration-legacy-array.json` and a tolerant-decode test; otherwise drop array support.
+- [x] **Step 5: Update the default fixture to canonical shape.** Rewrite `testkit/cassettes/its_rest/discovery/smart-configuration.json` so `services` is the object form with `baseUrl`. If back-compat is kept (ADR decision), add `smart-configuration-legacy-array.json` and a tolerant-decode test; otherwise drop array support.
 
-- [ ] **Step 6: Run the suite.** `go test ./smart/discovery/... -v` — expect PASS. Then `go test ./transport/... ./...` for anything that built catalogs from the old fixture.
+- [x] **Step 6: Run the suite.** `go test ./smart/discovery/... -v` — expect PASS. Then `go test ./transport/... ./...` for anything that built catalogs from the old fixture.
 
-- [ ] **Step 7: Land the ADR + spec/registry updates.** Write `docs/adr/0008-smart-discovery-services-shape.md` (decision, alternatives, back-compat); add it to `docs/adr/README.md`. Cite the canonical spec URL in `service-discovery.md`. Update `traceability.yaml` REQ-070/072 (add fixture + new test files). Run `make spec-check`.
+- [x] **Step 7: Land the ADR + spec/registry updates.** Write `docs/adr/0008-smart-discovery-services-shape.md` (decision, alternatives, back-compat); add it to `docs/adr/README.md`. Cite the canonical spec URL in `service-discovery.md`. Update `traceability.yaml` REQ-070/072 (add fixture + new test files). Run `make spec-check`.
 
-- [ ] **Step 8: Commit.** `git add -A && git commit -m "fix(discovery): parse SMART services as canonical map (REQ-070); ADR 0008"`
+- [x] **Step 8: Commit.** `git add -A && git commit -m "fix(discovery): parse SMART services as canonical map (REQ-070); ADR 0008"`
 
 ## Phase 2 — openEHR launch-context claims `ehrId` / `episodeId` (F-B) [MED]
 
@@ -265,14 +265,14 @@ Update `parse` to range over the map (`for id, s := range wire.Services`), use `
 - Test: `auth/smart/exchange_test.go`, `smart/launch_test.go`
 - Spec: `docs/specifications/auth.md` (REQ-064 section), `REQ.md` row note, `traceability.yaml`
 
-- [ ] **Step 1: Failing test (auth/smart).** Add `TestParseTokenResponseOpenEHRClaims` asserting `ParseTokenResponse([]byte(`{"access_token":"a","ehrId":"ehr-1","episodeId":"ep-9"}`))` yields `EHRID == "ehr-1"` and `EpisodeID == "ep-9"`.
-- [ ] **Step 2: Run; verify fail** — `go test ./auth/smart/ -run TestParseTokenResponseOpenEHRClaims -v` (fields don't exist).
-- [ ] **Step 3: Add fields.** Add `EHRID string` and `EpisodeID string` to `TokenResponse` and `tokenResponse` (`json:"ehrId"`, `json:"episodeId"`); copy them in `ParseTokenResponse`. Also capture the SMART-compat launch-context extras the reference clients surface — `intent` (`json:"intent"`), `smart_style_url`, `need_patient_banner`, `tenant` — when present.
-- [ ] **Step 4: Failing test (smart).** In `smart/launch_test.go` assert `LaunchContextFromTokenResponse` copies `EHRID`/`EpisodeID` (and `Intent`/`SMARTStyleURL`/`NeedPatientBanner`/`Tenant`) onto `LaunchContext`.
-- [ ] **Step 5: Add `LaunchContext.EHRID` / `LaunchContext.EpisodeID`** (plus `Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) and map them in `smart/launch.go` (keep `Raw` carrying them too). Keep `Patient`/`Encounter` for FHIR-compat per the spec's compatibility goal.
-- [ ] **Step 6: Run** `go test ./auth/smart/... ./smart/... -v` — expect PASS.
-- [ ] **Step 7: Spec.** Extend REQ-064 in `auth.md` to name `EHRID`/`EpisodeID` (cite the canonical spec's `ehrId`/`episodeId` claims). Update `traceability.yaml`.
-- [ ] **Step 8: Commit** `feat(smart): surface openEHR ehrId/episodeId launch context (REQ-064)`.
+- [x] **Step 1: Failing test (auth/smart).** Add `TestParseTokenResponseOpenEHRClaims` asserting `ParseTokenResponse([]byte(`{"access_token":"a","ehrId":"ehr-1","episodeId":"ep-9"}`))` yields `EHRID == "ehr-1"` and `EpisodeID == "ep-9"`.
+- [x] **Step 2: Run; verify fail** — `go test ./auth/smart/ -run TestParseTokenResponseOpenEHRClaims -v` (fields don't exist).
+- [x] **Step 3: Add fields.** Add `EHRID string` and `EpisodeID string` to `TokenResponse` and `tokenResponse` (`json:"ehrId"`, `json:"episodeId"`); copy them in `ParseTokenResponse`. Also capture the SMART-compat launch-context extras the reference clients surface — `intent` (`json:"intent"`), `smart_style_url`, `need_patient_banner`, `tenant` — when present.
+- [x] **Step 4: Failing test (smart).** In `smart/launch_test.go` assert `LaunchContextFromTokenResponse` copies `EHRID`/`EpisodeID` (and `Intent`/`SMARTStyleURL`/`NeedPatientBanner`/`Tenant`) onto `LaunchContext`.
+- [x] **Step 5: Add `LaunchContext.EHRID` / `LaunchContext.EpisodeID`** (plus `Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) and map them in `smart/launch.go` (keep `Raw` carrying them too). Keep `Patient`/`Encounter` for FHIR-compat per the spec's compatibility goal.
+- [x] **Step 6: Run** `go test ./auth/smart/... ./smart/... -v` — expect PASS.
+- [x] **Step 7: Spec.** Extend REQ-064 in `auth.md` to name `EHRID`/`EpisodeID` (cite the canonical spec's `ehrId`/`episodeId` claims). Update `traceability.yaml`.
+- [x] **Step 8: Commit** `feat(smart): surface openEHR ehrId/episodeId launch context (REQ-064)`.
 
 ## Phase 3 — Asymmetric client authentication: RS384/ES384 + `private_key_jwt` + SMART Backend Services (F-I, F-C) [HIGH]
 
@@ -286,36 +286,36 @@ Update `parse` to range over the map (`for id, s := range wire.Services`), use `
 
 ### 3a — RS384/ES384 in the signer (F-I)
 
-- [ ] **Step 1: Failing tests.** In `jwtbearer_test.go` add `TestClaimsSignerRS384` and `TestClaimsSignerES384`: build a `ClaimsSigner` with `WithAlgorithm("RS384")` (RSA key) and `WithAlgorithm("ES384")` (ECDSA P-384 key), produce an assertion, decode the JWS header and assert `alg` matches, and verify the signature with the public key.
-- [ ] **Step 2: Run; verify fail** (`RS384`/`ES384` rejected at construction today).
-- [ ] **Step 3: Implement.** Replace the RS256-only path: map `alg → (crypto.Hash, signer-type)`. Support `RS384` (RSA + SHA-384), `ES384` (ECDSA P-384 + SHA-384, encode r||s fixed-width per JOSE), keep `RS256` for back-compat. Validate the key type matches `alg`. For ECDSA, sign the hash and serialise `r`/`s` to 48-byte big-endian halves. Make the documented **default `RS384`** (SMART baseline) while still accepting an explicit `RS256`. **Factor the `alg → (hash, key-type)` map and the JWS sign/verify primitives into a small unexported helper (e.g. `internal/jose` or shared funcs in `auth`) so the F-M id-token *verifier* (3e) reuses the exact same alg table — one source of truth for the supported algorithm set, no reflection.**
-- [ ] **Step 4: Run** `go test ./auth/jwtbearer/... -v` — PASS.
+- [x] **Step 1: Failing tests.** In `jwtbearer_test.go` add `TestClaimsSignerRS384` and `TestClaimsSignerES384`: build a `ClaimsSigner` with `WithAlgorithm("RS384")` (RSA key) and `WithAlgorithm("ES384")` (ECDSA P-384 key), produce an assertion, decode the JWS header and assert `alg` matches, and verify the signature with the public key.
+- [x] **Step 2: Run; verify fail** (`RS384`/`ES384` rejected at construction today).
+- [x] **Step 3: Implement.** Replace the RS256-only path: map `alg → (crypto.Hash, signer-type)`. Support `RS384` (RSA + SHA-384), `ES384` (ECDSA P-384 + SHA-384, encode r||s fixed-width per JOSE), keep `RS256` for back-compat. Validate the key type matches `alg`. For ECDSA, sign the hash and serialise `r`/`s` to 48-byte big-endian halves. Make the documented **default `RS384`** (SMART baseline) while still accepting an explicit `RS256`. **Factor the `alg → (hash, key-type)` map and the JWS sign/verify primitives into a small unexported helper (e.g. `internal/jose` or shared funcs in `auth`) so the F-M id-token *verifier* (3e) reuses the exact same alg table — one source of truth for the supported algorithm set, no reflection.**
+- [x] **Step 4: Run** `go test ./auth/jwtbearer/... -v` — PASS.
 
 ### 3b — `private_key_jwt` on the SMART authorization-code exchange (F-C)
 
-- [ ] **Step 5: Failing test.** `TestExchangeWithPrivateKeyJWT` in `smart_test.go`: configure a `Source` with a client-assertion signer (no `client_secret`); assert the token POST body carries `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a `client_assertion` whose decoded claims have `iss==sub==client_id`, `aud==token endpoint`, a `jti`, and `exp ≤ now+5m`; assert **no** HTTP Basic header.
-- [ ] **Step 6: Run; verify fail.**
-- [ ] **Step 7: Implement.** Add `smart.WithClientAssertionKey(signer crypto.Signer, alg, kid string)` (build a `jwtbearer.ClaimsSigner` internally with `aud = TokenEndpoint`, `iss = sub = ClientID`). In `postToken`, when a signer is configured, set the two `client_assertion*` form fields instead of `SetBasicAuth`; `client_secret_basic` stays the fallback when only a secret is set; public clients (neither) send nothing. **(G-3) Drive method selection from discovery:** prefer the auth method advertised in `token_endpoint_auth_methods_supported` (surfaced in Phase 6 / F-K) — pick `private_key_jwt` when a signer is set and the server lists it; do **not** trial-and-error like `x/oauth2`'s `AuthStyleAutoDetect`. If discovery and the configured credential disagree, fail fast with `ErrInvalidConfig`.
-- [ ] **Step 8: Run** `go test ./auth/smart/... -v` — PASS.
+- [x] **Step 5: Failing test.** `TestExchangeWithPrivateKeyJWT` in `smart_test.go`: configure a `Source` with a client-assertion signer (no `client_secret`); assert the token POST body carries `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a `client_assertion` whose decoded claims have `iss==sub==client_id`, `aud==token endpoint`, a `jti`, and `exp ≤ now+5m`; assert **no** HTTP Basic header.
+- [x] **Step 6: Run; verify fail.**
+- [x] **Step 7: Implement.** Add `smart.WithClientAssertionKey(signer crypto.Signer, alg, kid string)` (build a `jwtbearer.ClaimsSigner` internally with `aud = TokenEndpoint`, `iss = sub = ClientID`). In `postToken`, when a signer is configured, set the two `client_assertion*` form fields instead of `SetBasicAuth`; `client_secret_basic` stays the fallback when only a secret is set; public clients (neither) send nothing. **(G-3) Drive method selection from discovery:** prefer the auth method advertised in `token_endpoint_auth_methods_supported` (surfaced in Phase 6 / F-K) — pick `private_key_jwt` when a signer is set and the server lists it; do **not** trial-and-error like `x/oauth2`'s `AuthStyleAutoDetect`. If discovery and the configured credential disagree, fail fast with `ErrInvalidConfig`.
+- [x] **Step 8: Run** `go test ./auth/smart/... -v` — PASS.
 
 ### 3c — SMART Backend Services (`client_credentials` + `client_assertion`) (F-C)
 
-- [ ] **Step 9: Failing test.** In `clientcreds_test.go` add `TestClientCredentialsWithClientAssertion`: construct a `Source` via a new `WithClientAssertion(jwtbearer.AssertionSource)` (no secret) and assert the POST body has `grant_type=client_credentials`, `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`, a signed `client_assertion`, and the requested `scope`, with **no** Basic header.
-- [ ] **Step 10: Run; verify fail.**
-- [ ] **Step 11: Implement.** Add `AuthMethod`-equivalent assertion mode (or a `clientAssertion AssertionSource` field) to `clientcreds`; relax `FromConfig` so a `ClientSecret` is not required when an assertion source is set; in `fetch` emit `client_assertion*` instead of Basic/post credentials. This makes `clientcreds` the SMART-Backend-Services provider while `jwtbearer` remains the openEHR "JWT Bearer Token Grant".
-- [ ] **Step 12: Run** `go test ./auth/clientcreds/... -race -v` — PASS.
+- [x] **Step 9: Failing test.** In `clientcreds_test.go` add `TestClientCredentialsWithClientAssertion`: construct a `Source` via a new `WithClientAssertion(jwtbearer.AssertionSource)` (no secret) and assert the POST body has `grant_type=client_credentials`, `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`, a signed `client_assertion`, and the requested `scope`, with **no** Basic header.
+- [x] **Step 10: Run; verify fail.**
+- [x] **Step 11: Implement.** Add `AuthMethod`-equivalent assertion mode (or a `clientAssertion AssertionSource` field) to `clientcreds`; relax `FromConfig` so a `ClientSecret` is not required when an assertion source is set; in `fetch` emit `client_assertion*` instead of Basic/post credentials. This makes `clientcreds` the SMART-Backend-Services provider while `jwtbearer` remains the openEHR "JWT Bearer Token Grant".
+- [x] **Step 12: Run** `go test ./auth/clientcreds/... -race -v` — PASS.
 
 ### 3e — ID-token verification alg agility (F-M)
 
-- [ ] **Step 12a: Failing tests.** In `smart/idtoken_test.go` add `TestValidateIDTokenRS384` and `TestValidateIDTokenES384`: sign an id_token with RS384 (RSA) and ES384 (ECDSA P-384), publish the matching JWK, and assert `ValidateIDToken` accepts it. Add `TestValidateIDTokenRejectsUnlistedAlg` (alg not in the allowlist → `ErrJWKSValidationFailed`) and `TestValidateIDTokenRejectsAlgNone`.
-- [ ] **Step 12b: Run; verify fail** (RS256-only today).
-- [ ] **Step 12c: Implement.** Generalise `ValidateIDToken`/`rsaPublicKeyFromJWK` to the **shared alg table from 3a** (RS256/RS384/ES256/ES384): add EC JWK parsing (`crypto/ecdsa`, P-256/P-384) and ECDSA verification, keep the **verify-signature-before-claims** ordering, and constrain the accepted header `alg` to the allowlist (default RS256/RS384/ES256/ES384, narrowed to the server's `id_token_signing_alg_values_supported` from F-K when present). Keep the `alg`-must-match-`kty` guard; continue rejecting `none` and multi-signature tokens. No new third-party dep.
-- [ ] **Step 12d: Run** `go test ./smart/... -v` — PASS.
+- [x] **Step 12a: Failing tests.** In `smart/idtoken_test.go` add `TestValidateIDTokenRS384` and `TestValidateIDTokenES384`: sign an id_token with RS384 (RSA) and ES384 (ECDSA P-384), publish the matching JWK, and assert `ValidateIDToken` accepts it. Add `TestValidateIDTokenRejectsUnlistedAlg` (alg not in the allowlist → `ErrJWKSValidationFailed`) and `TestValidateIDTokenRejectsAlgNone`.
+- [x] **Step 12b: Run; verify fail** (RS256-only today).
+- [x] **Step 12c: Implement.** Generalise `ValidateIDToken`/`rsaPublicKeyFromJWK` to the **shared alg table from 3a** (RS256/RS384/ES256/ES384): add EC JWK parsing (`crypto/ecdsa`, P-256/P-384) and ECDSA verification, keep the **verify-signature-before-claims** ordering, and constrain the accepted header `alg` to the allowlist (default RS256/RS384/ES256/ES384, narrowed to the server's `id_token_signing_alg_values_supported` from F-K when present). Keep the `alg`-must-match-`kty` guard; continue rejecting `none` and multi-signature tokens. No new third-party dep.
+- [x] **Step 12d: Run** `go test ./smart/... -v` — PASS.
 
 ### 3d — Spec + close-out
 
-- [ ] **Step 13: Spec.** In `auth.md` REQ-068 document the asymmetric confidential code flow and the Backend Services flow (cite `client-confidential-asymmetric` and `backend-services`), and record the `RS384`/`ES384` baseline (cite the SHALL). Note in `service-discovery.md` that `token_endpoint_auth_signing_alg_values_supported` selects the client-auth algorithm and `id_token_signing_alg_values_supported` selects the id-token verify allowlist (both parsed in F-K / Phase 6); record the discovery-driven client-auth-method selection (G-3) and the id-token alg agility (F-M) under REQ-062/REQ-064. Keep REQ-068 `partial` until Phase 5 probes pass. Update `traceability.yaml`.
-- [ ] **Step 14: Commit** `feat(auth): RS384/ES384 + private_key_jwt for code exchange, backend services, and id_token verification (REQ-068, REQ-064)`.
+- [x] **Step 13: Spec.** In `auth.md` REQ-068 document the asymmetric confidential code flow and the Backend Services flow (cite `client-confidential-asymmetric` and `backend-services`), and record the `RS384`/`ES384` baseline (cite the SHALL). Note in `service-discovery.md` that `token_endpoint_auth_signing_alg_values_supported` selects the client-auth algorithm and `id_token_signing_alg_values_supported` selects the id-token verify allowlist (both parsed in F-K / Phase 6); record the discovery-driven client-auth-method selection (G-3) and the id-token alg agility (F-M) under REQ-062/REQ-064. Keep REQ-068 `partial` until Phase 5 probes pass. Update `traceability.yaml`.
+- [x] **Step 14: Commit** `feat(auth): RS384/ES384 + private_key_jwt for code exchange, backend services, and id_token verification (REQ-068, REQ-064)`.
 
 ## Phase 4 — Transport 401 → refresh / catalog-refresh hook (F-D) [MED]
 
@@ -327,9 +327,9 @@ Update `parse` to range over the map (`for id, s := range wire.Services`), use `
 - Test: `transport/client_test.go`, plus `testkit/probes/auth/probe_007_token_refresh.go`
 - Spec: `auth.md` REQ-063 (replace the "out of scope" paragraph with the wired behaviour), `service-discovery.md` REQ-071 bullet 3, `REQ.md` rows, `traceability.yaml`
 
-- [ ] **Step 1: Failing test.** In `transport/client_test.go` add `TestDoReauthOn401`: a test server returns `401` on the first call (stale bearer), `200` on the second; the configured `TokenSource` returns a new bearer after `Reauth`. Assert exactly two upstream calls, the second carrying the refreshed bearer, and a final non-error `200`. A second test asserts two consecutive `401`s return `errors.Is(err, transport.ErrUnauthorized)` with exactly one reauth attempt.
-- [ ] **Step 2: Run; verify fail.**
-- [ ] **Step 3: Define the hook.** Add to `auth`:
+- [x] **Step 1: Failing test.** In `transport/client_test.go` add `TestDoReauthOn401`: a test server returns `401` on the first call (stale bearer), `200` on the second; the configured `TokenSource` returns a new bearer after `Reauth`. Assert exactly two upstream calls, the second carrying the refreshed bearer, and a final non-error `200`. A second test asserts two consecutive `401`s return `errors.Is(err, transport.ErrUnauthorized)` with exactly one reauth attempt.
+- [x] **Step 2: Run; verify fail.**
+- [x] **Step 3: Define the hook.** Add to `auth`:
 
 ```go
 // Reauther forces a fresh credential after a wire 401 (REQ-063).
@@ -338,26 +338,26 @@ type Reauther interface { Reauth(ctx context.Context) error }
 
 Implement `(*smart.Source).Reauth` = "mark current token stale + run refresh grant"; expose a `discovery`-refresh adapter. Add `transport.WithReauthOn401(r auth.Reauther)`.
 
-- [ ] **Step 3a2 (G-5): Status-aware token-endpoint error.** Give the token-exchange/refresh path an error that carries the HTTP status alongside the parsed `auth.OAuth2Error` envelope (mirroring `x/oauth2.RetrieveError{Response, Body, ErrorCode, …}`, but with a bounded body snippet). Add a `Terminal()` predicate: true for a 4xx carrying `invalid_grant`/`invalid_client`, false for 5xx/network. Add `TestTokenErrorTerminalClassification`. This is the gate F-L's clearing logic depends on.
-- [ ] **Step 3b (F-L): Clear the refresh token on terminal failure only.** In `auth/smart` `Source.Token()`/`refreshGrant`, when the refresh fails and the Step-3a2 error reports `Terminal()`, **clear `s.refresh`** and the cached token before returning `ErrReauthRequired`, mirroring `client-js` ("delete refresh token so we don't loop"); on a non-terminal (5xx/network) failure **retain** `s.refresh` and return `ErrRefreshFailed` so a transient blip doesn't force re-auth. Subsequent `Token()` then deterministically returns `ErrReauthRequired` instead of re-POSTing a dead refresh token. Add `TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal`.
-- [ ] **Step 3c (F-L): Add explicit `RefreshIfNeeded`.** Expose `(*smart.Source).RefreshIfNeeded(ctx)` (refresh only when within the threshold) alongside the existing proactive path, matching the reference client's API and giving consumers a non-request-bound refresh trigger.
-- [ ] **Step 3d (G-2): Configurable early-expiry buffer.** Replace the hardcoded 30s proactive-refresh threshold in `smart.Source` with a functional option (e.g. `smart.WithEarlyExpiry(d)`, default 30s), mirroring `x/oauth2.ReuseTokenSourceWithExpiry`. Add `TestEarlyExpiryConfigurable`. Document under REQ-063.
-- [ ] **Step 4: Wire `Do`.** After `doOnce` returns a `*WireError` with status `401`, if a reauther is configured and this attempt has not yet reauthed, call `Reauth(ctx)` once, rebuild headers (fresh token via `tokenSourceFor`), retry once. Guard against infinite loops with a per-`Do` boolean. Leave behaviour unchanged when no reauther is set (preserves current `ErrUnauthorized` contract).
-- [ ] **Step 5: Run** `go test ./transport/... ./auth/... -race -v` — PASS.
-- [ ] **Step 6: Probes.** Implement `testkit/probes/auth/probe_007_token_refresh.go` (and complete the transport half of PROBE-041) per `conformance.md`.
-- [ ] **Step 7: Spec.** Rewrite the REQ-063 "Out of scope" paragraph in `auth.md` to document the wired, opt-in 401→refresh; update REQ-071 bullet 3 in `service-discovery.md`; flip REQ-063 row to `landed`. Update `traceability.yaml` + `conformance.md` PROBE-007/041 status.
-- [ ] **Step 8: Commit** `feat(transport): opt-in 401 -> reauth/refresh-and-retry (REQ-063, REQ-071)`.
+- [x] **Step 3a2 (G-5): Status-aware token-endpoint error.** Give the token-exchange/refresh path an error that carries the HTTP status alongside the parsed `auth.OAuth2Error` envelope (mirroring `x/oauth2.RetrieveError{Response, Body, ErrorCode, …}`, but with a bounded body snippet). Add a `Terminal()` predicate: true for a 4xx carrying `invalid_grant`/`invalid_client`, false for 5xx/network. Add `TestTokenErrorTerminalClassification`. This is the gate F-L's clearing logic depends on.
+- [x] **Step 3b (F-L): Clear the refresh token on terminal failure only.** In `auth/smart` `Source.Token()`/`refreshGrant`, when the refresh fails and the Step-3a2 error reports `Terminal()`, **clear `s.refresh`** and the cached token before returning `ErrReauthRequired`, mirroring `client-js` ("delete refresh token so we don't loop"); on a non-terminal (5xx/network) failure **retain** `s.refresh` and return `ErrRefreshFailed` so a transient blip doesn't force re-auth. Subsequent `Token()` then deterministically returns `ErrReauthRequired` instead of re-POSTing a dead refresh token. Add `TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal`.
+- [x] **Step 3c (F-L): Add explicit `RefreshIfNeeded`.** Expose `(*smart.Source).RefreshIfNeeded(ctx)` (refresh only when within the threshold) alongside the existing proactive path, matching the reference client's API and giving consumers a non-request-bound refresh trigger.
+- [x] **Step 3d (G-2): Configurable early-expiry buffer.** Replace the hardcoded 30s proactive-refresh threshold in `smart.Source` with a functional option (e.g. `smart.WithEarlyExpiry(d)`, default 30s), mirroring `x/oauth2.ReuseTokenSourceWithExpiry`. Add `TestEarlyExpiryConfigurable`. Document under REQ-063.
+- [x] **Step 4: Wire `Do`.** After `doOnce` returns a `*WireError` with status `401`, if a reauther is configured and this attempt has not yet reauthed, call `Reauth(ctx)` once, rebuild headers (fresh token via `tokenSourceFor`), retry once. Guard against infinite loops with a per-`Do` boolean. Leave behaviour unchanged when no reauther is set (preserves current `ErrUnauthorized` contract).
+- [x] **Step 5: Run** `go test ./transport/... ./auth/... -race -v` — PASS.
+- [x] **Step 6: Probes.** Implement `testkit/probes/auth/probe_007_token_refresh.go` (and complete the transport half of PROBE-041) per `conformance.md`.
+- [x] **Step 7: Spec.** Rewrite the REQ-063 "Out of scope" paragraph in `auth.md` to document the wired, opt-in 401→refresh; update REQ-071 bullet 3 in `service-discovery.md`; flip REQ-063 row to `landed`. Update `traceability.yaml` + `conformance.md` PROBE-007/041 status.
+- [x] **Step 8: Commit** `feat(transport): opt-in 401 -> reauth/refresh-and-retry (REQ-063, REQ-071)`.
 
 ## Phase 5 — Auth conformance probes (F-E) [MED]
 
 **Files:** `testkit/probes/auth/probe_00{1..9}_*.go`, `conformance.md`, `traceability.yaml`, `docs/roadmap.md`
 
-- [ ] **Step 1:** Create `testkit/probes/auth/` and implement PROBE-001 (discovery declares `code`+`S256`), PROBE-004 (PKCE verifier round-trip), PROBE-005 (scope round-trip), PROBE-006 (JWKS rotation), PROBE-007 (token refresh — shared with Phase 4), PROBE-008/009 as scoped in `conformance.md`, each driven by an `httptest` SMART server. Tag each with `// PROBE-00N`. **(G-7) PKCE parity:** within PROBE-004 assert the SDK verifier matches RFC 7636 / `x/oauth2.GenerateVerifier` — ≥32 bytes entropy, `base64.RawURLEncoding` (no padding), and `challenge == base64url(SHA256(verifier))` with method `S256`.
-- [ ] **Step 2:** Add launch-mode coverage tests proving standalone (`AuthorizeURL` without `launch`), embedded (`launch` param present), and backend (`clientcreds` + `jwtbearer`) so REQ-068 is provably covered.
-- [ ] **Step 3:** Run `make probe-status` and `go test ./testkit/probes/auth/... -v` — PASS.
-- [ ] **Step 4:** Cross-check the in-process assertions against the **Inferno SMART App Launch Test Kit STU2.2 *Client* suite** scenarios (Public, Confidential Symmetric, Confidential Asymmetric, Backend Services Asymmetric) — use them as the external requirement checklist; record any scenario the SDK cannot satisfy as a follow-up rather than silently skipping.
-- [ ] **Step 5:** Update `conformance.md` statuses, `traceability.yaml` (REQ-068 → `landed` once flows+modes are probe-covered), and `roadmap.md`.
-- [ ] **Step 6: Commit** `test(probes): land auth probes PROBE-001..009 (REQ-061/068)`.
+- [x] **Step 1:** Create `testkit/probes/auth/` and implement PROBE-001 (discovery declares `code`+`S256`), PROBE-004 (PKCE verifier round-trip), PROBE-005 (scope round-trip), PROBE-006 (JWKS rotation), PROBE-007 (token refresh — shared with Phase 4), PROBE-008/009 as scoped in `conformance.md`, each driven by an `httptest` SMART server. Tag each with `// PROBE-00N`. **(G-7) PKCE parity:** within PROBE-004 assert the SDK verifier matches RFC 7636 / `x/oauth2.GenerateVerifier` — ≥32 bytes entropy, `base64.RawURLEncoding` (no padding), and `challenge == base64url(SHA256(verifier))` with method `S256`.
+- [x] **Step 2:** Add launch-mode coverage tests proving standalone (`AuthorizeURL` without `launch`), embedded (`launch` param present), and backend (`clientcreds` + `jwtbearer`) so REQ-068 is provably covered.
+- [x] **Step 3:** Run `make probe-status` and `go test ./testkit/probes/auth/... -v` — PASS.
+- [x] **Step 4:** Cross-check the in-process assertions against the **Inferno SMART App Launch Test Kit STU2.2 *Client* suite** scenarios (Public, Confidential Symmetric, Confidential Asymmetric, Backend Services Asymmetric) — use them as the external requirement checklist; record any scenario the SDK cannot satisfy as a follow-up rather than silently skipping.
+- [x] **Step 5:** Update `conformance.md` statuses, `traceability.yaml` (REQ-068 → `landed` once flows+modes are probe-covered), and `roadmap.md`.
+- [x] **Step 6: Commit** `test(probes): land auth probes PROBE-001..009 (REQ-061/068)`.
 
 ## Phase 5b — Token introspection client (F-J) [MED]
 
@@ -365,24 +365,24 @@ Implement `(*smart.Source).Reauth` = "mark current token stale + run refresh gra
 
 **Files:** new `auth/introspect/` (`introspect.go`, `introspect_test.go`), `smart/discovery` (surface `introspection_endpoint` from Phase 6), `auth.md` (new REQ or REQ-062 extension), `REQ.md`, `traceability.yaml`
 
-- [ ] **Step 1: Failing test.** `TestIntrospectActiveToken`: an `httptest` server implements `POST /introspect` returning `{"active":true,"scope":"patient/COMPOSITION.read openid","client_id":"c1","patient":"p1","exp":...}`; assert the client posts `token=<value>` form-encoded with its own bearer in `Authorization`, and parses `Active`, `Scope`, `ClientID`, `Patient`, `Exp` into a typed `Result`.
-- [ ] **Step 2: Run; verify fail.**
-- [ ] **Step 3: Implement** `introspect.New(endpoint, *http.Client)` + `Introspect(ctx, token, bearer) (Result, error)` per RFC 7662 (required `active`/`scope`/`client_id`/`exp`; conditional launch-context + `iss`/`sub`/`fhirUser`; `Raw map[string]any`). Inject `*http.Client` (REQ-021); honour ctx (REQ-020).
-- [ ] **Step 4: Run** `go test ./auth/introspect/... -v` — PASS.
-- [ ] **Step 5: Spec + commit.** Add a REQ (or extend REQ-062) citing the `token-introspection` profile; update `traceability.yaml`. `feat(auth/introspect): RFC 7662 token introspection client`.
+- [x] **Step 1: Failing test.** `TestIntrospectActiveToken`: an `httptest` server implements `POST /introspect` returning `{"active":true,"scope":"patient/COMPOSITION.read openid","client_id":"c1","patient":"p1","exp":...}`; assert the client posts `token=<value>` form-encoded with its own bearer in `Authorization`, and parses `Active`, `Scope`, `ClientID`, `Patient`, `Exp` into a typed `Result`.
+- [x] **Step 2: Run; verify fail.**
+- [x] **Step 3: Implement** `introspect.New(endpoint, *http.Client)` + `Introspect(ctx, token, bearer) (Result, error)` per RFC 7662 (required `active`/`scope`/`client_id`/`exp`; conditional launch-context + `iss`/`sub`/`fhirUser`; `Raw map[string]any`). Inject `*http.Client` (REQ-021); honour ctx (REQ-020).
+- [x] **Step 4: Run** `go test ./auth/introspect/... -v` — PASS.
+- [x] **Step 5: Spec + commit.** Add a REQ (or extend REQ-062) citing the `token-introspection` profile; update `traceability.yaml`. `feat(auth/introspect): RFC 7662 token introspection client`.
 
 ## Phase 6 — Scope/context helpers + canonical sources + example (F-F, F-G, F-H) [LOW]
 
 **Files:** `auth/scope.go`, `auth/scope_test.go`, `auth.md`, `service-discovery.md`, `research-strands.md`, `docs/adr/`, `smart/discovery/catalog.go` (+resolver), `cmd/examples/smart-launch/`, `docs/examples.md`
 
-- [ ] **Step 1:** Add launch-context scope constants/helpers to `auth/scope.go` (`ScopeOpenID`, `ScopeLaunch`, `ScopeLaunchPatient`, `ScopeLaunchEpisode`, `ScopeOfflineAccess`, `ScopeOnlineAccess`) with a table test. Purely lexical — no enforcement (consistent with § Scope handling).
-- [ ] **Step 2:** Document in `auth.md` how a refresh token is requested (`offline_access` / `online_access`) under REQ-063, and cite the canonical openEHR SMART spec + SMART App Launch v2 URLs in `auth.md` and `service-discovery.md`.
-- [ ] **Step 3 (F-K + G-3 + F-M):** Capture `introspection_endpoint` / `revocation_endpoint` / `management_endpoint`, `token_endpoint_auth_signing_alg_values_supported`, **`token_endpoint_auth_methods_supported` (G-3 — client-auth method selection)**, and **`id_token_signing_alg_values_supported` (F-M — id-token verify allowlist)** on `AuthEndpoints` (parsed in `parseAuthEndpoints`) — surface only (the signing-alg list feeds Phase 3a/3b's RS384/ES384 selection; the methods list feeds Phase 3b's G-3 selection; the id-token alg list feeds Phase 3e; `introspection_endpoint` feeds Phase 5b). Add the openEHR capability strings (`context-openehr-ehr`, `context-openehr-episode`, `openehr-permission-v1`, `launch-base64-json`) to a documented constant block.
-- [ ] **Step 4:** Resolve STRAND-05: write `docs/adr/0009-smart-auth-library-scope.md` recording the hand-rolled vs `x/oauth2` decision and the probe evidence from Phase 5; flip STRAND-05 to **Resolved** with the ADR backlink; amend REQ-061..064 notes as needed. **(G-6)** In the same ADR, record the decision on an optional `x/oauth2` interop adapter (`auth.FromOAuth2TokenSource`): the OTel-only dependency rule means it cannot live in core — either isolate it in an opt-in `auth/oauth2adapter` submodule (separate `go.mod`) or decline and document why; note the `oauth2.TokenSource.Token()` no-`ctx` bridging caveat. Do **not** add `x/oauth2` to the root module.
-- [ ] **Step 5:** Add a runnable `cmd/examples/smart-launch/` (standalone PKCE against an in-process SMART stub, no secrets) and register it in `docs/examples.md` per the ai-workflow Examples checklist. The example MUST **demonstrate persisting the `AuthorizationRequest` (`state` + PKCE `code_verifier`) across the redirect** (e.g. keyed by `state` in an in-memory session map) — the reference clients (`client-js`/`client-py`) hide this in session storage and it is the #1 integration gotcha for the Go SDK's caller-managed model.
-- [ ] **Step 5b (consideration, optional):** If the MCP/multi-EHR use case is in scope, add a small `smart`/`smart/discovery` helper to resolve a `Source`+`ServiceCatalog` by an incoming `iss` (issuer allow-list), the Go analog of client-js `issMatch` — built on the issuer-keyed discovery cache (REQ-065/070) + per-request `auth.WithTokenSource`. Otherwise record it as a follow-up.
-- [ ] **Step 6:** `make spec-check && make ci`.
-- [ ] **Step 7: Commit** `feat(auth): scope helpers, canonical SMART sources, ADR 0009, smart-launch example`.
+- [x] **Step 1:** Add launch-context scope constants/helpers to `auth/scope.go` (`ScopeOpenID`, `ScopeLaunch`, `ScopeLaunchPatient`, `ScopeLaunchEpisode`, `ScopeOfflineAccess`, `ScopeOnlineAccess`) with a table test. Purely lexical — no enforcement (consistent with § Scope handling).
+- [x] **Step 2:** Document in `auth.md` how a refresh token is requested (`offline_access` / `online_access`) under REQ-063, and cite the canonical openEHR SMART spec + SMART App Launch v2 URLs in `auth.md` and `service-discovery.md`.
+- [x] **Step 3 (F-K + G-3 + F-M):** Capture `introspection_endpoint` / `revocation_endpoint` / `management_endpoint`, `token_endpoint_auth_signing_alg_values_supported`, **`token_endpoint_auth_methods_supported` (G-3 — client-auth method selection)**, and **`id_token_signing_alg_values_supported` (F-M — id-token verify allowlist)** on `AuthEndpoints` (parsed in `parseAuthEndpoints`) — surface only (the signing-alg list feeds Phase 3a/3b's RS384/ES384 selection; the methods list feeds Phase 3b's G-3 selection; the id-token alg list feeds Phase 3e; `introspection_endpoint` feeds Phase 5b). Add the openEHR capability strings (`context-openehr-ehr`, `context-openehr-episode`, `openehr-permission-v1`, `launch-base64-json`) to a documented constant block.
+- [x] **Step 4:** Resolve STRAND-05: write `docs/adr/0009-smart-auth-library-scope.md` recording the hand-rolled vs `x/oauth2` decision and the probe evidence from Phase 5; flip STRAND-05 to **Resolved** with the ADR backlink; amend REQ-061..064 notes as needed. **(G-6)** In the same ADR, record the decision on an optional `x/oauth2` interop adapter (`auth.FromOAuth2TokenSource`): the OTel-only dependency rule means it cannot live in core — either isolate it in an opt-in `auth/oauth2adapter` submodule (separate `go.mod`) or decline and document why; note the `oauth2.TokenSource.Token()` no-`ctx` bridging caveat. Do **not** add `x/oauth2` to the root module.
+- [x] **Step 5:** Add a runnable `cmd/examples/smart-launch/` (standalone PKCE against an in-process SMART stub, no secrets) and register it in `docs/examples.md` per the ai-workflow Examples checklist. The example MUST **demonstrate persisting the `AuthorizationRequest` (`state` + PKCE `code_verifier`) across the redirect** (e.g. keyed by `state` in an in-memory session map) — the reference clients (`client-js`/`client-py`) hide this in session storage and it is the #1 integration gotcha for the Go SDK's caller-managed model.
+- [x] **Step 5b (consideration, optional):** If the MCP/multi-EHR use case is in scope, add a small `smart`/`smart/discovery` helper to resolve a `Source`+`ServiceCatalog` by an incoming `iss` (issuer allow-list), the Go analog of client-js `issMatch` — built on the issuer-keyed discovery cache (REQ-065/070) + per-request `auth.WithTokenSource`. Otherwise record it as a follow-up. — **Outcome: deferred** (not built); recorded as a follow-up in ADR 0009.
+- [x] **Step 6:** `make spec-check && make ci`.
+- [x] **Step 7: Commit** `feat(auth): scope helpers, canonical SMART sources, ADR 0009, smart-launch example`.
 
 ## Mapping to specs
 
