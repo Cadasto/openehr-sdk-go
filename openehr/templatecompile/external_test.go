@@ -11,7 +11,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -168,5 +170,54 @@ func TestExternalValidateEHRStatus(t *testing.T) {
 	}
 	if !rootMismatch {
 		t.Fatalf("expected an rm_type_mismatch issue; got %+v", res.Issues)
+	}
+}
+
+// TestExternalInstanceAndAQL proves the other two REQ-111 consumers —
+// instance.Generate (REQ-107) and validation.ValidateAQL (REQ-109) — are
+// reachable on the public-only call path with an externally-compiled OPT,
+// so every entry point REQ-111 names is covered, not just the builder and
+// the composition validator.
+func TestExternalInstanceAndAQL(t *testing.T) {
+	ctx := context.Background()
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+
+	// instance.Generate synthesises an RM root from the public *Compiled.
+	v, err := instance.Generate(ctx, c, instance.Options{
+		Policy:    instance.Minimal,
+		Territory: "NL",
+		Composer:  externalComposer(),
+	})
+	if err != nil {
+		t.Fatalf("instance.Generate: %v", err)
+	}
+	if _, err := instance.AsComposition(v); err != nil {
+		t.Fatalf("instance.AsComposition: %v", err)
+	}
+
+	// validation.ValidateAQL runs the template-aware lint against the public
+	// *Compiled. A query naming an archetype absent from the template must
+	// surface aql_archetype_not_in_template — proving the externally-compiled
+	// template actually drives the check.
+	res := validation.ValidateAQL(
+		aql.Query{Q: "SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1]"},
+		c,
+	)
+	found := false
+	for _, is := range res.Issues {
+		if is.Code == "aql_archetype_not_in_template" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("ValidateAQL did not flag the absent archetype against the compiled template; got %+v", res.Issues)
 	}
 }

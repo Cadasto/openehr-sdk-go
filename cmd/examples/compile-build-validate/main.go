@@ -100,10 +100,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 6. The other typed validators are reachable too (REQ-110). Against
-	//    a COMPOSITION-rooted OPT an EHR_STATUS correctly mismatches —
-	//    shown here only to prove the call path is public.
+	// 6. The other typed validators are reachable too (REQ-110). Against a
+	//    COMPOSITION-rooted OPT an EHR_STATUS must surface a root type
+	//    mismatch — assert it so a silent regression to OK=true fails the
+	//    example rather than exiting 0.
 	status := &rm.EHRStatus{Name: rm.DVText{Value: "EHR Status"}, Subject: rm.PartySelf{}}
-	fmt.Printf("ehr_status : ValidateEHRStatus callable (OK=%v against a COMPOSITION OPT)\n",
-		validation.ValidateEHRStatus(status, c).OK)
+	ehrRes := validation.ValidateEHRStatus(status, c)
+	if ehrRes.OK {
+		log.Fatal("ehr_status : ValidateEHRStatus unexpectedly OK against a COMPOSITION OPT")
+	}
+	fmt.Printf("ehr_status : ValidateEHRStatus callable — %d issue(s), root type mismatch as expected\n", len(ehrRes.Issues))
 }

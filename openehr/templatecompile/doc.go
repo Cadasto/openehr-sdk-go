@@ -33,8 +33,11 @@
 // → [CompiledAttribute.Children]).
 //
 // Pre-1.0, the one area expected to change is multi-language term
-// resolution: [CompiledNode.Term]'s lang parameter is accepted but
-// currently ignored (single-document-language OPTs, REQ-105).
+// resolution: [CompiledNode.Term]'s lang parameter is accepted for
+// forward compatibility, and for the single-document-language OPTs of v1
+// every lang resolves to the document-language term. Multi-language
+// selection (and document-language fallback) is the pre-1.0 change
+// (REQ-105).
 //
 // # Why not openehr/template
 //

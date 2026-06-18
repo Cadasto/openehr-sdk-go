@@ -113,3 +113,21 @@ func TestCompile_WithRMInfo_DrivesImplicitInjection(t *testing.T) {
 		t.Error("WithRMInfo(no-required) should inject fewer attributes than the default lookup")
 	}
 }
+
+// TestNodeAt_UnknownPath_ReturnsErrPathNotFound pins the other
+// re-exported sentinel: an external caller cannot import the engine, so
+// matching templatecompile.ErrPathNotFound across the boundary is the
+// only way to detect an unknown path from Compiled.NodeAt.
+func TestNodeAt_UnknownPath_ReturnsErrPathNotFound(t *testing.T) {
+	opt, err := template.ParseFile(fixtures.TemplateOptForName("vital_signs"))
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if _, err := c.NodeAt("/no_such_attribute"); !errors.Is(err, templatecompile.ErrPathNotFound) {
+		t.Fatalf("NodeAt(unknown) error = %v, want errors.Is ErrPathNotFound", err)
+	}
+}

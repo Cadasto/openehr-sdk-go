@@ -1,7 +1,7 @@
 # Plan — Public compiled-template bridge (external composition build + validation)
 
 - **Date:** 2026-06-17
-- **Status:** In progress
+- **Status:** Landed (2026-06-18) — PR #44
 - **Relates:** REQ-101 (composition builder), REQ-102 / REQ-110 (validation), REQ-107 (instance), REQ-013/REQ-100 (building-block independence)
 - **New identifiers:** REQ-111, ADR 0010
 
@@ -75,11 +75,15 @@ var ErrInvalidInput = impl.ErrInvalidInput     // same var → errors.Is works a
 var ErrPathNotFound = impl.ErrPathNotFound
 ```
 
-- **Committed public surface:** `Compile`, `Compiled`, `Option`, `WithRMInfo`,
-  `WithoutImplicitAttributes`, `ErrInvalidInput`, `ErrPathNotFound`. The
-  node-level types (`CompiledNode`, `CompiledAttribute`) stay internal-named —
-  reachable via `Compiled`'s methods but not nameable by external code, so they
-  remain free to evolve.
+- **Committed public surface:** `Compile`, `Compiled`, the introspection tree
+  (`CompiledNode`, `CompiledAttribute`), `Option`, `WithRMInfo`,
+  `WithoutImplicitAttributes`, `ErrInvalidInput`, `ErrPathNotFound` — all type
+  aliases of the engine forms, so downstream code can navigate the compiled
+  template and hold the node types in its own signatures.
+  *(Updated 2026-06-18: `CompiledNode` / `CompiledAttribute` were exposed per
+  owner decision — see [ADR 0010]; the compile engine and free helpers like
+  `IsAOMPrimitiveShortName` stay internal. The earlier draft kept them
+  internal-named.)*
 - **Consumer signatures** reference the public alias so pkg.go.dev renders a
   live link to the public type (clean docs). Because the alias *is* the
   internal type, all existing internal-typed code (unexported helpers, struct
@@ -132,18 +136,22 @@ var ErrPathNotFound = impl.ErrPathNotFound
 
 ## Acceptance criteria
 
-- [ ] Public, externally-constructable compiled type, produced from
+- [x] Public, externally-constructable compiled type, produced from
       `template.ParseOPT` output, importing no `internal/…` package.
-- [ ] `composition.NewBuilder`/`NewSkeleton` and `validation.Validate*`
+- [x] `composition.NewBuilder`/`NewSkeleton` and `validation.Validate*`
       callable from outside this module (proven by a public-only example/test).
-- [ ] Reference fixture round-trips builder → `canjson.Marshal` →
+- [x] Reference fixture round-trips builder → `canjson.Marshal` →
       `canjson.Unmarshal` with field-level equality.
-- [ ] `validation.ValidateEHRStatus` callable on an external `*rm.EHRStatus` +
+- [x] `validation.ValidateEHRStatus` callable on an external `*rm.EHRStatus` +
       externally-compiled OPT.
-- [ ] `make ci` green (fmt, vet, lint, test, spec-check).
+- [x] `make ci` green (fmt, vet, lint, test, spec-check).
+- [x] Introspection tree (`CompiledNode` / `CompiledAttribute`) public and
+      navigable downstream — `introspect_test.go` + `cmd/examples/template-explore`.
 
 ## Out of scope
 
 - Full OPT parsing (already landed, REQ-100).
-- Exposing `CompiledNode`/`CompiledAttribute` as named public types.
 - AQL-style path-fluent setters (separate ergonomic concern).
+
+*(`CompiledNode` / `CompiledAttribute` were initially out of scope but were
+exposed during review — see the committed-surface note above.)*

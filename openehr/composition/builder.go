@@ -8,6 +8,7 @@ import (
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -47,7 +48,10 @@ type pendingAssignment struct {
 // compiled template for path lookups.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
-		return nil, errors.New("composition.NewBuilder: nil compiled template")
+		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /
+		// instance.Generate return for a nil template) so external callers
+		// can errors.Is against it uniformly across the three entry points.
+		return nil, fmt.Errorf("composition.NewBuilder: %w", instance.ErrNilCompiled)
 	}
 	skel, err := NewSkeleton(ctx, c, opts...)
 	if err != nil {

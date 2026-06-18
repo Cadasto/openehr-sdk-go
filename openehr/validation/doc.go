@@ -52,15 +52,14 @@
 // `openehr/client/*`, or `openehr/serialize/`. The forbidden
 // forbidden-import set is enforced by `TestValidationForbiddenImports`.
 //
-// # v1: module-local callability
+// # External callability (REQ-111)
 //
-// The `c` argument is typed against the SDK's internal compiled-
-// template package (internal/templatecompile.Compiled). Per Go's
-// internal/ visibility rule, external modules cannot construct
-// the argument and therefore cannot call [ValidateComposition]
-// in v1. The validator is callable from any package within
-// github.com/cadasto/openehr-sdk-go (composition builder, codegen,
-// MCP servers, CI tools vendoring the SDK). External callability
-// lands alongside REQ-101 when template.Compile is re-exported.
-// See docs/adr/0005-compiled-template-foundation.md §C2.
+// The `c` argument is the compiled template. Construct it from a parsed
+// OPT with the public bridge
+// [github.com/cadasto/openehr-sdk-go/openehr/templatecompile.Compile];
+// the exported signatures here reference that public type, so external
+// modules can call [Validate] / [ValidateComposition] / siblings without
+// importing any internal/ package. The bridge lives in a sibling package
+// rather than openehr/template to avoid an import cycle and REQ-100's
+// stdlib-only contract — see docs/adr/0010-public-compiled-template-bridge.md.
 package validation
