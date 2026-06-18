@@ -369,6 +369,13 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	}
 	refreshTok := s.refresh
 	cur := s.cur
+	if refreshTok == "" && cur.IsZero() {
+		// Post-terminal state: both the access token and the refresh token have
+		// been cleared by a prior terminal failure (F-L). Return immediately
+		// without touching inflight — there is nothing to exchange (REQ-063).
+		s.mu.Unlock()
+		return auth.Token{}, &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
+	}
 	if refreshTok == "" && !cur.IsZero() {
 		// Stale but no refresh_token — return the cached access token
 		// without claiming inflight (REQ-026).
@@ -382,11 +389,7 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 	var tok auth.Token
 	var err error
 	var refreshedTR TokenResponse
-	if refreshTok != "" {
-		tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
-	} else {
-		err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no token or refresh_token")}
-	}
+	tok, refreshedTR, refreshTok, err = s.refreshGrant(ctx, refreshTok)
 
 	s.mu.Lock()
 	if err == nil {
@@ -431,10 +434,13 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 	return err
 }
 
-// Reauth forces a refresh regardless of the current token's freshness. It is
-// used by transport layers to recover from a wire 401 even when the cached
-// token has not yet crossed the proactive-refresh threshold (REQ-063). On
-// terminal failure it clears the refresh token and returns ErrReauthRequired.
+// Reauth forces the cached access token to be treated as stale and drives a
+// refresh on the next token acquisition, even when the token has not yet crossed
+// the proactive-refresh threshold. Use it to recover from a wire 401. If a
+// refresh is already in flight (e.g. concurrent 401 recovery), Reauth coalesces
+// onto it rather than issuing a duplicate request (single-flight, REQ-026). On a
+// terminal refresh failure it clears the refresh token and returns
+// ErrReauthRequired.
 func (s *Source) Reauth(ctx context.Context) error {
 	s.mu.Lock()
 	// Mark the current token stale so that Token() will execute the refresh.

@@ -634,11 +634,12 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 		if !errors.Is(firstErr, auth.ErrRefreshFailed) {
 			t.Fatalf("Token() after 503: got %v, want ErrRefreshFailed", firstErr)
 		}
-		// A second Token() call must retry the endpoint (refresh retained).
-		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
+		// s.cur and s.refresh are both retained after a transient failure — no
+		// re-seed needed. A second Token() call must use the retained refresh
+		// token and hit the endpoint again (proving s.refresh was not cleared).
 		_, _ = src.Token(context.Background())
-		if calls < 2 {
-			t.Fatalf("expected at least 2 endpoint calls (refresh retained), got %d", calls)
+		if calls != 2 {
+			t.Fatalf("expected 2 endpoint calls (refresh retained and reused), got %d", calls)
 		}
 	})
 }

@@ -101,7 +101,8 @@ func (e *ExchangeError) Unwrap() []error {
 // Terminal reports whether the token-endpoint failure is permanent — a 4xx
 // response whose OAuth2 envelope is invalid_grant or invalid_client. Transient
 // failures (5xx, network, context, unparsed) return false so callers retain
-// the refresh token and may retry (REQ-063).
+// the refresh token and may retry (REQ-063). Reach this method via
+// errors.As(err, &ex) rather than a direct type assertion; it is nil-receiver safe.
 func (e *ExchangeError) Terminal() bool {
 	if e == nil || e.StatusCode < 400 || e.StatusCode >= 500 || e.OAuth2 == nil {
 		return false
