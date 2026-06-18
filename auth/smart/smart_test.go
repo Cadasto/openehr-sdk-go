@@ -455,6 +455,80 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 	}
 }
 
+// TestExchangeWithClientSecretBasic verifies that, when a Source is configured
+// with WithClientSecret (confidential symmetric, client_secret_basic), the
+// authorization-code token exchange sends an HTTP Basic auth header with the
+// correct base64-encoded clientID:secret credential, includes grant_type and
+// code fields on the form body, and does NOT send client_assertion /
+// client_assertion_type form fields (REQ-068).
+func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
+	var capturedAuth string
+	var capturedForm url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			b, _ := io.ReadAll(r.Body)
+			capturedForm, _ = url.ParseQuery(string(b))
+			capturedAuth = r.Header.Get("Authorization")
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"at-sym","token_type":"Bearer","expires_in":3600}`))
+		case "/jwks":
+			_, _ = w.Write(readJWKS())
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	const (
+		clientID = "sym-client"
+		secret   = "s3cret"
+	)
+	src, err := smart.New(
+		clientID, testAuthEndpoints(srv),
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+		smart.WithClientSecret(secret),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := src.BeginAuthorization("state-sym")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-sym", "state-sym", req)
+	if err != nil {
+		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
+	}
+	if tok.Value != "at-sym" {
+		t.Fatalf("access = %q, want at-sym", tok.Value)
+	}
+
+	// The Authorization header must be HTTP Basic with base64(clientID:secret).
+	// http.Request.SetBasicAuth encodes clientID and secret directly (no
+	// url.QueryEscape) and uses standard base64 encoding.
+	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte(clientID+":"+secret))
+	if capturedAuth != wantBasic {
+		t.Fatalf("Authorization header = %q, want %q", capturedAuth, wantBasic)
+	}
+
+	// The form must include the expected grant_type.
+	if got := capturedForm.Get("grant_type"); got != "authorization_code" {
+		t.Fatalf("grant_type = %q, want authorization_code", got)
+	}
+
+	// No client_assertion or client_assertion_type — symmetric auth uses Basic,
+	// not a signed JWT (REQ-068).
+	if got := capturedForm.Get("client_assertion"); got != "" {
+		t.Fatalf("client_assertion = %q, want empty (symmetric client must not send JWT assertion)", got)
+	}
+	if got := capturedForm.Get("client_assertion_type"); got != "" {
+		t.Fatalf("client_assertion_type = %q, want empty (symmetric client must not send assertion type)", got)
+	}
+}
+
 // TestClientAssertionAndSecretBothRejected verifies that configuring both
 // WithClientSecret and WithClientAssertionKey is rejected at construction
 // with ErrInvalidConfig (REQ-068).

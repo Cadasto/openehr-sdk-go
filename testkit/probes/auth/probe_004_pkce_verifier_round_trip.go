@@ -179,7 +179,15 @@ func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PRO
 		return r, nil
 	}
 
+	// Explicit pass condition: the token exchange must have returned a non-empty
+	// access_token, confirming the 200 + access_token outcome (REQ-061).
+	if cap.tokenResp.AccessToken == "" {
+		r.Status = "fail"
+		r.Detail = "token exchange succeeded without error but access_token is empty; want non-empty access_token in 200 response"
+		return r, nil
+	}
+
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("S256 PKCE round-trip: challenge on authz, verifier on token; G-7 parity holds (%d-byte verifier, RFC 7636 / x/oauth2)", len(raw))
+	r.Detail = fmt.Sprintf("S256 PKCE round-trip: challenge on authz, verifier on token; 200+access_token confirmed; G-7 parity holds (%d-byte verifier, RFC 7636 / x/oauth2)", len(raw))
 	return r, nil
 }

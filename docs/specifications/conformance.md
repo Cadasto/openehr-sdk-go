@@ -197,8 +197,8 @@ named coverage functions alongside the auth probes in
 
 Together with the PKCE public flow (PROBE-004) and the confidential-code
 auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
-/ `TestG3CrossCheckRejectsUnsupportedMethod` unit pins), this exercises all
-four flows across all three launch modes.
+/ `TestG3CrossCheckRejectsUnsupportedMethod` / `TestExchangeWithClientSecretBasic`
+unit pins), this exercises all four flows across all three launch modes.
 
 ##### Inferno SMART App Launch (STU2.2) Client-suite cross-check
 
@@ -209,7 +209,7 @@ client scenarios to SDK coverage:
 | Inferno client scenario | SDK coverage | Status |
 |---|---|---|
 | **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
-| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; `auth/smart` unit pins | Covered (Sandbox) |
+| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; positive wire test `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
 | **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
 | **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`); `auth/jwtbearer` for the RFC 7523 grant | Covered (Sandbox) |
 
