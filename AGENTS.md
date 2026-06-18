@@ -28,7 +28,7 @@ Reading order:
 |---|---|---|
 | 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
 | 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
-| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml) |
+| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI conventions — recommended plugins/skills (go-coding, gopls-lsp, codebase-memory), MCP/openEHR skills, hooks |
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions |
@@ -95,7 +95,7 @@ Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
 
-Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies are kept deliberately minimal and reviewed; the current set is: **OpenTelemetry** (tracing, confined to `transport/`), **antlr4-go** (AQL parser, `openehr/aql/parse`), and — adopted for SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — **`golang.org/x/oauth2`** and **`github.com/coreos/go-oidc/v3`** (the latter brings `go-jose/v4` transitively), scoped to `auth/` and `smart/` — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
+Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies are kept deliberately minimal and reviewed; the current set is: **OpenTelemetry** (tracing, confined to `transport/`), **antlr4-go** (AQL parser, `openehr/aql/parse`), and — adopted for SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — **`golang.org/x/oauth2`**, **`github.com/coreos/go-oidc/v3`**, and **`github.com/go-jose/go-jose/v4`** (JOSE/JWT crypto), all scoped to `auth/` and `smart/` — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
 **Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
