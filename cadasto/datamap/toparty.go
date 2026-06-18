@@ -229,7 +229,11 @@ func encodePartyDetails(root template.ObjectNode, payload map[string]any, sec pa
 	if !ok {
 		return nil, nil
 	}
-	return encodePartyItemTree(detailsNode, detPayload, sec)
+	// Re-scope to the details ITEM_TREE's own archetype (person_details.v2) so
+	// its terms drive the encode: the tree name ("Persoon data") and the value
+	// terms for coded items (at0310 → "Man") come from this archetype, not the
+	// PARTY root's term dictionary.
+	return encodePartyItemTree(detailsNode, detPayload, partySectionFromNode(detailsNode))
 }
 
 func encodePartyItemTree(treeNode template.ObjectNode, payload map[string]any, sec partySection) (map[string]any, error) {
