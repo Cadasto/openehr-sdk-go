@@ -22,4 +22,5 @@
 //   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
 //   - cmd/examples/aql-build            — AQL struct + verb builders (REQ-055)
 //   - cmd/examples/lint-aql             — AQL static lint + ValidateAQL (REQ-109)
+//   - cmd/examples/compile-build-validate — public compile→build→validate, public-only imports (REQ-111)
 package examples

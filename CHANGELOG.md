@@ -10,6 +10,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use. Internal renames, fix-ups, and dro
 
 ### Added
 
+- **Public compiled-template bridge (REQ-111).** New `openehr/templatecompile` package re-exports `Compile(opt)`, the `Compiled` handle, and its introspection tree (`CompiledNode` / `CompiledAttribute`) so external modules can both construct the compiled template the composition builder (REQ-101), instance synthesiser (REQ-107), validator (REQ-102/110), and AQL lint (REQ-109) accept — now callable outside this module without any `internal/` import — and navigate it (form generation, path discovery, custom mapping). Sibling of `openehr/template` to avoid an import cycle and REQ-100's stdlib-only contract ([ADR 0010](docs/adr/0010-public-compiled-template-bridge.md)); new `cmd/examples/compile-build-validate` shows the public-only path. Additive.
+
 ## [0.8.0] - 2026-06-17
 
 Eighth `v0.x` minor — the **template modelling cycle**: REQ-104 slot assertion grammar and REQ-105 terminology bindings land together with REQ-110 validation beyond COMPOSITION, completing the deferred tail of the REQ-100 follow-up plan. **Additive only — no public API or behaviour breaks this cycle**; per [`docs/releases.md`](docs/releases.md), `v0.x` minors *may* break public API, but none do here — safe to upgrade from `v0.7.0`.

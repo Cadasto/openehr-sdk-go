@@ -3,7 +3,7 @@ package composition
 import (
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -17,7 +17,7 @@ import (
 // admissible via the catch-all "*rm.<RMType>" mapping checked against
 // the compiled-node's RMTypeName so the table stays maintainable as
 // new RM types come in.
-func checkRMType(node *templatecompile.CompiledNode, v any) error {
+func checkRMType(node *tcimpl.CompiledNode, v any) error {
 	want := node.RMTypeName()
 	got, ok := goConcreteRMType(v)
 	if !ok {

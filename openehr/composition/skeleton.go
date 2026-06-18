@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // NewSkeleton produces a structurally-conformant *rm.Composition for

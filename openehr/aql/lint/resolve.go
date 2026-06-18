@@ -3,14 +3,14 @@ package lint
 import (
 	"fmt"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
 // templateIssues runs Layer 3 against a compiled OPT: archetype membership
 // (aql_archetype_not_in_template, Error) and archetype-scoped path resolution
 // (aql_path_not_in_template, Warning).
-func templateIssues(md Metadata, c *templatecompile.Compiled) []Issue {
+func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 	var issues []Issue
 
 	// aql_archetype_not_in_template — every literal archetype HRID named in
@@ -96,7 +96,7 @@ func templateIssues(md Metadata, c *templatecompile.Compiled) []Issue {
 // Consequence (documented false-positive policy, REQ-109): a path through a
 // non-mandatory RM attribute the OPT did not constrain may still false-warn.
 // The check is a Warning precisely because the CDR is the path authority.
-func pathDivergence(node *templatecompile.CompiledNode, segs []parse.PathSegment) (bad string, diverged bool) {
+func pathDivergence(node *tcimpl.CompiledNode, segs []parse.PathSegment) (bad string, diverged bool) {
 	for _, seg := range segs {
 		attr := node.Attribute(seg.Name)
 		if attr == nil {
@@ -118,7 +118,7 @@ func pathDivergence(node *templatecompile.CompiledNode, segs []parse.PathSegment
 // a predicate matching a child's node id (at-/id-code), that child is taken;
 // otherwise the first child is taken deterministically (lenient first-child,
 // mirroring template.OperationalTemplate.NodeAt).
-func pickChild(children []*templatecompile.CompiledNode, predicate string) *templatecompile.CompiledNode {
+func pickChild(children []*tcimpl.CompiledNode, predicate string) *tcimpl.CompiledNode {
 	if predicate != "" {
 		for _, child := range children {
 			if child.NodeID() == predicate {

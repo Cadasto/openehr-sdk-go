@@ -381,11 +381,11 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `internal/templatecompile/` (same-module internal access).
 
-### Public surface scope (v1 — module-local)
+### Public surface scope (resolved by REQ-111)
 
-The `c *templatecompile.Compiled` argument is typed against the SDK's internal compiled-template package. Per Go's `internal/` visibility rule, **external consumers (modules outside `github.com/cadasto/openehr-sdk-go`) cannot construct the argument and therefore cannot call `ValidateComposition` directly in v1**. The validator is callable from any package within this module — composition builder, codegen, CI tools, MCP servers vendoring the SDK.
+The `c *templatecompile.Compiled` argument is the compiled-template form. It was, through v0.8.0, typed against the SDK's *internal* compiled-template package, so per Go's `internal/` visibility rule **external consumers (modules outside `github.com/cadasto/openehr-sdk-go`) could not construct it and therefore could not call `ValidateComposition` directly**. The validator was callable only from packages within this module.
 
-This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2: `internal/templatecompile/` stays internal until REQ-101 (composition builder) confirms the public shape. The public re-export (`template.Compile` / `template.Compiled`) lands alongside REQ-101 Phase 1, after which the validator's public signature becomes externally callable without code change. Until then, downstream consumers either vendor the SDK as a private dependency or wait for the promotion.
+**REQ-111 closes this.** The public bridge `openehr/templatecompile.Compile` produces the `*templatecompile.Compiled` (a type alias of the internal compiled form) that this validator accepts, so external modules now drive the full pipeline through public packages with no code change to the validator. [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2 originally proposed re-exporting the constructor as `template.Compile` / `template.Compiled` from `openehr/template`; [ADR 0010](../adr/0010-public-compiled-template-bridge.md) revised the placement to the sibling package `openehr/templatecompile` because hosting it in `openehr/template` would create an import cycle and violate REQ-100's stdlib-only contract. See REQ-111.
 
 ### Out of scope (this REQ)
 
@@ -468,7 +468,7 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 `openehr/instance/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
 
-In v1 the public signature accepts `*templatecompile.Compiled` (module-local), same restriction as `validation.ValidateComposition` per [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2 — the public re-export lands with REQ-101 Phase 1.
+The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
 - **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
 - **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
@@ -510,7 +510,7 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 
 ### Building-block independence (REQ-013)
 
-`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
+`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
 
 - **Lives in:** [`openehr/composition/`](../../openehr/composition/)
 - **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal round-trip preserves values at key paths.
@@ -615,4 +615,59 @@ The walker logic is unchanged; generalisation is a lockstep extension of the fou
 - **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
 - **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
 - **Plan:** [`docs/plans/archive/2026-06-17-validation-non-composition-roots.md`](../plans/archive/2026-06-17-validation-non-composition-roots.md)
+
+---
+
+## REQ-111 — Public compiled-template bridge
+
+The compiled-template form (`templatecompile.Compiled`) is the argument every template-driven entry point takes: the composition builder (REQ-101 — `NewBuilder` / `NewSkeleton`), the RM instance synthesiser (REQ-107 — `Generate`), the validator (REQ-102 / REQ-110 — `Validate` and its typed wrappers), and the AQL static lint (REQ-109 — `lint.Options.Compiled`). Through v0.8.0 it was only constructable inside this module, so **none of those entry points was callable from an external module**.
+
+The SDK **MUST** ship a public constructor that turns a parsed OPT into that compiled form without exposing any `internal/` package, so external consumers can drive the full parse → compile → build → validate pipeline through public packages alone.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/templatecompile
+
+// Compiled is the public, externally-constructable compiled template.
+// It is a type alias of the internal compiled form, so values returned
+// by Compile are accepted as-is by composition, instance, validation
+// and aql/lint — REQ-111 adds no conversion and changes no behaviour.
+type Compiled = <internal compiled form>
+
+func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error)
+
+type Option func(*config)
+func WithRMInfo(l rminfo.Lookup) Option       // custom RM-info source
+func WithoutImplicitAttributes() Option        // OPT-declared attributes only
+
+var ErrInvalidInput error  // re-export; errors.Is works across the boundary
+var ErrPathNotFound error
+
+// Introspection tree — also public, for form generation, path discovery,
+// and custom mapping/validation. Aliases of the engine node types.
+type CompiledNode = <internal compiled node>
+type CompiledAttribute = <internal compiled attribute>
+```
+
+The committed public surface is `Compile`, `Compiled`, the introspection tree (`CompiledNode` / `CompiledAttribute`), the functional `Option`s, and the two sentinel errors — all aliases of the engine types, so a downstream package can navigate the compiled template (`Compiled.Root` / `NodeAt` → `CompiledNode.Attributes` → `CompiledAttribute.Children`) and hold the node types in its own signatures. Pre-1.0 the one area expected to change is multi-language term resolution (`CompiledNode.Term`'s `lang` parameter, REQ-105); the surface is otherwise stable. Engine-only helpers (e.g. `IsAOMPrimitiveShortName`, the raw slot include/exclude strings) stay internal.
+
+The consuming packages reference the public `*templatecompile.Compiled` in their **exported** signatures (so the rendered API docs link the public package); their unexported code that needs the node-level types imports the internal engine directly. Because `Compiled` is a type alias, the two names denote the identical type and no conversion is needed.
+
+### Placement (ADR 0010)
+
+The constructor **MUST NOT** live in `openehr/template` (the natural home next to `ParseFile`), for two reasons:
+
+1. **Import cycle.** The compile engine imports `openehr/template`; a `Compile` inside `openehr/template` would import the engine, forming `template → templatecompile → template`.
+2. **REQ-100 stdlib-only contract.** REQ-100 mandates `openehr/template` import nothing from `openehr/rm/…`; compilation needs `openehr/rm/rminfo` for implicit-attribute injection.
+
+It therefore lives in the sibling package `openehr/templatecompile`. This supersedes [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2's `template.Compile` / `template.Compiled` proposal; see [ADR 0010](../adr/0010-public-compiled-template-bridge.md).
+
+### Building-block independence (REQ-013)
+
+`openehr/templatecompile/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/template`, `openehr/rm/rminfo`, and the internal compile engine only.
+
+- **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
+- **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
+- **Plan:** [`docs/plans/2026-06-17-public-compiled-template-bridge.md`](../plans/2026-06-17-public-compiled-template-bridge.md)
 

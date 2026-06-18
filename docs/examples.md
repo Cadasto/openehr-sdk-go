@@ -26,6 +26,7 @@ make build
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
+| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 
 ---
@@ -118,7 +119,7 @@ go run ./cmd/examples/validate-composition -invalid   # demo a required-field fa
 
 **Packages:** `openehr/template`, `openehr/validation`, `internal/templatecompile`
 
-**Note:** `templatecompile.Compile` is currently internal. This in-repo example is the supported call shape until a public `template.Compile` lands ([ADR 0005](adr/0005-compiled-template-foundation.md)).
+**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead — see [compile-build-validate](#compile-build-validate) (REQ-111, [ADR 0010](adr/0010-public-compiled-template-bridge.md)).
 
 **Default fixture:** hand-built vital-signs composition matching `vital_signs.opt`.
 
@@ -219,6 +220,30 @@ SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/
 ```
 
 **What to copy into your app:** for CI / pre-flight checks call `lint.LintString(q, nil)` (Layers 1–2, no template needed); when you hold a compiled OPT, pass it via `lint.Options{Compiled: c}` (or `validation.ValidateAQL`) to add archetype / path checks. Dispatch on `Issue.Code`; treat only `Error`-severity issues as hard failures.
+
+---
+
+### compile-build-validate
+
+**Purpose:** Drive the whole clinical pipeline through **public packages only** (REQ-111) — the shape an external module uses. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the REQ-101 builder, serialise to canonical JSON, round-trip it, and validate. Before REQ-111 the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
+
+```bash
+go run ./cmd/examples/compile-build-validate
+go run ./cmd/examples/compile-build-validate path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm` — **no `internal/` import.**
+
+**Sample output:**
+
+```text
+template : vital_signs (vital_signs.opt)
+composition: 7550 bytes canonical JSON, round-tripped
+validation : OK — round-tripped composition conforms to the OPT
+ehr_status : ValidateEHRStatus callable (OK=false against a COMPOSITION OPT)
+```
+
+**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.Validate*` calls. The compiled template is the single artifact the builder and validator share.
 
 ---
 
