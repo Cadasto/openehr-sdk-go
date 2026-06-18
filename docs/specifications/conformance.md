@@ -98,7 +98,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A SMART-on-openEHR deployment is reachable.
 - **Wire assertion:** GET `<issuer>/.well-known/smart-configuration` (or equivalent) returns 200 with a JSON body containing `"response_types_supported"` including `"code"` and `"code_challenge_methods_supported"` including `"S256"`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_001_discovery_code_pkce.go`](../../testkit/probes/auth/probe_001_discovery_code_pkce.go). Resolves the canonical SMART configuration cassette through the real `discovery.Resolver` and asserts `code` + `S256` on the resolved `AuthEndpoints`.
+- **Satisfies:** REQ-061.
 
 #### PROBE-002 — Discovery advertises `org.openehr.rest`
 
@@ -106,7 +107,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** SMART discovery resolved.
 - **Wire assertion:** The discovery document's service catalog contains an entry with id `"org.openehr.rest"`, a parseable `base_url`, and a `spec_version` field.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_002_openehr_rest_service.go`](../../testkit/probes/auth/probe_002_openehr_rest_service.go). Asserts `catalog.OpenEHRRest()` resolves an entry with an absolute `base_url` and a declared `spec_version`.
+- **Satisfies:** REQ-070, REQ-072.
 
 #### PROBE-003 — Spec-version mismatch fails fast
 
@@ -114,15 +116,18 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** SDK is configured to require `1.1.0-development`; deployment advertises `1.0.3`.
 - **Wire assertion:** Construction-time discovery returns a `DiscoveryError` with reason `spec_version_mismatch`. No request to the openEHR REST endpoint is made.
 - **Modes:** Sandbox, Cassette (constructed-mismatch cassette).
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_003_spec_version_mismatch.go`](../../testkit/probes/auth/probe_003_spec_version_mismatch.go). Serves a cassette whose `org.openehr.rest` declares `1.0.3` and asserts the resolver fails fast with `DiscoveryError(spec_version_mismatch)`, returning no catalog.
+- **Satisfies:** REQ-072.
 
 #### PROBE-004 — PKCE verifier round-trip
 
 - **Title:** A SMART launch using `S256` PKCE successfully exchanges code for token.
 - **Preconditions:** Deployment registers the SDK as a SMART app with PKCE required.
 - **Wire assertion:** Authorization request carries `code_challenge` and `code_challenge_method=S256`; token exchange carries `code_verifier`; token response is 200 with an `access_token`.
+- **G-7 PKCE parity:** the SDK's verifier additionally satisfies RFC 7636 / `x/oauth2`: ≥ 32 bytes of decoded entropy, `base64.RawURLEncoding` (URL-safe, unpadded), and `code_challenge == base64url(SHA256(verifier))` with method `S256` — cross-checked against `golang.org/x/oauth2.S256ChallengeFromVerifier`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_004_pkce_verifier_round_trip.go`](../../testkit/probes/auth/probe_004_pkce_verifier_round_trip.go). Drives a full `auth/smart` authorization-code + PKCE launch against an httptest token endpoint and asserts the wire round-trip plus the G-7 parity properties.
+- **Satisfies:** REQ-061.
 
 #### PROBE-005 — Scope round-trip
 
@@ -130,7 +135,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Scope `patient/COMPOSITION.read` is requested.
 - **Wire assertion:** Authorization request `scope` parameter contains `patient/COMPOSITION.read`; token response `scope` field contains it (or the JWT `scope` claim does).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_005_scope_round_trip.go`](../../testkit/probes/auth/probe_005_scope_round_trip.go). Asserts the configured scope appears on the authorization request and survives into the SDK-parsed token-response `scope` field.
+- **Satisfies:** REQ-061.
 
 #### PROBE-008 — Platform principal claims surface verbatim
 
@@ -138,7 +144,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A token with `principal_uid = "u-123"`, `principal_type = "AGENT"`.
 - **Wire assertion:** SDK exposes `LaunchContext.Principal = {UID: "u-123", Type: PrincipalTypeAgent}`. Missing claims surface as nil/zero, not as guessed defaults.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_008_principal_claims.go`](../../testkit/probes/auth/probe_008_principal_claims.go). Mints a signed id_token, validates it via `smart.LaunchContextFromTokenResponse`, and asserts the principal claims surface verbatim while an absent-claims token yields a nil `Principal`.
+- **Satisfies:** REQ-067.
 
 #### PROBE-009 — Caller attribution forwarded on opt-in
 
@@ -146,7 +153,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** One client with `WithCallerAttribution(...)`, one without.
 - **Wire assertion:** Configured client emits the `X-Cadasto-Caller-Attribution` header and `caller.agent_id` OTel attribute; unconfigured client emits neither.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_009_caller_attribution.go`](../../testkit/probes/auth/probe_009_caller_attribution.go). Runs one `transport.Client` with `WithCallerAttribution` and one without against the same httptest endpoint, capturing the request header at the server and the span attributes via an in-memory `TracerProvider` (no OTel-SDK dependency).
+- **Satisfies:** REQ-066.
 
 #### PROBE-006 — JWKS rotation transparent to caller
 
@@ -154,7 +162,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A cached JWKS does not contain the `kid` of the issued token (simulating rotation).
 - **Wire assertion:** SDK fetches JWKS once, validates the token, and proceeds. No double-refresh, no double-validation failure surfaced.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_006_jwks_rotation.go`](../../testkit/probes/auth/probe_006_jwks_rotation.go). Signs an id_token with a rotated key whose `kid` is absent from the seeded JWKS cache, then asserts `smart.ValidateIDToken` recovers via exactly one refresh (seed + one fetch on the miss) and validates transparently.
+- **Satisfies:** REQ-062.
 
 #### PROBE-007 — Token refresh transparent to caller
 
@@ -162,8 +171,59 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached token has `expires_at < now`; refresh token is valid.
 - **Wire assertion:** Token endpoint receives `grant_type=refresh_token`; the next outgoing request carries the new access token.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox — transport half) — see [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go). The transport-side safety net (wire 401 → `Reauth` → retry once with refreshed bearer) is asserted here (REQ-063, Phase 4b). The proactive expiry-based refresh path (token source refreshes before expiry in `Source.Token`) is covered by `auth/smart` unit tests (`TestRefreshIfNeeded`, `TestSourceReauthForcesRefresh`). Full cassette/live coverage (token-endpoint `grant_type=refresh_token` on the wire) is deferred to Phase 5.
+- **Status:** Implemented (Sandbox) — both halves. The transport-side safety net (wire 401 → `Reauth` → retry once with refreshed bearer) is asserted in [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go) (REQ-063, Phase 4b). The proactive expiry-based half — `Source.Token` refreshing a stale token via a `grant_type=refresh_token` exchange on the wire — landed in Phase 5 as [`testkit/probes/auth/probe_007_proactive_refresh.go`](../../testkit/probes/auth/probe_007_proactive_refresh.go); it seeds an expired access token + valid refresh token and asserts the token endpoint receives exactly one `grant_type=refresh_token` request and the SDK returns the freshly issued bearer. (`auth/smart` unit tests `TestRefreshIfNeeded` / `TestSourceReauthForcesRefresh` remain.) Full cassette/live ratification is deferred.
 - **Satisfies:** REQ-063
+
+#### Launch-mode coverage (REQ-068)
+
+The four SMART grant flows × three launch modes (REQ-068) are exercised as
+named coverage functions alongside the auth probes in
+[`testkit/probes/auth/launch_modes.go`](../../testkit/probes/auth/launch_modes.go)
+(run via `TestLaunchModeStandalone` / `TestLaunchModeEmbedded` /
+`TestLaunchModeBackend`). They are coverage proofs rather than catalogued
+`PROBE-NNN` IDs, but they are part of the auth-suite definition of done:
+
+- **Standalone** — `Source.AuthorizeURL` builds an authorization URL with
+  `response_type=code` + the `S256` PKCE challenge and **no** `launch`
+  parameter.
+- **Embedded (EHR launch)** — an EHR-supplied `launch` parameter is
+  forwarded verbatim to the authorization endpoint.
+- **Backend service** — three confidential backend flows produce the
+  expected token request on the wire: `auth/clientcreds` with a symmetric
+  `client_secret` (HTTP Basic), `auth/clientcreds` with
+  `WithClientAssertion` (`client_credentials` + signed `client_assertion`,
+  no Basic, no `client_secret` — SMART Backend Services asymmetric), and
+  `auth/jwtbearer` (RFC 7523 JWT Bearer grant).
+
+Together with the PKCE public flow (PROBE-004) and the confidential-code
+auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
+/ `TestG3CrossCheckRejectsUnsupportedMethod` unit pins), this exercises all
+four flows across all three launch modes.
+
+##### Inferno SMART App Launch (STU2.2) Client-suite cross-check
+
+The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite is used
+as an external checklist (it cannot be executed here). Mapping of its
+client scenarios to SDK coverage:
+
+| Inferno client scenario | SDK coverage | Status |
+|---|---|---|
+| **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
+| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; `auth/smart` unit pins | Covered (Sandbox) |
+| **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
+| **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`); `auth/jwtbearer` for the RFC 7523 grant | Covered (Sandbox) |
+
+**Recorded gaps (follow-ups, not silent skips):**
+
+- The SDK is the SMART **client**, so Inferno scenarios that assert the SDK
+  *responds* as an authorization server (e.g. token-introspection responder
+  behaviour) are out of scope by construction.
+- Cassette/Live ratification of all auth probes against a reference
+  authorization server (and a real Inferno run against a deployed Cadasto
+  endpoint) is deferred — the probes are Sandbox-only today.
+- ES384/ES256 asymmetric client-assertion paths are unit-tested in
+  `auth/jwtbearer` but the launch-mode backend coverage exercises the RS384
+  default only; an ES* backend coverage arm is a possible follow-up.
 
 ### Versioned writes and optimistic concurrency
 
@@ -532,7 +592,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 
 | Topic | Probes | Lives in (test code) |
 |---|---|---|
-| Auth + discovery | PROBE-001 … 009 | PROBE-007 transport half implemented (Sandbox) — [`testkit/probes/auth/`](../../testkit/probes/auth/); discovery resolver covered by `smart/discovery/resolver_test.go`; remaining auth probes (PROBE-001–006, 008–009) planned for Phase 5 |
+| Auth + discovery | PROBE-001 … 009 | **all implemented (Sandbox)** — [`testkit/probes/auth/`](../../testkit/probes/auth/). PROBE-001/002/003 drive the real `discovery.Resolver`; PROBE-004 (PKCE + G-7 parity) / PROBE-005 (scope) drive a full `auth/smart` authorization-code launch; PROBE-006 (JWKS rotation), PROBE-007 (transport + proactive refresh halves), PROBE-008 (principal claims), PROBE-009 (caller attribution). Launch-mode coverage (standalone / embedded / backend, REQ-068) lives alongside in [`launch_modes.go`](../../testkit/probes/auth/launch_modes.go). |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021, PROBE-028 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go) |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots. |
