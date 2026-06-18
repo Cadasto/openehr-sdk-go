@@ -4,7 +4,7 @@
 - **Supersedes:** —
 - **Superseded by:** —
 - **Revises:** [ADR 0005](0005-compiled-template-foundation.md) §C2 (the `template.Compile` / `template.Compiled` re-export proposal).
-- **Tracks:** [`docs/plans/2026-06-17-public-compiled-template-bridge.md`](../plans/2026-06-17-public-compiled-template-bridge.md). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
+- **Tracks:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md). Implements [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge); unblocks external callers of REQ-101 / REQ-102 / REQ-107 / REQ-110.
 
 > **Numbering note.** ADR numbers 0008 (SMART discovery `services` shape) and 0009 (SMART/auth dependency policy) are reserved for decisions in flight on a separate branch and are not yet on `main`. This ADR takes 0010 to avoid a number collision on merge.
 

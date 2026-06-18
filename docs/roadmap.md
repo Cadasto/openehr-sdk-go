@@ -48,7 +48,7 @@
 | Terminology bindings (REQ-105) | **Landed** | `openehr/template/`, `internal/templatecompile/` | `ArchetypeRoot.Terms()` / `TermBindings()` deep-copy accessors; compiled `Term`, `TermLang`, `TermBindings`, `TermBindingsForNode` surface OPT term definitions and external bindings (single document language; `lang` forward-compat). External terminology lookup deferred. [plan](plans/archive/2026-06-12-template-req104-req105-deferred.md) |
 | RM structural lookup | **Landed** | `openehr/rm/rminfo/` | BMM-derived `Lookup` (`RequiredAttributes`, `AttributeRMType`, `IsContainer`, `KnownRMTypes`); stdlib-only, no runtime BMM dependency. [ADR 0005](adr/0005-compiled-template-foundation.md) |
 | Compiled OPT foundation | **Landed (internal)** | `internal/templatecompile/` | `Compile` produces walker-friendly tree with cached AQL paths, implicit RM-attribute injection, per-archetype-root term scope; consumed by composition builder (REQ-101) and validator (REQ-102). Engine stays internal; public access is the REQ-111 bridge below. [ADR 0005](adr/0005-compiled-template-foundation.md) |
-| Public compiled-template bridge (REQ-111) | **Landed** | `openehr/templatecompile/` | `Compile(opt)` re-exports the compiled form (type alias) so external modules can call the builder (REQ-101), instance synthesiser (REQ-107), validator (REQ-102/110), and AQL lint (REQ-109) through public packages — closing the "compiled type is internal" gap. Sibling of `openehr/template/` to avoid an import cycle + REQ-100's stdlib-only rule. [ADR 0010](adr/0010-public-compiled-template-bridge.md), [plan](plans/2026-06-17-public-compiled-template-bridge.md) |
+| Public compiled-template bridge (REQ-111) | **Landed** | `openehr/templatecompile/` | `Compile(opt)` re-exports the compiled form (type alias) so external modules can call the builder (REQ-101), instance synthesiser (REQ-107), validator (REQ-102/110), and AQL lint (REQ-109) through public packages — closing the "compiled type is internal" gap. Sibling of `openehr/template/` to avoid an import cycle + REQ-100's stdlib-only rule. [ADR 0010](adr/0010-public-compiled-template-bridge.md), [plan](plans/archive/2026-06-17-public-compiled-template-bridge.md) |
 | Composition vs OPT validation (REQ-102) | **Landed** | `openehr/validation/` | Template-driven `ValidateComposition`; PROBE-025/026. [plan](plans/archive/2026-05-24-composition-validation-template-driven.md) |
 | AQL static lint (REQ-109) | **Landed** | `openehr/aql/parse/`, `openehr/aql/lint/`, `openehr/validation/` | Parse against the SDK grammar profile (ADR 0007) → 3-layer lint (`lint.LintString` / `lint.Lint`) → `validation.ValidateAQL` bridge; PROBE-028. [plan](plans/archive/2026-06-15-aql-lint.md) |
 | Validation beyond COMPOSITION (REQ-110) | **Landed** | `openehr/validation/` | Generic `Validate(root, c)` + typed `ValidateDemographic` (PARTY hierarchy + ADDRESS/CONTACT/PARTY_IDENTITY/PARTY_RELATIONSHIP/CAPABILITY), `ValidateFolder`, `ValidateEHRStatus`; DataValue-leaf readers; PROBE-074. [plan](plans/archive/2026-06-17-validation-non-composition-roots.md) |
@@ -78,7 +78,7 @@
 | `Prefer` negotiation (REQ-094) | **Landed** | `transport/`, `openehr/client/ehr/composition/`, `directory/`, `ehrstatus/` | All three write-path modes landed: `return=representation` bare-body decode (SDK-GAP-09), `return=identifier` slot population, and `representation` + empty body → `ErrInvalidShape`. [Archived plan](plans/archive/2026-05-25-req094-prefer-followups.md); PROBE-065 round-trip deferred |
 | Transport `NoRetry` / `Disabled` | **Landed** | `transport/` REQ-096 | Bench-friendly retry opt-out |
 | Transport observer hook | **Landed** | `transport/` REQ-098 | `WithObserver` + `WithObservationTag` |
-| Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | `services` wire-shape fix (object vs array) + extra endpoint/alg metadata sequenced in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) (ADR 0008) |
+| Service discovery | **Landed** | `smart/discovery/` REQ-070–072 | `services` wire-shape fix (object vs array) + extra endpoint/alg metadata sequenced in [plans/archive/2026-06-16-auth-smart-conformance-audit.md](plans/archive/2026-06-16-auth-smart-conformance-audit.md) (ADR 0008) |
 
 ---
 
@@ -109,7 +109,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | Feature | Status | Package | Notes |
 |---------|--------|---------|-------|
 | Discovery resolver + cache | **Landed** | `smart/discovery/` | |
-| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067); App Registration open (STRAND-05) — to be resolved via ADR 0009 in [plans/2026-06-16-auth-smart-conformance-audit.md](plans/2026-06-16-auth-smart-conformance-audit.md) |
+| AppContext / launch helpers | **Partial** | `smart/` | LaunchContext + ID-token validation (REQ-064/067); App Registration open (STRAND-05) — to be resolved via ADR 0009 in [plans/archive/2026-06-16-auth-smart-conformance-audit.md](plans/archive/2026-06-16-auth-smart-conformance-audit.md) |
 | Cadasto Extra API | **Planned** | `cadasto/extra/` | |
 | Datamap V2 | **Planned** | `cadasto/datamap/` REQ-058 | |
 | MPI preview | **Planned** | `cadasto/mpi/` | |

@@ -669,5 +669,5 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 
 - **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
-- **Plan:** [`docs/plans/2026-06-17-public-compiled-template-bridge.md`](../plans/2026-06-17-public-compiled-template-bridge.md)
+- **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 

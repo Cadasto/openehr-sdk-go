@@ -1,6 +1,6 @@
 # Plan — Auth / SMART-on-openEHR conformance audit and polish
 
-> **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan touches **normative specs** — follow the spec-driven workflow in [AGENTS.md](../../AGENTS.md) (run `make spec-context REQ=NNN`, edit the canonical topic spec, then the REQ row + `traceability.yaml`). Do **not** resolve [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library) silently in code — surface decisions or land an ADR.
+> **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan touches **normative specs** — follow the spec-driven workflow in [AGENTS.md](../../../AGENTS.md) (run `make spec-context REQ=NNN`, edit the canonical topic spec, then the REQ row + `traceability.yaml`). Do **not** resolve [STRAND-05](../../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library) silently in code — surface decisions or land an ADR.
 
 **Date:** 2026-06-16
 **Status:** Implemented (2026-06-18)
@@ -386,11 +386,11 @@ Implement `(*smart.Source).Reauth` = "mark current token stale + run refresh gra
 
 ## Mapping to specs
 
-- [docs/specifications/auth.md](../specifications/auth.md) — REQ-060..069 (REQ-063, REQ-064, REQ-068 amended)
-- [docs/specifications/service-discovery.md](../specifications/service-discovery.md) — REQ-070..072 (services shape, version gate)
-- [docs/specifications/conformance.md](../specifications/conformance.md) — PROBE-001..009, PROBE-041
-- [docs/specifications/research-strands.md § STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library) — resolved via ADR 0009
-- [docs/specifications/REQ.md](../specifications/REQ.md) + [traceability.yaml](../specifications/traceability.yaml) — registry rows
+- [docs/specifications/auth.md](../../specifications/auth.md) — REQ-060..069 (REQ-063, REQ-064, REQ-068 amended)
+- [docs/specifications/service-discovery.md](../../specifications/service-discovery.md) — REQ-070..072 (services shape, version gate)
+- [docs/specifications/conformance.md](../../specifications/conformance.md) — PROBE-001..009, PROBE-041
+- [docs/specifications/research-strands.md § STRAND-05](../../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library) — resolved via ADR 0009
+- [docs/specifications/REQ.md](../../specifications/REQ.md) + [traceability.yaml](../../specifications/traceability.yaml) — registry rows
 - Canonical external sources: see the **References** section below.
 
 ## References
