@@ -70,6 +70,9 @@ func TestIntrospectActiveToken(t *testing.T) {
 	if result.Exp.IsZero() {
 		t.Error("Exp should be set")
 	}
+	if result.Exp.Unix() != futureExp {
+		t.Errorf("Exp.Unix()=%d, want %d", result.Exp.Unix(), futureExp)
+	}
 	if result.Raw == nil {
 		t.Error("Raw should be non-nil")
 	}
@@ -120,6 +123,13 @@ func TestIntrospectNonTwoXX(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error on 401, got nil")
 	}
+	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
+		t.Errorf("expected errors.Is ErrTokenExchangeFailed, got %v", err)
+	}
+	var ex *auth.ExchangeError
+	if !errors.As(err, &ex) || ex.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected *auth.ExchangeError status 401, got %v", err)
+	}
 }
 
 func TestIntrospectNilHTTPClient(t *testing.T) {
@@ -169,6 +179,39 @@ func TestIntrospectAudArray(t *testing.T) {
 	}
 	if result.Sub != "u1" {
 		t.Errorf("Sub=%q", result.Sub)
+	}
+}
+
+func TestIntrospectAudString(t *testing.T) {
+	// REQ-062: aud can be a scalar string — parse both cases.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"active":true,"aud":"rs1"}`))
+	}))
+	defer srv.Close()
+
+	client, err := introspect.New(srv.URL, http.DefaultClient)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	result, err := client.Introspect(context.Background(), "token", "bearer")
+	if err != nil {
+		t.Fatalf("Introspect: %v", err)
+	}
+	if result.Aud != "rs1" {
+		t.Errorf("Aud=%q, want \"rs1\"", result.Aud)
+	}
+}
+
+func TestIntrospectInvalidScheme(t *testing.T) {
+	// REQ-062: endpoint with non-http/https scheme → ErrInvalidConfig.
+	_, err := introspect.New("ftp://host/x", http.DefaultClient)
+	if err == nil {
+		t.Fatal("expected ErrInvalidConfig for ftp scheme")
+	}
+	if !isInvalidConfig(err) {
+		t.Errorf("expected errors.Is(err, auth.ErrInvalidConfig), got %v", err)
 	}
 }
 

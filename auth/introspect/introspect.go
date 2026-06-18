@@ -22,9 +22,9 @@ type Client struct {
 
 // New constructs an introspection Client for the given endpoint URL.
 // httpClient is required (REQ-021); a nil value returns [auth.ErrInvalidConfig].
-// endpoint must be a non-empty, parseable absolute URL; an empty or
-// unparseable value returns [auth.ErrInvalidConfig].
-func New(endpoint string, httpClient *http.Client, _ ...Option) (*Client, error) {
+// endpoint must be a non-empty, parseable absolute URL with scheme "https"
+// or "http"; other values return [auth.ErrInvalidConfig].
+func New(endpoint string, httpClient *http.Client) (*Client, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("%w: HTTPClient is required (REQ-021)", auth.ErrInvalidConfig)
 	}
@@ -35,12 +35,11 @@ func New(endpoint string, httpClient *http.Client, _ ...Option) (*Client, error)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return nil, fmt.Errorf("%w: endpoint %q is not a valid absolute URL", auth.ErrInvalidConfig, endpoint)
 	}
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return nil, fmt.Errorf("%w: endpoint scheme %q must be https or http", auth.ErrInvalidConfig, u.Scheme)
+	}
 	return &Client{endpoint: endpoint, httpClient: httpClient}, nil
 }
-
-// Option is a placeholder for future functional options. No options are
-// currently defined; the variadic parameter exists for forward compatibility.
-type Option func()
 
 // Result holds the RFC 7662 §2.2 introspection response fields.
 type Result struct {
