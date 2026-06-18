@@ -33,6 +33,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/serialize/` | Canonical JSON / XML, FLAT, STRUCTURED codecs. |
 | `openehr/validation/` | Validation interfaces and implementations: Composition vs OPT, demographic structural validation, AQL syntax / path resolution. |
 | `openehr/template/` | ADL 1.4 operational template (OPT: `.opt` / `OPERATIONAL_TEMPLATE`) parse and path utilities. **Consumes** `openehr/aom/` types but does not own them. OET (`.oet`) is out of scope for v1. |
+| `openehr/templatecompile/` | Public compiled-template bridge (REQ-111): `Compile(opt)` turns a parsed OPT into the `Compiled` form the composition builder, instance synthesiser, validator, and AQL lint accept. Thin alias re-export over `internal/templatecompile`; sibling of `openehr/template/` because it needs `openehr/rm/rminfo` ([ADR 0010](../adr/0010-public-compiled-template-bridge.md)). |
 | `openehr/aom/` | Archetype Object Model — the in-memory form of an archetype after parsing ADL. Sibling of `openehr/rm/` (both are top-level openEHR information models). |
 | `openehr/aom/aom14/` | AOM 1.4 types (ADL 1.4). **Generated** from `openehr_am_1.4.0.bmm.json` + `openehr_base_1.3.0.bmm.json` (REQ-042). |
 | `openehr/aom/aom2/` | AOM 2 types (ADL 2). **Deferred for v1** — BMM file kept in `resources/bmm/`. |

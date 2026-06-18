@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // Generate synthesises an RM instance for the compiled template's
@@ -103,7 +104,7 @@ func (g *generator) nextUID() *rm.HierObjectID {
 // materialising each attribute's children. Mirrors the lockstep
 // shape of openehr/validation/walk_composition.go but in the
 // opposite direction — the OPT drives, rmwrite attaches.
-func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any) error {
+func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
@@ -159,7 +160,7 @@ func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any)
 // pins) — the act of pinning is itself a signal that the resulting
 // tree should carry those children even under the smallest viable
 // build.
-func (g *generator) shouldVisit(attr *templatecompile.CompiledAttribute) bool {
+func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if g.opts.Policy == Example {
 		return true
 	}
@@ -178,8 +179,8 @@ func (g *generator) shouldVisit(attr *templatecompile.CompiledAttribute) bool {
 // resulting tree satisfies REQ-102 v2's "required attribute absent"
 // check without the OPT pinning structure for every BMM mandatory.
 func (g *generator) materialiseSingle(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	children := attr.Children()
@@ -204,7 +205,7 @@ func (g *generator) materialiseSingle(
 	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
 	// omitted, or an unknown xsi:type the parser admitted leniently),
 	// the populatePrimitiveDefault sentinel holds.
-	if templatecompile.IsAOMPrimitiveShortName(child.RMTypeName()) {
+	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
 			return g.applyPrimitiveExample(child, parentRM, pc)
 		}
@@ -247,8 +248,8 @@ func (g *generator) materialiseSingle(
 // here so user-supplied Options values are not clobbered with a
 // placeholder.
 func (g *generator) materialiseImplicitSingle(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	if optNode.RMTypeName() == "COMPOSITION" {
@@ -378,8 +379,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 // cardinality.upper (default unbounded). The synthesised count
 // never exceeds the OPT-declared upper bound.
 func (g *generator) materialiseMultiple(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	children := attr.Children()
@@ -487,7 +488,7 @@ func (g *generator) materialiseMultiple(
 // id can be synthesized. It falls back to the RM-type-prefix example
 // only for slots without parsed includes; parsed includes must be
 // satisfied explicitly. Returns false when no safe id can be derived.
-func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNode) bool {
+func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
 	rules := slot.SlotRules()
 	archetypeID := rules.ExampleArchetypeID()
 	if archetypeID == "" && !rules.HasParsedIncludes() {
@@ -506,7 +507,7 @@ func (g *generator) stampSlotFill(rmValue any, slot *templatecompile.CompiledNod
 
 // firstNonSlot returns the first OPT child that is not a slot, or
 // nil when every child is a slot.
-func firstNonSlot(children []*templatecompile.CompiledNode) *templatecompile.CompiledNode {
+func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 	for _, c := range children {
 		if !c.IsSlot() {
 			return c
@@ -521,8 +522,8 @@ func firstNonSlot(children []*templatecompile.CompiledNode) *templatecompile.Com
 // when the type is outside the typereg registry — the validator
 // will flag it.
 func (g *generator) materialiseImplicitMultiple(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	rmType := attr.RMTypeName()
@@ -545,7 +546,7 @@ func (g *generator) materialiseImplicitMultiple(
 // an empty multi-valued attribute as "required" whenever existence
 // pins lower ≥ 1, regardless of cardinality.lower (cardinality and
 // existence are orthogonal in AOM 1.4).
-func remainingLowerNeeded(attr *templatecompile.CompiledAttribute, current int) int {
+func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 	low := 0
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
 		low = cm.Lower()
@@ -566,7 +567,7 @@ func remainingLowerNeeded(attr *templatecompile.CompiledAttribute, current int) 
 // OPT (EVENT, ITEM_STRUCTURE, DATA_VALUE, ITEM, CONTENT_ITEM,
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor].
-func (g *generator) makeChild(child *templatecompile.CompiledNode) (any, error) {
+func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
 	rmType := concreteFor(child.RMTypeName())
 	rmChild, err := rmwrite.NewRM(rmType)
 	if err != nil {
@@ -627,7 +628,7 @@ func concreteFor(rmType string) string {
 // value. The isTemplateRoot flag controls whether template_id is
 // stamped on archetype_details — only the very top-level root
 // carries it.
-func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, isTemplateRoot bool) {
+func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, isTemplateRoot bool) {
 	if opt == nil || rmValue == nil {
 		return
 	}
@@ -682,7 +683,7 @@ func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmVa
 // constraint type because the value shape differs per primitive
 // (REQ-103 closed set).
 func (g *generator) applyPrimitiveExample(
-	_ *templatecompile.CompiledNode,
+	_ *tcimpl.CompiledNode,
 	rmValue any,
 	pc constraints.PrimitiveConstraint,
 ) error {
@@ -829,7 +830,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 
 // isRequired mirrors validation/walk_composition.go's isRequired —
 // BMM-mandatory OR existence lower ≥ 1.
-func isRequired(attr *templatecompile.CompiledAttribute) bool {
+func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	if attr.Required() {
 		return true
 	}

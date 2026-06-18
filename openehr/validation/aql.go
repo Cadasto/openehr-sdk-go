@@ -1,9 +1,9 @@
 package validation
 
 import (
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // ValidateAQL statically lints an AQL query (REQ-109) and bridges the result

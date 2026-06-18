@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
@@ -32,7 +32,7 @@ import (
 //   - Otherwise: iterate every attribute (explicit OPT-declared
 //     and BMM-mandatory implicits), enforce existence + cardinality,
 //     match RM child(ren), recurse.
-func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string) {
 	if optNode == nil || rmValue == nil {
 		return
 	}
@@ -55,7 +55,7 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	// AOM 1.4 primitive short-name leaf reached via a DV wrapper's
 	// .value string channel (clinical_note.opt shape). Validate the
 	// string against the REQ-103 constraint without an RM-type check.
-	if pc := optNode.PrimitiveConstraint(); pc != nil && templatecompile.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
+	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
 		if _, ok := rmValue.(string); ok {
 			w.applyPrimitive(optNode, rmValue, path, pc)
 			return
@@ -109,8 +109,8 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 //   - two or more children → `alternative_mismatch` with the list
 //     of allowed RM types.
 func (w *walker) walkSingleAttribute(
-	opt *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	opt *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 	parentPath string,
 ) {
@@ -178,7 +178,7 @@ func (w *walker) walkSingleAttribute(
 // exactly one child the function is effectively "does the child
 // fit?"; the alternative_mismatch case fires only when the OPT
 // declared more than one alternative.
-func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *templatecompile.CompiledNode {
+func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
 	gotType := describeRMType(val)
 	for _, c := range children {
 		want := c.RMTypeName()
@@ -193,7 +193,7 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 		// under a DV wrapper's .value string channel — the RM value
 		// is a Go string while the OPT child rm_type_name is the
 		// primitive short name.
-		if templatecompile.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
+		if tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
 			if _, ok := val.(string); ok {
 				return c
 			}
@@ -204,7 +204,7 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
 // in alternative_mismatch Detail messages.
-func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
+func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 	names := make([]string, len(children))
 	for i, c := range children {
 		names[i] = c.RMTypeName()
@@ -219,8 +219,8 @@ func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
 // archetype/node ids first, then evaluates the parsed REQ-104 slot
 // grammar (see [matchChildByID]).
 func (w *walker) walkMultipleAttribute(
-	opt *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	opt *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 	parentPath string,
 ) {
@@ -274,7 +274,7 @@ func (w *walker) walkMultipleAttribute(
 	if len(children) == 0 {
 		return
 	}
-	perChildCount := make(map[*templatecompile.CompiledNode]int, len(children))
+	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := matchChildByID(children, item)
 		segment := segmentForRMItem(attr, item, idx)
@@ -319,7 +319,7 @@ func (w *walker) walkMultipleAttribute(
 // childIdentity describes an OPT child for inclusion in cardinality
 // diagnostics. Prefers the archetype id (for *ArchetypeRoot children)
 // then the at-code then the RM type name.
-func childIdentity(c *templatecompile.CompiledNode) string {
+func childIdentity(c *tcimpl.CompiledNode) string {
 	if id := c.ArchetypeID(); id != "" {
 		return id
 	}
@@ -336,7 +336,7 @@ func childIdentity(c *templatecompile.CompiledNode) string {
 // CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
 // the value is passed through as-is.
 func (w *walker) applyPrimitive(
-	optNode *templatecompile.CompiledNode,
+	optNode *tcimpl.CompiledNode,
 	rmValue any,
 	path string,
 	pc constraints.PrimitiveConstraint,
@@ -394,7 +394,7 @@ func primitiveInput(rmValue any) any {
 // presence. Also honours the BMM-mandatory bit (Required()): some
 // attributes are mandatory by RM even when the OPT existence
 // element is silent (e.g. COMPOSITION.category).
-func isRequired(attr *templatecompile.CompiledAttribute) bool {
+func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	if attr.Required() {
 		return true
 	}
@@ -439,7 +439,7 @@ func formatInterval(m *template.Multiplicity) string {
 // attrs (rare on this code path — walkMultipleAttribute uses
 // segmentForRMItem instead) we fall back to the child's
 // id-or-index segment.
-func segmentForChild(attr *templatecompile.CompiledAttribute, child *templatecompile.CompiledNode, idx int) string {
+func segmentForChild(attr *tcimpl.CompiledAttribute, child *tcimpl.CompiledNode, idx int) string {
 	seg := "/" + attr.Name()
 	if attr.Cardinality() != template.Multiple {
 		return seg
@@ -457,7 +457,7 @@ func segmentForChild(attr *templatecompile.CompiledAttribute, child *templatecom
 // Multiple attribute. Predicate is the RM item's
 // archetype_node_id when available; otherwise a 1-based sibling
 // index ("@1", "@2", ...).
-func segmentForRMItem(attr *templatecompile.CompiledAttribute, item any, idx int) string {
+func segmentForRMItem(attr *tcimpl.CompiledAttribute, item any, idx int) string {
 	seg := "/" + attr.Name()
 	if id := locatableArchetypeNodeID(item); id != "" {
 		return seg + "[" + id + "]"
@@ -469,7 +469,7 @@ func segmentForRMItem(attr *templatecompile.CompiledAttribute, item any, idx int
 // archetype-root pins) or NodeID (for at-code pins) matches the RM
 // item's archetype_node_id. Returns nil when none match — caller
 // emits slot_fill in that case.
-func matchChildByID(children []*templatecompile.CompiledNode, item any) *templatecompile.CompiledNode {
+func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
 		return nil
@@ -496,7 +496,7 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 // slotFitsArchetypeID checks whether archetypeID satisfies the
 // slot's REQ-104 include / exclude rules, including the RM-type-
 // prefix fallback when no includes were parsed.
-func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
+func slotFitsArchetypeID(slot *tcimpl.CompiledNode, archetypeID string) bool {
 	return slot.AllowsArchetypeID(archetypeID)
 }
 
@@ -523,7 +523,7 @@ func describeLocatableID(v any) string {
 // when the RM's archetype_node_id disagrees with the OPT-pinned id
 // at this node. Archetype-root nodes compare against ArchetypeID();
 // inner nodes (at-code-pinned) compare against NodeID().
-func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	if opt.IsSlot() {
 		// Slot fit is by the parsed REQ-104 archetype-id assertion
 		// grammar (RM-type-prefix fallback when no includes parsed).
@@ -563,7 +563,7 @@ func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmVal
 // disagrees with the compiled OPT node's RMTypeName. Honours BMM
 // abstract supertypes: an OPT slot constrained to ITEM_STRUCTURE
 // admits ITEM_TREE / ITEM_LIST / ITEM_SINGLE / ITEM_TABLE, etc.
-func (w *walker) checkRMType(opt *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	want := opt.RMTypeName()
 	if want == "" {
 		return
