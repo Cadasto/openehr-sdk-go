@@ -343,7 +343,17 @@ func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID stri
 
 	// 2. Create pad — bouw initial EHR_STATUS met de subject-koppeling
 	// zodat een latere find-by-subject deze nieuwe EHR vindt.
-	status := &rm.EHRStatus{
+	created, _, err := ehr.Create(ctx, c.rest, ehr.WithInitialStatus(subjectStatus(namespace, externalID)))
+	if err != nil {
+		return "", fmt.Errorf("care: FindOrCreateEHR: create %s/%s: %w", namespace, externalID, err)
+	}
+	return created.EHRID.Value, nil
+}
+
+// subjectStatus builds the initial EHR_STATUS that links a new EHR to a subject
+// (namespace + external id) via EHR_STATUS.subject.external_ref.
+func subjectStatus(namespace, externalID string) *rm.EHRStatus {
+	return &rm.EHRStatus{
 		ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1",
 		Name:            &rm.DVText{Value: "EHR Status"},
 		IsModifiable:    true,
@@ -367,9 +377,29 @@ func (c *Client) FindOrCreateEHR(ctx context.Context, namespace, externalID stri
 			},
 		},
 	}
-	created, _, err := ehr.Create(ctx, c.rest, ehr.WithInitialStatus(status))
+}
+
+// CreateEHRForPerson creates a new EHR and crosslinks it to an existing
+// demographic PERSON via Cadasto's `cadasto-person-uid` request header (OP-320:
+// POST /ehr writes the link in the same contribution). personUID MUST be the
+// bare object uuid — the versioned form (…::namespace::N) is rejected with 400.
+// The EHR also gets an initial EHR_STATUS with the subject external_ref
+// (namespace/externalID) for compatibility. Returns the new EHR id.
+//
+// Cadasto conflict semantics surface as transport errors: 422 (PERSON missing /
+// not a PERSON), 409 (PERSON already linked to an EHR) — callers that want to
+// reuse an existing link should resolve it before calling this.
+func (c *Client) CreateEHRForPerson(ctx context.Context, namespace, externalID, personUID string) (string, error) {
+	if personUID == "" {
+		return "", errors.New("care: CreateEHRForPerson: personUID is required")
+	}
+	created, _, err := ehr.Create(
+		ctx, c.rest,
+		ehr.WithInitialStatus(subjectStatus(namespace, externalID)),
+		ehr.WithHeader("cadasto-person-uid", personUID),
+	)
 	if err != nil {
-		return "", fmt.Errorf("care: FindOrCreateEHR: create %s/%s: %w", namespace, externalID, err)
+		return "", fmt.Errorf("care: CreateEHRForPerson: create+link %s: %w", personUID, err)
 	}
 	return created.EHRID.Value, nil
 }

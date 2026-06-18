@@ -80,6 +80,7 @@ func GetBySubject(ctx context.Context, c *transport.Client, subjectNamespace, su
 type createConfig struct {
 	ehrID         EHRID
 	initialStatus *rm.EHRStatus
+	headers       http.Header
 }
 
 // CreateOption mutates [Create]'s behaviour.
@@ -98,6 +99,18 @@ func WithEHRID(id EHRID) CreateOption {
 // linkage, queryable + modifiable per the deployment's policy).
 func WithInitialStatus(s *rm.EHRStatus) CreateOption {
 	return func(c *createConfig) { c.initialStatus = s }
+}
+
+// WithHeader sets an extra request header on the create call — for vendor
+// extensions such as Cadasto's `cadasto-person-uid` EHR↔PERSON crosslink
+// (OP-320). Multiple calls accumulate; later calls overwrite the same name.
+func WithHeader(name, value string) CreateOption {
+	return func(c *createConfig) {
+		if c.headers == nil {
+			c.headers = http.Header{}
+		}
+		c.headers.Set(name, value)
+	}
 }
 
 // Create issues an EHR-creation request. POST /ehr (server-assigned
@@ -124,8 +137,9 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 	}
 
 	req := &transport.Request{
-		Body:   body,
-		Prefer: transport.PreferRepresentation,
+		Body:    body,
+		Headers: cfg.headers,
+		Prefer:  transport.PreferRepresentation,
 	}
 	if cfg.ehrID != "" {
 		req.Method = http.MethodPut
