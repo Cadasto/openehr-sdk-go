@@ -427,6 +427,7 @@ requirements:
       - openehr/aql/parse/gen
       - openehr/aql/lint
       - openehr/validation
+      - openehr/templatecompile  # REQ-111 — lint.Options.Compiled is the public compiled type
       - internal/templatecompile
       - testkit/probes/aql
     probes: [PROBE-028]
@@ -494,6 +495,7 @@ requirements:
     packages:
       - openehr/template/constraints
       - openehr/instance
+      - openehr/templatecompile  # REQ-111 — Generate now accepts the public compiled type
       - internal/templateinstance/rmwrite
       - testkit/probes/instance
     probes: [PROBE-027]
@@ -515,6 +517,7 @@ requirements:
     implementation: landed  # Phases 0-2 landed; per-template typed builder is a follow-up
     packages:
       - openehr/composition
+      - openehr/templatecompile  # REQ-111 — NewBuilder/NewSkeleton accept the public compiled type
       - testkit/probes/composition
     probes: [PROBE-023]
     tests:
@@ -536,7 +539,7 @@ requirements:
     # bound enforcement, and PROBE-025 / PROBE-026 sandbox probes.
     # See docs/plans/archive/2026-05-24-composition-validation-template-driven.md.
     implementation: landed
-    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     adrs: [docs/adr/0006-composition-validation-walker-placement.md]
     probes: [PROBE-025, PROBE-026]
     tests:
@@ -560,7 +563,7 @@ requirements:
     # extension of rmTypeInfo/bmmSubtypes/rmread + DataValue-leaf readers.
     # PROBE-074. See docs/plans/archive/2026-06-17-validation-non-composition-roots.md.
     implementation: landed
-    packages: [openehr/validation, openehr/validation/rmread, internal/templatecompile, testkit/probes/validation]
+    packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     adrs: [docs/adr/0006-composition-validation-walker-placement.md]
     probes: [PROBE-074]
     tests:
@@ -570,6 +573,35 @@ requirements:
       - testkit/probes/validation/probe_074_test.go
     plans:
       - docs/plans/archive/2026-06-17-validation-non-composition-roots.md
+
+  - id: REQ-111
+    title: Public compiled-template bridge
+    canonical: docs/specifications/clinical-modeling.md#req-111--public-compiled-template-bridge
+    status: draft
+    # Public openehr/templatecompile.Compile re-exports the internal compiled
+    # form (type alias) so external modules can construct the *Compiled the
+    # composition builder (REQ-101), instance synthesiser (REQ-107), validator
+    # (REQ-102/REQ-110) and AQL lint (REQ-109) accept. Placement in a sibling
+    # package (not openehr/template) avoids an import cycle and REQ-100's
+    # stdlib-only contract — ADR 0010. No new PROBE (API-reachability, not a
+    # wire-conformance assertion; builder round-trip is PROBE-023).
+    implementation: landed
+    packages:
+      - openehr/templatecompile
+      - openehr/composition
+      - openehr/instance
+      - openehr/validation
+      - openehr/aql/lint
+    adrs: [docs/adr/0010-public-compiled-template-bridge.md]
+    probes: []
+    tests:
+      - openehr/templatecompile/compile_test.go
+      - openehr/templatecompile/external_test.go
+      - openehr/templatecompile/introspect_test.go
+      - cmd/examples/compile-build-validate/main.go
+      - cmd/examples/template-explore/main.go
+    plans:
+      - docs/plans/2026-06-17-public-compiled-template-bridge.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.

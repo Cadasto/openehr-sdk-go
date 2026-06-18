@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
@@ -37,7 +39,7 @@ type Builder struct {
 type pendingAssignment struct {
 	path     string
 	rawValue any
-	node     *templatecompile.CompiledNode
+	node     *tcimpl.CompiledNode
 }
 
 // NewBuilder constructs a Builder seeded with NewSkeleton output.
@@ -46,7 +48,10 @@ type pendingAssignment struct {
 // compiled template for path lookups.
 func NewBuilder(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*Builder, error) {
 	if c == nil {
-		return nil, errors.New("composition.NewBuilder: nil compiled template")
+		// Wrap instance.ErrNilCompiled (the sentinel NewSkeleton /
+		// instance.Generate return for a nil template) so external callers
+		// can errors.Is against it uniformly across the three entry points.
+		return nil, fmt.Errorf("composition.NewBuilder: %w", instance.ErrNilCompiled)
 	}
 	skel, err := NewSkeleton(ctx, c, opts...)
 	if err != nil {
@@ -246,7 +251,7 @@ type pathSegment struct {
 // buildSegments produces the ordered (attr, predicate) list from
 // compiled root to the supplied node. Walks up via Parent() and
 // reverses.
-func buildSegments(node *templatecompile.CompiledNode) ([]pathSegment, error) {
+func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
 	var segs []pathSegment
 	for cur := node; cur != nil && cur.Parent() != nil; cur = cur.Parent() {
 		parent := cur.Parent()
@@ -282,7 +287,7 @@ func buildSegments(node *templatecompile.CompiledNode) ([]pathSegment, error) {
 // findAttributeContaining returns (parentAttr, child) where
 // parentAttr is the CompiledAttribute on parent whose Children slice
 // contains target.
-func findAttributeContaining(parent, target *templatecompile.CompiledNode) (*templatecompile.CompiledAttribute, *templatecompile.CompiledNode) {
+func findAttributeContaining(parent, target *tcimpl.CompiledNode) (*tcimpl.CompiledAttribute, *tcimpl.CompiledNode) {
 	for _, attr := range parent.Attributes() {
 		for _, c := range attr.Children() {
 			if c == target {
