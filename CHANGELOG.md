@@ -10,6 +10,12 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+## [0.9.0] - 2026-06-18
+
+Ninth `v0.x` minor — the **SMART-on-openEHR auth conformance cycle**: the full client-auth matrix, SMART Backend Services, ID-token algorithm agility, and RFC 7662 token introspection land alongside the public compiled-template bridge (REQ-111) and the SDD tooling alignment. Additive only — no public API breaks this cycle; safe to upgrade from `v0.8.0`.
+
+### Added
+
 - **SMART-on-openEHR auth conformance audit (REQ-061..064, REQ-067, REQ-069..072).** Full client-auth matrix — public PKCE, confidential `client_secret_basic`/`client_secret_post`, asymmetric `private_key_jwt` (`auth/smart`); Backend Services `client_credentials` + `private_key_jwt` (`auth/clientcreds`); JWT Bearer grant RFC 7523 (`auth/jwtbearer`, RS384/ES384 baseline); ID-token alg agility RS256/RS384/ES256/ES384 (`smart/idtoken`); RFC 7662 token introspection (`auth/introspect`); transport 401→reauth safety net with terminal-vs-transient token-error classification (REQ-063) and configurable early-expiry; launch-context scope helpers. Retires the OTel-only dependency rule — adopts `golang.org/x/oauth2` + `github.com/coreos/go-oidc/v3` (+ direct `go-jose/v4`) for JOSE/OIDC crypto, scoped to `auth/`+`smart/` ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)); SMART discovery `services`-map shape ([ADR 0008](docs/adr/0008-smart-discovery-services-shape.md)). PROBE-001..009; runnable `cmd/examples/smart-launch`. STRAND-05 resolved.
 - **Public compiled-template bridge (REQ-111).** New `openehr/templatecompile` re-exports `Compile(opt)`, the `Compiled` handle, and its introspection tree (`CompiledNode`/`CompiledAttribute`) so external modules can build the compiled template the builder (REQ-101), instance synthesiser (REQ-107), validator (REQ-102/110), and AQL lint (REQ-109) accept — and navigate it (form generation, path discovery) — without an `internal/` import ([ADR 0010](docs/adr/0010-public-compiled-template-bridge.md)). New examples `cmd/examples/{compile-build-validate,template-explore}`. Additive.
 - **SDD tooling alignment (docs).** Added the machine-readable `docs/.sdd.yaml` descriptor and the `docs/development-process.md` constitution; reconciled the `go-jose/v4` dependency framing (direct import; also required by `go-oidc/v3`) across AGENTS.md / ADR 0009 / research-strands. No code or API change.
