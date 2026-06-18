@@ -15,6 +15,15 @@ Application
 
 The boundary between layers is **the generic `TokenSource` abstraction** — providers implement it; transports consume it; everything authenticated flows through it.
 
+## Canonical sources
+
+The SMART-on-openEHR authentication model in this SDK is derived from two primary specifications:
+
+- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — defines openEHR-specific extensions: the `services` discovery map, `launch/patient`, `launch/episode`, `ehrId`, `episodeId` claims, and the `org.openehr.rest` service identifier.
+- **HL7 SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
+
+See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency and library-scope decisions underpinning this implementation.
+
 ## TokenSource contract
 
 ### REQ-060
@@ -230,6 +239,13 @@ The `auth/introspect` package provides a standalone, opt-in RFC 7662 token intro
 **`Result` fields (RFC 7662 §2.2).** `Active bool` (required). Optional/conditional: `Scope`, `ClientID`, `Username`, `TokenType`, `Exp`/`Iat`/`Nbf` (RFC 7662 numeric dates parsed to `time.Time` from the float64 JSON number), `Sub`, `Aud` (string or JSON array — array values joined with a space), `Iss`, `Jti`. SMART/openEHR launch-context extras when present: `Patient`, `FHIRUser` (`fhirUser`), `EHRID` (`ehrId`), `EpisodeID` (`episodeId`). `Raw map[string]any` carries the complete decoded body including vendor-extension claims.
 
 ### REQ-063 — Token refresh
+
+**Requesting a refresh token.** The authorization server grants a `refresh_token` only when the authorization request includes the appropriate offline-access scope. Per HL7 SMART App Launch v2 "Scopes and Launch Context" ([https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/)):
+
+- Include `offline_access` in the scope list to request a refresh token that persists beyond the current browser session.
+- Include `online_access` to request a refresh token scoped to the current online session only.
+
+The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`. These constants are lexical only — whether the server honours the request depends on the deployment's policy.
 
 The `auth/smart` `TokenSource` **MUST** transparently refresh access tokens when:
 

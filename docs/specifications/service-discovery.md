@@ -8,6 +8,13 @@ A SMART-on-openEHR deployment advertises **service base URLs** via a discovery d
 
 The SDK treats discovery as a **first-class step**, not an implementation detail of constructor convenience.
 
+## Canonical sources
+
+- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — normative definition of the SMART discovery document shape for openEHR deployments, the `services` map, and openEHR-specific service identifiers.
+- **HL7 SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the `/.well-known/smart-configuration` endpoint, required and optional metadata fields (including `authorization_endpoint`, `token_endpoint`, `jwks_uri`, `scopes_supported`, and algorithm-support lists).
+
+See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency decisions that underpin the discovery implementation.
+
 ## ServiceCatalog
 
 ### REQ-070

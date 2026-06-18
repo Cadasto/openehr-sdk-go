@@ -395,8 +395,9 @@ requirements:
     canonical: docs/specifications/auth.md#req-061--pkce-flow
     status: draft
     implementation: landed
-    packages: [auth/smart]
+    packages: [auth/smart, auth]
     plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
     probes: [PROBE-001, PROBE-004, PROBE-005]
     notes: >
       Phase 5 (F-E): the PKCE flow is now exercised as conformance probes —
@@ -416,6 +417,7 @@ requirements:
     implementation: landed
     packages: [auth/smart, smart/discovery, auth/introspect]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
     probes: [PROBE-006]
     notes: >
       alg allowlists (token_endpoint_auth_signing_alg_values_supported,
@@ -451,6 +453,7 @@ requirements:
     implementation: landed
     packages: [auth, auth/smart, transport]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
     probes: [PROBE-007]
     notes: >
       Phase 4a+4b landed. Phase 4a: ExchangeError.Terminal(), F-L
@@ -478,6 +481,7 @@ requirements:
     implementation: landed
     packages: [smart, auth/smart]
     plans: [docs/plans/2026-06-16-auth-smart-conformance-audit.md]
+    adrs: [docs/adr/0009-smart-auth-library-scope.md]
     notes: >
       Phase 3e (F-M): id_token signature verification gained algorithm agility
       (RS256/RS384/ES256/ES384) via go-oidc/v3, constrained by the discovery

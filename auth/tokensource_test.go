@@ -85,6 +85,42 @@ func TestTokenSourceFromContextEmpty(t *testing.T) {
 	}
 }
 
+// TestScopeConstants pins the lexical value of each launch-context and refresh
+// scope constant so that accidental renames are caught immediately. [REQ-061]
+func TestScopeConstants(t *testing.T) {
+	tests := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{"ScopeOpenID", ScopeOpenID, "openid"},
+		{"ScopeProfile", ScopeProfile, "profile"},
+		{"ScopeFHIRUser", ScopeFHIRUser, "fhirUser"},
+		{"ScopeLaunch", ScopeLaunch, "launch"},
+		{"ScopeLaunchPatient", ScopeLaunchPatient, "launch/patient"},
+		{"ScopeLaunchEpisode", ScopeLaunchEpisode, "launch/episode"},
+		{"ScopeOfflineAccess", ScopeOfflineAccess, "offline_access"},
+		{"ScopeOnlineAccess", ScopeOnlineAccess, "online_access"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.got != tc.want {
+				t.Errorf("%s = %q, want %q", tc.name, tc.got, tc.want)
+			}
+		})
+	}
+}
+
+// TestJoinScopesWithConstants verifies that the scope constants round-trip
+// correctly through JoinScopes. [REQ-061]
+func TestJoinScopesWithConstants(t *testing.T) {
+	got := JoinScopes(ScopeOpenID, ScopeLaunchPatient, ScopeOfflineAccess)
+	want := "openid launch/patient offline_access"
+	if got != want {
+		t.Errorf("JoinScopes(ScopeOpenID, ScopeLaunchPatient, ScopeOfflineAccess) = %q, want %q", got, want)
+	}
+}
+
 func TestBuildScope(t *testing.T) {
 	tests := []struct {
 		compartment, resource, permission string
