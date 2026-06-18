@@ -332,7 +332,7 @@ func encodePartyAddresses(contactNode template.ObjectNode, payload map[string]an
 }
 
 func encodePartyAddress(ar *template.ArchetypeRoot, payload map[string]any, sec partySection) (map[string]any, error) {
-	name := addressName(payload, sec)
+	name := addressName(ar, payload, sec)
 	out := map[string]any{
 		"_type":             "ADDRESS",
 		"archetype_node_id": ar.ArchetypeID(),
@@ -353,7 +353,7 @@ func encodePartyAddress(ar *template.ArchetypeRoot, payload map[string]any, sec 
 	return out, nil
 }
 
-func addressName(payload map[string]any, sec partySection) map[string]any {
+func addressName(node template.ObjectNode, payload map[string]any, sec partySection) map[string]any {
 	if c, ok := payload["_code"]; ok {
 		if terminology, code, display, pok := parseCodeField(c); pok {
 			label := display
@@ -370,6 +370,12 @@ func addressName(payload map[string]any, sec partySection) map[string]any {
 			}
 			return dvCodedText(label, terminology, code)
 		}
+	}
+	// The ADDRESS name is constrained to a closed coded list (address type:
+	// at0464 "Hoofdadres", at0462 "Postadres", …). Cadasto rejects a plain
+	// DV_TEXT here, so default to the first allowed code when none was given.
+	if coded, ok := constrainedCodedName(node, sec.terms); ok {
+		return coded
 	}
 	return dvText(sec.label)
 }

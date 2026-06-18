@@ -560,8 +560,26 @@ func encodeItems(itemsAttr *template.Attribute, payload map[string]any, terms ma
 		if nodeID == "" || obj.RMTypeName() == "" {
 			continue
 		}
+		// A slot-filled CLUSTER archetype (e.g. person_identifier.v2 nested in the
+		// person_details ITEM_TREE) reports the bare at0000 root node id, shared
+		// with its sibling archetypes; it is addressed in the datamap — and must be
+		// emitted to Cadasto — by its archetype id, with archetype_details. Its
+		// items also belong to the nested archetype's own term dictionary.
+		lookupKey := nodeID
+		archetypeID := ""
+		subTerms := terms
 		label := terms[nodeID]
-		value, found := lookupChildPayload(payload, nodeID, label)
+		if ar, ok := obj.(*template.ArchetypeRoot); ok && ar.ArchetypeID() != "" {
+			archetypeID = ar.ArchetypeID()
+			lookupKey = archetypeID
+			subTerms = partySectionFromNode(ar).terms
+			// The cluster's runtime name comes from the nested archetype's own
+			// at0000 term (person_identifier.v2 → "Persoon ID"), not the parent
+			// tree's term for the shared bare node id ("Persoon data"). Cadasto
+			// rejects a mismatched name against the constrained value.
+			label = termOrFallback(subTerms, nodeID, label)
+		}
+		value, found := lookupChildPayload(payload, lookupKey, label)
 		if !found {
 			continue
 		}
@@ -584,16 +602,21 @@ func encodeItems(itemsAttr *template.Attribute, payload map[string]any, terms ma
 				if subItemsAttr == nil {
 					continue
 				}
-				subItems, err := encodeItems(subItemsAttr, subPayload, terms)
+				subItems, err := encodeItems(subItemsAttr, subPayload, subTerms)
 				if err != nil {
 					return nil, fmt.Errorf("cluster %s: %w", nodeID, err)
 				}
-				out = append(out, map[string]any{
+				cluster := map[string]any{
 					"_type":             "CLUSTER",
 					"archetype_node_id": nodeID,
 					"name":              clusterName(subPayload, label),
 					"items":             subItems,
-				})
+				}
+				if archetypeID != "" {
+					cluster["archetype_node_id"] = archetypeID
+					cluster["archetype_details"] = archetypeDetails(archetypeID, "")
+				}
+				out = append(out, cluster)
 			case "ELEMENT":
 				el, err := encodeElement(obj, inst, terms)
 				if err != nil {
@@ -680,15 +703,40 @@ func encodeValue(constraint template.ObjectNode, payload any, terms map[string]s
 	case "DV_MULTIMEDIA":
 		return encodeMultimedia(payload), nil
 	default:
+		// DV_INTERVAL<T> (e.g. a validity window <DV_DATE>) is parametric, so it
+		// can't be a fixed switch case. The short-form decode strips the outer
+		// _type but leaves the lower/upper RM sub-objects intact; rebuild the
+		// interval around them under the constraint's parametric type.
+		if strings.HasPrefix(rmType, "DV_INTERVAL") {
+			return encodeInterval(rmType, payload), nil
+		}
 		// Unsupported RM value type. The blank datamap skeleton carries empty
-		// optional slots of exotic types (DV_INTERVAL<DV_DATE> validity windows,
-		// …) that we never populate — omit those rather than fail the whole
-		// encode. Only a value that actually carries content is a real error.
+		// optional slots of exotic types that we never populate — omit those
+		// rather than fail the whole encode. Only a value that actually carries
+		// content is a real error.
 		if !valueHasContent(payload) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("RM value type %q not supported", rmType)
 	}
+}
+
+// encodeInterval rebuilds a DV_INTERVAL<T> from a short-form payload, passing
+// the lower/upper RM sub-objects through verbatim (they keep their own _type)
+// and copying the inclusion/unbounded flags. Returns nil when the interval has
+// no bounds at all (a blank skeleton slot we never populated).
+func encodeInterval(rmType string, payload any) map[string]any {
+	m, ok := payload.(map[string]any)
+	if !ok || !valueHasContent(m) {
+		return nil
+	}
+	out := map[string]any{"_type": rmType}
+	for _, k := range []string{"lower", "upper", "lower_included", "upper_included", "lower_unbounded", "upper_unbounded"} {
+		if v, ok := m[k]; ok && v != nil {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // valueHasContent reports whether payload carries a real value worth encoding.
