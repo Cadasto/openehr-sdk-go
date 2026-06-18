@@ -29,6 +29,8 @@ type config struct {
 	rawErrorBodies bool
 
 	maxResponseBody int64
+
+	reauther auth.Reauther
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -124,4 +126,22 @@ const DefaultMaxResponseBody int64 = 64 << 20
 // via WithMaxResponseBody(-1).
 func WithMaxResponseBody(n int64) Option {
 	return func(cfg *config) { cfg.maxResponseBody = n }
+}
+
+// WithReauthOn401 installs an opt-in 401→reauth safety net (REQ-063).
+// When a wire 401 is received and the Reauther has not yet been invoked
+// for the current Do call, transport calls r.Reauth(ctx) once and retries
+// the request one time with the freshly acquired token. On a second 401
+// (or when Reauth returns an error) the error is surfaced to the caller.
+//
+// When this option is not set, the no-reauther path is unchanged:
+// a wire 401 returns ErrUnauthorized immediately (existing contract).
+//
+// This is a complementary safety net — proactive expiry-based refresh
+// in TokenSource.Token is the primary mechanism.
+//
+// A discovery-catalog-refresh closure can satisfy the interface via
+// auth.ReautherFunc (REQ-071 bullet 3).
+func WithReauthOn401(r auth.Reauther) Option {
+	return func(cfg *config) { cfg.reauther = r }
 }

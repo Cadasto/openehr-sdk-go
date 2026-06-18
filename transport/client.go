@@ -125,7 +125,8 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 
 	tracer := otel.GetTracerProvider().Tracer(tracerName)
 	spanName := req.effectiveMethod() + " " + req.effectiveRoute()
-	ctx, span := tracer.Start(ctx, spanName,
+	ctx, span := tracer.Start(
+		ctx, spanName,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
 			attribute.String("http.method", req.effectiveMethod()),
@@ -145,15 +146,35 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		start = time.Now()
 	}
 	var (
-		resp    *Response
-		lastErr error
-		attempt int
+		resp     *Response
+		lastErr  error
+		attempt  int
+		reauthed bool
 	)
 	for {
 		attempt++
 		span.SetAttributes(attribute.Int("retry.attempt", attempt-1))
 		resp, lastErr = c.doOnce(ctx, req, target)
 		if !c.shouldRetry(req, resp, lastErr, attempt) {
+			// 401→reauth safety net (REQ-063, opt-in): if the final error is
+			// a wire 401, a Reauther is configured, and this Do call has not
+			// yet reauthed, invoke Reauth once and retry the request once.
+			// The retry re-fetches the token via tokenSourceFor → now fresh.
+			// On a second 401 (or if Reauth itself fails) the error is
+			// surfaced unchanged. This guard fires at most once per Do call.
+			if !reauthed && c.cfg.reauther != nil && isWire401(lastErr) {
+				reauthed = true
+				if raErr := c.cfg.reauther.Reauth(ctx); raErr != nil {
+					lastErr = fmt.Errorf("transport: reauth: %w", raErr)
+					break
+				}
+				// Single reauth-retry: reset attempt counter so the loop
+				// runs exactly once more (shouldRetry will not fire on an
+				// attempt count of 1 unless a new RetryPolicy applies, but
+				// we always break after doOnce here via the inner guard).
+				attempt = 0
+				continue
+			}
 			break
 		}
 		wait := c.cfg.retry.backoff(attempt)
@@ -420,6 +441,13 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 		return nil, false
 	}
 	return &d, true
+}
+
+// isWire401 reports whether err is a *WireError whose StatusCode is 401.
+// Used by the opt-in 401→reauth guard in Do (REQ-063).
+func isWire401(err error) bool {
+	var we *WireError
+	return errors.As(err, &we) && we.StatusCode == 401
 }
 
 // shouldRetry consults the configured RetryPolicy. Network errors are

@@ -124,6 +124,22 @@ func TestJoinScopes(t *testing.T) {
 	}
 }
 
+// TestReautherFuncSatisfiesInterface verifies that ReautherFunc implements
+// the Reauther interface and delegates to its underlying function (REQ-063).
+func TestReautherFuncSatisfiesInterface(t *testing.T) {
+	called := false
+	var r Reauther = ReautherFunc(func(_ context.Context) error {
+		called = true
+		return nil
+	})
+	if err := r.Reauth(context.Background()); err != nil {
+		t.Fatalf("Reauth returned unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("ReautherFunc.Reauth did not call the underlying function")
+	}
+}
+
 func TestExchangeError(t *testing.T) {
 	inner := errors.New("network unreachable")
 	oa := &OAuth2Error{Code: "invalid_grant", Description: "stale code"}

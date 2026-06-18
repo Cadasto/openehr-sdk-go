@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -104,7 +105,8 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "tok-1", Type: "Bearer"})),
 		WithUserAgent("sdk-test/1.0"),
@@ -162,7 +164,8 @@ func TestDoNoAuthSuppressesAuthorization(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "tok"})),
 	)
@@ -181,7 +184,8 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "default-tok"})),
 	)
@@ -212,7 +216,8 @@ func TestDoBasicAuthAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(src),
 	)
@@ -328,7 +333,8 @@ func TestRetryOnRetriableStatus(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{
 			MaxAttempts:    3,
@@ -371,7 +377,8 @@ func TestRetryNotAppliedToNonRetriableStatus(t *testing.T) {
 				w.WriteHeader(tc.status)
 			}))
 			defer srv.Close()
-			c, _ := New(newCatalog(t, srv),
+			c, _ := New(
+				newCatalog(t, srv),
 				WithHTTPClient(srv.Client()),
 				WithRetry(RetryPolicy{
 					MaxAttempts:    5,
@@ -393,7 +400,8 @@ func TestRetryNotAppliedToPOSTByDefault(t *testing.T) {
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 5, InitialBackoff: time.Millisecond}),
 	)
@@ -410,7 +418,8 @@ func TestRetryOptIntoNonIdempotent(t *testing.T) {
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Millisecond, RetryNonIdempotent: true}),
 	)
@@ -455,7 +464,8 @@ func TestRetryNoRetrySentinel(t *testing.T) {
 				w.WriteHeader(503)
 			}))
 			defer srv.Close()
-			c, _ := New(newCatalog(t, srv),
+			c, _ := New(
+				newCatalog(t, srv),
 				WithHTTPClient(srv.Client()),
 				WithRetry(tc.policy),
 			)
@@ -474,7 +484,8 @@ func TestRetryCtxCancellation(t *testing.T) {
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 10, InitialBackoff: 50 * time.Millisecond}),
 	)
@@ -493,7 +504,8 @@ func TestCallerAttributionDefault(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithCallerAttribution(CallerAttribution{
 			AgentID:       "mcp-claude-code/1.0",
@@ -518,7 +530,8 @@ func TestCallerAttributionPerRequest(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithCallerAttribution(CallerAttribution{AgentID: "default"}),
 	)
@@ -790,7 +803,8 @@ func TestMaxResponseBody(t *testing.T) {
 			_, _ = w.Write([]byte(body4k))
 		}))
 		defer srv.Close()
-		c, _ := New(newCatalog(t, srv),
+		c, _ := New(
+			newCatalog(t, srv),
 			WithHTTPClient(srv.Client()),
 			WithMaxResponseBody(1<<10),
 		)
@@ -818,6 +832,138 @@ func TestMaxResponseBody(t *testing.T) {
 			t.Error("expected non-empty body")
 		}
 	})
+}
+
+// --- 401→reauth tests (REQ-063) ---
+
+// stubReauther is a test double for auth.Reauther that records how many
+// times Reauth was called and which token the associated TokenSource
+// should vend after the first Reauth call.
+type stubTokenSource struct {
+	mu        sync.Mutex
+	reauths   int
+	tokens    []string // tokens[0] is pre-reauth, tokens[1] is post-reauth
+	nextIndex int
+}
+
+func (s *stubTokenSource) Token(_ context.Context) (auth.Token, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	idx := s.nextIndex
+	if idx >= len(s.tokens) {
+		idx = len(s.tokens) - 1
+	}
+	return auth.Token{Value: s.tokens[idx], Type: "Bearer"}, nil
+}
+
+func (s *stubTokenSource) Reauth(_ context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.reauths++
+	if s.nextIndex < len(s.tokens)-1 {
+		s.nextIndex++
+	}
+	return nil
+}
+
+// TestDoReauthOn401 — REQ-063: on a wire 401, if a Reauther is configured
+// and this Do has not yet reauthed, transport calls Reauth once then retries.
+// Assert: exactly 2 upstream calls, second carries refreshed bearer, final err=nil.
+func TestDoReauthOn401(t *testing.T) { // REQ-063
+	var (
+		hits     atomic.Int32
+		captured [2]string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := int(hits.Add(1))
+		if n <= 2 {
+			captured[n-1] = r.Header.Get("Authorization")
+		}
+		if n == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	stub := &stubTokenSource{tokens: []string{"old-tok", "fresh-tok"}}
+	c, _ := New(
+		newCatalog(t, srv),
+		WithHTTPClient(srv.Client()),
+		WithTokenSource(stub),
+		WithReauthOn401(stub),
+	)
+	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if err != nil {
+		t.Fatalf("expected success after reauth; got %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("StatusCode = %d, want 200", resp.StatusCode)
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("upstream calls = %d, want exactly 2", n)
+	}
+	if captured[0] != "Bearer old-tok" {
+		t.Errorf("first request Authorization = %q, want Bearer old-tok", captured[0])
+	}
+	if captured[1] != "Bearer fresh-tok" {
+		t.Errorf("second request Authorization = %q, want Bearer fresh-tok (refreshed)", captured[1])
+	}
+	if stub.reauths != 1 {
+		t.Errorf("Reauth called %d times, want exactly 1", stub.reauths)
+	}
+}
+
+// TestDoReauthOn401TwiceFails — REQ-063: when the retry after Reauth also
+// returns 401, transport surfaces ErrUnauthorized and does NOT loop.
+// Assert: Reauth attempted exactly once, err=ErrUnauthorized.
+func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-063
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	stub := &stubTokenSource{tokens: []string{"tok"}}
+	c, _ := New(
+		newCatalog(t, srv),
+		WithHTTPClient(srv.Client()),
+		WithTokenSource(stub),
+		WithReauthOn401(stub),
+	)
+	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+	if n := hits.Load(); n != 2 {
+		t.Errorf("upstream calls = %d, want exactly 2 (original + one retry)", n)
+	}
+	if stub.reauths != 1 {
+		t.Errorf("Reauth called %d times, want exactly 1 (no infinite loop)", stub.reauths)
+	}
+}
+
+// TestDoNoReautherUnchanged — REQ-063: when no Reauther is configured, a
+// wire 401 is returned immediately as ErrUnauthorized with exactly one
+// upstream call (unchanged existing contract).
+func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
+	var hits atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
+	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected ErrUnauthorized, got %v", err)
+	}
+	if n := hits.Load(); n != 1 {
+		t.Errorf("upstream calls = %d, want exactly 1 (no reauther, no retry)", n)
+	}
 }
 
 // readCassette returns the bytes of a vendored cassette at

@@ -231,7 +231,7 @@ Refresh uses the stored `refresh_token` against the deployment's `token_endpoint
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
 
-#### Implementation — Phase 4a (Source/error side)
+#### Implementation — Phase 4a + 4b (Source/error side + transport hook)
 
 **Terminal vs. transient refresh classification (`ExchangeError.Terminal()`).**
 `auth.ExchangeError` exposes a `Terminal() bool` method. A failure is terminal when the HTTP status is 4xx **and** the OAuth2 error code is `invalid_grant` or `invalid_client`. All other failures (5xx, network, context, unparsed) are transient and return `false`. The distinction drives the F-L refresh-clearing rule below.
@@ -257,12 +257,33 @@ type Reauther interface {
     Reauth(ctx context.Context) error
 }
 ```
-`*smart.Source` implements `Reauther`. `Reauth(ctx)` forces a refresh regardless of the current token's freshness by zeroing `s.cur` and calling `Token()`. It applies the same F-L terminal/transient classification as a regular refresh failure. The transport-layer 401→`Reauth` wiring (Phase 4b) is not yet connected.
+`*smart.Source` implements `Reauther`. `Reauth(ctx)` forces a refresh regardless of the current token's freshness by zeroing `s.cur` and calling `Token()`. It applies the same F-L terminal/transient classification as a regular refresh failure.
+
+**`ReautherFunc` adapter.**
+```go
+// auth/reauth.go
+type ReautherFunc func(ctx context.Context) error
+func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
+```
+`ReautherFunc` lets a closure — for example a discovery-catalog-refresh function (REQ-071 bullet 3) — satisfy `Reauther` without importing `smart/discovery` into `transport/`.
+
+**Transport-layer opt-in 401→reauth safety net (Phase 4b, F-D).**
+`transport.WithReauthOn401(r auth.Reauther)` installs an opt-in safety net. When a wire `401` is received:
+
+1. If a `Reauther` is configured **and** this `Do` call has not yet reauthed, `transport/` calls `r.Reauth(ctx)` exactly once.
+2. If `Reauth` returns nil, the request is retried once. The retry re-acquires the token via `tokenSourceFor` — now pointing at the refreshed credential.
+3. If the retry also returns `401`, `transport.ErrUnauthorized` is surfaced. If `Reauth` itself returns an error, that error (wrapped) is surfaced. In either case the loop does not repeat.
+
+A per-`Do` boolean guards against infinite loops; `Reauth` is called at most once per `Do` invocation regardless of retry policy.
+
+When `WithReauthOn401` is **not** set, the existing contract is unchanged: a wire `401` returns `transport.ErrUnauthorized` immediately after one upstream call.
+
+This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism. The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
 
 Out of scope (v1 implementation status):
 
-- **Transport-layer 401 → refresh:** `transport/` maps `401 Unauthorized` to `ErrUnauthorized` and does **not** invoke `auth/smart` refresh automatically. Proactive refresh on `TokenSource.Token()` before expiry is implemented; wire-triggered re-auth after an expired access token on an in-flight REST call is the consumer's responsibility (call `Token()` again or restart the launch flow). `auth/clientcreds` and `auth/jwtbearer` have no refresh path.
-- **Phase 4b** will wire the transport 401 hook to call `Reauth` on the token source and add integration probes.
+- `auth/clientcreds` and `auth/jwtbearer` do not implement `Reauther`; they have no refresh path. Callers using those providers may wire a custom `ReautherFunc` closure.
+- MTLS, FAPI, JAR/PAR — out of v1 scope.
 
 ### REQ-064 — Launch context
 

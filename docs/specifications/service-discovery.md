@@ -111,6 +111,17 @@ The discovery cache **MUST**:
 - Be invalidated on `401` / `403` against a previously-working endpoint, after at most one refresh attempt.
 - Coalesce concurrent resolution attempts (REQ-026) — one goroutine fetches; the others wait.
 
+**Bullet 3 — catalog refresh on 401 via transport hook (Phase 4b).** A consumer that wants the transport layer to drive a catalog refresh on a wire `401` can supply a `ReautherFunc` closure to `transport.WithReauthOn401`:
+
+```go
+transport.WithReauthOn401(auth.ReautherFunc(func(ctx context.Context) error {
+    _, err := resolver.Refresh(ctx, issuer)
+    return err
+}))
+```
+
+`auth.ReautherFunc` satisfies `auth.Reauther` without importing `smart/discovery` into `transport/`. The transport calls the closure at most once per `Do` invocation; on a second `401` after the retry it surfaces `transport.ErrUnauthorized`. This wires REQ-071 bullet 3 (invalidate on 401 + retry once) through the opt-in transport safety net described in [auth.md § REQ-063](auth.md#req-063--token-refresh).
+
 Cache implementation:
 
 - The default cache is in-process (a `sync.Map` keyed by issuer URL).

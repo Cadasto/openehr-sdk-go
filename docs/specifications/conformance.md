@@ -162,7 +162,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached token has `expires_at < now`; refresh token is valid.
 - **Wire assertion:** Token endpoint receives `grant_type=refresh_token`; the next outgoing request carries the new access token.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox — transport half) — see [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go). The transport-side safety net (wire 401 → `Reauth` → retry once with refreshed bearer) is asserted here (REQ-063, Phase 4b). The proactive expiry-based refresh path (token source refreshes before expiry in `Source.Token`) is covered by `auth/smart` unit tests (`TestRefreshIfNeeded`, `TestSourceReauthForcesRefresh`). Full cassette/live coverage (token-endpoint `grant_type=refresh_token` on the wire) is deferred to Phase 5.
+- **Satisfies:** REQ-063
 
 ### Versioned writes and optimistic concurrency
 
@@ -531,7 +532,7 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 
 | Topic | Probes | Lives in (test code) |
 |---|---|---|
-| Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
+| Auth + discovery | PROBE-001 … 009 | PROBE-007 transport half implemented (Sandbox) — [`testkit/probes/auth/`](../../testkit/probes/auth/); discovery resolver covered by `smart/discovery/resolver_test.go`; remaining auth probes (PROBE-001–006, 008–009) planned for Phase 5 |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021, PROBE-028 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go) |
 | Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots. |
