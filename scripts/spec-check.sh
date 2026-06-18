@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Verify docs/specifications/traceability.yaml against the working tree.
-# Warn-only for planned REQs; fails on landed/partial entries with missing artefacts.
 #
-# Checks:
+# Fail (exit 1):
 #   - REQ.md registry <-> traceability.yaml membership (both directions)
 #   - REQ.md Impl. column agrees with traceability implementation
 #   - landed/partial REQs cite existing packages/tests/plans and catalogued probes
+#   - landed/partial REQs do not cite a probe with Status: Draft in conformance.md
 #   - canonical: anchors resolve to a real heading in the target spec file
 #   - status: is a valid spec-stability value (draft|stable|deprecated)
-#   - a landed/partial REQ does not claim a Draft (unimplemented) probe as coverage
+#
+# Warn only (exit 0 unless other errors):
+#   - planned REQs with missing artefacts
+#   - missing canonical: link in traceability.yaml
+#   - yaml REQ ids absent from REQ.md registry
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -92,7 +96,7 @@ flush_req() {
       # A landed/partial REQ must not claim a Draft (unimplemented) probe as coverage.
       if awk -v h="#### ${pr} " 'index($0,h)==1{f=1;next} f&&/^#### /{exit} f' "$CONF" \
            | grep -qiE '\*\*Status:\*\*[[:space:]]*Draft'; then
-        warn_msg "$current_id: cites ${pr}, which is Status: Draft in conformance.md (not implemented coverage — drop it until its test lands)"
+        die "$current_id: cites ${pr}, which is Status: Draft in conformance.md (not implemented coverage — drop it until its test lands)"
       fi
     done
   fi

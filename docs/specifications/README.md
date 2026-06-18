@@ -27,7 +27,8 @@ The repo uses several document kinds, each with a distinct role and boundary:
 | **Specification** (this tree) | How must the system behave / be structured? | Yes (MUST / SHALL / SHOULD / MAY) | [`docs/specifications/`](.) — topic specs + REQ.md registry + traceability.yaml + conformance.md (PROBE-NNN) + research-strands.md (STRAND-NN) |
 | **ADR** | Which irreversible architectural fork did we take? | Decision record | [`docs/adr/`](../adr/) |
 | **Plan** | What exact work implements a slice? | No (delivery tasks) | [`docs/plans/`](../plans/) |
-| **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
+| **Guide** | How do I work in this repo safely? | No | [`docs/architecture.md`](../architecture.md), [`docs/development-process.md`](../development-process.md), [`docs/ai-workflow.md`](../ai-workflow.md), [`docs/ci.md`](../ci.md) |
+| **Descriptor** | Machine-readable SDD conventions for tooling | Config (not prose) | [`docs/.sdd.yaml`](../.sdd.yaml) — REQ style, paths, build targets, PROBE/STRAND toggles; read by `sdd-*` skills |
 | **Roadmap** | What has landed and what hasn't? | No (status snapshot) | [`docs/roadmap.md`](../roadmap.md) |
 
 **Boundaries between kinds:**
@@ -102,6 +103,8 @@ Identifiers MUST be stable once published — they are referenced from outside t
 |---|---|
 | [REQ.md](REQ.md) | Requirement registry (index) — links to canonical topic specs |
 | [traceability.yaml](traceability.yaml) | Machine-readable REQ → package / probe / test / plan map |
+| [../.sdd.yaml](../.sdd.yaml) | SDD project descriptor — identifier style, document paths, `make` targets (read by `sdd-*` skills) |
+| [../development-process.md](../development-process.md) | SDD constitution — the delivery loop, DoR/DoD pointers, superpowers boundary |
 | [packaging.md](packaging.md) | Module identity REQ-001–005 |
 | [transport.md](transport.md) | Transport layer REQ-090–094, 096–098 |
 | [glossary.md](glossary.md) | openEHR, SMART, Cadasto, and SDK-internal terms |

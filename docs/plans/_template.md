@@ -13,6 +13,25 @@
 
 One paragraph: what ships and who consumes it.
 
+## Definition of Ready
+
+Implementation may start when:
+
+- **`**Covers:**`** lists every REQ-NNN (and STRAND-NN / ADR if applicable) this plan implements.
+- Canonical normative prose exists for each covered REQ (topic spec section + registry row in [REQ.md](../specifications/REQ.md)).
+- Any irreversible fork has an **Accepted** [ADR](../adr/).
+- Phases list concrete tasks and name the verification command (`make ci`, `make spec-check`, probes).
+
+## Definition of Done
+
+The plan is complete when:
+
+- Code and tests land with `// REQ-` / `// PROBE-` citations.
+- [`traceability.yaml`](../specifications/traceability.yaml) and the REQ.md **Impl.** column reflect the implementation.
+- Canonical spec prose / **Status:** updated in the same PR when behaviour changed.
+- `make spec-check` and `make ci` pass.
+- Plan archived under [`docs/plans/archive/`](archive/) (or **Status:** set to complete).
+
 ## Implementation checklist
 
 | Step | Status |

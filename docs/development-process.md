@@ -2,9 +2,11 @@
 
 How work flows in this repository — the SDD **constitution**. This is a deliberately **thin map**: it
 states the loop and links to the canonical home for each rule rather than restating it (duplicated prose
-is the cardinal SDD anti-pattern). The **specification is the source of truth** — code is derived from it
-and continuously measured against it (`make spec-check`); when they disagree, the spec wins, except a
-section explicitly marked *implementation-aligned*.
+is the cardinal SDD anti-pattern). Source-of-truth modes and when spec vs code wins during a PR are
+defined in [specifications/README.md § Source of truth](specifications/README.md#source-of-truth):
+**spec-first** for new capability (normative spec leads; code and tests land through the plan chain),
+**implementation-aligned** for hardening on shipped code (code wins until the topic spec and
+`traceability.yaml` are updated in the same PR). Drift is measured continuously via `make spec-check`.
 
 The machine-readable conventions for this repo — REQ identifier style, document paths, build targets,
 `PROBE`/`STRAND` toggles, and the ground-truth source — live in [`.sdd.yaml`](.sdd.yaml), the descriptor
