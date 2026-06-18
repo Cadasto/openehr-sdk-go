@@ -46,7 +46,9 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 |---|---|
 | `golang.org/x/oauth2` | PKCE `code_verifier`/`code_challenge` generation (RFC 7636 `GenerateVerifier` / `S256ChallengeFromVerifier`) in `auth/smart/pkce.go`, plus an RFC 7636 parity cross-check in PROBE-004. (Token sources, refresh, and token-endpoint error handling are the SDK's own `auth` types — not `x/oauth2`'s.) |
 | `github.com/coreos/go-oidc/v3` | ID-token signature verification (RS256/RS384/ES256/ES384 via `go-jose`) |
-| `github.com/go-jose/go-jose/v4` _(transitive)_ | JWS signing for `client_assertion` / JWT Bearer grant; JWK→`crypto.PublicKey` parsing; ECDSA r‖s byte-padding |
+| `github.com/go-jose/go-jose/v4` _(direct; also required by `go-oidc/v3`)_ | JWS signing for `client_assertion` / JWT Bearer grant; JWK→`crypto.PublicKey` parsing; ECDSA r‖s byte-padding |
+
+> **Note — dependency classification.** `go-jose/v4` is a **direct** dependency in `go.mod`: `auth/jwtbearer` and `smart/idtoken` import it directly for JWS signing and JWK parsing. It is *also* required by `go-oidc/v3`, so adopting it added no separate supply-chain surface. (An earlier draft of this table tagged the row *transitive*, capturing only the latter fact.)
 
 **Rationale for adoption.** The pre-audit implementation hand-rolled RSA signature verification and JWK parsing. This was a correctness and coverage risk:
 
@@ -54,7 +56,7 @@ The SDK adopts three new runtime dependencies, scoped to `auth/` and `smart/`:
 - Hand-rolling ID-token verification misses `alg:none` rejection, key-type/alg mismatch enforcement, and subtle clock-skew / claim-order issues.
 - RS256-only signing limited the SDK to a sub-baseline profile; SMART mandates RS384/ES384 as the `client-confidential-asymmetric` SHALL baseline.
 
-`go-jose/v4` and `go-oidc/v3` are widely deployed, receive regular security audits, and are the de-facto Go substrate for JOSE/OIDC. The supply-chain cost (three additional transitive deps) is accepted in exchange for crypto correctness. The previous OTel-only rule was a heuristic, not a hard constraint — it served early development when auth was minimal. At SMART-on-openEHR scope, maintaining that heuristic would require writing and owning security-sensitive crypto code the ecosystem already provides correctly.
+`go-jose/v4` and `go-oidc/v3` are widely deployed, receive regular security audits, and are the de-facto Go substrate for JOSE/OIDC. The supply-chain cost (three additional direct deps plus their transitive closure) is accepted in exchange for crypto correctness. The previous OTel-only rule was a heuristic, not a hard constraint — it served early development when auth was minimal. At SMART-on-openEHR scope, maintaining that heuristic would require writing and owning security-sensitive crypto code the ecosystem already provides correctly.
 
 **Scope boundary.** The new deps are consumed only within `auth/` and `smart/`. Packages without auth concerns (`openehr/rm`, `openehr/aql`, `openehr/serialize`, `openehr/validation`, `transport`, etc.) do not transitively import them.
 
@@ -88,7 +90,7 @@ Not evaluated in depth. `go-jose/v4` is the direct successor of `square/go-jose/
 
 ## Consequences
 
-- The `auth/` and `smart/` packages depend on `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and (transitively) `github.com/go-jose/go-jose/v4`.
+- The `auth/` and `smart/` packages depend on `golang.org/x/oauth2`, `github.com/coreos/go-oidc/v3`, and `github.com/go-jose/go-jose/v4` (directly imported for JWS signing; also required by `go-oidc/v3`).
 - The OTel-only runtime dependency rule is retired. The new guidance (recorded in `docs/architecture.md`) is: prefer the standard library and established Go ecosystem libraries for security-sensitive primitives; avoid unnecessary deps for non-security concerns.
 - `auth.ScopeOfflineAccess` / `auth.ScopeOnlineAccess` are the canonical way to request a refresh token in authorization scope strings (REQ-063, `offline_access` / `online_access`).
 - The `FromOAuth2TokenSource` adapter and the issuer-matching multi-EHR helper remain open follow-ups with no blocking dependency.

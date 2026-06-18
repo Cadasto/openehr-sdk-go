@@ -1,0 +1,41 @@
+# docs/.sdd.yaml — the SDD project descriptor. Every /sdd-* skill reads this first
+# to learn this repo's conventions; none of them hard-code paths or identifier styles.
+# Schema: <sdd plugin>/references/traceability-schema.md §1. Methodology: §5 (identifiers).
+# Do NOT switch req_style once published — it would renumber stable IDs (a major doc event).
+sdd:
+  req_style: flat-numeric           # flat-numeric (REQ-NNN) — leaner for a library
+  req_gap: 10                       # decadal, topic-banded: 001-005 packaging, 010-014 layout,
+                                    # 020-026 idiom, 030-033 rm, 040-047 bmm, 050-059 wire,
+                                    # 060-064 auth, … — assign the next ID in the topic's band.
+                                    # See docs/specifications/REQ.md § Numbering policy.
+
+  paths:
+    # Requirements use a REGISTRY model, not per-REQ files: the REQ-NNN index lives in
+    # docs/specifications/REQ.md and each requirement's canonical normative prose lives in
+    # exactly one topic spec in the same tree. There is deliberately no separate
+    # docs/requirements/ dir (single canonical home — methodology §5).
+    requirements: docs/specifications
+    specifications: docs/specifications
+    adr: docs/adr
+    plans: docs/plans
+    plans_archive: docs/plans/archive
+
+  traceability: docs/specifications/traceability.yaml
+
+  build_entrypoint: make            # single entry point — extend the Makefile, no ad-hoc scripts
+  ci_target: ci                     # full PR gate: `make ci` (includes spec-check)
+  spec_check_target: spec-check     # traceability drift gate: `make spec-check`
+  # Also available: `make spec-context REQ=NNN` (one-shot bundle) and `make probe-status`.
+
+  use_probes: true                  # PROBE-NNN conformance probes — catalog in docs/specifications/conformance.md
+  use_strands: true                 # STRAND-NN open research questions — docs/specifications/research-strands.md
+  upstream: ""                      # the spec tree is self-contained; no upstream SDD repo consumed
+
+  # "Look it up, never guess" — the authoritative sources for this repo's domain facts:
+  ground_truth: >-
+    openEHR specifications and the vendored machine-readable contracts in resources/ —
+    resources/its-rest/*.openapi.yaml (REST 1.1.0-development) and resources/bmm/*.bmm.json
+    (RM/AM/BASE/LANG/TERM) — plus the openEHR MCP skills/assistant. Agents MUST look up RM
+    paths, terminology codes, ITS-JSON/REST request-response shapes, and class invariants
+    rather than guess. The conformance probe suite (testkit/probes, catalogued in
+    docs/specifications/conformance.md) is the source of truth for wire-level semantics.
