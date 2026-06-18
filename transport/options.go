@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
@@ -31,6 +33,8 @@ type config struct {
 	maxResponseBody int64
 
 	reauther auth.Reauther
+
+	tracerProvider trace.TracerProvider
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -144,4 +148,16 @@ func WithMaxResponseBody(n int64) Option {
 // auth.ReautherFunc (REQ-071 bullet 3).
 func WithReauthOn401(r auth.Reauther) Option {
 	return func(cfg *config) { cfg.reauther = r }
+}
+
+// WithTracerProvider injects the OTel [trace.TracerProvider] used to
+// create spans inside [Client.Do]. When not set, [otel.GetTracerProvider]
+// is called at span-start time (the existing behaviour, preserving
+// backward compatibility).
+//
+// Injecting a provider is preferred in tests (avoids mutating the
+// global) and in multi-tenant binaries that route spans to different
+// exporters per-client.
+func WithTracerProvider(tp trace.TracerProvider) Option {
+	return func(cfg *config) { cfg.tracerProvider = tp }
 }

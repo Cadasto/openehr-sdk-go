@@ -300,14 +300,21 @@ func TestTokenMissingAccessToken(t *testing.T) {
 // with no client secret and no HTTP Basic header. (REQ-068)
 func TestClientCredentialsWithClientAssertion(t *testing.T) {
 	// Capture the raw form body and headers from the token endpoint.
-	var capturedForm url.Values
-	var capturedAuth string
+	var (
+		capMu        sync.Mutex
+		capturedForm url.Values
+		capturedAuth string
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		capturedAuth = r.Header.Get("Authorization")
+		hdr := r.Header.Get("Authorization")
 		if err := r.ParseForm(); err != nil {
 			t.Fatalf("parse form: %v", err)
 		}
-		capturedForm = r.PostForm
+		form := r.PostForm
+		capMu.Lock()
+		capturedAuth = hdr
+		capturedForm = form
+		capMu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token": "smart-backend-tok",
@@ -356,23 +363,29 @@ func TestClientCredentialsWithClientAssertion(t *testing.T) {
 		t.Errorf("Value = %q, want smart-backend-tok", tok.Value)
 	}
 
+	// Snapshot the captured values under the lock before asserting.
+	capMu.Lock()
+	gotForm := capturedForm
+	gotAuth := capturedAuth
+	capMu.Unlock()
+
 	// Assert required form fields.
-	if g := capturedForm.Get("grant_type"); g != "client_credentials" {
+	if g := gotForm.Get("grant_type"); g != "client_credentials" {
 		t.Errorf("grant_type = %q, want client_credentials", g)
 	}
-	if g := capturedForm.Get("client_assertion_type"); g != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+	if g := gotForm.Get("client_assertion_type"); g != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
 		t.Errorf("client_assertion_type = %q, want urn:ietf:params:oauth:client-assertion-type:jwt-bearer", g)
 	}
-	if g := capturedForm.Get("client_assertion"); g == "" {
+	if g := gotForm.Get("client_assertion"); g == "" {
 		t.Error("client_assertion must be non-empty")
 	}
-	if g := capturedForm.Get("scope"); g != "system/*.read" {
+	if g := gotForm.Get("scope"); g != "system/*.read" {
 		t.Errorf("scope = %q, want system/*.read", g)
 	}
 
 	// Assert no HTTP Basic Authorization header was sent.
-	if strings.HasPrefix(capturedAuth, "Basic ") {
-		t.Errorf("expected no Basic Authorization header, got %q", capturedAuth)
+	if strings.HasPrefix(gotAuth, "Basic ") {
+		t.Errorf("expected no Basic Authorization header, got %q", gotAuth)
 	}
 }
 

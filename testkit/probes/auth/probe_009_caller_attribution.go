@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"sync"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -33,17 +32,22 @@ func Probe009CallerAttributionOptIn(ctx context.Context) (Result, error) { // PR
 
 	const headerName = transport.DefaultCallerAttributionHeader
 
-	// Install an in-memory TracerProvider for the duration of the probe so
-	// the transport's span.SetAttributes calls are observable; restore the
-	// previous global provider afterwards.
+	// Use an in-memory TracerProvider injected via WithTracerProvider — no
+	// global OTel mutation. This avoids triggering otel's delegateTraceOnce
+	// (a sync.Once) which cannot be undone by a defer restore and races
+	// under concurrent harness use.
 	rec := &spanRecorder{}
-	prev := otel.GetTracerProvider()
-	otel.SetTracerProvider(&recordingTP{rec: rec})
-	defer otel.SetTracerProvider(prev)
+	recordingTP := &recordingTP{rec: rec}
 
-	var capturedHeader string
+	var (
+		hdrMu          sync.Mutex
+		capturedHeader string
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		capturedHeader = req.Header.Get(headerName)
+		v := req.Header.Get(headerName)
+		hdrMu.Lock()
+		capturedHeader = v
+		hdrMu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{}`))
 	}))
@@ -64,10 +68,13 @@ func Probe009CallerAttributionOptIn(ctx context.Context) (Result, error) { // PR
 
 	// Configured client — should emit header + caller.agent_id attribute.
 	rec.reset()
+	hdrMu.Lock()
 	capturedHeader = ""
+	hdrMu.Unlock()
 	configured, err := transport.New(
 		cat,
 		transport.WithHTTPClient(srv.Client()),
+		transport.WithTracerProvider(recordingTP),
 		transport.WithCallerAttribution(transport.CallerAttribution{
 			AgentID:       "mcp-probe/1.0.0",
 			ModelProvider: "anthropic",
@@ -81,7 +88,10 @@ func Probe009CallerAttributionOptIn(ctx context.Context) (Result, error) { // PR
 		r.Detail = fmt.Sprintf("configured client Do failed: %v", err)
 		return r, nil
 	}
-	if capturedHeader == "" {
+	hdrMu.Lock()
+	gotHeader := capturedHeader
+	hdrMu.Unlock()
+	if gotHeader == "" {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("configured client emitted no %s header", headerName)
 		return r, nil
@@ -94,8 +104,14 @@ func Probe009CallerAttributionOptIn(ctx context.Context) (Result, error) { // PR
 
 	// Unconfigured client — neither header nor attribute on the wire.
 	rec.reset()
+	hdrMu.Lock()
 	capturedHeader = ""
-	plain, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
+	hdrMu.Unlock()
+	plain, err := transport.New(
+		cat,
+		transport.WithHTTPClient(srv.Client()),
+		transport.WithTracerProvider(recordingTP),
+	)
 	if err != nil {
 		return r, fmt.Errorf("PROBE-009: build plain client: %w", err)
 	}
@@ -104,9 +120,12 @@ func Probe009CallerAttributionOptIn(ctx context.Context) (Result, error) { // PR
 		r.Detail = fmt.Sprintf("plain client Do failed: %v", err)
 		return r, nil
 	}
-	if capturedHeader != "" {
+	hdrMu.Lock()
+	gotHeader = capturedHeader
+	hdrMu.Unlock()
+	if gotHeader != "" {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("unconfigured client emitted %s = %q; want absent", headerName, capturedHeader)
+		r.Detail = fmt.Sprintf("unconfigured client emitted %s = %q; want absent", headerName, gotHeader)
 		return r, nil
 	}
 	if _, ok := rec.lookup("caller.agent_id"); ok {

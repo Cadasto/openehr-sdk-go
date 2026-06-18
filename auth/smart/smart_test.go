@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -364,14 +365,21 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var capturedForm url.Values
-	var capturedAuthHeader string
+	var (
+		capMu              sync.Mutex
+		capturedForm       url.Values
+		capturedAuthHeader string
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			b, _ := io.ReadAll(r.Body)
-			capturedForm, _ = url.ParseQuery(string(b))
-			capturedAuthHeader = r.Header.Get("Authorization")
+			form, _ := url.ParseQuery(string(b))
+			hdr := r.Header.Get("Authorization")
+			capMu.Lock()
+			capturedForm = form
+			capturedAuthHeader = hdr
+			capMu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"at-pkjwt","token_type":"Bearer","expires_in":3600}`))
 		case "/jwks":
@@ -405,15 +413,21 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 		t.Fatalf("access = %q, want at-pkjwt", tok.Value)
 	}
 
+	// Snapshot the captured values under the lock before asserting.
+	capMu.Lock()
+	gotAuthHeader := capturedAuthHeader
+	gotForm := capturedForm
+	capMu.Unlock()
+
 	// No HTTP Basic header — confidential auth is by assertion, not secret.
-	if capturedAuthHeader != "" {
-		t.Fatalf("Authorization header = %q, want empty (no client_secret_basic)", capturedAuthHeader)
+	if gotAuthHeader != "" {
+		t.Fatalf("Authorization header = %q, want empty (no client_secret_basic)", gotAuthHeader)
 	}
 
-	if got := capturedForm.Get("client_assertion_type"); got != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+	if got := gotForm.Get("client_assertion_type"); got != "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
 		t.Fatalf("client_assertion_type = %q", got)
 	}
-	assertion := capturedForm.Get("client_assertion")
+	assertion := gotForm.Get("client_assertion")
 	if assertion == "" {
 		t.Fatal("client_assertion is empty, want a signed JWT")
 	}
@@ -462,14 +476,21 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 // code fields on the form body, and does NOT send client_assertion /
 // client_assertion_type form fields (REQ-068).
 func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
-	var capturedAuth string
-	var capturedForm url.Values
+	var (
+		capMu        sync.Mutex
+		capturedAuth string
+		capturedForm url.Values
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/token":
 			b, _ := io.ReadAll(r.Body)
-			capturedForm, _ = url.ParseQuery(string(b))
-			capturedAuth = r.Header.Get("Authorization")
+			form, _ := url.ParseQuery(string(b))
+			hdr := r.Header.Get("Authorization")
+			capMu.Lock()
+			capturedForm = form
+			capturedAuth = hdr
+			capMu.Unlock()
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write([]byte(`{"access_token":"at-sym","token_type":"Bearer","expires_in":3600}`))
 		case "/jwks":
@@ -506,25 +527,36 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 		t.Fatalf("access = %q, want at-sym", tok.Value)
 	}
 
+	// Snapshot the captured values under the lock before asserting.
+	capMu.Lock()
+	gotAuth := capturedAuth
+	gotForm := capturedForm
+	capMu.Unlock()
+
 	// The Authorization header must be HTTP Basic with base64(clientID:secret).
 	// http.Request.SetBasicAuth encodes clientID and secret directly (no
 	// url.QueryEscape) and uses standard base64 encoding.
 	wantBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte(clientID+":"+secret))
-	if capturedAuth != wantBasic {
-		t.Fatalf("Authorization header = %q, want %q", capturedAuth, wantBasic)
+	if gotAuth != wantBasic {
+		t.Fatalf("Authorization header = %q, want %q", gotAuth, wantBasic)
 	}
 
 	// The form must include the expected grant_type.
-	if got := capturedForm.Get("grant_type"); got != "authorization_code" {
+	if got := gotForm.Get("grant_type"); got != "authorization_code" {
 		t.Fatalf("grant_type = %q, want authorization_code", got)
+	}
+
+	// The form must include the authorization code (Fix 4: previously missing assertion).
+	if got := gotForm.Get("code"); got != "code-sym" {
+		t.Fatalf("code = %q, want code-sym", got)
 	}
 
 	// No client_assertion or client_assertion_type — symmetric auth uses Basic,
 	// not a signed JWT (REQ-068).
-	if got := capturedForm.Get("client_assertion"); got != "" {
+	if got := gotForm.Get("client_assertion"); got != "" {
 		t.Fatalf("client_assertion = %q, want empty (symmetric client must not send JWT assertion)", got)
 	}
-	if got := capturedForm.Get("client_assertion_type"); got != "" {
+	if got := gotForm.Get("client_assertion_type"); got != "" {
 		t.Fatalf("client_assertion_type = %q, want empty (symmetric client must not send assertion type)", got)
 	}
 }

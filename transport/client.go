@@ -123,7 +123,11 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
 	}
 
-	tracer := otel.GetTracerProvider().Tracer(tracerName)
+	tp := c.cfg.tracerProvider
+	if tp == nil {
+		tp = otel.GetTracerProvider()
+	}
+	tracer := tp.Tracer(tracerName)
 	spanName := req.effectiveMethod() + " " + req.effectiveRoute()
 	ctx, span := tracer.Start(
 		ctx, spanName,
