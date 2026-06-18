@@ -50,6 +50,10 @@ When implementing or reviewing against a REQ:
 
 New normative text goes in the **canonical topic spec** first, then the REQ registry row — never as duplicate prose in `REQ.md` or as a rule that exists only in code.
 
+**Descriptor & process.** Machine-readable conventions (REQ style, document paths, `make` targets, `PROBE`/`STRAND` toggles, ground-truth source) live in [`docs/.sdd.yaml`](docs/.sdd.yaml) — the descriptor the `sdd-*` skills read first. The end-to-end loop and the Definition of Ready / Done are mapped in [`docs/development-process.md`](docs/development-process.md).
+
+**superpowers + SDD.** SDD owns the spec/traceability layer; the superpowers loop owns build/verify/branch. Brainstorming design docs are *narrative input* that feeds the canonical specs (not a normative source), and plans belong in [`docs/plans/`](docs/plans/) with the `**Covers:**` header + DoR/DoD — never a parallel `docs/superpowers/` tree. Full redirect: [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd).
+
 **Examples:** when you add, rename, remove, or materially change a [`cmd/examples/`](cmd/examples/) program, keep its docs in sync **in the same PR** — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
 ## Module layout & boundaries
