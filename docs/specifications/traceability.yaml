@@ -599,6 +599,7 @@ requirements:
       - openehr/templatecompile/external_test.go
       - openehr/templatecompile/introspect_test.go
       - cmd/examples/compile-build-validate/main.go
+      - cmd/examples/template-explore/main.go
     plans:
       - docs/plans/2026-06-17-public-compiled-template-bridge.md
 

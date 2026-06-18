@@ -27,6 +27,7 @@ make build
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
+| [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 
 ---
@@ -244,6 +245,41 @@ ehr_status : ValidateEHRStatus callable (OK=false against a COMPOSITION OPT)
 ```
 
 **What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.Validate*` calls. The compiled template is the single artifact the builder and validator share.
+
+---
+
+### template-explore
+
+**Purpose:** Introspect a compiled OPT through the public node-level types (REQ-111) — the building block for a form generator or a path-discovery tool. Walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths — the canonical `composition.Builder.Set` targets.
+
+```bash
+go run ./cmd/examples/template-explore
+go run ./cmd/examples/template-explore path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile` — **no `internal/` import.**
+
+**Sample output (abridged):**
+
+```text
+root     : COMPOSITION
+
+structure (node → attribute → child node):
+COMPOSITION [openEHR-EHR-COMPOSITION.encounter.v1]  "Encounter"
+  .content [*]
+    OBSERVATION [openEHR-EHR-OBSERVATION.blood_pressure.v1]  "Blood Pressure"
+      ...
+        ELEMENT [at0004]  "Systolic"
+          .value [1]
+            DV_QUANTITY  ·primitive
+
+addressable primitive-leaf paths (6) — Builder.Set targets:
+  /category/defining_code
+  /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value
+  ...
+```
+
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker; `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, `node.Term(code, "")` gives the label, `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
 
 ---
 
