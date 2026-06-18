@@ -115,7 +115,7 @@ requirements:
 
   - id: REQ-068
     title: SMART flows and launch modes
-    canonical: docs/specifications/auth.md#req-068
+    canonical: docs/specifications/auth.md#req-068--flow-and-launch-mode-coverage
     status: draft
     implementation: landed
     packages: [auth/clientcreds, auth/jwtbearer, auth/smart]
@@ -265,7 +265,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
-    probes: [PROBE-050, PROBE-051]
+    probes: [PROBE-051]
     tests:
       - transport/client_test.go
 
@@ -299,7 +299,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
-    probes: [PROBE-061, PROBE-065, PROBE-071]
+    probes: [PROBE-061, PROBE-071]
     tests:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
@@ -366,7 +366,7 @@ requirements:
 
   - id: REQ-055
     title: AQL wire boundary
-    canonical: docs/specifications/wire.md#req-055
+    canonical: docs/specifications/wire.md#req-055--wire-boundary
     status: draft
     implementation: landed
     packages: [openehr/aql, openehr/client/query]
@@ -413,7 +413,7 @@ requirements:
 
   - id: REQ-062
     title: JWKS rotation
-    canonical: docs/specifications/auth.md#req-062
+    canonical: docs/specifications/auth.md#req-062--jwks-rotation
     status: draft
     implementation: landed
     packages: [auth/smart, smart/discovery, auth/introspect]
@@ -451,7 +451,7 @@ requirements:
 
   - id: REQ-063
     title: Token refresh
-    canonical: docs/specifications/auth.md#req-063
+    canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
     implementation: landed
     packages: [auth, auth/smart, transport]
@@ -479,7 +479,7 @@ requirements:
 
   - id: REQ-064
     title: Launch context
-    canonical: docs/specifications/auth.md#req-064
+    canonical: docs/specifications/auth.md#req-064--launch-context
     status: draft
     implementation: landed
     packages: [smart, auth/smart]
@@ -509,7 +509,7 @@ requirements:
 
   - id: REQ-082
     title: Probe runnability
-    canonical: docs/specifications/conformance.md#runnability
+    canonical: docs/specifications/conformance.md#req-082--runnability
     status: draft
     implementation: partial
     packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
@@ -550,7 +550,7 @@ requirements:
   - id: REQ-109
     title: AQL static lint
     canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
-    status: landed
+    status: draft
     implementation: landed
     packages:
       - openehr/aql/parse
