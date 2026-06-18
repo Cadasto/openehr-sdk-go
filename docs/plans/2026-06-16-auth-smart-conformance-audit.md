@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan touches **normative specs** — follow the spec-driven workflow in [AGENTS.md](../../AGENTS.md) (run `make spec-context REQ=NNN`, edit the canonical topic spec, then the REQ row + `traceability.yaml`). Do **not** resolve [STRAND-05](../specifications/research-strands.md#strand-05--smart-on-openehr-auth-library) silently in code — surface decisions or land an ADR.
 
 **Date:** 2026-06-16
-**Status:** Draft
+**Status:** Implemented (2026-06-18)
 **Owner:** SDK maintainers
 **Covers:** REQ-063, REQ-068, REQ-064, REQ-070, REQ-072, REQ-061, REQ-062 (canonical-spec sections only — no duplicate normative prose)
 **Probes:** PROBE-001..009, PROBE-041, PROBE-007
-**Implementation:** planned
+**Implementation:** landed — all findings F-A..F-M closed on branch `chore/auth-smart-audit`; ADR 0008 + 0009 landed; STRAND-05 resolved. `make ci` green (note: `test-race` requires CGO and runs in CI).
 **Depends on:** landed `auth/`, `auth/smart/`, `auth/clientcreds/`, `auth/jwtbearer/`, `smart/`, `smart/discovery/`, `transport/`
 **Defers:** dynamic client registration, MTLS/FAPI/JAR/PAR, token revocation client, UDAP/DPoP refresh-token binding, SMART App State
 
@@ -169,12 +169,12 @@ Validated the plan against the SMART-maintained reference clients `smart-on-fhir
 
 | Step | Status |
 |---|---|
-| Spec / registry updated (`traceability.yaml`, REQ.md rows, ADR for STRAND-05) | |
-| Code | |
-| Tests with `// REQ-` / `// PROBE-` comments | |
-| Canonical-shaped discovery fixture added | |
-| `make spec-check` | |
-| `make ci` | |
+| Spec / registry updated (`traceability.yaml`, REQ.md rows, ADR for STRAND-05) | ✅ ADR 0008 + 0009; STRAND-05 resolved |
+| Code | ✅ all findings F-A..F-M |
+| Tests with `// REQ-` / `// PROBE-` comments | ✅ incl. PROBE-001..009 |
+| Canonical-shaped discovery fixture added | ✅ |
+| `make spec-check` | ✅ OK |
+| `make ci` | ✅ green (`test-race` runs in CI — needs CGO) |
 
 ---
 
