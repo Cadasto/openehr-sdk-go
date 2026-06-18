@@ -475,12 +475,19 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 	if err != nil {
 		// A *WireError carries a status — defer to the status-based
 		// retriable check so RetriableStatus is the single gate.
-		// Anything else is a network / transport / token error;
-		// retry per the method's idempotency.
 		var we *WireError
 		if errors.As(err, &we) {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
 		}
+		// Token-source errors that are deterministically terminal (the config
+		// is invalid, or re-authentication is required and nothing can refresh
+		// it) will fail identically on every attempt — retrying only burns the
+		// budget and re-invokes Token(). Treat them as non-retriable.
+		if errors.Is(err, auth.ErrReauthRequired) || errors.Is(err, auth.ErrInvalidConfig) {
+			return false
+		}
+		// Anything else is a network / transport / transient token error;
+		// retry per the method's idempotency.
 		return true
 	}
 	if resp == nil {

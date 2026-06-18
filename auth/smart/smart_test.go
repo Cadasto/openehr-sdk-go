@@ -561,6 +561,85 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	}
 }
 
+// TestExchangeWithClientSecretPost verifies that, when the authorization
+// server advertises only client_secret_post (and not client_secret_basic), a
+// Source configured with WithClientSecret presents its credential in the form
+// body (client_id / client_secret) and sends NO HTTP Basic Authorization
+// header (REQ-068).
+func TestExchangeWithClientSecretPost(t *testing.T) { // REQ-068
+	var (
+		capMu        sync.Mutex
+		capturedAuth string
+		capturedForm url.Values
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/token":
+			b, _ := io.ReadAll(r.Body)
+			form, _ := url.ParseQuery(string(b))
+			hdr := r.Header.Get("Authorization")
+			capMu.Lock()
+			capturedForm = form
+			capturedAuth = hdr
+			capMu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"access_token":"at-post","token_type":"Bearer","expires_in":3600}`))
+		case "/jwks":
+			_, _ = w.Write(readJWKS())
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	const (
+		clientID = "post-client"
+		secret   = "p0st-s3cret"
+	)
+	eps := discovery.AuthEndpoints{
+		AuthorizationEndpoint:             discovery.MustParseURL(srv.URL + "/authorize"),
+		TokenEndpoint:                     discovery.MustParseURL(srv.URL + "/token"),
+		JWKSURI:                           discovery.MustParseURL(srv.URL + "/jwks"),
+		TokenEndpointAuthMethodsSupported: []string{"client_secret_post"},
+	}
+	src, err := smart.New(
+		clientID, eps,
+		smart.WithHTTPClient(srv.Client()),
+		smart.WithRedirectURI("https://app.example/callback"),
+		smart.WithClientSecret(secret),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := src.BeginAuthorization("state-post")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-post", "state-post", req)
+	if err != nil {
+		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
+	}
+	if tok.Value != "at-post" {
+		t.Fatalf("access = %q, want at-post", tok.Value)
+	}
+
+	capMu.Lock()
+	gotAuth := capturedAuth
+	gotForm := capturedForm
+	capMu.Unlock()
+
+	if gotAuth != "" {
+		t.Fatalf("Authorization header = %q, want empty (client_secret_post must not use HTTP Basic)", gotAuth)
+	}
+	if got := gotForm.Get("client_id"); got != clientID {
+		t.Fatalf("client_id = %q, want %q", got, clientID)
+	}
+	if got := gotForm.Get("client_secret"); got != secret {
+		t.Fatalf("client_secret = %q, want %q", got, secret)
+	}
+}
+
 // TestClientAssertionAndSecretBothRejected verifies that configuring both
 // WithClientSecret and WithClientAssertionKey is rejected at construction
 // with ErrInvalidConfig (REQ-068).
@@ -924,5 +1003,37 @@ func TestSourceReauthForcesRefresh(t *testing.T) { // REQ-063
 	}
 	if calls != 1 {
 		t.Fatalf("Token() after Reauth must not make an extra call; calls = %d", calls)
+	}
+}
+
+// TestSourceReauthNoRefreshTokenKeepsValidToken verifies that, when no
+// refresh_token is available, Reauth signals re-authentication WITHOUT
+// discarding a cached access token that is still within its ExpiresAt — a wire
+// 401 may be scope-related, and a public client has no other credential to fall
+// back on (REQ-063).
+func TestSourceReauthNoRefreshTokenKeepsValidToken(t *testing.T) { // REQ-063
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("token endpoint must not be called without a refresh_token; got %s", r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	src, err := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Still-valid token, no refresh_token.
+	src.SetTokens(auth.Token{Value: "at-valid", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "")
+
+	if err := src.Reauth(context.Background()); !errors.Is(err, auth.ErrReauthRequired) {
+		t.Fatalf("Reauth err = %v, want ErrReauthRequired", err)
+	}
+	// The still-valid cached token must survive — Token() returns it as-is.
+	tok, err := src.Token(context.Background())
+	if err != nil {
+		t.Fatalf("Token() after Reauth: %v", err)
+	}
+	if tok.Value != "at-valid" {
+		t.Fatalf("cached token was discarded: got %q, want at-valid", tok.Value)
 	}
 }

@@ -27,6 +27,7 @@ const (
 	// (RFC 8414 / SMART client-confidential-asymmetric).
 	methodPrivateKeyJWT     = "private_key_jwt"
 	methodClientSecretBasic = "client_secret_basic"
+	methodClientSecretPost  = "client_secret_post"
 )
 
 // clientAssertionKey holds the asymmetric credential for private_key_jwt
@@ -58,6 +59,11 @@ type Config struct {
 	// ClientID and token endpoint are known. When non-nil, postToken emits a
 	// signed client_assertion instead of HTTP Basic auth (REQ-068).
 	assertionSource jwtbearer.AssertionSource
+	// secretAuthMethod records how a configured ClientSecret is presented at
+	// the token endpoint — client_secret_basic (HTTP Basic, the default) or
+	// client_secret_post (credentials in the form body). Resolved by
+	// configureClientAuth from the server's advertised methods (REQ-068).
+	secretAuthMethod string
 }
 
 // Option mutates Config during construction.
@@ -213,7 +219,16 @@ func configureClientAuth(cfg *Config) error {
 		}
 		cfg.assertionSource = signer
 	case hasSecret:
+		// Default to client_secret_basic. When the server advertises methods
+		// but not basic, fall back to client_secret_post if it is offered, so
+		// a deployment that only accepts post-style credentials still works.
 		method = methodClientSecretBasic
+		if advertised := cfg.Auth.TokenEndpointAuthMethodsSupported; len(advertised) > 0 &&
+			!slices.Contains(advertised, methodClientSecretBasic) &&
+			slices.Contains(advertised, methodClientSecretPost) {
+			method = methodClientSecretPost
+		}
+		cfg.secretAuthMethod = method
 	default:
 		// Public client — no client authentication to cross-check.
 		return nil
@@ -447,9 +462,25 @@ func (s *Source) RefreshIfNeeded(ctx context.Context) error {
 // onto it rather than issuing a duplicate request (single-flight, REQ-026). On a
 // terminal refresh failure it clears the refresh token and returns
 // ErrReauthRequired.
+//
+// When no refresh_token is available there is nothing to exchange, so Reauth
+// does NOT discard the cached access token (a wire 401 may be scope-related
+// rather than an expiry, and a public client has no other credential to fall
+// back on). It returns ErrReauthRequired, clearing the cached token only when
+// it is already past ExpiresAt — which MUST NOT be used silently (REQ-063).
 func (s *Source) Reauth(ctx context.Context) error {
 	s.mu.Lock()
-	// Mark the current token stale so that Token() will execute the refresh.
+	if s.refresh == "" {
+		expired := !s.cur.IsZero() && !s.cur.ExpiresAt.IsZero() && time.Until(s.cur.ExpiresAt) <= 0
+		if expired {
+			s.cur = auth.Token{}
+		}
+		s.mu.Unlock()
+		return &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: errors.New("no refresh_token; re-authentication required")}
+	}
+	// A refresh_token is available: mark the current token stale so the next
+	// Token() executes the refresh even if it has not yet crossed the
+	// proactive-refresh threshold.
 	s.cur = auth.Token{}
 	s.mu.Unlock()
 	_, err := s.Token(ctx)
@@ -489,7 +520,9 @@ func (s *Source) refreshGrant(ctx context.Context, refresh string) (auth.Token, 
 func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, TokenResponse, string, error) {
 	// Client authentication is selected deterministically (REQ-068):
 	//   - assertion signer configured → private_key_jwt (signed client_assertion)
-	//   - else client secret set      → client_secret_basic (HTTP Basic)
+	//   - else client secret set      → client_secret_basic (HTTP Basic) or
+	//     client_secret_post (credentials in the form body), per the method
+	//     resolved by configureClientAuth from the server's advertised methods
 	//   - else                        → public client (no client auth)
 	useBasic := false
 	if s.cfg.assertionSource != nil {
@@ -503,7 +536,12 @@ func (s *Source) postToken(ctx context.Context, form url.Values) (auth.Token, To
 		form.Set("client_assertion_type", clientAssertionType)
 		form.Set("client_assertion", assertion)
 	} else if s.cfg.ClientSecret != "" {
-		useBasic = true
+		if s.cfg.secretAuthMethod == methodClientSecretPost {
+			form.Set("client_id", s.cfg.ClientID)
+			form.Set("client_secret", s.cfg.ClientSecret)
+		} else {
+			useBasic = true
+		}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.cfg.Auth.TokenEndpoint.String(), strings.NewReader(form.Encode()))

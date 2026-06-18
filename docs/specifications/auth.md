@@ -136,14 +136,16 @@ Client-authentication method selection is **deterministic** (no trial-and-error)
 | Configuration | Method | Wire effect |
 |---|---|---|
 | `WithClientAssertionKey` set | `private_key_jwt` | signed `client_assertion` form fields; no Basic header |
-| `WithClientSecret` set (only) | `client_secret_basic` | HTTP Basic header |
+| `WithClientSecret` set (only) | `client_secret_basic` (default) or `client_secret_post` | HTTP Basic header, or `client_id`/`client_secret` form fields |
 | neither | public client | no client authentication |
+
+For a symmetric secret the SDK defaults to `client_secret_basic`. When the server advertises `token_endpoint_auth_methods_supported` but **not** `client_secret_basic`, and **does** advertise `client_secret_post`, the SDK falls back to `client_secret_post` (credentials in the form body) so deployments that accept only the post-style method still work.
 
 Configuring **both** an assertion key and a client secret is ambiguous and is rejected at construction with `auth.ErrInvalidConfig`.
 
 ##### G-3 — discovery-driven method cross-check
 
-When the authorization server advertises `token_endpoint_auth_methods_supported` (RFC 8414), `FromConfig` cross-checks the method implied by the configured credential against that list. If the list is non-empty and does **not** contain the configured method (`private_key_jwt` when a signer is set, `client_secret_basic` when only a secret is set), construction fails fast with `auth.ErrInvalidConfig` rather than deferring the failure to a rejected token request. When the list is empty or absent, the check is skipped (the server has not constrained the method).
+When the authorization server advertises `token_endpoint_auth_methods_supported` (RFC 8414), `FromConfig` cross-checks the method implied by the configured credential against that list. If the list is non-empty and does **not** contain the resolved method (`private_key_jwt` when a signer is set; for a symmetric secret, `client_secret_basic` by default or `client_secret_post` when only the post method is advertised), construction fails fast with `auth.ErrInvalidConfig` rather than deferring the failure to a rejected token request. When the list is empty or absent, the check is skipped (the server has not constrained the method).
 
 #### Backend Services asymmetric client auth — `client_credentials` + `client_assertion` (Phase 3c, F-C)
 
@@ -222,7 +224,7 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 `smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
 
 - **Supported algorithms:** `RS256`, `RS384`, `ES256`, `ES384`. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
-- **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). When non-empty it is intersected with the supported set — the discovery list can narrow but never widen the SDK's support, and an empty intersection falls back to the full supported set rather than go-oidc's RS256-only default. When the caller passes nothing, the full supported set applies.
+- **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). When non-empty it is intersected with the supported set — the discovery list can narrow but never widen the SDK's support. An empty intersection (the deployment advertises only algorithms the SDK does not support) **fails closed**: validation is rejected with `auth.ErrJWKSValidationFailed` rather than silently falling back to the full supported set, honouring the server's advertised constraint. When the caller passes nothing, the full supported set applies.
 - **Rejected:** the unsecured `none` algorithm is always rejected (explicitly, and because it is never in the allowlist); any algorithm outside the effective allowlist is rejected; an `alg`/key-type mismatch is rejected by go-jose key matching. All rejections surface as `auth.ErrJWKSValidationFailed` (preserved sentinel — `errors.Is` keeps working).
 - **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The returned `*IDTokenClaims` shape is unchanged.
 
@@ -247,14 +249,13 @@ The `auth/introspect` package provides a standalone, opt-in RFC 7662 token intro
 
 The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`. These constants are lexical only — whether the server honours the request depends on the deployment's policy.
 
-The `auth/smart` `TokenSource` **MUST** transparently refresh access tokens when:
+The `auth/smart` `TokenSource` **MUST** proactively refresh access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
 
-- `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
-- A `401 Unauthorized` response is received from the wire with an indication that the token has expired.
+Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request. Keeping it opt-in avoids surprising retries of non-idempotent writes (see _transport reauth hook_ below).
 
 Refresh uses the stored `refresh_token` against the deployment's `token_endpoint` (`grant_type=refresh_token`). On refresh failure:
 
-- A re-authentication-required signal **MUST** be surfaced to the consumer (typed error or callback — to be designed).
+- A re-authentication-required signal **MUST** be surfaced to the consumer as the typed sentinel `auth.ErrReauthRequired` (wrapped in `*auth.ExchangeError`).
 - The expired token **MUST NOT** be used silently.
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
@@ -262,12 +263,12 @@ If no `refresh_token` is available (the deployment did not grant one), the `Toke
 #### Implementation — Phase 4a + 4b (Source/error side + transport hook)
 
 **Terminal vs. transient refresh classification (`ExchangeError.Terminal()`).**
-`auth.ExchangeError` exposes a `Terminal() bool` method. A failure is terminal when the HTTP status is 4xx **and** the OAuth2 error code is `invalid_grant` or `invalid_client`. All other failures (5xx, network, context, unparsed) are transient and return `false`. The distinction drives the F-L refresh-clearing rule below.
+`auth.ExchangeError` exposes a `Terminal() bool` method. A failure is terminal when the HTTP status is 4xx **and** the OAuth2 error code is `invalid_grant`, `invalid_client`, or `invalid_token`. All other failures (5xx, network, context, unparsed) are transient and return `false`. The distinction drives the F-L refresh-clearing rule below.
 
 **F-L: clear refresh token only on terminal failure.**
 When a `refresh_token` grant fails, `Source.Token` classifies the returned `*auth.ExchangeError`:
 
-- **Terminal** (`invalid_grant` / `invalid_client` with 4xx) → clear `s.refresh` and `s.cur`, then return `ErrReauthRequired`. A subsequent `Token()` call will short-circuit to `ErrReauthRequired` without issuing another POST.
+- **Terminal** (`invalid_grant` / `invalid_client` / `invalid_token` with 4xx) → clear `s.refresh` and `s.cur`, then return `ErrReauthRequired`. A subsequent `Token()` call will short-circuit to `ErrReauthRequired` without issuing another POST.
 - **Transient** (5xx, network, ctx) → retain `s.refresh` and `s.cur`, return `ErrRefreshFailed`. The consumer may retry; the refresh token is still valid.
 
 Both state mutations happen under `s.mu` (the same mutex used by all of `Token`).
@@ -285,7 +286,7 @@ type Reauther interface {
     Reauth(ctx context.Context) error
 }
 ```
-`*smart.Source` implements `Reauther`. `Reauth(ctx)` forces a refresh regardless of the current token's freshness by zeroing `s.cur` and calling `Token()`. It applies the same F-L terminal/transient classification as a regular refresh failure.
+`*smart.Source` implements `Reauther`. When a `refresh_token` is present, `Reauth(ctx)` forces a refresh regardless of the current token's freshness by marking `s.cur` stale and calling `Token()`, applying the same F-L terminal/transient classification as a regular refresh failure. When **no** `refresh_token` is available there is nothing to exchange, so `Reauth` does not discard a cached token that is still within its `ExpiresAt` (a wire 401 may be scope-related, and a public client has no other credential); it returns `auth.ErrReauthRequired`, clearing the cached token only when it is already past `ExpiresAt`.
 
 **`ReautherFunc` adapter.**
 ```go
