@@ -82,8 +82,8 @@ func TestCapabilitiesDecodesCassette(t *testing.T) {
 	if meta == nil {
 		t.Fatal("expected non-nil metadata")
 	}
-	if captured.Method != http.MethodGet {
-		t.Errorf("method = %q, want GET", captured.Method)
+	if captured.Method != http.MethodOptions {
+		t.Errorf("method = %q, want OPTIONS", captured.Method)
 	}
 	if captured.URL.Path != "/openehr/v1/" {
 		t.Errorf("path = %q, want /openehr/v1/", captured.URL.Path)
@@ -272,7 +272,8 @@ func TestHealthIsAnonymous(t *testing.T) {
 		_, _ = w.Write([]byte(`{"solution":"x"}`))
 	}))
 	defer srv.Close()
-	c, _ := transport.New(newCatalog(t, srv),
+	c, _ := transport.New(
+		newCatalog(t, srv),
 		transport.WithHTTPClient(srv.Client()),
 		transport.WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "should-not-leak", Type: "Bearer"})),
 	)

@@ -468,7 +468,7 @@ func TestCreateSendsAuditAndPreferHeaders(t *testing.T) {
 		demographic.WithAuditDetails(audit)); err != nil {
 		t.Fatal(err)
 	}
-	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `system_id="cdr.example"`) {
 		t.Errorf("openehr-audit-details header = %q", h)
 	}
 	if h := captured.Header.Get("Prefer"); h != "return=minimal" {
@@ -526,7 +526,7 @@ func TestDeleteSendsAuditDetails(t *testing.T) {
 		demographic.WithDeleteAudit(audit)); err != nil {
 		t.Fatal(err)
 	}
-	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `system_id="cdr.example"`) {
 		t.Errorf("openehr-audit-details header = %q", h)
 	}
 }

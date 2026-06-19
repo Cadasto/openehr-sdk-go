@@ -265,6 +265,7 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 		{"403", "403.json", 403, ErrForbidden},
 		{"409", "409.json", 409, ErrVersionConflict},
 		{"412", "412.json", 412, ErrPreconditionFailed},
+		{"422", "422.json", 422, ErrUnprocessable},
 		{"428", "428.json", 428, ErrPreconditionRequired},
 		{"400", "400.json", 400, nil}, // no sentinel; pure WireError
 	}

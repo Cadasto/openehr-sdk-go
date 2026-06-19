@@ -213,7 +213,8 @@ func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
 		IsQueryable:     true,
 		Subject:         rm.PartySelf{},
 	}
-	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+	out, meta, err := ehrstatus.Put(
+		context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -245,7 +246,8 @@ func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 		IsQueryable:     true,
 		Subject:         rm.PartySelf{},
 	}
-	out, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+	out, meta, err := ehrstatus.Put(
+		context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -310,7 +312,8 @@ func TestPutWithAuditDetails(t *testing.T) {
 		},
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
-	if _, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
+	if _, _, err := ehrstatus.Put(
+		context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
 		ehrstatus.WithAuditDetails(audit),
 	); err != nil {
 		t.Fatal(err)
@@ -319,7 +322,7 @@ func TestPutWithAuditDetails(t *testing.T) {
 	if header == "" {
 		t.Fatal("openehr-audit-details header not set")
 	}
-	if !contains(header, `"system_id":"cdr.example"`) {
+	if !contains(header, `system_id="cdr.example"`) {
 		t.Errorf("audit header = %q", header)
 	}
 }

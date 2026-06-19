@@ -134,7 +134,8 @@ func TestUploadTemplateWithVersion(t *testing.T) {
 		_, _ = w.Write(readCassette(t, "template_metadata.json"))
 	}))
 	defer srv.Close()
-	if _, _, err := definition.UploadTemplate(context.Background(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt),
+	if _, _, err := definition.UploadTemplate(
+		context.Background(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt),
 		definition.WithUploadVersion("2"),
 	); err != nil {
 		t.Fatal(err)
@@ -258,22 +259,32 @@ func TestExampleComposition(t *testing.T) {
 	if comp == nil {
 		t.Fatal("nil Composition")
 	}
-	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/body_weight.v1/example_composition" {
+	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/body_weight.v1/example" {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
 }
 
-func TestExampleCompositionWithFormat(t *testing.T) {
+func TestExampleCompositionWithParams(t *testing.T) {
+	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("format"); got != "FLAT" {
-			t.Errorf("?format = %q, want FLAT", got)
-		}
+		captured = r.Clone(r.Context())
 		w.WriteHeader(http.StatusNotImplemented) // we only assert the request shape here
 	}))
 	defer srv.Close()
-	_, _, _ = definition.ExampleComposition(context.Background(), newClient(t, srv), "x", definition.FormatADL14,
-		definition.WithExampleFormat("FLAT"),
+	_, _, _ = definition.ExampleComposition(
+		context.Background(), newClient(t, srv), "x", definition.FormatADL14,
+		definition.WithExampleType(definition.ExampleTypeOutput),
+		definition.WithExampleDetailLevel(definition.ExampleDetailComplete),
 	)
+	if got := captured.URL.Query().Get("type"); got != "output" {
+		t.Errorf("?type = %q, want output", got)
+	}
+	if got := captured.URL.Query().Get("detail_level"); got != "complete" {
+		t.Errorf("?detail_level = %q, want complete", got)
+	}
+	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/x/example" {
+		t.Errorf("path = %q, want …/example", captured.URL.Path)
+	}
 }
 
 func TestTemplateMetadataRoundTrip(t *testing.T) {

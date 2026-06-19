@@ -313,29 +313,66 @@ func DeleteTemplate(ctx context.Context, c *transport.Client, templateID string,
 	return resp.Metadata, nil
 }
 
+// ExampleType selects the kind of example the deployment synthesises:
+// ExampleTypeInput (ready to submit to the repository) or
+// ExampleTypeOutput (as it would appear when retrieved). Maps to the
+// `type` query parameter; when unset the spec default ("input") applies.
+type ExampleType string
+
+const (
+	// ExampleTypeInput requests an example ready to be submitted.
+	ExampleTypeInput ExampleType = "input"
+	// ExampleTypeOutput requests an example as it appears on retrieval.
+	ExampleTypeOutput ExampleType = "output"
+)
+
+// ExampleDetailLevel selects how complete the generated example is. Maps
+// to the `detail_level` query parameter; when unset the spec default
+// ("required") applies.
+type ExampleDetailLevel string
+
+const (
+	// ExampleDetailRequired populates only required data points.
+	ExampleDetailRequired ExampleDetailLevel = "required"
+	// ExampleDetailMedium populates a medium level of detail.
+	ExampleDetailMedium ExampleDetailLevel = "medium"
+	// ExampleDetailComplete populates the most complete example.
+	ExampleDetailComplete ExampleDetailLevel = "complete"
+)
+
 // exampleConfig is the resolved option set for [ExampleComposition].
 type exampleConfig struct {
-	format string
+	exampleType string
+	detailLevel string
 }
 
 // ExampleOption mutates [ExampleComposition]'s request shape.
 type ExampleOption func(*exampleConfig)
 
-// WithExampleFormat overrides the `format` query parameter the SDK
-// requests for the example response. Default is omitted — the
-// deployment chooses its canonical-JSON default. Consumers wanting
-// FLAT or STRUCTURED variants pass them here (and accept that the
-// returned bytes will not decode into [*rm.Composition]).
-func WithExampleFormat(f string) ExampleOption {
-	return func(c *exampleConfig) { c.format = f }
+// WithExampleType sets the `type` query parameter (input or output).
+// Omitted by default — the deployment applies the spec default "input".
+func WithExampleType(t ExampleType) ExampleOption {
+	return func(c *exampleConfig) { c.exampleType = string(t) }
+}
+
+// WithExampleDetailLevel sets the `detail_level` query parameter
+// (required, medium, or complete). Omitted by default — the deployment
+// applies the spec default "required".
+func WithExampleDetailLevel(l ExampleDetailLevel) ExampleOption {
+	return func(c *exampleConfig) { c.detailLevel = string(l) }
 }
 
 // ExampleComposition asks the deployment to synthesise an example
 // COMPOSITION for templateID. The example is typically used by
 // validators and UIs to bootstrap a payload against a known template.
 //
-// Wire: GET /definition/template/{format}/{template_id}/example_composition.
-// Decodes the response body via canjson into a [*rm.Composition].
+// Wire: GET /definition/template/{format}/{template_id}/example with the
+// optional `type` and `detail_level` query parameters (operationId
+// definition_template_adl1.4_example_get —
+// resources/its-rest/definition-validation.openapi.yaml line 225). Decodes
+// the canonical-JSON response body into a [*rm.Composition]; flat /
+// structured / XML negotiation is not reachable through this typed entry
+// point (drop to transport.Client.Do for those).
 func ExampleComposition(ctx context.Context, c *transport.Client, templateID string, format TemplateFormat, opts ...ExampleOption) (*rm.Composition, *transport.Metadata, error) {
 	if !format.IsValid() {
 		return nil, nil, fmt.Errorf("definition.ExampleComposition: %w: format %q is not supported in v1", transport.ErrInvalidConfig, format)
@@ -349,12 +386,19 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID) + "/example_composition",
-		Route:  "/definition/template/{format}/{template_id}/example_composition",
+		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID) + "/example",
+		Route:  "/definition/template/{format}/{template_id}/example",
 		Accept: "application/json",
 	}
-	if cfg.format != "" {
-		req.Query = url.Values{"format": []string{cfg.format}}
+	if cfg.exampleType != "" || cfg.detailLevel != "" {
+		q := url.Values{}
+		if cfg.exampleType != "" {
+			q.Set("type", cfg.exampleType)
+		}
+		if cfg.detailLevel != "" {
+			q.Set("detail_level", cfg.detailLevel)
+		}
+		req.Query = q
 	}
 	out, meta, err := transport.Decode[rm.Composition](ctx, c, req)
 	return out, meta, err
