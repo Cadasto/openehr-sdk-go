@@ -1,0 +1,3235 @@
+openapi: 3.1.0
+info:
+  title: EHRbase API
+  description: >-
+    EHRbase implements the [official openEHR REST
+    API](https://specifications.openehr.org/releases/ITS-REST/latest/).
+    Additionally, EHRbase provides a custom `status` heartbeat endpoint, an
+    [Admin API](https://docs.ehrbase.org/docs/EHRbase/Explore/Admin-REST) (if
+    activated) and a [Status and Metrics
+    API](https://docs.ehrbase.org/docs/EHRbase/Explore/Status-And-Metrics) (if
+    activated) for monitoring and maintenance.  Note: The openEHR REST API is
+    documented in their official documentation, not here. Please refer to their
+    separate documentation.
+  license:
+    name: Apache 2.0
+    url: https://github.com/ehrbase/ehrbase/blob/develop/LICENSE.md
+  version: v1
+externalDocs:
+  description: EHRbase Documentation
+  url: https://docs.ehrbase.org/
+servers:
+  - url: http://localhost:8080/ehrbase
+    description: Generated server url
+paths:
+  /rest/openehr/v1/ehr/{ehr_id}:
+    get:
+      tags:
+        - EHR
+      summary: Get EHR by id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#tag/EHR/operation/ehr_get_by_id
+      operationId: getEhrById
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            OK, is returned when the requested EHR resource is successfully
+            retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '404':
+          description: >-
+            Not Found, is returned when an EHR with <code>ehr_id</code>  does
+            not exist.
+    put:
+      tags:
+        - EHR
+      summary: Create EHR with id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/1.0.3/ehr.html#tag/EHR/operation/ehr_get_by_id
+      operationId: createEhrWithId
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/EHR'
+            example:
+              archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+              name:
+                value: EHR status
+              uid:
+                _type: OBJECT_VERSION_ID
+                value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+              subject:
+                _type: PARTY_SELF
+              is_queryable: true
+              is_modifiable: true
+      responses:
+        '201':
+          description: >-
+            Created, is returned when the EHR has been successfully created. The
+            new EHR resource is returned in the body when the request's
+            <code>Prefer</code> header value is
+            <code>return=representation</code> , otherwise only headers are
+            returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '400':
+          description: >-
+            Bad Request, is returned when the request URL or body (if provided)
+            could not be parsed or has invalid content.
+        '409':
+          description: >-
+            Conflict, Unable to create a new EHR due to a conflict with an
+            already existing EHR with the same subject id, namespace pair,
+            whenever EHR_STATUS is supplied.
+  /rest/openehr/v1/ehr/{ehr_id}/ehr_status:
+    get:
+      tags:
+        - EHR_STATUS
+      summary: Get EHR_STATUS version by time
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-ehr_status-get
+      operationId: getEhrStatusVersionByTime
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version_at_time
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            OK, is returned when the requested EHR_STATUS is successfully
+            retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR_STATUS'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '400':
+          description: >-
+            Bad Request, is returned when the request has invalid content such
+            as an invalid <code>version_at_time</code> format.
+        '404':
+          description: >-
+            Not Found, is returned when an EHR with <code>ehr_id</code> does not
+            exist, or when a version of the resource identified by the request
+            parameters (at specified <code>version_at_time</code>) does not
+            exist.
+    put:
+      tags:
+        - EHR_STATUS
+      summary: Update EHR_STATUS
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-ehr_status-put
+      operationId: updateEhrStatus
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/EHR_STATUS'
+            example:
+              archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+              name:
+                value: EHR status
+              uid:
+                _type: OBJECT_VERSION_ID
+                value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+              subject:
+                _type: PARTY_SELF
+              is_queryable: true
+              is_modifiable: true
+        required: true
+      responses:
+        '200':
+          description: >-
+            OK, is returned when the EHR_STATUS is successfully updated, and the
+            updated resource is returned in the body when <code>Prefer</code>
+            header value is <code>return=representation</code>.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR_STATUS'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '204':
+          description: >-
+            No Content, is returned when the <code>Prefer</code> header is
+            missing or is set to <code>return=minimal</code>
+        '400':
+          description: >-
+            Bad Request, is returned when the request URL or body (if provided)
+            could not be parsed or has invalid content.
+        '404':
+          description: >-
+            Not Found, is returned when an EHR with <code>ehr_id</code> does not
+            exist.
+        '412':
+          description: >-
+            Precondition Failed, is returned when <code>If-Match</code> request
+            header doesn't match the latest version on the service side. Returns
+            also latest <code>version_uid</code> in the <code>Location</code>
+            and <codeETag></code> headers.
+  /rest/openehr/v1/ehr/{ehr_id}/directory:
+    get:
+      tags:
+        - DIRECTORY
+      summary: Get folder in directory version at time
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#directory-directory-get-1
+      operationId: getFolderInDirectoryVersionAtTime
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version_at_time
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: path
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            default: application/json
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '204':
+          description: No Content
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+    put:
+      tags:
+        - DIRECTORY
+      summary: Update directory
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#directory-directory-put
+      operationId: updateDirectory
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectVersionId'
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            default: application/json
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+            default: return=minimal
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Folder'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '204':
+          description: No Content
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '400':
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '412':
+          description: Precondition Failed
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+    post:
+      tags:
+        - DIRECTORY
+      summary: Create directory
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#directory-directory-post
+      operationId: createDirectory
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            default: application/json
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+            default: return=minimal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Folder'
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '400':
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+    delete:
+      tags:
+        - DIRECTORY
+      summary: Delete directory
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#directory-directory-delete
+      operationId: deleteDirectory
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            default: application/json
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectVersionId'
+      responses:
+        '204':
+          description: No Content
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '400':
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '412':
+          description: Precondition Failed
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+  /rest/openehr/v1/ehr/{ehr_id}/composition/{versioned_object_uid}:
+    get:
+      tags:
+        - COMPOSITION
+      summary: Get composition at time
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-composition-get
+      operationId: getComposition
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Composition format
+          required: false
+          schema:
+            type: string
+            enum:
+              - JSON
+              - XML
+              - STRUCTURED
+              - FLAT
+        - name: version_at_time
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: object
+            application/openehr.wt.flat.schema+json:
+              schema:
+                type: object
+            application/openehr.wt.structured.schema+json:
+              schema:
+                type: object
+    put:
+      tags:
+        - COMPOSITION
+      summary: Update composition
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-composition-put
+      operationId: updateComposition
+      parameters:
+        - name: openehrVersion
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: If-Match
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: templateId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Composition format
+          required: false
+          schema:
+            type: string
+            enum:
+              - JSON
+              - XML
+              - STRUCTURED
+              - FLAT
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+          application/xml:
+            schema:
+              type: string
+          application/openehr.wt.flat.schema+json:
+            schema:
+              type: string
+          application/openehr.wt.structured.schema+json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+            application/xml:
+              schema:
+                type: string
+            application/openehr.wt.flat.schema+json:
+              schema:
+                type: string
+            application/openehr.wt.structured.schema+json:
+              schema:
+                type: string
+  /rest/openehr/v1/definition/query/{qualified_query_name}/{version}:
+    get:
+      tags:
+        - STORED_QUERY
+      summary: Get stored query and info/metadata
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-get-1
+      operationId: getStoredQueryVersion
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+    put:
+      tags:
+        - STORED_QUERY
+      summary: Store a query
+      description: >-
+        Content type application/json is still supported but it's deprecated,
+        please use text/plain instead.
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-put
+      operationId: putStoredQuery
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: AQL
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+  /rest/openehr/v1/definition/query/{qualified_query_name}:
+    get:
+      tags:
+        - STORED_QUERY
+      summary: List stored queries
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-get
+      operationId: getStoredQueryList
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionListResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionListResponseData'
+    put:
+      tags:
+        - STORED_QUERY
+      summary: Store a query
+      description: >-
+        Content type application/json is still supported but it's deprecated,
+        please use text/plain instead.
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-put
+      operationId: putStoredQuery_1
+      parameters:
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: AQL
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionResponseData'
+  /rest/openehr/v1/query/{qualified_query_name}/{version}:
+    get:
+      tags:
+        - QUERY
+      summary: Execute stored query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-get-1
+      operationId: executeStoredQuery
+      parameters:
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: fetch
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+    post:
+      tags:
+        - QUERY
+      summary: Execute stored query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-post-1
+      operationId: executeStoredQuery_1
+      parameters:
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+          application/xml:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+  /rest/openehr/v1/query/{qualified_query_name}:
+    get:
+      tags:
+        - QUERY
+      summary: Execute stored query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-get-1
+      operationId: executeStoredQuery_2
+      parameters:
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: fetch
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+    post:
+      tags:
+        - QUERY
+      summary: Execute stored query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-post-1
+      operationId: executeStoredQuery_3
+      parameters:
+        - name: qualified_query_name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+          application/xml:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+  /rest/openehr/v1/query/aql:
+    get:
+      tags:
+        - QUERY
+      summary: Execute ad-hoc (non-stored) AQL query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-get
+      operationId: executeAdHocQuery
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: fetch
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int32
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+    post:
+      tags:
+        - QUERY
+      summary: Execute ad-hoc (non-stored) AQL query
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/query.html#query-execute-query-post
+      operationId: executeAdHocQuery_1
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+          application/xml:
+            schema:
+              type: object
+              additionalProperties:
+                type: object
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryResponseData'
+  /rest/openehr/v1/ehr:
+    get:
+      tags:
+        - EHR
+      summary: Get EHR summary by subject id and namespace
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#tag/EHR/operation/ehr_get_by_subject
+      operationId: getEhrBySubject
+      parameters:
+        - name: subject_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: subject_namespace
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            OK, is returned when the requested EHR resource is successfully
+            retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '404':
+          description: >-
+            Not Found, is returned when an EHR with supplied subject parameters
+            does not exist.
+    post:
+      tags:
+        - EHR
+      summary: Create EHR
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#tag/EHR/operation/ehr_create
+      operationId: createEhr
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+            default: return=minimal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/EHR'
+            example:
+              archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+              name:
+                value: EHR status
+              uid:
+                _type: OBJECT_VERSION_ID
+                value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+              subject:
+                _type: PARTY_SELF
+              is_queryable: true
+              is_modifiable: true
+      responses:
+        '201':
+          description: >-
+            Created, is returned when the EHR has been successfully created. The
+            new EHR resource is returned in the body when the request's
+            <code>Prefer</code>  header value is
+            <code>return=representation</code> , otherwise only headers are
+            returned.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '400':
+          description: >-
+            Bad Request, is returned when the request URL or body (if provided)
+            could not be parsed or has invalid content.
+        '409':
+          description: >-
+            Conflict, Unable to create a new EHR due to a conflict with an
+            already existing EHR with the same subject id, namespace pair,
+            whenever EHR_STATUS is supplied.
+  /rest/openehr/v1/ehr/{ehr_id}/contribution:
+    post:
+      tags:
+        - CONTRIBUTION
+      summary: Create contribution
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#contribution-contribution-post
+      operationId: createContribution
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              type: string
+          application/json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: object
+  /rest/openehr/v1/ehr/{ehr_id}/composition:
+    post:
+      tags:
+        - COMPOSITION
+      summary: Create composition
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-composition-post
+      operationId: createComposition
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: templateId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Composition format
+          required: false
+          schema:
+            type: string
+            enum:
+              - JSON
+              - XML
+              - STRUCTURED
+              - FLAT
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+          application/xml:
+            schema:
+              type: string
+          application/openehr.wt.flat.schema+json:
+            schema:
+              type: string
+          application/openehr.wt.structured.schema+json:
+            schema:
+              type: string
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: string
+            application/xml:
+              schema:
+                type: string
+            application/openehr.wt.flat.schema+json:
+              schema:
+                type: string
+            application/openehr.wt.structured.schema+json:
+              schema:
+                type: string
+  /rest/openehr/v1/definition/template/adl2:
+    get:
+      tags:
+        - ADL 2 TEMPLATE
+      summary: List templates
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definition.html#tag/ADL2/operation/definition_template_adl2_get
+      operationId: getTemplatesNew
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateResponseData'
+    post:
+      tags:
+        - ADL 2 TEMPLATE
+      summary: Upload a template
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definition.html#tag/ADL2/operation/definition_template_adl2_upload
+      operationId: createTemplateNew
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Content-Type
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/TemplateResponseData'
+  /rest/openehr/v1/definition/template/adl1.4:
+    get:
+      tags:
+        - ADL 1.4 TEMPLATE
+      summary: List templates
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definition.html#tag/ADL1.4/operation/definition_template_adl1.4_list
+      operationId: getTemplatesClassic
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateMetaDataDto'
+            application/xml:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TemplateMetaDataDto'
+    post:
+      tags:
+        - ADL 1.4 TEMPLATE
+      summary: Upload a template
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definition.html#tag/ADL1.4/operation/definition_template_adl1.4_upload
+      operationId: createTemplateClassic
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              type: string
+        required: true
+      responses:
+        '201':
+          description: Created
+          content:
+            application/xml:
+              schema:
+                type: string
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_ehr_status:
+    get:
+      tags:
+        - VERSIONED_EHR_STATUS
+      summary: Get versioned EHR_STATUS
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-versioned_ehr_status-get
+      operationId: retrieveVersionedEhrStatusByEhr
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VERSIONED_EHR_STATUS'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/VERSIONED_EHR_STATUS'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_ehr_status/version:
+    get:
+      tags:
+        - VERSIONED_EHR_STATUS
+      summary: Get versioned EHR_STATUS version by time
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-versioned_ehr_status-get-2
+      operationId: retrieveVersionOfEhrStatusByTime
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version_at_time
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataEhrStatusDto'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataEhrStatusDto'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_ehr_status/version/{version_uid}:
+    get:
+      tags:
+        - VERSIONED_EHR_STATUS
+      summary: Get versioned EHR_STATUS version by id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-versioned_ehr_status-get-3
+      operationId: retrieveVersionOfEhrStatusByVersionUid
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataEhrStatusDto'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataEhrStatusDto'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_ehr_status/revision_history:
+    get:
+      tags:
+        - VERSIONED_EHR_STATUS
+      summary: Get versioned EHR_STATUS revision history
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-versioned_ehr_status-get-1
+      operationId: retrieveVersionedEhrStatusRevisionHistoryByEhr
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevisionHistoryItem'
+            application/xml:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevisionHistoryItem'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_composition/{versioned_object_uid}:
+    get:
+      tags:
+        - VERSIONED_COMPOSITION
+      summary: Get versioned composition
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-versioned_composition-get
+      operationId: retrieveVersionedCompositionByVersionedObjectUid
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VERSIONED_COMPOSITION'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/VERSIONED_COMPOSITION'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_composition/{versioned_object_uid}/version:
+    get:
+      tags:
+        - VERSIONED_COMPOSITION
+      summary: Get versioned composition version at time
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-versioned_ehr_status-get-3
+      operationId: retrieveVersionOfCompositionByTime
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version_at_time
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataComposition'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataComposition'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_composition/{versioned_object_uid}/version/{version_uid}:
+    get:
+      tags:
+        - VERSIONED_COMPOSITION
+      summary: Get versioned composition version by id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-versioned_composition-get-2
+      operationId: retrieveVersionOfCompositionByVersionUid
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataComposition'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/OriginalVersionResponseDataComposition'
+  /rest/openehr/v1/ehr/{ehr_id}/versioned_composition/{versioned_object_uid}/revision_history:
+    get:
+      tags:
+        - VERSIONED_COMPOSITION
+      summary: Get versioned composition revision history
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-versioned_composition-get-1
+      operationId: retrieveVersionedCompositionRevisionHistoryByEhr
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: versioned_object_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevisionHistoryItem'
+            application/xml:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RevisionHistoryItem'
+  /rest/openehr/v1/ehr/{ehr_id}/ehr_status/{version_uid}:
+    get:
+      tags:
+        - EHR_STATUS
+      summary: Get EHR_STATUS by version id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#ehr_status-ehr_status-get-1
+      operationId: getEhrStatusByVersionId
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: >-
+            OK, is returned when the requested EHR_STATUS is successfully
+            retrieved.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EHR_STATUS'
+              example:
+                archetype_node_id: openEHR-EHR-EHR_STATUS.generic.v1
+                name:
+                  value: EHR status
+                uid:
+                  _type: OBJECT_VERSION_ID
+                  value: 9e3eb79b-1caa-4ab9-8cd4-d374b7c42bb4::local.ehrbase.org::1
+                subject:
+                  _type: PARTY_SELF
+                is_queryable: true
+                is_modifiable: true
+        '404':
+          description: >-
+            Not Found, is returned when an EHR with <code>ehr_id</code> does not
+            exist, or when the <code>version_uid</code> does not exist.
+  /rest/openehr/v1/ehr/{ehr_id}/directory/{version_uid}:
+    get:
+      tags:
+        - DIRECTORY
+      summary: Get folder in directory version
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#directory-directory-get
+      operationId: getFolderInDirectory
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: version_uid
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ObjectVersionId'
+        - name: path
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+            default: application/json
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+        '404':
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/DirectoryResponseData'
+  /rest/openehr/v1/ehr/{ehr_id}/contribution/{contribution_uid}:
+    get:
+      tags:
+        - CONTRIBUTION
+      summary: Get contribution by id
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#contribution-contribution-get
+      operationId: getContribution
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: contribution_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: object
+  /rest/openehr/v1/definition/template/adl2/{template_id}/{version_pattern}:
+    get:
+      tags:
+        - ADL 2 TEMPLATE
+      summary: Get template
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-get-1
+      operationId: getTemplateNew
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version_pattern
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                $ref: '#/components/schemas/TemplateResponseData'
+  /rest/openehr/v1/definition/template/adl1.4/{template_id}:
+    get:
+      tags:
+        - ADL 1.4 TEMPLATE
+      summary: Get template
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definition.html#tag/ADL1.4/operation/definition_template_adl1.4_get
+      operationId: getTemplateClassic
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/xml:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/openehr.wt+json:
+              schema:
+                type: object
+  /rest/openehr/v1/definition/template/adl1.4/{template_id}/webtemplate:
+    get:
+      tags:
+        - TEMPLATE
+      summary: Deprecated since 2.2.0 and marked for removal
+      description: >-
+        Replaced by
+        [/rest/openehr/v1/definition/template/adl1.4/{template_id}](./index.html?urls.primaryName=1.%20openEHR%20API#/ADL%201.4%20TEMPLATE/getTemplateClassic)
+      operationId: getWebTemplate
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebTemplate'
+            application/openehr.wt+json:
+              schema:
+                $ref: '#/components/schemas/WebTemplate'
+      deprecated: true
+  /rest/openehr/v1/definition/template/adl1.4/{template_id}/example:
+    get:
+      tags:
+        - ADL 1.4 TEMPLATE
+      summary: Get an example composition for the specified template
+      operationId: getTemplateExample
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: template_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: format
+          in: query
+          description: Composition format
+          required: false
+          schema:
+            type: string
+            enum:
+              - JSON
+              - XML
+              - STRUCTURED
+              - FLAT
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+            application/xml:
+              schema:
+                type: string
+            application/openehr.wt.structured.schema+json:
+              schema:
+                type: string
+            application/openehr.wt.flat.schema+json:
+              schema:
+                type: string
+  /rest/openehr/v1/definition/query:
+    get:
+      tags:
+        - STORED_QUERY
+      summary: List stored queries
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/definitions.html#definitions-stored-query-get
+      operationId: getStoredQueryList_1
+      parameters:
+        - name: Accept
+          in: header
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionListResponseData'
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/QueryDefinitionListResponseData'
+  /rest/openehr/v1/ehr/{ehr_id}/composition/{preceding_version_uid}:
+    delete:
+      tags:
+        - COMPOSITION
+      summary: Delete composition
+      externalDocs:
+        url: >-
+          https://specifications.openehr.org/releases/ITS-REST/latest/ehr.html#composition-composition-delete
+      operationId: deleteComposition
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: preceding_version_uid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: No Content
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: object
+            application/openehr.wt.flat.schema+json:
+              schema:
+                type: object
+            application/openehr.wt.structured.schema+json:
+              schema:
+                type: object
+components:
+  schemas:
+    ArchetypeID:
+      type: object
+      properties:
+        qualified_rm_entity:
+          type: string
+          writeOnly: true
+        domain_concept:
+          type: string
+          writeOnly: true
+        rm_originator:
+          type: string
+          writeOnly: true
+        rm_name:
+          type: string
+          writeOnly: true
+        rm_entity:
+          type: string
+          writeOnly: true
+        specialisation:
+          type: string
+        versionId:
+          type: string
+        value:
+          type: string
+        namespace:
+          type: string
+        qualifiedRmEntity:
+          type: string
+        domainConcept:
+          type: string
+        rmOriginator:
+          type: string
+        rmName:
+          type: string
+        rmEntity:
+          type: string
+        semanticId:
+          type: string
+        fullId:
+          type: string
+    Archetyped:
+      type: object
+      properties:
+        archetypeId:
+          $ref: '#/components/schemas/ArchetypeID'
+        templateId:
+          $ref: '#/components/schemas/TemplateId'
+        rmVersion:
+          type: string
+    AuditDetails:
+      type: object
+      properties:
+        systemId:
+          type: string
+        timeCommitted:
+          $ref: '#/components/schemas/DvDateTime'
+        changeType:
+          $ref: '#/components/schemas/DvCodedText'
+        description:
+          $ref: '#/components/schemas/DvText'
+        committer:
+          $ref: '#/components/schemas/PartyProxy'
+    CodePhrase:
+      type: object
+      properties:
+        terminologyId:
+          $ref: '#/components/schemas/TerminologyId'
+        codeString:
+          type: string
+        preferredTerm:
+          type: string
+    Composition:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetypeNodeId:
+          type: string
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetypeDetails:
+          $ref: '#/components/schemas/Archetyped'
+        feederAudit:
+          $ref: '#/components/schemas/FeederAudit'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        language:
+          $ref: '#/components/schemas/CodePhrase'
+        territory:
+          $ref: '#/components/schemas/CodePhrase'
+        category:
+          $ref: '#/components/schemas/DvCodedText'
+        composer:
+          $ref: '#/components/schemas/PartyProxy'
+        context:
+          $ref: '#/components/schemas/EventContext'
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContentItem'
+        path:
+          type: string
+    CompositionDto:
+      type: object
+      properties:
+        composition:
+          $ref: '#/components/schemas/Composition'
+        templateId:
+          type: string
+        uuid:
+          type: string
+          format: uuid
+        ehrId:
+          type: string
+          format: uuid
+    ContentItem:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetypeNodeId:
+          type: string
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetypeDetails:
+          $ref: '#/components/schemas/Archetyped'
+        feederAudit:
+          $ref: '#/components/schemas/FeederAudit'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        path:
+          type: string
+    ContributionDto:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        objectReferences:
+          type: object
+          additionalProperties:
+            type: string
+        auditDetails:
+          $ref: '#/components/schemas/AuditDetails'
+    DvCodedText:
+      type: object
+      properties:
+        value:
+          type: string
+        hyperlink:
+          $ref: '#/components/schemas/DvURI'
+        formatting:
+          type: string
+        language:
+          $ref: '#/components/schemas/CodePhrase'
+        encoding:
+          $ref: '#/components/schemas/CodePhrase'
+        definingCode:
+          $ref: '#/components/schemas/CodePhrase'
+    DvDateTime:
+      type: object
+      properties:
+        normalStatus:
+          $ref: '#/components/schemas/CodePhrase'
+        normalRange:
+          $ref: '#/components/schemas/DvIntervalDvDateTime'
+        otherReferenceRanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceRangeDvDateTime'
+        magnitudeStatus:
+          type: string
+        accuracy:
+          $ref: '#/components/schemas/DvDuration'
+        value:
+          type: object
+    DvDuration:
+      type: object
+      properties:
+        normalStatus:
+          $ref: '#/components/schemas/CodePhrase'
+        normalRange:
+          $ref: '#/components/schemas/DvIntervalDvDuration'
+        otherReferenceRanges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReferenceRangeDvDuration'
+        magnitudeStatus:
+          type: string
+        accuracy:
+          type: number
+          format: double
+        accuracyIsPercent:
+          type: boolean
+        value:
+          type: object
+          properties:
+            units:
+              type: array
+              items:
+                type: object
+                properties:
+                  durationEstimated:
+                    type: boolean
+                  duration:
+                    type: object
+                    properties:
+                      seconds:
+                        type: integer
+                        format: int64
+                      zero:
+                        type: boolean
+                      nano:
+                        type: integer
+                        format: int32
+                      negative:
+                        type: boolean
+                      positive:
+                        type: boolean
+                  timeBased:
+                    type: boolean
+                  dateBased:
+                    type: boolean
+    DvEHRURI:
+      type: object
+      properties:
+        value:
+          type: string
+          format: uri
+    DvEncapsulated:
+      type: object
+      properties:
+        charset:
+          $ref: '#/components/schemas/CodePhrase'
+        language:
+          $ref: '#/components/schemas/CodePhrase'
+    DvIdentifier:
+      type: object
+      properties:
+        issuer:
+          type: string
+        assigner:
+          type: string
+        id:
+          type: string
+        type:
+          type: string
+    DvIntervalDvDateTime:
+      type: object
+      properties:
+        lower:
+          $ref: '#/components/schemas/DvDateTime'
+        upper:
+          $ref: '#/components/schemas/DvDateTime'
+        upperUnbounded:
+          type: boolean
+        lowerIncluded:
+          type: boolean
+        upperIncluded:
+          type: boolean
+        lowerUnbounded:
+          type: boolean
+    DvIntervalDvDuration:
+      type: object
+      properties:
+        lower:
+          $ref: '#/components/schemas/DvDuration'
+        upper:
+          $ref: '#/components/schemas/DvDuration'
+        upperUnbounded:
+          type: boolean
+        lowerIncluded:
+          type: boolean
+        upperIncluded:
+          type: boolean
+        lowerUnbounded:
+          type: boolean
+    DvText:
+      type: object
+      properties:
+        value:
+          type: string
+        hyperlink:
+          $ref: '#/components/schemas/DvURI'
+        formatting:
+          type: string
+        mappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/TermMapping'
+        language:
+          $ref: '#/components/schemas/CodePhrase'
+        encoding:
+          $ref: '#/components/schemas/CodePhrase'
+    DvURI:
+      type: object
+      properties:
+        value:
+          type: string
+          format: uri
+    EHR:
+      type: object
+      properties:
+        system_id:
+          $ref: '#/components/schemas/HierObjectId'
+        ehr_id:
+          $ref: '#/components/schemas/HierObjectId'
+        ehr_status:
+          $ref: '#/components/schemas/EHR_STATUS'
+        time_created:
+          $ref: '#/components/schemas/DvDateTime'
+        compositions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CompositionDto'
+        contributions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContributionDto'
+    EHR_STATUS:
+      type: object
+      properties:
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetype_node_id:
+          type: string
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetype_details:
+          $ref: '#/components/schemas/Archetyped'
+        feeder_audit:
+          $ref: '#/components/schemas/FeederAudit'
+        subject:
+          $ref: '#/components/schemas/PartySelf'
+        is_queryable:
+          type: boolean
+        is_modifiable:
+          type: boolean
+        other_details:
+          $ref: '#/components/schemas/ItemStructure'
+        _type:
+          type: string
+      required:
+        - _type
+        - archetype_node_id
+    EventContext:
+      type: object
+      properties:
+        startTime:
+          $ref: '#/components/schemas/DvDateTime'
+        endTime:
+          $ref: '#/components/schemas/DvDateTime'
+        location:
+          type: string
+        setting:
+          $ref: '#/components/schemas/DvCodedText'
+        otherContext:
+          $ref: '#/components/schemas/ItemStructure'
+        healthCareFacility:
+          $ref: '#/components/schemas/PartyIdentified'
+        participations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participation'
+        path:
+          type: string
+        pathSegments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PathSegment'
+    FeederAudit:
+      type: object
+      properties:
+        originatingSystemItemIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/DvIdentifier'
+        feederSystemItemIds:
+          type: array
+          items:
+            $ref: '#/components/schemas/DvIdentifier'
+        originalContent:
+          $ref: '#/components/schemas/DvEncapsulated'
+        originatingSystemAudit:
+          $ref: '#/components/schemas/FeederAuditDetails'
+        feederSystemAudit:
+          $ref: '#/components/schemas/FeederAuditDetails'
+    FeederAuditDetails:
+      type: object
+      properties:
+        systemId:
+          type: string
+        location:
+          $ref: '#/components/schemas/PartyIdentified'
+        provider:
+          $ref: '#/components/schemas/PartyIdentified'
+        subject:
+          $ref: '#/components/schemas/PartyProxy'
+        time:
+          $ref: '#/components/schemas/DvDateTime'
+        versionId:
+          type: string
+        otherDetails:
+          $ref: '#/components/schemas/ItemStructure'
+    HierObjectId:
+      type: object
+      properties:
+        value:
+          type: string
+    Item:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetypeNodeId:
+          type: string
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetypeDetails:
+          $ref: '#/components/schemas/Archetyped'
+        feederAudit:
+          $ref: '#/components/schemas/FeederAudit'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        path:
+          type: string
+    ItemStructure:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetypeNodeId:
+          type: string
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetypeDetails:
+          $ref: '#/components/schemas/Archetyped'
+        feederAudit:
+          $ref: '#/components/schemas/FeederAudit'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        path:
+          type: string
+    Link:
+      type: object
+      properties:
+        meaning:
+          $ref: '#/components/schemas/DvText'
+        type:
+          $ref: '#/components/schemas/DvText'
+        target:
+          $ref: '#/components/schemas/DvEHRURI'
+    ObjectId:
+      type: object
+      properties:
+        value:
+          type: string
+    Participation:
+      type: object
+      properties:
+        function:
+          $ref: '#/components/schemas/DvText'
+        mode:
+          $ref: '#/components/schemas/DvCodedText'
+        time:
+          $ref: '#/components/schemas/DvIntervalDvDateTime'
+        performer:
+          $ref: '#/components/schemas/PartyProxy'
+    PartyIdentified:
+      type: object
+      properties:
+        externalRef:
+          $ref: '#/components/schemas/PartyRef'
+        name:
+          type: string
+        identifiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/DvIdentifier'
+    PartyProxy:
+      type: object
+      properties:
+        externalRef:
+          $ref: '#/components/schemas/PartyRef'
+    PartyRef:
+      type: object
+      properties:
+        namespace:
+          type: string
+        type:
+          type: string
+        id:
+          $ref: '#/components/schemas/ObjectId'
+    PartySelf:
+      type: object
+      properties:
+        externalRef:
+          $ref: '#/components/schemas/PartyRef'
+    PathSegment:
+      type: object
+      properties:
+        nodeName:
+          type: string
+        nodeId:
+          type: string
+        archetypeRef:
+          type: string
+        index:
+          type: integer
+          format: int32
+    ReferenceRangeDvDateTime:
+      type: object
+      properties:
+        range:
+          $ref: '#/components/schemas/DvIntervalDvDateTime'
+        meaning:
+          $ref: '#/components/schemas/DvText'
+    ReferenceRangeDvDuration:
+      type: object
+      properties:
+        range:
+          $ref: '#/components/schemas/DvIntervalDvDuration'
+        meaning:
+          $ref: '#/components/schemas/DvText'
+    TemplateId:
+      type: object
+      properties:
+        value:
+          type: string
+    TermMapping:
+      type: object
+      properties:
+        match:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/DvCodedText'
+        target:
+          $ref: '#/components/schemas/CodePhrase'
+    TerminologyId:
+      type: object
+      properties:
+        value:
+          type: string
+    UIDBasedId:
+      type: object
+      properties:
+        value:
+          type: string
+    ObjectVersionId:
+      type: object
+      properties:
+        value:
+          type: string
+    Folder:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DvText'
+        archetypeNodeId:
+          type: string
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        archetypeDetails:
+          $ref: '#/components/schemas/Archetyped'
+        feederAudit:
+          $ref: '#/components/schemas/FeederAudit'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Link'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectRefObjectId'
+        folders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Folder'
+        details:
+          $ref: '#/components/schemas/ItemStructure'
+        path:
+          type: string
+    ObjectRefObjectId:
+      type: object
+      properties:
+        namespace:
+          type: string
+        type:
+          type: string
+        id:
+          $ref: '#/components/schemas/ObjectId'
+    DirectoryResponseData:
+      type: object
+      properties:
+        uid:
+          $ref: '#/components/schemas/UIDBasedId'
+        folders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Folder'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectRefObjectId'
+        details:
+          $ref: '#/components/schemas/ItemStructure'
+        name:
+          $ref: '#/components/schemas/DvText'
+    QueryDefinitionResponseData:
+      type: object
+      properties:
+        q:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        version:
+          type: string
+        saved:
+          type: string
+    MetaData:
+      type: object
+      properties:
+        _href:
+          type: string
+        _type:
+          type: string
+        _schema_version:
+          type: string
+        _created:
+          type: string
+          format: date-time
+        _generator:
+          type: string
+        _executed_aql:
+          type: string
+    QueryResponseData:
+      type: object
+      properties:
+        meta:
+          $ref: '#/components/schemas/MetaData'
+        q:
+          type: string
+        name:
+          type: string
+        columns:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
+        rows:
+          type: array
+          items:
+            type: array
+            items:
+              type: object
+    TemplateResponseData:
+      type: object
+    VERSIONED_EHR_STATUS:
+      type: object
+      properties:
+        uid:
+          $ref: '#/components/schemas/HierObjectId'
+        owner_id:
+          $ref: '#/components/schemas/ObjectRefObjectId'
+        time_created:
+          type: string
+        _type:
+          type: string
+    Attestation:
+      type: object
+      properties:
+        systemId:
+          type: string
+        timeCommitted:
+          $ref: '#/components/schemas/DvDateTime'
+        changeType:
+          $ref: '#/components/schemas/DvCodedText'
+        description:
+          $ref: '#/components/schemas/DvText'
+        committer:
+          $ref: '#/components/schemas/PartyProxy'
+        attestedView:
+          $ref: '#/components/schemas/DvMultimedia'
+        proof:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DvEHRURI'
+        reason:
+          $ref: '#/components/schemas/DvText'
+        pending:
+          type: boolean
+    Contribution:
+      type: object
+      properties:
+        uid:
+          $ref: '#/components/schemas/HierObjectId'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectRefObjectId'
+        audit:
+          $ref: '#/components/schemas/AuditDetails'
+    DvMultimedia:
+      type: object
+      properties:
+        charset:
+          $ref: '#/components/schemas/CodePhrase'
+        language:
+          $ref: '#/components/schemas/CodePhrase'
+        alternateText:
+          type: string
+        uri:
+          $ref: '#/components/schemas/DvURI'
+        data:
+          type: string
+          format: byte
+        mediaType:
+          $ref: '#/components/schemas/CodePhrase'
+        compressionAlgorithm:
+          $ref: '#/components/schemas/CodePhrase'
+        integrityCheck:
+          type: string
+          format: byte
+        integrityCheckAlgorithm:
+          $ref: '#/components/schemas/CodePhrase'
+        size:
+          type: integer
+          format: int32
+        thumbnail:
+          $ref: '#/components/schemas/DvMultimedia'
+    OriginalVersionResponseDataEhrStatusDto:
+      type: object
+      properties:
+        contribution:
+          $ref: '#/components/schemas/Contribution'
+        signature:
+          type: string
+        attestations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attestation'
+        data:
+          $ref: '#/components/schemas/EHR_STATUS'
+        _type:
+          type: string
+        uid:
+          $ref: '#/components/schemas/ObjectVersionId'
+        commit_audit:
+          $ref: '#/components/schemas/AuditDetails'
+        preceding_version_uid:
+          $ref: '#/components/schemas/ObjectVersionId'
+        other_input_version_uids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectVersionId'
+        lifecycle_state:
+          $ref: '#/components/schemas/DvCodedText'
+    RevisionHistoryItem:
+      type: object
+      properties:
+        versionId:
+          $ref: '#/components/schemas/ObjectVersionId'
+        audits:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditDetails'
+    VERSIONED_COMPOSITION:
+      type: object
+      properties:
+        uid:
+          $ref: '#/components/schemas/HierObjectId'
+        owner_id:
+          $ref: '#/components/schemas/ObjectRefObjectId'
+        time_created:
+          type: string
+        _type:
+          type: string
+    OriginalVersionResponseDataComposition:
+      type: object
+      properties:
+        contribution:
+          $ref: '#/components/schemas/Contribution'
+        signature:
+          type: string
+        attestations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attestation'
+        data:
+          $ref: '#/components/schemas/Composition'
+        _type:
+          type: string
+        uid:
+          $ref: '#/components/schemas/ObjectVersionId'
+        commit_audit:
+          $ref: '#/components/schemas/AuditDetails'
+        preceding_version_uid:
+          $ref: '#/components/schemas/ObjectVersionId'
+        other_input_version_uids:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectVersionId'
+        lifecycle_state:
+          $ref: '#/components/schemas/DvCodedText'
+    TemplateMetaDataDto:
+      type: object
+      properties:
+        concept:
+          type: string
+        template_id:
+          type: string
+        archetype_id:
+          type: string
+        created_timestamp:
+          type: string
+          format: date-time
+    WebTemplate:
+      type: object
+      properties:
+        templateId:
+          type: string
+        version:
+          type: string
+        defaultLanguage:
+          type: string
+        languages:
+          type: array
+          items:
+            type: string
+        tree:
+          $ref: '#/components/schemas/WebTemplateNode'
+    WebTemplateAnnotation:
+      type: object
+      properties:
+        comment:
+          type: string
+    WebTemplateInput:
+      type: object
+      properties:
+        suffix:
+          type: string
+        type:
+          type: string
+        list:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebTemplateInputValue'
+        listOpen:
+          type: boolean
+        validation:
+          $ref: '#/components/schemas/WebTemplateValidation'
+        terminology:
+          type: string
+        defaultValue:
+          type: string
+    WebTemplateInputValue:
+      type: object
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        localizedLabels:
+          type: object
+          additionalProperties:
+            type: string
+        localizedDescriptions:
+          type: object
+          additionalProperties:
+            type: string
+        termBindings:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/WebTemplateTerminology'
+        ordinal:
+          type: integer
+          format: int32
+        currentStates:
+          type: array
+          items:
+            type: string
+        validation:
+          $ref: '#/components/schemas/WebTemplateValidation'
+    WebTemplateInterval:
+      type: object
+      properties:
+        min:
+          type: object
+        minOp:
+          type: string
+          enum:
+            - '>='
+            - '>'
+            - <=
+            - <
+        max:
+          type: object
+        maxOp:
+          type: string
+          enum:
+            - '>='
+            - '>'
+            - <=
+            - <
+    WebTemplateNode:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        localizedName:
+          type: string
+        rmType:
+          type: string
+        nodeId:
+          type: string
+        min:
+          type: integer
+          format: int32
+        max:
+          type: integer
+          format: int32
+        localizedNames:
+          type: object
+          additionalProperties:
+            type: string
+        localizedDescriptions:
+          type: object
+          additionalProperties:
+            type: string
+        aqlPath:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebTemplateNode'
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebTemplateInput'
+        inContext:
+          type: boolean
+        termBindings:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/WebTemplateTerminology'
+        dependsOn:
+          type: array
+          items:
+            type: string
+        annotations:
+          $ref: '#/components/schemas/WebTemplateAnnotation'
+        proportionTypes:
+          type: array
+          items:
+            type: string
+            enum:
+              - ratio
+              - unitary
+              - percent
+              - fraction
+              - integer_fraction
+        cardinalities:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebtemplateCardinality'
+    WebTemplateTerminology:
+      type: object
+      properties:
+        value:
+          type: string
+        terminologyId:
+          type: string
+    WebTemplateValidation:
+      type: object
+      properties:
+        precision:
+          $ref: '#/components/schemas/WebTemplateInterval'
+        range:
+          $ref: '#/components/schemas/WebTemplateInterval'
+        pattern:
+          type: string
+    WebtemplateCardinality:
+      type: object
+      properties:
+        min:
+          type: integer
+          format: int32
+        max:
+          type: integer
+          format: int32
+        ids:
+          type: array
+          items:
+            type: string
+        excludeFromWebTemplate:
+          type: boolean
+    QueryDefinitionListResponseData:
+      type: object
+      properties:
+        versions:
+          type: array
+          items:
+            type: object
+            additionalProperties:
+              type: string
