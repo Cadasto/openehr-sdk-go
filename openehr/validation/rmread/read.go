@@ -164,6 +164,71 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	case rm.DVMultimedia:
 		return readDVMultimediaSingle(&p, attrName)
 
+	case *rm.DVCount:
+		return readDVCountSingle(p, attrName)
+	case rm.DVCount:
+		return readDVCountSingle(&p, attrName)
+
+	case *rm.DVQuantity:
+		return readDVQuantitySingle(p, attrName)
+	case rm.DVQuantity:
+		return readDVQuantitySingle(&p, attrName)
+
+	case *rm.DVProportion:
+		return readDVProportionSingle(p, attrName)
+	case rm.DVProportion:
+		return readDVProportionSingle(&p, attrName)
+
+	case *rm.DVURI:
+		return readDVURISingle(p, attrName)
+	case rm.DVURI:
+		return readDVURISingle(&p, attrName)
+
+	case *rm.DVEHRURI:
+		return readDVEHRURISingle(p, attrName)
+	case rm.DVEHRURI:
+		return readDVEHRURISingle(&p, attrName)
+
+	case *rm.DVParsable:
+		return readDVParsableSingle(p, attrName)
+	case rm.DVParsable:
+		return readDVParsableSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVQuantity]:
+		return readDVIntervalQuantitySingle(p, attrName)
+	case rm.DVInterval[rm.DVQuantity]:
+		return readDVIntervalQuantitySingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVCount]:
+		return readDVIntervalCountSingle(p, attrName)
+	case rm.DVInterval[rm.DVCount]:
+		return readDVIntervalCountSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVDateTime]:
+		return readDVIntervalDateTimeSingle(p, attrName)
+	case rm.DVInterval[rm.DVDateTime]:
+		return readDVIntervalDateTimeSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVDate]:
+		return readDVIntervalDateSingle(p, attrName)
+	case rm.DVInterval[rm.DVDate]:
+		return readDVIntervalDateSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVTime]:
+		return readDVIntervalTimeSingle(p, attrName)
+	case rm.DVInterval[rm.DVTime]:
+		return readDVIntervalTimeSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVProportion]:
+		return readDVIntervalProportionSingle(p, attrName)
+	case rm.DVInterval[rm.DVProportion]:
+		return readDVIntervalProportionSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVOrdered]:
+		return readDVIntervalOrderedSingle(p, attrName)
+	case rm.DVInterval[rm.DVOrdered]:
+		return readDVIntervalOrderedSingle(&p, attrName)
+
 	// --- demographic: PARTY hierarchy + archetypeable sub-components ---
 	case *rm.Person:
 		return readPersonSingle(p, attrName)

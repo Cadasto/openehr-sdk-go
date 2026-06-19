@@ -134,6 +134,9 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
+		if skipNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+			continue
+		}
 		if !g.shouldVisit(attr) {
 			continue
 		}
@@ -270,7 +273,7 @@ func (g *generator) materialiseImplicitSingle(
 		_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), "example")
 		return nil
 	}
-	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		// Unknown RM type — silently skip; the OPT is mis-modelled or
 		// the attribute is outside the current registry, both of
@@ -370,6 +373,37 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Magnitude = 0
 	case *rm.DVQuantity:
 		// Leave zero — the OPT primitive constraint may further pin.
+	case *rm.DVProportion:
+		v.Numerator = 1
+		v.Denominator = 1
+	case *rm.DVURI:
+		v.Value = "http://example.com"
+	case *rm.DVIdentifier:
+		v.ID = "example"
+	case *rm.DVParsable:
+		v.Value = "example"
+		v.Formalism = "text/plain"
+	case *rm.DVInterval[rm.DVQuantity]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVCount]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVDateTime]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVDate]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVTime]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVProportion]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVOrdered]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
 	}
 }
 
@@ -402,6 +436,10 @@ func (g *generator) materialiseMultiple(
 		// to satisfy the slot's occurrences.lower (often 0 — most
 		// slots are optional).
 		if child.IsSlot() {
+			continue
+		}
+		if g.opts.Policy == Minimal && optionalSiblingIDCollides(child, children) &&
+			!firstCollidingOptionalSibling(child, children) {
 			continue
 		}
 		childCount := 1
@@ -530,7 +568,7 @@ func (g *generator) materialiseImplicitMultiple(
 	if rmType == "" {
 		return nil
 	}
-	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		return nil //nolint:nilerr // intentional: defer to validator
 	}
@@ -568,8 +606,7 @@ func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor].
 func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
-	rmType := concreteFor(child.RMTypeName())
-	rmChild, err := rmwrite.NewRM(rmType)
+	rmChild, err := newRMForOPTType(child.RMTypeName())
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
@@ -619,6 +656,8 @@ func concreteFor(rmType string) string {
 		return "DV_DATE_TIME"
 	case "BOOLEAN":
 		return "DV_BOOLEAN"
+	case "INTEGER":
+		return "DV_COUNT"
 	}
 	return rmType
 }
@@ -894,4 +933,65 @@ func toInt64(value any) (int64, bool) {
 		return int64(v), true
 	}
 	return 0, false
+}
+
+// skipNonStorableAttr returns true for BMM function attributes that
+// are not persisted on the wire (e.g. EVENT.offset is derived).
+func skipNonStorableAttr(parentRMType, attrName string) bool {
+	switch parentRMType {
+	case "POINT_EVENT", "INTERVAL_EVENT":
+		return attrName == "offset"
+	case "DV_PROPORTION", "DV_QUANTITY":
+		return attrName == "is_integral"
+	}
+	return false
+}
+
+// optionalSiblingIDCollides reports whether this optional child shares
+// its node_id with another optional sibling under the same attribute.
+func optionalSiblingIDCollides(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
+	if child.IsSlot() {
+		return false
+	}
+	occ := child.Occurrences()
+	if occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
+		return false
+	}
+	id := child.NodeID()
+	if id == "" {
+		return false
+	}
+	count := 0
+	for _, sib := range siblings {
+		if sib.IsSlot() {
+			continue
+		}
+		sibOcc := sib.Occurrences()
+		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
+			continue
+		}
+		if sib.NodeID() == id {
+			count++
+		}
+	}
+	return count > 1
+}
+
+// firstCollidingOptionalSibling is true when child is the first
+// optional sibling among those sharing its node_id.
+func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
+	id := child.NodeID()
+	for _, sib := range siblings {
+		if sib.IsSlot() {
+			continue
+		}
+		sibOcc := sib.Occurrences()
+		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
+			continue
+		}
+		if sib.NodeID() == id {
+			return sib == child
+		}
+	}
+	return false
 }

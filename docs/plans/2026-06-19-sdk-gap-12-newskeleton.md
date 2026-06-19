@@ -1,7 +1,7 @@
 # Plan — Close SDK-GAP-12 (`NewSkeleton` real-world OPT coverage)
 
 **Date:** 2026-06-19  
-**Status:** Draft  
+**Status:** Landed  
 **Owner:** SDK maintainers  
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-example-values) (interval leaves), [REQ-110](../specifications/clinical-modeling.md#req-110--validation-v2) (soundness contract)  
 **Probes:** [PROBE-027](../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  

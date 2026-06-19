@@ -35,6 +35,12 @@ func TestValidateComposition_ConstraintCassettes_NoPrimitiveViolations(t *testin
 		// is asserted positively in
 		// TestValidateComposition_ConstraintCassette_MultimediaViolation.
 		"Test_dv_multimedia_open_constraint.v0": "media_type application/dicom not in closed list [application/pdf]",
+		// OPT pins false_valid=false while the instance carries false.
+		// Surfaced once INTEGER/BOOLEAN AOM short-name channels validate
+		// through DV wrapper scalar attrs (SDK-GAP-12 rmread path).
+		"Test_dv_boolean_true_false.v0": "value false not allowed",
+		// OPT pins magnitude range [10..20] while the instance carries 25.
+		"Test_dv_count_range_constraint.v0": "magnitude 25 outside [10..20]",
 	}
 	for _, id := range ids {
 		if _, skip := constraintViolatingCassettes[id]; skip {

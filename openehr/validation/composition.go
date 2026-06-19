@@ -205,6 +205,20 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 		return "DV_PARSABLE", "", true
 	case *rm.DVProportion, rm.DVProportion:
 		return "DV_PROPORTION", "", true
+	case *rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity]:
+		return "DV_INTERVAL<DV_QUANTITY>", "", true
+	case *rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount]:
+		return "DV_INTERVAL<DV_COUNT>", "", true
+	case *rm.DVInterval[rm.DVDateTime], rm.DVInterval[rm.DVDateTime]:
+		return "DV_INTERVAL<DV_DATE_TIME>", "", true
+	case *rm.DVInterval[rm.DVDate], rm.DVInterval[rm.DVDate]:
+		return "DV_INTERVAL<DV_DATE>", "", true
+	case *rm.DVInterval[rm.DVTime], rm.DVInterval[rm.DVTime]:
+		return "DV_INTERVAL<DV_TIME>", "", true
+	case *rm.DVInterval[rm.DVProportion], rm.DVInterval[rm.DVProportion]:
+		return "DV_INTERVAL<DV_PROPORTION>", "", true
+	case *rm.DVInterval[rm.DVOrdered], rm.DVInterval[rm.DVOrdered]:
+		return "DV_INTERVAL", "", true
 
 	// PartyProxy concretes.
 	case rm.PartySelf, *rm.PartySelf:

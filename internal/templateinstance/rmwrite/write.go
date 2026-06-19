@@ -81,8 +81,28 @@ func EnsureSingle(parent any, _ /* parentType */, attrName string, child any) er
 		return writeDVTemporalValueSingle("DV_DURATION", attrName, child, func(s string) { p.Value = s })
 	case *rm.DVBoolean:
 		return writeDVBooleanSingle(p, attrName, child)
+	case *rm.DVCount:
+		return writeDVCountSingle(p, attrName, child)
+	case *rm.DVQuantity:
+		return writeDVQuantitySingle(p, attrName, child)
+	case *rm.DVMultimedia:
+		return writeDVMultimediaSingle(p, attrName, child)
 	case *rm.CodePhrase:
 		return writeCodePhraseSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVQuantity]:
+		return writeDVIntervalQuantitySingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVCount]:
+		return writeDVIntervalCountSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVDateTime]:
+		return writeDVIntervalDateTimeSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVDate]:
+		return writeDVIntervalDateSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVTime]:
+		return writeDVIntervalTimeSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVProportion]:
+		return writeDVIntervalProportionSingle(p, attrName, child)
+	case *rm.DVInterval[rm.DVOrdered]:
+		return writeDVIntervalOrderedSingle(p, attrName, child)
 	}
 	return fmt.Errorf("%w: parent %T, attr %q", ErrUnknownAttribute, parent, attrName)
 }
@@ -813,7 +833,19 @@ func writeItemTableMultiple(t *rm.ItemTable, attr string, child any) error {
 
 // --- CLUSTER / ELEMENT --------------------------------------------------
 
-func writeClusterSingle(_ *rm.Cluster, attr string, _ any) error {
+func writeClusterSingle(c *rm.Cluster, attr string, child any) error {
+	switch attr {
+	case "name":
+		if v, ok := coerceDVText(child); ok {
+			c.Name = v
+			return nil
+		}
+		if v, ok := coerceDVCodedText(child); ok {
+			c.Name = v
+			return nil
+		}
+		return mismatch(attr, child, "DV_TEXT")
+	}
 	return fmt.Errorf("%w: *rm.Cluster has no single attr %q", ErrUnknownAttribute, attr)
 }
 
@@ -853,6 +885,16 @@ func writeElementSingle(e *rm.Element, attr string, child any) error {
 		}
 		e.NullReason = v
 		return nil
+	case "name":
+		if v, ok := coerceDVText(child); ok {
+			e.Name = v
+			return nil
+		}
+		if v, ok := coerceDVCodedText(child); ok {
+			e.Name = v
+			return nil
+		}
+		return mismatch(attr, child, "DV_TEXT")
 	}
 	return fmt.Errorf("%w: *rm.Element has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -918,6 +960,9 @@ func writeDVCodedTextSingle(t *rm.DVCodedText, attr string, child any) error {
 		if !ok {
 			return mismatch(attr, child, "CODE_PHRASE")
 		}
+		if v.TerminologyID.Value == "" {
+			v.TerminologyID = rm.TerminologyID{Value: "local"}
+		}
 		t.DefiningCode = v
 		return nil
 	}
@@ -932,6 +977,9 @@ func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
 			return mismatch(attr, child, "String")
 		}
 		c.CodeString = v
+		if c.TerminologyID.Value == "" {
+			c.TerminologyID = rm.TerminologyID{Value: "local"}
+		}
 		return nil
 	case "terminology_id":
 		switch v := child.(type) {

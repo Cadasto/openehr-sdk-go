@@ -17,7 +17,7 @@ import (
 // REQ-024: closed switch, no reflection.
 func IsAOMPrimitiveShortName(s string) bool {
 	switch s {
-	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL":
 		return true
 	default:
 		return false
