@@ -747,7 +747,7 @@ requirements:
       - openehr/rm/identification_funcs_test.go
       - openehr/client/ehr/ids_test.go
     plans:
-      - docs/plans/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-06-19-rm-functions.md
 
   - id: REQ-121
     title: Locatable path read access
@@ -761,7 +761,7 @@ requirements:
     tests:
       - openehr/rm/rmpath/rmpath_test.go
     plans:
-      - docs/plans/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-06-19-rm-functions.md
 
   - id: REQ-122
     title: Version-control derived helpers
@@ -775,7 +775,7 @@ requirements:
     tests:
       - openehr/rm/changecontrol_funcs_test.go
     plans:
-      - docs/plans/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-06-19-rm-functions.md
 
   - id: REQ-123
     title: Temporal data-value helpers
@@ -789,7 +789,7 @@ requirements:
     tests:
       - openehr/rm/temporal_funcs_test.go
     plans:
-      - docs/plans/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-06-19-rm-functions.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.

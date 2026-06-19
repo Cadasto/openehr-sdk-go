@@ -1,7 +1,7 @@
 # Plan — RM behavioural functions (identifiers, paths, version-derived, temporal)
 
 **Date:** 2026-06-19
-**Status:** Draft
+**Status:** Landed (2026-06-19)
 **Owner:** SDK maintainers
 **Covers:** [REQ-120](../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation), [REQ-121](../specifications/rm-functions.md#req-121--locatable-path-read-access), [REQ-122](../specifications/rm-functions.md#req-122--version-control-derived-helpers), [REQ-123](../specifications/rm-functions.md#req-123--temporal-data-value-helpers); [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md)
 **Probes:** none — these are in-memory behaviours, unit-tested rather than wire-conformance (consistent with REQ-111).
@@ -40,14 +40,14 @@ The hybrid surface holds, with two refinements forced by Go realities (fold into
 
 | Step | Status |
 |---|---|
-| Generator stub-suppression hook + regenerate (`make codegen-verify`) | |
-| REQ-120 identifier parsing/derivation + client delegation | |
-| REQ-122 version-derived helper | |
-| REQ-121 `rmpath` read access | |
-| REQ-123 temporal helpers | |
-| Tests with `// REQ-120..123` comments | |
-| `traceability.yaml` packages/tests + `REQ.md` Impl. → `landed`; roadmap + CHANGELOG `[Unreleased]` | |
-| `make spec-check` · `make ci` | |
+| Generator stub-suppression hook + regenerate (`make codegen-verify`) | ✅ `56cf692` |
+| REQ-120 identifier parsing/derivation + client delegation | ✅ `40bd4bb` |
+| REQ-122 version-derived helper | ✅ `68a8b41` |
+| REQ-121 `rmpath` read access | ✅ `fe82410` |
+| REQ-123 temporal helpers | ✅ `68e908b` |
+| Tests with `// REQ-120..123` comments | ✅ |
+| `traceability.yaml` packages/tests + `REQ.md` Impl. → `landed`; roadmap + CHANGELOG `[Unreleased]` | ✅ `f3589ed` |
+| `make spec-check` · `make ci` | ✅ green |
 
 ## Phases
 
