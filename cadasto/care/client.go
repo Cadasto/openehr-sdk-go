@@ -404,6 +404,19 @@ func (c *Client) CreateEHRForPerson(ctx context.Context, namespace, externalID, 
 	return created.EHRID.Value, nil
 }
 
+// EHRExists reports whether an EHR with the given id is a real, committable
+// resource on the deployment (HEAD /ehr/{id}). Use this to reject phantom EHR
+// ids: an AQL FROM PERSON CONTAINS EHR can list ehr_ids whose REST resource was
+// never materialised (stale/duplicate crosslinks), and POSTing a composition to
+// such an id fails with 404. A 404 here yields (false, nil) — absence is not an
+// error; only auth/5xx surface as an error.
+func (c *Client) EHRExists(ctx context.Context, ehrID string) (bool, error) {
+	if ehrID == "" {
+		return false, nil
+	}
+	return ehr.Exists(ctx, c.rest, ehr.EHRID(ehrID))
+}
+
 // SaveData writes a datamap payload for a patient under the given template:
 // fetch the OPT from the CDR, encode via the codec, bridge canonical JSON to a
 // typed *rm.Composition, and POST it. Returns the new composition version uid.
