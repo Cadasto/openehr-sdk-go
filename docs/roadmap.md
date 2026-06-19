@@ -98,7 +98,7 @@
 | Definition — ADL 1.4 templates | **Landed** | `openehr/client/definition/` | Upload/list/get/delete, example composition |
 | Definition — stored AQL | **Landed** | `openehr/client/definition/` | Put/get/list/delete; REQ-057 |
 | Definition — ADL 2 | **Planned** | — | Deferred in package docs |
-| Demographic | **Planned** | `openehr/client/demographic/` | `doc.go` only |
+| Demographic | **Landed** | `openehr/client/demographic/` | PARTY hierarchy CRUD (five typed resources) + read-only `versioned_party` family; polymorphic decode via `typereg.DecodeAs[rm.Party]`; PROBE-073. [archived plan](plans/archive/2026-06-14-demographic-rest-client.md) |
 | Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
 
 REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-rest-api-client.md) (archived; this roadmap reflects the tree). Demographic follow-up: [2026-06-14-demographic-rest-client.md](plans/archive/2026-06-14-demographic-rest-client.md).
