@@ -25,7 +25,7 @@ type VersionedObjectID string
 func (v VersionedObjectID) String() string { return string(v) }
 
 // VersionUID identifies a specific version of a versioned resource.
-// Wire form: <uid>::<creating_system_id>::<version_number> per the
+// Wire form: <object_id>::<creating_system_id>::<version_tree_id> per the
 // openEHR ObjectVersionID grammar.
 type VersionUID string
 

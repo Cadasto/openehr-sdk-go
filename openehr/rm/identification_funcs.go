@@ -163,7 +163,7 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has an empty segment", ErrMalformedID, s)
 	}
 	if _, err := ParseVersionTreeID(parts[2]); err != nil {
-		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q: %s", ErrMalformedID, s, strings.TrimPrefix(err.Error(), "rm: malformed identifier: "))
+		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has invalid version_tree_id %q", ErrMalformedID, s, parts[2])
 	}
 	return ObjectVersionID{Value: s}, nil
 }

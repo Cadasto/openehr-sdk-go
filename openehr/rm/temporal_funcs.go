@@ -84,9 +84,14 @@ func (d *DVDate) DayUnknown() bool { p, _ := parseDate(d.Value); return !p.dayKn
 func (d *DVDate) IsPartial() bool { return d.DayUnknown() }
 
 // Magnitude returns the number of days since the calendar origin
-// 0001-01-01 (unknown month/day count as 1). REQ-123.
+// 0001-01-01 (a legitimately-partial value counts unknown month/day as
+// 1). A malformed value returns 0 rather than a fabricated magnitude, so
+// Compare does not silently mis-order garbage. REQ-123.
 func (d *DVDate) Magnitude() Integer {
-	p, _ := parseDate(d.Value)
+	p, err := parseDate(d.Value)
+	if err != nil {
+		return 0
+	}
 	return Integer(dateMagnitudeDays(p))
 }
 
@@ -137,9 +142,16 @@ func (d *DVTime) Timezone() string { p, _ := parseTime(d.Value); return p.tz }
 // REQ-123.
 func (d *DVTime) IsPartial() bool { p, _ := parseTime(d.Value); return !p.secondKnown }
 
-// Magnitude returns the number of seconds since the start of day. REQ-123.
+// Magnitude returns the number of seconds since the start of day. The
+// value is clock-local — the timezone offset is not normalized away (per
+// the openEHR DV_TIME.magnitude definition), so two instants equal in
+// UTC but stated in different zones do not compare equal. A malformed
+// value returns 0. REQ-123.
 func (d *DVTime) Magnitude() Real {
-	p, _ := parseTime(d.Value)
+	p, err := parseTime(d.Value)
+	if err != nil {
+		return 0
+	}
 	return Real(float64(p.hour*3600+p.minute*60+p.second) + p.frac)
 }
 
@@ -227,9 +239,14 @@ func (d *DVDateTime) IsPartial() bool {
 }
 
 // Magnitude returns the number of seconds since the calendar origin
-// 0001-01-01T00:00:00. REQ-123.
+// 0001-01-01T00:00:00. The value is clock-local (the timezone offset is
+// not normalized away, per the openEHR definition). A malformed value
+// returns 0. REQ-123.
 func (d *DVDateTime) Magnitude() float64 {
-	dp, tp, _ := d.split()
+	dp, tp, err := d.split()
+	if err != nil {
+		return 0
+	}
 	return float64(dateMagnitudeDays(dp))*secondsPerDay + float64(tp.hour*3600+tp.minute*60+tp.second) + tp.frac
 }
 
@@ -295,7 +312,10 @@ func (d *DVDuration) IsNegative() bool { p, _ := parseDuration(d.Value); return 
 // calendar-nominal components. Negative when the duration is negative.
 // REQ-123.
 func (d *DVDuration) Magnitude() float64 {
-	p, _ := parseDuration(d.Value)
+	p, err := parseDuration(d.Value)
+	if err != nil {
+		return 0
+	}
 	secs := float64(p.years)*nominalDaysInYear*secondsPerDay +
 		float64(p.months)*nominalDaysInMonth*secondsPerDay +
 		float64(p.weeks)*7*secondsPerDay +
@@ -459,6 +479,13 @@ func parseDuration(s string) (durationParts, error) {
 			return p, fmt.Errorf("bad duration component in %q", s)
 		}
 		num = ""
+		// openEHR's ISO8601_DURATION carries a fraction only on the
+		// seconds component (fractional_second); a fraction on any other
+		// component is malformed — reject it rather than silently
+		// truncate to the integer part.
+		if frac != 0 && c != 'S' {
+			return p, fmt.Errorf("fractional %q component not permitted in %q", string(c), s)
+		}
 		switch c {
 		case 'Y':
 			p.years = whole

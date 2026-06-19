@@ -139,6 +139,84 @@ func TestPathSyntaxError(t *testing.T) {
 	}
 }
 
+// reportComposition exercises spine types beyond the vital-signs chain:
+//
+//	COMPOSITION → SECTION → EVALUATION → ITEM_LIST → ELEMENT
+func reportComposition() *rm.Composition {
+	list := &rm.ItemList{
+		ArchetypeNodeID: "at0010",
+		Items: []rm.Element{
+			{ArchetypeNodeID: "at0011", Name: rm.DVText{Value: "Field A"}, Value: rm.DVText{Value: "alpha"}},
+			{ArchetypeNodeID: "at0012", Name: rm.DVText{Value: "Field B"}, Value: rm.DVText{Value: "beta"}},
+		},
+	}
+	eval := &rm.Evaluation{
+		ArchetypeNodeID: "openEHR-EHR-EVALUATION.problem.v1",
+		Name:            rm.DVText{Value: "Problem"},
+		Data:            list,
+	}
+	section := &rm.Section{
+		ArchetypeNodeID: "openEHR-EHR-SECTION.adhoc.v1",
+		Name:            rm.DVText{Value: "Findings"},
+		Items:           []rm.ContentItem{eval},
+	}
+	return &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1",
+		Name:            rm.DVText{Value: "Report"},
+		Content:         []rm.ContentItem{section},
+	}
+}
+
+func TestSectionEvaluationItemListPath(t *testing.T) {
+	comp := reportComposition()
+	const base = "/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem.v1]/data/items"
+	got, err := rmpath.ItemAtPath(comp, base+"[at0011]/value")
+	if err != nil {
+		t.Fatalf("ItemAtPath = %v", err)
+	}
+	if dv, ok := got.(rm.DVText); !ok || dv.Value != "alpha" {
+		t.Errorf("at0011 value = %v (%T), want DVText alpha", got, got)
+	}
+}
+
+func TestPredicateForms(t *testing.T) {
+	comp := reportComposition()
+	const base = "/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem.v1]/data/items"
+	cases := map[string]string{
+		"node id":             base + "[at0012]/value",
+		"name only quoted":    base + "['Field B']/value",
+		"aql name/value":      base + "[name/value='Field B']/value",
+		"node and name/value": base + "[at0012 and name/value='Field B']/value",
+		"node, name comma":    base + "[at0012,'Field B']/value",
+	}
+	for name, p := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := rmpath.ItemAtPath(comp, p)
+			if err != nil {
+				t.Fatalf("ItemAtPath(%q) = %v", p, err)
+			}
+			if dv, ok := got.(rm.DVText); !ok || dv.Value != "beta" {
+				t.Errorf("= %v (%T), want DVText beta", got, got)
+			}
+		})
+	}
+}
+
+// TestWalkerTypedNilNoPanic guards the no-panic contract: a typed-nil
+// pointer or a genuine nil inside a container must not crash the walker.
+func TestWalkerTypedNilNoPanic(t *testing.T) {
+	comp := &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.x.v1",
+		Content:         []rm.ContentItem{(*rm.Observation)(nil), nil},
+	}
+	if rmpath.PathExists(comp, "/content/data") {
+		t.Error("expected no resolution through nil content entries")
+	}
+	if _, err := rmpath.ItemsAtPath(comp, "/content[at0001]/data/items/value"); err != nil {
+		t.Errorf("ItemsAtPath over nil content = %v, want nil error", err)
+	}
+}
+
 func TestEmptyPathIsRoot(t *testing.T) {
 	comp := vitalSigns()
 	got, err := rmpath.ItemAtPath(comp, "/")

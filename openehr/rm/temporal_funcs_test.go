@@ -156,6 +156,61 @@ func TestDVDuration(t *testing.T) {
 	}
 }
 
+func TestDVDurationMonthVsMinute(t *testing.T) {
+	months := rm.DVDuration{Value: "P2M"}
+	if months.Months() != 2 || months.Minutes() != 0 {
+		t.Errorf("P2M = %d months / %d minutes, want 2/0", months.Months(), months.Minutes())
+	}
+	minutes := rm.DVDuration{Value: "PT2M"}
+	if minutes.Minutes() != 2 || minutes.Months() != 0 {
+		t.Errorf("PT2M = %d months / %d minutes, want 0/2", minutes.Months(), minutes.Minutes())
+	}
+}
+
+func TestDVDurationFractionalOnlyOnSeconds(t *testing.T) {
+	// A fraction on a non-second component is malformed (openEHR carries
+	// a fraction only on seconds) — must not silently truncate.
+	if _, err := (&rm.DVDuration{Value: "PT2.5H"}).ToDuration(); !errors.Is(err, rm.ErrTemporalConversion) {
+		t.Errorf("ToDuration(PT2.5H) err = %v, want ErrTemporalConversion", err)
+	}
+	if m := (&rm.DVDuration{Value: "PT2.5H"}).Magnitude(); m != 0 {
+		t.Errorf("Magnitude(PT2.5H) = %v, want 0 (malformed)", m)
+	}
+	// Fractional seconds remain valid.
+	got, err := (&rm.DVDuration{Value: "PT1.5S"}).ToDuration()
+	if err != nil || got != 1500*time.Millisecond {
+		t.Errorf("ToDuration(PT1.5S) = %v, %v; want 1.5s", got, err)
+	}
+}
+
+func TestDVDateTimeNegativeAndBadTimezone(t *testing.T) {
+	tt, err := (&rm.DVDateTime{Value: "2024-03-15T10:30:00-05:00"}).ToTime()
+	if err != nil {
+		t.Fatalf("ToTime(-05:00) = %v", err)
+	}
+	if _, off := tt.Zone(); off != -5*3600 {
+		t.Errorf("zone offset = %d, want -18000", off)
+	}
+	if _, err := (&rm.DVDateTime{Value: "2024-03-15T10:30:00+9"}).ToTime(); !errors.Is(err, rm.ErrTemporalConversion) {
+		t.Errorf("ToTime(malformed tz) err = %v, want ErrTemporalConversion", err)
+	}
+}
+
+func TestDVDateMalformedMagnitudeIsZero(t *testing.T) {
+	// Malformed values must not fabricate a comparable magnitude.
+	for _, bad := range []string{"2024-13-01", "2024-02-30x", "garbage"} {
+		d := rm.DVDate{Value: bad}
+		if m := d.Magnitude(); m != 0 {
+			t.Errorf("Magnitude(%q) = %d, want 0", bad, m)
+		}
+	}
+	// A legitimately-partial value keeps a real magnitude.
+	partial := rm.DVDate{Value: "2024"}
+	if partial.Magnitude() == 0 {
+		t.Error("Magnitude(2024) should be non-zero")
+	}
+}
+
 func TestTemporalMalformedNoPanic(t *testing.T) {
 	// Best-effort accessors return zero values; no panic.
 	bad := rm.DVDate{Value: "garbage"}

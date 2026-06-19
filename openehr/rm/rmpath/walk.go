@@ -101,9 +101,12 @@ func childrenAt(parent any, attr string) []any {
 	return nil
 }
 
-// iface wraps a non-nil interface value as a single child.
+// iface wraps a present interface value as a single child. A genuinely
+// nil interface and a typed-nil pointer (e.g. a (*rm.Observation)(nil)
+// boxed in a ContentItem) both yield no child, so the walker never
+// dereferences a nil receiver — upholding the no-panic contract.
 func iface(v any) []any {
-	if v == nil {
+	if v == nil || isNilPointer(v) {
 		return nil
 	}
 	return []any{v}
@@ -228,11 +231,7 @@ func activityChildren(a *rm.Activity, attr string) []any {
 func historyChildren(h *rm.History[rm.ItemStructure], attr string) []any {
 	switch attr {
 	case "events":
-		out := make([]any, 0, len(h.Events))
-		for _, e := range h.Events {
-			out = append(out, e)
-		}
-		return out
+		return ifaceSlice(h.Events)
 	case "summary":
 		return iface(h.Summary)
 	case "name":
@@ -339,15 +338,58 @@ func elementChildren(e *rm.Element, attr string) []any {
 }
 
 // ifaceSlice flattens a slice of an interface element type to []any,
-// skipping nil entries.
+// skipping genuinely-nil entries and typed-nil pointers (so the walker
+// never dereferences a nil receiver).
 func ifaceSlice[T any](s []T) []any {
 	out := make([]any, 0, len(s))
 	for _, v := range s {
-		if av := any(v); av != nil {
+		if av := any(v); av != nil && !isNilPointer(av) {
 			out = append(out, av)
 		}
 	}
 	return out
+}
+
+// isNilPointer reports whether v is a typed-nil pointer to one of the RM
+// types the walker dispatches on. A typed-nil boxed in an interface
+// (e.g. (*rm.Observation)(nil) stored as a ContentItem) is itself
+// non-nil, so without this guard childrenAt / nodeIDOf would dereference
+// it. Reflection-free (REQ-024): an explicit type switch over the spine
+// pointer types that can appear as interface-typed children.
+func isNilPointer(v any) bool {
+	switch p := v.(type) {
+	case *rm.Observation:
+		return p == nil
+	case *rm.Evaluation:
+		return p == nil
+	case *rm.Instruction:
+		return p == nil
+	case *rm.Action:
+		return p == nil
+	case *rm.AdminEntry:
+		return p == nil
+	case *rm.GenericEntry:
+		return p == nil
+	case *rm.Section:
+		return p == nil
+	case *rm.Cluster:
+		return p == nil
+	case *rm.Element:
+		return p == nil
+	case *rm.ItemTree:
+		return p == nil
+	case *rm.ItemList:
+		return p == nil
+	case *rm.ItemSingle:
+		return p == nil
+	case *rm.ItemTable:
+		return p == nil
+	case *rm.PointEvent[rm.ItemStructure]:
+		return p == nil
+	case *rm.IntervalEvent[rm.ItemStructure]:
+		return p == nil
+	}
+	return false
 }
 
 // nodeIDOf returns the archetype_node_id of a LOCATABLE child, or "".
