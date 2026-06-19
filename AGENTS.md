@@ -75,7 +75,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …).
 
-**CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. One short bullet per artefact class (not per file, REQ, or commit); no API inventories (those live in `traceability.yaml`). Pre-1.0: only `### Added` is used.
+**CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. **One single-sentence bullet (~35 words max) per artefact class** — artefact + scope + key REQ/PROBE only; **no API inventories, method/type enumerations, or per-REQ breakdowns** (those live in `traceability.yaml`, commits, PR bodies). The release-summary line is one sentence. Err short — release notes are generated verbatim from the block, and a longer entry is a defect, not thoroughness. Pre-1.0: only `### Added` is used.
 
 ## Tooling & workflow
 

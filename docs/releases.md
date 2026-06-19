@@ -49,7 +49,7 @@ Until then we ship `v0.x` adopter slices; current progress is in [`docs/roadmap.
 ### Tag checklist
 
 1. **CI green on `main`** — `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
-2. **CHANGELOG** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it. Commit this (with step 3) **directly to `main`** — no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)).
+2. **CHANGELOG** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it. Keep it terse — one-sentence bullets and a one-sentence summary per the [CHANGELOG brevity rule](../CHANGELOG.md); notes are generated verbatim from this block, so trim *here*, not in the GitHub draft. Commit this (with step 3) **directly to `main`** — no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)).
 3. **Roadmap** — bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
 4. **Annotated tag from `main`** and push:
    ```bash
