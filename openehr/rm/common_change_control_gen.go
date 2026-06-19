@@ -88,11 +88,6 @@ func (v *Version[T]) Data() T {
 	panic("not implemented: VERSION.data — implement in a non-generated file")
 }
 
-// IsBranch True if this Version represents a branch. Derived from `_uid_` attribute.
-func (v *Version[T]) IsBranch() bool {
-	panic("not implemented: VERSION.is_branch — implement in a non-generated file")
-}
-
 // LifecycleState Lifecycle state of this version; coded by openEHR vocabulary `version lifecycle state`.
 func (v *Version[T]) LifecycleState() DVCodedText {
 	panic("not implemented: VERSION.lifecycle_state — implement in a non-generated file")

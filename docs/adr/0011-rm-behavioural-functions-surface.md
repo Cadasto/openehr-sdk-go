@@ -26,6 +26,13 @@ Realise the stubbed RM behavioural functions with a **hybrid surface**, scoped t
 4. **Path read access as a building block.** `item_at_path`/`items_at_path`/`path_exists`/`path_unique` live in a new `openehr/rm/rmpath` package (sibling of `rminfo`) that carries **its own minimal reflection-free walker** — it does **not** import `openehr/validation/rmread`, preserving the dependency direction (REQ-014) and building-block independence (REQ-013). The generated `LOCATABLE` path methods delegate to it.
 5. **Out-of-scope functions stay explicit stubs.** `PATHABLE.parent` / `path_of_item`, every `VERSIONED_OBJECT` container operation, and all `commit_*` mutators are not realised as in-memory RM behaviour (the SDK's versioning is server-mediated). They remain documented stubs that fail loudly rather than return a misleading value.
 
+## Decision refinements (during implementation)
+
+Two Go realities, discovered while implementing, refine the decision above (recorded here rather than re-opening it):
+
+1. **Generator stub-suppression, not in-place fill.** A generated method and a hand-written method of the same name collide (`method redeclared`). So the generator gained a curated manual-implementation skip set ([ADR 0002 § D7](0002-bmm-codegen-decisions.md)) that *suppresses* stub emission for the realised functions, which are then written in `openehr/rm/*_funcs.go`. Decision points 1–3 stand; the mechanism is suppress-then-write.
+2. **Path read access is package functions, not delegating methods.** `openehr/rm/rmpath` imports `openehr/rm`; if `rm`'s `LOCATABLE` methods delegated back into `rmpath` that would be an import cycle. So the `LOCATABLE.{item_at_path,items_at_path,path_exists,path_unique}` stubs are *suppressed* (not filled), and `rmpath.ItemAtPath(root, path)` etc. are the surface — more REQ-023-idiomatic. This supersedes decision point 4's "the generated `LOCATABLE` path methods delegate to it"; `rm-functions.md` § REQ-121 carries the same correction.
+
 ## Consequences
 
 - The panic stubs are filled incrementally for the in-scope subset; the public RM surface stops panicking for those operations.
