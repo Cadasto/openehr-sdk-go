@@ -99,6 +99,8 @@ Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies
 
 **Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
+**Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
+
 ## openEHR knowledge
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.

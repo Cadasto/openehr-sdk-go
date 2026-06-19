@@ -18,41 +18,6 @@ type ArchetypeID struct {
 	Value string `json:"value"`
 }
 
-// DomainConcept Name of the concept represented by this archetype, including specialisation, e.g. `"Biochemistry_result-cholesterol"`.
-func (a *ArchetypeID) DomainConcept() string {
-	panic("not implemented: ARCHETYPE_ID.domain_concept — implement in a non-generated file")
-}
-
-// QualifiedRMEntity Globally qualified reference model entity, e.g.  `"openehr-EHR-OBSERVATION"`.
-func (a *ArchetypeID) QualifiedRMEntity() string {
-	panic("not implemented: ARCHETYPE_ID.qualified_rm_entity — implement in a non-generated file")
-}
-
-// RMEntity Name of the ontological level within the reference model to which this archetype is targeted, e.g. for openEHR:  `"FOLDER"`, `"COMPOSITION"`, `"SECTION"`, `"OBSERVATION"`.
-func (a *ArchetypeID) RMEntity() string {
-	panic("not implemented: ARCHETYPE_ID.rm_entity — implement in a non-generated file")
-}
-
-// RMName Name of the reference model, e.g. `"RIM"`,  `"EHR"`,  `"EN13606"`.
-func (a *ArchetypeID) RMName() string {
-	panic("not implemented: ARCHETYPE_ID.rm_name — implement in a non-generated file")
-}
-
-// RMOriginator Organisation originating the reference model on which this archetype is based, e.g. `"openEHR"`, `"CEN"`, `"HL7"`.
-func (a *ArchetypeID) RMOriginator() string {
-	panic("not implemented: ARCHETYPE_ID.rm_originator — implement in a non-generated file")
-}
-
-// Specialisation Name of specialisation of concept, if this archetype is a specialisation of another archetype, e.g. `"cholesterol"`.
-func (a *ArchetypeID) Specialisation() string {
-	panic("not implemented: ARCHETYPE_ID.specialisation — implement in a non-generated file")
-}
-
-// VersionID Version identification of this archetype, representing the major version, e.g. `"1"`.
-func (a *ArchetypeID) VersionID() string {
-	panic("not implemented: ARCHETYPE_ID.version_id — implement in a non-generated file")
-}
-
 // GenericID Generic identifier type for identifiers whose format is otherwise unknown to openEHR. Includes an attribute for naming the identification scheme (which may well be local).
 type GenericID struct {
 	// Scheme Name of the scheme to which this identifier conforms. Ideally this name will be recognisable globally but realistically it may be a local ad hoc scheme whose name is not controlled or standardised in any way.
@@ -86,15 +51,6 @@ type LocatableRef struct {
 	ID UIDBasedID `json:"id"`
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
 	Path *string `json:"path,omitempty"`
-}
-
-// AsURI A URI form of the reference, created by concatenating the following:
-//
-// * scheme, e.g. `ehr:`, derived from `_namespace_`
-// * `_id.value_`
-// * `/` + `_path_`, where `_path_` is non-empty
-func (l *LocatableRef) AsURI() string {
-	panic("not implemented: LOCATABLE_REF.as_uri — implement in a non-generated file")
 }
 
 // ObjectID Ancestor class of identifiers of informational objects. Ids may be completely meaningless, in which case their only job is to refer to something, or may carry some information to do with the identified object.
@@ -138,26 +94,6 @@ type ObjectVersionID struct {
 	Value string `json:"value"`
 }
 
-// CreatingSystemID Identifier of the system that created the Version corresponding to this Object version id.
-func (o *ObjectVersionID) CreatingSystemID() UID {
-	panic("not implemented: OBJECT_VERSION_ID.creating_system_id — implement in a non-generated file")
-}
-
-// IsBranch True if this version identifier represents a branch.
-func (o *ObjectVersionID) IsBranch() bool {
-	panic("not implemented: OBJECT_VERSION_ID.is_branch — implement in a non-generated file")
-}
-
-// ObjectID Unique identifier for logical object of which this identifier identifies one version; normally the `_object_id_` will be the unique identifier of the version container containing the version referred to by this `OBJECT_VERSION_ID` instance.
-func (o *ObjectVersionID) ObjectID() UID {
-	panic("not implemented: OBJECT_VERSION_ID.object_id — implement in a non-generated file")
-}
-
-// VersionTreeID Tree identifier of this version with respect to other versions in the same version tree, as either 1 or 3 part dot-separated numbers, e.g.  1 ,  2.1.4 .
-func (o *ObjectVersionID) VersionTreeID() VersionTreeID {
-	panic("not implemented: OBJECT_VERSION_ID.version_tree_id — implement in a non-generated file")
-}
-
 // PartyRef Identifier for parties in a demographic or identity service. There are typically a number of subtypes of the `PARTY` class, including `PERSON`, `ORGANISATION`, etc. Abstract supertypes are allowed if the referenced object is of a type not known by the current implementation of this class (in other words, if the demographic model is changed by the addition of a new `PARTY` or `ACTOR` subtypes, valid `PARTY_REFs` can still be constructed to them).
 type PartyRef struct {
 	ObjectRef
@@ -175,16 +111,6 @@ type TemplateID struct {
 type TerminologyID struct {
 	// Value The value of the id in the form defined below.
 	Value string `json:"value"`
-}
-
-// Name Return the terminology id (which includes the  version  in some cases). Distinct names correspond to distinct (i.e. non-compatible) terminologies. Thus the names  `"ICD10AM"` and `"ICD10"` refer to distinct terminologies.
-func (t *TerminologyID) Name() string {
-	panic("not implemented: TERMINOLOGY_ID.name — implement in a non-generated file")
-}
-
-// VersionID Version of this terminology, if versioning supported, else the empty string.
-func (t *TerminologyID) VersionID() string {
-	panic("not implemented: TERMINOLOGY_ID.version_id — implement in a non-generated file")
 }
 
 // UID Abstract parent of classes representing unique identifiers which identify information entities in a durable way. UIDs only ever identify one IE in time or space and are never re-used.
@@ -207,36 +133,6 @@ func (HierObjectID) isUIDBasedID() {}
 
 func (ObjectVersionID) isUIDBasedID() {}
 
-// Extension Optional local identifier of the object within the context of the root identifier. Returns the part to the right of the first '::' separator if any, or else any empty String.
-func (h *HierObjectID) Extension() string {
-	panic("not implemented: UID_BASED_ID.extension — implement in a non-generated file")
-}
-
-// Extension Optional local identifier of the object within the context of the root identifier. Returns the part to the right of the first '::' separator if any, or else any empty String.
-func (o *ObjectVersionID) Extension() string {
-	panic("not implemented: UID_BASED_ID.extension — implement in a non-generated file")
-}
-
-// HasExtension True if not `_extension_.is_empty()`.
-func (h *HierObjectID) HasExtension() bool {
-	panic("not implemented: UID_BASED_ID.has_extension — implement in a non-generated file")
-}
-
-// HasExtension True if not `_extension_.is_empty()`.
-func (o *ObjectVersionID) HasExtension() bool {
-	panic("not implemented: UID_BASED_ID.has_extension — implement in a non-generated file")
-}
-
-// Root The identifier of the conceptual namespace in which the object exists, within the identification scheme. Returns the part to the left of the first '::' separator, if any, or else the whole string.
-func (h *HierObjectID) Root() UID {
-	panic("not implemented: UID_BASED_ID.root — implement in a non-generated file")
-}
-
-// Root The identifier of the conceptual namespace in which the object exists, within the identification scheme. Returns the part to the left of the first '::' separator, if any, or else the whole string.
-func (o *ObjectVersionID) Root() UID {
-	panic("not implemented: UID_BASED_ID.root — implement in a non-generated file")
-}
-
 // Uuid Model of the DCE Universal Unique Identifier or UUID which takes the form of hexadecimal integers separated by hyphens, following the pattern 8-4-4-4-12 as defined by the Open Group, CDE 1.1 Remote Procedure Call specification, Appendix A. Also known as a GUID.
 type Uuid struct {
 	// Value The value of the id.
@@ -249,29 +145,4 @@ type Uuid struct {
 type VersionTreeID struct {
 	// Value String form of this identifier.
 	Value string `json:"value"`
-}
-
-// BranchNumber Number of branch from the trunk point; numbering starts at 1.
-func (v *VersionTreeID) BranchNumber() string {
-	panic("not implemented: VERSION_TREE_ID.branch_number — implement in a non-generated file")
-}
-
-// BranchVersion Version of the branch; numbering starts at 1.
-func (v *VersionTreeID) BranchVersion() string {
-	panic("not implemented: VERSION_TREE_ID.branch_version — implement in a non-generated file")
-}
-
-// IsBranch True if this version identifier represents a branch, i.e. has `_branch_number()_` and `_branch_version()_` parts.
-func (v *VersionTreeID) IsBranch() bool {
-	panic("not implemented: VERSION_TREE_ID.is_branch — implement in a non-generated file")
-}
-
-// IsFirst True if this version identifier corresponds to the first version, i.e. `_trunk_version_` is 1.
-func (v *VersionTreeID) IsFirst() bool {
-	panic("not implemented: VERSION_TREE_ID.is_first — implement in a non-generated file")
-}
-
-// TrunkVersion Trunk version number; numbering starts at 1.
-func (v *VersionTreeID) TrunkVersion() string {
-	panic("not implemented: VERSION_TREE_ID.trunk_version — implement in a non-generated file")
 }

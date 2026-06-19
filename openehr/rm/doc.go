@@ -19,9 +19,20 @@
 // Methods emitted from BMM `function` declarations in `*_gen.go` files
 // have stub bodies that panic with `not implemented: <CLASS>.<fn>`.
 // This is intentional (REQ-044): the generator never emits real
-// function bodies. Implement behaviour in hand-written `*_ext.go`
-// companions in the same package; run `make codegen` after BMM bumps
-// but do not edit `*_gen.go` by hand.
+// function bodies. Implement behaviour in hand-written companions in the
+// same package (`*_ext.go`, or `*_funcs.go` for the REQ-120..123
+// behavioural-function set — see [ADR 0011]); run `make codegen` after
+// BMM bumps but do not edit `*_gen.go` by hand.
+//
+// The pure/derived behavioural functions of REQ-120..123 are realised:
+// identifier parsing/derivation in identification_funcs.go, version
+// helpers in changecontrol_funcs.go, temporal DV_* helpers in
+// temporal_funcs.go, and openEHR-path read access in the sibling
+// [github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath] package. Their
+// generated stubs are suppressed via the generator's
+// manual-implementation skip set ([ADR 0002] § D7). Functions still left
+// as fail-loud panic stubs (temporal arithmetic, PATHABLE.parent /
+// path_of_item, VERSIONED_OBJECT container ops) are deferred by design.
 //
 // # Substitution slots and the `*Like` interfaces (SDK-GAP-11)
 //
@@ -58,4 +69,7 @@
 //
 // BMM-bump audit on this surface lives in like_interfaces.go and
 // like_accessors.go file comments + ADR-0001 step 10.
+//
+// [ADR 0011]: https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0011-rm-behavioural-functions-surface.md
+// [ADR 0002]: https://github.com/cadasto/openehr-sdk-go/blob/main/docs/adr/0002-bmm-codegen-decisions.md
 package rm

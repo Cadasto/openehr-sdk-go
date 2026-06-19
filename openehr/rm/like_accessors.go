@@ -50,6 +50,18 @@ func DVTextValueOf(v DVTextLike) string {
 	if v == nil {
 		return ""
 	}
+	switch t := v.(type) {
+	case *DVText:
+		if t == nil {
+			return ""
+		}
+		return t.GetValue()
+	case *DVCodedText:
+		if t == nil {
+			return ""
+		}
+		return t.GetValue()
+	}
 	return v.GetValue()
 }
 

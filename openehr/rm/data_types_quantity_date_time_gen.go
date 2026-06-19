@@ -49,26 +49,6 @@ func (d *DVDate) IsEqual(other DVQuantified) bool {
 	panic("not implemented: DV_DATE.is_equal — implement in a non-generated file")
 }
 
-// IsStrictlyComparableTo True, for any two Dates.
-func (d *DVDate) IsStrictlyComparableTo(other DVDate) bool {
-	panic("not implemented: DV_DATE.is_strictly_comparable_to — implement in a non-generated file")
-}
-
-// LessThan True if this date object is less than `_other_`, based on comparison of `_magnitude()_`.
-//
-// Pre: is_strictly_comparable_to (other)
-// Post: Result = magnitude < other.magnitude
-//
-// Aliases: < (Go does not support operator overloading)
-func (d *DVDate) LessThan(other DVDate) bool {
-	panic("not implemented: DV_DATE.less_than — implement in a non-generated file")
-}
-
-// Magnitude Numeric value of the date as days since the calendar origin date `0001-01-01`.
-func (d *DVDate) Magnitude() Integer {
-	panic("not implemented: DV_DATE.magnitude — implement in a non-generated file")
-}
-
 // Subtract Subtract a Duration from this Date.
 //
 // Aliases: - (Go does not support operator overloading)
@@ -115,26 +95,6 @@ func (d *DVDateTime) Add(aDiff DVDuration) DVDateTime {
 // Aliases: - (Go does not support operator overloading)
 func (d *DVDateTime) Diff(other DVDateTime) DVDuration {
 	panic("not implemented: DV_DATE_TIME.diff — implement in a non-generated file")
-}
-
-// IsStrictlyComparableTo True, for any two Date/times.
-func (d *DVDateTime) IsStrictlyComparableTo(other DVDateTime) bool {
-	panic("not implemented: DV_DATE_TIME.is_strictly_comparable_to — implement in a non-generated file")
-}
-
-// LessThan True if this date-time object is less than `_other_`, based on comparison of `_magnitude()_`.
-//
-// Pre: is_strictly_comparable_to (other)
-// Post: Result = magnitude < other.magnitude
-//
-// Aliases: < (Go does not support operator overloading)
-func (d *DVDateTime) LessThan(other DVDateTime) bool {
-	panic("not implemented: DV_DATE_TIME.less_than — implement in a non-generated file")
-}
-
-// Magnitude Numeric value of the date/time as seconds since the calendar origin date/time `0001-01-01T00:00:00Z`.
-func (d *DVDateTime) Magnitude() float64 {
-	panic("not implemented: DV_DATE_TIME.magnitude — implement in a non-generated file")
 }
 
 // Subtract Subtract a Duration from this Date/time.
@@ -184,26 +144,6 @@ type DVDuration struct {
 // Aliases: + (Go does not support operator overloading)
 func (d *DVDuration) Add(other DVDuration) DVDuration {
 	panic("not implemented: DV_DURATION.add — implement in a non-generated file")
-}
-
-// IsStrictlyComparableTo True, for any two Durations.
-func (d *DVDuration) IsStrictlyComparableTo(other DVDuration) bool {
-	panic("not implemented: DV_DURATION.is_strictly_comparable_to — implement in a non-generated file")
-}
-
-// LessThan True if this duration object is less than `_other_`, based on comparison of `_magnitude()_`.
-//
-// Pre: is_strictly_comparable_to (other)
-// Post: Result = magnitude < other.magnitude
-//
-// Aliases: < (Go does not support operator overloading)
-func (d *DVDuration) LessThan(other DVDuration) bool {
-	panic("not implemented: DV_DURATION.less_than — implement in a non-generated file")
-}
-
-// Magnitude Numeric value of the duration as a number of seconds. Computed using the method `_to_seconds()_` inherited from `Iso8601_duration`.
-func (d *DVDuration) Magnitude() float64 {
-	panic("not implemented: DV_DURATION.magnitude — implement in a non-generated file")
 }
 
 // Multiply Product of this Duration and `_factor_`.
@@ -279,26 +219,6 @@ func (d *DVTime) Add(aDiff DVDuration) DVTime {
 // Aliases: - (Go does not support operator overloading)
 func (d *DVTime) Diff(other DVTime) DVDuration {
 	panic("not implemented: DV_TIME.diff — implement in a non-generated file")
-}
-
-// IsStrictlyComparableTo True, for any two Times.
-func (d *DVTime) IsStrictlyComparableTo(other DVTime) bool {
-	panic("not implemented: DV_TIME.is_strictly_comparable_to — implement in a non-generated file")
-}
-
-// LessThan True if this time object is less than `_other_`, based on comparison of `_magnitude()_`.
-//
-// Pre: is_strictly_comparable_to (other)
-// Post: Result = magnitude < other.magnitude
-//
-// Aliases: < (Go does not support operator overloading)
-func (d *DVTime) LessThan(other DVTime) bool {
-	panic("not implemented: DV_TIME.less_than — implement in a non-generated file")
-}
-
-// Magnitude Numeric value of the time as seconds since the start of day, i.e. `00:00:00`.
-func (d *DVTime) Magnitude() Real {
-	panic("not implemented: DV_TIME.magnitude — implement in a non-generated file")
 }
 
 // Subtract Subtract a Duration from this Time.
