@@ -241,24 +241,21 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 	return nil
 }
 
-// TestGenerateClinicalNoteMinimal pins the PR #18 re-review finding:
+// TestGenerateClinicalNoteExample pins the PR #18 re-review finding:
 // clinical_note.opt uses the AOM 1.4 primitive-short-name shape
 // (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
 // Before the materialiseSingle / IsAOMPrimitiveShortName fix, the
 // generator tried to attach a fresh *DVDuration to the parent DV's
 // .value (a String slot) and failed; this regression keeps the
-// generator end-to-end on the second vendored OPT fixture.
-//
-// The leaf primitive constraint flows through the parser via the
-// C_PRIMITIVE_OBJECT inner-`<item>` extraction; CDuration's
-// ExampleValue happens to return the same "P0D" sentinel as the
-// pre-Phase-1 fallback, so the asserted value is stable across
-// the two regression scopes.
-func TestGenerateClinicalNoteMinimal(t *testing.T) {
+// generator end-to-end on the vendored OPT fixture under Example
+// policy (the INSTRUCTION subtree carrying DV_DURATION is beyond the
+// first content entry capped under Minimal — see
+// TestGenerateSocialMinimal_respectsContentUpper).
+func TestGenerateClinicalNoteExample(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Example,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &name},
 	})

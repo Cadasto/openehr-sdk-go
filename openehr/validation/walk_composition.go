@@ -8,6 +8,7 @@ import (
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -52,11 +53,10 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	// root, identity is checked inline against COMPOSITION's
 	// archetype_node_id (not via a separate attribute descent).
 	w.checkLocatableIdentity(optNode, rmValue, path)
-	// AOM 1.4 primitive short-name leaf reached via a DV wrapper's
-	// .value string channel (clinical_note.opt shape). Validate the
-	// string against the REQ-103 constraint without an RM-type check.
+	// AOM 1.4 primitive short-name leaf on a BMM scalar channel
+	// (e.g. DV_COUNT.magnitude ← INTEGER, DV_DURATION.value ← string).
 	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
-		if _, ok := rmValue.(string); ok {
+		if primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue) {
 			w.applyPrimitive(optNode, rmValue, path, pc)
 			return
 		}
@@ -82,13 +82,9 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	}
 
 	for _, attr := range optNode.Attributes() {
-		// Implicit (BMM-mandatory, OPT-silent) attributes have no
-		// children — the OPT did not pin a structural constraint
-		// for them. We still run the existence check so a
-		// BMM-mandatory attribute (e.g. COMPOSITION.composer,
-		// /language, /territory) that the composition leaves nil
-		// or zero-valued surfaces as `required`. No descent
-		// happens because Children() is empty for implicit attrs.
+		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+			continue
+		}
 		switch attr.Cardinality() {
 		case template.Single:
 			w.walkSingleAttribute(optNode, attr, rmValue, path)
@@ -186,15 +182,15 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 			// Wildcard / not-typed OPT child — accept.
 			return c
 		}
-		if gotType == want || rmTypeIsSubtypeOf(gotType, want) {
+		if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want) {
 			return c
 		}
-		// AOM 1.4 primitive short name (DURATION, DATE, …) pinned
-		// under a DV wrapper's .value string channel — the RM value
-		// is a Go string while the OPT child rm_type_name is the
-		// primitive short name.
+		// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
+		// pinned under a BMM-typed attribute channel — the RM value
+		// may be a Go string, integer, real, or bool rather than an
+		// RM wrapper type.
 		if tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
-			if _, ok := val.(string); ok {
+			if primitiveValueMatchesShortName(want, val) {
 				return c
 			}
 		}
@@ -385,6 +381,13 @@ func primitiveInput(rmValue any) any {
 			Terminology: v.TerminologyID.Value,
 			CodeString:  v.CodeString,
 		}
+	case rm.Integer:
+		return int64(v)
+	case rm.Real:
+		// Normalise the named float64 to a bare float64 so a C_REAL
+		// constraint validates it instead of rejecting it as
+		// wrong_type (SDK-GAP-12: REAL on DV_QUANTITY.magnitude).
+		return float64(v)
 	}
 	return rmValue
 }
@@ -572,7 +575,7 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	if got == want {
 		return
 	}
-	if rmTypeIsSubtypeOf(got, want) {
+	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want) {
 		return
 	}
 	w.emit(Issue{
@@ -591,6 +594,38 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 	subtypes := bmmSubtypes[abstract]
 	return slices.Contains(subtypes, concrete)
+}
+
+// intervalRMTypeMatches reports whether a concrete interval RM type
+// name satisfies an OPT-declared generic interval type (SDK-GAP-11/12).
+func intervalRMTypeMatches(got, want string) bool {
+	if got == want {
+		return true
+	}
+	if want == "DV_INTERVAL" && strings.HasPrefix(got, "DV_INTERVAL<") {
+		return true
+	}
+	return false
+}
+
+// primitiveValueMatchesShortName reports whether an RM-side Go value
+// satisfies an AOM 1.4 primitive short-name OPT child (INTEGER,
+// REAL, DURATION, …) bound to a BMM scalar attribute slot.
+func primitiveValueMatchesShortName(shortName string, val any) bool {
+	switch shortName {
+	case "BOOLEAN":
+		_, ok := val.(bool)
+		return ok
+	case "INTEGER":
+		return rm.IsInt64(val)
+	case "REAL":
+		return rm.IsReal(val)
+	case "DATE", "TIME", "DATE_TIME", "DURATION":
+		_, ok := val.(string)
+		return ok
+	default:
+		return false
+	}
 }
 
 // bmmSubtypes is the closed lookup of abstract → concrete RM type
