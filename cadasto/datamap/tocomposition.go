@@ -631,6 +631,28 @@ func encodeItems(itemsAttr *template.Attribute, payload map[string]any, terms ma
 
 func encodeElement(elem template.ObjectNode, valuePayload any, terms map[string]string) (map[string]any, error) {
 	nodeID := elem.NodeID()
+
+	// Coded/explicit ELEMENT name. By default an element's name is the template
+	// label as DV_TEXT. A payload MAP that carries the Datamap-V2 name meta-keys
+	// `_code` (coded name) or `_name` (explicit display) overrides it, and the
+	// element value then comes from the payload's `value` field. This supports
+	// "named" elements such as openEHR-EHR-CLUSTER.annotations.v1 at0001, whose
+	// name MUST be a DV_CODED_TEXT (the annotation type) — Cadasto rejects a
+	// DV_TEXT name with 422. The meta-keys are underscore-prefixed so they never
+	// collide with bare coded-value short-forms ({code,value,terminology}).
+	name := dvText(terms[nodeID])
+	if m, ok := valuePayload.(map[string]any); ok {
+		_, hasCode := m["_code"]
+		display, hasName := m["_name"].(string)
+		if hasCode {
+			name = clusterName(m, terms[nodeID])
+			valuePayload = m["value"]
+		} else if hasName {
+			name = dvText(display)
+			valuePayload = m["value"]
+		}
+	}
+
 	valueConstraint, ok := attrFirstObject(findAttr(elem, "value"))
 	if !ok {
 		// Unconstrained ELEMENT — sommige OPT-varianten laten de value-attr
@@ -642,7 +664,7 @@ func encodeElement(elem template.ObjectNode, valuePayload any, terms map[string]
 			return map[string]any{
 				"_type":             "ELEMENT",
 				"archetype_node_id": nodeID,
-				"name":              dvText(terms[nodeID]),
+				"name":              name,
 				"value":             exp,
 			}, nil
 		}
@@ -655,7 +677,7 @@ func encodeElement(elem template.ObjectNode, valuePayload any, terms map[string]
 	return map[string]any{
 		"_type":             "ELEMENT",
 		"archetype_node_id": nodeID,
-		"name":              dvText(terms[nodeID]),
+		"name":              name,
 		"value":             rmValue,
 	}, nil
 }
