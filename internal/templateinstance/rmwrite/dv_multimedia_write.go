@@ -14,12 +14,14 @@ func writeDVMultimediaSingle(m *rm.DVMultimedia, attr string, child any) error {
 			return mismatch(attr, child, "CODE_PHRASE")
 		}
 		if v.TerminologyID.Value == "" {
-			v.TerminologyID = rm.TerminologyID{Value: "openehr"}
+			// media_type codes are drawn from the IANA media-types
+			// code set, not the openEHR terminology (SDK-GAP-12).
+			v.TerminologyID = rm.TerminologyID{Value: "IANA_media-types"}
 		}
 		m.MediaType = v
 		return nil
 	case "size":
-		n, ok := coerceInt64(child)
+		n, ok := rm.AsInt64(child)
 		if !ok {
 			return mismatch(attr, child, "Integer")
 		}

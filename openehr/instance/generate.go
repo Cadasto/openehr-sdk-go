@@ -134,7 +134,7 @@ func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	}
 
 	for _, attr := range optNode.Attributes() {
-		if skipNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
 			continue
 		}
 		if !g.shouldVisit(attr) {
@@ -770,14 +770,14 @@ func (g *generator) applyPrimitiveExample(
 		v.Value = b
 		return nil
 	case *rm.DVCount:
-		n, ok := toInt64(ex)
+		n, ok := rm.AsInt64(ex)
 		if !ok {
 			return fmt.Errorf("DV_COUNT example value is %T, want integer", ex)
 		}
 		v.Magnitude = n
 		return nil
 	case *rm.DVOrdinal:
-		n, ok := toInt64(ex)
+		n, ok := rm.AsInt64(ex)
 		if !ok {
 			return fmt.Errorf("DV_ORDINAL example value is %T, want integer", ex)
 		}
@@ -906,45 +906,6 @@ func newHierObjectID() *rm.HierObjectID {
 	s := hex.EncodeToString(b[:])
 	uuid := s[0:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:32]
 	return &rm.HierObjectID{Value: uuid}
-}
-
-// toInt64 widens any numeric Go shape to int64. Mirrors the helper
-// in openehr/template/constraints/numeric.go but kept inline here so
-// we don't pull a private import.
-func toInt64(value any) (int64, bool) {
-	switch v := value.(type) {
-	case int:
-		return int64(v), true
-	case int8:
-		return int64(v), true
-	case int16:
-		return int64(v), true
-	case int32:
-		return int64(v), true
-	case int64:
-		return v, true
-	case uint:
-		return int64(v), true
-	case uint8:
-		return int64(v), true
-	case uint16:
-		return int64(v), true
-	case uint32:
-		return int64(v), true
-	}
-	return 0, false
-}
-
-// skipNonStorableAttr returns true for BMM function attributes that
-// are not persisted on the wire (e.g. EVENT.offset is derived).
-func skipNonStorableAttr(parentRMType, attrName string) bool {
-	switch parentRMType {
-	case "POINT_EVENT", "INTERVAL_EVENT":
-		return attrName == "offset"
-	case "DV_PROPORTION", "DV_QUANTITY":
-		return attrName == "is_integral"
-	}
-	return false
 }
 
 // optionalSiblingIDCollides reports whether this optional child shares

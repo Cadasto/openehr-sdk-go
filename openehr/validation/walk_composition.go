@@ -8,6 +8,7 @@ import (
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -81,7 +82,7 @@ func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string
 	}
 
 	for _, attr := range optNode.Attributes() {
-		if isNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
 			continue
 		}
 		switch attr.Cardinality() {
@@ -382,6 +383,11 @@ func primitiveInput(rmValue any) any {
 		}
 	case rm.Integer:
 		return int64(v)
+	case rm.Real:
+		// Normalise the named float64 to a bare float64 so a C_REAL
+		// constraint validates it instead of rejecting it as
+		// wrong_type (SDK-GAP-12: REAL on DV_QUANTITY.magnitude).
+		return float64(v)
 	}
 	return rmValue
 }
@@ -611,36 +617,12 @@ func primitiveValueMatchesShortName(shortName string, val any) bool {
 		_, ok := val.(bool)
 		return ok
 	case "INTEGER":
-		return isInt64Like(val)
+		return rm.IsInt64(val)
 	case "REAL":
-		switch val.(type) {
-		case rm.Real, float64, float32, int, int64, int32:
-			return true
-		default:
-			return false
-		}
+		return rm.IsReal(val)
 	case "DATE", "TIME", "DATE_TIME", "DURATION":
 		_, ok := val.(string)
 		return ok
-	default:
-		return false
-	}
-}
-
-func isNonStorableAttr(parentRMType, attrName string) bool {
-	switch parentRMType {
-	case "POINT_EVENT", "INTERVAL_EVENT":
-		return attrName == "offset"
-	case "DV_PROPORTION", "DV_QUANTITY":
-		return attrName == "is_integral"
-	}
-	return false
-}
-
-func isInt64Like(val any) bool {
-	switch val.(type) {
-	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, rm.Integer:
-		return true
 	default:
 		return false
 	}
