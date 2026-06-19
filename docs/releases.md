@@ -49,7 +49,7 @@ Until then we ship `v0.x` adopter slices; current progress is in [`docs/roadmap.
 ### Tag checklist
 
 1. **CI green on `main`** — `make ci` (the same gate as [`ci.yml`](../.github/workflows/ci.yml)).
-2. **CHANGELOG** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it.
+2. **CHANGELOG** — rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`; open a fresh `## [Unreleased]` above it. Commit this (with step 3) **directly to `main`** — no branch or PR for a release bump (see [Branch & tag policy](#branch--tag-policy)).
 3. **Roadmap** — bump [`docs/roadmap.md`](roadmap.md) if the release crosses a milestone.
 4. **Annotated tag from `main`** and push:
    ```bash
@@ -70,6 +70,7 @@ Preview notes locally without side effects: `bash scripts/release-notes.sh X.Y.Z
 
 - `main` is always releasable after CI; tag **only** from `main` (or a `release/v0.x` hotfix branch).
 - Tags are pushed by maintainers only; branch protection on `main` is the enforcement.
+- **Substantive work** (features, fixes, docs of record) lands via branch + PR. **Mechanical release bookkeeping** — the version-bump CHANGELOG cut (steps 2–3 above) and any milestone roadmap bump — is committed **directly to `main`** by a maintainer; no branch or PR detour. If a direct push is ever rejected by branch protection, stop and surface it rather than silently routing the bump through a PR.
 
 ## References
 
