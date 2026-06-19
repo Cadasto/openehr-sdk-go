@@ -54,7 +54,7 @@
 | AQL static lint (REQ-109) | **Landed** | `openehr/aql/parse/`, `openehr/aql/lint/`, `openehr/validation/` | Parse against the SDK grammar profile (ADR 0007) → 3-layer lint (`lint.LintString` / `lint.Lint`) → `validation.ValidateAQL` bridge; PROBE-028. [plan](plans/archive/2026-06-15-aql-lint.md) |
 | Validation beyond COMPOSITION (REQ-110) | **Landed** | `openehr/validation/` | Generic `Validate(root, c)` + typed `ValidateDemographic` (PARTY hierarchy + ADDRESS/CONTACT/PARTY_IDENTITY/PARTY_RELATIONSHIP/CAPABILITY), `ValidateFolder`, `ValidateEHRStatus`; DataValue-leaf readers; PROBE-074. [plan](plans/archive/2026-06-17-validation-non-composition-roots.md) |
 | AQL wire models + builders | **Landed** | `openehr/aql/` REQ-055 | Literal AQL + ResultSet; struct-builder + verb-functions emit byte-identical canonical AQL (PROBE-020); `ErrPathResolution` mapping (PROBE-021). [builders plan](plans/archive/2026-05-21-aql-builders.md) |
-| OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` + closed-root accessors + `internal/templateinstance/rmwrite/`; PROBE-027 on `vital_signs.opt` + `clinical_note.opt`; `Options.UIDSource` test-determinism seam; canjson-polymorphic `Composition.uid`. [archive](plans/archive/2026-05-24-template-instance-example-generator.md) + [wire-parser archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md). |
+| OPT → RM instance synthesis | **Landed** | `openehr/instance/` REQ-107 | `Generate(ctx, c, opts)` + closed-root accessors + `internal/templateinstance/rmwrite/`; PROBE-027 on `vital_signs.opt` + `clinical_note.opt` + the SDK-GAP-12 real-world corpus (`Referral Request.v1` / `Demonstration.v1` / `social`); `Options.UIDSource` test-determinism seam; canjson-polymorphic `Composition.uid`. [archive](plans/archive/2026-05-24-template-instance-example-generator.md) + [wire-parser archive](plans/archive/2026-05-26-c-primitive-object-wire-parser.md). |
 | Composition builder | **Landed** | `openehr/composition/` REQ-101 | `NewSkeleton` + `Builder.Set/SetText/SetQuantity/SetCodedText/Build`; PROBE-023 (full unmarshal round-trip). [archive](plans/archive/2026-05-21-composition-builder.md) |
 | LANG / TERM BMM | **Deferred** | `resources/bmm/` | Reference pins only |
 | EHR Extract RM | **Deferred** | — | Skipped per v1 scope |
@@ -126,7 +126,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | Serialize probes | **Landed** | `testkit/probes/serialize/` | PROBE-030/031, 033/034 |
 | Versioned-write probes | **Landed** | `testkit/probes/versioned/` | PROBE-010–013; PROBE-071 (SDK-GAP-09 representation writes) |
 | Validation probes | **Landed** | `testkit/probes/validation/` | PROBE-025/026 (REQ-102) |
-| Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 (REQ-107 + REQ-104 slot-fill grammar) on `vital_signs.opt` + `clinical_note.opt` |
+| Instance synthesis probe | **Landed** | `testkit/probes/instance/` | PROBE-027 (REQ-107 + REQ-104 slot-fill grammar) on `vital_signs.opt` + `clinical_note.opt` + SDK-GAP-12 real-world corpus (`Referral Request.v1` / `Demonstration.v1` / `social`) |
 | Composition builder probe | **Landed** | `testkit/probes/composition/` | PROBE-023 (REQ-101) — full marshal → unmarshal → re-marshal round-trip |
 | AQL builder probe | **Landed** | `testkit/probes/aql/` | PROBE-020 (REQ-055) — struct vs verb byte-identical, both match golden; PROBE-021 mapping sandbox-tested |
 | Definition probe | **Landed** | `testkit/probes/definition/` | PROBE-067 |
