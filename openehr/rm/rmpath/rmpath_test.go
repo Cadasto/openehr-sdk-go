@@ -326,4 +326,28 @@ func TestTypedNilRootNoPanic(t *testing.T) {
 	if rmpath.PathExists(c, "/content/data") {
 		t.Error("PathExists(typed-nil root) = true, want false")
 	}
+	if rmpath.PathExists(c, "") || rmpath.PathExists(c, "/") {
+		t.Error("PathExists(typed-nil root, empty path) = true, want false")
+	}
+	if rmpath.PathUnique(c, "") {
+		t.Error("PathUnique(typed-nil root, empty path) = true, want false")
+	}
+	if _, err := rmpath.ItemAtPath(c, ""); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(typed-nil root, empty) err = %v, want ErrPathNotFound", err)
+	}
+}
+
+func TestNamePredicateTypedNilNameNoPanic(t *testing.T) {
+	obs := &rm.Observation{
+		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.blood_pressure.v1",
+		Name:            (*rm.DVText)(nil),
+	}
+	comp := &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.encounter.v1",
+		Content:         []rm.ContentItem{obs},
+	}
+	path := `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1 and name/value='Blood pressure']/data`
+	if _, err := rmpath.ItemAtPath(comp, path); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(name predicate, typed-nil Name) err = %v, want ErrPathNotFound", err)
+	}
 }

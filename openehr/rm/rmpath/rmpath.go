@@ -69,6 +69,9 @@ func PathUnique(root rm.Locatable, path string) bool {
 
 // resolve walks root by the parsed path and returns the matching items.
 func resolve(root rm.Locatable, path string) ([]any, error) {
+	if isNilPointer(root) {
+		return nil, nil
+	}
 	segs, err := parsePath(path)
 	if err != nil {
 		return nil, err

@@ -42,6 +42,42 @@ func TestParseObjectVersionID(t *testing.T) {
 	}
 }
 
+func TestParseObjectVersionIDRoundTrip(t *testing.T) {
+	const canonical = "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::cdr.example::2.1.4"
+	parsed, err := rm.ParseObjectVersionID(canonical)
+	if err != nil {
+		t.Fatalf("ParseObjectVersionID = %v", err)
+	}
+	if parsed.Value != canonical {
+		t.Errorf("Value = %q, want %q", parsed.Value, canonical)
+	}
+	if got := rm.UIDValue(parsed.ObjectID()); got != "87284370-2D4B-4e3d-A3F3-F303D2F4F34B" {
+		t.Errorf("ObjectID = %q", got)
+	}
+	if got := rm.UIDValue(parsed.CreatingSystemID()); got != "cdr.example" {
+		t.Errorf("CreatingSystemID = %q", got)
+	}
+	if got := parsed.VersionTreeID().Value; got != "2.1.4" {
+		t.Errorf("VersionTreeID = %q", got)
+	}
+	if !parsed.IsBranch() {
+		t.Error("IsBranch = false, want true")
+	}
+}
+
+func TestParseVersionTreeIDRoundTrip(t *testing.T) {
+	parsed, err := rm.ParseVersionTreeID("2.1.4")
+	if err != nil {
+		t.Fatalf("ParseVersionTreeID = %v", err)
+	}
+	if parsed.Value != "2.1.4" {
+		t.Errorf("Value = %q", parsed.Value)
+	}
+	if parsed.TrunkVersion() != "2" || parsed.BranchNumber() != "1" || parsed.BranchVersion() != "4" {
+		t.Errorf("decomposition = %q/%q/%q", parsed.TrunkVersion(), parsed.BranchNumber(), parsed.BranchVersion())
+	}
+}
+
 func TestObjectVersionIDDerivation(t *testing.T) {
 	ovid := rm.ObjectVersionID{Value: "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::cdr.example::2.1.4"}
 

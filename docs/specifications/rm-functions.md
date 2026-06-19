@@ -14,7 +14,7 @@ Per [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md):
 
 - Concrete-typed derivations (identifier components, `is_branch`) **MUST** be exposed as methods on the RM type, implemented in hand-written `*_funcs.go` files alongside the generated `*_gen.go` (the generator's documented "implement in a non-generated file" extension point).
 - A fallible parse (input may be malformed) **MUST** additionally offer an error-returning entry point: a package-level `Parse…` function for the identifier forms, and the `ToTime` / `ToDuration` conversions for the temporal forms. The BMM-signature derivation methods are **best-effort** — they return a zero value on malformed input and never panic; the package-level error-returning function is the canonical validity check (there is no per-method `ok` boolean). Where a derivation method needs no validation beyond decomposition (e.g. `VersionTreeID.is_branch`), it remains purely lexical — only the `Parse…` path is authoritative for well-formedness.
-- Library code **MUST NOT** panic on malformed identifier strings, on resolving an absent path, or on a typed-nil node in the object tree — failures surface as a returned error, a zero value, or an empty result, per [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025) and [§ Concurrency](idiom.md).
+- Library code **MUST NOT** panic on malformed identifier strings, on resolving an absent path, or on a typed-nil node in the object tree — failures surface as a returned error, a zero value, or an empty result, per [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025).
 - Navigation **MUST** remain reflection-free (typed dispatch) per [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024).
 
 ## REQ-120 — RM identifier parsing and derivation
@@ -23,16 +23,16 @@ The SDK **MUST** expose the derived components of the openEHR identifier types f
 
 - `UID_BASED_ID` (lexical form `root '::' extension`) **MUST** derive `root`, `extension`, and `has_extension`. `HIER_OBJECT_ID` and `OBJECT_VERSION_ID` inherit these; an `OBJECT_VERSION_ID`'s `object_id` is its `root`.
 - `OBJECT_VERSION_ID` (lexical form `object_id '::' creating_system_id '::' version_tree_id`) **MUST** derive `object_id`, `creating_system_id`, `version_tree_id`, and `is_branch`.
-- `VERSION_TREE_ID` (lexical form `trunk_version [ '.' branch_number '.' branch_version ]`, 1 or 3 dot-separated parts) **MUST** derive `trunk_version`, `branch_number`, `branch_version`, and `is_branch` (true iff the 3-part branch form is present).
+- `VERSION_TREE_ID` (lexical form `trunk_version [ '.' branch_number '.' branch_version ]`, 1 or 3 dot-separated parts) **MUST** derive `trunk_version`, `branch_number`, `branch_version`, `is_branch` (true iff the 3-part branch form is present), and `is_first` (true iff the trunk version is `1`).
 - `ARCHETYPE_ID` (lexical form `rm_originator '-' rm_name '-' rm_entity '.' concept { '-' specialisation }* '.v' version_id`) **MUST** derive `rm_originator`, `rm_name`, `rm_entity`, `qualified_rm_entity`, `domain_concept`, `specialisation`, and `version_id`.
 - `TERMINOLOGY_ID` (lexical form `name [ '(' version ')' ]`) **MUST** derive `name` and `version_id`.
 - `OBJECT_REF` / `PARTY_REF` and the `PARTY_PROXY` family **SHOULD** expose convenience accessors for their reference and identity components; `LOCATABLE_REF` **SHOULD** provide `as_uri()` — the `ehr:`-scheme URI built from `namespace` + `id.value` + `path`.
 
-There **MUST** be a **single canonical parser** for each identifier form, owned in `openehr/rm`; existing client-side helpers (e.g. the version-uid splitter in `openehr/client/ehr`) **MUST** delegate to it rather than re-parse — one canonical home, no duplicate lexical logic.
+There **MUST** be a **single canonical parser** for each fallible identifier form, owned in `openehr/rm` (`ParseObjectVersionID`, `ParseVersionTreeID`, `ParseArchetypeID`, `ParseTerminologyID`); existing client-side helpers (e.g. the version-uid splitter in `openehr/client/ehr`) **MUST** delegate to them rather than re-parse — one canonical home, no duplicate lexical logic. `HIER_OBJECT_ID` / `UID_BASED_ID` decomposition is best-effort only (no separate `Parse…` entry point).
 
-A malformed identifier string **MUST NOT** panic: the error-returning parser **MUST** return a non-nil error, and the best-effort methods **MUST** return a zero value with a companion `ok`/error rather than crash.
+A malformed identifier string **MUST NOT** panic: the error-returning `Parse…` functions **MUST** return a non-nil error, and the best-effort derivation methods **MUST** return a zero value and never panic (there is no per-method `ok` boolean — see § Surface and fallibility above).
 
-**Acceptance:** for canonical and malformed sample strings of each form, the derived components equal the spec's lexical decomposition; malformed input yields an error (no panic); the client version-uid helper produces identical results to the canonical parser.
+**Acceptance:** for canonical and malformed sample strings of each form, `Parse…` round-trips the input and derived components equal the spec's lexical decomposition; malformed input yields an error from `Parse…` (no panic); best-effort methods never panic; the client version-uid helper produces identical results to the canonical parser.
 
 **Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). The `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` convenience accessors are **SHOULD**-level and **deferred** to a follow-up (only `LOCATABLE_REF.as_uri` is realised in this band); the underlying fields are already directly accessible on the generated structs.
 
@@ -68,12 +68,12 @@ The SDK **MUST** expose read, inspection, comparison, and conversion helpers for
 
 - **Component access** — each type **MUST** expose the components of its parsed form: `DV_DATE` → `year`/`month`/`day`; `DV_TIME` → `hour`/`minute`/`second`/`fractional_second`; `DV_DATE_TIME` → their union; all with `timezone` where present; `DV_DURATION` → `years`/`months`/`weeks`/`days`/`hours`/`minutes`/`seconds`/`fractional_seconds`.
 - **Partial-form inspection** — `DV_DATE`/`DV_DATE_TIME`/`DV_TIME` **MUST** report partial forms (`is_partial`, and for dates `month_unknown`/`day_unknown`), since openEHR admits `"2024"` / `"2024-03"` approximate values that Go's `time.Time` cannot represent.
-- **Magnitude & comparison** — each type **MUST** expose `magnitude()` (days for `DV_DATE`; seconds for `DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`) and a total ordering consistent with the spec's `less_than` / `is_strictly_comparable_to`.
+- **Magnitude & comparison** — each type **MUST** expose `magnitude()` (days for `DV_DATE`; seconds for `DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`) and a total ordering consistent with the spec's `less_than` / `is_strictly_comparable_to`; the package-level `Compare` helper **MAY** implement the shared ordering logic for idiomatic Go callers.
 - **Go bridge** — each type **SHOULD** offer idiomatic conversion (`DV_DATE`/`DV_TIME`/`DV_DATE_TIME` → `time.Time`; `DV_DURATION` → `time.Duration`), returning an error when the value is partial — or, for a duration, carries calendar-nominal `Y`/`M` components — and so cannot map cleanly.
 
-A malformed `value` **MUST** surface as an error per the surface/fallibility policy above; resolution **MUST NOT** panic.
+Malformed input **MUST NOT** panic: component accessors and `magnitude()` are best-effort (zero on unparseable input); `ToTime` / `ToDuration` **MUST** return a non-nil error on malformed, partial, or calendar-nominal values.
 
-**Acceptance:** for canonical and partial sample strings of each type, the component accessors and `is_partial` match the ISO 8601 decomposition; `magnitude()` and comparison order a known sequence correctly; the Go-bridge conversion succeeds for full values and errors for partial/nominal ones.
+**Acceptance:** for canonical and partial sample strings of each type, the component accessors and `is_partial` match the ISO 8601 decomposition; `magnitude()` and comparison order a known sequence correctly; the Go-bridge conversion succeeds for full values and errors for partial/nominal ones; malformed samples return an error from `ToTime`/`ToDuration` and never panic.
 
 **Out of scope:** temporal **arithmetic** — `add`/`subtract`/`diff` against `DV_DURATION`, `DV_DURATION.multiply`/`negative`, and the calendar-aware `add_nominal`/`subtract_nominal` (leap-year / short-month semantics). Deferred to a follow-up REQ; the generated arithmetic methods remain documented stubs.
 

@@ -6,9 +6,10 @@ package rm
 // derived components bmmgen emits as suppressed stubs (manual_impl.go).
 // Each fallible form has a canonical package-level Parse… entry point
 // returning (T, error); the BMM-signature methods are best-effort and
-// never panic on malformed input (they return zero values). This is the
-// single canonical home for the identifier lexical forms — see
-// docs/specifications/rm-functions.md § REQ-120 and ADR 0011.
+// never panic on malformed input (best-effort lexical decomposition;
+// use Parse… for validation). This is the single canonical home for
+// the identifier lexical forms — see docs/specifications/rm-functions.md
+// § REQ-120 and ADR 0011.
 
 import (
 	"errors"
