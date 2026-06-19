@@ -92,6 +92,10 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-109 | AQL static lint | [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION | [clinical-modeling.md § REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) | landed |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) | landed |
+| REQ-120 | RM identifier parsing and derivation | [rm-functions.md § REQ-120](rm-functions.md#req-120--rm-identifier-parsing-and-derivation) | planned |
+| REQ-121 | Locatable path read access | [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) | planned |
+| REQ-122 | Version-control derived helpers | [rm-functions.md § REQ-122](rm-functions.md#req-122--version-control-derived-helpers) | planned |
+| REQ-123 | Temporal data-value helpers | [rm-functions.md § REQ-123](rm-functions.md#req-123--temporal-data-value-helpers) | planned |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
@@ -114,5 +118,6 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |
 | Clinical modeling | 100–109 | 110–119 |
+| RM behavioural functions | 120–123 | 124–129 |
 
 Identifiers **MUST** be stable once published. Renumbering is prohibited.

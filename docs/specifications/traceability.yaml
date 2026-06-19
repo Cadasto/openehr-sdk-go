@@ -733,6 +733,38 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-17-public-compiled-template-bridge.md
 
+  - id: REQ-120
+    title: RM identifier parsing and derivation
+    canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation
+    status: draft
+    implementation: planned
+    adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
+    probes: []
+
+  - id: REQ-121
+    title: Locatable path read access
+    canonical: docs/specifications/rm-functions.md#req-121--locatable-path-read-access
+    status: draft
+    implementation: planned
+    adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
+    probes: []
+
+  - id: REQ-122
+    title: Version-control derived helpers
+    canonical: docs/specifications/rm-functions.md#req-122--version-control-derived-helpers
+    status: draft
+    implementation: planned
+    adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
+    probes: []
+
+  - id: REQ-123
+    title: Temporal data-value helpers
+    canonical: docs/specifications/rm-functions.md#req-123--temporal-data-value-helpers
+    status: draft
+    implementation: planned
+    adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
+    probes: []
+
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
   - id: REQ-002

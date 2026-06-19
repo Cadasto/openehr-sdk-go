@@ -16,5 +16,6 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | [0008](0008-smart-discovery-services-shape.md) | SMART discovery: canonical `services` map shape | Accepted (2026-06-17) |
 | [0009](0009-smart-auth-library-scope.md) | SMART-on-openEHR auth library scope and dependency model | Accepted (2026-06-18) |
 | [0010](0010-public-compiled-template-bridge.md) | Public compiled-template bridge placement (`openehr/templatecompile`) | Accepted (2026-06-17) |
+| [0011](0011-rm-behavioural-functions-surface.md) | RM behavioural-function surface and fallibility policy | Accepted (2026-06-19) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

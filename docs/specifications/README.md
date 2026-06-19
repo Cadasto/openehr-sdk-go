@@ -112,6 +112,7 @@ Identifiers MUST be stable once published — they are referenced from outside t
 | [module-layout.md](module-layout.md) | Package taxonomy, dependency direction, boundary rules, versioning |
 | [idiom.md](idiom.md) | Idiomatic Go surface — `context.Context`, `*http.Client` injection, functional options, errors, generics, concurrency |
 | [rm-modeling.md](rm-modeling.md) | openEHR Reference Model rules in Go — structs, embedded base, interfaces, type registry |
+| [rm-functions.md](rm-functions.md) | RM behavioural functions — identifier parsing/derivation, locatable path read access, version-derived helpers, temporal DV_* helpers (REQ-120–123) |
 | [bmm-conformance.md](bmm-conformance.md) | Pinned BMM sources, generator, P_BMM → Go mapping rules, primitive type mapping |
 | [auth.md](auth.md) | `auth.TokenSource` contract and the SMART-on-openEHR provider flow |
 | [wire.md](wire.md) | openEHR REST 1.1.0-development pin, AQL wire, canonical JSON / FLAT / STRUCTURED |
