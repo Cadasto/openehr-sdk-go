@@ -33,6 +33,12 @@ func parseBMMGeneric(declared string) (base, param string, ok bool) {
 	if j <= i {
 		return "", "", false
 	}
+	if strings.TrimSpace(declared[j+1:]) != "" {
+		return "", "", false
+	}
+	if param := strings.TrimSpace(declared[i+1 : j]); param == "" {
+		return "", "", false
+	}
 	return strings.TrimSpace(declared[:i]), strings.TrimSpace(declared[i+1 : j]), true
 }
 

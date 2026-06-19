@@ -50,4 +50,7 @@ func TestGenerateSocialMinimal_respectsContentUpper(t *testing.T) {
 	if n := len(comp.Content); n != 1 {
 		t.Fatalf("content len = %d, want 1 (existence.upper=1)", n)
 	}
+	if _, ok := comp.Content[0].(*rm.Observation); !ok {
+		t.Fatalf("content[0] type = %T, want *rm.Observation (first colliding optional sibling)", comp.Content[0])
+	}
 }

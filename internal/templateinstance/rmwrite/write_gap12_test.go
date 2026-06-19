@@ -59,7 +59,7 @@ func TestEnsureSingleNumericAndInterval(t *testing.T) {
 			attr:   "lower",
 			child:  rm.DVCount{Magnitude: 10},
 			check: func(t *testing.T, p any) {
-				if got := p.(*rm.DVInterval[rm.DVCount]).Interval.Lower.Magnitude; got != 10 {
+				if got := p.(*rm.DVInterval[rm.DVCount]).Lower.Magnitude; got != 10 {
 					t.Errorf("Lower.Magnitude = %d, want 10", got)
 				}
 			},
@@ -70,7 +70,7 @@ func TestEnsureSingleNumericAndInterval(t *testing.T) {
 			attr:   "upper",
 			child:  &rm.DVDate{Value: "2020-01-01"},
 			check: func(t *testing.T, p any) {
-				if got := p.(*rm.DVInterval[rm.DVDate]).Interval.Upper.Value; got != "2020-01-01" {
+				if got := p.(*rm.DVInterval[rm.DVDate]).Upper.Value; got != "2020-01-01" {
 					t.Errorf("Upper.Value = %q, want 2020-01-01", got)
 				}
 			},
@@ -81,7 +81,7 @@ func TestEnsureSingleNumericAndInterval(t *testing.T) {
 			attr:   "lower_included",
 			child:  true,
 			check: func(t *testing.T, p any) {
-				if !p.(*rm.DVInterval[rm.DVQuantity]).Interval.LowerIncluded {
+				if !p.(*rm.DVInterval[rm.DVQuantity]).LowerIncluded {
 					t.Error("LowerIncluded = false, want true")
 				}
 			},

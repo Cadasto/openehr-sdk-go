@@ -241,7 +241,7 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 	return nil
 }
 
-// TestGenerateClinicalNoteMinimal pins the PR #18 re-review finding:
+// TestGenerateClinicalNoteExample pins the PR #18 re-review finding:
 // clinical_note.opt uses the AOM 1.4 primitive-short-name shape
 // (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
 // Before the materialiseSingle / IsAOMPrimitiveShortName fix, the
@@ -251,7 +251,7 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 // policy (the INSTRUCTION subtree carrying DV_DURATION is beyond the
 // first content entry capped under Minimal — see
 // TestGenerateSocialMinimal_respectsContentUpper).
-func TestGenerateClinicalNoteMinimal(t *testing.T) {
+func TestGenerateClinicalNoteExample(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{

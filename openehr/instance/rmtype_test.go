@@ -16,6 +16,10 @@ func TestNewRMForOPTType_generics(t *testing.T) {
 		{"DV_INTERVAL<DV_QUANTITY>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVQuantity]); return ok }},
 		{"DV_INTERVAL<DV_COUNT>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVCount]); return ok }},
 		{"DV_INTERVAL<DV_DATE_TIME>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVDateTime]); return ok }},
+		{"DV_INTERVAL<DV_DATE>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVDate]); return ok }},
+		{"DV_INTERVAL<DV_TIME>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVTime]); return ok }},
+		{"DV_INTERVAL<DV_PROPORTION>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVProportion]); return ok }},
+		{"DV_INTERVAL<DV_ORDERED>", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVOrdered]); return ok }},
 		{"DV_TEXT", func(v any) bool { _, ok := v.(*rm.DVText); return ok }},
 		{"DV_INTERVAL", func(v any) bool { _, ok := v.(*rm.DVInterval[rm.DVOrdered]); return ok }},
 	}
@@ -46,5 +50,11 @@ func TestParseBMMGeneric(t *testing.T) {
 	}
 	if _, _, ok := parseBMMGeneric("DV_TEXT"); ok {
 		t.Fatal("expected non-generic DV_TEXT to return ok=false")
+	}
+	if _, _, ok := parseBMMGeneric("DV_INTERVAL<DV_QUANTITY>junk"); ok {
+		t.Fatal("expected trailing junk after generic param to return ok=false")
+	}
+	if _, _, ok := parseBMMGeneric("DV_INTERVAL<>"); ok {
+		t.Fatal("expected empty generic param to return ok=false")
 	}
 }

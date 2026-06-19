@@ -101,3 +101,55 @@ func TestValidateComposition_ConstraintCassette_MultimediaViolation(t *testing.T
 		t.Errorf("expected a primitive media_type violation, got %+v", r.Issues)
 	}
 }
+
+// REQ-110 — BOOLEAN AOM short-name on a DV wrapper scalar channel must
+// validate against the OPT's C_BOOLEAN constraint. Test_dv_boolean_true_false.v0
+// pins false_valid=false while the instance carries false.
+func TestValidateComposition_ConstraintCassette_BooleanViolation(t *testing.T) {
+	const id = "Test_dv_boolean_true_false.v0"
+	c := mustCompile(t, id)
+	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comp rm.Composition
+	if err := canjson.Unmarshal(raw, &comp); err != nil {
+		t.Fatalf("decode composition: %v", err)
+	}
+	r := validation.ValidateComposition(&comp, c)
+	found := false
+	for _, issue := range r.Issues {
+		if strings.HasPrefix(issue.Code, "primitive_") && strings.Contains(issue.Detail, "false not allowed") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a primitive boolean violation, got %+v", r.Issues)
+	}
+}
+
+// REQ-110 — INTEGER magnitude on a DV_COUNT scalar channel must validate
+// against the OPT range constraint. Test_dv_count_range_constraint.v0 pins
+// magnitude [10..20] while the instance carries 25.
+func TestValidateComposition_ConstraintCassette_CountRangeViolation(t *testing.T) {
+	const id = "Test_dv_count_range_constraint.v0"
+	c := mustCompile(t, id)
+	raw, err := os.ReadFile(fixtures.CompositionJSON(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comp rm.Composition
+	if err := canjson.Unmarshal(raw, &comp); err != nil {
+		t.Fatalf("decode composition: %v", err)
+	}
+	r := validation.ValidateComposition(&comp, c)
+	found := false
+	for _, issue := range r.Issues {
+		if strings.HasPrefix(issue.Code, "primitive_") && strings.Contains(issue.Detail, "outside [10..20]") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected a primitive count range violation, got %+v", r.Issues)
+	}
+}

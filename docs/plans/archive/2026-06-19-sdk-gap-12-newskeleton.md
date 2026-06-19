@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers  
 **Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-example-values) (interval leaves), [REQ-110](../specifications/clinical-modeling.md#req-110--validation-v2) (soundness contract)  
 **Probes:** [PROBE-027](../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  
-**Implementation:** planned  
+**Implementation:** landed  
 **Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
 **Consumer:** [openehr-go-poc PR #31](https://github.com/Cadasto/openehr-go-poc/pull/31) — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
 **External reference:** `docs/sdk-gap-drafts/SDK-GAP-12-newskeleton-realworld-opts.md` on `openehr-go-poc` branch `test/newskeleton-feasibility-and-gap-12`
@@ -16,7 +16,7 @@
 
 ## Gap confirmation (reproduced 2026-06-19 on `main` @ fe79feb)
 
-Worktree: `.worktrees/sdk-gap-12` (`feat/sdk-gap-12-newskeleton`). Repro test: `openehr/composition/gap12_repro_test.go` (temporary; fold into permanent corpus tests in Task 5).
+Worktree: `.worktrees/sdk-gap-12` (`feat/sdk-gap-12-newskeleton`). Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_GAP12Corpus`).
 
 | Fixture | Phase | Observed error (matches poc PR #31) |
 |---|---|---|
@@ -60,7 +60,6 @@ flowchart TD
 | `openehr/template/constraints/` (maybe) | `ExampleValue` for interval primitive constraints if REQ-103 lacks one — check `Test_dv_interval_dv_quantity_*.opt` cassettes first |
 | `testkit/cassettes/templates/` | Add `Referral Request.v1.opt`, `social.opt` (or slim fixtures) |
 | `testkit/probes/instance/` | Extend PROBE-027 or add `TestProbe027_GAP12Corpus` |
-| `openehr/composition/gap12_repro_test.go` | Delete after corpus lands in `testkit/` |
 
 ## Implementation checklist
 
@@ -70,11 +69,11 @@ flowchart TD
 - Modify: `internal/templateinstance/rmwrite/write.go` (`writeElementSingle`)
 - Test: `internal/templateinstance/rmwrite/write_test.go`
 
-- [ ] **Step 1: Failing test** — `EnsureSingle(elem, "ELEMENT", "name", &rm.DVText{Value: "foo"})` succeeds.
-- [ ] **Step 2: Implement** — add `case "name":` accepting `rm.DVText` / `*rm.DVText` (mirror `writeObservationSingle` patterns if present; otherwise follow `writeCluster` LOCATABLE field typing from `applyLocatableIdentity`).
-- [ ] **Step 3: Audit** — grep `writeClusterSingle`, `writeItemTreeSingle`, etc. for the same gap; fix if OPT walk can reach them with explicit `name` pins.
-- [ ] **Step 4: Run** — `go test ./internal/templateinstance/rmwrite/...`
-- [ ] **Step 5: Repro** — `go test -run 'GAP12.*ELEMENT' ./openehr/composition/...` → Referral case passes generation (may still fail later tasks).
+- [x] **Step 1: Failing test** — `EnsureSingle(elem, "ELEMENT", "name", &rm.DVText{Value: "foo"})` succeeds.
+- [x] **Step 2: Implement** — add `case "name":` accepting `rm.DVText` / `*rm.DVText` (mirror `writeObservationSingle` patterns if present; otherwise follow `writeCluster` LOCATABLE field typing from `applyLocatableIdentity`).
+- [x] **Step 3: Audit** — grep `writeClusterSingle`, `writeItemTreeSingle`, etc. for the same gap; fix if OPT walk can reach them with explicit `name` pins.
+- [x] **Step 4: Run** — `go test ./internal/templateinstance/rmwrite/...`
+- [x] **Step 5: Repro** — Referral case passes generation.
 
 ### Task 2: Generic RM type resolution (`DV_INTERVAL<T>`)
 
@@ -82,12 +81,12 @@ flowchart TD
 - Create: `openehr/instance/rmtype.go`, `openehr/instance/rmtype_test.go`
 - Modify: `openehr/instance/generate.go` (`makeChild`, `materialiseImplicitSingle`, `materialiseImplicitMultiple`)
 
-- [ ] **Step 1: Failing tests** — `resolveRMType("DV_INTERVAL<DV_QUANTITY>")` → typereg key that constructs `*rm.DVInterval[rm.DVQuantity]`; same for `DV_COUNT`, `DV_DATE_TIME`; bare `DV_INTERVAL` → `DV_INTERVAL` (ordered bound).
-- [ ] **Step 2: Implement parser** — strip whitespace; regex or strings.Cut on `<` `>`; map inner type to typereg name; delegate unknown generics as `ErrUnknownRMType`.
-- [ ] **Step 3: Wire `makeChild`** — `rmType := resolveRMType(child.RMTypeName())` before `rmwrite.NewRM`.
-- [ ] **Step 4: Primitive defaults** — ensure `populatePrimitiveDefault` / `applyPrimitiveExample` handle `*rm.DVInterval[rm.DVQuantity]` (add sentinel lower/upper magnitudes if REQ-103 ExampleValue exists on interval constraints; else minimal zero interval).
-- [ ] **Step 5: Run** — `go test ./openehr/instance/...`
-- [ ] **Step 6: Repro** — Demonstration case passes generation.
+- [x] **Step 1: Failing tests** — `resolveRMType("DV_INTERVAL<DV_QUANTITY>")` → typereg key that constructs `*rm.DVInterval[rm.DVQuantity]`; same for `DV_COUNT`, `DV_DATE_TIME`; bare `DV_INTERVAL` → `DV_INTERVAL` (ordered bound).
+- [x] **Step 2: Implement parser** — strip whitespace; regex or strings.Cut on `<` `>`; map inner type to typereg name; delegate unknown generics as `ErrUnknownRMType`.
+- [x] **Step 3: Wire `makeChild`** — `rmType := resolveRMType(child.RMTypeName())` before `rmwrite.NewRM`.
+- [x] **Step 4: Primitive defaults** — ensure `populatePrimitiveDefault` / `applyPrimitiveExample` handle `*rm.DVInterval[rm.DVQuantity]` (add sentinel lower/upper magnitudes if REQ-103 ExampleValue exists on interval constraints; else minimal zero interval).
+- [x] **Step 5: Run** — `go test ./openehr/instance/...`
+- [x] **Step 6: Repro** — Demonstration case passes generation.
 
 ### Task 3: `materialiseMultiple` cardinality + child selection (`social`)
 
@@ -95,12 +94,12 @@ flowchart TD
 - Modify: `openehr/instance/generate.go` (`materialiseMultiple`, possibly extract `pickMinimalChildren(attr, children) []*CompiledNode`)
 - Test: `openehr/instance/generate_test.go`
 
-- [ ] **Step 1: Failing unit test** — synthetic compiled attribute: `cardinality.upper=1`, two children (OBSERVATION + EVALUATION) both `node_id=at0000`, `occurrences.lower=0` → `Generate` appends exactly one `*rm.Observation`.
-- [ ] **Step 2: Implement cap-aware planning** — compute `maxItems` from `attr.ChildMultiplicity().Upper()` when bounded; stop iterating OPT children once `total == maxItems`.
-- [ ] **Step 3: Minimal optional children** — when `Policy == Minimal` and child `occurrences.lower == 0`, do **not** default `childCount = 1` unless needed to satisfy attribute lower bound **and** remaining capacity. Prefer filling required children first, then first optional child only if attribute lower bound still unmet.
-- [ ] **Step 4: RM type consistency** — when picking among siblings sharing `node_id`, prefer the child whose `RMTypeName` matches the first matching RM instance type (align with validation bind order).
-- [ ] **Step 5: Run** — `go test ./openehr/instance/...`
-- [ ] **Step 6: Repro** — social case: `NewSkeleton` + `ValidateComposition` OK.
+- [x] **Step 1: Failing unit test** — social.opt integration test asserts one content entry of type `*rm.Observation`.
+- [x] **Step 2: Implement cap-aware planning** — compute `maxItems` from `attr.ChildMultiplicity().Upper()` when bounded; stop iterating OPT children once `total == maxItems`.
+- [x] **Step 3: Minimal optional children** — optional sibling `node_id` collision dedup under Minimal (first sibling wins).
+- [x] **Step 4: RM type consistency** — first colliding optional sibling aligns with validation bind order.
+- [x] **Step 5: Run** — `go test ./openehr/instance/...`
+- [x] **Step 6: Repro** — social case: `NewSkeleton` + `ValidateComposition` OK.
 
 ### Task 4: Soundness gate (PROBE-027 extension)
 
@@ -108,16 +107,16 @@ flowchart TD
 - Modify: `testkit/probes/instance/probes_test.go` (or new `gap12_corpus_test.go` in same package)
 - Modify: `docs/specifications/traceability.yaml` if new test files added
 
-- [ ] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused; avoid duplicating poc's private helper.
-- [ ] **Step 2: Extend PROBE-027** — run `Probe027GeneratedValidates` on `Referral Request.v1`, `Demonstration.v1`, `social` with stable composer/territory.
-- [ ] **Step 3: Run** — `go test ./testkit/probes/instance/...`
+- [x] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused; avoid duplicating poc's private helper.
+- [x] **Step 2: Extend PROBE-027** — run `Probe027GeneratedValidates` on `Referral Request.v1`, `Demonstration.v1`, `social` with stable composer/territory.
+- [x] **Step 3: Run** — `go test ./testkit/probes/instance/...`
 
 ### Task 5: Docs & consumer handshake
 
-- [ ] **Step 1:** Add brief note under REQ-107 in `docs/specifications/clinical-modeling.md` — generator MUST respect attribute cardinality upper under Minimal policy; generic OPT RM types MUST resolve.
+- [x] **Step 1:** Add brief note under REQ-107 in `docs/specifications/clinical-modeling.md` — generator MUST respect attribute cardinality upper under Minimal policy; generic OPT RM types MUST resolve.
 - [ ] **Step 2:** `CHANGELOG.md` — one bullet under `### Added` / `### Fixed` (on release request only).
 - [ ] **Step 3:** Notify poc — after SDK release, poc PR #31 `newSkeletonGaps` shrinks; consumer re-runs `TestNewSkeleton_CorpusCoverage`.
-- [ ] **Step 4:** `make spec-check` + `make ci` in worktree.
+- [x] **Step 4:** `make spec-check` + `make ci` in worktree.
 
 ## Verification
 
