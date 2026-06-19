@@ -1263,6 +1263,20 @@ func lookupChildPayload(payload map[string]any, nodeID, label string) (any, bool
 	if v, ok := payload[nodeID]; ok {
 		return v, true
 	}
+	// Label-drift fallback: Empty() and the encoder can derive a node's display
+	// label from different term scopes — the party-root dictionary vs. a nested
+	// ITEM_TREE archetype's own dictionary (e.g. person_details.v2 at0001 is
+	// "Demografische gegevens" at the party root but "Geboortegegevens" in its
+	// own ontology). That made the labelled key built by Empty miss the encoder's
+	// "nodeID|label" lookup, silently dropping the cluster (birth date never
+	// reached Cadasto). nodeIDs are unique within one items collection, so a
+	// "nodeID|*" prefix match is unambiguous and recovers the payload.
+	prefix := nodeID + "|"
+	for k, v := range payload {
+		if strings.HasPrefix(k, prefix) {
+			return v, true
+		}
+	}
 	return nil, false
 }
 
