@@ -106,7 +106,7 @@ func (d *DVDate) IsStrictlyComparableTo(other DVDate) bool { return true }
 func (d *DVDate) ToTime() (time.Time, error) {
 	p, err := parseDate(d.Value)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date %q: %v", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	if !p.dayKnown {
 		return time.Time{}, fmt.Errorf("%w: date %q is partial", ErrTemporalConversion, d.Value)
@@ -162,14 +162,14 @@ func (d *DVTime) IsStrictlyComparableTo(other DVTime) bool { return true }
 func (d *DVTime) ToTime() (time.Time, error) {
 	p, err := parseTime(d.Value)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: time %q: %v", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	if !p.secondKnown {
 		return time.Time{}, fmt.Errorf("%w: time %q is partial", ErrTemporalConversion, d.Value)
 	}
 	loc, err := tzLocation(p)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: time %q: %v", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: time %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	return time.Date(0, 1, 1, p.hour, p.minute, p.second, int(p.frac*1e9), loc), nil
 }
@@ -248,14 +248,14 @@ func (d *DVDateTime) IsStrictlyComparableTo(other DVDateTime) bool { return true
 func (d *DVDateTime) ToTime() (time.Time, error) {
 	dp, tp, err := d.split()
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date-time %q: %v", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	if !dp.dayKnown || !tp.secondKnown {
 		return time.Time{}, fmt.Errorf("%w: date-time %q is partial", ErrTemporalConversion, d.Value)
 	}
 	loc, err := tzLocation(tp)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: date-time %q: %v", ErrTemporalConversion, d.Value, err)
+		return time.Time{}, fmt.Errorf("%w: date-time %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	return time.Date(dp.year, time.Month(dp.month), dp.day, tp.hour, tp.minute, tp.second, int(tp.frac*1e9), loc), nil
 }
@@ -323,7 +323,7 @@ func (d *DVDuration) IsStrictlyComparableTo(other DVDuration) bool { return true
 func (d *DVDuration) ToDuration() (time.Duration, error) {
 	p, err := parseDuration(d.Value)
 	if err != nil {
-		return 0, fmt.Errorf("%w: duration %q: %v", ErrTemporalConversion, d.Value, err)
+		return 0, fmt.Errorf("%w: duration %q: %w", ErrTemporalConversion, d.Value, err)
 	}
 	if p.years != 0 || p.months != 0 {
 		return 0, fmt.Errorf("%w: duration %q has calendar-nominal Y/M components", ErrTemporalConversion, d.Value)

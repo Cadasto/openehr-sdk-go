@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -158,10 +159,8 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 	if len(parts) != 3 {
 		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q must be object_id::creating_system_id::version_tree_id", ErrMalformedID, s)
 	}
-	for _, p := range parts {
-		if p == "" {
-			return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has an empty segment", ErrMalformedID, s)
-		}
+	if slices.Contains(parts, "") {
+		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has an empty segment", ErrMalformedID, s)
 	}
 	if _, err := ParseVersionTreeID(parts[2]); err != nil {
 		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q: %s", ErrMalformedID, s, strings.TrimPrefix(err.Error(), "rm: malformed identifier: "))

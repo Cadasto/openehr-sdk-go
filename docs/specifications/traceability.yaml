@@ -737,33 +737,59 @@ requirements:
     title: RM identifier parsing and derivation
     canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation
     status: draft
-    implementation: planned
+    implementation: landed
     adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
     probes: []
+    packages:
+      - openehr/rm
+      - openehr/client/ehr
+    tests:
+      - openehr/rm/identification_funcs_test.go
+      - openehr/client/ehr/ids_test.go
+    plans:
+      - docs/plans/2026-06-19-rm-functions.md
 
   - id: REQ-121
     title: Locatable path read access
     canonical: docs/specifications/rm-functions.md#req-121--locatable-path-read-access
     status: draft
-    implementation: planned
+    implementation: landed
     adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
     probes: []
+    packages:
+      - openehr/rm/rmpath
+    tests:
+      - openehr/rm/rmpath/rmpath_test.go
+    plans:
+      - docs/plans/2026-06-19-rm-functions.md
 
   - id: REQ-122
     title: Version-control derived helpers
     canonical: docs/specifications/rm-functions.md#req-122--version-control-derived-helpers
     status: draft
-    implementation: planned
+    implementation: landed
     adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
     probes: []
+    packages:
+      - openehr/rm
+    tests:
+      - openehr/rm/changecontrol_funcs_test.go
+    plans:
+      - docs/plans/2026-06-19-rm-functions.md
 
   - id: REQ-123
     title: Temporal data-value helpers
     canonical: docs/specifications/rm-functions.md#req-123--temporal-data-value-helpers
     status: draft
-    implementation: planned
+    implementation: landed
     adrs: [docs/adr/0011-rm-behavioural-functions-surface.md]
     probes: []
+    packages:
+      - openehr/rm
+    tests:
+      - openehr/rm/temporal_funcs_test.go
+    plans:
+      - docs/plans/2026-06-19-rm-functions.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
