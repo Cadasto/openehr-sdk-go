@@ -3,8 +3,30 @@ package ehr
 import (
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
+
+// TestVersionUIDDelegatesToCanonicalParser asserts the client helpers
+// agree with the canonical rm.ObjectVersionID parser (REQ-120): no
+// duplicate lexical logic.
+func TestVersionUIDDelegatesToCanonicalParser(t *testing.T) {
+	const raw = "87284370-2D4B-4e3d-A3F3-F303D2F4F34B::cdr.example::2"
+	v := VersionUID(raw)
+	ovID, err := rm.ParseObjectVersionID(raw)
+	if err != nil {
+		t.Fatalf("ParseObjectVersionID: %v", err)
+	}
+	if got, want := string(v.VersionedObjectID()), rm.UIDValue(ovID.ObjectID()); got != want {
+		t.Errorf("VersionedObjectID = %q, canonical = %q", got, want)
+	}
+	if got, want := v.CreatingSystemID(), rm.UIDValue(ovID.CreatingSystemID()); got != want {
+		t.Errorf("CreatingSystemID = %q, canonical = %q", got, want)
+	}
+	if got, want := v.VersionNumber(), ovID.VersionTreeID().Value; got != want {
+		t.Errorf("VersionNumber = %q, canonical = %q", got, want)
+	}
+}
 
 func TestExtractVersionUIDFromLocation(t *testing.T) {
 	tests := []struct {
