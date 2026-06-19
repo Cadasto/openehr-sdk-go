@@ -60,3 +60,15 @@ func TestNewVersionMetadataAbsoluteLocation(t *testing.T) {
 		t.Errorf("VersionUID = %q, want vo::sys::1", meta.VersionUID)
 	}
 }
+
+// TestVersionUIDMalformedSegments asserts the stricter (canonical-parser)
+// behaviour: a non-three-part version-uid yields empty segments (REQ-120).
+func TestVersionUIDMalformedSegments(t *testing.T) {
+	for _, raw := range []string{"uid::sys", "uid::sys::0", "uid::sys::1.1", "garbage", ""} {
+		v := VersionUID(raw)
+		if v.VersionedObjectID() != "" || v.CreatingSystemID() != "" || v.VersionNumber() != "" {
+			t.Errorf("%q: want empty segments, got %q/%q/%q",
+				raw, v.VersionedObjectID(), v.CreatingSystemID(), v.VersionNumber())
+		}
+	}
+}

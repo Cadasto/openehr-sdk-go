@@ -31,11 +31,12 @@
 //
 // The walker covers the clinical composition spine — COMPOSITION,
 // SECTION, the ENTRY types, HISTORY / EVENT, the ITEM_STRUCTURE
-// variants, CLUSTER, ELEMENT — and terminates at an ELEMENT.value leaf.
-// Demographic (PARTY) and EHR/admin object navigation are not yet
-// covered; an unresolvable attribute simply yields no match (path_exists
-// = false). Convergence onto a single shared RM navigator (with
-// openehr/validation/rmread) is a possible later step (ADR 0011).
+// variants, CLUSTER, ELEMENT — down to the ELEMENT leaf (its value, plus
+// name and null_flavour). Data-value internals (e.g. DV_QUANTITY.units)
+// are not traversed. Demographic (PARTY) and EHR/admin object navigation
+// are not yet covered; an unresolvable attribute simply yields no match
+// (path_exists = false). Convergence onto a single shared RM navigator
+// (with openehr/validation/rmread) is a possible later step (ADR 0011).
 //
 // # Fallibility
 //

@@ -7,7 +7,7 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
-| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D6) | Accepted (2026-05-16) |
+| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D7) | Accepted (2026-05-16) |
 | [0003](0003-rm-event-polymorphism.md) | Codec polymorphism for abstract generic RM classes (EVENT, …) | Accepted (2026-05-16) |
 | [0004](0004-numeric-wire-tolerance.md) | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted (2026-05-16) |
 | [0005](0005-compiled-template-foundation.md) | Compiled OPT foundation (`rminfo` + `internal/templatecompile`) | Accepted (2026-05-22) |

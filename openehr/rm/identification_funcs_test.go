@@ -206,3 +206,20 @@ func TestLocatableRefAsURI(t *testing.T) {
 		t.Errorf("AsURI(no path) = %q", got)
 	}
 }
+
+func TestIdentifierAccessorsNoPanicOnGarbage(t *testing.T) {
+	// REQ-120 best-effort derivation methods must never panic, however
+	// malformed the input. (A panic here fails the test outright.)
+	for _, g := range []string{"", "!!!", "::::", "no-delimiters", "a.b", "x::"} {
+		ov := rm.ObjectVersionID{Value: g}
+		_, _, _, _, _ = ov.ObjectID(), ov.CreatingSystemID(), ov.VersionTreeID(), ov.IsBranch(), ov.Extension()
+		a := rm.ArchetypeID{Value: g}
+		_, _, _, _, _, _ = a.RMOriginator(), a.RMName(), a.RMEntity(), a.DomainConcept(), a.Specialisation(), a.VersionID()
+		term := rm.TerminologyID{Value: g}
+		_, _ = term.Name(), term.VersionID()
+		h := rm.HierObjectID{Value: g}
+		_, _, _ = h.Root(), h.Extension(), h.HasExtension()
+		vt := rm.VersionTreeID{Value: g}
+		_, _, _, _ = vt.TrunkVersion(), vt.BranchNumber(), vt.IsBranch(), vt.IsFirst()
+	}
+}

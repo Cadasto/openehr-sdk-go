@@ -6,7 +6,14 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // flattened to a slice (0, 1, or many). Dispatch is on the concrete RM
 // type — reflection-free (REQ-024). An unknown (type, attr) pair yields
 // no children, so the path simply fails to resolve rather than panicking.
+//
+// A typed-nil pointer parent (including a typed-nil root, e.g. a
+// (*rm.Composition)(nil) passed to ItemAtPath) yields no children rather
+// than a nil-receiver dereference — upholding the no-panic contract.
 func childrenAt(parent any, attr string) []any {
+	if isNilPointer(parent) {
+		return nil
+	}
 	switch p := parent.(type) {
 	case *rm.Composition:
 		return compositionChildren(p, attr)
@@ -352,12 +359,15 @@ func ifaceSlice[T any](s []T) []any {
 
 // isNilPointer reports whether v is a typed-nil pointer to one of the RM
 // types the walker dispatches on. A typed-nil boxed in an interface
-// (e.g. (*rm.Observation)(nil) stored as a ContentItem) is itself
-// non-nil, so without this guard childrenAt / nodeIDOf would dereference
-// it. Reflection-free (REQ-024): an explicit type switch over the spine
-// pointer types that can appear as interface-typed children.
+// (e.g. (*rm.Observation)(nil) stored as a ContentItem, or a typed-nil
+// root) is itself non-nil, so without this guard childrenAt / nodeIDOf /
+// nameValueOf would dereference it. Reflection-free (REQ-024): an
+// explicit type switch covering every pointer type those switches
+// dispatch on — keep it in lock-step with them.
 func isNilPointer(v any) bool {
 	switch p := v.(type) {
+	case *rm.Composition:
+		return p == nil
 	case *rm.Observation:
 		return p == nil
 	case *rm.Evaluation:
@@ -372,6 +382,8 @@ func isNilPointer(v any) bool {
 		return p == nil
 	case *rm.Section:
 		return p == nil
+	case *rm.Activity:
+		return p == nil
 	case *rm.Cluster:
 		return p == nil
 	case *rm.Element:
@@ -384,6 +396,8 @@ func isNilPointer(v any) bool {
 		return p == nil
 	case *rm.ItemTable:
 		return p == nil
+	case *rm.History[rm.ItemStructure]:
+		return p == nil
 	case *rm.PointEvent[rm.ItemStructure]:
 		return p == nil
 	case *rm.IntervalEvent[rm.ItemStructure]:
@@ -394,6 +408,9 @@ func isNilPointer(v any) bool {
 
 // nodeIDOf returns the archetype_node_id of a LOCATABLE child, or "".
 func nodeIDOf(o any) string {
+	if isNilPointer(o) {
+		return ""
+	}
 	switch v := o.(type) {
 	case *rm.Composition:
 		return v.ArchetypeNodeID
@@ -473,6 +490,9 @@ func nodeIDOf(o any) string {
 
 // nameValueOf returns the name/value string of a LOCATABLE child, or "".
 func nameValueOf(o any) string {
+	if isNilPointer(o) {
+		return ""
+	}
 	switch v := o.(type) {
 	case *rm.Composition:
 		return rm.DVTextValueOf(v.Name)

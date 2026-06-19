@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** [REQ-120](../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation), [REQ-121](../specifications/rm-functions.md#req-121--locatable-path-read-access), [REQ-122](../specifications/rm-functions.md#req-122--version-control-derived-helpers), [REQ-123](../specifications/rm-functions.md#req-123--temporal-data-value-helpers); [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md)
 **Probes:** none — these are in-memory behaviours, unit-tested rather than wire-conformance (consistent with REQ-111).
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** the `bmmgen` stub-suppression hook (Phase 1) — every method-filling phase needs it. Landed packages reused: `openehr/rm` types, `openehr/aql/parse` / `openehr/template` (path-segment parsing reference), `openehr/validation/rmread` (walker *pattern* reference only — not imported).
 **Defers:** `PATHABLE.parent` / `path_of_item`; `VERSIONED_OBJECT` container ops (`version_count`/`version_at_time`/`latest_version`/`all_versions`/`commit_*`); temporal **arithmetic** (`add`/`subtract`/`diff`/`multiply`/`add_nominal`); FLAT/STRUCTURED. These remain generated panic-stubs, documented as out-of-scope in [rm-functions.md](../specifications/rm-functions.md).
 

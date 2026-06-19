@@ -163,7 +163,10 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has an empty segment", ErrMalformedID, s)
 	}
 	if _, err := ParseVersionTreeID(parts[2]); err != nil {
-		return ObjectVersionID{}, fmt.Errorf("%w: object_version_id %q has invalid version_tree_id %q", ErrMalformedID, s, parts[2])
+		// Chain the inner error so it is unwrappable; it already wraps
+		// ErrMalformedID, so errors.Is(…, ErrMalformedID) still holds and
+		// the prefix is not doubled.
+		return ObjectVersionID{}, fmt.Errorf("object_version_id %q: %w", s, err)
 	}
 	return ObjectVersionID{Value: s}, nil
 }
@@ -194,7 +197,10 @@ func (v *VersionTreeID) BranchVersion() string {
 	return ""
 }
 
-// IsBranch reports whether this is a 3-part branch identifier. REQ-120.
+// IsBranch reports whether this is a 3-part branch identifier. Like the
+// other derivation methods it is purely lexical and best-effort (it does
+// not validate that the parts are integers ≥ 1); use ParseVersionTreeID
+// for well-formedness. REQ-120.
 func (v *VersionTreeID) IsBranch() bool {
 	return len(strings.Split(v.Value, ".")) == 3
 }

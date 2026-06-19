@@ -227,3 +227,103 @@ func TestEmptyPathIsRoot(t *testing.T) {
 		t.Errorf("ItemAtPath(/) did not return the root")
 	}
 }
+
+// spineComposition exercises the spine types not covered by the
+// vital-signs / report fixtures: INSTRUCTION→ACTIVITY, ACTION, ADMIN_ENTRY
+// →ITEM_TABLE→CLUSTER, GENERIC_ENTRY→ITEM_SINGLE, and INTERVAL_EVENT.
+func spineComposition() *rm.Composition {
+	leaf := func(node, name, val string) rm.Element {
+		return rm.Element{ArchetypeNodeID: node, Name: rm.DVText{Value: name}, Value: rm.DVText{Value: val}}
+	}
+	instr := &rm.Instruction{
+		ArchetypeNodeID: "openEHR-EHR-INSTRUCTION.order.v1",
+		Name:            rm.DVText{Value: "Order"},
+		Activities: []rm.Activity{{
+			ArchetypeNodeID: "at0100",
+			Name:            rm.DVText{Value: "Act"},
+			// ITEM_SINGLE (an ITEM_STRUCTURE) under the activity.
+			Description: &rm.ItemSingle{ArchetypeNodeID: "at0101", Item: leaf("at0102", "Dose", "5mg")},
+		}},
+	}
+	action := &rm.Action{
+		ArchetypeNodeID: "openEHR-EHR-ACTION.proc.v1",
+		Name:            rm.DVText{Value: "Action"},
+		Description:     &rm.ItemTree{ArchetypeNodeID: "at0200", Items: []rm.Item{leaf("at0201", "Step", "done")}},
+	}
+	admin := &rm.AdminEntry{
+		ArchetypeNodeID: "openEHR-EHR-ADMIN_ENTRY.appt.v1",
+		Name:            rm.DVText{Value: "Admin"},
+		Data: &rm.ItemTable{ArchetypeNodeID: "at0300", Rows: []rm.Cluster{{
+			ArchetypeNodeID: "at0301", Items: []rm.Item{leaf("at0302", "Cell", "x")},
+		}}},
+	}
+	generic := &rm.GenericEntry{
+		ArchetypeNodeID: "openEHR-EHR-GENERIC_ENTRY.g.v1",
+		Name:            rm.DVText{Value: "Generic"},
+		// GENERIC_ENTRY.data is an ITEM (here an ELEMENT), not an ITEM_STRUCTURE.
+		Data: leaf("at0401", "Only", "v"),
+	}
+	obs := &rm.Observation{
+		ArchetypeNodeID: "openEHR-EHR-OBSERVATION.iv.v1",
+		Name:            rm.DVText{Value: "IV obs"},
+		Data: rm.History[rm.ItemStructure]{
+			ArchetypeNodeID: "at0500",
+			Events: []rm.Event{&rm.IntervalEvent[rm.ItemStructure]{
+				ArchetypeNodeID: "at0501",
+				Name:            rm.DVText{Value: "Interval"},
+				Data:            &rm.ItemTree{ArchetypeNodeID: "at0502", Items: []rm.Item{leaf("at0503", "IVval", "iv")}},
+			}},
+		},
+	}
+	return &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.spine.v1",
+		Name:            rm.DVText{Value: "Spine"},
+		Content:         []rm.ContentItem{instr, action, admin, generic, obs},
+	}
+}
+
+func TestSpineTypeCoverage(t *testing.T) {
+	comp := spineComposition()
+	cases := map[string]struct{ path, want string }{
+		"instruction/activity/itemsingle": {"/content[openEHR-EHR-INSTRUCTION.order.v1]/activities[at0100]/description/item/value", "5mg"},
+		"action/itemtree":                 {"/content[openEHR-EHR-ACTION.proc.v1]/description/items[at0201]/value", "done"},
+		"adminentry/itemtable/cluster":    {"/content[openEHR-EHR-ADMIN_ENTRY.appt.v1]/data/rows[at0301]/items[at0302]/value", "x"},
+		"genericentry/element":            {"/content[openEHR-EHR-GENERIC_ENTRY.g.v1]/data/value", "v"},
+		"observation/intervalevent":       {"/content[openEHR-EHR-OBSERVATION.iv.v1]/data/events[at0501]/data/items[at0503]/value", "iv"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := rmpath.ItemAtPath(comp, c.path)
+			if err != nil {
+				t.Fatalf("ItemAtPath(%q) = %v", c.path, err)
+			}
+			if dv, ok := got.(rm.DVText); !ok || dv.Value != c.want {
+				t.Errorf("= %v (%T), want DVText %q", got, got, c.want)
+			}
+		})
+	}
+}
+
+func TestMalformedPathBooleansAndItemAt(t *testing.T) {
+	comp := vitalSigns()
+	const bad = "/content[at0001" // unterminated predicate
+	if rmpath.PathExists(comp, bad) {
+		t.Error("PathExists(malformed) = true, want false")
+	}
+	if rmpath.PathUnique(comp, bad) {
+		t.Error("PathUnique(malformed) = true, want false")
+	}
+	if _, err := rmpath.ItemAtPath(comp, bad); !errors.Is(err, rmpath.ErrPathSyntax) {
+		t.Errorf("ItemAtPath(malformed) err = %v, want ErrPathSyntax", err)
+	}
+}
+
+func TestTypedNilRootNoPanic(t *testing.T) {
+	var c *rm.Composition // typed-nil root
+	if _, err := rmpath.ItemAtPath(c, "/content"); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(typed-nil root) err = %v, want ErrPathNotFound", err)
+	}
+	if rmpath.PathExists(c, "/content/data") {
+		t.Error("PathExists(typed-nil root) = true, want false")
+	}
+}

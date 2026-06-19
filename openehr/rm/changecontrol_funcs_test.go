@@ -1,10 +1,29 @@
 package rm_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
+
+// TestVersionedObjectContainerOpsFailLoud asserts the out-of-scope
+// VERSIONED_OBJECT container operations remain fail-loud panic stubs
+// (server-mediated, not in-memory — REQ-122), so they aren't mistaken
+// for a silent zero-value.
+func TestVersionedObjectContainerOpsFailLoud(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("VersionCount() should panic (out of scope, server-mediated)")
+		}
+		if msg, ok := r.(string); !ok || !strings.Contains(msg, "not implemented: VERSIONED_OBJECT.version_count") {
+			t.Errorf("unexpected panic value: %v", r)
+		}
+	}()
+	vo := rm.VersionedObject[any]{}
+	_ = vo.VersionCount()
+}
 
 // REQ-122 — version-control derived helper.
 

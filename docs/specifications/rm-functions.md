@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, `PATHABLE`/`LOCATABLE`, and version-control classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape). Covers REQ-120 through REQ-122.
+Normative contract for the **derived / behavioural functions** the openEHR Reference Model defines on its identifier, `PATHABLE`/`LOCATABLE`, version-control, and temporal data-value classes — the operations that `bmmgen` emits as signatures from the pinned BMM but cannot implement from a schema (they carry algorithm, not just shape).
 
 Covers REQ-120 through REQ-123. Structural RM rules (how the types are generated and shaped) are in [rm-modeling.md](rm-modeling.md) and [bmm-conformance.md](bmm-conformance.md); this spec governs the **runtime behaviour** of the functions on those types. Identifier lexical forms are authoritative in the openEHR BASE *Identification* package and the RM *Common* package; agents **MUST** look them up there ([base_types identification](https://specifications.openehr.org/releases/BASE/development/base_types.html#_identification_package), [RM common](https://specifications.openehr.org/releases/RM/development/common.html)) rather than guess.
 
@@ -13,8 +13,8 @@ Conventions (RFC-2119 keywords, status axes): [README.md](README.md). Surface an
 Per [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md):
 
 - Concrete-typed derivations (identifier components, `is_branch`) **MUST** be exposed as methods on the RM type, implemented in hand-written `*_funcs.go` files alongside the generated `*_gen.go` (the generator's documented "implement in a non-generated file" extension point).
-- A fallible parse (input may be malformed) **MUST** additionally offer an error-returning entry point (e.g. a package-level `Parse…` function); the BMM-signature method returns a best-effort value and an `ok`/error companion.
-- Library code **MUST NOT** panic on malformed identifier strings or on resolving an absent path — failures surface as a returned error, `ok` boolean, or typed nil, per [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025) and [§ Concurrency](idiom.md).
+- A fallible parse (input may be malformed) **MUST** additionally offer an error-returning entry point: a package-level `Parse…` function for the identifier forms, and the `ToTime` / `ToDuration` conversions for the temporal forms. The BMM-signature derivation methods are **best-effort** — they return a zero value on malformed input and never panic; the package-level error-returning function is the canonical validity check (there is no per-method `ok` boolean). Where a derivation method needs no validation beyond decomposition (e.g. `VersionTreeID.is_branch`), it remains purely lexical — only the `Parse…` path is authoritative for well-formedness.
+- Library code **MUST NOT** panic on malformed identifier strings, on resolving an absent path, or on a typed-nil node in the object tree — failures surface as a returned error, a zero value, or an empty result, per [idiom.md § Errors (REQ-025)](idiom.md#errors-req-025) and [§ Concurrency](idiom.md).
 - Navigation **MUST** remain reflection-free (typed dispatch) per [idiom.md § Generics policy (REQ-024)](idiom.md#generics-policy-req-024).
 
 ## REQ-120 — RM identifier parsing and derivation
@@ -34,7 +34,7 @@ A malformed identifier string **MUST NOT** panic: the error-returning parser **M
 
 **Acceptance:** for canonical and malformed sample strings of each form, the derived components equal the spec's lexical decomposition; malformed input yields an error (no panic); the client version-uid helper produces identical results to the canonical parser.
 
-**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107).
+**Out of scope:** validity *checking* of the embedded `UID` syntax beyond decomposition; generation of new identifiers (covered for instance synthesis by REQ-107). The `OBJECT_REF` / `PARTY_REF` / `PARTY_PROXY` convenience accessors are **SHOULD**-level and **deferred** to a follow-up (only `LOCATABLE_REF.as_uri` is realised in this band); the underlying fields are already directly accessible on the generated structs.
 
 ## REQ-121 — Locatable path read access
 

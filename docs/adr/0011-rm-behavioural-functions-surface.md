@@ -18,12 +18,12 @@ Three forces shape how to realise them:
 
 ## Decision
 
-Realise the stubbed RM behavioural functions with a **hybrid surface**, scoped to the pure/derived subset (REQ-120/121/122):
+Realise the stubbed RM behavioural functions with a **hybrid surface**, scoped to the pure/derived subset (REQ-120/121/122/123):
 
 1. **Concrete-typed derivations as methods.** Identifier component derivation and `is_branch` are implemented as hand-written methods on the RM types, in `*_funcs.go` files beside the generated `*_gen.go` (the generator's documented target). They return the BMM-typed result.
-2. **Fallible parses also get an error-returning function.** Because identifier input may be malformed, each parse has a canonical package-level `Parse…` entry point returning `(T, error)`; the BMM-signature method returns a best-effort value with an `ok`/error companion. **No library code panics** on malformed data.
+2. **Fallible parses also get an error-returning function.** Because identifier input may be malformed, each parse has a canonical package-level `Parse…` entry point returning `(T, error)` (and `ToTime` / `ToDuration` for the temporal forms); the BMM-signature methods are best-effort, returning a zero value on malformed input — the package-level function is the error-returning companion (there is no per-method `ok` boolean). **No library code panics** on malformed data.
 3. **One canonical id parser.** The parser lives in `openehr/rm`; `openehr/client/ehr`'s version-uid helper delegates to it — single canonical home, no duplicate lexical logic.
-4. **Path read access as a building block.** `item_at_path`/`items_at_path`/`path_exists`/`path_unique` live in a new `openehr/rm/rmpath` package (sibling of `rminfo`) that carries **its own minimal reflection-free walker** — it does **not** import `openehr/validation/rmread`, preserving the dependency direction (REQ-014) and building-block independence (REQ-013). The generated `LOCATABLE` path methods delegate to it.
+4. **Path read access as a building block.** `item_at_path`/`items_at_path`/`path_exists`/`path_unique` live in a new `openehr/rm/rmpath` package (sibling of `rminfo`) that carries **its own minimal reflection-free walker** — it does **not** import `openehr/validation/rmread`, preserving the dependency direction (REQ-014) and building-block independence (REQ-013). ~~The generated `LOCATABLE` path methods delegate to it.~~ — **superseded by decision refinement 2 below**: a delegating method would create an `rm ↔ rmpath` import cycle, so the `LOCATABLE` path-method stubs are suppressed (not emitted) and the `rmpath` package functions are the surface.
 5. **Out-of-scope functions stay explicit stubs.** `PATHABLE.parent` / `path_of_item`, every `VERSIONED_OBJECT` container operation, and all `commit_*` mutators are not realised as in-memory RM behaviour (the SDK's versioning is server-mediated). They remain documented stubs that fail loudly rather than return a misleading value.
 
 ## Decision refinements (during implementation)

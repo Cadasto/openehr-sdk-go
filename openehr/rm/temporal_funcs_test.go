@@ -223,3 +223,24 @@ func TestTemporalMalformedNoPanic(t *testing.T) {
 		t.Errorf("ToDuration(nonsense) err = %v", err)
 	}
 }
+
+func TestDVDurationWeekMixing(t *testing.T) {
+	// openEHR permits the W designator mixed with others (deviation).
+	d := rm.DVDuration{Value: "P1Y2W3D"}
+	if d.Years() != 1 || d.Weeks() != 2 || d.Days() != 3 {
+		t.Errorf("P1Y2W3D = %dY/%dW/%dD, want 1/2/3", d.Years(), d.Weeks(), d.Days())
+	}
+	if d.Magnitude() <= 0 {
+		t.Errorf("Magnitude(P1Y2W3D) = %v, want > 0", d.Magnitude())
+	}
+}
+
+func TestDVTimeMagnitudeIsClockLocal(t *testing.T) {
+	// Magnitude is clock-local — the timezone offset is not normalized,
+	// so the same instant in different zones does not compare equal.
+	utc := rm.DVTime{Value: "10:00:00Z"}
+	plus2 := rm.DVTime{Value: "12:00:00+02:00"} // same instant as 10:00Z
+	if !utc.LessThan(plus2) {
+		t.Error("expected clock-local 10:00 < 12:00 (tz ignored)")
+	}
+}
