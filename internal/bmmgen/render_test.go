@@ -168,6 +168,73 @@ func TestMethodStubsForDVQuantity(t *testing.T) {
 	_ = src
 }
 
+// TestManualImplementationSkip asserts the manuallyImplemented set
+// (manual_impl.go) suppresses stub emission for the REQ-120..123
+// hand-written functions, while leaving the deferred functions as
+// generated fail-loud panic stubs. Guards the generator hook that lets
+// openehr/rm/*_funcs.go and openehr/rm/rmpath provide those surfaces
+// without a "method redeclared" collision (ADR 0002 § D7, ADR 0011).
+func TestManualImplementationSkip(t *testing.T) {
+	plan, err := BuildPlan(context.Background(), "openehr_rm_1.2.0", bmm.FSResolver{Root: testResources})
+	if err != nil {
+		t.Fatalf("BuildPlan: %v", err)
+	}
+	render := func(fileBase string) string {
+		var file *PlannedFile
+		for _, f := range plan.Files {
+			if f.FileBase == fileBase {
+				file = f
+				break
+			}
+		}
+		if file == nil {
+			t.Fatalf("%s file not in plan", fileBase)
+		}
+		got, err := RenderFile(plan, file)
+		if err != nil {
+			t.Fatalf("RenderFile(%s): %v", fileBase, err)
+		}
+		return string(got)
+	}
+
+	// Suppressed: these stubs MUST NOT appear (hand-written elsewhere).
+	suppressed := map[string][]string{
+		"base_types_identification": {
+			"not implemented: UID_BASED_ID.root",
+			"not implemented: OBJECT_VERSION_ID.is_branch",
+			"not implemented: VERSION_TREE_ID.is_branch",
+			"not implemented: ARCHETYPE_ID.domain_concept",
+			"not implemented: TERMINOLOGY_ID.name",
+			"not implemented: LOCATABLE_REF.as_uri",
+		},
+		"common_archetyped":             {"not implemented: PATHABLE.item_at_path", "not implemented: PATHABLE.path_unique"},
+		"common_change_control":         {"not implemented: VERSION.is_branch"},
+		"data_types_quantity_date_time": {"not implemented: DV_DATE.magnitude", "not implemented: DV_DURATION.less_than"},
+	}
+	for fileBase, msgs := range suppressed {
+		src := render(fileBase)
+		for _, m := range msgs {
+			if bytes.Contains([]byte(src), []byte(m)) {
+				t.Errorf("%s: stub %q should be suppressed (manuallyImplemented) but was emitted", fileBase, m)
+			}
+		}
+	}
+
+	// Deferred: these stubs MUST remain (out of scope, fail loud).
+	deferred := map[string][]string{
+		"common_archetyped":             {"not implemented: PATHABLE.parent", "not implemented: PATHABLE.path_of_item"},
+		"data_types_quantity_date_time": {"not implemented: DV_DATE.add", "not implemented: DV_DURATION.multiply"},
+	}
+	for fileBase, msgs := range deferred {
+		src := render(fileBase)
+		for _, m := range msgs {
+			if !bytes.Contains([]byte(src), []byte(m)) {
+				t.Errorf("%s: deferred stub %q should remain but was not emitted", fileBase, m)
+			}
+		}
+	}
+}
+
 // TestVerifyOnFreshTreeIsClean asserts that immediately after a
 // generation the working tree passes -verify with no drifts.
 func TestVerifyOnFreshTreeIsClean(t *testing.T) {

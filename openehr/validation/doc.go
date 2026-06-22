@@ -1,6 +1,6 @@
 // Package validation checks in-memory openEHR Reference Model
 // artefacts against a compiled OPT and reports every issue in one
-// pass — REQ-102.
+// pass — REQ-102 (COMPOSITION) and REQ-110 (any archetypeable root).
 //
 // Public entry:
 //
@@ -10,6 +10,14 @@
 //	        log.Printf("%s: %s — %s", issue.Path, issue.Code, issue.Detail)
 //	    }
 //	}
+//
+// The walker is value-source-generic: [Validate] runs it over any RM
+// root the closed RM set recognises, and the typed wrappers
+// [ValidateComposition], [ValidateDemographic] (PERSON / ORGANISATION /
+// GROUP / AGENT / ROLE), [ValidateFolder], and [ValidateEHRStatus]
+// delegate to it (REQ-110). PARTY sub-components (ADDRESS, CONTACT,
+// PARTY_IDENTITY, PARTY_RELATIONSHIP, CAPABILITY) validate in place
+// during a PARTY walk or as roots via [Validate].
 //
 // # Trust model
 //
@@ -30,7 +38,7 @@
 // OPT-required node is flagged at the parent attribute's path
 // (no descent), rather than silently bypassed.
 //
-// See [docs/plans/2026-05-24-validation-v2-template-driven.md]
+// See [docs/plans/archive/2026-05-24-composition-validation-template-driven.md]
 // for the migration's phase split.
 //
 // # Collect-all
@@ -44,15 +52,14 @@
 // `openehr/client/*`, or `openehr/serialize/`. The forbidden
 // forbidden-import set is enforced by `TestValidationForbiddenImports`.
 //
-// # v1: module-local callability
+// # External callability (REQ-111)
 //
-// The `c` argument is typed against the SDK's internal compiled-
-// template package (internal/templatecompile.Compiled). Per Go's
-// internal/ visibility rule, external modules cannot construct
-// the argument and therefore cannot call [ValidateComposition]
-// in v1. The validator is callable from any package within
-// github.com/cadasto/openehr-sdk-go (composition builder, codegen,
-// MCP servers, CI tools vendoring the SDK). External callability
-// lands alongside REQ-101 when template.Compile is re-exported.
-// See docs/adr/0005-compiled-template-foundation.md §C2.
+// The `c` argument is the compiled template. Construct it from a parsed
+// OPT with the public bridge
+// [github.com/cadasto/openehr-sdk-go/openehr/templatecompile.Compile];
+// the exported signatures here reference that public type, so external
+// modules can call [Validate] / [ValidateComposition] / siblings without
+// importing any internal/ package. The bridge lives in a sibling package
+// rather than openehr/template to avoid an import cycle and REQ-100's
+// stdlib-only contract — see docs/adr/0010-public-compiled-template-bridge.md.
 package validation

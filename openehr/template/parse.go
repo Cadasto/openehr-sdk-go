@@ -403,11 +403,15 @@ func buildNode(o *xmlCObject, strict bool, depth int) (Node, error) {
 			termBindings:  collectTermBindings(o.TermBindings),
 		}, nil
 	case "ARCHETYPE_SLOT":
+		includes := collectAssertions(o.Includes)
+		excludes := collectAssertions(o.Excludes)
 		return &Slot{
-			rmTypeName: o.RMTypeName,
-			nodeID:     o.NodeID,
-			includes:   collectAssertions(o.Includes),
-			excludes:   collectAssertions(o.Excludes),
+			rmTypeName:     o.RMTypeName,
+			nodeID:         o.NodeID,
+			includes:       includes,
+			excludes:       excludes,
+			parsedIncludes: parseSlotAssertions(includes),
+			parsedExcludes: parseSlotAssertions(excludes),
 		}, nil
 	default:
 		// REQ-103 primitive constraint types map to leaf

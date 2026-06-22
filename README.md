@@ -35,11 +35,11 @@ Plus building-block use cases that import a single sub-package (RM modeling, cod
 What the SDK provides today and what's planned. The authoritative landed-vs-planned status and the REQ / PROBE identifiers live in the [roadmap matrix](docs/roadmap.md) and the [REQ registry](docs/specifications/REQ.md).
 
 - **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), and Admin operations over a versioned transport. → [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
-- **Reference Model** — typed RM structs with a central type registry, generated from pinned BMM dictionaries. → [rm-modeling](docs/specifications/rm-modeling.md)
+- **Reference Model** — typed RM structs with a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. → [rm-modeling](docs/specifications/rm-modeling.md)
 - **Serialization** — canonical JSON and XML round-trips; FLAT / STRUCTURED planned. → [wire](docs/specifications/wire.md)
 - **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints and a compiled-template foundation. → [rm-modeling](docs/specifications/rm-modeling.md)
 - **Compositions** — OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. → [wire](docs/specifications/wire.md)
-- **AQL** — literal AQL wire models and result sets; fluent builders planned. → [wire](docs/specifications/wire.md)
+- **AQL** — literal AQL wire models and result sets, fluent struct/verb builders, and static parse-and-lint. → [wire](docs/specifications/wire.md)
 - **Authentication** — SMART-on-openEHR (PKCE), client-credentials, JWT-bearer, and basic token sources, layered over a generic injected `TokenSource`. → [auth](docs/specifications/auth.md)
 - **Service discovery** — multi-backend service catalog with per-node spec pinning and partial-failure handling. → [service-discovery](docs/specifications/service-discovery.md)
 - **Cadasto platform extras** — Datamap, MPI, Extra API, Admin, and Care aggregates, shipped in-module for v1 behind a clean cut line. → [module-layout](docs/specifications/module-layout.md)

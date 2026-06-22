@@ -92,12 +92,19 @@ flowchart TD
 
 The SDK is built for a minimal, auditable dependency surface:
 
-- **Two direct third-party runtime dependencies, both narrowly scoped:**
-  - **OpenTelemetry** (`go.opentelemetry.io/otel`, `/trace`), used **only** by `transport/` for distributed tracing (REQ-090). It pulls a handful of transitive deps (logr, xxhash).
-  - **The ANTLR Go runtime** (`github.com/antlr4-go/antlr/v4`, pure Go, no transitive deps), used **only** by `openehr/aql/parse` to run the committed, generated AQL parser (REQ-109, ADR [0007](adr/0007-aql-antlr-grammar-profile.md)). The generator (Java) is containerised and codegen-only — never on the build/test path.
-- **Everything else is the standard library** — `net/http` for the (injected) HTTP client, `encoding/json` and `encoding/xml` for the canonical codecs, `crypto/*` + `encoding` for JWT/JWKS handling in `auth/smart`, and `context` threaded throughout.
-- **Most building blocks pull zero external code.** Importing `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, or `openehr/validation` brings in no third-party packages at all. The exceptions are the OTel-carrying `transport/` path and the AQL lint path (`openehr/aql/parse` → ANTLR runtime; `openehr/aql/lint` and `validation.ValidateAQL` transitively). This keeps CLI validators, fakers, and mapping prototypes lightweight and is the practical payoff of the building-block boundary (REQ-013).
-- **No HTTP-client library** (the SDK wraps stdlib `net/http`) and **no OAuth/identity library** (`auth/smart` is hand-rolled against the SMART-on-openEHR contract).
+Runtime dependencies are kept deliberately minimal and reviewed. The current set:
+
+| Dependency | Scope | Rationale |
+|---|---|---|
+| `go.opentelemetry.io/otel`, `/trace` | `transport/` only | Distributed tracing (REQ-090). Pulls logr, xxhash transitively. |
+| `github.com/antlr4-go/antlr/v4` | `openehr/aql/parse` only | AQL parser runtime — pure Go, no transitive deps (REQ-109, ADR [0007](adr/0007-aql-antlr-grammar-profile.md)). The generator (Java) is containerised, never on the build/test path. |
+| `golang.org/x/oauth2` | `auth/smart` (+ probes) | RFC 7636 PKCE `code_verifier`/`code_challenge` generation; parity cross-check in PROBE-004 (ADR [0009](adr/0009-smart-auth-library-scope.md)). Token sources/refresh/errors are the SDK's own `auth` types. |
+| `github.com/coreos/go-oidc/v3` | `smart/` (id-token verify) | ID-token verification for SMART App Launch (ADR [0009](adr/0009-smart-auth-library-scope.md)). |
+| `github.com/go-jose/go-jose/v4` | `auth/jwtbearer`, `smart/idtoken` | JWS signing for `client_assertion` / JWT Bearer grant and JWK→`crypto.PublicKey` parsing (ADR [0009](adr/0009-smart-auth-library-scope.md)). Direct dependency; also required by `go-oidc/v3`. |
+
+- **Everything else is the standard library** — `net/http` for the (injected) HTTP client, `encoding/json` and `encoding/xml` for the canonical codecs, and `context` threaded throughout.
+- **Most building blocks pull zero external code.** Importing `openehr/rm`, `openehr/serialize/canjson`, `openehr/template`, or `openehr/validation` brings in no third-party packages at all. The exceptions are the OTel-carrying `transport/` path, the AQL lint path (`openehr/aql/parse` → ANTLR runtime; `openehr/aql/lint` and `validation.ValidateAQL` transitively), and the auth path (`auth/`, `smart/` → x/oauth2 + go-oidc + go-jose). This keeps CLI validators, fakers, and mapping prototypes lightweight and is the practical payoff of the building-block boundary (REQ-013).
+- **No HTTP-client library** — the SDK wraps stdlib `net/http`.
 
 ## Integrating the SDK
 

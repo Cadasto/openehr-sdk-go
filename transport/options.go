@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/cadasto/openehr-sdk-go/auth"
 )
 
@@ -29,6 +31,10 @@ type config struct {
 	rawErrorBodies bool
 
 	maxResponseBody int64
+
+	reauther auth.Reauther
+
+	tracerProvider trace.TracerProvider
 }
 
 // Option mutates the transport configuration. Apply via transport.New.
@@ -124,4 +130,44 @@ const DefaultMaxResponseBody int64 = 64 << 20
 // via WithMaxResponseBody(-1).
 func WithMaxResponseBody(n int64) Option {
 	return func(cfg *config) { cfg.maxResponseBody = n }
+}
+
+// WithReauthOn401 installs an opt-in 401→reauth safety net (REQ-063).
+// When a wire 401 is received and the Reauther has not yet been invoked
+// for the current Do call, transport calls r.Reauth(ctx) once and retries
+// the request one time with the freshly acquired token. On a second 401
+// (or when Reauth returns an error) the error is surfaced to the caller.
+//
+// When this option is not set, the no-reauther path is unchanged:
+// a wire 401 returns ErrUnauthorized immediately (existing contract).
+//
+// This is a complementary safety net — proactive expiry-based refresh
+// in TokenSource.Token is the primary mechanism.
+//
+// All HTTP methods are retried, including non-idempotent writes (POST/PUT).
+// This is safe because a 401 means the request was rejected at the
+// authentication layer and therefore NOT processed by the resource — re-driving
+// it once after refreshing the credential cannot double-apply a write. Note,
+// however, that a 401 may also indicate insufficient scope rather than an
+// expired token; in that case the reauth-and-retry simply 401s again and the
+// caller still receives ErrUnauthorized (one wasted round-trip, no harm). Enable
+// the hook when your deployment returns 401 for token expiry; if a server
+// distinguishes expiry (401) from authorization (403), this targets the former.
+//
+// A discovery-catalog-refresh closure can satisfy the interface via
+// auth.ReautherFunc (REQ-071 bullet 3).
+func WithReauthOn401(r auth.Reauther) Option {
+	return func(cfg *config) { cfg.reauther = r }
+}
+
+// WithTracerProvider injects the OTel [trace.TracerProvider] used to
+// create spans inside [Client.Do]. When not set, [otel.GetTracerProvider]
+// is called at span-start time (the existing behaviour, preserving
+// backward compatibility).
+//
+// Injecting a provider is preferred in tests (avoids mutating the
+// global) and in multi-tenant binaries that route spans to different
+// exporters per-client.
+func WithTracerProvider(tp trace.TracerProvider) Option {
+	return func(cfg *config) { cfg.tracerProvider = tp }
 }

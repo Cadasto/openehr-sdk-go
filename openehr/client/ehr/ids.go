@@ -3,6 +3,8 @@ package ehr
 import (
 	"net/url"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
 // EHRID identifies an EHR root. Distinct type from the openEHR
@@ -23,7 +25,7 @@ type VersionedObjectID string
 func (v VersionedObjectID) String() string { return string(v) }
 
 // VersionUID identifies a specific version of a versioned resource.
-// Wire form: <uid>::<creating_system_id>::<version_number> per the
+// Wire form: <object_id>::<creating_system_id>::<version_tree_id> per the
 // openEHR ObjectVersionID grammar.
 type VersionUID string
 
@@ -31,36 +33,39 @@ type VersionUID string
 func (v VersionUID) String() string { return string(v) }
 
 // VersionedObjectID returns the versioned-object family this VersionUID
-// belongs to — the substring before the first "::". Empty when the
-// VersionUID does not contain the separator (best-effort).
+// belongs to — the object_id segment of the underlying ObjectVersionID.
+// Empty when the VersionUID is not a well-formed object_version_id.
+//
+// Delegates to the canonical parser [rm.ParseObjectVersionID] so the
+// "::"-splitting lexical logic has a single home (REQ-120).
 func (v VersionUID) VersionedObjectID() VersionedObjectID {
-	if voID, _, ok := strings.Cut(string(v), "::"); ok && voID != "" {
-		return VersionedObjectID(voID)
+	ovID, err := rm.ParseObjectVersionID(string(v))
+	if err != nil {
+		return ""
 	}
-	return ""
+	return VersionedObjectID(rm.UIDValue(ovID.ObjectID()))
 }
 
 // CreatingSystemID returns the creating-system segment of the
-// VersionUID — the substring between the first and second "::". Empty
-// when the VersionUID is malformed.
+// VersionUID. Empty when the VersionUID is not a well-formed
+// object_version_id. Delegates to [rm.ParseObjectVersionID] (REQ-120).
 func (v VersionUID) CreatingSystemID() string {
-	_, rest, ok := strings.Cut(string(v), "::")
-	if !ok {
+	ovID, err := rm.ParseObjectVersionID(string(v))
+	if err != nil {
 		return ""
 	}
-	sys, _, _ := strings.Cut(rest, "::")
-	return sys
+	return rm.UIDValue(ovID.CreatingSystemID())
 }
 
-// VersionNumber returns the version-number segment — the substring
-// after the second "::". Empty when malformed.
+// VersionNumber returns the version-tree segment of the VersionUID.
+// Empty when the VersionUID is not a well-formed object_version_id.
+// Delegates to [rm.ParseObjectVersionID] (REQ-120).
 func (v VersionUID) VersionNumber() string {
-	_, rest, ok := strings.Cut(string(v), "::")
-	if !ok {
+	ovID, err := rm.ParseObjectVersionID(string(v))
+	if err != nil {
 		return ""
 	}
-	_, num, _ := strings.Cut(rest, "::")
-	return num
+	return ovID.VersionTreeID().Value
 }
 
 // extractVersionUIDFromLocation parses a Location header value to a

@@ -28,7 +28,7 @@ Reading order:
 |---|---|---|
 | 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
 | 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
-| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml) |
+| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
 | 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
 | 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI conventions — recommended plugins/skills (go-coding, gopls-lsp, codebase-memory), MCP/openEHR skills, hooks |
 | 5 | [docs/adr/](docs/adr/) | Closed architectural decisions |
@@ -49,6 +49,10 @@ When implementing or reviewing against a REQ:
 4. Run `make spec-check` before claiming spec compliance (`make ci` includes it).
 
 New normative text goes in the **canonical topic spec** first, then the REQ registry row — never as duplicate prose in `REQ.md` or as a rule that exists only in code.
+
+**Descriptor & process.** Machine-readable conventions (REQ style, document paths, `make` targets, `PROBE`/`STRAND` toggles, ground-truth source) live in [`docs/.sdd.yaml`](docs/.sdd.yaml) — the descriptor the `sdd-*` skills read first. The end-to-end loop and the Definition of Ready / Done are mapped in [`docs/development-process.md`](docs/development-process.md).
+
+**superpowers + SDD.** SDD owns the spec/traceability layer; the superpowers loop owns build/verify/branch. Brainstorming design docs are *narrative input* that feeds the canonical specs (not a normative source), and plans belong in [`docs/plans/`](docs/plans/) with the `**Covers:**` header + DoR/DoD — never a parallel `docs/superpowers/` tree. Full redirect: [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd).
 
 **Examples:** when you add, rename, remove, or materially change a [`cmd/examples/`](cmd/examples/) program, keep its docs in sync **in the same PR** — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
@@ -71,7 +75,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …).
 
-**CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. One short bullet per artefact class (not per file, REQ, or commit); no API inventories (those live in `traceability.yaml`). Pre-1.0: only `### Added` is used.
+**CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. **One single-sentence bullet (~35 words max) per artefact class** — artefact + scope + key REQ/PROBE only; **no API inventories, method/type enumerations, or per-REQ breakdowns** (those live in `traceability.yaml`, commits, PR bodies). The release-summary line is one sentence. Err short — release notes are generated verbatim from the block, and a longer entry is a defect, not thoroughness. Pre-1.0: only `### Added` is used.
 
 ## Tooling & workflow
 
@@ -91,13 +95,17 @@ Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
 
-Test framework is stdlib `testing` + helpers in `testkit/`. The only third-party runtime dependency is OpenTelemetry (tracing, confined to `transport/`) — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
+Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies are kept deliberately minimal and reviewed; the current set is: **OpenTelemetry** (tracing, confined to `transport/`), **antlr4-go** (AQL parser, `openehr/aql/parse`), and — adopted for SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — **`golang.org/x/oauth2`** and **`github.com/coreos/go-oidc/v3`**; the latter also requires **`go-jose/v4`**, which `auth/jwtbearer` + `smart` import directly for JWS signing — all scoped to `auth/` and `smart/` — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
 **Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
+
+**Local agent config:** personal permission grants belong in the gitignored `.claude/settings.local.json` — never add a `permissions` block to the checked-in `.claude/settings.json` (shared hook/plugin config only).
 
 ## openEHR knowledge
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
+
+**REST API schema.** The machine-readable openEHR REST API contract is vendored in [`resources/its-rest/`](resources/its-rest/README.md) — the upstream `*-validation.openapi.yaml` OpenAPI 3.0 documents (EHR, Query, Definition, Admin, Demographic, System). When you need endpoint paths, request/response bodies, headers, or status codes for any REST resource, read those files rather than guessing. Refresh / verify the pin with `make its-rest-sync` / `make its-rest-check`.
 
 ## Do not touch (yet)
 

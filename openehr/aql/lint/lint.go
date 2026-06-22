@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // Severity classifies a lint [Issue]. Error means the query is (statically)

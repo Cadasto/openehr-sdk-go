@@ -98,7 +98,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A SMART-on-openEHR deployment is reachable.
 - **Wire assertion:** GET `<issuer>/.well-known/smart-configuration` (or equivalent) returns 200 with a JSON body containing `"response_types_supported"` including `"code"` and `"code_challenge_methods_supported"` including `"S256"`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_001_discovery_code_pkce.go`](../../testkit/probes/auth/probe_001_discovery_code_pkce.go). Resolves the canonical SMART configuration cassette through the real `discovery.Resolver` and asserts `code` + `S256` on the resolved `AuthEndpoints`.
+- **Satisfies:** REQ-061.
 
 #### PROBE-002 — Discovery advertises `org.openehr.rest`
 
@@ -106,7 +107,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** SMART discovery resolved.
 - **Wire assertion:** The discovery document's service catalog contains an entry with id `"org.openehr.rest"`, a parseable `base_url`, and a `spec_version` field.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_002_openehr_rest_service.go`](../../testkit/probes/auth/probe_002_openehr_rest_service.go). Asserts `catalog.OpenEHRRest()` resolves an entry with an absolute `base_url` and a declared `spec_version`.
+- **Satisfies:** REQ-070, REQ-072.
 
 #### PROBE-003 — Spec-version mismatch fails fast
 
@@ -114,15 +116,18 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** SDK is configured to require `1.1.0-development`; deployment advertises `1.0.3`.
 - **Wire assertion:** Construction-time discovery returns a `DiscoveryError` with reason `spec_version_mismatch`. No request to the openEHR REST endpoint is made.
 - **Modes:** Sandbox, Cassette (constructed-mismatch cassette).
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_003_spec_version_mismatch.go`](../../testkit/probes/auth/probe_003_spec_version_mismatch.go). Serves a cassette whose `org.openehr.rest` declares `1.0.3` and asserts the resolver fails fast with `DiscoveryError(spec_version_mismatch)`, returning no catalog.
+- **Satisfies:** REQ-072.
 
 #### PROBE-004 — PKCE verifier round-trip
 
 - **Title:** A SMART launch using `S256` PKCE successfully exchanges code for token.
 - **Preconditions:** Deployment registers the SDK as a SMART app with PKCE required.
 - **Wire assertion:** Authorization request carries `code_challenge` and `code_challenge_method=S256`; token exchange carries `code_verifier`; token response is 200 with an `access_token`.
+- **G-7 PKCE parity:** the SDK's verifier additionally satisfies RFC 7636 / `x/oauth2`: ≥ 32 bytes of decoded entropy, `base64.RawURLEncoding` (URL-safe, unpadded), and `code_challenge == base64url(SHA256(verifier))` with method `S256` — cross-checked against `golang.org/x/oauth2.S256ChallengeFromVerifier`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_004_pkce_verifier_round_trip.go`](../../testkit/probes/auth/probe_004_pkce_verifier_round_trip.go). Drives a full `auth/smart` authorization-code + PKCE launch against an httptest token endpoint and asserts the wire round-trip plus the G-7 parity properties.
+- **Satisfies:** REQ-061.
 
 #### PROBE-005 — Scope round-trip
 
@@ -130,7 +135,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Scope `patient/COMPOSITION.read` is requested.
 - **Wire assertion:** Authorization request `scope` parameter contains `patient/COMPOSITION.read`; token response `scope` field contains it (or the JWT `scope` claim does).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_005_scope_round_trip.go`](../../testkit/probes/auth/probe_005_scope_round_trip.go). Asserts the configured scope appears on the authorization request and survives into the SDK-parsed token-response `scope` field.
+- **Satisfies:** REQ-061.
 
 #### PROBE-008 — Platform principal claims surface verbatim
 
@@ -138,7 +144,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A token with `principal_uid = "u-123"`, `principal_type = "AGENT"`.
 - **Wire assertion:** SDK exposes `LaunchContext.Principal = {UID: "u-123", Type: PrincipalTypeAgent}`. Missing claims surface as nil/zero, not as guessed defaults.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_008_principal_claims.go`](../../testkit/probes/auth/probe_008_principal_claims.go). Mints a signed id_token, validates it via `smart.LaunchContextFromTokenResponse`, and asserts the principal claims surface verbatim while an absent-claims token yields a nil `Principal`.
+- **Satisfies:** REQ-067.
 
 #### PROBE-009 — Caller attribution forwarded on opt-in
 
@@ -146,7 +153,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** One client with `WithCallerAttribution(...)`, one without.
 - **Wire assertion:** Configured client emits the `X-Cadasto-Caller-Attribution` header and `caller.agent_id` OTel attribute; unconfigured client emits neither.
 - **Modes:** Sandbox.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_009_caller_attribution.go`](../../testkit/probes/auth/probe_009_caller_attribution.go). Runs one `transport.Client` with `WithCallerAttribution` and one without against the same httptest endpoint, capturing the request header at the server and the span attributes via an in-memory `TracerProvider` (no OTel-SDK dependency).
+- **Satisfies:** REQ-066.
 
 #### PROBE-006 — JWKS rotation transparent to caller
 
@@ -154,7 +162,8 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** A cached JWKS does not contain the `kid` of the issued token (simulating rotation).
 - **Wire assertion:** SDK fetches JWKS once, validates the token, and proceeds. No double-refresh, no double-validation failure surfaced.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/auth/probe_006_jwks_rotation.go`](../../testkit/probes/auth/probe_006_jwks_rotation.go). Signs an id_token with a rotated key whose `kid` is absent from the seeded JWKS cache, then asserts `smart.ValidateIDToken` recovers via exactly one refresh (seed + one fetch on the miss) and validates transparently.
+- **Satisfies:** REQ-062.
 
 #### PROBE-007 — Token refresh transparent to caller
 
@@ -162,7 +171,59 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached token has `expires_at < now`; refresh token is valid.
 - **Wire assertion:** Token endpoint receives `grant_type=refresh_token`; the next outgoing request carries the new access token.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Draft.
+- **Status:** Implemented (Sandbox) — both halves. The transport-side safety net (wire 401 → `Reauth` → retry once with refreshed bearer) is asserted in [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go) (REQ-063, Phase 4b). The proactive expiry-based half — `Source.Token` refreshing a stale token via a `grant_type=refresh_token` exchange on the wire — landed in Phase 5 as [`testkit/probes/auth/probe_007_proactive_refresh.go`](../../testkit/probes/auth/probe_007_proactive_refresh.go); it seeds an expired access token + valid refresh token and asserts the token endpoint receives exactly one `grant_type=refresh_token` request and the SDK returns the freshly issued bearer. (`auth/smart` unit tests `TestRefreshIfNeeded` / `TestSourceReauthForcesRefresh` remain.) Full cassette/live ratification is deferred.
+- **Satisfies:** REQ-063
+
+#### Launch-mode coverage (REQ-068)
+
+The four SMART grant flows × three launch modes (REQ-068) are exercised as
+named coverage functions alongside the auth probes in
+[`testkit/probes/auth/launch_modes.go`](../../testkit/probes/auth/launch_modes.go)
+(run via `TestLaunchModeStandalone` / `TestLaunchModeEmbedded` /
+`TestLaunchModeBackend`). They are coverage proofs rather than catalogued
+`PROBE-NNN` IDs, but they are part of the auth-suite definition of done:
+
+- **Standalone** — `Source.AuthorizeURL` builds an authorization URL with
+  `response_type=code` + the `S256` PKCE challenge and **no** `launch`
+  parameter.
+- **Embedded (EHR launch)** — an EHR-supplied `launch` parameter is
+  forwarded verbatim to the authorization endpoint.
+- **Backend service** — three confidential backend flows produce the
+  expected token request on the wire: `auth/clientcreds` with a symmetric
+  `client_secret` (HTTP Basic), `auth/clientcreds` with
+  `WithClientAssertion` (`client_credentials` + signed `client_assertion`,
+  no Basic, no `client_secret` — SMART Backend Services asymmetric), and
+  `auth/jwtbearer` (RFC 7523 JWT Bearer grant).
+
+Together with the PKCE public flow (PROBE-004) and the confidential-code
+auth-method selection (covered by `auth/smart`'s `TestExchangeWithPrivateKeyJWT`
+/ `TestG3CrossCheckRejectsUnsupportedMethod` / `TestExchangeWithClientSecretBasic`
+unit pins), this exercises all four flows across all three launch modes.
+
+##### Inferno SMART App Launch (STU2.2) Client-suite cross-check
+
+The HL7 Inferno **SMART App Launch Test Kit STU2.2 _Client_** suite is used
+as an external checklist (it cannot be executed here). Mapping of its
+client scenarios to SDK coverage:
+
+| Inferno client scenario | SDK coverage | Status |
+|---|---|---|
+| **Public client** (authorization-code + PKCE, no secret) | PROBE-004 (PKCE + G-7 parity), PROBE-005 (scope), standalone/embedded launch modes | Covered (Sandbox) |
+| **Confidential Symmetric** (`client_secret_basic`) | `auth/smart` `client_secret_basic` selection + backend symmetric arm of `LaunchModeBackend`; positive wire test `TestExchangeWithClientSecretBasic` (asserts `Authorization: Basic base64(clientID:secret)`, `grant_type=authorization_code`, no `client_assertion`) | Covered (Sandbox) |
+| **Confidential Asymmetric** (`private_key_jwt`) | `auth/smart` `WithClientAssertionKey` (`TestExchangeWithPrivateKeyJWT`, G-3 cross-check) + private_key_jwt backend arm of `LaunchModeBackend` | Covered (Sandbox) |
+| **Backend Services Asymmetric** (`client_credentials` + `client_assertion`) | backend arm of `LaunchModeBackend` (`auth/clientcreds.WithClientAssertion`); `auth/jwtbearer` for the RFC 7523 grant | Covered (Sandbox) |
+
+**Recorded gaps (follow-ups, not silent skips):**
+
+- The SDK is the SMART **client**, so Inferno scenarios that assert the SDK
+  *responds* as an authorization server (e.g. token-introspection responder
+  behaviour) are out of scope by construction.
+- Cassette/Live ratification of all auth probes against a reference
+  authorization server (and a real Inferno run against a deployed Cadasto
+  endpoint) is deferred — the probes are Sandbox-only today.
+- ES384/ES256 asymmetric client-assertion paths are unit-tested in
+  `auth/jwtbearer` but the launch-mode backend coverage exercises the RS384
+  default only; an ES* backend coverage arm is a possible follow-up.
 
 ### Versioned writes and optimistic concurrency
 
@@ -279,8 +340,17 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Compiled OPT for a fixture template; valid composer + territory for COMPOSITION roots.
 - **Wire assertion:** Cross-package round-trip — generator and validator agree on the same template-driven contract.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. v1 stop-gap: slot fills synthesise `openEHR-EHR-<RMType>.example.v1` archetype ids matching the validator's RM-type-prefix `slotFitsArchetypeID` heuristic until REQ-104 supplies a parsed slot grammar.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/instance/probe_027_generated_validates.go`](../../testkit/probes/instance/probe_027_generated_validates.go). Probe runs against both `vital_signs.opt` and `clinical_note.opt` for `Minimal` and `Example` policies. Slot fills draw a conforming archetype id from the parsed REQ-104 include grammar when a safe example can be synthesized, falling back to `openEHR-EHR-<RMType>.example.v1` (the validator's RM-type-prefix fallback path) only when the OPT carried no parseable includes.
 - **Satisfies:** REQ-107.
+
+#### PROBE-074 — Template-driven validation of non-COMPOSITION roots
+
+- **Title:** `validation.Validate(root, c)` over a fixture-defined list of (OPT, RM root, expected codes) tuples returns the expected [`validation.Issue.Code`](../../openehr/validation/issue.go) multiset for archetypeable roots outside the COMPOSITION content set — the demographic PARTY hierarchy (`PERSON`/`ORGANISATION`/`GROUP`/`AGENT`/`ROLE` + sub-components) and the EHR-IM roots (`FOLDER`/`EHR_STATUS`).
+- **Preconditions:** An OPT body rooted at the target RM type (real `Address.v2.opt` / `TestPerson.v2.opt`, or a synthetic root) and an in-memory or fixture-decoded RM root; each case carries a `WantCodes []string` multiset.
+- **Wire assertion:** Sandbox-only — `template.ParseOPT` + `templatecompile.Compile` + `validation.Validate` MUST produce an `Issue.Code` multiset matching each case's `WantCodes`. A conformant ADDRESS instance validates clean; a `PERSON` under an `ORGANISATION` OPT surfaces `rm_type_mismatch`; a `PERSON` missing its OPT-pinned `identities` surfaces `required` + `cardinality`; a `FOLDER` whose archetype id differs surfaces `archetype_id_mismatch`.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_074_noncomposition_validate.go`](../../testkit/probes/validation/probe_074_noncomposition_validate.go).
+- **Satisfies:** REQ-110, REQ-102, REQ-103.
 
 ### Canonical JSON and formats
 
@@ -354,7 +424,7 @@ The catalog is the normative list. Each entry has:
 - **Preconditions:** Cached catalog; backend rotates and returns `401` on the cached token.
 - **Wire assertion:** SDK refreshes JWKS/catalog once, retries once. On second `401`, returns `transport.ErrUnauthorized`.
 - **Modes:** Sandbox, Cassette.
-- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The full transport-driven retry-on-401 + `transport.ErrUnauthorized` mapping (REQ-071 bullet 3) lands once the transport calls into `Resolver.Refresh` on 401 — currently transport surfaces 401 directly without re-driving discovery.
+- **Status:** Implemented (Sandbox) — discovery-layer half — see [`testkit/probes/discovery/probe_041_catalog_refresh_on_401.go`](../../testkit/probes/discovery/probe_041_catalog_refresh_on_401.go). The probe asserts the resolver's `Refresh` against a 401 upstream issues exactly one fetch and returns a typed `*discovery.DiscoveryError(fetch_failed)`. The transport-layer 401→reauth hook is wired (opt-in via `transport.WithReauthOn401` + `auth.ReautherFunc`; see PROBE-007 in [`testkit/probes/auth/probe_007_transport_refresh.go`](../../testkit/probes/auth/probe_007_transport_refresh.go)); the REQ-071-bullet-3 application pattern (discovery-catalog-refresh on 401) remains the pending closure.
 - **Satisfies:** REQ-071 (discovery half), REQ-072
 
 ### REST binding
@@ -470,6 +540,15 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — `contribution.Submission` lands in [`openehr/client/ehr/contribution/submission.go`](../../openehr/client/ehr/contribution/submission.go) and `contribution.Commit` now takes `*Submission`; the probe is at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go). The commit-audit DTO (`contribution.UpdateAudit` + write-version wrappers `OriginalVersion`/`ImportedVersion`) drops the server-assigned `time_committed`; the probe asserts both the version shape and the audit shape. Unit-level pins `TestCommitSubmissionShape` and the `update_audit` / `version` tests cover the SDK leaf. Plans: [`docs/plans/archive/2026-05-26-contribution-submission-shape.md`](../plans/archive/2026-05-26-contribution-submission-shape.md) (SDK-GAP-10) and the UPDATE_AUDIT/DvCodedText follow-up (SPECITS-95).
 - **Satisfies:** SDK-GAP-10, REQ-050, REQ-095.
 
+#### PROBE-073 — Demographic PARTY polymorphic round-trip
+
+- **Title:** A PARTY of each concrete type (PERSON / ORGANISATION / GROUP / AGENT / ROLE) round-trips through create → get → get-version with its `_type` discriminator decoded back into the same concrete type at every hop.
+- **Preconditions:** A server (Sandbox: fake) serving the typed PARTY body for `POST|GET /demographic/{type}[/{uid_based_id}]` and the `ORIGINAL_VERSION<PARTY>` envelope for `GET /demographic/versioned_party/{vo_uid}/version`.
+- **Wire assertion:** Sandbox — `demographic.Create` (Prefer=representation), `demographic.Get`, and `demographic.GetVersion` each MUST decode the response into the same concrete Go type as the input PARTY (REQ-040). The VERSION hop additionally exercises the `ORIGINAL_VERSION<PARTY>` envelope whose generic `data` cannot decode into the abstract `rm.Party` interface and is re-decoded by `_type` through the type registry. A body whose `_type` decodes to a different concrete type is non-conformant.
+- **Modes:** Sandbox.
+- **Status:** Implemented (Sandbox) — see [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); the leaf is covered by the `openehr/client/demographic` unit tests. Demographic API maturity is Draft (upstream ITS-REST `x-status: DEVELOPMENT`).
+- **Satisfies:** REQ-040, REQ-050.
+
 ### Observability
 
 #### PROBE-050 — OTel span carries openEHR attributes
@@ -513,11 +592,11 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 
 | Topic | Probes | Lives in (test code) |
 |---|---|---|
-| Auth + discovery | PROBE-001 … 009 | *planned* — `testkit/probes/auth/` (discovery resolver covered by `smart/discovery/resolver_test.go`; formal probes not yet) |
+| Auth + discovery | PROBE-001 … 009 | **all implemented (Sandbox)** — [`testkit/probes/auth/`](../../testkit/probes/auth/). PROBE-001/002/003 drive the real `discovery.Resolver`; PROBE-004 (PKCE + G-7 parity) / PROBE-005 (scope) drive a full `auth/smart` authorization-code launch; PROBE-006 (JWKS rotation), PROBE-007 (transport + proactive refresh halves), PROBE-008 (principal claims), PROBE-009 (caller attribution). Launch-mode coverage (standalone / embedded / backend, REQ-068) lives alongside in [`launch_modes.go`](../../testkit/probes/auth/launch_modes.go). |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
 | AQL | PROBE-020 … 021, PROBE-028 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go) |
-| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed. |
+| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots. |
 | Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../../transport/client_test.go); *planned* — `testkit/probes/observability/` |
-| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip) still deferred |
+| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072, PROBE-073 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); PROBE-073 (Demographic PARTY polymorphic round-trip) implemented (Sandbox) at [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip) still deferred |

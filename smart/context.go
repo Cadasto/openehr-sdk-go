@@ -8,6 +8,7 @@ type launchContextKey struct{}
 // (REQ-064, REQ-067). Populated from a token-endpoint response via
 // [LaunchContextFromTokenResponse].
 type LaunchContext struct {
+	// FHIR-compat launch-context claims.
 	Patient   string
 	Encounter string
 	User      string
@@ -15,6 +16,26 @@ type LaunchContext struct {
 	IDToken   *IDTokenClaims
 	Issuer    string
 	Principal *PrincipalIdentity
+	// openEHR-native launch-context claims (REQ-064).
+	// EHRID is the EHR identifier conveyed via the "ehrId" token claim,
+	// requested via the "launch/patient" scope in the openEHR SMART spec
+	// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+	EHRID string
+	// EpisodeID is the episode identifier conveyed via the "episodeId" token
+	// claim, requested via the "launch/episode" scope (experimental).
+	EpisodeID string
+	// SMART-compat extras surfaced by reference SMART clients.
+	// Intent is the optional "intent" launch-context parameter (SMART v2).
+	Intent string
+	// SMARTStyleURL is the optional "smart_style_url" launch-context parameter (SMART v2).
+	SMARTStyleURL string
+	// NeedPatientBanner is the optional "need_patient_banner" launch-context parameter
+	// (SMART v2). nil means the server did not express a preference — the caller should
+	// apply the SMART default of showing the patient banner. Non-nil points to the
+	// server's explicit value.
+	NeedPatientBanner *bool
+	// Tenant is the optional "tenant" launch-context parameter (SMART v2).
+	Tenant string
 	// Raw is a defensive shallow copy of the token-response raw map;
 	// nested values are not deep-copied. Mutating it does not affect the
 	// originating TokenResponse.

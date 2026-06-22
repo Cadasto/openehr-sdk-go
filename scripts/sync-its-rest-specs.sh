@@ -1,0 +1,218 @@
+#!/usr/bin/env bash
+#
+# sync-its-rest-specs.sh — ingest / check / sync the openEHR ITS-REST
+# OpenAPI specifications into resources/its-rest/.
+#
+# Source: https://github.com/openEHR/specifications-ITS-REST
+#         computable/OAS/*-validation.openapi.yaml
+#
+# These are the *-validation flavour of the openEHR REST API OpenAPI 3.0
+# documents (the canonical, vendor-extension-light variant — the sibling
+# -codegen / -html flavours carry the same schema with tooling-specific
+# extensions). They are vendored as pinned reference assets: the machine-
+# readable contract for the openEHR REST API surface (EHR, COMPOSITION,
+# DIRECTORY, EHR_STATUS, CONTRIBUTION, QUERY, DEFINITION/templates,
+# ADMIN, DEMOGRAPHIC, SYSTEM). The SDK's transport/client packages are
+# hand-written against this contract; the specs are not code-generated
+# from (drift here is informational, not a build break).
+#
+# Subcommands:
+#   sync     Download every *-validation.openapi.yaml at ITS_REST_REF
+#            (default: master), write them to resources/its-rest/, and
+#            regenerate MANIFEST.txt (pinned commit + per-file sha256).
+#            Removes vendored specs no longer present upstream.
+#   ingest   Alias for sync (first-time population).
+#   check    Verify the vendored copies are intact and current:
+#              1. offline — recompute sha256 and compare to MANIFEST
+#                 (detects local edits / corruption); fails on mismatch.
+#              2. online (best-effort) — compare the pinned commit to the
+#                 current upstream HEAD and report if a sync is due.
+#
+# Environment:
+#   ITS_REST_REF   upstream git ref to pin (branch / tag / sha). Default: master.
+#   GITHUB_TOKEN   optional; raises the unauthenticated GitHub API rate limit.
+#
+# Reproducibility: `sync` resolves ITS_REST_REF to a concrete commit sha and
+# downloads every file at that sha, so two syncs of the same ref are
+# byte-identical. The resolved sha is recorded in MANIFEST.txt.
+set -euo pipefail
+
+readonly REPO="openEHR/specifications-ITS-REST"
+readonly OAS_PATH="computable/OAS"
+readonly SPEC_SUFFIX="-validation.openapi.yaml"
+readonly REF="${ITS_REST_REF:-master}"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+readonly DEST="$ROOT/resources/its-rest"
+readonly MANIFEST="$DEST/MANIFEST.txt"
+
+# --- helpers ---------------------------------------------------------------
+
+die() {
+  echo "sync-its-rest-specs: $*" >&2
+  exit 1
+}
+
+# api <path> — GET the GitHub REST API, honouring GITHUB_TOKEN when set.
+# --retry survives transient network blips / secondary rate limits.
+api() {
+  local url="https://api.github.com/repos/$REPO/$1"
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    curl -fsSL --retry 3 --retry-all-errors -H "Authorization: Bearer $GITHUB_TOKEN" "$url"
+  else
+    curl -fsSL --retry 3 --retry-all-errors "$url"
+  fi
+}
+
+# sha256_of <file> — print the bare sha256 hash of a file.
+sha256_of() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+
+# resolve_commit <ref> — print the concrete commit sha for a ref.
+resolve_commit() {
+  api "commits/$1" | jq -r '.sha' | grep -E '^[0-9a-f]{40}$' \
+    || die "could not resolve ref '$1' in $REPO"
+}
+
+# list_specs <commit> — print the *-validation.openapi.yaml filenames present
+# under computable/OAS at the given commit, one per line, sorted.
+list_specs() {
+  api "contents/$OAS_PATH?ref=$1" \
+    | jq -r '.[] | .name' \
+    | grep -E -- "${SPEC_SUFFIX//./\\.}$" \
+    | sort \
+    || die "no '*$SPEC_SUFFIX' files found under $OAS_PATH at $1"
+}
+
+# raw_url <commit> <name> — the raw.githubusercontent URL for a spec file.
+raw_url() {
+  echo "https://raw.githubusercontent.com/$REPO/$1/$OAS_PATH/$2"
+}
+
+require_tools() {
+  command -v curl >/dev/null || die "curl is required"
+  command -v jq >/dev/null || die "jq is required"
+}
+
+# --- subcommands -----------------------------------------------------------
+
+cmd_sync() {
+  require_tools
+  mkdir -p "$DEST"
+
+  echo "Resolving $REPO@$REF ..."
+  local commit
+  commit="$(resolve_commit "$REF")"
+  echo "Pinned commit: $commit"
+
+  local names
+  names="$(list_specs "$commit")"
+  [[ -n "$names" ]] || die "upstream returned an empty spec list"
+
+  # Download each spec at the pinned commit.
+  local name
+  while IFS= read -r name; do
+    echo "  fetch $name"
+    curl -fsSL --retry 3 --retry-all-errors "$(raw_url "$commit" "$name")" -o "$DEST/$name" \
+      || die "download failed: $name"
+    # Guard against a truncated/empty body that still returned HTTP 200 —
+    # don't let a corrupt file become the canonical (hashed) copy.
+    [[ -s "$DEST/$name" ]] || die "download produced an empty file: $name"
+  done <<<"$names"
+
+  # Drop vendored specs no longer present upstream.
+  local existing
+  for existing in "$DEST"/*"$SPEC_SUFFIX"; do
+    [[ -e "$existing" ]] || continue
+    local base
+    base="$(basename "$existing")"
+    if ! grep -qxF "$base" <<<"$names"; then
+      echo "  remove stale $base"
+      rm -f "$existing"
+    fi
+  done
+
+  # Regenerate the manifest (provenance + per-file integrity hashes).
+  {
+    echo "# openEHR ITS-REST OpenAPI specs — sync manifest"
+    echo "# Generated by scripts/sync-its-rest-specs.sh — do not edit by hand."
+    echo "source_repo: $REPO"
+    echo "source_path: $OAS_PATH"
+    echo "pattern: *$SPEC_SUFFIX"
+    echo "ref: $REF"
+    echo "commit: $commit"
+    echo "fetched_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "source_tree: https://github.com/$REPO/tree/$commit/$OAS_PATH"
+    echo "#"
+    echo "# sha256  filename"
+    while IFS= read -r name; do
+      echo "$(sha256_of "$DEST/$name")  $name"
+    done <<<"$names"
+  } >"$MANIFEST"
+
+  local count
+  count="$(wc -l <<<"$names")"
+  echo "Synced $count spec(s) → resources/its-rest/ (commit ${commit:0:12})"
+}
+
+cmd_check() {
+  [[ -f "$MANIFEST" ]] || die "no MANIFEST.txt — run 'make its-rest-sync' first"
+
+  # 1. Offline integrity: local files must match the manifest hashes.
+  echo "Checking vendored spec integrity against MANIFEST.txt ..."
+  local hash_block
+  hash_block="$(sed -n '/^# sha256  filename/,$p' "$MANIFEST" | tail -n +2)"
+  [[ -n "$hash_block" ]] || die "manifest has no hash block"
+
+  local rc=0
+  ( cd "$DEST" && sha256sum -c --quiet - <<<"$hash_block" ) || rc=1
+
+  # Detect vendored specs absent from the manifest (extras).
+  local name
+  for f in "$DEST"/*"$SPEC_SUFFIX"; do
+    [[ -e "$f" ]] || continue
+    name="$(basename "$f")"
+    if ! grep -qE "  $name\$" <<<"$hash_block"; then
+      echo "  UNTRACKED: $name (in resources/its-rest/ but not in MANIFEST.txt)"
+      rc=1
+    fi
+  done
+
+  if [[ $rc -ne 0 ]]; then
+    die "integrity check failed — run 'make its-rest-sync' to refresh"
+  fi
+  echo "Integrity OK ($(grep -cE "  .+$SPEC_SUFFIX\$" <<<"$hash_block") spec(s))."
+
+  # 2. Online staleness (best-effort; never fails the command).
+  require_tools
+  local pinned upstream
+  pinned="$(grep -E '^commit: ' "$MANIFEST" | awk '{print $2}')"
+  if upstream="$(resolve_commit "$REF" 2>/dev/null)"; then
+    if [[ "$pinned" != "$upstream" ]]; then
+      echo "Upstream $REPO@$REF advanced: ${pinned:0:12} -> ${upstream:0:12}"
+      echo "Run 'make its-rest-sync' to update the vendored specs."
+    else
+      echo "Up to date with $REPO@$REF (${pinned:0:12})."
+    fi
+  else
+    echo "(offline — skipped upstream staleness check)"
+  fi
+}
+
+main() {
+  case "${1:-}" in
+    sync | ingest) cmd_sync ;;
+    check) cmd_check ;;
+    "" | -h | --help)
+      sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+      ;;
+    *) die "unknown subcommand '$1' (want: sync | ingest | check)" ;;
+  esac
+}
+
+main "$@"

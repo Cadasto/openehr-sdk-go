@@ -15,6 +15,15 @@ Application
 
 The boundary between layers is **the generic `TokenSource` abstraction** — providers implement it; transports consume it; everything authenticated flows through it.
 
+## Canonical sources
+
+The SMART-on-openEHR authentication model in this SDK is derived from two primary specifications:
+
+- **openEHR SMART App Launch** — [https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html](https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html) — defines openEHR-specific extensions: the `services` discovery map, `launch/patient`, `launch/episode`, `ehrId`, `episodeId` claims, and the `org.openehr.rest` service identifier.
+- **HL7 SMART App Launch v2.2** — [https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/) — defines the PKCE flow, scopes and launch context (including `offline_access`, `online_access`, `launch`, `launch/patient`), client-confidential-asymmetric (`private_key_jwt`), Backend Services, and JWKS rotation.
+
+See also [ADR 0009](../adr/0009-smart-auth-library-scope.md) for the dependency and library-scope decisions underpinning this implementation.
+
 ## TokenSource contract
 
 ### REQ-060
@@ -94,6 +103,72 @@ The platform supports four SMART grant flows and three launch modes. The SDK **M
 | **Client Credentials** (backend services) | `auth/clientcreds` | Service-to-service callers (benchmark, seeder, MCP server backend) |
 | **JWT Bearer** (confidential clients with asymmetric keys) | `auth/jwtbearer` | Systems holding a signed assertion |
 
+#### JWT Bearer — client_assertion signing algorithms (Phase 3a)
+
+The HL7 SMART `client-confidential-asymmetric` profile states that clients **SHALL** support **RS384** and **ES384** for signing `client_assertion` JWTs at the token endpoint. The SDK's `auth/jwtbearer.ClaimsSigner` implements this baseline:
+
+| Algorithm | Key type | Status |
+|---|---|---|
+| **RS384** | RSA (`*rsa.PrivateKey`) | **default** — SMART baseline |
+| **ES384** | ECDSA P-384 (`*ecdsa.PrivateKey`) | supported — SMART baseline |
+| RS256 | RSA (`*rsa.PrivateKey`) | supported — back-compat only |
+| ES256 | ECDSA P-256 (`*ecdsa.PrivateKey`) | supported — common in practice |
+
+The default algorithm is **RS384** (changed from RS256 in Phase 3a). Callers that previously relied on the RS256 default must pass `WithAlgorithm("RS256")` explicitly if they require RS256.
+
+All signing is delegated to `github.com/go-jose/go-jose/v4`, which handles JOSE encoding including ECDSA r‖s byte-padding. Hand-rolled PKCS1v15/ECDSA paths have been removed.
+
+Key-type validation is enforced at `NewClaimsSigner` construction time and returns `auth.ErrInvalidConfig` on mismatch (e.g. ES384 with an RSA key). Opaque `crypto.Signer` implementations (e.g. KMS/HSM handles) are supported for both RSA and ECDSA: a non-concrete signer is wrapped at signing time with `go-jose/v4`'s `cryptosigner.Opaque`, which handles the JOSE encoding (including ECDSA r‖s) — no concrete-key requirement.
+
+#### Authorization Code with asymmetric client auth — `private_key_jwt` (Phase 3b, F-C)
+
+The HL7 SMART `client-confidential-asymmetric` profile lets a confidential client authenticate the authorization-code token exchange with a **signed `client_assertion`** (RFC 7523 / RFC 7521 `private_key_jwt`) instead of a shared `client_secret`. This is preferred over `client_secret_basic` because no symmetric secret is transmitted to the token endpoint.
+
+`auth/smart` enables this via `WithClientAssertionKey(signer crypto.Signer, alg, kid string)`. When configured, the code exchange (and refresh) **MUST**:
+
+- Send form fields `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer` and a freshly signed `client_assertion`.
+- **Omit** the HTTP Basic `Authorization` header (no `client_secret_basic`).
+
+The assertion is produced by reusing `auth/jwtbearer.ClaimsSigner` (the same RS384-default signer as the JWT Bearer flow above) with `iss = sub = client_id`, `aud = token_endpoint`, and an auto-generated unique `jti` and short `exp` (default 5 minutes). The signing algorithm and `kid` are caller-supplied; key/alg mismatches are rejected at construction with `auth.ErrInvalidConfig`.
+
+Client-authentication method selection is **deterministic** (no trial-and-error):
+
+| Configuration | Method | Wire effect |
+|---|---|---|
+| `WithClientAssertionKey` set | `private_key_jwt` | signed `client_assertion` form fields; no Basic header |
+| `WithClientSecret` set (only) | `client_secret_basic` (default) or `client_secret_post` | HTTP Basic header, or `client_id`/`client_secret` form fields |
+| neither | public client | no client authentication |
+
+For a symmetric secret the SDK defaults to `client_secret_basic`. When the server advertises `token_endpoint_auth_methods_supported` but **not** `client_secret_basic`, and **does** advertise `client_secret_post`, the SDK falls back to `client_secret_post` (credentials in the form body) so deployments that accept only the post-style method still work.
+
+Configuring **both** an assertion key and a client secret is ambiguous and is rejected at construction with `auth.ErrInvalidConfig`.
+
+##### G-3 — discovery-driven method cross-check
+
+When the authorization server advertises `token_endpoint_auth_methods_supported` (RFC 8414), `FromConfig` cross-checks the method implied by the configured credential against that list. If the list is non-empty and does **not** contain the resolved method (`private_key_jwt` when a signer is set; for a symmetric secret, `client_secret_basic` by default or `client_secret_post` when only the post method is advertised), construction fails fast with `auth.ErrInvalidConfig` rather than deferring the failure to a rejected token request. When the list is empty or absent, the check is skipped (the server has not constrained the method).
+
+#### Backend Services asymmetric client auth — `client_credentials` + `client_assertion` (Phase 3c, F-C)
+
+The HL7 SMART [Backend Services](https://hl7.org/fhir/smart-app-launch/backend-services.html) profile specifies that a backend service authenticates at the token endpoint with:
+
+- `grant_type=client_credentials`
+- `client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer`
+- A freshly signed `client_assertion` JWT (RFC 7523)
+- **No** HTTP Basic `Authorization` header and **no** `client_secret`
+
+`auth/clientcreds` implements this via `WithClientAssertion(src jwtbearer.AssertionSource)`. When configured, `fetch` calls `src.Assertion(ctx)` on every token exchange, adds the two `client_assertion*` form fields, and omits Basic auth and `client_secret`. Signing errors are wrapped as `auth.ErrTokenExchangeFailed` with the message prefix `"client_assertion signing: ..."`.
+
+**Distinction from `auth/jwtbearer`:** `auth/jwtbearer` implements the separate RFC 7523 _JWT Bearer Token Grant_ (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — the JWT is the _authorization grant_ itself. `auth/clientcreds` with `WithClientAssertion` uses `grant_type=client_credentials` — the JWT is the _client authentication credential_. Both use `jwtbearer.AssertionSource` / `jwtbearer.ClaimsSigner` for signing.
+
+**Configuration rules** (enforced at `FromConfig`):
+
+| Configuration | Behaviour |
+|---|---|
+| `WithClientAssertion` set, no `ClientSecret` | `private_key_jwt` — signed `client_assertion` form fields; no Basic header |
+| `ClientSecret` set (only) | `client_secret_basic` (default) or `client_secret_post` |
+| Both `ClientSecret` and `WithClientAssertion` | Rejected with `auth.ErrInvalidConfig` (ambiguous) |
+| Neither | Rejected with `auth.ErrInvalidConfig` (no credentials) |
+
 ### Launch modes
 
 Three launch modes the SDK **MUST** support — each is a way the SMART flow starts:
@@ -130,6 +205,13 @@ The PKCE implementation **MUST**:
 
 ### REQ-062 — JWKS rotation
 
+#### Algorithm allowlists (surface-only in v0.8)
+
+The SMART discovery resolver surfaces two algorithm-selection lists onto `AuthEndpoints` (REQ-070):
+
+- **`TokenEndpointAuthSigningAlgValuesSupported`** (`token_endpoint_auth_signing_alg_values_supported`) — the JWS algorithms the authorization server accepts for client-assertion JWTs at the token endpoint (e.g. `["RS384","ES384"]`). Phase 3b client-credential selection logic will read this list to choose a signing algorithm; in v0.8 the field is populated but not yet consumed.
+- **`IDTokenSigningAlgValuesSupported`** (`id_token_signing_alg_values_supported`) — the JWS algorithms used to sign ID tokens (e.g. `["RS256","ES384"]`). ID-token verification (REQ-064) consumes this list as the verification allowlist when present (see _ID-token verification algorithm agility_ below). `TokenEndpointAuthSigningAlgValuesSupported` remains surface-only in v0.8 (Phase 3b client-credential alg selection).
+
 The SDK validates ID tokens (and, in some deployments, opaque access tokens via introspection or signature verification) against the deployment's published JWKS. JWKS rotation **MUST** be handled:
 
 - The JWKS document **MUST** be fetched on first use and cached.
@@ -137,16 +219,43 @@ The SDK validates ID tokens (and, in some deployments, opaque access tokens via 
 - On a verification miss (`kid` not in cache), the SDK **MUST** refresh the JWKS once before reporting the verification as failed. This handles silent rotation by the authorization server.
 - The refresh path **MUST** coalesce concurrent attempts (REQ-026).
 
+#### ID-token verification algorithm agility (REQ-062, REQ-064) — landed in Phase 3e
+
+`smart.ValidateIDToken` verifies the `id_token` signature against the deployment's JWKS and then applies the SDK's claim semantics. Signature verification is delegated to **`github.com/coreos/go-oidc/v3`** (which uses `go-jose/v4`); the SDK does **not** hand-roll signature verification or JWK→key parsing.
+
+- **Supported algorithms:** `RS256`, `RS384`, `ES256`, `ES384`. RS384/ES384 are the HL7 SMART asymmetric baseline; RS256/ES256 cover the widely deployed remainder. Both RSA and ECDSA keys published in the JWKS are honoured.
+- **Allowlist:** the caller passes the deployment's `id_token_signing_alg_values_supported` (via `smart.WithIDTokenSigningAlgs` / `ValidateConfig.AllowedIDTokenAlgs`). When non-empty it is intersected with the supported set — the discovery list can narrow but never widen the SDK's support. An empty intersection (the deployment advertises only algorithms the SDK does not support) **fails closed**: validation is rejected with `auth.ErrJWKSValidationFailed` rather than silently falling back to the full supported set, honouring the server's advertised constraint. When the caller passes nothing, the full supported set applies.
+- **Rejected:** the unsecured `none` algorithm is always rejected (explicitly, and because it is never in the allowlist); any algorithm outside the effective allowlist is rejected; an `alg`/key-type mismatch is rejected by go-jose key matching. All rejections surface as `auth.ErrJWKSValidationFailed` (preserved sentinel — `errors.Is` keeps working).
+- **Verify-before-claims:** the signature is verified before any claim is trusted (inherent to go-oidc). The SDK then re-applies its stricter claim semantics via `claimsFromMap`: `iss`/`aud`/`exp`/`nbf`/`iat` with a **30-second** clock skew (`clockSkew`) plus the required `nonce` match. The returned `*IDTokenClaims` shape is unchanged.
+
+#### RFC 7662 token introspection client (F-J) — opt-in, resource-server scope — landed in Phase 5b
+
+The `auth/introspect` package provides a standalone, opt-in RFC 7662 token introspection client. It is a **resource-server / MCP-gateway concern**, not wired into the default `auth/smart` client path — reference SMART client SDKs deliberately omit introspection (it is not a client-side operation). Consumers acting as resource servers that need to validate opaque access tokens at runtime can use it independently.
+
+**Standards:** [RFC 7662 — OAuth 2.0 Token Introspection](https://www.rfc-editor.org/rfc/rfc7662) and the [HL7 SMART App Launch token-introspection profile](https://www.hl7.org/fhir/smart-app-launch/token-introspection.html).
+
+**Construction.** `introspect.New(endpoint string, httpClient *http.Client, opts ...Option) (*Client, error)` — injects the `*http.Client` (REQ-021; nil is rejected with `auth.ErrInvalidConfig`); validates that `endpoint` is a non-empty, parseable absolute URL (also `auth.ErrInvalidConfig` on failure). The `introspection_endpoint` URL is surfaced from the authorization server's discovery document via `smart/discovery` (see REQ-070 / `AuthEndpoints.IntrospectionEndpoint`) and can be passed directly.
+
+**Introspection call.** `(*Client).Introspect(ctx context.Context, token string, bearer string) (Result, error)` — POSTs `token=<value>` form-encoded to the endpoint (RFC 7662 §2.1) with `Authorization: Bearer <bearer>` (the resource server authenticates using its own access credential). `ctx` is threaded (REQ-020). An `{"active":false}` response is a **successful** introspection — returned as `(Result{Active:false}, nil)`; inactive tokens are **not** treated as errors. Non-2xx responses are returned as a wrapped `*auth.ExchangeError` (sentinel `auth.ErrTokenExchangeFailed`; `OAuth2` field populated when the body matches RFC 6749 §5.2).
+
+**`Result` fields (RFC 7662 §2.2).** `Active bool` (required). Optional/conditional: `Scope`, `ClientID`, `Username`, `TokenType`, `Exp`/`Iat`/`Nbf` (RFC 7662 numeric dates parsed to `time.Time` from the float64 JSON number), `Sub`, `Aud` (string or JSON array — array values joined with a space), `Iss`, `Jti`. SMART/openEHR launch-context extras when present: `Patient`, `FHIRUser` (`fhirUser`), `EHRID` (`ehrId`), `EpisodeID` (`episodeId`). `Raw map[string]any` carries the complete decoded body including vendor-extension claims.
+
 ### REQ-063 — Token refresh
 
-The `auth/smart` `TokenSource` **MUST** transparently refresh access tokens when:
+**Requesting a refresh token.** The authorization server grants a `refresh_token` only when the authorization request includes the appropriate offline-access scope. Per HL7 SMART App Launch v2 "Scopes and Launch Context" ([https://hl7.org/fhir/smart-app-launch/](https://hl7.org/fhir/smart-app-launch/)):
 
-- `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
-- A `401 Unauthorized` response is received from the wire with an indication that the token has expired.
+- Include `offline_access` in the scope list to request a refresh token that persists beyond the current browser session.
+- Include `online_access` to request a refresh token scoped to the current online session only.
+
+The SDK provides `auth.ScopeOfflineAccess` and `auth.ScopeOnlineAccess` constants for composing these scope strings via `auth.JoinScopes`. These constants are lexical only — whether the server honours the request depends on the deployment's policy.
+
+The `auth/smart` `TokenSource` **MUST** proactively refresh access tokens when `ExpiresAt` is within a configurable threshold (default: 30 seconds) of `time.Now()`.
+
+Wire-driven refresh — recovering from a `401 Unauthorized` that indicates an expired/invalid token — is **opt-in** rather than automatic inside the `TokenSource`: the transport layer exposes `transport.WithReauthOn401`, which on a 401 invokes the configured `auth.Reauther` (implemented by `*smart.Source.Reauth`) once and replays the request. Keeping it opt-in avoids surprising retries of non-idempotent writes (see _transport reauth hook_ below).
 
 Refresh uses the stored `refresh_token` against the deployment's `token_endpoint` (`grant_type=refresh_token`). On refresh failure:
 
-- A re-authentication-required signal **MUST** be surfaced to the consumer (typed error or callback — to be designed).
+- A re-authentication-required signal **MUST** be surfaced to the consumer as the typed sentinel `auth.ErrReauthRequired` (wrapped in `*auth.ExchangeError`).
 - The expired token **MUST NOT** be used silently.
 
 If no `refresh_token` is available (the deployment did not grant one), the `TokenSource` **MUST** return a typed error directing the consumer to restart the launch flow.
@@ -160,6 +269,61 @@ This recovers the case a source **cannot** self-detect: an access token minted w
 Out of scope (v1 implementation status):
 
 - **`auth/smart` refresh-token surfacing:** the typed re-authentication-required signal on `refresh_token`-grant failure is still to be designed; `auth/smart` does not yet auto-refresh via its stored `refresh_token` on a wire 401. The transport-layer `Invalidatable` re-auth above covers re-acquirable grants (`auth/clientcreds`); `auth/jwtbearer` may adopt `Invalidatable` when its re-assertion path lands.
+#### Implementation — Phase 4a + 4b (Source/error side + transport hook)
+
+**Terminal vs. transient refresh classification (`ExchangeError.Terminal()`).**
+`auth.ExchangeError` exposes a `Terminal() bool` method. A failure is terminal when the HTTP status is 4xx **and** the OAuth2 error code is `invalid_grant`, `invalid_client`, or `invalid_token`. All other failures (5xx, network, context, unparsed) are transient and return `false`. The distinction drives the F-L refresh-clearing rule below.
+
+**F-L: clear refresh token only on terminal failure.**
+When a `refresh_token` grant fails, `Source.Token` classifies the returned `*auth.ExchangeError`:
+
+- **Terminal** (`invalid_grant` / `invalid_client` / `invalid_token` with 4xx) → clear `s.refresh` and `s.cur`, then return `ErrReauthRequired`. A subsequent `Token()` call will short-circuit to `ErrReauthRequired` without issuing another POST.
+- **Transient** (5xx, network, ctx) → retain `s.refresh` and `s.cur`, return `ErrRefreshFailed`. The consumer may retry; the refresh token is still valid.
+
+Both state mutations happen under `s.mu` (the same mutex used by all of `Token`).
+
+**Configurable early-expiry buffer (G-2).**
+`WithRefreshThreshold(d time.Duration)` sets the proactive-refresh window (default: 30 seconds). A token is considered stale — and `Token()` will attempt a refresh — when `time.Until(ExpiresAt) <= RefreshThreshold`. This is the sole configurable early-expiry buffer; no duplicate option exists.
+
+**`RefreshIfNeeded(ctx context.Context) error`.**
+A non-request-bound refresh trigger: checks `staleLocked()` and whether a refresh token is present; if both are true it calls through to `Token()` to execute the refresh; otherwise it is a no-op returning `nil`. Error contract is identical to `Token()`.
+
+**`Reauther` interface (`auth.Reauther`).**
+```go
+// auth/reauth.go
+type Reauther interface {
+    Reauth(ctx context.Context) error
+}
+```
+`*smart.Source` implements `Reauther`. When a `refresh_token` is present, `Reauth(ctx)` forces a refresh regardless of the current token's freshness by marking `s.cur` stale and calling `Token()`, applying the same F-L terminal/transient classification as a regular refresh failure. When **no** `refresh_token` is available there is nothing to exchange, so `Reauth` does not discard a cached token that is still within its `ExpiresAt` (a wire 401 may be scope-related, and a public client has no other credential); it returns `auth.ErrReauthRequired`, clearing the cached token only when it is already past `ExpiresAt`.
+
+**`ReautherFunc` adapter.**
+```go
+// auth/reauth.go
+type ReautherFunc func(ctx context.Context) error
+func (f ReautherFunc) Reauth(ctx context.Context) error { return f(ctx) }
+```
+`ReautherFunc` lets a closure — for example a discovery-catalog-refresh function (REQ-071 bullet 3) — satisfy `Reauther` without importing `smart/discovery` into `transport/`.
+
+**Transport-layer opt-in 401→reauth safety net (Phase 4b, F-D).**
+`transport.WithReauthOn401(r auth.Reauther)` installs an opt-in safety net. When a wire `401` is received:
+
+1. If a `Reauther` is configured **and** this `Do` call has not yet reauthed, `transport/` calls `r.Reauth(ctx)` exactly once.
+2. If `Reauth` returns nil, the request is retried once. The retry re-acquires the token via `tokenSourceFor` — now pointing at the refreshed credential.
+3. If the retry also returns `401`, `transport.ErrUnauthorized` is surfaced. If `Reauth` itself returns an error, that error (wrapped) is surfaced. In either case the loop does not repeat.
+
+A per-`Do` boolean guards against infinite loops; `Reauth` is called at most once per `Do` invocation regardless of retry policy.
+
+When `WithReauthOn401` is **not** set, the existing contract is unchanged: a wire `401` returns `transport.ErrUnauthorized` immediately after one upstream call.
+
+This hook is a **complementary safety net** — proactive expiry-based refresh in `Source.Token()` before the request is issued remains the primary mechanism. The hook covers the residual window where a token expires between the proactive-refresh check and the wire round-trip.
+
+The retry fires for **all HTTP methods**, including non-idempotent writes (`POST`/`PUT`). This is safe because a `401` means the request was rejected at the authentication layer and therefore **not processed** by the resource — re-driving it once after refreshing the credential cannot double-apply a write. A `401` arising from insufficient *scope* (rather than token expiry) will simply `401` again and surface `transport.ErrUnauthorized` after the single retry (one wasted round-trip, no harm). Deployments that signal authorization failures with `403` (reserving `401` for authentication/expiry) get the cleanest behaviour.
+
+Out of scope (v1 implementation status):
+
+- `auth/clientcreds` and `auth/jwtbearer` do not implement `Reauther`; they have no refresh path. Callers using those providers may wire a custom `ReautherFunc` closure.
+- MTLS, FAPI, JAR/PAR — out of v1 scope.
 
 ### REQ-064 — Launch context
 
@@ -173,12 +337,25 @@ package smart
 import "context"
 
 type LaunchContext struct {
+    // FHIR-compat launch-context claims (SMART App Launch §7.1).
     Patient     string         // SMART "patient" launch parameter — opaque to SDK
     Encounter   string         // SMART "encounter" launch parameter
     User        string         // SMART "fhirUser" / openEHR equivalent
     Scopes      []string       // granted scopes (post-token-exchange)
     IDToken     *IDTokenClaims // parsed ID-token claims (sub, aud, iss, iat, exp, custom)
     Issuer      string         // deployment issuer URL
+
+    // openEHR-native launch-context claims, per the openEHR SMART App Launch spec
+    // (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+    EHRID     string // "ehrId" token claim — EHR-level context, requested via "launch/patient"
+    EpisodeID string // "episodeId" token claim — Episode context (experimental), via "launch/episode"
+
+    // SMART-compat extras surfaced by reference SMART clients.
+    Intent            string // "intent" — suggested workflow for the app
+    SMARTStyleURL     string // "smart_style_url" — EHR style sheet URL
+    NeedPatientBanner *bool  // "need_patient_banner" — nil: server silent, caller shows banner; non-nil: server's explicit value
+    Tenant            string // "tenant" — multi-tenant EHR deployment identifier
+
     Raw         map[string]any // verbatim token-response payload for custom claims
 }
 
@@ -186,7 +363,9 @@ func WithLaunchContext(ctx context.Context, lc *LaunchContext) context.Context
 func LaunchContextFromContext(ctx context.Context) (*LaunchContext, bool)
 ```
 
-Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange.
+Consumers **MUST NOT** be required to parse JWT claims by hand. `IDTokenClaims` carries the standard claims plus a typed map for deployment-extension claims; the SDK validates the signature, exp, iss, aud, nonce as part of the token exchange. Signature verification supports RS256/RS384/ES256/ES384 and is constrained by the deployment's advertised `id_token_signing_alg_values_supported` when supplied — see _ID-token verification algorithm agility_ under REQ-062.
+
+The `EHRID` and `EpisodeID` fields are populated from the `ehrId` and `episodeId` token claims defined in the canonical openEHR SMART App Launch specification. The SMART-compat extras (`Intent`, `SMARTStyleURL`, `NeedPatientBanner`, `Tenant`) are populated when present. All of these fields are also available untyped via `Raw`.
 
 ## Platform principal claims
 
@@ -325,18 +504,31 @@ The SDK **MUST NOT** enforce, parse, or validate scope strings as application po
 
 ## Error mapping
 
-Auth errors **MUST** surface as typed values:
+Auth errors **MUST** surface as typed sentinels. The shared classes live in
+package `auth` (`auth/errors.go`); the SMART-launch-specific state-mismatch
+sentinel lives in package `smart` (`auth/smart/errors.go`):
 
 ```go
+// package auth — shared across all providers
 var (
-    ErrLaunchInvalidState     = errors.New("SMART launch: state mismatch")
-    ErrLaunchPKCEMismatch     = errors.New("SMART launch: PKCE verifier mismatch")
-    ErrTokenExchangeFailed    = errors.New("SMART launch: token exchange failed")
-    ErrRefreshFailed          = errors.New("SMART launch: token refresh failed")
-    ErrReauthRequired         = errors.New("SMART launch: re-authentication required")
-    ErrJWKSValidationFailed   = errors.New("auth: JWKS validation failed")
+    ErrInvalidConfig        = errors.New("auth: invalid configuration")
+    ErrTokenExchangeFailed  = errors.New("auth: token exchange failed")
+    ErrRefreshFailed        = errors.New("auth: token refresh failed")
+    ErrReauthRequired       = errors.New("auth: re-authentication required")
+    ErrJWKSValidationFailed = errors.New("auth: JWKS validation failed")
 )
+
+// package smart — SMART App Launch specific
+var ErrLaunchInvalidState = errors.New("SMART launch: state mismatch")
 ```
+
+A PKCE `code_verifier` mismatch is **not** a separate client-side sentinel: the
+verifier is sent to the token endpoint, and a mismatch is rejected **server-side**,
+surfacing as `auth.ErrTokenExchangeFailed`. Token-exchange and refresh failures
+are wrapped in `*auth.ExchangeError`, which carries the HTTP `StatusCode`, the
+parsed RFC 6749 `OAuth2` envelope, and a `Terminal()` predicate (4xx
+`invalid_grant`/`invalid_client`/`invalid_token`) that drives refresh-token
+clearing (REQ-063, F-L).
 
 Consumers detect classes via `errors.Is`. The underlying wire error is preserved via `errors.Unwrap`.
 

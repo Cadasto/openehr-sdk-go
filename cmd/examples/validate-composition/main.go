@@ -4,10 +4,10 @@
 // serialize on the validation path: template → compiled OPT → RM
 // instance → Issue list.
 //
-// Note: templatecompile.Compile is internal; this example lives in
-// the SDK module and is the supported v1 call shape. External repos
-// cannot call ValidateComposition until template.Compile is
-// re-exported (see docs/adr/0005-compiled-template-foundation.md).
+// Note: this example calls the internal templatecompile.Compile
+// directly (it lives in the SDK module). External modules use the
+// public openehr/templatecompile.Compile bridge instead (REQ-111) —
+// see cmd/examples/compile-build-validate and ADR 0010.
 //
 // Run:
 //

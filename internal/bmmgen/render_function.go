@@ -73,6 +73,12 @@ func renderFunctions(b *strings.Builder, plan *Plan, pc *PlannedClass) error {
 		descendants := plan.AbstractDescendants[pc.BMMName]
 		for _, fnName := range fnNames {
 			fn := sc.Functions[fnName]
+			// Manual-implementation skip: a function hand-written in a
+			// non-generated file (keyed on its declaring owner) is not
+			// emitted as a stub on any descendant. See manual_impl.go.
+			if manuallyImplemented[pc.BMMName+"."+fnName] {
+				continue
+			}
 			for _, dName := range descendants {
 				dpc, ok := plan.Classes[dName]
 				if !ok {
@@ -127,6 +133,11 @@ func renderFunctions(b *strings.Builder, plan *Plan, pc *PlannedClass) error {
 		// field already provides the accessor surface (Go forbids
 		// method-on-struct sharing the name of a struct field).
 		if descendantHasFieldNamed(plan, sc, MethodName(fnName)) {
+			continue
+		}
+		// Manual-implementation skip: hand-written in a non-generated
+		// file (keyed on this class). See manual_impl.go.
+		if manuallyImplemented[pc.BMMName+"."+fnName] {
 			continue
 		}
 		ctx := funcEmitContext{

@@ -2,6 +2,8 @@ package validation_test
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -104,6 +106,66 @@ func TestValidateComposition_SlotFillUnknownArchetype(t *testing.T) {
 	}
 	if !containsCode(r.Issues, "slot_fill") {
 		t.Errorf("expected slot_fill issue, got %+v", r.Issues)
+	}
+}
+
+// REQ-104 — a CLUSTER filling the protocol slot whose archetype id
+// fails the slot's parsed include assertions surfaces slot_fill. This
+// is the reject path of the parsed grammar (distinct from the
+// unknown-root case above, which never matches any OPT child).
+func TestValidateComposition_SlotFillParsedIncludeRejects(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+
+	const badID = "openEHR-EHR-CLUSTER.not_an_allowed_device.v1"
+	// Guard: only meaningful when some CLUSTER slot carries parsed
+	// includes that reject badID. If every slot falls back to the
+	// RM-type prefix rule, any CLUSTER id fits and there is nothing
+	// to assert.
+	var rejects bool
+	for _, n := range c.AllByRMType("CLUSTER") {
+		if n.IsSlot() && n.SlotRules().HasParsedIncludes() && !n.AllowsArchetypeID(badID) {
+			rejects = true
+			break
+		}
+	}
+	if !rejects {
+		t.Skip("no CLUSTER slot with parsed includes rejects the test id")
+	}
+
+	comp := validVitalSignsComposition()
+	obs := validBloodPressureObservation()
+	obs.Protocol = &rm.ItemTree{
+		ArchetypeNodeID: "at0011",
+		Name:            rm.DVText{Value: "protocol"},
+		Items: []rm.Item{
+			&rm.Cluster{
+				ArchetypeNodeID: badID,
+				Name:            rm.DVText{Value: "Device"},
+			},
+		},
+	}
+	comp.Content = []rm.ContentItem{obs}
+
+	r := validation.ValidateComposition(comp, c)
+	if r.OK {
+		t.Fatal("expected slot_fill for non-conforming CLUSTER in protocol slot, got OK")
+	}
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Errorf("expected slot_fill issue, got %+v", r.Issues)
+	}
+}
+
+// REQ-104 — C_SINGLE_ATTRIBUTE slots enforce the same parsed
+// include/exclude rules as C_MULTIPLE_ATTRIBUTE slots. A protocol
+// slot that accepts only openEHR-EHR-ITEM_TREE.allowed.v1 must reject
+// any other ITEM_TREE archetype id even though the RM type matches.
+func TestValidateComposition_SingleAttributeSlotFillParsedIncludeRejects(t *testing.T) {
+	c := mustCompileSyntheticOPT(t, singleAttributeSlotOPT)
+	comp := validSingleAttributeSlotComposition("openEHR-EHR-ITEM_TREE.rejected.v1")
+
+	r := validation.ValidateComposition(comp, c)
+	if !containsCode(r.Issues, "slot_fill") {
+		t.Fatalf("expected slot_fill for non-conforming single-attribute slot fill, got OK=%v issues=%+v", r.OK, r.Issues)
 	}
 }
 
@@ -729,10 +791,11 @@ func validBloodPressureObservation() *rm.Observation {
 			},
 		},
 		// The OPT pins /protocol/items to an ARCHETYPE_SLOT
-		// constrained to CLUSTER. v2 Phase 2 uses the RM-type-prefix
-		// fallback (REQ-104 will swap in the parsed slot grammar);
-		// any archetype id of the shape "openEHR-EHR-CLUSTER.<concept>.v<n>"
-		// satisfies the slot match.
+		// constrained to CLUSTER. Slot fit is evaluated against the
+		// parsed REQ-104 assertion grammar, falling back to the
+		// RM-type-prefix rule when the OPT carried no parseable
+		// includes; an archetype id of the shape
+		// "openEHR-EHR-CLUSTER.<concept>.v<n>" satisfies the match.
 		Protocol: &rm.ItemTree{
 			ArchetypeNodeID: "at0011",
 			Name:            rm.DVText{Value: "protocol"},
@@ -746,6 +809,35 @@ func validBloodPressureObservation() *rm.Observation {
 	}
 }
 
+func validSingleAttributeSlotComposition(protocolID string) *rm.Composition {
+	obs := validBloodPressureObservation()
+	obs.Protocol = &rm.ItemTree{
+		ArchetypeNodeID: protocolID,
+		Name:            rm.DVText{Value: "Protocol"},
+	}
+	return &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.single_attribute_slot.v1",
+		Name:            rm.DVText{Value: "Encounter"},
+		Category: rm.DVCodedText{
+			DVText: rm.DVText{Value: "event"},
+			DefiningCode: rm.CodePhrase{
+				TerminologyID: rm.TerminologyID{Value: "openehr"},
+				CodeString:    "433",
+			},
+		},
+		Composer: rm.PartySelf{},
+		Language: rm.CodePhrase{
+			TerminologyID: rm.TerminologyID{Value: "ISO_639-1"},
+			CodeString:    "en",
+		},
+		Territory: rm.CodePhrase{
+			TerminologyID: rm.TerminologyID{Value: "ISO_3166-1"},
+			CodeString:    "NL",
+		},
+		Content: []rm.ContentItem{obs},
+	}
+}
+
 func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(fixtures.TemplateOptForName(fixture))
@@ -755,6 +847,23 @@ func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile(%s): %v", fixture, err)
+	}
+	return c
+}
+
+func mustCompileSyntheticOPT(t *testing.T, xml string) *templatecompile.Compiled {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "synthetic.opt")
+	if err := os.WriteFile(path, []byte(xml), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	opt, err := template.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile(synthetic): %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile(synthetic): %v", err)
 	}
 	return c
 }
@@ -776,3 +885,56 @@ func containsIssue(issues []validation.Issue, path, code string) bool {
 	}
 	return false
 }
+
+const singleAttributeSlotOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>single_attribute_slot</value></template_id>
+  <concept>single_attribute_slot</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>OBSERVATION</rm_type_name>
+        <node_id>at0000</node_id>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>protocol</rm_attribute_name>
+          <children xsi:type="ARCHETYPE_SLOT">
+            <rm_type_name>ITEM_TREE</rm_type_name>
+            <node_id>at9000</node_id>
+            <includes>
+              <expression xsi:type="EXPR_BINARY_OPERATOR">
+                <type>Boolean</type>
+                <operator>2007</operator>
+                <precedence_overridden>false</precedence_overridden>
+                <left_operand xsi:type="EXPR_LEAF">
+                  <type>String</type>
+                  <item xsi:type="xsd:string">archetype_id/value</item>
+                  <reference_type>attribute</reference_type>
+                </left_operand>
+                <right_operand xsi:type="EXPR_LEAF">
+                  <type>C_STRING</type>
+                  <item xsi:type="C_STRING">
+                    <pattern>openEHR-EHR-ITEM_TREE\.allowed\.v1</pattern>
+                  </item>
+                  <reference_type>constraint</reference_type>
+                </right_operand>
+              </expression>
+            </includes>
+          </children>
+        </attributes>
+        <archetype_id>
+          <value>openEHR-EHR-OBSERVATION.blood_pressure.v1</value>
+        </archetype_id>
+      </children>
+    </attributes>
+    <archetype_id>
+      <value>openEHR-EHR-COMPOSITION.single_attribute_slot.v1</value>
+    </archetype_id>
+  </definition>
+</template>`

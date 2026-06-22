@@ -233,10 +233,11 @@ func TestNodeAt_PredicateAtCode(t *testing.T) {
 	}
 }
 
-// REQ-100 § Resolution semantics — *Slot is a leaf in v1; an OPT
-// path that attempts to descend through a slot returns
-// ErrPathNotFound (the slot's child shape is opaque until slot-fill
-// validation lands — REQ-104).
+// REQ-100 § Resolution semantics — *Slot is a leaf; an OPT path that
+// attempts to descend through a slot returns ErrPathNotFound. The
+// slot's child shape is opaque to path resolution: REQ-104 surfaces
+// the include/exclude assertion grammar on the slot node, but the
+// fillers themselves are not part of the OPT tree.
 func TestNodeAt_CannotDescendSlot(t *testing.T) {
 	opt := mustParseVitalSigns(t)
 	slotAttrName, slotNodeID := findSlotUnderRoot(t, opt)

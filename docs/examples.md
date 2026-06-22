@@ -26,7 +26,10 @@ make build
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
+| [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
+| [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
+| [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
 ---
 
@@ -118,7 +121,7 @@ go run ./cmd/examples/validate-composition -invalid   # demo a required-field fa
 
 **Packages:** `openehr/template`, `openehr/validation`, `internal/templatecompile`
 
-**Note:** `templatecompile.Compile` is currently internal. This in-repo example is the supported call shape until a public `template.Compile` lands ([ADR 0005](adr/0005-compiled-template-foundation.md)).
+**Note:** this example calls the internal `templatecompile.Compile` directly (it lives in-repo). External modules use the public `openehr/templatecompile.Compile` bridge instead — see [compile-build-validate](#compile-build-validate) (REQ-111, [ADR 0010](adr/0010-public-compiled-template-bridge.md)).
 
 **Default fixture:** hand-built vital-signs composition matching `vital_signs.opt`.
 
@@ -222,6 +225,65 @@ SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1] WHERE o/data/
 
 ---
 
+### compile-build-validate
+
+**Purpose:** Drive the whole clinical pipeline through **public packages only** (REQ-111) — the shape an external module uses. Parse an OPT, compile it with `openehr/templatecompile.Compile`, build a `*rm.Composition` with the REQ-101 builder, serialise to canonical JSON, round-trip it, and validate. Before REQ-111 the compiled template was only constructable inside the SDK module, so this exact program could not be written downstream.
+
+```bash
+go run ./cmd/examples/compile-build-validate
+go run ./cmd/examples/compile-build-validate path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/composition`, `openehr/serialize/canjson`, `openehr/validation`, `openehr/rm` — **no `internal/` import.**
+
+**Sample output:**
+
+```text
+template : vital_signs (vital_signs.opt)
+composition: 7550 bytes canonical JSON, round-tripped
+validation : OK — round-tripped composition conforms to the OPT
+ehr_status : ValidateEHRStatus callable (OK=false against a COMPOSITION OPT)
+```
+
+**What to copy into your app:** `templatecompile.Compile(opt)` once per template, then reuse the `*Compiled` across many `composition.NewBuilder` / `validation.Validate*` calls. The compiled template is the single artifact the builder and validator share.
+
+---
+
+### template-explore
+
+**Purpose:** Introspect a compiled OPT through the public node-level types (REQ-111) — the building block for a form generator or a path-discovery tool. Walks the `templatecompile.CompiledNode` tree to print the template structure (RM type, pinned archetype id / at-code, cardinality + required, term label, slot / primitive markers), then lists the addressable primitive-leaf paths — the canonical `composition.Builder.Set` targets.
+
+```bash
+go run ./cmd/examples/template-explore
+go run ./cmd/examples/template-explore path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile` — **no `internal/` import.**
+
+**Sample output (abridged):**
+
+```text
+root     : COMPOSITION
+
+structure (node → attribute → child node):
+COMPOSITION [openEHR-EHR-COMPOSITION.encounter.v1]  "Encounter"
+  .content [*]
+    OBSERVATION [openEHR-EHR-OBSERVATION.blood_pressure.v1]  "Blood Pressure"
+      ...
+        ELEMENT [at0004]  "Systolic"
+          .value [1]
+            DV_QUANTITY  ·primitive
+
+addressable primitive-leaf paths (6) — Builder.Set targets:
+  /category/defining_code
+  /content[openEHR-EHR-OBSERVATION.blood_pressure.v1]/data/events[at0006]/data/items[at0004]/value
+  ...
+```
+
+**What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker; `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, `node.Term(code, "")` gives the label, `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+
+---
+
 ## REST client
 
 ### ehr_create
@@ -253,6 +315,48 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 
 ---
 
+### smart-launch
+
+**Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server — no external network, no secrets, works offline.
+
+The key teaching point is the **state + PKCE code_verifier persistence** across the redirect: `auth/smart.AuthorizationRequest` (returned by `BeginAuthorization`) must be stored server-side between the initial redirect and the callback, then retrieved by `state` and passed unchanged to `ExchangeAuthorizationCode`.
+
+```bash
+go run ./cmd/examples/smart-launch
+```
+
+**Packages:** `auth/smart`, `auth` (scope constants), `smart/discovery`
+
+**Sample output:**
+
+```text
+step 1: Source built (public client, PKCE, standalone)
+step 2: BeginAuthorization → state="…"  verifier="…"
+step 3: authorize URL built (len=306)
+step 4: AuthorizationRequest stored in session map (key="…")
+step 5: redirect received  code="stub-code-…"  state="…"
+step 6: AuthorizationRequest retrieved from session map (state validated)
+step 7: token exchange complete
+  access_token : stub-access-token-001
+  token_type   : Bearer
+  scope        : openid launch/patient offline_access
+  expires_at   : …
+  refresh_token: stub-refresh-token-001
+  ehrId        : 00000000-0000-0000-0000-000000000001
+OK: standalone SMART PKCE launch flow completed (in-process stub)
+```
+
+**What to copy into your app:**
+
+1. Call `BeginAuthorization("")` to get an `AuthorizationRequest` with a random `state` and PKCE pair.
+2. Persist the `AuthorizationRequest` in a session store keyed by `state` **before** redirecting the user.
+3. On the redirect callback, retrieve the stored `AuthorizationRequest` by `callbackState`, delete it (replay prevention), and pass it to `ExchangeAuthorizationCode`.
+4. `ExchangeAuthorizationCode` re-validates `state` internally (CSRF guard) and sends the `code_verifier` to the token endpoint (PKCE proof).
+
+See [specifications/auth.md § REQ-061](specifications/auth.md#req-061--pkce-flow) for the normative rules.
+
+---
+
 ## Suggested learning order
 
 ```text
@@ -261,6 +365,7 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 3. validate-from-json      ← wire bytes + validation (CI pattern)
 4. generate-example        ← synthesise data from templates
 5. ehr_create              ← REST wiring (mock first, then real CDR)
+6. smart-launch            ← SMART PKCE auth (standalone, public client)
 ```
 
 Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction).

@@ -80,16 +80,39 @@ type ServiceEntry struct {
 // AuthEndpoints carries the OAuth2 / OIDC endpoints from the SMART
 // configuration document.
 type AuthEndpoints struct {
-	AuthorizationEndpoint             *url.URL
-	TokenEndpoint                     *url.URL
-	JWKSURI                           *url.URL
-	RegistrationEndpoint              *url.URL
-	ScopesSupported                   []string
-	ResponseTypesSupported            []string
-	CodeChallengeMethodsSupported     []string
-	GrantTypesSupported               []string
+	AuthorizationEndpoint *url.URL
+	TokenEndpoint         *url.URL
+	JWKSURI               *url.URL
+	RegistrationEndpoint  *url.URL
+	// IntrospectionEndpoint is the RFC 7662 token-introspection endpoint
+	// advertised by the authorization server. Nil when absent. Consumed by
+	// Phase 5b introspection client (REQ-062).
+	IntrospectionEndpoint *url.URL
+	// RevocationEndpoint is the RFC 7009 token-revocation endpoint. Nil when
+	// absent.
+	RevocationEndpoint *url.URL
+	// ManagementEndpoint is the SMART management endpoint (deployment-specific).
+	// Nil when absent.
+	ManagementEndpoint *url.URL
+
+	ScopesSupported               []string
+	ResponseTypesSupported        []string
+	CodeChallengeMethodsSupported []string
+	GrantTypesSupported           []string
+	// TokenEndpointAuthMethodsSupported lists the client-authentication methods
+	// the authorization server accepts (e.g. "private_key_jwt",
+	// "client_secret_basic"). Used by Phase 3b G-3 method selection.
 	TokenEndpointAuthMethodsSupported []string
-	Capabilities                      []string
+	// TokenEndpointAuthSigningAlgValuesSupported lists the JWS algorithms
+	// accepted for client-assertion JWTs at the token endpoint
+	// (e.g. "RS384", "ES384"). Feeds Phase 3b alg selection. Surface-only
+	// in this release; no selection logic is wired here (REQ-062).
+	TokenEndpointAuthSigningAlgValuesSupported []string
+	// IDTokenSigningAlgValuesSupported lists the JWS algorithms used to sign
+	// ID tokens (e.g. "RS256", "ES384"). Feeds Phase 3e id-token verify
+	// allowlist. Surface-only in this release (REQ-062).
+	IDTokenSigningAlgValuesSupported []string
+	Capabilities                     []string
 }
 
 // Service identifier constants. The SDK consumes only the openEHR
@@ -98,4 +121,33 @@ type AuthEndpoints struct {
 const (
 	ServiceIDOpenEHRRest = "org.openehr.rest"
 	ServiceIDFHIRRest    = "org.fhir.rest"
+)
+
+// openEHR SMART capability string constants.
+//
+// These values appear in the "capabilities" array of a SMART configuration
+// document advertised by an openEHR-capable authorization server, as defined
+// by the canonical openEHR SMART App Launch specification
+// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+//
+// Consumers MAY inspect ServiceCatalog.Auth.Capabilities or
+// ServiceEntry.Capabilities to branch on these strings. The SDK itself
+// does not enforce or select behaviour based on them in this release;
+// that is deferred to later phases.
+const (
+	// CapabilityContextOpenEHREHR indicates the server can return an openEHR
+	// EHR context parameter on launch.
+	CapabilityContextOpenEHREHR = "context-openehr-ehr"
+
+	// CapabilityContextOpenEHREpisode indicates the server can return an
+	// openEHR episode context parameter on launch.
+	CapabilityContextOpenEHREpisode = "context-openehr-episode"
+
+	// CapabilityOpenEHRPermissionV1 indicates the server supports the openEHR
+	// permission model v1 scope vocabulary.
+	CapabilityOpenEHRPermissionV1 = "openehr-permission-v1"
+
+	// CapabilityLaunchBase64JSON indicates launch context parameters are
+	// delivered as base64-encoded JSON rather than as plain query parameters.
+	CapabilityLaunchBase64JSON = "launch-base64-json"
 )

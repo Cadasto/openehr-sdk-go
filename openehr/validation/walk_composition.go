@@ -6,8 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -32,7 +33,7 @@ import (
 //   - Otherwise: iterate every attribute (explicit OPT-declared
 //     and BMM-mandatory implicits), enforce existence + cardinality,
 //     match RM child(ren), recurse.
-func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) walkNode(optNode *tcimpl.CompiledNode, rmValue any, path string) {
 	if optNode == nil || rmValue == nil {
 		return
 	}
@@ -52,6 +53,14 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	// root, identity is checked inline against COMPOSITION's
 	// archetype_node_id (not via a separate attribute descent).
 	w.checkLocatableIdentity(optNode, rmValue, path)
+	// AOM 1.4 primitive short-name leaf on a BMM scalar channel
+	// (e.g. DV_COUNT.magnitude ← INTEGER, DV_DURATION.value ← string).
+	if pc := optNode.PrimitiveConstraint(); pc != nil && tcimpl.IsAOMPrimitiveShortName(optNode.RMTypeName()) {
+		if primitiveValueMatchesShortName(optNode.RMTypeName(), rmValue) {
+			w.applyPrimitive(optNode, rmValue, path, pc)
+			return
+		}
+	}
 	w.checkRMType(optNode, rmValue, path)
 
 	if optNode.IsSlot() {
@@ -73,13 +82,9 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 	}
 
 	for _, attr := range optNode.Attributes() {
-		// Implicit (BMM-mandatory, OPT-silent) attributes have no
-		// children — the OPT did not pin a structural constraint
-		// for them. We still run the existence check so a
-		// BMM-mandatory attribute (e.g. COMPOSITION.composer,
-		// /language, /territory) that the composition leaves nil
-		// or zero-valued surfaces as `required`. No descent
-		// happens because Children() is empty for implicit attrs.
+		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+			continue
+		}
 		switch attr.Cardinality() {
 		case template.Single:
 			w.walkSingleAttribute(optNode, attr, rmValue, path)
@@ -100,8 +105,8 @@ func (w *walker) walkNode(optNode *templatecompile.CompiledNode, rmValue any, pa
 //   - two or more children → `alternative_mismatch` with the list
 //     of allowed RM types.
 func (w *walker) walkSingleAttribute(
-	opt *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	opt *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 	parentPath string,
 ) {
@@ -125,6 +130,18 @@ func (w *walker) walkSingleAttribute(
 		return
 	}
 	child := matchSingleAlternative(children, val)
+	if child != nil && child.IsSlot() {
+		archetypeID := locatableArchetypeNodeID(val)
+		if archetypeID == "" || !child.AllowsArchetypeID(archetypeID) {
+			w.emit(Issue{
+				Path:     attrPath,
+				Code:     "slot_fill",
+				Detail:   fmt.Sprintf("RM value %s under %q does not satisfy slot %s", describeLocatableID(val), attr.Name(), child.NodeID()),
+				Severity: Error,
+			})
+			return
+		}
+	}
 	if child == nil {
 		// With multiple OPT children the OPT declared AnyOf
 		// alternatives; with a single child it is a plain type
@@ -157,7 +174,7 @@ func (w *walker) walkSingleAttribute(
 // exactly one child the function is effectively "does the child
 // fit?"; the alternative_mismatch case fires only when the OPT
 // declared more than one alternative.
-func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *templatecompile.CompiledNode {
+func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.CompiledNode {
 	gotType := describeRMType(val)
 	for _, c := range children {
 		want := c.RMTypeName()
@@ -165,8 +182,17 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 			// Wildcard / not-typed OPT child — accept.
 			return c
 		}
-		if gotType == want || rmTypeIsSubtypeOf(gotType, want) {
+		if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want) {
 			return c
+		}
+		// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
+		// pinned under a BMM-typed attribute channel — the RM value
+		// may be a Go string, integer, real, or bool rather than an
+		// RM wrapper type.
+		if tcimpl.IsAOMPrimitiveShortName(want) && c.PrimitiveConstraint() != nil {
+			if primitiveValueMatchesShortName(want, val) {
+				return c
+			}
 		}
 	}
 	return nil
@@ -174,7 +200,7 @@ func matchSingleAlternative(children []*templatecompile.CompiledNode, val any) *
 
 // formatAllowedTypes renders the OPT child RM types for inclusion
 // in alternative_mismatch Detail messages.
-func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
+func formatAllowedTypes(children []*tcimpl.CompiledNode) string {
 	names := make([]string, len(children))
 	for i, c := range children {
 		names[i] = c.RMTypeName()
@@ -185,11 +211,12 @@ func formatAllowedTypes(children []*templatecompile.CompiledNode) string {
 // walkMultipleAttribute enforces existence + cardinality on a
 // multi-valued attribute and binds each RM item to the OPT child
 // whose archetype_node_id matches. Items without a matching OPT
-// child surface as slot_fill issues (archetype-id equality today;
-// REQ-104 will swap in the parsed slot grammar).
+// child surface as slot_fill issues; matching pins exact
+// archetype/node ids first, then evaluates the parsed REQ-104 slot
+// grammar (see [matchChildByID]).
 func (w *walker) walkMultipleAttribute(
-	opt *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	opt *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 	parentPath string,
 ) {
@@ -243,7 +270,7 @@ func (w *walker) walkMultipleAttribute(
 	if len(children) == 0 {
 		return
 	}
-	perChildCount := make(map[*templatecompile.CompiledNode]int, len(children))
+	perChildCount := make(map[*tcimpl.CompiledNode]int, len(children))
 	for idx, item := range items {
 		matched := matchChildByID(children, item)
 		segment := segmentForRMItem(attr, item, idx)
@@ -288,7 +315,7 @@ func (w *walker) walkMultipleAttribute(
 // childIdentity describes an OPT child for inclusion in cardinality
 // diagnostics. Prefers the archetype id (for *ArchetypeRoot children)
 // then the at-code then the RM type name.
-func childIdentity(c *templatecompile.CompiledNode) string {
+func childIdentity(c *tcimpl.CompiledNode) string {
 	if id := c.ArchetypeID(); id != "" {
 		return id
 	}
@@ -305,7 +332,7 @@ func childIdentity(c *templatecompile.CompiledNode) string {
 // CODE_PHRASE directly under category/defining_code → C_CODE_PHRASE),
 // the value is passed through as-is.
 func (w *walker) applyPrimitive(
-	optNode *templatecompile.CompiledNode,
+	optNode *tcimpl.CompiledNode,
 	rmValue any,
 	path string,
 	pc constraints.PrimitiveConstraint,
@@ -354,6 +381,13 @@ func primitiveInput(rmValue any) any {
 			Terminology: v.TerminologyID.Value,
 			CodeString:  v.CodeString,
 		}
+	case rm.Integer:
+		return int64(v)
+	case rm.Real:
+		// Normalise the named float64 to a bare float64 so a C_REAL
+		// constraint validates it instead of rejecting it as
+		// wrong_type (SDK-GAP-12: REAL on DV_QUANTITY.magnitude).
+		return float64(v)
 	}
 	return rmValue
 }
@@ -363,7 +397,7 @@ func primitiveInput(rmValue any) any {
 // presence. Also honours the BMM-mandatory bit (Required()): some
 // attributes are mandatory by RM even when the OPT existence
 // element is silent (e.g. COMPOSITION.category).
-func isRequired(attr *templatecompile.CompiledAttribute) bool {
+func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	if attr.Required() {
 		return true
 	}
@@ -408,7 +442,7 @@ func formatInterval(m *template.Multiplicity) string {
 // attrs (rare on this code path — walkMultipleAttribute uses
 // segmentForRMItem instead) we fall back to the child's
 // id-or-index segment.
-func segmentForChild(attr *templatecompile.CompiledAttribute, child *templatecompile.CompiledNode, idx int) string {
+func segmentForChild(attr *tcimpl.CompiledAttribute, child *tcimpl.CompiledNode, idx int) string {
 	seg := "/" + attr.Name()
 	if attr.Cardinality() != template.Multiple {
 		return seg
@@ -426,7 +460,7 @@ func segmentForChild(attr *templatecompile.CompiledAttribute, child *templatecom
 // Multiple attribute. Predicate is the RM item's
 // archetype_node_id when available; otherwise a 1-based sibling
 // index ("@1", "@2", ...).
-func segmentForRMItem(attr *templatecompile.CompiledAttribute, item any, idx int) string {
+func segmentForRMItem(attr *tcimpl.CompiledAttribute, item any, idx int) string {
 	seg := "/" + attr.Name()
 	if id := locatableArchetypeNodeID(item); id != "" {
 		return seg + "[" + id + "]"
@@ -438,24 +472,23 @@ func segmentForRMItem(attr *templatecompile.CompiledAttribute, item any, idx int
 // archetype-root pins) or NodeID (for at-code pins) matches the RM
 // item's archetype_node_id. Returns nil when none match — caller
 // emits slot_fill in that case.
-func matchChildByID(children []*templatecompile.CompiledNode, item any) *templatecompile.CompiledNode {
+func matchChildByID(children []*tcimpl.CompiledNode, item any) *tcimpl.CompiledNode {
 	id := locatableArchetypeNodeID(item)
 	if id == "" {
 		return nil
 	}
 	for _, c := range children {
+		if c.IsSlot() {
+			continue
+		}
 		if c.ArchetypeID() != "" && c.ArchetypeID() == id {
 			return c
 		}
 		if c.NodeID() != "" && c.NodeID() == id {
 			return c
 		}
-		// Slot: RM-type-prefix fallback. The slot's RMTypeName is
-		// the RM class it gates; an archetype id of the shape
-		// "openEHR-EHR-<rmType>.<concept>.v<n>" satisfies it when
-		// the rmType matches. v2 keeps this fallback to maintain
-		// parity with the existing v1 behaviour until REQ-104
-		// supplies a parsed assertion grammar.
+	}
+	for _, c := range children {
 		if c.IsSlot() && slotFitsArchetypeID(c, id) {
 			return c
 		}
@@ -463,13 +496,11 @@ func matchChildByID(children []*templatecompile.CompiledNode, item any) *templat
 	return nil
 }
 
-// slotFitsArchetypeID checks the RM-type-prefix fallback: an
-// archetype id `openEHR-EHR-<RMType>.<concept>.v<n>` fits a slot
-// constrained to `<RMType>` when their RM type segments match.
-// Used until REQ-104 parses the OPT's <includes>/<excludes>
-// grammar.
-func slotFitsArchetypeID(slot *templatecompile.CompiledNode, archetypeID string) bool {
-	return strings.HasPrefix(archetypeID, "openEHR-EHR-"+slot.RMTypeName()+".")
+// slotFitsArchetypeID checks whether archetypeID satisfies the
+// slot's REQ-104 include / exclude rules, including the RM-type-
+// prefix fallback when no includes were parsed.
+func slotFitsArchetypeID(slot *tcimpl.CompiledNode, archetypeID string) bool {
+	return slot.AllowsArchetypeID(archetypeID)
 }
 
 // locatableArchetypeNodeID extracts archetype_node_id from any RM
@@ -495,11 +526,12 @@ func describeLocatableID(v any) string {
 // when the RM's archetype_node_id disagrees with the OPT-pinned id
 // at this node. Archetype-root nodes compare against ArchetypeID();
 // inner nodes (at-code-pinned) compare against NodeID().
-func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) checkLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	if opt.IsSlot() {
-		// Slot fit is by archetype-id assertion (RM-type-prefix
-		// fallback in v2; REQ-104 grammar to come). The slot's
-		// NodeID is the OPT's own at-code for the slot point — it
+		// Slot fit is by the parsed REQ-104 archetype-id assertion
+		// grammar (RM-type-prefix fallback when no includes parsed).
+		// The slot's NodeID is the OPT's own at-code for the slot
+		// point — it
 		// is not expected to match the filling archetype's
 		// archetype_node_id, so a direct identity check here would
 		// false-positive on every legitimate slot fill.
@@ -534,7 +566,7 @@ func (w *walker) checkLocatableIdentity(opt *templatecompile.CompiledNode, rmVal
 // disagrees with the compiled OPT node's RMTypeName. Honours BMM
 // abstract supertypes: an OPT slot constrained to ITEM_STRUCTURE
 // admits ITEM_TREE / ITEM_LIST / ITEM_SINGLE / ITEM_TABLE, etc.
-func (w *walker) checkRMType(opt *templatecompile.CompiledNode, rmValue any, path string) {
+func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string) {
 	want := opt.RMTypeName()
 	if want == "" {
 		return
@@ -543,7 +575,7 @@ func (w *walker) checkRMType(opt *templatecompile.CompiledNode, rmValue any, pat
 	if got == want {
 		return
 	}
-	if rmTypeIsSubtypeOf(got, want) {
+	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want) {
 		return
 	}
 	w.emit(Issue{
@@ -564,6 +596,38 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 	return slices.Contains(subtypes, concrete)
 }
 
+// intervalRMTypeMatches reports whether a concrete interval RM type
+// name satisfies an OPT-declared generic interval type (SDK-GAP-11/12).
+func intervalRMTypeMatches(got, want string) bool {
+	if got == want {
+		return true
+	}
+	if want == "DV_INTERVAL" && strings.HasPrefix(got, "DV_INTERVAL<") {
+		return true
+	}
+	return false
+}
+
+// primitiveValueMatchesShortName reports whether an RM-side Go value
+// satisfies an AOM 1.4 primitive short-name OPT child (INTEGER,
+// REAL, DURATION, …) bound to a BMM scalar attribute slot.
+func primitiveValueMatchesShortName(shortName string, val any) bool {
+	switch shortName {
+	case "BOOLEAN":
+		_, ok := val.(bool)
+		return ok
+	case "INTEGER":
+		return rm.IsInt64(val)
+	case "REAL":
+		return rm.IsReal(val)
+	case "DATE", "TIME", "DATE_TIME", "DURATION":
+		_, ok := val.(string)
+		return ok
+	default:
+		return false
+	}
+}
+
 // bmmSubtypes is the closed lookup of abstract → concrete RM type
 // admission rules used by checkRMType. Sourced from
 // openehr_rm_1.2.0.bmm: concrete classes that satisfy each
@@ -576,12 +640,14 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 // surface as the same false positive on a polymorphic OPT slot.
 // Extend in lock-step.
 //
-// Out of scope for v2: FOLDER / EHR_STATUS (not reachable from
-// COMPOSITION through the Phase 1 content-type closed set);
-// DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA / DV_PROPORTION /
-// DV_SCALE / DV_STATE / time-specifications (DataValue subtypes
-// outside the closed REQ-103 primitive set). Add when an OPT
+// Out of scope for v2: DV_INTERVAL / DV_PARSABLE / DV_MULTIMEDIA /
+// DV_PROPORTION / DV_SCALE / DV_STATE / time-specifications (DataValue
+// subtypes outside the closed REQ-103 primitive set). Add when an OPT
 // surfaces a real consumer for them.
+//
+// REQ-110 added the demographic PARTY hierarchy (+ sub-components) and
+// the EHR-IM roots FOLDER / EHR_STATUS so non-COMPOSITION OPTs validate
+// through the same walker.
 var bmmSubtypes = map[string][]string{
 	"LOCATABLE": {
 		"COMPOSITION", "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",
@@ -589,6 +655,19 @@ var bmmSubtypes = map[string][]string{
 		"HISTORY", "POINT_EVENT", "INTERVAL_EVENT",
 		"ITEM_TREE", "ITEM_LIST", "ITEM_SINGLE", "ITEM_TABLE",
 		"CLUSTER", "ELEMENT",
+		// REQ-110: demographic + EHR-IM LOCATABLE concretes.
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+		"ADDRESS", "CONTACT", "PARTY_IDENTITY", "PARTY_RELATIONSHIP", "CAPABILITY",
+		"FOLDER", "EHR_STATUS",
+	},
+	// PARTY hierarchy (org.openehr.rm.demographic): PARTY is the common
+	// ancestor; ACTOR adds the real-world-entity subtypes (PERSON,
+	// ORGANISATION, GROUP, AGENT). ROLE is a PARTY but not an ACTOR.
+	"PARTY": {
+		"PERSON", "ORGANISATION", "GROUP", "AGENT", "ROLE",
+	},
+	"ACTOR": {
+		"PERSON", "ORGANISATION", "GROUP", "AGENT",
 	},
 	"CONTENT_ITEM": {
 		"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION",

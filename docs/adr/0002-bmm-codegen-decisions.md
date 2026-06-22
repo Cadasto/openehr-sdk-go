@@ -35,7 +35,11 @@ Non-generic abstract classes become Go interfaces with unexported `is<X>()` mark
 
 ### D6 — BMM functions become panic stubs; bodies live in `*_ext.go`
 
-Every BMM `function` becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc. Real implementations belong in hand-written `*_ext.go` companions only (REQ-044). The generator never touches non-`_gen.go` files.
+Every BMM `function` becomes a Go method whose body is `panic("not implemented: …")` with BMM documentation propagated as godoc. Real implementations belong in hand-written companion files only (REQ-044) — `*_ext.go`, or `*_funcs.go` for the behavioural-function set realised under [ADR 0011](0011-rm-behavioural-functions-surface.md). The generator never touches non-`_gen.go` files.
+
+### D7 — Manual-implementation skip set suppresses chosen stubs
+
+A curated set ([`internal/bmmgen/manual_impl.go`](../../internal/bmmgen/manual_impl.go)), keyed `OWNER.function` on the BMM declaring class, lists functions that are hand-written in a non-generated file. `renderFunctions` skips stub emission for those keys at both emit sites (the abstract-descendant loop and the concrete / abstract-generic loop), so a hand-written method does not collide with a generated panic stub (`method redeclared`). A declaring-owner key (e.g. `UID_BASED_ID.root`, `PATHABLE.item_at_path`) suppresses the stub on every concrete descendant at once. This realises the [ADR 0011](0011-rm-behavioural-functions-surface.md) surface for REQ-120..123; functions absent from the set keep emitting fail-loud stubs (D6).
 
 ## Consequences
 

@@ -67,6 +67,22 @@ func TestEnsureSingleVitalSignsCoverage(t *testing.T) {
 			},
 		},
 		{
+			name:       "Element.name (DV_TEXT)",
+			parent:     &rm.Element{},
+			parentType: "ELEMENT",
+			attr:       "name",
+			child:      &rm.DVText{Value: "foo"},
+			check: func(t *testing.T, parent any) {
+				name, ok := parent.(*rm.Element).Name.(rm.DVText)
+				if !ok {
+					t.Fatalf("Name type = %T, want rm.DVText", parent.(*rm.Element).Name)
+				}
+				if name.Value != "foo" {
+					t.Errorf("Name.Value = %q, want foo", name.Value)
+				}
+			},
+		},
+		{
 			name:       "Element.value (DV_QUANTITY)",
 			parent:     &rm.Element{},
 			parentType: "ELEMENT",

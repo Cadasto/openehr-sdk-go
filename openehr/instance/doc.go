@@ -38,9 +38,11 @@
 //
 // # REQ-013 building-block independence
 //
-// This package imports openehr/rm, openehr/rm/typereg,
-// openehr/rm/rminfo, openehr/template, openehr/template/constraints,
-// internal/templatecompile, internal/templatecompile/walk, and
+// The exported Generate signature takes the public compiled template
+// openehr/templatecompile.Compiled (REQ-111); this package also imports
+// openehr/rm, openehr/rm/typereg, openehr/rm/rminfo, openehr/template,
+// openehr/template/constraints, internal/templatecompile (engine node
+// types), internal/templatecompile/walk, and
 // internal/templateinstance/rmwrite — same building-block universe
 // as openehr/validation. It does NOT import openehr/serialize,
 // openehr/client, transport, auth, openehr/composition (REQ-101

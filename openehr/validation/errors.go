@@ -34,9 +34,10 @@ var (
 	ErrPrimitive = errors.New("validation: primitive constraint")
 
 	// ErrSlotFill fires when a Content[i] archetype id does not
-	// satisfy the OPT's slot include / exclude rules. v1 uses the
-	// RM-type-prefix fallback (openEHR-EHR-<rmType>.); REQ-104 will
-	// swap in the parsed assertion grammar.
+	// satisfy the OPT's slot include / exclude rules — evaluated
+	// against the parsed REQ-104 assertion grammar, with the
+	// RM-type-prefix fallback (openEHR-EHR-<rmType>.) when no
+	// includes were parsed.
 	ErrSlotFill = errors.New("validation: slot fill")
 
 	// ErrAQLSyntax is the sentinel for a Layer-1 lint failure surfaced by

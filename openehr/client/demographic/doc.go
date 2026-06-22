@@ -13,6 +13,12 @@
 // polymorphically by its `_type` discriminator (REQ-040) via the type
 // registry, returning the concrete type behind the [rm.Party] interface.
 //
+// The read-only `versioned_party` family — [GetVersionedParty],
+// [GetRevisionHistory], and [GetVersion] / [GetVersionAtTime] /
+// [GetVersionByID] — exposes the VERSIONED_PARTY container, its revision
+// history, and the ORIGINAL_VERSION<PARTY> envelope decoded into a
+// [PartyVersion] (envelope fields + the polymorphically-decoded payload).
+//
 // Maturity: Draft. The upstream ITS-REST Demographic API is `x-status:
 // DEVELOPMENT` (the development/unstable companion to the EHR API), so this
 // package's surface MAY change between SDK minor versions until upstream

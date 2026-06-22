@@ -1,11 +1,11 @@
 # Plan — Phase 2 clinical building blocks (umbrella)
 
 **Date:** 2026-05-21
-**Status:** Draft
+**Status:** Draft (umbrella — Phase 2 sequence landed; only the deferred WebTemplate child REQ-106 remains open)
 **Owner:** SDK maintainers
 **Covers:** Phase 2 milestone ([`../roadmap.md`](../roadmap.md)); REQ-013, REQ-014; cross-links REQ-055 (AQL), REQ-053 (FLAT/STRUCTURED — deferred here)
 **Probes:** PROBE-020, PROBE-021 (AQL); new probe IDs reserved per child plan
-**Implementation:** partial — landed: OPT parser (REQ-100) including the C_PRIMITIVE_OBJECT inner-`<item>` wire parser, compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, REQ-102 composition validation, REQ-107 template-driven instance generator (with full PROBE-023 unmarshal round-trip), REQ-101 composition builder; open: AQL builders ([plan](2026-05-21-aql-builders.md)); demographic/AQL validators still planned (umbrella validation plan)
+**Implementation:** landed — OPT parser (REQ-100) including the C_PRIMITIVE_OBJECT inner-`<item>` wire parser, compiled template foundation (internal), walker pattern, REQ-103 primitive constraints, RMInfoLookup, REQ-102 composition validation, REQ-107 template-driven instance generator (with full PROBE-023 unmarshal round-trip), REQ-101 composition builder, REQ-055 AQL builders + REQ-109 AQL parse/static lint, REQ-110 validation beyond COMPOSITION (demographic PARTY hierarchy + FOLDER / EHR_STATUS), REQ-104/105 slot assertions + terminology bindings, REQ-111 public compiled-template bridge. **Only deferred:** REQ-106 WebTemplate export ([plan](2026-05-22-webtemplate-export.md))
 **Depends on:** [`2026-05-15-bmm-codegen.md`](archive/2026-05-15-bmm-codegen.md); [`2026-05-15-canonical-json-serialization.md`](archive/2026-05-15-canonical-json-serialization.md); [`2026-05-15-rest-api-client.md`](archive/2026-05-15-rest-api-client.md) Phases 1–6 (EHR + Query + Definition templates landed)
 **Defers:** REQ-053 FLAT/STRUCTURED codecs; AOM 2.4 / ADL2 template upload; Cadasto `cadasto/*`; full openEHR conformance-probe ratification (REQ-080)
 
@@ -22,7 +22,7 @@ This umbrella plan sequences work and records shared rules. **Implementation det
 | 1 | [`archive/2026-05-21-template-parser.md`](archive/2026-05-21-template-parser.md) | `openehr/template/` | composition, validation (landed) |
 | 2 | [`archive/2026-05-24-template-instance-example-generator.md`](archive/2026-05-24-template-instance-example-generator.md) | `openehr/instance/` | composition builder, tests (landed) |
 | 3 | [`archive/2026-05-21-composition-builder.md`](archive/2026-05-21-composition-builder.md) | `openehr/composition/` | (landed) |
-| 4 | [`archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) + [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) | `openehr/validation/` | (landed for composition + AQL lint; demographic still planned) |
+| 4 | [`archive/2026-05-21-validation.md`](archive/2026-05-21-validation.md) + [`archive/2026-05-24-composition-validation-template-driven.md`](archive/2026-05-24-composition-validation-template-driven.md) + [`archive/2026-06-17-validation-non-composition-roots.md`](archive/2026-06-17-validation-non-composition-roots.md) | `openehr/validation/` | (landed — composition REQ-102, AQL lint REQ-109, and demographic PARTY / FOLDER / EHR_STATUS REQ-110) |
 | 5 | [`archive/2026-05-21-aql-builders.md`](archive/2026-05-21-aql-builders.md) | `openehr/aql/` (builders) | landed (REQ-055; archived) |
 | 6 | [`archive/2026-06-15-aql-lint.md`](archive/2026-06-15-aql-lint.md) | `openehr/aql/parse/`, `openehr/aql/lint/`, `validation.ValidateAQL` | landed (REQ-109; PROBE-028; archived) |
 | 7 | [`archive/2026-05-26-c-primitive-object-wire-parser.md`](archive/2026-05-26-c-primitive-object-wire-parser.md) | `openehr/template/` parser + `openehr/instance/` UID emission | (landed) |
@@ -96,7 +96,7 @@ Several Phase 2 behaviours are described in [`docs/specifications/module-layout.
 |---|---|---|---|---|
 | OPT parser (`openehr/template/`) | Done | Done | Done | **Done** — REQ-100 + followups (parser hardening, path ergonomics, compiled foundation, walker, REQ-103 primitives) all landed |
 | Composition builder | Done | Done | — | **Done** — REQ-101 `NewSkeleton` + `Builder.Set/Build`; PROBE-023 full round-trip. [archive](archive/2026-05-21-composition-builder.md) |
-| Validation (REQ-102 composition) | Done | Done | — | **Done** — [composition validation plan](archive/2026-05-24-composition-validation-template-driven.md); demographic/AQL still **Open** (umbrella [validation plan](archive/2026-05-21-validation.md)) |
+| Validation (REQ-102/109/110) | Done | Done | Done | **Done** — composition [plan](archive/2026-05-24-composition-validation-template-driven.md) (REQ-102); AQL static lint REQ-109 [plan](archive/2026-06-15-aql-lint.md); demographic PARTY / FOLDER / EHR_STATUS REQ-110 [plan](archive/2026-06-17-validation-non-composition-roots.md) |
 | AQL builders | Done | Done | Done | **Done** — REQ-055 struct + verb builders, shared emitter, PROBE-020/021 (Sandbox). [plan](2026-05-21-aql-builders.md) |
 
 Update this table when a child plan phase lands; [`../roadmap.md`](../roadmap.md) milestone **Phase 2** flips when all four child Phase 1 rows are **Done**.

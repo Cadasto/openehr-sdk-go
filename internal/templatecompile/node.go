@@ -8,6 +8,22 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
+// IsAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
+// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
+// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
+// BMM-typed primitive attributes (e.g. DV_DURATION.value). Shared by
+// the validator and the instance synthesiser so both agree on which
+// leaves carry a primitive constraint rather than an RM wrapper.
+// REQ-024: closed switch, no reflection.
+func IsAOMPrimitiveShortName(s string) bool {
+	switch s {
+	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION", "INTEGER", "REAL":
+		return true
+	default:
+		return false
+	}
+}
+
 // CompiledNode is one node in the compiled OPT tree. Mirrors the
 // OPT's [template.Node] taxonomy (ComplexObject / ArchetypeRoot /
 // Slot) collapsed into a single struct because walker code rarely
@@ -30,6 +46,7 @@ type CompiledNode struct {
 	isSlot       bool
 	slotIncludes []string
 	slotExcludes []string
+	slotRules    constraints.SlotRules
 
 	// primitive carries the typed REQ-103 constraint value when the
 	// wire xsi:type was a primitive. Nil for non-primitive nodes
@@ -99,6 +116,33 @@ func (n *CompiledNode) SlotIncludes() []string { return slices.Clone(n.slotInclu
 // archetype-id exclude assertion strings. Empty for non-slot nodes.
 func (n *CompiledNode) SlotExcludes() []string { return slices.Clone(n.slotExcludes) }
 
+// SlotRules returns the parsed REQ-104 assertion rules for this
+// slot. Zero value for non-slot nodes. The returned rule slices are
+// defensive copies.
+func (n *CompiledNode) SlotRules() constraints.SlotRules { return n.slotRules.Clone() }
+
+// AllowsArchetypeID reports whether archetypeID satisfies this
+// slot's include / exclude rules (REQ-104), including the
+// RM-type-prefix fallback when no includes were parsed. False for
+// non-slot nodes.
+func (n *CompiledNode) AllowsArchetypeID(archetypeID string) bool {
+	if !n.isSlot {
+		return false
+	}
+	return n.slotRules.AllowsArchetypeID(archetypeID)
+}
+
+// ExampleSlotFillArchetypeID returns a synthetic archetype id for
+// instance generation when one can be derived from this slot's rules.
+// Returns "" for non-slot nodes, or when parsed includes are too
+// complex to synthesize safely.
+func (n *CompiledNode) ExampleSlotFillArchetypeID() string {
+	if !n.isSlot {
+		return ""
+	}
+	return n.slotRules.ExampleArchetypeID()
+}
+
 // PrimitiveConstraint returns the typed REQ-103 constraint value for
 // this node, or nil when the wire xsi:type was not a primitive in
 // the closed set. Mirrors [template.ComplexObject.PrimitiveConstraint]
@@ -113,8 +157,17 @@ func (n *CompiledNode) PrimitiveConstraint() constraints.PrimitiveConstraint {
 // sees that root's terminology rather than a sibling root's. Returns
 // (zero, false) when no enclosing root defines the code.
 //
+// The lang parameter is accepted for forward compatibility but is
+// currently ignored: an ADL 1.4 OPT carries a single document
+// language ([Compiled.Language]), so there is only one set of term
+// definitions to return. Per REQ-105 a future multi-language OPT
+// would select lang and fall back to the document language when the
+// requested translation is absent; until then every lang resolves
+// to the document-language term.
+//
 // The returned [template.ArchetypeTerm.Items] map is a defensive copy.
-func (n *CompiledNode) Term(code string) (template.ArchetypeTerm, bool) {
+func (n *CompiledNode) Term(code, lang string) (template.ArchetypeTerm, bool) {
+	_ = lang // single-language OPT (REQ-105); see doc comment.
 	for cur := n; cur != nil; cur = cur.parent {
 		if t, ok := cur.terms[code]; ok {
 			return template.ArchetypeTerm{Code: t.Code, Items: maps.Clone(t.Items)}, true

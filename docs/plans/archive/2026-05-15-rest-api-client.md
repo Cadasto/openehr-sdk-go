@@ -1,7 +1,7 @@
 # Plan — openEHR REST API client (1.1.0-development)
 
 **Date:** 2026-05-15
-**Status:** Archived — Phases 1–6 + 8 landed (the openEHR REST client family). Phase 7 (Demographic) split out to the active plan [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md); Phase 9 (benchmark harness) is optional/deferred.
+**Status:** Archived — Phases 1–6 + 8 landed (the openEHR REST client family). Phase 7 (Demographic) split out to the active plan [`2026-06-14-demographic-rest-client.md`](2026-06-14-demographic-rest-client.md); Phase 9 (benchmark harness) is optional/deferred.
 **Owner:** SDK maintainers
 **Covers:** REQ-050, REQ-051, REQ-054, REQ-055, REQ-057, REQ-058, **REQ-059 (openEHR custom headers)**, REQ-013, REQ-014, REQ-020, REQ-021, REQ-022, REQ-023, REQ-024, REQ-025, REQ-026, REQ-060..068 (auth integration), REQ-070..072 (discovery integration), REQ-090..092 (observability/retry/TLS), **REQ-093 (error envelope)**, **REQ-094 (`Prefer` negotiation)**, **REQ-095 (OpenAPI authoritative source)**; PROBE-010..013 implement; reserves PROBE-040..049 (REST-binding probes)
 **Depends on:** BMM codegen complete ([`2026-05-15-bmm-codegen.md`](2026-05-15-bmm-codegen.md)); canonical JSON codec ([`2026-05-15-canonical-json-serialization.md`](2026-05-15-canonical-json-serialization.md)) Phases 0–3; canonical XML codec ([`2026-05-15-canonical-xml-serialization.md`](2026-05-15-canonical-xml-serialization.md)) optional for v1 (clients negotiate JSON by default)
@@ -17,7 +17,7 @@
 | 4 — EHR versioned writes | PUT/POST/DELETE, `contribution`, PROBE-010–012 | **Done** |
 | 5 — Query API | `openehr/client/query/` | **Done** |
 | 6 — Definition API | templates, stored queries | **Done** (ADL 1.4 templates + stored AQL CRUD; PROBE-067) |
-| 7 — Demographic API | **split out** → [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md) | Open |
+| 7 — Demographic API | **split out** → [`2026-06-14-demographic-rest-client.md`](2026-06-14-demographic-rest-client.md) | Open |
 | 8 — Admin API | `openehr/client/admin/` ITS-REST housekeeping | **Done** (REQ-099; PROBE-070) |
 | 9 — Benchmark harness | load/benchmark consumer over the client | Open |
 
@@ -351,7 +351,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 ### Phase 7 — Demographic API
 
-**Split out** to its own active plan: [`2026-06-14-demographic-rest-client.md`](../2026-06-14-demographic-rest-client.md). The Demographic API (PARTY-hierarchy CRUD) was `doc.go`-only when this plan was archived; it is tracked there.
+**Split out** to its own active plan: [`2026-06-14-demographic-rest-client.md`](2026-06-14-demographic-rest-client.md). The Demographic API (PARTY-hierarchy CRUD) was `doc.go`-only when this plan was archived; it is tracked there.
 
 ### Phase 8 — Admin API
 

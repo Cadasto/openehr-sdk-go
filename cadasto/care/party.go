@@ -217,9 +217,9 @@ func (c *Client) getPartyWithRefFallback(ctx context.Context, partyType demograp
 	for _, void := range voidUIDCandidates(uid) {
 		if isFullVersionUID(uid) {
 			label := "GET /demographic/versioned_party/" + void + "/version/" + uid
-			party, meta, err := demographic.GetVersionedParty(ctx, c.rest, void, uid)
-			if err == nil && party != nil {
-				return party, meta, nil
+			pv, meta, err := demographic.GetVersionByID(ctx, c.rest, openehrclient.VersionedObjectID(void), openehrclient.VersionUID(uid))
+			if err == nil && pv != nil && pv.Party != nil {
+				return pv.Party, meta, nil
 			}
 			if err != nil && !partyGetRetriable(err) {
 				return nil, meta, err
@@ -227,9 +227,9 @@ func (c *Client) getPartyWithRefFallback(ctx context.Context, partyType demograp
 			record(label, err)
 		}
 		label := "GET /demographic/versioned_party/" + void + "/version"
-		party, meta, err := demographic.GetVersionedParty(ctx, c.rest, void, "")
-		if err == nil && party != nil {
-			return party, meta, nil
+		pv, meta, err := demographic.GetVersion(ctx, c.rest, openehrclient.VersionedObjectID(void))
+		if err == nil && pv != nil && pv.Party != nil {
+			return pv.Party, meta, nil
 		}
 		if err != nil && !partyGetRetriable(err) {
 			return nil, meta, err

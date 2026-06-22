@@ -217,8 +217,8 @@ The zero-value `NumericRange{}` (no fields set) is treated as "any value accepte
 
 - **AOM partial date / time pattern enforcement** — `CDate`, `CTime`, `CDateTime`, `CDuration` capture the raw `Pattern` string but `Validate` performs only an ISO 8601 sanity check. Strict AOM-pattern enforcement is a follow-up. Validators that need it interpret the stored pattern directly.
 - **`C_STRING.list_open`** — AOM 1.4 declares this mandatory flag on `C_STRING` to distinguish open enumerations (the list is *exemplars*, not the closed set) from closed ones. v1 `CString` does not capture it; `Validate` treats every non-empty `List` as closed. Surfacing the flag (and weakening `Validate` to "advisory" when `list_open=true`) is a follow-up REQ.
-- **`ARCHETYPE_SLOT` assertion grammar** — separate REQ-104. The current `Slot.Includes()` / `Slot.Excludes()` raw-string surface remains the only addressable slot constraint.
-- **External terminology lookup** — REQ-105 surfaces bindings, but neither it nor REQ-103 calls into a remote terminology service during `Validate`.
+- **`ARCHETYPE_SLOT` assertion grammar** — landed under REQ-104 (see below).
+- **External terminology lookup** — REQ-105 surfaces bindings carried in the OPT; neither REQ-103 nor REQ-105 calls into a remote terminology service during `Validate`.
 - **AOM 2 `tuple_constraint`** — not used by ADL 1.4.
 
 ### Building-block independence (REQ-013)
@@ -231,6 +231,52 @@ Every `PrimitiveConstraint` additionally exposes `ExampleValue() any` — a mini
 
 - **Lives in:** [`openehr/template/constraints/`](../../openehr/template/constraints/)
 - **Probes:** PROBE-024 (primitive constraint validation against fixture inputs)
+
+---
+
+## REQ-104 — Slot assertion grammar
+
+The SDK **MUST** parse the ADL 1.4 `ARCHETYPE_SLOT` include / exclude assertion subset sufficient for slot-fit checking in validators and instance synthesis.
+
+### Supported grammar (v1)
+
+v1 supports the `archetype_id matches {regex}` expression form, including:
+
+- Plain text assertions embedded in OPT XML (`archetype_id matches {/openEHR-EHR-OBSERVATION\.body_weight\..*/}`)
+- The OPT XML expression tree where operator `2007` (`matches`) binds `archetype_id/value` to a `C_STRING` `<pattern>` (the Ocean Template Designer shape)
+
+Unparseable assertion blobs are retained on [`Slot.Includes`](../../openehr/template/template.go) / [`Slot.Excludes`](../../openehr/template/template.go) and ignored by the structured matcher; when every include blob fails to compile the slot widens to the RM-type-prefix fallback (observable via `SlotRules.IncludesDroppedUnparsed`).
+
+### Contract
+
+- [`constraints.SlotAssertion`](../../openehr/template/constraints/slot.go) carries a compiled Go `regexp` and exposes `MatchesArchetypeID(string) bool`.
+- [`constraints.SlotRules`](../../openehr/template/constraints/slot.go) aggregates includes and excludes for one slot. `AllowsArchetypeID` applies excludes first, then requires a match against at least one include when includes are present; when no includes were parsed it **MUST** fall back to the RM-type-prefix rule (`openEHR-EHR-<rmType>.`). A catch-all exclude (`.*`) is **ignored when includes are present** — template editors auto-generate it as the complement of a closed includes list, so applying it literally would reject the slot's own includes.
+- Wire-side [`Slot`](../../openehr/template/template.go) exposes `ParsedIncludes`, `ParsedExcludes`, `AllowsRMType` (prefix fallback), `AllowsArchetypeID`, and `SlotRules`.
+- [`templatecompile.CompiledNode`](../../internal/templatecompile/node.go) copies parsed rules at compile time and exposes `AllowsArchetypeID` / `ExampleSlotFillArchetypeID` for validators and the instance synthesiser.
+
+### Building-block independence (REQ-013)
+
+`openehr/template/constraints/` remains stdlib-only. Slot assertion types live alongside primitive constraints.
+
+- **Lives in:** [`openehr/template/constraints/slot.go`](../../openehr/template/constraints/slot.go), [`openehr/template/slot_assertion.go`](../../openehr/template/slot_assertion.go), [`internal/templatecompile/`](../../internal/templatecompile/), [`openehr/validation/walk_composition.go`](../../openehr/validation/walk_composition.go)
+- **Tests:** [`openehr/template/constraints/slot_test.go`](../../openehr/template/constraints/slot_test.go), [`openehr/template/slot_assertion_test.go`](../../openehr/template/slot_assertion_test.go)
+
+---
+
+## REQ-105 — Terminology bindings
+
+The SDK **MUST** expose structured accessors for archetype term definitions and external terminology bindings carried in an OPT, without performing live terminology resolution.
+
+### Contract
+
+- [`ArchetypeTerm`](../../openehr/template/template.go) and [`TermBinding`](../../openehr/template/template.go) remain the wire-side records parsed from `<term_definitions>` and `<term_bindings>`.
+- [`templatecompile.Compiled.TermLang(nodeID, lang)`](../../internal/templatecompile/compiled.go) resolves an at-code's term text scoped to the composition root archetype. [`CompiledNode.Term(code, lang)`](../../internal/templatecompile/node.go) walks parent archetype roots for context-sensitive lookup.
+- **Language fallback:** ADL 1.4 OPTs carry a single document language (`Compiled.Language()`). When the requested `lang` is empty or equals the document language, the OPT's `Items` map (`text`, `description`, …) is returned. When `lang` differs and no translation exists in the OPT, the document-language term **MUST** be returned (no error — callers distinguish absence via the `ok` bool only).
+- [`Compiled.TermBindingsForNode(nodeID)`](../../internal/templatecompile/compiled.go) filters the compile-time flattened binding list to entries whose `NodeOrPath` equals the at-code or whose AQL-like locator contains `[nodeID]`.
+- External SNOMED / LOINC / ICD lookup is **out of scope** — REQ-105 only surfaces bindings the OPT carries.
+
+- **Lives in:** [`openehr/template/`](../../openehr/template/), [`internal/templatecompile/compiled.go`](../../internal/templatecompile/compiled.go)
+- **Tests:** [`internal/templatecompile/compile_test.go`](../../internal/templatecompile/compile_test.go)
 
 ---
 
@@ -280,10 +326,9 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 | **Structural — RM type match** | the RM instance's concrete type must satisfy the OPT child's `RMTypeName` (with abstract supertype admission per BMM); single-child attributes surface failures as `rm_type_mismatch` at the attribute path |
 | **Identity — archetype / node id pinning** | LOCATABLE.archetype_node_id is checked against the matched OPT child's `ArchetypeID()` (for archetype roots) or `NodeID()` (for inner at-codes) |
 | **Primitive constraints** | REQ-103 `PrimitiveConstraint.Validate` runs at every primitive leaf the OPT declares; bound to the RM value found by the structural walk |
-| **Slot fit — RM-type prefix fallback** | each `Content[i].ArchetypeNodeID` must match one of the OPT's archetype-root or slot-include archetype ids (or, when no slot constraint applies, share the slot's RM-type prefix `openEHR-EHR-<rmType>.`) |
-| **Slot assertion grammar** | deferred — REQ-104 |
+| **Slot fit — assertion grammar** | REQ-104 `CompiledNode.AllowsArchetypeID` (includes / excludes with RM-type-prefix fallback when no includes parsed) |
 | **Extra RM nodes not declared in OPT** | not flagged in v2; optional `warning` policy is a follow-up |
-| **Terminology binding value-set** | deferred — REQ-105 |
+| **Terminology binding value-set** | deferred — live external terminology lookup; REQ-105 surfaces OPT bindings only |
 
 ### Issue codes
 
@@ -298,7 +343,7 @@ An RM-guided intermediate (v1) landed on a sibling branch as a stepping stone: i
 | `archetype_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned archetype id at the matched node |
 | `node_id_mismatch` | LOCATABLE.archetype_node_id does not equal the OPT-pinned at-code at the matched node |
 | `primitive_*` | a REQ-103 primitive `Violation.Code` (`out_of_range`, `pattern_mismatch`, `not_in_list`, `wrong_type`, `unit_unknown`, `invalid_value`) at a leaf |
-| `slot_fill` | an RM item under a C_MULTIPLE_ATTRIBUTE whose `archetype_node_id` matches no OPT child (including slot RM-type-prefix fallback in v2) |
+| `slot_fill` | an RM value under a slot-constrained attribute whose `archetype_node_id` satisfies no OPT child or parsed slot assertion; slots fall back to the RM-type-prefix rule only when no include assertions were parsed |
 | `nil_composition` / `nil_template` | global guards — caller supplied a nil argument |
 
 Existence and child-count cardinality are **independent constraints**: a multi-valued attribute with `existence.lower ≥ 1` AND `cardinality.lower ≥ 1` whose RM-side slice is empty fires BOTH `required` AND `cardinality` at the same path. Validators MUST emit both codes when both clauses fail; collect-all semantics make this the natural outcome. Consumers de-duplicating for display SHOULD treat the pair as a single user-facing failure at that path.
@@ -336,18 +381,18 @@ Global guard codes (`nil_composition`, `nil_template`) return `nil` from `Issue.
 
 The dependency graph: `openehr/validation/` → `openehr/template/`, `openehr/template/constraints/`, `openehr/rm/`, `openehr/rm/rminfo/`, `internal/templatecompile/` (same-module internal access).
 
-### Public surface scope (v1 — module-local)
+### Public surface scope (resolved by REQ-111)
 
-The `c *templatecompile.Compiled` argument is typed against the SDK's internal compiled-template package. Per Go's `internal/` visibility rule, **external consumers (modules outside `github.com/cadasto/openehr-sdk-go`) cannot construct the argument and therefore cannot call `ValidateComposition` directly in v1**. The validator is callable from any package within this module — composition builder, codegen, CI tools, MCP servers vendoring the SDK.
+The `c *templatecompile.Compiled` argument is the compiled-template form. It was, through v0.8.0, typed against the SDK's *internal* compiled-template package, so per Go's `internal/` visibility rule **external consumers (modules outside `github.com/cadasto/openehr-sdk-go`) could not construct it and therefore could not call `ValidateComposition` directly**. The validator was callable only from packages within this module.
 
-This restriction is intentional and matches [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2: `internal/templatecompile/` stays internal until REQ-101 (composition builder) confirms the public shape. The public re-export (`template.Compile` / `template.Compiled`) lands alongside REQ-101 Phase 1, after which the validator's public signature becomes externally callable without code change. Until then, downstream consumers either vendor the SDK as a private dependency or wait for the promotion.
+**REQ-111 closes this.** The public bridge `openehr/templatecompile.Compile` produces the `*templatecompile.Compiled` (a type alias of the internal compiled form) that this validator accepts, so external modules now drive the full pipeline through public packages with no code change to the validator. [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2 originally proposed re-exporting the constructor as `template.Compile` / `template.Compiled` from `openehr/template`; [ADR 0010](../adr/0010-public-compiled-template-bridge.md) revised the placement to the sibling package `openehr/templatecompile` because hosting it in `openehr/template` would create an import cycle and violate REQ-100's stdlib-only contract. See REQ-111.
 
 ### Out of scope (this REQ)
 
 - **AQL lint** (`ValidateAQL`) — **landed** as a separate entry point under REQ-109 (see below); it does not change the composition-validation surface. **Demographic validator** (`ValidateDemographic`) remains deferred.
 - **Validating wire bytes / canonical JSON** — the validator never imports `serialize/`. Callers decode first, validate second.
 - **External terminology lookup** — value-set membership against SNOMED CT / LOINC / external services. REQ-103 closed-code-list checking is the v1 ceiling.
-- **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit uses the RM-type-prefix fallback.
+- **Cross-archetype slot-fill resolution** — no federated archetype repository; slot fit is local to parsed REQ-104 assertions, with RM-type-prefix fallback only when no include assertions were parsed.
 - **Full ADL2 / AOM 2 validation semantics.**
 
 - **Lives in:** [`openehr/validation/`](../../openehr/validation/)
@@ -394,9 +439,9 @@ func AsObservation(v any) (*rm.Observation, error)
 // … closed set matching validation ContentItem + standalone archetype roots
 ```
 
-`Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. Multi-valued attributes are sized to `max(existence.lower, 1)`; `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics).
+`Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. Multi-valued attributes are sized to `max(existence.lower, 1)` subject to AOM `cardinality.upper` when bounded; under `Minimal`, when optional archetype-root siblings share a `node_id`, the synthesiser emits only the first colliding sibling so validator node-id binding stays unambiguous (SDK-GAP-12). OPT-declared BMM generic RM types (e.g. `DV_INTERVAL<DV_QUANTITY>`) MUST resolve to the concrete Go typereg constructor before `rmwrite` attachment. `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics).
 
-Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via REQ-104 prefix match or the first include pattern — same compromise as validation slot-fit.
+Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via the parsed REQ-104 include grammar when a safe example id can be derived, or via the RM-type-prefix fallback only when no include assertions were parsed — same compromise as validation slot-fit.
 
 ### Trust model
 
@@ -406,7 +451,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt`; `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). One known v1 stop-gap remains: slot-fill archetype-id stamping (awaits REQ-104 grammar) — synthesiser stamps `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + SDK-GAP-12 corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
 
 ### Out of scope
 
@@ -423,7 +468,7 @@ Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/
 
 `openehr/instance/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. The generator operates on **in-memory RM graphs**, never on wire bytes — callers wanting canonical JSON / XML output run `serialize/canjson` or `canxml` themselves (`cmd/examples/` may import the codec; the library does not).
 
-In v1 the public signature accepts `*templatecompile.Compiled` (module-local), same restriction as `validation.ValidateComposition` per [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2 — the public re-export lands with REQ-101 Phase 1.
+The public signature accepts `*templatecompile.Compiled`. As with `validation.ValidateComposition`, REQ-111 makes that argument externally constructable via `openehr/templatecompile.Compile`, so `instance.Generate` is now callable from outside the module (see [ADR 0010](../adr/0010-public-compiled-template-bridge.md)).
 
 - **Lives in:** [`openehr/instance/`](../../openehr/instance/) (lands in Phase 2); `openehr/template/constraints/.ExampleValue()` (Phase 0 — landed); `internal/templateinstance/` (Phase 1+).
 - **Probes:** PROBE-027 — `instance.Generate` + `validation.ValidateComposition` round-trip clean on the same OPT (Phase 3).
@@ -465,7 +510,7 @@ REQ-101 trusts REQ-107 for the skeleton walk: every implicit RM attribute, every
 
 ### Building-block independence (REQ-013)
 
-`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
+`openehr/composition/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It depends on `openehr/rm`, `openehr/rm/typereg`, `openehr/template`, `openehr/templatecompile` (the public REQ-111 bridge, referenced in the exported `NewBuilder` / `NewSkeleton` signatures), `openehr/template/constraints`, `openehr/instance`, `openehr/validation/rmread`, `internal/templatecompile`, and `internal/templateinstance/rmwrite`. The forbidden-import set is enforced by `TestCompositionForbiddenImports`.
 
 - **Lives in:** [`openehr/composition/`](../../openehr/composition/)
 - **Probes:** PROBE-023 — `composition.NewBuilder` + `Set` → `Build` → `canjson.Marshal` → `canjson.Unmarshal` → re-marshal round-trip preserves values at key paths.
@@ -529,4 +574,100 @@ SELECT-present-with-≥1-projection and FROM-present are guaranteed by a success
 - **Lives in:** [`openehr/aql/parse/`](../../openehr/aql/parse/), [`openehr/aql/lint/`](../../openehr/aql/lint/); bridge in [`openehr/validation/aql.go`](../../openehr/validation/aql.go)
 - **Probes:** PROBE-028 — lint fixed query strings against the grammar profile (+ a compiled OPT for Layer 3) and assert a stable issue-code multiset.
 - **Plan:** [`docs/plans/archive/2026-06-15-aql-lint.md`](../plans/archive/2026-06-15-aql-lint.md)
+
+## REQ-110 — Template-driven validation beyond COMPOSITION
+
+REQ-102's walker is **value-source-generic**: the compiled OPT drives traversal and the RM root is the value source, read property-by-property through `openehr/validation/rmread`. The SDK **MUST** expose that walker for **any** archetypeable RM root, not only `COMPOSITION` — the demographic **PARTY** hierarchy and the EHR-IM container roots — so a demographic or directory OPT validates through the same machinery as a clinical template.
+
+### Surface
+
+```go
+// Generic entry — root is any RM LOCATABLE concrete the walker recognises.
+func Validate(root any, c *templatecompile.Compiled) Result
+
+// Typed convenience wrappers (delegate to Validate):
+func ValidateComposition(comp *rm.Composition, c *templatecompile.Compiled) Result  // REQ-102
+func ValidateDemographic(party rm.Party, c *templatecompile.Compiled) Result        // PERSON/ORGANISATION/GROUP/AGENT/ROLE
+func ValidateFolder(folder *rm.Folder, c *templatecompile.Compiled) Result
+func ValidateEHRStatus(status *rm.EHRStatus, c *templatecompile.Compiled) Result
+```
+
+`ValidateComposition` keeps its `nil_composition` guard for source compatibility, then delegates. A nil/typed-nil root yields `nil_root` (or the wrapper's `nil_party` / `nil_folder` / `nil_ehr_status`); a root whose concrete RM type does not match the OPT root surfaces `rm_type_mismatch` at `/`, never a silent pass.
+
+### Covered roots
+
+- **Demographic PARTY hierarchy:** `PERSON`, `ORGANISATION`, `GROUP`, `AGENT`, `ROLE`, plus the archetypeable sub-components walked in place or as roots — `ADDRESS`, `CONTACT`, `PARTY_IDENTITY`, `PARTY_RELATIONSHIP`, `CAPABILITY`.
+- **EHR-IM roots:** `FOLDER` (directory trees, recursing `folders`) and `EHR_STATUS`.
+
+### Implementation
+
+The walker logic is unchanged; generalisation is a lockstep extension of the four closed routing sets — `rmTypeInfo` and `bmmSubtypes` (`openehr/validation/`), and `ReadSingle`/`ReadMultiple` per-type readers + `isTypedNilPointer` (`openehr/validation/rmread/`). The same change adds the primitive-bearing **DataValue leaf** readers (`DV_DATE`/`DV_TIME`/`DV_DATE_TIME`/`DV_DURATION`.`value`, `DV_BOOLEAN.value`, `DV_IDENTIFIER.id`, `DV_MULTIMEDIA` `media_type`/`size`) so a DV value encoded as a `C_COMPLEX_OBJECT` with an explicit `value` `C_PRIMITIVE_OBJECT` child binds and validates (REQ-103) rather than reporting a false `required`.
+
+### Known limitations
+
+- `DV_INTERVAL<T>` over `DV_ORDERED` is not yet type-matched by the walker (a DataValue gap, not demographic-specific; cf. the `Test_dv_interval_*` round-trip exclusions). A `DV_INTERVAL` instance under an interval-typed OPT slot surfaces `rm_type_mismatch`.
+- Reference-typed attributes (`PARTY.roles`, `FOLDER.items` → `OBJECT_REF`/`PARTY_REF`) are addressable for existence/cardinality but their targets are not descended.
+
+### Building-block independence (REQ-013)
+
+`openehr/validation/` and `openehr/validation/rmread/` remain importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — enforced by `TestValidationForbiddenImports`. Decoding an instance for validation (canjson / canxml) is the caller's concern; `Validate` takes an in-memory root.
+
+- **Lives in:** [`openehr/validation/validate.go`](../../openehr/validation/validate.go), [`openehr/validation/rmread/read.go`](../../openehr/validation/rmread/read.go)
+- **Probes:** PROBE-074 — template-driven validation of non-COMPOSITION roots; asserts the issue-code multiset per (OPT, root) shape.
+- **Plan:** [`docs/plans/archive/2026-06-17-validation-non-composition-roots.md`](../plans/archive/2026-06-17-validation-non-composition-roots.md)
+
+---
+
+## REQ-111 — Public compiled-template bridge
+
+The compiled-template form (`templatecompile.Compiled`) is the argument every template-driven entry point takes: the composition builder (REQ-101 — `NewBuilder` / `NewSkeleton`), the RM instance synthesiser (REQ-107 — `Generate`), the validator (REQ-102 / REQ-110 — `Validate` and its typed wrappers), and the AQL static lint (REQ-109 — `lint.Options.Compiled`). Through v0.8.0 it was only constructable inside this module, so **none of those entry points was callable from an external module**.
+
+The SDK **MUST** ship a public constructor that turns a parsed OPT into that compiled form without exposing any `internal/` package, so external consumers can drive the full parse → compile → build → validate pipeline through public packages alone.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/templatecompile
+
+// Compiled is the public, externally-constructable compiled template.
+// It is a type alias of the internal compiled form, so values returned
+// by Compile are accepted as-is by composition, instance, validation
+// and aql/lint — REQ-111 adds no conversion and changes no behaviour.
+type Compiled = <internal compiled form>
+
+func Compile(opt *template.OperationalTemplate, opts ...Option) (*Compiled, error)
+
+type Option func(*config)
+func WithRMInfo(l rminfo.Lookup) Option       // custom RM-info source
+func WithoutImplicitAttributes() Option        // OPT-declared attributes only
+
+var ErrInvalidInput error  // re-export; errors.Is works across the boundary
+var ErrPathNotFound error
+
+// Introspection tree — also public, for form generation, path discovery,
+// and custom mapping/validation. Aliases of the engine node types.
+type CompiledNode = <internal compiled node>
+type CompiledAttribute = <internal compiled attribute>
+```
+
+The committed public surface is `Compile`, `Compiled`, the introspection tree (`CompiledNode` / `CompiledAttribute`), the functional `Option`s, and the two sentinel errors — all aliases of the engine types, so a downstream package can navigate the compiled template (`Compiled.Root` / `NodeAt` → `CompiledNode.Attributes` → `CompiledAttribute.Children`) and hold the node types in its own signatures. Pre-1.0 the one area expected to change is multi-language term resolution (`CompiledNode.Term`'s `lang` parameter, REQ-105); the surface is otherwise stable. Everything reachable as a method on `Compiled` / `CompiledNode` / `CompiledAttribute` is committed (including the slot accessors `SlotIncludes` / `SlotExcludes` / `SlotRules` / `AllowsArchetypeID` / `ExampleSlotFillArchetypeID`); the compile engine and free helpers that are not methods on the exported types (e.g. `IsAOMPrimitiveShortName`) stay internal.
+
+The consuming packages reference the public `*templatecompile.Compiled` in their **exported** signatures (so the rendered API docs link the public package); their unexported code that needs the node-level types imports the internal engine directly. Because `Compiled` is a type alias, the two names denote the identical type and no conversion is needed.
+
+### Placement (ADR 0010)
+
+The constructor **MUST NOT** live in `openehr/template` (the natural home next to `ParseFile`), for two reasons:
+
+1. **Import cycle.** The compile engine imports `openehr/template`; a `Compile` inside `openehr/template` would import the engine, forming `template → templatecompile → template`.
+2. **REQ-100 stdlib-only contract.** REQ-100 mandates `openehr/template` import nothing from `openehr/rm/…`; compilation needs `openehr/rm/rminfo` for implicit-attribute injection.
+
+It therefore lives in the sibling package `openehr/templatecompile`. This supersedes [ADR 0005](../adr/0005-compiled-template-foundation.md) §C2's `template.Compile` / `template.Compiled` proposal; see [ADR 0010](../adr/0010-public-compiled-template-bridge.md).
+
+### Building-block independence (REQ-013)
+
+`openehr/templatecompile/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/template`, `openehr/rm/rminfo`, and the internal compile engine only.
+
+- **Lives in:** [`openehr/templatecompile/`](../../openehr/templatecompile/)
+- **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
+- **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 

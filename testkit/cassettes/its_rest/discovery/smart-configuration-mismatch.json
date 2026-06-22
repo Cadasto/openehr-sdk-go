@@ -5,12 +5,11 @@
   "scopes_supported": ["openid", "profile", "patient/*.read"],
   "response_types_supported": ["code"],
   "code_challenge_methods_supported": ["S256"],
-  "services": [
-    {
-      "id": "org.openehr.rest",
-      "base_url": "https://api.example.com/openehr/v1",
+  "services": {
+    "org.openehr.rest": {
+      "baseUrl": "https://api.example.com/openehr/v1",
       "spec_version": "1.0.3",
       "capabilities": []
     }
-  ]
+  }
 }

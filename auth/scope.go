@@ -2,6 +2,27 @@ package auth
 
 import "strings"
 
+// Launch-context and refresh scope constants for SMART App Launch.
+//
+// These values are defined in the HL7 SMART App Launch v2 specification
+// (https://hl7.org/fhir/smart-app-launch/) "Scopes and Launch Context" section
+// and in the openEHR SMART App Launch specification
+// (https://specifications.openehr.org/releases/ITS-REST/development/smart_app_launch.html).
+//
+// All constants are purely lexical — the SDK does NOT enforce their presence or
+// absence; the deployment is authoritative (consistent with the BuildScope note
+// below). [REQ-061]
+const (
+	ScopeOpenID        = "openid"         // required for ID-token issuance
+	ScopeProfile       = "profile"        // request standard profile claims
+	ScopeFHIRUser      = "fhirUser"       // request fhirUser identity claim
+	ScopeLaunch        = "launch"         // EHR-launch context (embedded / iFrame launch)
+	ScopeLaunchPatient = "launch/patient" // standalone patient-context launch; triggers ehrId claim on openEHR
+	ScopeLaunchEpisode = "launch/episode" // standalone episode-context launch (openEHR experimental)
+	ScopeOfflineAccess = "offline_access" // request a refresh token (persists beyond browser session)
+	ScopeOnlineAccess  = "online_access"  // request a refresh token scoped to the current session only
+)
+
 // BuildScope composes an openEHR-formatted scope from its three parts
 // per the SMART-on-openEHR convention: <compartment>/<resource>.<permission>.
 //

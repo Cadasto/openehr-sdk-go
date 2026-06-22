@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/internal/templateinstance/rmwrite"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // Generate synthesises an RM instance for the compiled template's
@@ -103,13 +104,15 @@ func (g *generator) nextUID() *rm.HierObjectID {
 // materialising each attribute's children. Mirrors the lockstep
 // shape of openehr/validation/walk_composition.go but in the
 // opposite direction — the OPT drives, rmwrite attaches.
-func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any) error {
+func (g *generator) walkNode(optNode *tcimpl.CompiledNode, rmValue any) error {
 	if optNode == nil || rmValue == nil {
 		return nil
 	}
-	// Slots are leaf fill-points — REQ-104 will parse the include
-	// grammar. v1 leaves slot bodies empty; the caller composes them
-	// via REQ-101 builder Set calls.
+	// Slots are leaf fill-points: the synthesiser leaves slot bodies
+	// empty and the caller composes them via REQ-101 builder Set
+	// calls. The parsed REQ-104 grammar is used only to stamp a
+	// conforming archetype id when a lower-bound top-up forces a
+	// slot fill and a safe example can be derived (see stampSlotFill).
 	if optNode.IsSlot() {
 		return nil
 	}
@@ -131,6 +134,9 @@ func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any)
 	}
 
 	for _, attr := range optNode.Attributes() {
+		if rminfo.IsNonStorableAttr(optNode.RMTypeName(), attr.Name()) {
+			continue
+		}
 		if !g.shouldVisit(attr) {
 			continue
 		}
@@ -157,7 +163,7 @@ func (g *generator) walkNode(optNode *templatecompile.CompiledNode, rmValue any)
 // pins) — the act of pinning is itself a signal that the resulting
 // tree should carry those children even under the smallest viable
 // build.
-func (g *generator) shouldVisit(attr *templatecompile.CompiledAttribute) bool {
+func (g *generator) shouldVisit(attr *tcimpl.CompiledAttribute) bool {
 	if g.opts.Policy == Example {
 		return true
 	}
@@ -176,8 +182,8 @@ func (g *generator) shouldVisit(attr *templatecompile.CompiledAttribute) bool {
 // resulting tree satisfies REQ-102 v2's "required attribute absent"
 // check without the OPT pinning structure for every BMM mandatory.
 func (g *generator) materialiseSingle(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	children := attr.Children()
@@ -202,7 +208,7 @@ func (g *generator) materialiseSingle(
 	// (a C_PRIMITIVE_OBJECT wrapper whose inner item the OPT author
 	// omitted, or an unknown xsi:type the parser admitted leniently),
 	// the populatePrimitiveDefault sentinel holds.
-	if isAOMPrimitiveShortName(child.RMTypeName()) {
+	if tcimpl.IsAOMPrimitiveShortName(child.RMTypeName()) {
 		if pc := child.PrimitiveConstraint(); pc != nil {
 			return g.applyPrimitiveExample(child, parentRM, pc)
 		}
@@ -220,6 +226,9 @@ func (g *generator) materialiseSingle(
 	// constraint IS present, applyPrimitiveExample inside walkNode
 	// overwrites the default. No-op for non-primitive wrappers.
 	g.populatePrimitiveDefault(rmChild)
+	if child.IsSlot() && !g.stampSlotFill(rmChild, child) {
+		return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, child.AQLPath())
+	}
 	if err := g.walkNode(child, rmChild); err != nil {
 		return err
 	}
@@ -227,19 +236,6 @@ func (g *generator) materialiseSingle(
 		return fmt.Errorf("attach %s.%s: %w", optNode.RMTypeName(), attr.Name(), err)
 	}
 	return nil
-}
-
-// isAOMPrimitiveShortName reports whether s is an AOM 1.4 primitive
-// short name (BOOLEAN, DATE, TIME, DATE_TIME, DURATION). These appear
-// as the rm_type_name of C_PRIMITIVE_OBJECT children pinned under
-// BMM-typed primitive attributes (e.g. DV_DURATION.value). REQ-024:
-// closed switch, no reflection.
-func isAOMPrimitiveShortName(s string) bool {
-	switch s {
-	case "BOOLEAN", "DATE", "TIME", "DATE_TIME", "DURATION":
-		return true
-	}
-	return false
 }
 
 // materialiseImplicitSingle creates a default value for a
@@ -255,8 +251,8 @@ func isAOMPrimitiveShortName(s string) bool {
 // here so user-supplied Options values are not clobbered with a
 // placeholder.
 func (g *generator) materialiseImplicitSingle(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	if optNode.RMTypeName() == "COMPOSITION" {
@@ -277,7 +273,7 @@ func (g *generator) materialiseImplicitSingle(
 		_ = rmwrite.EnsureSingle(parentRM, optNode.RMTypeName(), attr.Name(), "example")
 		return nil
 	}
-	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		// Unknown RM type — silently skip; the OPT is mis-modelled or
 		// the attribute is outside the current registry, both of
@@ -377,6 +373,37 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 		v.Magnitude = 0
 	case *rm.DVQuantity:
 		// Leave zero — the OPT primitive constraint may further pin.
+	case *rm.DVProportion:
+		v.Numerator = 1
+		v.Denominator = 1
+	case *rm.DVURI:
+		v.Value = "http://example.com"
+	case *rm.DVIdentifier:
+		v.ID = "example"
+	case *rm.DVParsable:
+		v.Value = "example"
+		v.Formalism = "text/plain"
+	case *rm.DVInterval[rm.DVQuantity]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVCount]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVDateTime]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVDate]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVTime]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVProportion]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
+	case *rm.DVInterval[rm.DVOrdered]:
+		v.LowerUnbounded = true
+		v.UpperUnbounded = true
 	}
 }
 
@@ -386,8 +413,8 @@ func (g *generator) populatePrimitiveDefault(rmValue any) {
 // cardinality.upper (default unbounded). The synthesised count
 // never exceeds the OPT-declared upper bound.
 func (g *generator) materialiseMultiple(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	children := attr.Children()
@@ -404,11 +431,15 @@ func (g *generator) materialiseMultiple(
 	}
 	total := 0
 	for _, child := range children {
-		// Slots are caller-filled (REQ-104 will surface a grammar);
-		// the synthesiser does not invent archetype roots to fill
-		// them and instead leaves the count to satisfy the slot's
-		// occurrences.lower (often 0 — most slots are optional).
+		// Slots are caller-filled; the synthesiser does not invent
+		// archetype roots to fill them and instead leaves the count
+		// to satisfy the slot's occurrences.lower (often 0 — most
+		// slots are optional).
 		if child.IsSlot() {
+			continue
+		}
+		if g.opts.Policy == Minimal && optionalSiblingIDCollides(child, children) &&
+			!firstCollidingOptionalSibling(child, children) {
 			continue
 		}
 		childCount := 1
@@ -448,11 +479,10 @@ func (g *generator) materialiseMultiple(
 	// nothing was appended (e.g. all OPT children had occurrence
 	// lower 0 under Example with no top-level cardinality block).
 	// When every OPT child is a slot we synthesise a slot-shaped
-	// fill: an RM value of the slot's RMTypeName stamped with a
-	// matching archetype id ("openEHR-EHR-<RMType>.example.v1"),
-	// which satisfies the validator's RM-type-prefix slotFit
-	// heuristic. REQ-104 slot grammar parsing replaces this when it
-	// lands.
+	// fill: an RM value of the slot's RMTypeName stamped (by
+	// stampSlotFill) with an archetype id drawn from the parsed
+	// REQ-104 include grammar, or from the RM-type-prefix fallback
+	// only when no includes were parsed.
 	if needed := remainingLowerNeeded(attr, total); needed > 0 {
 		seed := firstNonSlot(children)
 		if seed == nil && len(children) > 0 {
@@ -467,7 +497,9 @@ func (g *generator) materialiseMultiple(
 				return err
 			}
 			if seed.IsSlot() {
-				g.stampSlotFill(rmChild, seed.RMTypeName())
+				if !g.stampSlotFill(rmChild, seed) {
+					return fmt.Errorf("%w: %s", ErrSlotFillUnsupported, seed.AQLPath())
+				}
 			}
 			if err := g.walkNode(seed, rmChild); err != nil {
 				return err
@@ -490,23 +522,30 @@ func (g *generator) materialiseMultiple(
 }
 
 // stampSlotFill overrides the archetype_node_id and archetype_details
-// on a freshly-constructed RM value so it satisfies the validator's
-// RM-type-prefix slotFit heuristic
-// ("openEHR-EHR-<RMType>.example.v1"). A v1 stop-gap until REQ-104
-// supplies a parsed slot grammar — synthesiser picks a synthetic
-// archetype id that the validator accepts as a legitimate fill.
-func (g *generator) stampSlotFill(rmValue any, slotRMType string) {
-	archetypeID := "openEHR-EHR-" + slotRMType + ".example.v1"
+// on a freshly-constructed RM value when a valid slot-fill archetype
+// id can be synthesized. It falls back to the RM-type-prefix example
+// only for slots without parsed includes; parsed includes must be
+// satisfied explicitly. Returns false when no safe id can be derived.
+func (g *generator) stampSlotFill(rmValue any, slot *tcimpl.CompiledNode) bool {
+	rules := slot.SlotRules()
+	archetypeID := rules.ExampleArchetypeID()
+	if archetypeID == "" && !rules.HasParsedIncludes() {
+		archetypeID = "openEHR-EHR-" + slot.RMTypeName() + ".example.v1"
+	}
+	if archetypeID == "" || !rules.AllowsArchetypeID(archetypeID) {
+		return false
+	}
 	ad := &rm.Archetyped{
 		ArchetypeID: rm.ArchetypeID{Value: archetypeID},
 		RMVersion:   "1.1.0",
 	}
-	applyLocatableIdentity(rmValue, archetypeID, slotRMType, ad, g.nextUID)
+	applyLocatableIdentity(rmValue, archetypeID, slot.RMTypeName(), ad, g.nextUID)
+	return true
 }
 
 // firstNonSlot returns the first OPT child that is not a slot, or
 // nil when every child is a slot.
-func firstNonSlot(children []*templatecompile.CompiledNode) *templatecompile.CompiledNode {
+func firstNonSlot(children []*tcimpl.CompiledNode) *tcimpl.CompiledNode {
 	for _, c := range children {
 		if !c.IsSlot() {
 			return c
@@ -521,15 +560,15 @@ func firstNonSlot(children []*templatecompile.CompiledNode) *templatecompile.Com
 // when the type is outside the typereg registry — the validator
 // will flag it.
 func (g *generator) materialiseImplicitMultiple(
-	optNode *templatecompile.CompiledNode,
-	attr *templatecompile.CompiledAttribute,
+	optNode *tcimpl.CompiledNode,
+	attr *tcimpl.CompiledAttribute,
 	parentRM any,
 ) error {
 	rmType := attr.RMTypeName()
 	if rmType == "" {
 		return nil
 	}
-	rmChild, err := rmwrite.NewRM(concreteFor(rmType))
+	rmChild, err := newRMForOPTType(rmType)
 	if err != nil {
 		return nil //nolint:nilerr // intentional: defer to validator
 	}
@@ -545,7 +584,7 @@ func (g *generator) materialiseImplicitMultiple(
 // an empty multi-valued attribute as "required" whenever existence
 // pins lower ≥ 1, regardless of cardinality.lower (cardinality and
 // existence are orthogonal in AOM 1.4).
-func remainingLowerNeeded(attr *templatecompile.CompiledAttribute, current int) int {
+func remainingLowerNeeded(attr *tcimpl.CompiledAttribute, current int) int {
 	low := 0
 	if cm := attr.ChildMultiplicity(); cm != nil && !cm.LowerUnbounded() {
 		low = cm.Lower()
@@ -566,9 +605,8 @@ func remainingLowerNeeded(attr *templatecompile.CompiledAttribute, current int) 
 // OPT (EVENT, ITEM_STRUCTURE, DATA_VALUE, ITEM, CONTENT_ITEM,
 // CARE_ENTRY, ENTRY, LOCATABLE) resolve to a documented concrete
 // substitute — see [concreteFor].
-func (g *generator) makeChild(child *templatecompile.CompiledNode) (any, error) {
-	rmType := concreteFor(child.RMTypeName())
-	rmChild, err := rmwrite.NewRM(rmType)
+func (g *generator) makeChild(child *tcimpl.CompiledNode) (any, error) {
+	rmChild, err := newRMForOPTType(child.RMTypeName())
 	if err != nil {
 		return nil, fmt.Errorf("makeChild %s: %w", child.RMTypeName(), err)
 	}
@@ -618,6 +656,8 @@ func concreteFor(rmType string) string {
 		return "DV_DATE_TIME"
 	case "BOOLEAN":
 		return "DV_BOOLEAN"
+	case "INTEGER":
+		return "DV_COUNT"
 	}
 	return rmType
 }
@@ -627,7 +667,7 @@ func concreteFor(rmType string) string {
 // value. The isTemplateRoot flag controls whether template_id is
 // stamped on archetype_details — only the very top-level root
 // carries it.
-func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmValue any, isTemplateRoot bool) {
+func (g *generator) setLocatableIdentity(opt *tcimpl.CompiledNode, rmValue any, isTemplateRoot bool) {
 	if opt == nil || rmValue == nil {
 		return
 	}
@@ -648,7 +688,7 @@ func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmVa
 	// definitions when available; the RM type acts as the fallback.
 	name := opt.RMTypeName()
 	if id != "" {
-		if t, ok := opt.Term(id); ok {
+		if t, ok := opt.Term(id, ""); ok {
 			if text, found := t.Items["text"]; found && text != "" {
 				name = text
 			}
@@ -682,7 +722,7 @@ func (g *generator) setLocatableIdentity(opt *templatecompile.CompiledNode, rmVa
 // constraint type because the value shape differs per primitive
 // (REQ-103 closed set).
 func (g *generator) applyPrimitiveExample(
-	_ *templatecompile.CompiledNode,
+	_ *tcimpl.CompiledNode,
 	rmValue any,
 	pc constraints.PrimitiveConstraint,
 ) error {
@@ -730,14 +770,14 @@ func (g *generator) applyPrimitiveExample(
 		v.Value = b
 		return nil
 	case *rm.DVCount:
-		n, ok := toInt64(ex)
+		n, ok := rm.AsInt64(ex)
 		if !ok {
 			return fmt.Errorf("DV_COUNT example value is %T, want integer", ex)
 		}
 		v.Magnitude = n
 		return nil
 	case *rm.DVOrdinal:
-		n, ok := toInt64(ex)
+		n, ok := rm.AsInt64(ex)
 		if !ok {
 			return fmt.Errorf("DV_ORDINAL example value is %T, want integer", ex)
 		}
@@ -829,7 +869,7 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 
 // isRequired mirrors validation/walk_composition.go's isRequired —
 // BMM-mandatory OR existence lower ≥ 1.
-func isRequired(attr *templatecompile.CompiledAttribute) bool {
+func isRequired(attr *tcimpl.CompiledAttribute) bool {
 	if attr.Required() {
 		return true
 	}
@@ -868,29 +908,51 @@ func newHierObjectID() *rm.HierObjectID {
 	return &rm.HierObjectID{Value: uuid}
 }
 
-// toInt64 widens any numeric Go shape to int64. Mirrors the helper
-// in openehr/template/constraints/numeric.go but kept inline here so
-// we don't pull a private import.
-func toInt64(value any) (int64, bool) {
-	switch v := value.(type) {
-	case int:
-		return int64(v), true
-	case int8:
-		return int64(v), true
-	case int16:
-		return int64(v), true
-	case int32:
-		return int64(v), true
-	case int64:
-		return v, true
-	case uint:
-		return int64(v), true
-	case uint8:
-		return int64(v), true
-	case uint16:
-		return int64(v), true
-	case uint32:
-		return int64(v), true
+// optionalSiblingIDCollides reports whether this optional child shares
+// its node_id with another optional sibling under the same attribute.
+func optionalSiblingIDCollides(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
+	if child.IsSlot() {
+		return false
 	}
-	return 0, false
+	occ := child.Occurrences()
+	if occ != nil && !occ.LowerUnbounded() && occ.Lower() > 0 {
+		return false
+	}
+	id := child.NodeID()
+	if id == "" {
+		return false
+	}
+	count := 0
+	for _, sib := range siblings {
+		if sib.IsSlot() {
+			continue
+		}
+		sibOcc := sib.Occurrences()
+		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
+			continue
+		}
+		if sib.NodeID() == id {
+			count++
+		}
+	}
+	return count > 1
+}
+
+// firstCollidingOptionalSibling is true when child is the first
+// optional sibling among those sharing its node_id.
+func firstCollidingOptionalSibling(child *tcimpl.CompiledNode, siblings []*tcimpl.CompiledNode) bool {
+	id := child.NodeID()
+	for _, sib := range siblings {
+		if sib.IsSlot() {
+			continue
+		}
+		sibOcc := sib.Occurrences()
+		if sibOcc != nil && !sibOcc.LowerUnbounded() && sibOcc.Lower() > 0 {
+			continue
+		}
+		if sib.NodeID() == id {
+			return sib == child
+		}
+	}
+	return false
 }

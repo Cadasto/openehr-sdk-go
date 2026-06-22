@@ -56,6 +56,7 @@ endef
 .PHONY: help doctor go-version image-dev \
         fmt fmt-check vet \
         codegen codegen-verify antlr-image aqlgen aqlgen-verify \
+        its-rest-sync its-rest-check \
         test test-race \
         lint lint-ci \
         mod-tidy mod-tidy-check \
@@ -144,6 +145,14 @@ aqlgen-verify: antlr-image ## Fail if the committed AQL parser drifts from activ
 	rm -rf $(AQL_GEN_DIR).verify; \
 	if [ $$status -ne 0 ]; then echo "aqlgen-verify: AQL parser drifts from active/ — run 'make aqlgen'"; exit 1; fi; \
 	echo "aqlgen-verify: OK"
+
+##@ Resources
+
+its-rest-sync: ## Vendor openEHR ITS-REST OpenAPI specs into resources/its-rest/ (needs network; ITS_REST_REF to pin)
+	@./scripts/sync-its-rest-specs.sh sync
+
+its-rest-check: ## Verify vendored ITS-REST specs match MANIFEST + report upstream drift (needs network)
+	@./scripts/sync-its-rest-specs.sh check
 
 ##@ Test
 

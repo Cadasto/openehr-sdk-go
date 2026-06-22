@@ -64,6 +64,20 @@ func TestDVTextLikeGetValueNilInterface(t *testing.T) {
 	}
 }
 
+// TestDVTextValueOfTypedNilPointer guards the rmpath name-predicate path:
+// a LOCATABLE may carry a typed-nil *DVText in its Name field without
+// panicking when DVTextValueOf is called.
+func TestDVTextValueOfTypedNilPointer(t *testing.T) {
+	var name *rm.DVText
+	if got := rm.DVTextValueOf(name); got != "" {
+		t.Errorf("DVTextValueOf((*DVText)(nil)) = %q, want \"\"", got)
+	}
+	var coded *rm.DVCodedText
+	if got := rm.DVTextValueOf(coded); got != "" {
+		t.Errorf("DVTextValueOf((*DVCodedText)(nil)) = %q, want \"\"", got)
+	}
+}
+
 // TestDVURILikeGetValue pins the Phase 2 accessor: `.GetValue()` on a
 // DVURILike returns the URI string of the underlying concrete type
 // (DVURI or DVEHRURI).

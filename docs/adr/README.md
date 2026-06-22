@@ -7,11 +7,15 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-bmm-version-bump-runbook.md) | BMM version-bump runbook | Accepted (2026-05-16) |
-| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D6) | Accepted (2026-05-16) |
+| [0002](0002-bmm-codegen-decisions.md) | BMM code generator structural decisions (D1–D7) | Accepted (2026-05-16) |
 | [0003](0003-rm-event-polymorphism.md) | Codec polymorphism for abstract generic RM classes (EVENT, …) | Accepted (2026-05-16) |
 | [0004](0004-numeric-wire-tolerance.md) | Strict-encode, permissive-decode for BMM `Real` and `Integer` | Accepted (2026-05-16) |
 | [0005](0005-compiled-template-foundation.md) | Compiled OPT foundation (`rminfo` + `internal/templatecompile`) | Accepted (2026-05-22) |
 | [0006](0006-composition-validation-walker-placement.md) | Composition validation walker package placement | Accepted (2026-06-11) |
 | [0007](0007-aql-antlr-grammar-profile.md) | AQL parser: ANTLR + SDK grammar profile | Accepted (2026-06-15) |
+| [0008](0008-smart-discovery-services-shape.md) | SMART discovery: canonical `services` map shape | Accepted (2026-06-17) |
+| [0009](0009-smart-auth-library-scope.md) | SMART-on-openEHR auth library scope and dependency model | Accepted (2026-06-18) |
+| [0010](0010-public-compiled-template-bridge.md) | Public compiled-template bridge placement (`openehr/templatecompile`) | Accepted (2026-06-17) |
+| [0011](0011-rm-behavioural-functions-surface.md) | RM behavioural-function surface and fallibility policy | Accepted (2026-06-19) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

@@ -3,12 +3,17 @@ package jwtbearer
 import (
 	"context"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -55,7 +60,8 @@ func decodeJWT(t *testing.T, jwt string) (header, claims map[string]any, sig []b
 	return header, claims, sig
 }
 
-func verifyRS256(t *testing.T, pub *rsa.PublicKey, jwt string) {
+// verifyRSA verifies PKCS1v15 signatures for RS256, RS384, or RS512. REQ-068
+func verifyRSA(t *testing.T, alg string, pub *rsa.PublicKey, jwt string) {
 	t.Helper()
 	parts := strings.Split(jwt, ".")
 	if len(parts) != 3 {
@@ -65,12 +71,82 @@ func verifyRS256(t *testing.T, pub *rsa.PublicKey, jwt string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sum := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
-	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig); err != nil {
-		t.Errorf("signature verify: %v", err)
+	input := []byte(parts[0] + "." + parts[1])
+	var hashID crypto.Hash
+	var digest []byte
+	switch alg {
+	case "RS256":
+		hashID = crypto.SHA256
+		h := sha256.Sum256(input)
+		digest = h[:]
+	case "RS384":
+		hashID = crypto.SHA384
+		h := sha512.Sum384(input)
+		digest = h[:]
+	default:
+		t.Fatalf("verifyRSA: unsupported alg %q", alg)
+	}
+	if err := rsa.VerifyPKCS1v15(pub, hashID, digest, sig); err != nil {
+		t.Errorf("RSA signature verify (%s): %v", alg, err)
 	}
 }
 
+// verifyECDSA verifies an ECDSA signature encoded as JOSE r‖s. REQ-068
+func verifyECDSA(t *testing.T, alg string, pub *ecdsa.PublicKey, jwt string) {
+	t.Helper()
+	parts := strings.Split(jwt, ".")
+	if len(parts) != 3 {
+		t.Fatalf("jwt has %d parts", len(parts))
+	}
+	sigBytes, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatal(err)
+	}
+	// JOSE ECDSA signatures are r‖s, each padded to the curve's byte length.
+	if len(sigBytes)%2 != 0 {
+		t.Fatalf("ECDSA JOSE sig length %d is odd", len(sigBytes))
+	}
+	half := len(sigBytes) / 2
+	r := new(big.Int).SetBytes(sigBytes[:half])
+	s := new(big.Int).SetBytes(sigBytes[half:])
+	input := []byte(parts[0] + "." + parts[1])
+	var digest []byte
+	switch alg {
+	case "ES256":
+		h := sha256.Sum256(input)
+		digest = h[:]
+	case "ES384":
+		h := sha512.Sum384(input)
+		digest = h[:]
+	default:
+		t.Fatalf("verifyECDSA: unsupported alg %q", alg)
+	}
+	if !ecdsa.VerifyASN1(pub, digest, mustEncodeASN1(t, r, s)) {
+		t.Errorf("ECDSA signature verify (%s): invalid", alg)
+	}
+}
+
+// mustEncodeASN1 encodes (r, s) as DER for ecdsa.VerifyASN1.
+func mustEncodeASN1(t *testing.T, r, s *big.Int) []byte {
+	t.Helper()
+	// Minimal DER SEQUENCE { INTEGER r, INTEGER s }
+	encInt := func(n *big.Int) []byte {
+		b := n.Bytes()
+		if len(b) == 0 {
+			b = []byte{0}
+		}
+		if b[0]&0x80 != 0 {
+			b = append([]byte{0}, b...)
+		}
+		return append([]byte{0x02, byte(len(b))}, b...)
+	}
+	rb, sb := encInt(r), encInt(s)
+	body := append(rb, sb...)
+	return append([]byte{0x30, byte(len(body))}, body...)
+}
+
+// TestClaimsSignerProducesValidJWT covers the default RS384 path: claims
+// structure, header fields, and signature verification. REQ-068
 func TestClaimsSignerProducesValidJWT(t *testing.T) {
 	key := newKey(t)
 	signer, err := NewClaimsSigner(ClaimsTemplate{
@@ -86,8 +162,9 @@ func TestClaimsSignerProducesValidJWT(t *testing.T) {
 		t.Fatal(err)
 	}
 	header, claims, _ := decodeJWT(t, jwt)
-	if header["alg"] != "RS256" {
-		t.Errorf("alg = %v", header["alg"])
+	// Default is RS384 (SMART client-confidential-asymmetric baseline). REQ-068
+	if header["alg"] != "RS384" {
+		t.Errorf("alg = %v, want RS384", header["alg"])
 	}
 	if header["typ"] != "JWT" {
 		t.Errorf("typ = %v", header["typ"])
@@ -110,7 +187,7 @@ func TestClaimsSignerProducesValidJWT(t *testing.T) {
 	if claims["scope"] != "patient/*.read" {
 		t.Errorf("scope = %v", claims["scope"])
 	}
-	verifyRS256(t, &key.PublicKey, jwt)
+	verifyRSA(t, "RS384", &key.PublicKey, jwt)
 }
 
 func TestClaimsSignerJTIUnique(t *testing.T) {
@@ -174,17 +251,36 @@ func TestJTIHasCryptoRandEntropy(t *testing.T) {
 	}
 }
 
+func newECKey(t *testing.T, curve elliptic.Curve) *ecdsa.PrivateKey {
+	t.Helper()
+	k, err := ecdsa.GenerateKey(curve, rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return k
+}
+
 func TestClaimsSignerValidates(t *testing.T) {
+	rsaKey := newKey(t)
+	ecKey := newECKey(t, elliptic.P384())
+	ecKey256 := newECKey(t, elliptic.P256())
 	tests := []struct {
 		name string
 		tmpl ClaimsTemplate
 		k    crypto.Signer
 		alg  string
 	}{
-		{"no signer", ClaimsTemplate{Issuer: "i", Audience: "a"}, nil, "RS256"},
-		{"no issuer", ClaimsTemplate{Audience: "a"}, newKey(t), "RS256"},
-		{"no audience", ClaimsTemplate{Issuer: "i"}, newKey(t), "RS256"},
-		{"unsupported alg", ClaimsTemplate{Issuer: "i", Audience: "a"}, newKey(t), "HS256"},
+		// basic field validations — REQ-068
+		{"no signer", ClaimsTemplate{Issuer: "i", Audience: "a"}, nil, "RS384"},
+		{"no issuer", ClaimsTemplate{Audience: "a"}, rsaKey, "RS384"},
+		{"no audience", ClaimsTemplate{Issuer: "i"}, rsaKey, "RS384"},
+		// unsupported algorithm families
+		{"unsupported alg HS256", ClaimsTemplate{Issuer: "i", Audience: "a"}, rsaKey, "HS256"},
+		// key-type mismatches — REQ-068
+		{"ES384 with RSA key", ClaimsTemplate{Issuer: "i", Audience: "a"}, rsaKey, "ES384"},
+		{"RS384 with EC key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey, "RS384"},
+		{"ES256 with P-384 key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey, "ES256"},
+		{"ES384 with P-256 key", ClaimsTemplate{Issuer: "i", Audience: "a"}, ecKey256, "ES384"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -197,6 +293,67 @@ func TestClaimsSignerValidates(t *testing.T) {
 				t.Errorf("expected ErrInvalidConfig, got %v", err)
 			}
 		})
+	}
+}
+
+// opaqueRSASigner wraps a *rsa.PrivateKey without being *rsa.PrivateKey-typed,
+// simulating a KMS/HSM adapter that implements crypto.Signer opaquely.
+type opaqueRSASigner struct{ key *rsa.PrivateKey }
+
+func (o *opaqueRSASigner) Public() crypto.PublicKey { return &o.key.PublicKey }
+func (o *opaqueRSASigner) Sign(rand io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	return o.key.Sign(rand, digest, opts)
+}
+
+// TestClaimsSignerOpaqueSigner verifies that a crypto.Signer that is NOT a
+// concrete *rsa.PrivateKey (i.e. an opaque KMS/HSM adapter) works end-to-end
+// via cryptosigner.Opaque. The produced JWT signature must verify against the
+// underlying RSA public key. (REQ-068, fix 1)
+func TestClaimsSignerOpaqueSigner(t *testing.T) {
+	rawKey := newKey(t)
+	opaque := &opaqueRSASigner{key: rawKey}
+
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "kms-client", Audience: "https://as.example/token"},
+		opaque,
+		WithAlgorithm("RS384"),
+		WithKeyID("kms-kid"),
+	)
+	if err != nil {
+		t.Fatalf("NewClaimsSigner with opaque signer: %v", err)
+	}
+
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatalf("Assertion with opaque signer: %v", err)
+	}
+
+	header, claims, _ := decodeJWT(t, jwt)
+	if header["alg"] != "RS384" {
+		t.Errorf("alg = %v, want RS384", header["alg"])
+	}
+	if header["kid"] != "kms-kid" {
+		t.Errorf("kid = %v, want kms-kid", header["kid"])
+	}
+	if claims["iss"] != "kms-client" {
+		t.Errorf("iss = %v, want kms-client", claims["iss"])
+	}
+	verifyRSA(t, "RS384", &rawKey.PublicKey, jwt)
+}
+
+// TestClaimsSignerBypassedAlgValidation verifies that Assertion returns
+// ErrInvalidConfig even when ClaimsSigner is constructed directly (bypassing
+// NewClaimsSigner) with an unsupported algorithm. (fix 2)
+func TestClaimsSignerBypassedAlgValidation(t *testing.T) {
+	key := newKey(t)
+	s := &ClaimsSigner{
+		Template:  ClaimsTemplate{Issuer: "i", Subject: "i", Audience: "a", Lifetime: 5 * time.Minute},
+		Signer:    key,
+		Algorithm: "HS256", // unsupported
+	}
+	_, err := s.Assertion(context.Background())
+	if !errors.Is(err, auth.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig for bypassed alg, got %v", err)
 	}
 }
 
@@ -231,7 +388,8 @@ func TestSourceExchangesAssertion(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	src, err := New(srv.URL, StaticAssertion("the-jwt"),
+	src, err := New(
+		srv.URL, StaticAssertion("the-jwt"),
 		WithHTTPClient(srv.Client()),
 		WithClientID("client-xyz"),
 	)
@@ -325,4 +483,130 @@ func TestNewValidates(t *testing.T) {
 	if !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Errorf("missing http client: %v", err)
 	}
+}
+
+// TestClaimsSignerDefaultRS384 verifies that a signer built without
+// WithAlgorithm produces alg=="RS384" (SMART client-confidential-asymmetric
+// baseline). REQ-068
+func TestClaimsSignerDefaultRS384(t *testing.T) {
+	key := newKey(t)
+	s, err := NewClaimsSigner(ClaimsTemplate{Issuer: "i", Audience: "a"}, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, _, _ := decodeJWT(t, jwt)
+	if header["alg"] != "RS384" {
+		t.Errorf("default alg = %v, want RS384", header["alg"])
+	}
+	verifyRSA(t, "RS384", &key.PublicKey, jwt)
+}
+
+// TestClaimsSignerRS384 exercises RS384 explicitly and verifies the signature
+// against the RSA public key. HL7 SMART client-confidential-asymmetric SHALL
+// support RS384. REQ-068
+func TestClaimsSignerRS384(t *testing.T) {
+	key := newKey(t)
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "client-a", Audience: "https://as.example/token"},
+		key,
+		WithAlgorithm("RS384"),
+		WithKeyID("rsa-kid"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, claims, _ := decodeJWT(t, jwt)
+	if header["alg"] != "RS384" {
+		t.Errorf("alg = %v, want RS384", header["alg"])
+	}
+	if header["kid"] != "rsa-kid" {
+		t.Errorf("kid = %v", header["kid"])
+	}
+	if claims["iss"] != "client-a" {
+		t.Errorf("iss = %v", claims["iss"])
+	}
+	verifyRSA(t, "RS384", &key.PublicKey, jwt)
+}
+
+// TestClaimsSignerRS256 verifies that RS256 is still reachable via
+// WithAlgorithm("RS256") for backwards compatibility. REQ-068
+func TestClaimsSignerRS256(t *testing.T) {
+	key := newKey(t)
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "client-b", Audience: "https://as.example/token"},
+		key,
+		WithAlgorithm("RS256"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, _, _ := decodeJWT(t, jwt)
+	if header["alg"] != "RS256" {
+		t.Errorf("alg = %v, want RS256", header["alg"])
+	}
+	verifyRSA(t, "RS256", &key.PublicKey, jwt)
+}
+
+// TestClaimsSignerES384 exercises ES384 with a P-384 key. HL7 SMART
+// client-confidential-asymmetric SHALL support ES384. REQ-068
+func TestClaimsSignerES384(t *testing.T) {
+	key := newECKey(t, elliptic.P384())
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "client-ec", Audience: "https://as.example/token"},
+		key,
+		WithAlgorithm("ES384"),
+		WithKeyID("ec-kid"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, claims, _ := decodeJWT(t, jwt)
+	if header["alg"] != "ES384" {
+		t.Errorf("alg = %v, want ES384", header["alg"])
+	}
+	if header["kid"] != "ec-kid" {
+		t.Errorf("kid = %v", header["kid"])
+	}
+	if claims["iss"] != "client-ec" {
+		t.Errorf("iss = %v", claims["iss"])
+	}
+	verifyECDSA(t, "ES384", &key.PublicKey, jwt)
+}
+
+// TestClaimsSignerES256 exercises ES256 with a P-256 key. REQ-068
+func TestClaimsSignerES256(t *testing.T) {
+	key := newECKey(t, elliptic.P256())
+	s, err := NewClaimsSigner(
+		ClaimsTemplate{Issuer: "client-ec256", Audience: "https://as.example/token"},
+		key,
+		WithAlgorithm("ES256"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jwt, err := s.Assertion(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	header, _, _ := decodeJWT(t, jwt)
+	if header["alg"] != "ES256" {
+		t.Errorf("alg = %v, want ES256", header["alg"])
+	}
+	verifyECDSA(t, "ES256", &key.PublicKey, jwt)
 }

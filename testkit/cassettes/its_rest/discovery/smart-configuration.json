@@ -3,6 +3,9 @@
   "token_endpoint": "https://auth.example.com/token",
   "jwks_uri": "https://auth.example.com/jwks",
   "registration_endpoint": "https://auth.example.com/register",
+  "introspection_endpoint": "https://auth.example.com/introspect",
+  "revocation_endpoint": "https://auth.example.com/revoke",
+  "management_endpoint": "https://auth.example.com/manage",
   "scopes_supported": [
     "openid",
     "profile",
@@ -26,6 +29,8 @@
     "private_key_jwt",
     "none"
   ],
+  "token_endpoint_auth_signing_alg_values_supported": ["RS384", "ES384"],
+  "id_token_signing_alg_values_supported": ["RS256", "ES384"],
   "capabilities": [
     "launch-standalone",
     "launch-ehr",
@@ -34,14 +39,17 @@
     "client-confidential-asymmetric",
     "permission-v2",
     "context-passthrough-banner",
-    "context-passthrough-style"
+    "context-passthrough-style",
+    "context-openehr-ehr",
+    "context-openehr-episode",
+    "openehr-permission-v1",
+    "launch-base64-json"
   ],
-  "services": [
-    {
-      "id": "org.openehr.rest",
-      "base_url": "https://api.example.com/openehr/v1",
+  "services": {
+    "org.openehr.rest": {
+      "baseUrl": "https://api.example.com/openehr/v1",
       "spec_version": "1.1.0-development",
       "capabilities": ["composition", "ehr_status", "directory", "contribution", "itemtags", "query"]
     }
-  ]
+  }
 }

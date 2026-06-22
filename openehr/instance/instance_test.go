@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -32,6 +35,23 @@ func compileFixture(t *testing.T, name string) *templatecompile.Compiled {
 	c, err := templatecompile.Compile(opt)
 	if err != nil {
 		t.Fatalf("Compile %s: %v", name, err)
+	}
+	return c
+}
+
+func compileSyntheticOPT(t *testing.T, xml string) *templatecompile.Compiled {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "synthetic.opt")
+	if err := os.WriteFile(path, []byte(xml), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	opt, err := template.ParseFile(path)
+	if err != nil {
+		t.Fatalf("ParseFile synthetic: %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile synthetic: %v", err)
 	}
 	return c
 }
@@ -130,6 +150,18 @@ func TestGenerateVitalSignsExamplePopulatesPrimitives(t *testing.T) {
 	}
 }
 
+func TestGenerateRequiredSlotOnlyUnsynthesisableIncludeErrors(t *testing.T) {
+	c := compileSyntheticOPT(t, requiredSlotOnlyUnsynthesisableOPT)
+	_, err := instance.Generate(context.Background(), c, instance.Options{
+		Policy:    instance.Minimal,
+		Territory: "NL",
+		Composer:  testComposer(),
+	})
+	if !errors.Is(err, instance.ErrSlotFillUnsupported) {
+		t.Fatalf("Generate err = %v, want ErrSlotFillUnsupported", err)
+	}
+}
+
 func findQuantityLeaf(c *rm.Composition) *rm.DVQuantity {
 	for _, item := range c.Content {
 		if q := scanContentItemForQuantity(item); q != nil {
@@ -209,24 +241,21 @@ func elementQuantity(e *rm.Element) *rm.DVQuantity {
 	return nil
 }
 
-// TestGenerateClinicalNoteMinimal pins the PR #18 re-review finding:
+// TestGenerateClinicalNoteExample pins the PR #18 re-review finding:
 // clinical_note.opt uses the AOM 1.4 primitive-short-name shape
 // (DV_DURATION → value → C_PRIMITIVE_OBJECT → DURATION → C_DURATION).
-// Before the materialiseSingle / isAOMPrimitiveShortName fix, the
+// Before the materialiseSingle / IsAOMPrimitiveShortName fix, the
 // generator tried to attach a fresh *DVDuration to the parent DV's
 // .value (a String slot) and failed; this regression keeps the
-// generator end-to-end on the second vendored OPT fixture.
-//
-// The leaf primitive constraint flows through the parser via the
-// C_PRIMITIVE_OBJECT inner-`<item>` extraction; CDuration's
-// ExampleValue happens to return the same "P0D" sentinel as the
-// pre-Phase-1 fallback, so the asserted value is stable across
-// the two regression scopes.
-func TestGenerateClinicalNoteMinimal(t *testing.T) {
+// generator end-to-end on the vendored OPT fixture under Example
+// policy (the INSTRUCTION subtree carrying DV_DURATION is beyond the
+// first content entry capped under Minimal — see
+// TestGenerateSocialMinimal_respectsContentUpper).
+func TestGenerateClinicalNoteExample(t *testing.T) {
 	c := compileFixture(t, "clinical_note")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
-		Policy:    instance.Minimal,
+		Policy:    instance.Example,
 		Territory: "NL",
 		Composer:  &rm.PartyIdentified{Name: &name},
 	})
@@ -243,6 +272,30 @@ func TestGenerateClinicalNoteMinimal(t *testing.T) {
 	}
 	if dur.Value != "P0D" {
 		t.Errorf("DV_DURATION.value = %q, want %q (default sentinel)", dur.Value, "P0D")
+	}
+}
+
+func TestGenerateClinicalNoteValidates(t *testing.T) {
+	c := compileFixture(t, "clinical_note")
+	name := "Test Composer"
+	out, err := instance.Generate(context.Background(), c, instance.Options{
+		Policy:    instance.Example,
+		Territory: "NL",
+		Composer:  &rm.PartyIdentified{Name: &name},
+	})
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	comp, err := instance.AsComposition(out)
+	if err != nil {
+		t.Fatalf("AsComposition: %v", err)
+	}
+	r := validation.ValidateComposition(comp, c)
+	if !r.OK {
+		for _, iss := range r.Issues {
+			t.Logf("%s @ %s", iss.Code, iss.Path)
+		}
+		t.Fatalf("validation failed: %d issues", len(r.Issues))
 	}
 }
 
@@ -377,3 +430,64 @@ func TestPolicyString(t *testing.T) {
 		t.Error("Policy(99).String() should contain 'unknown'")
 	}
 }
+
+const requiredSlotOnlyUnsynthesisableOPT = `<?xml version="1.0" encoding="utf-8"?>
+<template xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://schemas.openehr.org/v1">
+  <language>
+    <terminology_id><value>ISO_639-1</value></terminology_id>
+    <code_string>en</code_string>
+  </language>
+  <template_id><value>required_slot_only_unsynthesisable</value></template_id>
+  <concept>required_slot_only_unsynthesisable</concept>
+  <definition>
+    <rm_type_name>COMPOSITION</rm_type_name>
+    <node_id>at0000</node_id>
+    <attributes xsi:type="C_MULTIPLE_ATTRIBUTE">
+      <rm_attribute_name>content</rm_attribute_name>
+      <existence>
+        <lower_included>true</lower_included>
+        <upper_included>true</upper_included>
+        <lower_unbounded>false</lower_unbounded>
+        <upper_unbounded>false</upper_unbounded>
+        <lower>1</lower>
+        <upper>1</upper>
+      </existence>
+      <children xsi:type="ARCHETYPE_SLOT">
+        <rm_type_name>OBSERVATION</rm_type_name>
+        <node_id>at9000</node_id>
+        <includes>
+          <expression xsi:type="EXPR_BINARY_OPERATOR">
+            <type>Boolean</type>
+            <operator>2007</operator>
+            <precedence_overridden>false</precedence_overridden>
+            <left_operand xsi:type="EXPR_LEAF">
+              <type>String</type>
+              <item xsi:type="xsd:string">archetype_id/value</item>
+              <reference_type>attribute</reference_type>
+            </left_operand>
+            <right_operand xsi:type="EXPR_LEAF">
+              <type>C_STRING</type>
+              <item xsi:type="C_STRING">
+                <pattern>openEHR-EHR-OBSERVATION\..*</pattern>
+              </item>
+              <reference_type>constraint</reference_type>
+            </right_operand>
+          </expression>
+        </includes>
+      </children>
+      <cardinality>
+        <is_ordered>false</is_ordered>
+        <is_unique>false</is_unique>
+        <interval>
+          <lower_included>true</lower_included>
+          <lower_unbounded>false</lower_unbounded>
+          <upper_unbounded>true</upper_unbounded>
+          <lower>1</lower>
+        </interval>
+      </cardinality>
+    </attributes>
+    <archetype_id>
+      <value>openEHR-EHR-COMPOSITION.required_slot_only_unsynthesisable.v1</value>
+    </archetype_id>
+  </definition>
+</template>`

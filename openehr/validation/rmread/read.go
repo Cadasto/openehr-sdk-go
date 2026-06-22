@@ -133,6 +133,163 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 		return readCodePhraseSingle(p, attrName)
 	case rm.CodePhrase:
 		return readCodePhraseSingle(&p, attrName)
+
+	// --- primitive-bearing DataValue leaves (explicit `value` C_PRIMITIVE child) ---
+	case *rm.DVDate:
+		return readDVDateSingle(p, attrName)
+	case rm.DVDate:
+		return readDVDateSingle(&p, attrName)
+	case *rm.DVTime:
+		return readDVTimeSingle(p, attrName)
+	case rm.DVTime:
+		return readDVTimeSingle(&p, attrName)
+	case *rm.DVDateTime:
+		return readDVDateTimeSingle(p, attrName)
+	case rm.DVDateTime:
+		return readDVDateTimeSingle(&p, attrName)
+	case *rm.DVDuration:
+		return readDVDurationSingle(p, attrName)
+	case rm.DVDuration:
+		return readDVDurationSingle(&p, attrName)
+	case *rm.DVBoolean:
+		return readDVBooleanSingle(p, attrName)
+	case rm.DVBoolean:
+		return readDVBooleanSingle(&p, attrName)
+	case *rm.DVIdentifier:
+		return readDVIdentifierSingle(p, attrName)
+	case rm.DVIdentifier:
+		return readDVIdentifierSingle(&p, attrName)
+	case *rm.DVMultimedia:
+		return readDVMultimediaSingle(p, attrName)
+	case rm.DVMultimedia:
+		return readDVMultimediaSingle(&p, attrName)
+
+	case *rm.DVCount:
+		return readDVCountSingle(p, attrName)
+	case rm.DVCount:
+		return readDVCountSingle(&p, attrName)
+
+	case *rm.DVQuantity:
+		return readDVQuantitySingle(p, attrName)
+	case rm.DVQuantity:
+		return readDVQuantitySingle(&p, attrName)
+
+	case *rm.DVProportion:
+		return readDVProportionSingle(p, attrName)
+	case rm.DVProportion:
+		return readDVProportionSingle(&p, attrName)
+
+	case *rm.DVURI:
+		return readDVURISingle(p, attrName)
+	case rm.DVURI:
+		return readDVURISingle(&p, attrName)
+
+	case *rm.DVEHRURI:
+		return readDVEHRURISingle(p, attrName)
+	case rm.DVEHRURI:
+		return readDVEHRURISingle(&p, attrName)
+
+	case *rm.DVParsable:
+		return readDVParsableSingle(p, attrName)
+	case rm.DVParsable:
+		return readDVParsableSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVQuantity]:
+		return readDVIntervalQuantitySingle(p, attrName)
+	case rm.DVInterval[rm.DVQuantity]:
+		return readDVIntervalQuantitySingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVCount]:
+		return readDVIntervalCountSingle(p, attrName)
+	case rm.DVInterval[rm.DVCount]:
+		return readDVIntervalCountSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVDateTime]:
+		return readDVIntervalDateTimeSingle(p, attrName)
+	case rm.DVInterval[rm.DVDateTime]:
+		return readDVIntervalDateTimeSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVDate]:
+		return readDVIntervalDateSingle(p, attrName)
+	case rm.DVInterval[rm.DVDate]:
+		return readDVIntervalDateSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVTime]:
+		return readDVIntervalTimeSingle(p, attrName)
+	case rm.DVInterval[rm.DVTime]:
+		return readDVIntervalTimeSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVProportion]:
+		return readDVIntervalProportionSingle(p, attrName)
+	case rm.DVInterval[rm.DVProportion]:
+		return readDVIntervalProportionSingle(&p, attrName)
+
+	case *rm.DVInterval[rm.DVOrdered]:
+		return readDVIntervalOrderedSingle(p, attrName)
+	case rm.DVInterval[rm.DVOrdered]:
+		return readDVIntervalOrderedSingle(&p, attrName)
+
+	// --- demographic: PARTY hierarchy + archetypeable sub-components ---
+	case *rm.Person:
+		return readPersonSingle(p, attrName)
+	case rm.Person:
+		return readPersonSingle(&p, attrName)
+
+	case *rm.Organisation:
+		return readOrganisationSingle(p, attrName)
+	case rm.Organisation:
+		return readOrganisationSingle(&p, attrName)
+
+	case *rm.Group:
+		return readGroupSingle(p, attrName)
+	case rm.Group:
+		return readGroupSingle(&p, attrName)
+
+	case *rm.Agent:
+		return readAgentSingle(p, attrName)
+	case rm.Agent:
+		return readAgentSingle(&p, attrName)
+
+	case *rm.Role:
+		return readRoleSingle(p, attrName)
+	case rm.Role:
+		return readRoleSingle(&p, attrName)
+
+	case *rm.Address:
+		return readAddressSingle(p, attrName)
+	case rm.Address:
+		return readAddressSingle(&p, attrName)
+
+	case *rm.Contact:
+		return readContactSingle(p, attrName)
+	case rm.Contact:
+		return readContactSingle(&p, attrName)
+
+	case *rm.PartyIdentity:
+		return readPartyIdentitySingle(p, attrName)
+	case rm.PartyIdentity:
+		return readPartyIdentitySingle(&p, attrName)
+
+	case *rm.PartyRelationship:
+		return readPartyRelationshipSingle(p, attrName)
+	case rm.PartyRelationship:
+		return readPartyRelationshipSingle(&p, attrName)
+
+	case *rm.Capability:
+		return readCapabilitySingle(p, attrName)
+	case rm.Capability:
+		return readCapabilitySingle(&p, attrName)
+
+	// --- EHR-IM roots ---
+	case *rm.Folder:
+		return readFolderSingle(p, attrName)
+	case rm.Folder:
+		return readFolderSingle(&p, attrName)
+
+	case *rm.EHRStatus:
+		return readEHRStatusSingle(p, attrName)
+	case rm.EHRStatus:
+		return readEHRStatusSingle(&p, attrName)
 	}
 	return nil, false
 }
@@ -184,6 +341,43 @@ func ReadMultiple(parent any, _ /* parentType */, attrName string) ([]any, bool)
 		return readClusterMultiple(p, attrName)
 	case rm.Cluster:
 		return readClusterMultiple(&p, attrName)
+
+	// --- demographic: PARTY hierarchy + sub-components ---
+	case *rm.Person:
+		return readPersonMultiple(p, attrName)
+	case rm.Person:
+		return readPersonMultiple(&p, attrName)
+
+	case *rm.Organisation:
+		return readOrganisationMultiple(p, attrName)
+	case rm.Organisation:
+		return readOrganisationMultiple(&p, attrName)
+
+	case *rm.Group:
+		return readGroupMultiple(p, attrName)
+	case rm.Group:
+		return readGroupMultiple(&p, attrName)
+
+	case *rm.Agent:
+		return readAgentMultiple(p, attrName)
+	case rm.Agent:
+		return readAgentMultiple(&p, attrName)
+
+	case *rm.Role:
+		return readRoleMultiple(p, attrName)
+	case rm.Role:
+		return readRoleMultiple(&p, attrName)
+
+	case *rm.Contact:
+		return readContactMultiple(p, attrName)
+	case rm.Contact:
+		return readContactMultiple(&p, attrName)
+
+	// --- EHR-IM roots ---
+	case *rm.Folder:
+		return readFolderMultiple(p, attrName)
+	case rm.Folder:
+		return readFolderMultiple(&p, attrName)
 	}
 	return nil, false
 }
@@ -695,6 +889,75 @@ func readDVCodedTextSingle(t *rm.DVCodedText, attr string) (any, bool) {
 	return nil, false
 }
 
+// Primitive-bearing DataValue leaves. When an OPT encodes a DV value as
+// a C_COMPLEX_OBJECT (DV_DATE / DV_BOOLEAN / …) carrying an explicit
+// `value` C_PRIMITIVE_OBJECT child — rather than a folded REQ-103
+// primitive leaf — the walker descends into the value attribute and
+// needs to bind the primitive. Without these readers a populated value
+// reports absent, a false `required`. The bound primitive is then
+// validated by the C_PRIMITIVE child (REQ-103).
+
+func readDVDateSingle(d *rm.DVDate, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(d.Value)
+	}
+	return nil, false
+}
+
+func readDVTimeSingle(t *rm.DVTime, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(t.Value)
+	}
+	return nil, false
+}
+
+func readDVDateTimeSingle(d *rm.DVDateTime, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(d.Value)
+	}
+	return nil, false
+}
+
+func readDVDurationSingle(d *rm.DVDuration, attr string) (any, bool) {
+	if attr == "value" {
+		return strPresent(d.Value)
+	}
+	return nil, false
+}
+
+func readDVBooleanSingle(b *rm.DVBoolean, attr string) (any, bool) {
+	if attr == "value" {
+		// Boolean value-typed field — always structurally present.
+		return b.Value, true
+	}
+	return nil, false
+}
+
+func readDVIdentifierSingle(i *rm.DVIdentifier, attr string) (any, bool) {
+	switch attr {
+	case "id":
+		return strPresent(i.ID)
+	case "issuer":
+		return ptrPresent(i.Issuer)
+	case "assigner":
+		return ptrPresent(i.Assigner)
+	case "type":
+		return ptrPresent(i.Type)
+	}
+	return nil, false
+}
+
+func readDVMultimediaSingle(m *rm.DVMultimedia, attr string) (any, bool) {
+	switch attr {
+	case "media_type":
+		return codePhrasePresent(m.MediaType)
+	case "size":
+		// Integer value-typed field — always structurally present.
+		return m.Size, true
+	}
+	return nil, false
+}
+
 func readCodePhraseSingle(c *rm.CodePhrase, attr string) (any, bool) {
 	switch attr {
 	case "code_string":
@@ -708,6 +971,231 @@ func readCodePhraseSingle(c *rm.CodePhrase, attr string) (any, bool) {
 		return c.PreferredTerm, true
 	}
 	return nil, false
+}
+
+// --- demographic: PARTY hierarchy + sub-components -----------------------
+//
+// The five PARTY concretes (PERSON, ORGANISATION, GROUP, AGENT and the
+// ACTOR-less ROLE) share the LOCATABLE channels (archetype_node_id /
+// name) plus the PARTY `details` ITEM_STRUCTURE; the four ACTOR
+// subtypes additionally share identities / contacts / relationships /
+// languages / roles. The shared shapes route through actorLike* /
+// partyLike* helpers so the per-type readers stay one line each.
+
+// readActorLikeSingle serves the single-valued LOCATABLE + PARTY
+// channels common to PERSON / ORGANISATION / GROUP / AGENT / ROLE.
+func readActorLikeSingle(archetypeNodeID string, name rm.DVTextLike, details rm.ItemStructure, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(archetypeNodeID)
+	case "name":
+		return dvTextPresent(name)
+	case "details":
+		return ifacePresent(details)
+	}
+	return nil, false
+}
+
+// readActorMultiple serves the multi-valued PARTY/ACTOR channels shared
+// by the four ACTOR subtypes (PERSON / ORGANISATION / GROUP / AGENT).
+func readActorMultiple(
+	identities []rm.PartyIdentity,
+	contacts []rm.Contact,
+	relationships []rm.PartyRelationship,
+	languages []rm.DVTextLike,
+	roles []rm.PartyRef,
+	attr string,
+) ([]any, bool) {
+	switch attr {
+	case "identities":
+		return boxPtrs(identities), true
+	case "contacts":
+		return boxPtrs(contacts), true
+	case "relationships":
+		return boxPtrs(relationships), true
+	case "languages":
+		return boxIfaces(languages), true
+	case "roles":
+		return boxPtrs(roles), true
+	}
+	return nil, false
+}
+
+func readPersonSingle(p *rm.Person, attr string) (any, bool) {
+	return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
+}
+
+func readPersonMultiple(p *rm.Person, attr string) ([]any, bool) {
+	return readActorMultiple(p.Identities, p.Contacts, p.Relationships, p.Languages, p.Roles, attr)
+}
+
+func readOrganisationSingle(o *rm.Organisation, attr string) (any, bool) {
+	return readActorLikeSingle(o.ArchetypeNodeID, o.Name, o.Details, attr)
+}
+
+func readOrganisationMultiple(o *rm.Organisation, attr string) ([]any, bool) {
+	return readActorMultiple(o.Identities, o.Contacts, o.Relationships, o.Languages, o.Roles, attr)
+}
+
+func readGroupSingle(g *rm.Group, attr string) (any, bool) {
+	return readActorLikeSingle(g.ArchetypeNodeID, g.Name, g.Details, attr)
+}
+
+func readGroupMultiple(g *rm.Group, attr string) ([]any, bool) {
+	return readActorMultiple(g.Identities, g.Contacts, g.Relationships, g.Languages, g.Roles, attr)
+}
+
+func readAgentSingle(a *rm.Agent, attr string) (any, bool) {
+	return readActorLikeSingle(a.ArchetypeNodeID, a.Name, a.Details, attr)
+}
+
+func readAgentMultiple(a *rm.Agent, attr string) ([]any, bool) {
+	return readActorMultiple(a.Identities, a.Contacts, a.Relationships, a.Languages, a.Roles, attr)
+}
+
+// ROLE is a PARTY but not an ACTOR — it carries capabilities and a
+// performer reference rather than identities-as-ACTOR; it still has
+// identities / contacts / relationships.
+func readRoleSingle(r *rm.Role, attr string) (any, bool) {
+	return readActorLikeSingle(r.ArchetypeNodeID, r.Name, r.Details, attr)
+}
+
+func readRoleMultiple(r *rm.Role, attr string) ([]any, bool) {
+	switch attr {
+	case "capabilities":
+		return boxPtrs(r.Capabilities), true
+	case "contacts":
+		return boxPtrs(r.Contacts), true
+	case "identities":
+		return boxPtrs(r.Identities), true
+	case "relationships":
+		return boxPtrs(r.Relationships), true
+	}
+	return nil, false
+}
+
+// ADDRESS / PARTY_IDENTITY / PARTY_RELATIONSHIP are archetypeable
+// LOCATABLEs whose only descendable channel is `details`
+// (ITEM_STRUCTURE). source/target on PARTY_RELATIONSHIP are PARTY_REF
+// references, not archetypeable structure — not surfaced.
+func readAddressSingle(a *rm.Address, attr string) (any, bool) {
+	return readActorLikeSingle(a.ArchetypeNodeID, a.Name, a.Details, attr)
+}
+
+func readPartyIdentitySingle(p *rm.PartyIdentity, attr string) (any, bool) {
+	return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
+}
+
+func readPartyRelationshipSingle(p *rm.PartyRelationship, attr string) (any, bool) {
+	return readActorLikeSingle(p.ArchetypeNodeID, p.Name, p.Details, attr)
+}
+
+// CONTACT holds a set of ADDRESS alternatives; its archetypeable
+// structure is the addresses list (no `details`).
+func readContactSingle(c *rm.Contact, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(c.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(c.Name)
+	}
+	return nil, false
+}
+
+func readContactMultiple(c *rm.Contact, attr string) ([]any, bool) {
+	switch attr {
+	case "addresses":
+		return boxPtrs(c.Addresses), true
+	}
+	return nil, false
+}
+
+// CAPABILITY (under ROLE) carries `credentials` (ITEM_STRUCTURE).
+func readCapabilitySingle(c *rm.Capability, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(c.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(c.Name)
+	case "credentials":
+		return ifacePresent(c.Credentials)
+	}
+	return nil, false
+}
+
+// --- EHR-IM roots: FOLDER, EHR_STATUS ------------------------------------
+
+func readFolderSingle(f *rm.Folder, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(f.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(f.Name)
+	case "details":
+		return ifacePresent(f.Details)
+	}
+	return nil, false
+}
+
+func readFolderMultiple(f *rm.Folder, attr string) ([]any, bool) {
+	switch attr {
+	case "folders":
+		return boxPtrs(f.Folders), true
+	case "items":
+		// OBJECT_REF references, not archetypeable structure; surfaced
+		// so an OPT pinning existence/cardinality on `items` can be
+		// satisfied (the walker does not descend reference targets).
+		return boxIfaces(f.Items), true
+	}
+	return nil, false
+}
+
+func readEHRStatusSingle(s *rm.EHRStatus, attr string) (any, bool) {
+	switch attr {
+	case "archetype_node_id":
+		return strPresent(s.ArchetypeNodeID)
+	case "name":
+		return dvTextPresent(s.Name)
+	case "subject":
+		// PARTY_SELF — value-typed, always structurally present.
+		return s.Subject, true
+	case "other_details":
+		return ifacePresent(s.OtherDetails)
+	case "is_modifiable":
+		// BMM-mandatory Boolean — a value-typed bool is always present.
+		return s.IsModifiable, true
+	case "is_queryable":
+		return s.IsQueryable, true
+	}
+	return nil, false
+}
+
+// --- slice boxing helpers ------------------------------------------------
+
+// boxPtrs boxes each element of a value-typed RM slice as a pointer
+// (`*T`) into the backing array, mirroring readInstructionMultiple's
+// `&i.Activities[k]`. Pointer boxing lets the parent validator's
+// rmTypeInfo switch (which enumerates `*rm.T`) recognise the element
+// and lets the walker descend into the live struct. REQ-024 — generic,
+// no reflection.
+func boxPtrs[T any](xs []T) []any {
+	out := make([]any, 0, len(xs))
+	for k := range xs {
+		out = append(out, &xs[k])
+	}
+	return out
+}
+
+// boxIfaces boxes each element of an interface-typed RM slice (e.g.
+// []DVTextLike, []ObjectRefLike) as-is — the element already carries a
+// concrete behind the interface, mirroring readClusterMultiple's
+// `append(out, it)`.
+func boxIfaces[T any](xs []T) []any {
+	out := make([]any, 0, len(xs))
+	for _, x := range xs {
+		out = append(out, x)
+	}
+	return out
 }
 
 // --- presence helpers ----------------------------------------------------
@@ -765,9 +1253,9 @@ func ptrPresent[T any](p *T) (any, bool) {
 // (rmread.ReadSingle on pointer cases, dataValueInput) would
 // dereference and panic.
 //
-// REQ-024 compliant: a closed type switch over the RM pointer
-// concretes that can appear behind a Go interface in the v2
-// content-type closed set. No reflection.
+// REQ-024 compliant: the typed-nil test delegates to [IsTypedNilPointer],
+// a closed type switch over the RM pointer concretes that can appear
+// behind a Go interface in the v2 content-type closed set. No reflection.
 func ifacePresent(v any) (any, bool) {
 	if v == nil {
 		return v, false
@@ -796,9 +1284,17 @@ func IsTypedNilPointer(v any) bool {
 // PartyProxy). Value-typed concretes never trigger the typed-nil
 // problem (a struct stored by value cannot be nil).
 //
-// Adding a new RM type means adding one switch case here, in
-// rmread.ReadSingle/ReadMultiple, and in the parent validator's
-// rmTypeInfo — the three switches are kept in lock-step.
+// Adding a new RM type may touch up to three switches, but they are
+// deliberately NOT the same set — membership depends on how the type is
+// stored:
+//   - this switch: only types pointer-stored behind an RM interface
+//     (so a typed-nil can arise); value-typed and root types are absent.
+//   - rmread.ReadSingle/ReadMultiple: only types with descendable
+//     attributes the walker reads.
+//   - the parent validator's rmTypeInfo: every type the walker routes
+//     (for RM-type name + archetype_node_id).
+//
+// Keep the relevant ones in step when adding a type; don't assume 1:1:1.
 func isTypedNilPointer(v any) bool {
 	switch p := v.(type) {
 	// DataValue concretes (Element.Value, etc.).
@@ -879,6 +1375,37 @@ func isTypedNilPointer(v any) bool {
 	case *rm.PartyIdentified:
 		return p == nil
 	case *rm.PartyRelated:
+		return p == nil
+
+	// PARTY concretes (a typed-nil *rm.Person behind the rm.Party
+	// interface passed to ValidateDemographic / the generic Validate).
+	case *rm.Person:
+		return p == nil
+	case *rm.Organisation:
+		return p == nil
+	case *rm.Group:
+		return p == nil
+	case *rm.Agent:
+		return p == nil
+	case *rm.Role:
+		return p == nil
+
+	// PARTY sub-components (boxed as *rm.T by boxPtrs when walked).
+	case *rm.Address:
+		return p == nil
+	case *rm.Contact:
+		return p == nil
+	case *rm.PartyIdentity:
+		return p == nil
+	case *rm.PartyRelationship:
+		return p == nil
+	case *rm.Capability:
+		return p == nil
+
+	// EHR-IM roots (a typed-nil root passed to the generic Validate).
+	case *rm.Folder:
+		return p == nil
+	case *rm.EHRStatus:
 		return p == nil
 	}
 	return false

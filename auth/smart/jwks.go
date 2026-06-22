@@ -23,7 +23,15 @@ type JWKS struct {
 	mu        sync.Mutex
 	keys      map[string]json.RawMessage
 	fetchedAt time.Time
-	inflight  chan struct{}
+	inflight  *jwksRefresh
+}
+
+// jwksRefresh carries the result of a single coalesced refresh so that
+// waiters observe the leader's outcome rather than assuming success. err is
+// written before done is closed, so a receive on done happens-after the write.
+type jwksRefresh struct {
+	done chan struct{}
+	err  error
 }
 
 // NewJWKS constructs a JWKS fetcher for uri. HTTPClient is required.
@@ -80,25 +88,29 @@ func (j *JWKS) staleLocked() bool {
 
 func (j *JWKS) refresh(ctx context.Context) error {
 	j.mu.Lock()
-	if j.inflight != nil {
-		ch := j.inflight
+	if r := j.inflight; r != nil {
 		j.mu.Unlock()
 		select {
-		case <-ch:
+		case <-r.done:
+			// Surface the leader's outcome: if its fetch failed, return that
+			// error rather than falling through to a misleading "kid not found
+			// after refresh" on the caller's next lookup.
+			return r.err
 		case <-ctx.Done():
 			return ctx.Err()
 		}
-		return nil
 	}
-	j.inflight = make(chan struct{})
+	r := &jwksRefresh{done: make(chan struct{})}
+	j.inflight = r
 	j.mu.Unlock()
 
 	err := j.fetch(ctx)
 
 	j.mu.Lock()
-	close(j.inflight)
+	r.err = err
 	j.inflight = nil
 	j.mu.Unlock()
+	close(r.done)
 	return err
 }
 
