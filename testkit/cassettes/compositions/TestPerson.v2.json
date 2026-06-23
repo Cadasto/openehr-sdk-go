@@ -460,11 +460,11 @@
                                     "_type": "DV_INTERVAL",
                                     "lower": {
                                         "_type": "DV_DATE",
-                                        "value": "20240722"
+                                        "value": "2024-07-22"
                                     },
                                     "upper": {
                                         "_type": "DV_DATE",
-                                        "value": "20241023"
+                                        "value": "2024-10-23"
                                     },
                                     "lower_unbounded": false,
                                     "upper_unbounded": false
@@ -530,11 +530,11 @@
                                     "_type": "DV_INTERVAL",
                                     "lower": {
                                         "_type": "DV_DATE",
-                                        "value": "20250115"
+                                        "value": "2025-01-15"
                                     },
                                     "upper": {
                                         "_type": "DV_DATE",
-                                        "value": "20251118"
+                                        "value": "2025-11-18"
                                     },
                                     "lower_unbounded": false,
                                     "upper_unbounded": false
@@ -600,11 +600,11 @@
                                     "_type": "DV_INTERVAL",
                                     "lower": {
                                         "_type": "DV_DATE",
-                                        "value": "20250526"
+                                        "value": "2025-05-26"
                                     },
                                     "upper": {
                                         "_type": "DV_DATE",
-                                        "value": "20250514"
+                                        "value": "2025-05-14"
                                     },
                                     "lower_unbounded": false,
                                     "upper_unbounded": false
@@ -1248,11 +1248,11 @@
                             "_type": "DV_INTERVAL",
                             "lower": {
                                 "_type": "DV_DATE",
-                                "value": "20250619"
+                                "value": "2025-06-19"
                             },
                             "upper": {
                                 "_type": "DV_DATE",
-                                "value": "20240213"
+                                "value": "2024-02-13"
                             },
                             "lower_unbounded": false,
                             "upper_unbounded": false

@@ -3,16 +3,20 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.composition.content.entry — canonical-JSON MarshalJSON companions
 
 type ActionJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
-	Protocol ItemStructure `json:"protocol,omitempty"`
+	Protocol json.RawMessage `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -20,14 +24,14 @@ type ActionJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
+	WorkflowID json.RawMessage `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject json.RawMessage `json:"subject"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
 	//
 	// * the patient
@@ -36,15 +40,15 @@ type ActionJSONMarshaller struct {
 	// * a device or software
 	//
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
-	Provider PartyProxy `json:"provider,omitempty"`
+	Provider json.RawMessage `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -58,7 +62,7 @@ type ActionJSONMarshaller struct {
 	// InstructionDetails Details of the Instruction that caused this Action to be performed, if there was one.
 	InstructionDetails *InstructionDetails `json:"instruction_details,omitempty"`
 	// Description Description of the action that has been performed, in the form of an archetyped structure.
-	Description ItemStructure `json:"description"`
+	Description json.RawMessage `json:"description"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Action with `_type`
@@ -67,39 +71,71 @@ type ActionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Action) MarshalJSON() ([]byte, error) {
+	rawProtocol, err := jsonpoly.Marshal(a.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	rawGuidelineID, err := jsonpoly.Marshal(a.GuidelineID)
+	if err != nil {
+		return nil, err
+	}
+	rawWorkflowID, err := jsonpoly.Marshal(a.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	rawSubject, err := jsonpoly.Marshal(a.Subject)
+	if err != nil {
+		return nil, err
+	}
+	rawProvider, err := jsonpoly.Marshal(a.Provider)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(a.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawDescription, err := jsonpoly.Marshal(a.Description)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ActionJSONMarshaller{
 		Class:               "ACTION",
-		Protocol:            a.Protocol,
-		GuidelineID:         a.GuidelineID,
+		Protocol:            rawProtocol,
+		GuidelineID:         rawGuidelineID,
 		Language:            a.Language,
 		Encoding:            a.Encoding,
 		OtherParticipations: a.OtherParticipations,
-		WorkflowID:          a.WorkflowID,
-		Subject:             a.Subject,
-		Provider:            a.Provider,
-		Name:                a.Name,
+		WorkflowID:          rawWorkflowID,
+		Subject:             rawSubject,
+		Provider:            rawProvider,
+		Name:                rawName,
 		ArchetypeNodeID:     a.ArchetypeNodeID,
-		UID:                 a.UID,
+		UID:                 rawUID,
 		Links:               a.Links,
 		ArchetypeDetails:    a.ArchetypeDetails,
 		FeederAudit:         a.FeederAudit,
 		Time:                a.Time,
 		IsmTransition:       a.IsmTransition,
 		InstructionDetails:  a.InstructionDetails,
-		Description:         a.Description,
+		Description:         rawDescription,
 	})
 }
 
 type ActivityJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -118,7 +154,7 @@ type ActivityJSONMarshaller struct {
 	// Defaults to  `/.*/`, meaning any archetype.
 	ActionArchetypeID string `json:"action_archetype_id"`
 	// Description Description of the activity, in the form of an archetyped structure.
-	Description ItemStructure `json:"description"`
+	Description json.RawMessage `json:"description"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Activity with `_type`
@@ -127,17 +163,29 @@ type ActivityJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Activity) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(a.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawDescription, err := jsonpoly.Marshal(a.Description)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ActivityJSONMarshaller{
 		Class:             "ACTIVITY",
-		Name:              a.Name,
+		Name:              rawName,
 		ArchetypeNodeID:   a.ArchetypeNodeID,
-		UID:               a.UID,
+		UID:               rawUID,
 		Links:             a.Links,
 		ArchetypeDetails:  a.ArchetypeDetails,
 		FeederAudit:       a.FeederAudit,
 		Timing:            a.Timing,
 		ActionArchetypeID: a.ActionArchetypeID,
-		Description:       a.Description,
+		Description:       rawDescription,
 	})
 }
 
@@ -150,14 +198,14 @@ type AdminEntryJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
+	WorkflowID json.RawMessage `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject json.RawMessage `json:"subject"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
 	//
 	// * the patient
@@ -166,15 +214,15 @@ type AdminEntryJSONMarshaller struct {
 	// * a device or software
 	//
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
-	Provider PartyProxy `json:"provider,omitempty"`
+	Provider json.RawMessage `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -182,7 +230,7 @@ type AdminEntryJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Data Content of the Admin Entry.
-	Data ItemStructure `json:"data"`
+	Data json.RawMessage `json:"data"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for AdminEntry with `_type`
@@ -191,30 +239,54 @@ type AdminEntryJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *AdminEntry) MarshalJSON() ([]byte, error) {
+	rawWorkflowID, err := jsonpoly.Marshal(a.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	rawSubject, err := jsonpoly.Marshal(a.Subject)
+	if err != nil {
+		return nil, err
+	}
+	rawProvider, err := jsonpoly.Marshal(a.Provider)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(a.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawData, err := jsonpoly.Marshal(a.Data)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AdminEntryJSONMarshaller{
 		Class:               "ADMIN_ENTRY",
 		Language:            a.Language,
 		Encoding:            a.Encoding,
 		OtherParticipations: a.OtherParticipations,
-		WorkflowID:          a.WorkflowID,
-		Subject:             a.Subject,
-		Provider:            a.Provider,
-		Name:                a.Name,
+		WorkflowID:          rawWorkflowID,
+		Subject:             rawSubject,
+		Provider:            rawProvider,
+		Name:                rawName,
 		ArchetypeNodeID:     a.ArchetypeNodeID,
-		UID:                 a.UID,
+		UID:                 rawUID,
 		Links:               a.Links,
 		ArchetypeDetails:    a.ArchetypeDetails,
 		FeederAudit:         a.FeederAudit,
-		Data:                a.Data,
+		Data:                rawData,
 	})
 }
 
 type EvaluationJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
-	Protocol ItemStructure `json:"protocol,omitempty"`
+	Protocol json.RawMessage `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -222,14 +294,14 @@ type EvaluationJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
+	WorkflowID json.RawMessage `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject json.RawMessage `json:"subject"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
 	//
 	// * the patient
@@ -238,15 +310,15 @@ type EvaluationJSONMarshaller struct {
 	// * a device or software
 	//
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
-	Provider PartyProxy `json:"provider,omitempty"`
+	Provider json.RawMessage `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -254,7 +326,7 @@ type EvaluationJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Data The data of this evaluation, in the form of a spatial data structure.
-	Data ItemStructure `json:"data"`
+	Data json.RawMessage `json:"data"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Evaluation with `_type`
@@ -263,32 +335,64 @@ type EvaluationJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *Evaluation) MarshalJSON() ([]byte, error) {
+	rawProtocol, err := jsonpoly.Marshal(e.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	rawGuidelineID, err := jsonpoly.Marshal(e.GuidelineID)
+	if err != nil {
+		return nil, err
+	}
+	rawWorkflowID, err := jsonpoly.Marshal(e.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	rawSubject, err := jsonpoly.Marshal(e.Subject)
+	if err != nil {
+		return nil, err
+	}
+	rawProvider, err := jsonpoly.Marshal(e.Provider)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(e.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(e.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawData, err := jsonpoly.Marshal(e.Data)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&EvaluationJSONMarshaller{
 		Class:               "EVALUATION",
-		Protocol:            e.Protocol,
-		GuidelineID:         e.GuidelineID,
+		Protocol:            rawProtocol,
+		GuidelineID:         rawGuidelineID,
 		Language:            e.Language,
 		Encoding:            e.Encoding,
 		OtherParticipations: e.OtherParticipations,
-		WorkflowID:          e.WorkflowID,
-		Subject:             e.Subject,
-		Provider:            e.Provider,
-		Name:                e.Name,
+		WorkflowID:          rawWorkflowID,
+		Subject:             rawSubject,
+		Provider:            rawProvider,
+		Name:                rawName,
 		ArchetypeNodeID:     e.ArchetypeNodeID,
-		UID:                 e.UID,
+		UID:                 rawUID,
 		Links:               e.Links,
 		ArchetypeDetails:    e.ArchetypeDetails,
 		FeederAudit:         e.FeederAudit,
-		Data:                e.Data,
+		Data:                rawData,
 	})
 }
 
 type InstructionJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
-	Protocol ItemStructure `json:"protocol,omitempty"`
+	Protocol json.RawMessage `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -296,14 +400,14 @@ type InstructionJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
+	WorkflowID json.RawMessage `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject json.RawMessage `json:"subject"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
 	//
 	// * the patient
@@ -312,15 +416,15 @@ type InstructionJSONMarshaller struct {
 	// * a device or software
 	//
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
-	Provider PartyProxy `json:"provider,omitempty"`
+	Provider json.RawMessage `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -328,7 +432,7 @@ type InstructionJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Narrative Mandatory human-readable version of what the Instruction is about.
-	Narrative DVTextLike `json:"narrative"`
+	Narrative json.RawMessage `json:"narrative"`
 	// ExpiryTime Optional expiry date/time to assist determination of when an Instruction can be assumed to have expired. This helps prevent false listing of Instructions as Active when they clearly must have been terminated in some way or other.
 	ExpiryTime *DVDateTime `json:"expiry_time,omitempty"`
 	// WfDefinition Optional workflow engine executable expression of the Instruction.
@@ -343,23 +447,55 @@ type InstructionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (i *Instruction) MarshalJSON() ([]byte, error) {
+	rawProtocol, err := jsonpoly.Marshal(i.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	rawGuidelineID, err := jsonpoly.Marshal(i.GuidelineID)
+	if err != nil {
+		return nil, err
+	}
+	rawWorkflowID, err := jsonpoly.Marshal(i.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	rawSubject, err := jsonpoly.Marshal(i.Subject)
+	if err != nil {
+		return nil, err
+	}
+	rawProvider, err := jsonpoly.Marshal(i.Provider)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(i.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(i.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawNarrative, err := jsonpoly.Marshal(i.Narrative)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&InstructionJSONMarshaller{
 		Class:               "INSTRUCTION",
-		Protocol:            i.Protocol,
-		GuidelineID:         i.GuidelineID,
+		Protocol:            rawProtocol,
+		GuidelineID:         rawGuidelineID,
 		Language:            i.Language,
 		Encoding:            i.Encoding,
 		OtherParticipations: i.OtherParticipations,
-		WorkflowID:          i.WorkflowID,
-		Subject:             i.Subject,
-		Provider:            i.Provider,
-		Name:                i.Name,
+		WorkflowID:          rawWorkflowID,
+		Subject:             rawSubject,
+		Provider:            rawProvider,
+		Name:                rawName,
 		ArchetypeNodeID:     i.ArchetypeNodeID,
-		UID:                 i.UID,
+		UID:                 rawUID,
 		Links:               i.Links,
 		ArchetypeDetails:    i.ArchetypeDetails,
 		FeederAudit:         i.FeederAudit,
-		Narrative:           i.Narrative,
+		Narrative:           rawNarrative,
 		ExpiryTime:          i.ExpiryTime,
 		WfDefinition:        i.WfDefinition,
 		Activities:          i.Activities,
@@ -379,7 +515,7 @@ type InstructionDetailsJSONMarshaller struct {
 	// * other workflow engine state.
 	//
 	// This specification does not currently define the actual structure or semantics of this field.
-	WfDetails ItemStructure `json:"wf_details,omitempty"`
+	WfDetails json.RawMessage `json:"wf_details,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for InstructionDetails with `_type`
@@ -388,11 +524,15 @@ type InstructionDetailsJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (i *InstructionDetails) MarshalJSON() ([]byte, error) {
+	rawWfDetails, err := jsonpoly.Marshal(i.WfDetails)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&InstructionDetailsJSONMarshaller{
 		Class:         "INSTRUCTION_DETAILS",
 		InstructionID: i.InstructionID,
 		ActivityID:    i.ActivityID,
-		WfDetails:     i.WfDetails,
+		WfDetails:     rawWfDetails,
 	})
 }
 
@@ -405,7 +545,7 @@ type IsmTransitionJSONMarshaller struct {
 	// CareflowStep The step in the careflow process which occurred as part of generating this action, e.g.  dispense ,  start_administration. This attribute represents the clinical  label for the activity, as  opposed to current_state which represents  the state machine (ISM)  computable form. Defined in archetype.
 	CareflowStep *DVCodedText `json:"careflow_step,omitempty"`
 	// Reason Optional possibility of adding one or more reasons for this careflow step having been taken. Multiple reasons may occur in medication management for example.
-	Reason []DVTextLike `json:"reason,omitempty"`
+	Reason json.RawMessage `json:"reason,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for IsmTransition with `_type`
@@ -414,21 +554,25 @@ type IsmTransitionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (i *IsmTransition) MarshalJSON() ([]byte, error) {
+	rawReason, err := jsonpoly.MarshalSlice(i.Reason)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&IsmTransitionJSONMarshaller{
 		Class:        "ISM_TRANSITION",
 		CurrentState: i.CurrentState,
 		Transition:   i.Transition,
 		CareflowStep: i.CareflowStep,
-		Reason:       i.Reason,
+		Reason:       rawReason,
 	})
 }
 
 type ObservationJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Protocol Description of the method (i.e. how) the information in this entry was arrived at. For `OBSERVATIONs`, this is a description of the method or instrument used. For `EVALUATIONs`, how the evaluation was arrived at. For `INSTRUCTIONs`, how to execute the Instruction. This may take the form of references to guidelines, including manually followed and executable; knowledge references such as a paper in Medline; clinical reasons within a larger care process.
-	Protocol ItemStructure `json:"protocol,omitempty"`
+	Protocol json.RawMessage `json:"protocol,omitempty"`
 	// GuidelineID Optional external identifier of guideline creating this Entry if relevant.
-	GuidelineID ObjectRefLike `json:"guideline_id,omitempty"`
+	GuidelineID json.RawMessage `json:"guideline_id,omitempty"`
 	// Language Mandatory indicator of the localised language in which this Entry is written. Coded from openEHR Code Set  languages .
 	Language CodePhrase `json:"language"`
 	// Encoding Name of character set in which text values in this Entry are encoded. Coded from openEHR Code Set  character sets.
@@ -436,14 +580,14 @@ type ObservationJSONMarshaller struct {
 	// OtherParticipations Other participations at `ENTRY` level.
 	OtherParticipations []Participation `json:"other_participations,omitempty"`
 	// WorkflowID Identifier of externally held workflow engine data for this workflow execution, for this subject of care.
-	WorkflowID ObjectRefLike `json:"workflow_id,omitempty"`
+	WorkflowID json.RawMessage `json:"workflow_id,omitempty"`
 	// Subject Id of human subject of this `ENTRY`, e.g.:
 	//
 	// * organ donor
 	// * foetus
 	// * a family member
 	// * another clinically relevant person.
-	Subject PartyProxy `json:"subject"`
+	Subject json.RawMessage `json:"subject"`
 	// Provider Optional identification of provider of the information in this `ENTRY`, which might be:
 	//
 	// * the patient
@@ -452,15 +596,15 @@ type ObservationJSONMarshaller struct {
 	// * a device or software
 	//
 	// Generally only used when the recorder needs to make it explicit. Otherwise, Composition composer and other participants are assumed.
-	Provider PartyProxy `json:"provider,omitempty"`
+	Provider json.RawMessage `json:"provider,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -479,19 +623,47 @@ type ObservationJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (o *Observation) MarshalJSON() ([]byte, error) {
+	rawProtocol, err := jsonpoly.Marshal(o.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	rawGuidelineID, err := jsonpoly.Marshal(o.GuidelineID)
+	if err != nil {
+		return nil, err
+	}
+	rawWorkflowID, err := jsonpoly.Marshal(o.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	rawSubject, err := jsonpoly.Marshal(o.Subject)
+	if err != nil {
+		return nil, err
+	}
+	rawProvider, err := jsonpoly.Marshal(o.Provider)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(o.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(o.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ObservationJSONMarshaller{
 		Class:               "OBSERVATION",
-		Protocol:            o.Protocol,
-		GuidelineID:         o.GuidelineID,
+		Protocol:            rawProtocol,
+		GuidelineID:         rawGuidelineID,
 		Language:            o.Language,
 		Encoding:            o.Encoding,
 		OtherParticipations: o.OtherParticipations,
-		WorkflowID:          o.WorkflowID,
-		Subject:             o.Subject,
-		Provider:            o.Provider,
-		Name:                o.Name,
+		WorkflowID:          rawWorkflowID,
+		Subject:             rawSubject,
+		Provider:            rawProvider,
+		Name:                rawName,
 		ArchetypeNodeID:     o.ArchetypeNodeID,
-		UID:                 o.UID,
+		UID:                 rawUID,
 		Links:               o.Links,
 		ArchetypeDetails:    o.ArchetypeDetails,
 		FeederAudit:         o.FeederAudit,

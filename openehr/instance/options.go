@@ -2,6 +2,7 @@ package instance
 
 import (
 	"errors"
+	mrand "math/rand/v2"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -26,6 +27,37 @@ func (p Policy) String() string {
 		return "minimal"
 	case Example:
 		return "example"
+	}
+	return "unknown"
+}
+
+// ValueFill controls how primitive leaves are valued, orthogonally to
+// [Policy] (which controls *which* nodes are materialised). SDK-GAP-14.
+type ValueFill int
+
+const (
+	// ExampleFill is the default: each primitive leaf gets its REQ-103
+	// PrimitiveConstraint.ExampleValue — a single representative value,
+	// byte-identical across calls for one OPT.
+	ExampleFill ValueFill = iota
+	// RandomFill draws each leaf from within its constraint (in-range
+	// magnitudes, value-set-member codes, enumeration entries), valid by
+	// construction and varying between calls. Use [Options.ValueSource]
+	// to make a run reproducible.
+	RandomFill
+)
+
+// Any ValueFill other than RandomFill behaves as ExampleFill (the
+// RandomFill check in Generate is exact), so an out-of-range value
+// degrades to the deterministic example fill rather than erroring.
+
+// String returns "example" / "random" / "unknown" for diagnostics.
+func (f ValueFill) String() string {
+	switch f {
+	case ExampleFill:
+		return "example"
+	case RandomFill:
+		return "random"
 	}
 	return "unknown"
 }
@@ -66,6 +98,22 @@ type Options struct {
 	// counter or named-seed source for deterministic UIDs in golden
 	// fixtures.
 	UIDSource func() *rm.HierObjectID
+
+	// ValueFill selects how primitive leaves are valued. Zero value =
+	// ExampleFill (the REQ-103 representative value). RandomFill draws
+	// in-constraint values that vary between calls. SDK-GAP-14.
+	ValueFill ValueFill
+
+	// ValueSource seeds the in-constraint sampler used when ValueFill is
+	// RandomFill; ignored otherwise. A fixed source (e.g.
+	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
+	// nil draws from the package-global, auto-seeded generator so
+	// successive calls differ. Mirrors the UIDSource seam.
+	//
+	// A math/rand/v2.Source is not safe for concurrent use: do not share
+	// one Source across concurrent Generate calls. Give each goroutine its
+	// own source (or leave it nil to use the concurrency-safe global).
+	ValueSource mrand.Source
 }
 
 // ErrTerritoryRequired signals that a COMPOSITION-root template

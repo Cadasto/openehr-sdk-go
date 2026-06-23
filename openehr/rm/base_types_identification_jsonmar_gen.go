@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.base.base_types.identification — canonical-JSON MarshalJSON companions
 
@@ -20,7 +24,7 @@ type AccessGroupRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID json.RawMessage `json:"id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for AccessGroupRef with `_type`
@@ -29,11 +33,15 @@ type AccessGroupRefJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *AccessGroupRef) MarshalJSON() ([]byte, error) {
+	rawID, err := jsonpoly.Marshal(a.ID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AccessGroupRefJSONMarshaller{
 		Class:     "ACCESS_GROUP_REF",
 		Namespace: a.Namespace,
 		Type:      a.Type,
-		ID:        a.ID,
+		ID:        rawID,
 	})
 }
 
@@ -145,7 +153,7 @@ type LocatableRefJSONMarshaller struct {
 	// Path The path to an instance, as an absolute path with respect to the object found at `VERSION._data_`. An empty path means that the object referred to by `_id_` is being specified.
 	Path *string `json:"path,omitempty"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID UIDBasedID `json:"id"`
+	ID json.RawMessage `json:"id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for LocatableRef with `_type`
@@ -154,12 +162,16 @@ type LocatableRefJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (l *LocatableRef) MarshalJSON() ([]byte, error) {
+	rawID, err := jsonpoly.Marshal(l.ID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&LocatableRefJSONMarshaller{
 		Class:     "LOCATABLE_REF",
 		Namespace: l.Namespace,
 		Type:      l.Type,
 		Path:      l.Path,
-		ID:        l.ID,
+		ID:        rawID,
 	})
 }
 
@@ -176,7 +188,7 @@ type ObjectRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID json.RawMessage `json:"id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for ObjectRef with `_type`
@@ -185,11 +197,15 @@ type ObjectRefJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (o *ObjectRef) MarshalJSON() ([]byte, error) {
+	rawID, err := jsonpoly.Marshal(o.ID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ObjectRefJSONMarshaller{
 		Class:     "OBJECT_REF",
 		Namespace: o.Namespace,
 		Type:      o.Type,
-		ID:        o.ID,
+		ID:        rawID,
 	})
 }
 
@@ -224,7 +240,7 @@ type PartyRefJSONMarshaller struct {
 	// Type Name of the  class (concrete or abstract) of object to which this identifier type refers, e.g. `PARTY`, `PERSON`,  `GUIDELINE`  etc. These class names are from the relevant reference model. The type name `ANY` can be used to indicate that any type is accepted (e.g. if the type is unknown).
 	Type string `json:"type"`
 	// ID Globally unique id of an object, regardless of where it is stored.
-	ID ObjectID `json:"id"`
+	ID json.RawMessage `json:"id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for PartyRef with `_type`
@@ -233,11 +249,15 @@ type PartyRefJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (p *PartyRef) MarshalJSON() ([]byte, error) {
+	rawID, err := jsonpoly.Marshal(p.ID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&PartyRefJSONMarshaller{
 		Class:     "PARTY_REF",
 		Namespace: p.Namespace,
 		Type:      p.Type,
-		ID:        p.ID,
+		ID:        rawID,
 	})
 }
 

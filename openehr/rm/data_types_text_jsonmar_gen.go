@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.data_types.text — canonical-JSON MarshalJSON companions
 
@@ -38,7 +42,7 @@ type DVCodedTextJSONMarshaller struct {
 	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
 	//
 	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink DVURILike `json:"hyperlink,omitempty"`
+	Hyperlink json.RawMessage `json:"hyperlink,omitempty"`
 	// Formatting If set, contains one of the following values:
 	//
 	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
@@ -63,10 +67,14 @@ type DVCodedTextJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (d *DVCodedText) MarshalJSON() ([]byte, error) {
+	rawHyperlink, err := jsonpoly.Marshal(d.Hyperlink)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&DVCodedTextJSONMarshaller{
 		Class:        "DV_CODED_TEXT",
 		Value:        d.Value,
-		Hyperlink:    d.Hyperlink,
+		Hyperlink:    rawHyperlink,
 		Formatting:   d.Formatting,
 		Mappings:     d.Mappings,
 		Language:     d.Language,
@@ -78,7 +86,7 @@ func (d *DVCodedText) MarshalJSON() ([]byte, error) {
 type DVParagraphJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Items Items making up the paragraph, each of which is a text item (which may have its own formatting, and/or have hyperlinks).
-	Items []DVTextLike `json:"items"`
+	Items json.RawMessage `json:"items"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for DVParagraph with `_type`
@@ -87,9 +95,13 @@ type DVParagraphJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (d *DVParagraph) MarshalJSON() ([]byte, error) {
+	rawItems, err := jsonpoly.MarshalSlice(d.Items)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&DVParagraphJSONMarshaller{
 		Class: "DV_PARAGRAPH",
-		Items: d.Items,
+		Items: rawItems,
 	})
 }
 
@@ -100,7 +112,7 @@ type DVTextJSONMarshaller struct {
 	// Hyperlink DEPRECATED: this field is deprecated; use markdown link/text in the `_value_` attribute, and `"markdown"` as the value of the `_formatting_` field.
 	//
 	// Original usage, prior to RM Release 1.0.4: Optional link sitting behind a section of plain text or coded term item.
-	Hyperlink DVURILike `json:"hyperlink,omitempty"`
+	Hyperlink json.RawMessage `json:"hyperlink,omitempty"`
 	// Formatting If set, contains one of the following values:
 	//
 	// * `"plain"`: use for plain text, possibly containing newlines, but otherwise unformatted (same as Void);
@@ -123,10 +135,14 @@ type DVTextJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (d *DVText) MarshalJSON() ([]byte, error) {
+	rawHyperlink, err := jsonpoly.Marshal(d.Hyperlink)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&DVTextJSONMarshaller{
 		Class:      "DV_TEXT",
 		Value:      d.Value,
-		Hyperlink:  d.Hyperlink,
+		Hyperlink:  rawHyperlink,
 		Formatting: d.Formatting,
 		Mappings:   d.Mappings,
 		Language:   d.Language,

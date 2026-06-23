@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.common.generic — canonical-JSON MarshalJSON companions
 
@@ -16,9 +20,9 @@ type AttestationJSONMarshaller struct {
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType DVCodedText `json:"change_type"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description DVTextLike `json:"description,omitempty"`
+	Description json.RawMessage `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
-	Committer PartyProxy `json:"committer"`
+	Committer json.RawMessage `json:"committer"`
 	// AttestedView Optional visual representation of content attested e.g. screen image.
 	AttestedView *DVMultimedia `json:"attested_view,omitempty"`
 	// Proof Proof of attestation.
@@ -26,7 +30,7 @@ type AttestationJSONMarshaller struct {
 	// Items Items attested, expressed as fully qualified runtime paths to the items in question. Although not recommended, these may include fine-grained items which have been attested in some other system. Otherwise it is assumed to be for the entire VERSION with which it is associated.
 	Items []DVEHRURI `json:"items,omitempty"`
 	// Reason Reason of this attestation. Optionally coded by the openEHR Terminology group  attestation reason ; includes values like  authorisation ,  witness  etc.
-	Reason DVTextLike `json:"reason"`
+	Reason json.RawMessage `json:"reason"`
 	// IsPending True if this attestation is outstanding; False means it has been completed.
 	IsPending bool `json:"is_pending"`
 }
@@ -37,17 +41,29 @@ type AttestationJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Attestation) MarshalJSON() ([]byte, error) {
+	rawDescription, err := jsonpoly.Marshal(a.Description)
+	if err != nil {
+		return nil, err
+	}
+	rawCommitter, err := jsonpoly.Marshal(a.Committer)
+	if err != nil {
+		return nil, err
+	}
+	rawReason, err := jsonpoly.Marshal(a.Reason)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AttestationJSONMarshaller{
 		Class:         "ATTESTATION",
 		SystemID:      a.SystemID,
 		TimeCommitted: a.TimeCommitted,
 		ChangeType:    a.ChangeType,
-		Description:   a.Description,
-		Committer:     a.Committer,
+		Description:   rawDescription,
+		Committer:     rawCommitter,
 		AttestedView:  a.AttestedView,
 		Proof:         a.Proof,
 		Items:         a.Items,
-		Reason:        a.Reason,
+		Reason:        rawReason,
 		IsPending:     a.IsPending,
 	})
 }
@@ -61,9 +77,9 @@ type AuditDetailsJSONMarshaller struct {
 	// ChangeType Type of change. Coded using the openEHR Terminology  audit change type  group.
 	ChangeType DVCodedText `json:"change_type"`
 	// Description Reason for committal. This may be used to qualify the value in the `_change_type_` field. For example, if the change affects only the EHR directory, this field might be used to indicate 'Folder "episode 2018-02-16" added' or similar.
-	Description DVTextLike `json:"description,omitempty"`
+	Description json.RawMessage `json:"description,omitempty"`
 	// Committer Identity and optional reference into identity management service, of user who committed the item.
-	Committer PartyProxy `json:"committer"`
+	Committer json.RawMessage `json:"committer"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for AuditDetails with `_type`
@@ -72,24 +88,32 @@ type AuditDetailsJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *AuditDetails) MarshalJSON() ([]byte, error) {
+	rawDescription, err := jsonpoly.Marshal(a.Description)
+	if err != nil {
+		return nil, err
+	}
+	rawCommitter, err := jsonpoly.Marshal(a.Committer)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AuditDetailsJSONMarshaller{
 		Class:         "AUDIT_DETAILS",
 		SystemID:      a.SystemID,
 		TimeCommitted: a.TimeCommitted,
 		ChangeType:    a.ChangeType,
-		Description:   a.Description,
-		Committer:     a.Committer,
+		Description:   rawDescription,
+		Committer:     rawCommitter,
 	})
 }
 
 type ParticipationJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Function The function of the Party in this participation (note that a given party might participate in more than one way in a particular activity). This attribute should be coded, but cannot be limited to the HL7v3:ParticipationFunction vocabulary, since it is too limited and hospital-oriented.
-	Function DVTextLike `json:"function"`
+	Function json.RawMessage `json:"function"`
 	// Mode Optional field for recording the 'mode' of the performer / activity interaction, e.g. present, by telephone, by email etc.
 	Mode *DVCodedText `json:"mode,omitempty"`
 	// Performer The id and possibly demographic system link of the party participating in the activity.
-	Performer PartyProxy `json:"performer"`
+	Performer json.RawMessage `json:"performer"`
 	// Time The time interval during which the participation took place, if it is used in an observational context (i.e. recording facts about the past); or the intended time interval of the participation when used in future contexts, such as EHR Instructions.
 	Time *DVInterval[DVDateTime] `json:"time,omitempty"`
 }
@@ -100,11 +124,19 @@ type ParticipationJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (p *Participation) MarshalJSON() ([]byte, error) {
+	rawFunction, err := jsonpoly.Marshal(p.Function)
+	if err != nil {
+		return nil, err
+	}
+	rawPerformer, err := jsonpoly.Marshal(p.Performer)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ParticipationJSONMarshaller{
 		Class:     "PARTICIPATION",
-		Function:  p.Function,
+		Function:  rawFunction,
 		Mode:      p.Mode,
-		Performer: p.Performer,
+		Performer: rawPerformer,
 		Time:      p.Time,
 	})
 }
@@ -201,7 +233,7 @@ type RevisionHistoryItemJSONMarshaller struct {
 	// VersionID Version identifier for this revision.
 	VersionID ObjectVersionID `json:"version_id"`
 	// Audits The audits for this revision; there will always be at least one commit audit (which may itself be an `ATTESTATION`), there may also be further attestations.
-	Audits []AuditDetailsLike `json:"audits"`
+	Audits json.RawMessage `json:"audits"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for RevisionHistoryItem with `_type`
@@ -210,9 +242,13 @@ type RevisionHistoryItemJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (r *RevisionHistoryItem) MarshalJSON() ([]byte, error) {
+	rawAudits, err := jsonpoly.MarshalSlice(r.Audits)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&RevisionHistoryItemJSONMarshaller{
 		Class:     "REVISION_HISTORY_ITEM",
 		VersionID: r.VersionID,
-		Audits:    r.Audits,
+		Audits:    rawAudits,
 	})
 }

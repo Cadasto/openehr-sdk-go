@@ -3,20 +3,24 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.composition — canonical-JSON MarshalJSON companions
 
 type CompositionJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -38,9 +42,9 @@ type CompositionJSONMarshaller struct {
 	// Context The clinical session context of this Composition, i.e. the contextual attributes of the clinical session.
 	Context *EventContext `json:"context,omitempty"`
 	// Composer The person primarily responsible for the content of the Composition (but not necessarily its committal into the EHR system). This is the identifier which should appear on the screen. It may or may not be the person who entered the data. When it is the patient, the special self  instance of `PARTY_PROXY` will be used.
-	Composer PartyProxy `json:"composer"`
+	Composer json.RawMessage `json:"composer"`
 	// Content The content of this Composition.
-	Content []ContentItem `json:"content,omitempty"`
+	Content json.RawMessage `json:"content,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Composition with `_type`
@@ -49,11 +53,27 @@ type CompositionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *Composition) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(c.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(c.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawComposer, err := jsonpoly.Marshal(c.Composer)
+	if err != nil {
+		return nil, err
+	}
+	rawContent, err := jsonpoly.MarshalSlice(c.Content)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CompositionJSONMarshaller{
 		Class:            "COMPOSITION",
-		Name:             c.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              c.UID,
+		UID:              rawUID,
 		Links:            c.Links,
 		ArchetypeDetails: c.ArchetypeDetails,
 		FeederAudit:      c.FeederAudit,
@@ -61,8 +81,8 @@ func (c *Composition) MarshalJSON() ([]byte, error) {
 		Territory:        c.Territory,
 		Category:         c.Category,
 		Context:          c.Context,
-		Composer:         c.Composer,
-		Content:          c.Content,
+		Composer:         rawComposer,
+		Content:          rawContent,
 	})
 }
 
@@ -77,9 +97,9 @@ type EventContextJSONMarshaller struct {
 	// Setting The setting in which the clinical session took place. Coded using the openEHR Terminology,  setting  group.
 	Setting DVCodedText `json:"setting"`
 	// OtherContext Other optional context which will be archetyped.
-	OtherContext ItemStructure `json:"other_context,omitempty"`
+	OtherContext json.RawMessage `json:"other_context,omitempty"`
 	// HealthCareFacility The health care facility under whose care the event took place. This is the most specific workgroup or delivery unit within a care delivery enterprise that has an official identifier in the health system, and can be used to ensure medico-legal accountability.
-	HealthCareFacility PartyIdentifiedLike `json:"health_care_facility,omitempty"`
+	HealthCareFacility json.RawMessage `json:"health_care_facility,omitempty"`
 	// Participations Parties involved in the healthcare event. These would normally include the physician(s) and often the patient (but not the latter if the clinical session is a pathology test for example).
 	Participations []Participation `json:"participations,omitempty"`
 }
@@ -90,14 +110,22 @@ type EventContextJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *EventContext) MarshalJSON() ([]byte, error) {
+	rawOtherContext, err := jsonpoly.Marshal(e.OtherContext)
+	if err != nil {
+		return nil, err
+	}
+	rawHealthCareFacility, err := jsonpoly.Marshal(e.HealthCareFacility)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&EventContextJSONMarshaller{
 		Class:              "EVENT_CONTEXT",
 		StartTime:          e.StartTime,
 		EndTime:            e.EndTime,
 		Location:           e.Location,
 		Setting:            e.Setting,
-		OtherContext:       e.OtherContext,
-		HealthCareFacility: e.HealthCareFacility,
+		OtherContext:       rawOtherContext,
+		HealthCareFacility: rawHealthCareFacility,
 		Participations:     e.Participations,
 	})
 }

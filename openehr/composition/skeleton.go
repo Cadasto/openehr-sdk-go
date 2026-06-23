@@ -18,7 +18,10 @@ import (
 //
 // WithComposer and WithTerritory are required for COMPOSITION roots
 // (instance.Generate enforces); WithLanguage / WithCategory / WithNow
-// are optional defaults documented per Option.
+// are optional defaults documented per Option. WithValueFill
+// (instance.RandomFill) + WithValueSource switch leaves from the fixed
+// REQ-103 ExampleValue to seeded in-constraint sampled values for a
+// diverse-but-valid corpus (SDK-GAP-14).
 func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled
@@ -28,11 +31,13 @@ func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Optio
 	}
 	cfg := buildConfig(opts...)
 	v, err := instance.Generate(ctx, c, instance.Options{
-		Policy:    instance.Minimal,
-		Language:  cfg.language,
-		Territory: cfg.territory,
-		Composer:  cfg.composer,
-		Now:       cfg.now,
+		Policy:      instance.Minimal,
+		Language:    cfg.language,
+		Territory:   cfg.territory,
+		Composer:    cfg.composer,
+		Now:         cfg.now,
+		ValueFill:   cfg.valueFill,
+		ValueSource: cfg.valueSource,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("composition.NewSkeleton: %w", err)

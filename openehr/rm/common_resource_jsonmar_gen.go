@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.common.resource — canonical-JSON MarshalJSON companions
 
@@ -20,7 +24,7 @@ type ResourceDescriptionJSONMarshaller struct {
 	// OtherDetails Additional non language-sensitive resource meta-data, as a list of name/value pairs.
 	OtherDetails *map[string]string `json:"other_details,omitempty"`
 	// ParentResource Reference to owning resource.
-	ParentResource AuthoredResource `json:"parent_resource"`
+	ParentResource json.RawMessage `json:"parent_resource"`
 	// Details Details of all parts of resource description that are natural language-dependent, keyed by language code.
 	Details map[string]ResourceDescriptionItem `json:"details"`
 }
@@ -31,6 +35,10 @@ type ResourceDescriptionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (r *ResourceDescription) MarshalJSON() ([]byte, error) {
+	rawParentResource, err := jsonpoly.Marshal(r.ParentResource)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ResourceDescriptionJSONMarshaller{
 		Class:              "RESOURCE_DESCRIPTION",
 		OriginalAuthor:     r.OriginalAuthor,
@@ -38,7 +46,7 @@ func (r *ResourceDescription) MarshalJSON() ([]byte, error) {
 		LifecycleState:     r.LifecycleState,
 		ResourcePackageURI: r.ResourcePackageURI,
 		OtherDetails:       r.OtherDetails,
-		ParentResource:     r.ParentResource,
+		ParentResource:     rawParentResource,
 		Details:            r.Details,
 	})
 }

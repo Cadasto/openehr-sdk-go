@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.ehr — canonical-JSON MarshalJSON companions
 
@@ -16,21 +20,21 @@ type EHRJSONMarshaller struct {
 	// NOTE: is is strongly recommended that a UUID always be used for this field.
 	EHRID HierObjectID `json:"ehr_id"`
 	// Contributions List of contributions causing changes to this EHR. Each contribution contains a list of versions, which may include references to any number of `VERSION` instances, i.e. items of type `VERSIONED_COMPOSITION` and `VERSIONED_FOLDER`.
-	Contributions []ObjectRefLike `json:"contributions,omitempty"`
+	Contributions json.RawMessage `json:"contributions,omitempty"`
 	// EHRStatus Reference to `EHR_STATUS` object for this EHR.
-	EHRStatus ObjectRefLike `json:"ehr_status"`
+	EHRStatus json.RawMessage `json:"ehr_status"`
 	// EHRAccess Reference to `EHR_ACCESS` object for this EHR.
-	EHRAccess ObjectRefLike `json:"ehr_access"`
+	EHRAccess json.RawMessage `json:"ehr_access"`
 	// Compositions Master list of all Versioned Composition references in this EHR.
-	Compositions []ObjectRefLike `json:"compositions,omitempty"`
+	Compositions json.RawMessage `json:"compositions,omitempty"`
 	// Directory Optional directory structure for this EHR. If present, this is a reference to the first member of `_folders_`.
-	Directory ObjectRefLike `json:"directory,omitempty"`
+	Directory json.RawMessage `json:"directory,omitempty"`
 	// TimeCreated Time of creation of the EHR.
 	TimeCreated DVDateTime `json:"time_created"`
 	// Folders Optional additional Folder structures for this EHR. If set, the `_directory_` attribute refers to the first member.
-	Folders []ObjectRefLike `json:"folders,omitempty"`
+	Folders json.RawMessage `json:"folders,omitempty"`
 	// Tags Optional list of tags associated with this EHR. Tag `_target_` values can only be within the same EHR.
-	Tags []ObjectRefLike `json:"tags,omitempty"`
+	Tags json.RawMessage `json:"tags,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for EHR with `_type`
@@ -39,31 +43,59 @@ type EHRJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *EHR) MarshalJSON() ([]byte, error) {
+	rawContributions, err := jsonpoly.MarshalSlice(e.Contributions)
+	if err != nil {
+		return nil, err
+	}
+	rawEHRStatus, err := jsonpoly.Marshal(e.EHRStatus)
+	if err != nil {
+		return nil, err
+	}
+	rawEHRAccess, err := jsonpoly.Marshal(e.EHRAccess)
+	if err != nil {
+		return nil, err
+	}
+	rawCompositions, err := jsonpoly.MarshalSlice(e.Compositions)
+	if err != nil {
+		return nil, err
+	}
+	rawDirectory, err := jsonpoly.Marshal(e.Directory)
+	if err != nil {
+		return nil, err
+	}
+	rawFolders, err := jsonpoly.MarshalSlice(e.Folders)
+	if err != nil {
+		return nil, err
+	}
+	rawTags, err := jsonpoly.MarshalSlice(e.Tags)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&EHRJSONMarshaller{
 		Class:         "EHR",
 		SystemID:      e.SystemID,
 		EHRID:         e.EHRID,
-		Contributions: e.Contributions,
-		EHRStatus:     e.EHRStatus,
-		EHRAccess:     e.EHRAccess,
-		Compositions:  e.Compositions,
-		Directory:     e.Directory,
+		Contributions: rawContributions,
+		EHRStatus:     rawEHRStatus,
+		EHRAccess:     rawEHRAccess,
+		Compositions:  rawCompositions,
+		Directory:     rawDirectory,
 		TimeCreated:   e.TimeCreated,
-		Folders:       e.Folders,
-		Tags:          e.Tags,
+		Folders:       rawFolders,
+		Tags:          rawTags,
 	})
 }
 
 type EHRAccessJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -71,7 +103,7 @@ type EHRAccessJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Settings Access control settings for the EHR. Instance is a subtype of the type `ACCESS_CONTROL_SETTINGS`, allowing for the use of different access control schemes.
-	Settings AccessControlSettings `json:"settings,omitempty"`
+	Settings json.RawMessage `json:"settings,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for EHRAccess with `_type`
@@ -80,28 +112,40 @@ type EHRAccessJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *EHRAccess) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(e.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(e.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawSettings, err := jsonpoly.Marshal(e.Settings)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&EHRAccessJSONMarshaller{
 		Class:            "EHR_ACCESS",
-		Name:             e.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  e.ArchetypeNodeID,
-		UID:              e.UID,
+		UID:              rawUID,
 		Links:            e.Links,
 		ArchetypeDetails: e.ArchetypeDetails,
 		FeederAudit:      e.FeederAudit,
-		Settings:         e.Settings,
+		Settings:         rawSettings,
 	})
 }
 
 type EHRStatusJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -115,7 +159,7 @@ type EHRStatusJSONMarshaller struct {
 	// IsModifiable True if the EHR, other than the `EHR_STATUS` object, is allowed to be written to. The `EHR_STATUS` object itself can always be written to.
 	IsModifiable bool `json:"is_modifiable"`
 	// OtherDetails Any other details of the EHR summary object, in the form of an archetyped `ITEM_STRUCTURE`.
-	OtherDetails ItemStructure `json:"other_details,omitempty"`
+	OtherDetails json.RawMessage `json:"other_details,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for EHRStatus with `_type`
@@ -124,18 +168,30 @@ type EHRStatusJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *EHRStatus) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(e.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(e.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawOtherDetails, err := jsonpoly.Marshal(e.OtherDetails)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&EHRStatusJSONMarshaller{
 		Class:            "EHR_STATUS",
-		Name:             e.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  e.ArchetypeNodeID,
-		UID:              e.UID,
+		UID:              rawUID,
 		Links:            e.Links,
 		ArchetypeDetails: e.ArchetypeDetails,
 		FeederAudit:      e.FeederAudit,
 		Subject:          e.Subject,
 		IsQueryable:      e.IsQueryable,
 		IsModifiable:     e.IsModifiable,
-		OtherDetails:     e.OtherDetails,
+		OtherDetails:     rawOtherDetails,
 	})
 }
 
@@ -144,7 +200,7 @@ type VersionedCompositionJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -155,10 +211,14 @@ type VersionedCompositionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (v *VersionedComposition) MarshalJSON() ([]byte, error) {
+	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&VersionedCompositionJSONMarshaller{
 		Class:       "VERSIONED_COMPOSITION",
 		UID:         v.UID,
-		OwnerID:     v.OwnerID,
+		OwnerID:     rawOwnerID,
 		TimeCreated: v.TimeCreated,
 	})
 }
@@ -168,7 +228,7 @@ type VersionedEHRAccessJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -179,10 +239,14 @@ type VersionedEHRAccessJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (v *VersionedEHRAccess) MarshalJSON() ([]byte, error) {
+	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&VersionedEHRAccessJSONMarshaller{
 		Class:       "VERSIONED_EHR_ACCESS",
 		UID:         v.UID,
-		OwnerID:     v.OwnerID,
+		OwnerID:     rawOwnerID,
 		TimeCreated: v.TimeCreated,
 	})
 }
@@ -192,7 +256,7 @@ type VersionedEHRStatusJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -203,10 +267,14 @@ type VersionedEHRStatusJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (v *VersionedEHRStatus) MarshalJSON() ([]byte, error) {
+	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&VersionedEHRStatusJSONMarshaller{
 		Class:       "VERSIONED_EHR_STATUS",
 		UID:         v.UID,
-		OwnerID:     v.OwnerID,
+		OwnerID:     rawOwnerID,
 		TimeCreated: v.TimeCreated,
 	})
 }

@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.data_types.quantity — canonical-JSON MarshalJSON companions
 
@@ -279,7 +283,7 @@ func (d *DVScale) MarshalJSON() ([]byte, error) {
 type ReferenceRangeJSONMarshaller[T DVOrdered] struct {
 	Class string `json:"_type"`
 	// Meaning Term whose value indicates the meaning of this range, e.g.  normal,  critical,  therapeutic  etc.
-	Meaning DVTextLike `json:"meaning"`
+	Meaning json.RawMessage `json:"meaning"`
 	// Range The data range for this meaning, e.g. critical  etc.
 	Range DVInterval[DVOrdered] `json:"range"`
 }
@@ -290,9 +294,13 @@ type ReferenceRangeJSONMarshaller[T DVOrdered] struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (r *ReferenceRange[T]) MarshalJSON() ([]byte, error) {
+	rawMeaning, err := jsonpoly.Marshal(r.Meaning)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ReferenceRangeJSONMarshaller[T]{
 		Class:   "REFERENCE_RANGE",
-		Meaning: r.Meaning,
+		Meaning: rawMeaning,
 		Range:   r.Range,
 	})
 }
