@@ -62,15 +62,24 @@
 //
 // # Encoding substitution slots (SDK-GAP-13)
 //
-// A concrete RM type may be stored in such an interface / `*Like` slot
-// either by pointer (`&rm.DVCodedText{…}`) or by value
+// A concrete RM type may be stored in such a `*Like` / abstract-category
+// slot either by pointer (`&rm.DVCodedText{…}`) or by value
 // (`rm.DVCodedText{…}`). Both forms encode correctly: the canonical-JSON
-// `MarshalJSON` companions route every interface-typed field through
+// `MarshalJSON` companions route these interface-typed fields through
 // [github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly], which
 // boxes a value into a pointer when needed so the pointer-receiver
-// `MarshalJSON` runs and the mandatory `_type` discriminator is always
-// emitted (ITS-JSON / REQ-052). Callers therefore need not remember to
-// take a pointer purely to preserve `_type` on the wire.
+// `MarshalJSON` runs and the mandatory `_type` discriminator is emitted
+// (ITS-JSON / REQ-052) regardless of how the value was assigned. For these
+// slots callers need not remember to take a pointer to preserve `_type`.
+//
+// Exception — the generic bounds of `DV_INTERVAL[T]` (`lower` / `upper`)
+// are NOT routed through jsonpoly. A concrete `DVInterval[DVQuantity]`
+// still emits its bound `_type` (the bound is a concrete value field,
+// addressable when the wire struct is marshalled by-pointer), and decoded
+// intervals always carry pointer bounds via typereg, so the round-trip is
+// safe. But a non-pointer value placed directly in a `DVInterval[DVOrdered]`
+// bound would drop `_type` — build interval bounds as the concrete
+// `DVInterval[T]` (or by pointer) to preserve it.
 //
 // Closed type-switch helpers in like_accessors.go (`AsDVText`,
 // `AuditDetailsBase`, `PartyIdentifiedBase`, `ObjectRefBase`) recover

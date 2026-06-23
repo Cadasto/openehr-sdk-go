@@ -71,11 +71,11 @@ func TestGenerateRandomFillReproducibleAndValid(t *testing.T) {
 		t.Error("same ValueSource seed should produce byte-identical output")
 	}
 
-	// (c) RandomFill varies from the fixed ExampleFill baseline (the
-	// clinical_note OPT carries constrained leaves to sample).
+	// (c) RandomFill varies from the fixed ExampleFill baseline. The
+	// vital_signs OPT carries DV_QUANTITY leaves with magnitude ranges, so
+	// a seeded run must differ from the deterministic example fill.
 	ex := gen(instance.ExampleFill, nil)
-	d := gen(instance.RandomFill, mrand.NewPCG(101, 101))
-	if bytes.Equal(a, ex) && bytes.Equal(d, ex) {
+	if bytes.Equal(a, ex) {
 		t.Error("RandomFill produced no leaf variation vs ExampleFill")
 	}
 }

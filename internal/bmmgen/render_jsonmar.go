@@ -358,11 +358,15 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 // abstract/narrow distinction (irrelevant on encode) into single/slice.
 //
 // SinglePropertyOpen (generic type-parameter bounds such as
-// DV_INTERVAL.lower/upper) is deliberately left direct: its concrete
-// instantiations already encode `_type` correctly (the bound is an
-// addressable struct field marshalled by-pointer), and the
-// DV_INTERVAL<T> round-trip collapse is handled validator-side
-// (SDK-GAP-13 sub-gap B), not here.
+// DV_INTERVAL.lower/upper) is deliberately left direct. For a concrete
+// instantiation (e.g. DVInterval[DVQuantity]) the bound is a concrete
+// value field that emits its `_type` because the wire struct is
+// marshalled by-pointer, so the field is addressable; on decode typereg
+// always rebuilds bounds as pointer concretes, so `_type` survives the
+// round-trip. The DV_INTERVAL<T> collapse to DVInterval[DVOrdered] is
+// handled validator-side (SDK-GAP-13 sub-gap B), not here. (A non-pointer
+// value placed directly in a DVInterval[DVOrdered] bound would drop
+// `_type`; that hand-built case is out of scope for this routing.)
 func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) polyKind {
 	if _, isOpen := prop.(*bmm.SinglePropertyOpen); isOpen {
 		return polyNone

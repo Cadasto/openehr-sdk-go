@@ -47,6 +47,10 @@ const (
 	RandomFill
 )
 
+// Any ValueFill other than RandomFill behaves as ExampleFill (the
+// RandomFill check in Generate is exact), so an out-of-range value
+// degrades to the deterministic example fill rather than erroring.
+
 // String returns "example" / "random" / "unknown" for diagnostics.
 func (f ValueFill) String() string {
 	switch f {
@@ -105,6 +109,10 @@ type Options struct {
 	// rand.NewPCG(seed, seed)) makes the leaf values byte-reproducible;
 	// nil draws from the package-global, auto-seeded generator so
 	// successive calls differ. Mirrors the UIDSource seam.
+	//
+	// A math/rand/v2.Source is not safe for concurrent use: do not share
+	// one Source across concurrent Generate calls. Give each goroutine its
+	// own source (or leave it nil to use the concurrency-safe global).
 	ValueSource mrand.Source
 }
 
