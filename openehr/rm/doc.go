@@ -60,6 +60,18 @@
 //     assert to concrete types; helper functions land per-package as
 //     needed.
 //
+// # Encoding substitution slots (SDK-GAP-13)
+//
+// A concrete RM type may be stored in such an interface / `*Like` slot
+// either by pointer (`&rm.DVCodedText{…}`) or by value
+// (`rm.DVCodedText{…}`). Both forms encode correctly: the canonical-JSON
+// `MarshalJSON` companions route every interface-typed field through
+// [github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly], which
+// boxes a value into a pointer when needed so the pointer-receiver
+// `MarshalJSON` runs and the mandatory `_type` discriminator is always
+// emitted (ITS-JSON / REQ-052). Callers therefore need not remember to
+// take a pointer purely to preserve `_type` on the wire.
+//
 // Closed type-switch helpers in like_accessors.go (`AsDVText`,
 // `AuditDetailsBase`, `PartyIdentifiedBase`, `ObjectRefBase`) recover
 // the parent struct from any subtype payload — useful at validation

@@ -182,7 +182,7 @@ func matchSingleAlternative(children []*tcimpl.CompiledNode, val any) *tcimpl.Co
 			// Wildcard / not-typed OPT child — accept.
 			return c
 		}
-		if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want) {
+		if gotType == want || rmTypeIsSubtypeOf(gotType, want) || intervalRMTypeMatches(gotType, want, val) {
 			return c
 		}
 		// AOM 1.4 primitive short name (DURATION, DATE, INTEGER, …)
@@ -575,7 +575,7 @@ func (w *walker) checkRMType(opt *tcimpl.CompiledNode, rmValue any, path string)
 	if got == want {
 		return
 	}
-	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want) {
+	if rmTypeIsSubtypeOf(got, want) || intervalRMTypeMatches(got, want, rmValue) {
 		return
 	}
 	w.emit(Issue{
@@ -598,14 +598,54 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
 // name satisfies an OPT-declared generic interval type (SDK-GAP-11/12).
-func intervalRMTypeMatches(got, want string) bool {
+//
+// SDK-GAP-13 sub-gap B: a DV_INTERVAL<T> value that has been through a
+// canonical-JSON round-trip re-decodes as the bare DVInterval[DVOrdered]
+// (typereg has a single "DV_INTERVAL" registration), so describeRMType
+// reports "DV_INTERVAL" and the OPT's "DV_INTERVAL<DV_QUANTITY>" would
+// spuriously fail. The wire form and the bounds are correct, so when the
+// declared type is a parameterised interval and the value collapsed to a
+// bare one, decide conformance from the bounds' runtime types via `val`.
+func intervalRMTypeMatches(got, want string, val any) bool {
 	if got == want {
 		return true
 	}
 	if want == "DV_INTERVAL" && strings.HasPrefix(got, "DV_INTERVAL<") {
 		return true
 	}
+	if got == "DV_INTERVAL" && strings.HasPrefix(want, "DV_INTERVAL<") {
+		inner := strings.TrimSuffix(strings.TrimPrefix(want, "DV_INTERVAL<"), ">")
+		return intervalBoundsSatisfy(val, inner)
+	}
 	return false
+}
+
+// intervalBoundsSatisfy reports whether a round-trip-collapsed
+// DVInterval[DVOrdered] satisfies DV_INTERVAL<wantInner> by inspecting
+// the runtime types of its bounds (which survive the round-trip via
+// their own `_type`). A fully unbounded interval carries no bound to
+// key off and trivially satisfies any element type. See [intervalRMTypeMatches].
+func intervalBoundsSatisfy(val any, wantInner string) bool {
+	var iv *rm.DVInterval[rm.DVOrdered]
+	switch v := val.(type) {
+	case *rm.DVInterval[rm.DVOrdered]:
+		iv = v
+	case rm.DVInterval[rm.DVOrdered]:
+		iv = &v
+	default:
+		return false
+	}
+	lowerPresent := !iv.LowerUnbounded && iv.Lower != nil
+	upperPresent := !iv.UpperUnbounded && iv.Upper != nil
+	if lowerPresent && describeRMType(iv.Lower) == wantInner {
+		return true
+	}
+	if upperPresent && describeRMType(iv.Upper) == wantInner {
+		return true
+	}
+	// No present bound to type-check (fully unbounded): accept — an
+	// unbounded interval satisfies any DV_INTERVAL<T>.
+	return !lowerPresent && !upperPresent
 }
 
 // primitiveValueMatchesShortName reports whether an RM-side Go value

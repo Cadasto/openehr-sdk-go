@@ -1,18 +1,40 @@
 # Plan — SDK-GAP-13: polymorphic `_type` encode/decode symmetry
 
 **Date:** 2026-06-23
-**Status:** Proposed (analysis only — fix approach not yet chosen; do not implement without sign-off)
+**Status:** Accepted — implementing (approach chosen 2026-06-23; see [Accepted approach](#accepted-approach-2026-06-23))
 **Owner:** SDK maintainers
 **Covers:** [REQ-052](../../specifications/wire.md#req-052), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)
-**Implementation:** planned
+**Implementation:** in progress
 **Relates:** SDK-GAP-11 (decode-side polymorphism — landed; [archive/2026-05-26-rm-polymorphic-decode-coverage.md](archive/2026-05-26-rm-polymorphic-decode-coverage.md)) and the `*Like` ergonomics note ([archive/2026-05-27-rm-like-interface-ergonomics.md](archive/2026-05-27-rm-like-interface-ergonomics.md)); SDK-GAP-12 NewSkeleton ([archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md))
 **Source (inbound):** a consuming CDR project — write-time template validation + benchmark; observed ~13% of the `NewSkeleton` corpus fails round-trip template validation (`Referral Request.v1`, `Demonstration.v1`), forcing its template validation to permissive (warn) mode instead of strict (reject).
 **Reframe vs the inbound draft:** the draft treats this as one "encode-side `_type`" gap. Investigation (below) shows it is **two distinct defects with different fixes** — only the first is an encode bug; the second is decode/validator and the wire is already correct.
 
 ## Definition of Ready (analysis gate)
 
-- [ ] Maintainer sign-off on fix approach (A1/B1 lean path, or split into two delivery tracks).
-- [ ] `Covers:` finalized in canonical specs if normative acceptance criteria are promoted.
+- [x] Maintainer sign-off on fix approach (2026-06-23: A1 *shared poly helper* variant + B1; A3 doc-note only; one branch, `fix/sdk-gap-13-14`).
+- [x] `Covers:` finalized — no new normative acceptance criteria promoted; the existing REQ-052/040/102/107 surface is sufficient.
+
+## Accepted approach (2026-06-23)
+
+Chosen after re-verifying the A/B split on `main`. Both sub-gaps land together on `fix/sdk-gap-13-14`.
+
+### Sub-gap A — **A1, shared poly helper** (not the value-receiver regen variant)
+
+Root cause re-confirmed: `MarshalJSON` is a pointer-receiver, and `rmwrite` stores a concrete *value* (`coerceDVCodedText`) into a `*Like` interface field ([`writeClusterSingle`/`writeElementSingle`](../../internal/templateinstance/rmwrite/write.go)), so `encoding/json` uses default struct encoding and drops `_type`.
+
+- New leaf package **`openehr/internal/jsonpoly`** — pure `reflect` + `encoding/json`, **no `openehr/rm` dependency** (the existing `openehr/serialize/internal/poly` is internal to `serialize/`, so the marshaller targets `openehr/rm` and `openehr/aom/aom14` cannot import it; `openehr/internal/...` is reachable by both).
+  - `Marshal(v any) (json.RawMessage, error)` — boxes a non-pointer concrete into a pointer via `reflect.New` so the pointer-receiver `MarshalJSON` runs and emits `_type`; this also restores the nested `CODE_PHRASE` `_type` (once `DVCodedText.MarshalJSON` runs, its wire struct is marshalled by-pointer, so its value-typed `defining_code` field is addressable). Returns `nil` for a nil interface (so `omitempty` still omits).
+  - `MarshalSlice[T](s []T) (json.RawMessage, error)` — element-wise, preserving `nil`/`omitempty` semantics.
+- **Codegen** ([`internal/bmmgen/render_jsonmar.go`](../../internal/bmmgen/render_jsonmar.go)): for fields where `isInterfaceTypeRef` is true (single) or the container element is an interface (slice), the wire-struct field type becomes `json.RawMessage` (same json tag, `omitempty` preserved) and the generated `MarshalJSON` pre-computes it via `jsonpoly.*` with error propagation. Non-interface fields, and the no-poly-field classes, keep the current form. No map-of-interface fields exist in the RM, so maps are untouched.
+- **A3 guardrail:** a short pointer-contract note in `openehr/rm/doc.go` only — the codec fix makes the wire correct regardless of pointer-vs-value, so a vet/lint analyzer would be cosmetic. (Maintainer chose doc-note-only.)
+
+### Sub-gap B — **B1, validator inspects the bounds**
+
+- Extend the interval admission check at [`walk_composition.go:185`](../../openehr/validation/walk_composition.go#L185) to also consider the RM `val`. When the OPT wants `DV_INTERVAL<X>` but the round-tripped value collapsed to bare `DV_INTERVAL` (`DVInterval[DVOrdered]`, per the single [`typereg`](../../openehr/rm/typereg_gen.go#L35) registration), crack open `.Lower`/`.Upper` and accept when the present bound(s) `describeRMType` as `X`. The wire form and the bounds are already correct (sub-gap B is decode-reconstruction, not an encode loss); no decode/`typereg` change.
+
+### Not chosen / deferred
+
+- A1 value-receiver regeneration (correct but a much larger, higher-risk diff); A2 producer-side pointers (no wire-level guarantee). B2 decode reconstruction (only needed if a consumer reads the concrete Go generic type post-decode — the reporting CDR validates, it does not).
 
 ## Goal
 

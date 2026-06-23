@@ -13,6 +13,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
+// jsonpolyImportPath is the leaf helper package used to marshal
+// interface-typed (polymorphic) fields so a concrete value sitting in
+// an interface slot still emits its `_type` discriminator (SDK-GAP-13
+// sub-gap A). It depends only on reflect + encoding/json, so the
+// generated marshaller packages can import it without an import cycle.
+const jsonpolyImportPath = "github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+
 // RenderMarshalJSONFile renders the canonical-JSON `MarshalJSON`
 // companions for every concrete (non-abstract, non-primitive,
 // non-interface) class in the supplied [PlannedFile].
@@ -56,20 +63,9 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 		return nil, nil
 	}
 
-	var body bytes.Buffer
-	body.WriteString(renderGeneratedHeader(plan))
-	body.WriteString("\n")
-	body.WriteString("import \"encoding/json\"\n")
-	// Cross-target rm imports are injected later when needsExternalImport is set.
-	body.WriteString("\n")
-	if file.PackagePath != "" {
-		fmt.Fprintf(&body, "// BMM package: %s — canonical-JSON MarshalJSON companions\n\n", file.PackagePath)
-	} else {
-		body.WriteString("// canonical-JSON MarshalJSON companions (foundation classes)\n\n")
-	}
-
-	// Pre-render so we can inject the external import only when a
-	// chunk actually emits a cross-target reference.
+	// Pre-render so the import set reflects what the chunks actually
+	// reference: the cross-target rm qualifier (aom14 → rm) and the
+	// jsonpoly helper (only when a polymorphic field is routed).
 	chunks := make([]string, 0, len(concrete))
 	for _, pc := range concrete {
 		chunk, err := renderMarshalJSON(plan, pc)
@@ -78,20 +74,32 @@ func RenderMarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 		}
 		chunks = append(chunks, chunk)
 	}
-	if needsExternalImportForJSONMar(plan, chunks) {
-		// Insert the import after the encoding/json line by rebuilding.
-		body.Reset()
-		body.WriteString(renderGeneratedHeader(plan))
-		body.WriteString("\n")
+
+	needExternal := needsExternalImportForJSONMar(plan, chunks)
+	needPoly := slices.ContainsFunc(chunks, func(c string) bool {
+		return strings.Contains(c, "jsonpoly.")
+	})
+
+	var body bytes.Buffer
+	body.WriteString(renderGeneratedHeader(plan))
+	body.WriteString("\n")
+	if needExternal || needPoly {
 		body.WriteString("import (\n")
 		body.WriteString("\t\"encoding/json\"\n\n")
-		fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
-		body.WriteString(")\n\n")
-		if file.PackagePath != "" {
-			fmt.Fprintf(&body, "// BMM package: %s — canonical-JSON MarshalJSON companions\n\n", file.PackagePath)
-		} else {
-			body.WriteString("// canonical-JSON MarshalJSON companions (foundation classes)\n\n")
+		if needPoly {
+			fmt.Fprintf(&body, "\t%q\n", jsonpolyImportPath)
 		}
+		if needExternal {
+			fmt.Fprintf(&body, "\t%q\n", plan.Target.ExternalImport)
+		}
+		body.WriteString(")\n\n")
+	} else {
+		body.WriteString("import \"encoding/json\"\n\n")
+	}
+	if file.PackagePath != "" {
+		fmt.Fprintf(&body, "// BMM package: %s — canonical-JSON MarshalJSON companions\n\n", file.PackagePath)
+	} else {
+		body.WriteString("// canonical-JSON MarshalJSON companions (foundation classes)\n\n")
 	}
 
 	for _, c := range chunks {
@@ -271,6 +279,13 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 		typeArgs = genericTypeArgList(sc)
 	}
 
+	// Classify each field for polymorphic marshalling once, so the wire
+	// struct and the method body stay in lockstep.
+	kinds := make([]polyKind, len(fields))
+	for i, ef := range fields {
+		kinds[i] = marshalPolyKind(plan, ef.Owner, sc, ef.Prop)
+	}
+
 	var b strings.Builder
 
 	// Wire struct definition.
@@ -280,8 +295,18 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	// and chosen to avoid colliding with the common BMM `type` property
 	// (e.g. DV_PROPORTION.type) which would Pascal-case to `Type`.
 	b.WriteString("\tClass string `json:\"_type\"`\n")
-	for _, ef := range fields {
-		line, err := renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
+	for i, ef := range fields {
+		var line string
+		var err error
+		if kinds[i] == polyNone {
+			line, err = renderField(plan, ef.Owner, ef.OwnerName, ef.Prop)
+		} else {
+			// Polymorphic field: pre-marshalled to RawMessage by the
+			// method body via the jsonpoly helper, which injects the
+			// mandatory `_type` even when a concrete value (not pointer)
+			// sits in the interface slot (SDK-GAP-13 sub-gap A).
+			line, err = polyWireField(ef.Prop)
+		}
 		if err != nil {
 			return "", fmt.Errorf("render wire field %s.%s: %w", pc.BMMName, ef.Prop.PropertyName(), err)
 		}
@@ -296,17 +321,97 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 	b.WriteString("// first (in their original order), then own + flattened-abstract\n")
 	b.WriteString("// ancestor fields in BMM property declaration order.\n")
 	fmt.Fprintf(&b, "func (%s *%s%s) MarshalJSON() ([]byte, error) {\n", recv, pc.GoName, typeArgs)
+	// Pre-marshal polymorphic fields through the jsonpoly helper so a
+	// value-in-interface still carries its `_type`. Each `rawX` is a
+	// fresh name, so `:=` is always valid even though `err` repeats.
+	for i, ef := range fields {
+		if kinds[i] == polyNone {
+			continue
+		}
+		fieldName := FieldName(ef.Prop.PropertyName())
+		helper := "Marshal"
+		if kinds[i] == polySlice {
+			helper = "MarshalSlice"
+		}
+		fmt.Fprintf(&b, "\traw%s, err := jsonpoly.%s(%s.%s)\n", fieldName, helper, recv, fieldName)
+		b.WriteString("\tif err != nil {\n\t\treturn nil, err\n\t}\n")
+	}
 	fmt.Fprintf(&b, "\treturn json.Marshal(&%s%s{\n", wireName, typeArgs)
 	fmt.Fprintf(&b, "\t\tClass: %q,\n", pc.BMMName)
-	for _, ef := range fields {
-		propName := ef.Prop.PropertyName()
-		fieldName := FieldName(propName)
-		fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", fieldName, recv, fieldName)
+	for i, ef := range fields {
+		fieldName := FieldName(ef.Prop.PropertyName())
+		if kinds[i] == polyNone {
+			fmt.Fprintf(&b, "\t\t%s: %s.%s,\n", fieldName, recv, fieldName)
+		} else {
+			fmt.Fprintf(&b, "\t\t%s: raw%s,\n", fieldName, fieldName)
+		}
 	}
 	b.WriteString("\t})\n")
 	b.WriteString("}\n")
 
 	return b.String(), nil
+}
+
+// marshalPolyKind classifies a property for canonical-JSON marshalling.
+// It reuses the decoder's polymorphicProperty classifier so encode and
+// decode agree on which fields are polymorphic, then folds the
+// abstract/narrow distinction (irrelevant on encode) into single/slice.
+//
+// SinglePropertyOpen (generic type-parameter bounds such as
+// DV_INTERVAL.lower/upper) is deliberately left direct: its concrete
+// instantiations already encode `_type` correctly (the bound is an
+// addressable struct field marshalled by-pointer), and the
+// DV_INTERVAL<T> round-trip collapse is handled validator-side
+// (SDK-GAP-13 sub-gap B), not here.
+func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) polyKind {
+	if _, isOpen := prop.(*bmm.SinglePropertyOpen); isOpen {
+		return polyNone
+	}
+	_, kind := polymorphicProperty(plan, owner, emitting, prop)
+	switch kind {
+	case polySingle, polySingleNarrow:
+		return polySingle
+	case polySlice, polySliceNarrow:
+		return polySlice
+	}
+	return polyNone
+}
+
+// polyWireField renders the wire-struct line for a polymorphic field:
+// a json.RawMessage carrying the same doc comment and json tag
+// (omitempty preserved) the typed field would have had. The method body
+// fills it via the jsonpoly helper.
+func polyWireField(prop bmm.Property) (string, error) {
+	name := prop.PropertyName()
+	goName := FieldName(name)
+	docLines := propertyDoc(goName, propertyDocText(prop))
+	return docLines + fmt.Sprintf("\t%s json.RawMessage %s\n", goName, polyJSONTag(prop, name)), nil
+}
+
+// polyJSONTag returns the json struct tag for a polymorphic wire field,
+// replicating renderField's omitempty decision per property kind so the
+// emitted key presence/absence is byte-identical to the typed field.
+func polyJSONTag(prop bmm.Property, name string) string {
+	jsonTag := fmt.Sprintf("`json:%q`", name)
+	jsonTagOpt := fmt.Sprintf("`json:%q`", name+",omitempty")
+	switch p := prop.(type) {
+	case *bmm.SingleProperty:
+		if p.IsMandatory {
+			return jsonTag
+		}
+		return jsonTagOpt
+	case *bmm.ContainerProperty:
+		if p.Cardinality == nil || p.Cardinality.Lower == 0 {
+			return jsonTagOpt
+		}
+		return jsonTag
+	case *bmm.GenericProperty:
+		if p.IsMandatory {
+			return jsonTag
+		}
+		return jsonTagOpt
+	}
+	return jsonTag
 }
 
 // jsonmarWireTypeName produces the per-class wire type identifier.

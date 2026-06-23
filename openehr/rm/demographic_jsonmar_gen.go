@@ -3,20 +3,24 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.demographic — canonical-JSON MarshalJSON companions
 
 type AddressJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -24,7 +28,7 @@ type AddressJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Details Archetypable structured address.
-	Details ItemStructure `json:"details"`
+	Details json.RawMessage `json:"details"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Address with `_type`
@@ -33,22 +37,34 @@ type AddressJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Address) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(a.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(a.Details)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AddressJSONMarshaller{
 		Class:            "ADDRESS",
-		Name:             a.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  a.ArchetypeNodeID,
-		UID:              a.UID,
+		UID:              rawUID,
 		Links:            a.Links,
 		ArchetypeDetails: a.ArchetypeDetails,
 		FeederAudit:      a.FeederAudit,
-		Details:          a.Details,
+		Details:          rawDetails,
 	})
 }
 
 type AgentJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVTextLike `json:"languages,omitempty"`
+	Languages json.RawMessage `json:"languages,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -56,17 +72,17 @@ type AgentJSONMarshaller struct {
 	// Contacts Contacts for this party.
 	Contacts []Contact `json:"contacts,omitempty"`
 	// Details All other details for this Party.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -81,17 +97,33 @@ type AgentJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Agent) MarshalJSON() ([]byte, error) {
+	rawLanguages, err := jsonpoly.MarshalSlice(a.Languages)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(a.Details)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(a.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(a.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AgentJSONMarshaller{
 		Class:            "AGENT",
-		Languages:        a.Languages,
+		Languages:        rawLanguages,
 		Roles:            a.Roles,
 		Identities:       a.Identities,
 		Contacts:         a.Contacts,
-		Details:          a.Details,
+		Details:          rawDetails,
 		Relationships:    a.Relationships,
-		Name:             a.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  a.ArchetypeNodeID,
-		UID:              a.UID,
+		UID:              rawUID,
 		Links:            a.Links,
 		ArchetypeDetails: a.ArchetypeDetails,
 		FeederAudit:      a.FeederAudit,
@@ -101,13 +133,13 @@ func (a *Agent) MarshalJSON() ([]byte, error) {
 type CapabilityJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -115,7 +147,7 @@ type CapabilityJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Credentials The qualifications of the performer of the role for this capability. This might include professional qualifications and official identifications such as provider numbers etc.
-	Credentials ItemStructure `json:"credentials"`
+	Credentials json.RawMessage `json:"credentials"`
 	// TimeValidity Valid time interval for the credentials of this capability.
 	TimeValidity *DVInterval[DVDate] `json:"time_validity,omitempty"`
 }
@@ -126,15 +158,27 @@ type CapabilityJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *Capability) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(c.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(c.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawCredentials, err := jsonpoly.Marshal(c.Credentials)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CapabilityJSONMarshaller{
 		Class:            "CAPABILITY",
-		Name:             c.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              c.UID,
+		UID:              rawUID,
 		Links:            c.Links,
 		ArchetypeDetails: c.ArchetypeDetails,
 		FeederAudit:      c.FeederAudit,
-		Credentials:      c.Credentials,
+		Credentials:      rawCredentials,
 		TimeValidity:     c.TimeValidity,
 	})
 }
@@ -142,13 +186,13 @@ func (c *Capability) MarshalJSON() ([]byte, error) {
 type ContactJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -167,11 +211,19 @@ type ContactJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *Contact) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(c.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(c.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ContactJSONMarshaller{
 		Class:            "CONTACT",
-		Name:             c.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  c.ArchetypeNodeID,
-		UID:              c.UID,
+		UID:              rawUID,
 		Links:            c.Links,
 		ArchetypeDetails: c.ArchetypeDetails,
 		FeederAudit:      c.FeederAudit,
@@ -183,7 +235,7 @@ func (c *Contact) MarshalJSON() ([]byte, error) {
 type GroupJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVTextLike `json:"languages,omitempty"`
+	Languages json.RawMessage `json:"languages,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -191,17 +243,17 @@ type GroupJSONMarshaller struct {
 	// Contacts Contacts for this party.
 	Contacts []Contact `json:"contacts,omitempty"`
 	// Details All other details for this Party.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -216,17 +268,33 @@ type GroupJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (g *Group) MarshalJSON() ([]byte, error) {
+	rawLanguages, err := jsonpoly.MarshalSlice(g.Languages)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(g.Details)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(g.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(g.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&GroupJSONMarshaller{
 		Class:            "GROUP",
-		Languages:        g.Languages,
+		Languages:        rawLanguages,
 		Roles:            g.Roles,
 		Identities:       g.Identities,
 		Contacts:         g.Contacts,
-		Details:          g.Details,
+		Details:          rawDetails,
 		Relationships:    g.Relationships,
-		Name:             g.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  g.ArchetypeNodeID,
-		UID:              g.UID,
+		UID:              rawUID,
 		Links:            g.Links,
 		ArchetypeDetails: g.ArchetypeDetails,
 		FeederAudit:      g.FeederAudit,
@@ -236,7 +304,7 @@ func (g *Group) MarshalJSON() ([]byte, error) {
 type OrganisationJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVTextLike `json:"languages,omitempty"`
+	Languages json.RawMessage `json:"languages,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -244,17 +312,17 @@ type OrganisationJSONMarshaller struct {
 	// Contacts Contacts for this party.
 	Contacts []Contact `json:"contacts,omitempty"`
 	// Details All other details for this Party.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -269,17 +337,33 @@ type OrganisationJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (o *Organisation) MarshalJSON() ([]byte, error) {
+	rawLanguages, err := jsonpoly.MarshalSlice(o.Languages)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(o.Details)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(o.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(o.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&OrganisationJSONMarshaller{
 		Class:            "ORGANISATION",
-		Languages:        o.Languages,
+		Languages:        rawLanguages,
 		Roles:            o.Roles,
 		Identities:       o.Identities,
 		Contacts:         o.Contacts,
-		Details:          o.Details,
+		Details:          rawDetails,
 		Relationships:    o.Relationships,
-		Name:             o.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  o.ArchetypeNodeID,
-		UID:              o.UID,
+		UID:              rawUID,
 		Links:            o.Links,
 		ArchetypeDetails: o.ArchetypeDetails,
 		FeederAudit:      o.FeederAudit,
@@ -289,13 +373,13 @@ func (o *Organisation) MarshalJSON() ([]byte, error) {
 type PartyIdentityJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -303,7 +387,7 @@ type PartyIdentityJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Details The value of the identity. This will often taken the form of a parseable string or a small structure of strings.
-	Details ItemStructure `json:"details"`
+	Details json.RawMessage `json:"details"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for PartyIdentity with `_type`
@@ -312,28 +396,40 @@ type PartyIdentityJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (p *PartyIdentity) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(p.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(p.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(p.Details)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&PartyIdentityJSONMarshaller{
 		Class:            "PARTY_IDENTITY",
-		Name:             p.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              p.UID,
+		UID:              rawUID,
 		Links:            p.Links,
 		ArchetypeDetails: p.ArchetypeDetails,
 		FeederAudit:      p.FeederAudit,
-		Details:          p.Details,
+		Details:          rawDetails,
 	})
 }
 
 type PartyRelationshipJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -341,7 +437,7 @@ type PartyRelationshipJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Details The detailed description of the relationship.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Target Target of relationship.
 	Target PartyRef `json:"target"`
 	// TimeValidity Valid time interval for this relationship.
@@ -356,15 +452,27 @@ type PartyRelationshipJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (p *PartyRelationship) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(p.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(p.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(p.Details)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&PartyRelationshipJSONMarshaller{
 		Class:            "PARTY_RELATIONSHIP",
-		Name:             p.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              p.UID,
+		UID:              rawUID,
 		Links:            p.Links,
 		ArchetypeDetails: p.ArchetypeDetails,
 		FeederAudit:      p.FeederAudit,
-		Details:          p.Details,
+		Details:          rawDetails,
 		Target:           p.Target,
 		TimeValidity:     p.TimeValidity,
 		Source:           p.Source,
@@ -374,7 +482,7 @@ func (p *PartyRelationship) MarshalJSON() ([]byte, error) {
 type PersonJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Languages Languages which can be used to communicate with this actor, in preferred order of use (if known, else order irrelevant).
-	Languages []DVTextLike `json:"languages,omitempty"`
+	Languages json.RawMessage `json:"languages,omitempty"`
 	// Roles Identifiers of the Version container for each Role played by this Party.
 	Roles []PartyRef `json:"roles,omitempty"`
 	// Identities Identities used by the party to identify itself, such as legal name, stage names, aliases, nicknames and so on.
@@ -382,17 +490,17 @@ type PersonJSONMarshaller struct {
 	// Contacts Contacts for this party.
 	Contacts []Contact `json:"contacts,omitempty"`
 	// Details All other details for this Party.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -407,17 +515,33 @@ type PersonJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (p *Person) MarshalJSON() ([]byte, error) {
+	rawLanguages, err := jsonpoly.MarshalSlice(p.Languages)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(p.Details)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(p.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(p.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&PersonJSONMarshaller{
 		Class:            "PERSON",
-		Languages:        p.Languages,
+		Languages:        rawLanguages,
 		Roles:            p.Roles,
 		Identities:       p.Identities,
 		Contacts:         p.Contacts,
-		Details:          p.Details,
+		Details:          rawDetails,
 		Relationships:    p.Relationships,
-		Name:             p.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  p.ArchetypeNodeID,
-		UID:              p.UID,
+		UID:              rawUID,
 		Links:            p.Links,
 		ArchetypeDetails: p.ArchetypeDetails,
 		FeederAudit:      p.FeederAudit,
@@ -431,17 +555,17 @@ type RoleJSONMarshaller struct {
 	// Contacts Contacts for this party.
 	Contacts []Contact `json:"contacts,omitempty"`
 	// Details All other details for this Party.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 	// Relationships Relationships in which this Party takes part as source.
 	Relationships []PartyRelationship `json:"relationships,omitempty"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -462,15 +586,27 @@ type RoleJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (r *Role) MarshalJSON() ([]byte, error) {
+	rawDetails, err := jsonpoly.Marshal(r.Details)
+	if err != nil {
+		return nil, err
+	}
+	rawName, err := jsonpoly.Marshal(r.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(r.UID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&RoleJSONMarshaller{
 		Class:            "ROLE",
 		Identities:       r.Identities,
 		Contacts:         r.Contacts,
-		Details:          r.Details,
+		Details:          rawDetails,
 		Relationships:    r.Relationships,
-		Name:             r.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  r.ArchetypeNodeID,
-		UID:              r.UID,
+		UID:              rawUID,
 		Links:            r.Links,
 		ArchetypeDetails: r.ArchetypeDetails,
 		FeederAudit:      r.FeederAudit,
@@ -485,7 +621,7 @@ type VersionedPartyJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -496,10 +632,14 @@ type VersionedPartyJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (v *VersionedParty) MarshalJSON() ([]byte, error) {
+	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&VersionedPartyJSONMarshaller{
 		Class:       "VERSIONED_PARTY",
 		UID:         v.UID,
-		OwnerID:     v.OwnerID,
+		OwnerID:     rawOwnerID,
 		TimeCreated: v.TimeCreated,
 	})
 }

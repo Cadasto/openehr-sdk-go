@@ -3,20 +3,24 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.common.directory — canonical-JSON MarshalJSON companions
 
 type FolderJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -24,11 +28,11 @@ type FolderJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Items The list of references to other (usually) versioned objects logically in this folder.
-	Items []ObjectRefLike `json:"items,omitempty"`
+	Items json.RawMessage `json:"items,omitempty"`
 	// Folders Sub-folders of this `FOLDER`.
 	Folders []Folder `json:"folders,omitempty"`
 	// Details Archetypable meta-data for `FOLDER`.
-	Details ItemStructure `json:"details,omitempty"`
+	Details json.RawMessage `json:"details,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for Folder with `_type`
@@ -37,17 +41,33 @@ type FolderJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (f *Folder) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(f.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(f.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawItems, err := jsonpoly.MarshalSlice(f.Items)
+	if err != nil {
+		return nil, err
+	}
+	rawDetails, err := jsonpoly.Marshal(f.Details)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&FolderJSONMarshaller{
 		Class:            "FOLDER",
-		Name:             f.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  f.ArchetypeNodeID,
-		UID:              f.UID,
+		UID:              rawUID,
 		Links:            f.Links,
 		ArchetypeDetails: f.ArchetypeDetails,
 		FeederAudit:      f.FeederAudit,
-		Items:            f.Items,
+		Items:            rawItems,
 		Folders:          f.Folders,
-		Details:          f.Details,
+		Details:          rawDetails,
 	})
 }
 
@@ -56,7 +76,7 @@ type VersionedFolderJSONMarshaller struct {
 	// UID Unique identifier of this version container in the form of a UID with no extension. This id will be the same in all instances of the same container in a distributed environment, meaning that it can be understood as the uid of the  virtual version tree.
 	UID HierObjectID `json:"uid"`
 	// OwnerID Reference to object to which this version container belongs, e.g. the id of the containing EHR or other relevant owning entity.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 	// TimeCreated Time of initial creation of this versioned object.
 	TimeCreated DVDateTime `json:"time_created"`
 }
@@ -67,10 +87,14 @@ type VersionedFolderJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (v *VersionedFolder) MarshalJSON() ([]byte, error) {
+	rawOwnerID, err := jsonpoly.Marshal(v.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&VersionedFolderJSONMarshaller{
 		Class:       "VERSIONED_FOLDER",
 		UID:         v.UID,
-		OwnerID:     v.OwnerID,
+		OwnerID:     rawOwnerID,
 		TimeCreated: v.TimeCreated,
 	})
 }
