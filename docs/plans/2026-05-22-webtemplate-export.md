@@ -11,7 +11,7 @@
 
 ## Goal
 
-Export the SDK's internal compiled template (REQ-100 + Phase 4 of the follow-up plan) as a JSON-format simplified template representation suitable for UI / form-generation consumers. This format is widely used in the openEHR ecosystem for client-side rendering, AQL builder UIs, and form-driven data entry. The originating reference is the [better-care WebTemplate format](https://github.com/better-care/web-template).
+Export the SDK's compiled template (the **landed** REQ-100 parser + REQ-111 public bridge) as a JSON-format simplified template representation suitable for UI / form-generation consumers. This format is widely used in the openEHR ecosystem for client-side rendering, AQL builder UIs, and form-driven data entry. The originating reference is the [better-care WebTemplate format](https://github.com/better-care/web-template).
 
 ## Why a separate plan
 
@@ -90,10 +90,14 @@ Until then this plan is a placeholder reserving the design space, the proposed R
 | Round-trip golden files for fixture OPTs | not started |
 | Cross-implementation conformance probe (PROBE-075) | not started |
 
+## Definition of Ready / Done
+
+Inherited from the [simplified-formats umbrella](2026-06-23-simplified-formats.md). Additionally, before implementing: **REQ-106 registered** in [`REQ.md`](../specifications/REQ.md) with canonical prose; reference implementation + `version` + `id`-generation algorithm locked (ADR if it forks behaviour). Verification: `make spec-check` + `make ci`.
+
 ## Mapping to specs
 
 - Pending: REQ-106 (JSON-format simplified template export) — **not yet in `REQ.md`; register before implementing** (umbrella DoR)
-- Foundation: [REQ-100 follow-up plan](archive/2026-05-22-template-req100-followups.md) Phase 4 (compiled template) + Phase 6 (REQ-103 primitives)
+- Foundation (landed): REQ-100 parser + REQ-111 public compiled-template bridge + REQ-103 primitives — historical delivery in the [archived follow-up plan](archive/2026-05-22-template-req100-followups.md)
 
 ## References (informational)
 

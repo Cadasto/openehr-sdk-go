@@ -3,7 +3,7 @@
 **Date:** 2026-06-23
 **Status:** Draft (proposed umbrella — planned; not yet approved for implementation)
 **Owner:** SDK maintainers
-**Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT / STRUCTURED composition codecs); **proposed REQ-106** (WebTemplate JSON export — child plan [`2026-05-22-webtemplate-export.md`](2026-05-22-webtemplate-export.md)). Cross-links the compiled-template foundation [REQ-100](../specifications/clinical-modeling.md)/[REQ-111](../specifications/module-layout.md), [REQ-103](../specifications/clinical-modeling.md) primitives, [REQ-107](../specifications/clinical-modeling.md) instance synthesis, [REQ-102](../specifications/transport.md) validation.
+**Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT / STRUCTURED composition codecs); **proposed REQ-106** (WebTemplate JSON export — child plan [`2026-05-22-webtemplate-export.md`](2026-05-22-webtemplate-export.md)). Cross-links the landed compiled-template foundation ([REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge)), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) primitives, [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) instance synthesis, [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) validation.
 **Probes:** PROBE-075 (WebTemplate export structural conformance), PROBE-076 (FLAT/STRUCTURED composition round-trip) — **reserved** (next free after PROBE-074).
 **Implementation:** planned
 **Depends on:** landed compiled-template foundation — `openehr/template/` + the public bridge `openehr/templatecompile/` (REQ-111), REQ-103 primitive constraints, REQ-107 `instance.Generate`. All shipped; no new prerequisites.
@@ -15,7 +15,7 @@ Build the SDK's **simplified-formats** stack on a single shared internal model d
 
 ## Why one umbrella (the key architectural insight)
 
-WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed as unrelated tracks. They are not: per the format research ([openehr-kb note](../../../openehr-kb/reference/notes/openehr-template-and-composition-formats.md) — *if the kb is not checked out, see the source repos in §References*), the **Web Template node tree IS the machinery FLAT/STRUCTURED needs**. Both reference implementations (EHRbase `openEHR_SDK`, Better `web-template`) generate flat paths from exactly this model:
+WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed as unrelated tracks. They are not: per the format research (the sibling private repo **`openehr-kb`**, `reference/notes/openehr-template-and-composition-formats.md`; primary sources also in §References), the **Web Template node tree IS the machinery FLAT/STRUCTURED needs**. Both reference implementations (EHRbase `openEHR_SDK`, Better `web-template`) generate flat paths from exactly this model:
 
 ```
 *template.Compiled (OPT, flattened)
@@ -40,7 +40,7 @@ A node's `id` (camelCase "web id"), its `aqlPath`, and its leaf `inputs` (with a
 
 Phases 2 and 3 are independent once Phase 1 exists; either can ship first by consumer demand.
 
-## Decisions to lock before implementation (Definition of Ready)
+## Decisions to lock before implementation
 
 - **Reference implementation:** target **EHRbase `openEHR_SDK`** (Java, actively maintained, `version "2.3"`) over Better `web-template` (Kotlin; frozen 2021, build-rot reports). Record as an [ADR](../adr/) if it forks behaviour.
 - **Pin the WebTemplate `version`** we emit (EHRbase emits `"2.3"`).
