@@ -149,7 +149,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-**Status:** Open (deferred) — opened by the [ITS-REST conformance remediation](../plans/2026-06-19-its-rest-conformance-remediation.md).
+**Status:** Open (deferred) — opened by the [ITS-REST conformance remediation](../plans/archive/2026-06-19-its-rest-conformance-remediation.md).
 
 **Two follow-ups carried out of that plan:**
 

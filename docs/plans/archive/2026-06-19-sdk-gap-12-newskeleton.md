@@ -7,8 +7,8 @@
 **Probes:** [PROBE-027](../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  
 **Implementation:** landed  
 **Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
-**Consumer:** [openehr-go-poc PR #31](https://github.com/Cadasto/openehr-go-poc/pull/31) — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
-**External reference:** `docs/sdk-gap-drafts/SDK-GAP-12-newskeleton-realworld-opts.md` on `openehr-go-poc` branch `test/newskeleton-feasibility-and-gap-12`
+**Consumer:** a consuming CDR project — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
+**External reference:** the consuming CDR project's SDK-GAP-12 draft (tracked in that project).
 
 ## Goal
 
