@@ -8,11 +8,11 @@ import "errors"
 //
 //	lifecycle_state.code_string="<code>"
 //
-// The code is an openEHR "version lifecycle state" terminology value
-// (e.g. "532" deleted, "553" incomplete, "532"/"523" per the vocabulary).
-// It is the dotted-attribute grammar, not JSON — the same family as
-// openehr-audit-details. Returns "" for an empty code and rejects control
-// characters (header-injection guard).
+// The code is an openEHR "version lifecycle state" terminology value —
+// "532" complete, "553" incomplete, "523" deleted. It is the dotted-
+// attribute grammar, not JSON — the same family as openehr-audit-details.
+// Returns "" for an empty code and rejects control characters (header-
+// injection guard).
 func FormatLifecycleStateHeader(code string) (string, error) {
 	if code == "" {
 		return "", nil

@@ -213,8 +213,10 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 //
 // Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors
 // per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
-// [transport.ErrPreconditionFailed], 428 →
-// [transport.ErrPreconditionRequired]. Forgetting ifMatch returns
+// [transport.ErrPreconditionFailed], 422 (template / semantic validation
+// failure) → [transport.ErrUnprocessable]. (428 →
+// [transport.ErrPreconditionRequired] is a defensive mapping only — openEHR
+// signals a missing If-Match as 400, not 428.) Forgetting ifMatch returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the

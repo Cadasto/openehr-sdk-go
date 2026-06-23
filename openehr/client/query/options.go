@@ -39,6 +39,10 @@ func WithEHRID(id string) ExecuteOption {
 // GET variants of the query endpoints). POST (the default) is recommended
 // for long AQL since GET is subject to URL-length limits; use GET for
 // short, cacheable queries.
+//
+// Named AQL parameters are flattened to top-level query keys (style=form,
+// explode=true), so avoid parameter names that collide with the reserved
+// keys q, offset, fetch, and ehr_id when using GET.
 func WithGET() ExecuteOption {
 	return func(c *executeConfig) { c.useGET = true }
 }

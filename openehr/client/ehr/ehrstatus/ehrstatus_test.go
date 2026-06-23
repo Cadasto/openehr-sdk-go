@@ -327,6 +327,24 @@ func TestPutWithAuditDetails(t *testing.T) {
 	}
 }
 
+func TestPutSendsLifecycleStateHeader(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+	if _, _, err := ehrstatus.Put(
+		context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
+		ehrstatus.WithLifecycleState("532"),
+	); err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.Header.Get("openehr-version"); got != `lifecycle_state.code_string="532"` {
+		t.Errorf("openehr-version = %q, want lifecycle_state.code_string=\"532\"", got)
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {

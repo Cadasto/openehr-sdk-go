@@ -266,9 +266,10 @@ func TestHealthDownOnWireError(t *testing.T) {
 func TestHealthIsAnonymous(t *testing.T) {
 	// Health MUST NOT emit Authorization even when a TokenSource is
 	// configured. Monitoring tools commonly run without credentials.
-	var seenAuth string
+	var seenAuth, seenMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenAuth = r.Header.Get("Authorization")
+		seenMethod = r.Method
 		_, _ = w.Write([]byte(`{"solution":"x"}`))
 	}))
 	defer srv.Close()
@@ -282,6 +283,9 @@ func TestHealthIsAnonymous(t *testing.T) {
 	}
 	if seenAuth != "" {
 		t.Errorf("Health emitted Authorization = %q (must be anonymous)", seenAuth)
+	}
+	if seenMethod != http.MethodOptions {
+		t.Errorf("Health method = %q, want OPTIONS", seenMethod)
 	}
 }
 

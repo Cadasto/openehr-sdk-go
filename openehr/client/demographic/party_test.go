@@ -465,11 +465,14 @@ func TestCreateSendsAuditAndPreferHeaders(t *testing.T) {
 	}
 	if _, _, err := demographic.Create(context.Background(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
-		demographic.WithAuditDetails(audit)); err != nil {
+		demographic.WithAuditDetails(audit), demographic.WithLifecycleState("532")); err != nil {
 		t.Fatal(err)
 	}
 	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `system_id="cdr.example"`) {
 		t.Errorf("openehr-audit-details header = %q", h)
+	}
+	if h := captured.Header.Get("openehr-version"); h != `lifecycle_state.code_string="532"` {
+		t.Errorf("openehr-version header = %q, want lifecycle_state.code_string=\"532\"", h)
 	}
 	if h := captured.Header.Get("Prefer"); h != "return=minimal" {
 		t.Errorf("Prefer = %q, want return=minimal", h)

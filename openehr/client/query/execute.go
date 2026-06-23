@@ -139,10 +139,32 @@ func storedQueryValues(params map[string]any, cfg executeConfig) url.Values {
 
 // addQueryParamValues encodes AQL named parameters as individual query
 // parameters (the spec's style=form, explode=true for query_parameters).
+// Values are encoded consistently with the POST body's JSON rendering — a
+// float reaches the wire as 1234567, not fmt.Sprint's "1.234567e+06" — so
+// the same params produce the same value over GET and POST.
 func addQueryParamValues(v url.Values, params map[string]any) {
 	for k, val := range params {
-		v.Set(k, fmt.Sprint(val))
+		v.Set(k, queryParamString(val))
 	}
+}
+
+// queryParamString renders an AQL parameter value the way the POST body
+// would: scalars via their JSON form (numbers unquoted, bool as true/false,
+// nil as null), strings as their bare unquoted text. Composite values fall
+// back to their JSON encoding (GET query_parameters are realistically
+// scalars).
+func queryParamString(val any) string {
+	b, err := json.Marshal(val)
+	if err != nil {
+		return fmt.Sprint(val)
+	}
+	if len(b) >= 2 && b[0] == '"' {
+		var s string
+		if json.Unmarshal(b, &s) == nil {
+			return s
+		}
+	}
+	return string(b)
 }
 
 // applyEHRScope sets the openEHR REST `ehr_id` query parameter when the

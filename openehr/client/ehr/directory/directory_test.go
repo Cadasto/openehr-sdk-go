@@ -183,6 +183,24 @@ func TestSaveDirectory(t *testing.T) {
 	}
 }
 
+func TestSaveSendsLifecycleStateHeader(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture,
+		&rm.Folder{Name: rm.DVText{Value: "Root"}},
+		directory.WithLifecycleState("532"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.Header.Get("openehr-version"); got != `lifecycle_state.code_string="532"` {
+		t.Errorf("openehr-version = %q, want lifecycle_state.code_string=\"532\"", got)
+	}
+}
+
 // TestSaveRepresentationDecodesBareFolder pins SDK-GAP-09 for the
 // directory leaf: `Prefer: return=representation` on POST returns a
 // bare FOLDER (not an ORIGINAL_VERSION<FOLDER>) per the ITS-REST

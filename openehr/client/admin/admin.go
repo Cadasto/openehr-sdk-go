@@ -28,8 +28,9 @@ func DeleteEHR(ctx context.Context, c *transport.Client, id ehr.EHRID) error {
 }
 
 // DeleteAllEHRs wipes EHRs on the deployment. Gated by deployment policy
-// — many production tenants disable this surface entirely and return
-// 403/404. With no ids it resets every EHR; passing one or more ids
+// — a deployment that disables it returns 405 Method Not Allowed per the
+// admin contract (some tenants instead return 403/404). With no ids it
+// resets every EHR; passing one or more ids
 // restricts the delete to that subset via the repeatable ehr_id query
 // parameter.
 //
