@@ -32,6 +32,18 @@ func mustDecodeJSON(t *testing.T, path string, dst any) {
 	}
 }
 
+// mustReplaceOnce replaces the first occurrence of old in s, failing the
+// test if old is absent. Guards corruption-based descent tests against a
+// silently-vacuous pass when a re-vendored fixture no longer contains the
+// literal being corrupted.
+func mustReplaceOnce(t *testing.T, s, old, replacement string) string {
+	t.Helper()
+	if !strings.Contains(s, old) {
+		t.Fatalf("fixture no longer contains %q — descent guard would pass vacuously; update the literal", old)
+	}
+	return strings.Replace(s, old, replacement, 1)
+}
+
 func mustCompileOPT(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(fixtures.TemplateOpt(name))
@@ -105,8 +117,8 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
-	corrupt := strings.Replace(string(raw), `"value": "2024-07-22"`, `"value": "not-a-date"`, 1)
-	corrupt = strings.Replace(corrupt, `"value": "2025-06-19"`, `"value": "also-not-a-date"`, 1)
+	corrupt := mustReplaceOnce(t, string(raw), `"value": "2024-07-22"`, `"value": "not-a-date"`)
+	corrupt = mustReplaceOnce(t, corrupt, `"value": "2025-06-19"`, `"value": "also-not-a-date"`)
 	var bad rm.Person
 	if err := json.Unmarshal([]byte(corrupt), &bad); err != nil {
 		t.Fatalf("decode corrupted fixture: %v", err)

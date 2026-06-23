@@ -53,10 +53,18 @@ func (s sampler) float64() float64 {
 
 // sampleValue returns a value drawn from within pc's constraint, in the
 // same Go shape pc.ExampleValue() yields (so [generator.applyPrimitiveExample]
-// handles both identically). The draw is self-checked against
-// pc.Validate; an unconstrained primitive, or any draw that fails
-// validation, falls back to pc.ExampleValue() so the result is always
-// valid by construction. SDK-GAP-14.
+// handles both identically). The draw is self-checked against pc.Validate,
+// so the result is always valid by construction.
+//
+// It falls back to pc.ExampleValue() — silently, and identically on every
+// call — whenever the constraint carries nothing enumerable to sample
+// (unconstrained primitive, pattern-only CString, CDuration) or a drawn
+// candidate fails pc.Validate. Several *bounded* shapes therefore also
+// degrade to the fixed example with no signal: an empty list∩range
+// intersection, a single-value range, a collapsed exclusive-integer
+// window, and the exclusive-lower real edge (a [lo,hi) draw can land on
+// the excluded bound). Output stays valid, but RandomFill can equal
+// ExampleFill for such a leaf. SDK-GAP-14.
 func sampleValue(pc constraints.PrimitiveConstraint, s sampler) any {
 	v := sampleByConstraint(pc, s)
 	if v == nil || len(pc.Validate(v)) != 0 {

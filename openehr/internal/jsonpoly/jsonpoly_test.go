@@ -86,3 +86,49 @@ func TestMarshalSlice(t *testing.T) {
 		t.Fatalf("empty slice should yield nil RawMessage, got %q", raw)
 	}
 }
+
+// TestMarshal_typedNilPointerInInterface guards the partially-built-value
+// case: an interface holding a typed-nil pointer (not a nil interface)
+// takes the pointer path and must marshal to "null" without panicking —
+// boxing must not turn it into a non-nil pointer that a pointer-receiver
+// MarshalJSON would dereference.
+func TestMarshal_typedNilPointerInInterface(t *testing.T) {
+	var slot iface = (*leaf)(nil)
+	raw, err := jsonpoly.Marshal(slot)
+	if err != nil {
+		t.Fatalf("typed-nil pointer: %v", err)
+	}
+	if string(raw) != "null" {
+		t.Fatalf("typed-nil pointer should marshal to null, got %q", raw)
+	}
+
+	// Inside a non-empty slice it renders as a literal null element.
+	got, err := jsonpoly.MarshalSlice([]iface{(*leaf)(nil), leaf{Value: "a"}})
+	if err != nil {
+		t.Fatalf("slice with typed-nil element: %v", err)
+	}
+	if want := `[null,{"_type":"LEAF","value":"a"}]`; string(got) != want {
+		t.Fatalf("slice with typed-nil element: got %s want %s", got, want)
+	}
+}
+
+// TestMarshal_nilUnderMandatoryFieldIsNull locks the documented contract:
+// the nil RawMessage from Marshal(nil), placed in a mandatory (no
+// omitempty) wire field, re-emits as JSON null — matching encoding/json's
+// treatment of a nil interface field.
+func TestMarshal_nilUnderMandatoryFieldIsNull(t *testing.T) {
+	raw, err := jsonpoly.Marshal(nil)
+	if err != nil {
+		t.Fatalf("nil: %v", err)
+	}
+	type wire struct {
+		Name json.RawMessage `json:"name"`
+	}
+	out, err := json.Marshal(wire{Name: raw})
+	if err != nil {
+		t.Fatalf("wire marshal: %v", err)
+	}
+	if want := `{"name":null}`; string(out) != want {
+		t.Fatalf("mandatory field with nil RawMessage: got %s want %s", out, want)
+	}
+}

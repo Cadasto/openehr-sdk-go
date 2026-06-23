@@ -354,19 +354,22 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 
 // marshalPolyKind classifies a property for canonical-JSON marshalling.
 // It reuses the decoder's polymorphicProperty classifier so encode and
-// decode agree on which fields are polymorphic, then folds the
+// decode agree on which non-open fields are polymorphic, then folds the
 // abstract/narrow distinction (irrelevant on encode) into single/slice.
 //
 // SinglePropertyOpen (generic type-parameter bounds such as
-// DV_INTERVAL.lower/upper) is deliberately left direct. For a concrete
-// instantiation (e.g. DVInterval[DVQuantity]) the bound is a concrete
-// value field that emits its `_type` because the wire struct is
-// marshalled by-pointer, so the field is addressable; on decode typereg
-// always rebuilds bounds as pointer concretes, so `_type` survives the
-// round-trip. The DV_INTERVAL<T> collapse to DVInterval[DVOrdered] is
-// handled validator-side (SDK-GAP-13 sub-gap B), not here. (A non-pointer
-// value placed directly in a DVInterval[DVOrdered] bound would drop
-// `_type`; that hand-built case is out of scope for this routing.)
+// DV_INTERVAL.lower/upper) is deliberately left direct — unlike the
+// decoder, which routes an open bound resolving to an abstract type
+// through typereg. The bound still emits its `_type` either way it is
+// held: as a value in a concrete instantiation (e.g. DVInterval[DVQuantity])
+// the bound is an addressable struct field, so its pointer-receiver
+// MarshalJSON runs when the wire struct is marshalled by-pointer; as a
+// pointer in the DVInterval[DVOrdered] that typereg rebuilds on decode it
+// emits `_type` directly. So `_type` survives the round-trip in both
+// shapes. The DV_INTERVAL<T> collapse to DVInterval[DVOrdered] is handled
+// validator-side (SDK-GAP-13 sub-gap B), not here. (A non-pointer value
+// placed directly in a DVInterval[DVOrdered] bound would drop `_type`;
+// that hand-built case is out of scope for this routing.)
 func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) polyKind {
 	if _, isOpen := prop.(*bmm.SinglePropertyOpen); isOpen {
 		return polyNone

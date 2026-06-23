@@ -80,7 +80,11 @@ func WithValueFill(f instance.ValueFill) Option {
 // instance.RandomFill. A fixed source (e.g. rand.NewPCG(seed, seed))
 // makes the generated leaf values byte-reproducible; nil draws from the
 // auto-seeded global generator so successive calls differ. Ignored
-// under ExampleFill. SDK-GAP-14.
+// under ExampleFill.
+//
+// A math/rand/v2.Source is not safe for concurrent use: do not share one
+// Source across concurrent NewSkeleton / Build calls — give each its own
+// (or leave it nil to use the concurrency-safe global). SDK-GAP-14.
 func WithValueSource(src mrand.Source) Option {
 	return func(c *config) { c.valueSource = src }
 }

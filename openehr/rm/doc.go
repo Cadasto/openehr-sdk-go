@@ -73,11 +73,13 @@
 // slots callers need not remember to take a pointer to preserve `_type`.
 //
 // Exception — the generic bounds of `DV_INTERVAL[T]` (`lower` / `upper`)
-// are NOT routed through jsonpoly. A concrete `DVInterval[DVQuantity]`
-// still emits its bound `_type` (the bound is a concrete value field,
-// addressable when the wire struct is marshalled by-pointer), and decoded
-// intervals always carry pointer bounds via typereg, so the round-trip is
-// safe. But a non-pointer value placed directly in a `DVInterval[DVOrdered]`
+// are NOT routed through jsonpoly. The bound re-emits its `_type` either
+// way it is held: as a value in a concrete `DVInterval[DVQuantity]` (the
+// bound is an addressable struct field, so the pointer-receiver
+// `MarshalJSON` runs when the wire struct is marshalled by-pointer), or as
+// a pointer in the `DVInterval[DVOrdered]` that typereg rebuilds when
+// decoding a collapsed `DV_INTERVAL<T>`. So the round-trip is safe in both
+// shapes. But a non-pointer value placed directly in a `DVInterval[DVOrdered]`
 // bound would drop `_type` — build interval bounds as the concrete
 // `DVInterval[T]` (or by pointer) to preserve it.
 //

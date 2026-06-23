@@ -72,6 +72,41 @@ func TestEncodeSubstitutedSubtypeInSliceKeepsType(t *testing.T) {
 	}
 }
 
+// TestEncodeConcreteIntervalKeepsBoundType locks the DV_INTERVAL[T]
+// exception documented in rm/doc.go: the generic bounds are NOT routed
+// through jsonpoly, yet a concrete DVInterval[DVQuantity] holding *value*
+// bounds still emits each bound's `_type` — the bound is an addressable
+// struct field, so its pointer-receiver MarshalJSON runs when the wire
+// struct is marshalled by-pointer. The `_type` must also survive a
+// round-trip (SDK-GAP-13).
+func TestEncodeConcreteIntervalKeepsBoundType(t *testing.T) {
+	iv := &rm.DVInterval[rm.DVQuantity]{}
+	iv.Lower = rm.DVQuantity{Magnitude: 5, Units: "cm"}
+	iv.Upper = rm.DVQuantity{Magnitude: 20, Units: "cm"}
+	iv.LowerIncluded, iv.UpperIncluded = true, true
+
+	data, err := canjson.Marshal(iv)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"_type":"DV_QUANTITY"`) {
+		t.Fatalf("interval value bound lost its DV_QUANTITY _type:\n%s", data)
+	}
+
+	// `_type` survives a round-trip through the generic unmarshaller.
+	var back rm.DVInterval[rm.DVQuantity]
+	if err := canjson.Unmarshal(data, &back); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	again, err := canjson.Marshal(&back)
+	if err != nil {
+		t.Fatalf("re-marshal: %v", err)
+	}
+	if !strings.Contains(string(again), `"_type":"DV_QUANTITY"`) {
+		t.Fatalf("interval bound _type dropped on round-trip:\n%s", again)
+	}
+}
+
 func codedName(n rm.DVTextLike) (*rm.DVCodedText, bool) {
 	switch v := n.(type) {
 	case *rm.DVCodedText:

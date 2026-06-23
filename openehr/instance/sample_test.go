@@ -169,3 +169,111 @@ func TestSampleValue_oneSidedRange(t *testing.T) {
 		}
 	}
 }
+
+// TestSampleValue_realInRange covers the CReal arm: a bounded range draws
+// in [lo,hi) and validates; a list∩range draws the sole in-range member;
+// an unbounded CReal varies via the small-value fallback.
+func TestSampleValue_realInRange(t *testing.T) {
+	bounded := constraints.CReal{Range: constraints.NumericRange{Lower: 1.0, Upper: 5.0, LowerInclusive: true, UpperInclusive: true}}
+	seq := draws(bounded, newSampler(mrand.NewPCG(23, 24)), 16)
+	for _, v := range seq {
+		f, ok := v.(float64)
+		if !ok || f < 1.0 || f >= 5.0 {
+			t.Fatalf("bounded CReal draw %v (%T) not in [1.0,5.0)", v, v)
+		}
+		if len(bounded.Validate(f)) != 0 {
+			t.Fatalf("bounded CReal draw %v failed Validate", f)
+		}
+	}
+	if distinct(seq) < 2 {
+		t.Errorf("bounded CReal produced no variation: %v", seq)
+	}
+
+	listRange := constraints.CReal{
+		List:  []float64{0.5, 2.5, 9.5},
+		Range: constraints.NumericRange{Lower: 1.0, Upper: 5.0, LowerInclusive: true, UpperInclusive: true},
+	}
+	for _, v := range draws(listRange, newSampler(mrand.NewPCG(25, 26)), 8) {
+		if v != 2.5 {
+			t.Fatalf("want 2.5 (sole in-range list member), got %v", v)
+		}
+	}
+
+	unbounded := constraints.CReal{}
+	if distinct(draws(unbounded, newSampler(mrand.NewPCG(27, 28)), 16)) < 2 {
+		t.Error("unbounded CReal produced no variation")
+	}
+}
+
+// TestSampleValue_boolean covers the CBoolean arm: a single-valued
+// constraint always yields that value; both-valid varies over enough
+// draws; both-invalid falls back to the deterministic ExampleValue.
+func TestSampleValue_boolean(t *testing.T) {
+	trueOnly := constraints.CBoolean{TrueValid: true}
+	for _, v := range draws(trueOnly, newSampler(mrand.NewPCG(29, 30)), 8) {
+		if v != true {
+			t.Fatalf("TrueValid-only must yield true, got %v", v)
+		}
+	}
+	falseOnly := constraints.CBoolean{FalseValid: true}
+	for _, v := range draws(falseOnly, newSampler(mrand.NewPCG(31, 32)), 8) {
+		if v != false {
+			t.Fatalf("FalseValid-only must yield false, got %v", v)
+		}
+	}
+	both := constraints.CBoolean{TrueValid: true, FalseValid: true}
+	if distinct(draws(both, newSampler(mrand.NewPCG(33, 34)), 24)) < 2 {
+		t.Error("both-valid CBoolean should produce both true and false over 24 draws")
+	}
+	neither := constraints.CBoolean{}
+	got := sampleValue(neither, newSampler(mrand.NewPCG(35, 36)))
+	if got != neither.ExampleValue() {
+		t.Errorf("both-invalid CBoolean: got %v, want ExampleValue %v", got, neither.ExampleValue())
+	}
+}
+
+// TestSampleValue_enumerableDoesNotCollapse is the SDK-GAP-14 regression
+// guard for the silent ExampleFill collapse: a multi-member enumerable
+// constraint must actually draw values other than ExampleValue. A future
+// filter/bounds bug that made the sampler always fall back would otherwise
+// be invisible (output stays valid, just non-varying) — the end-to-end
+// gap14 test would still pass on variation from a different leaf.
+func TestSampleValue_enumerableDoesNotCollapse(t *testing.T) {
+	c := constraints.CInteger{
+		List:  []int64{10, 20, 30},
+		Range: constraints.NumericRange{Lower: 1, Upper: 100, LowerInclusive: true, UpperInclusive: true},
+	}
+	ex := c.ExampleValue()
+	seq := draws(c, newSampler(mrand.NewPCG(37, 38)), 24)
+	sawNonExample := false
+	for _, v := range seq {
+		if v != ex {
+			sawNonExample = true
+			break
+		}
+	}
+	if !sawNonExample {
+		t.Errorf("RandomFill silently collapsed to ExampleValue %v for an enumerable constraint: %v", ex, seq)
+	}
+	if distinct(seq) < 2 {
+		t.Errorf("enumerable constraint produced no variation: %v", seq)
+	}
+}
+
+// TestSampleValue_quantityMagnitudeVaries pins the DvQuantity magnitude
+// draw specifically (the gap14 end-to-end test only proves *some* leaf
+// varies): across draws the in-range magnitude must take ≥2 distinct
+// values, so a regression to a fixed example magnitude is caught here.
+func TestSampleValue_quantityMagnitudeVaries(t *testing.T) {
+	c := constraints.DvQuantity{Units: []constraints.QuantityUnit{{
+		Units:     "mm[Hg]",
+		Magnitude: constraints.NumericRange{Lower: 40, Upper: 200, LowerInclusive: true, UpperInclusive: true},
+	}}}
+	mags := map[float64]struct{}{}
+	for _, v := range draws(c, newSampler(mrand.NewPCG(39, 40)), 16) {
+		mags[v.(constraints.QuantityValue).Magnitude] = struct{}{}
+	}
+	if len(mags) < 2 {
+		t.Errorf("DvQuantity magnitude did not vary across draws: %v", mags)
+	}
+}

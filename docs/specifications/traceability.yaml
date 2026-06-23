@@ -55,7 +55,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, testkit/cassettes, testkit/fixtures]
+    packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
@@ -63,6 +63,8 @@ requirements:
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
+      - openehr/serialize/canjson/polymorphic_encode_test.go
+      - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
 
@@ -647,6 +649,9 @@ requirements:
       - openehr/validation/constraint_cassettes_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/gap12_test.go
+      - openehr/instance/gap13_test.go
+      - openehr/instance/gap14_test.go
+      - openehr/instance/sample_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/imports_test.go
       - internal/templateinstance/rmwrite/write_test.go
@@ -694,6 +699,7 @@ requirements:
     probes: [PROBE-025, PROBE-026]
     tests:
       - openehr/validation/composition_test.go
+      - openehr/validation/interval_bounds_test.go
       - openehr/validation/rmread/read_test.go
       - testkit/probes/validation/probes_test.go
     plans:

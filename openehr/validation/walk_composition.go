@@ -623,8 +623,12 @@ func intervalRMTypeMatches(got, want string, val any) bool {
 // intervalBoundsSatisfy reports whether a round-trip-collapsed
 // DVInterval[DVOrdered] satisfies DV_INTERVAL<wantInner> by inspecting
 // the runtime types of its bounds (which survive the round-trip via
-// their own `_type`). A fully unbounded interval carries no bound to
-// key off and trivially satisfies any element type. See [intervalRMTypeMatches].
+// their own `_type`). Every *present* bound must be the wanted element
+// type; a fully unbounded interval carries no bound to key off and
+// trivially satisfies any element type. (Requiring agreement rather than
+// accepting on either bound rejects a malformed interval whose lower and
+// upper disagree — well-formed DV_INTERVAL<T> bounds are both T.) See
+// [intervalRMTypeMatches].
 func intervalBoundsSatisfy(val any, wantInner string) bool {
 	var iv *rm.DVInterval[rm.DVOrdered]
 	switch v := val.(type) {
@@ -637,15 +641,15 @@ func intervalBoundsSatisfy(val any, wantInner string) bool {
 	}
 	lowerPresent := !iv.LowerUnbounded && iv.Lower != nil
 	upperPresent := !iv.UpperUnbounded && iv.Upper != nil
-	if lowerPresent && describeRMType(iv.Lower) == wantInner {
-		return true
+	if lowerPresent && describeRMType(iv.Lower) != wantInner {
+		return false
 	}
-	if upperPresent && describeRMType(iv.Upper) == wantInner {
-		return true
+	if upperPresent && describeRMType(iv.Upper) != wantInner {
+		return false
 	}
-	// No present bound to type-check (fully unbounded): accept — an
-	// unbounded interval satisfies any DV_INTERVAL<T>.
-	return !lowerPresent && !upperPresent
+	// Every present bound matched (or the interval is fully unbounded):
+	// an unbounded interval satisfies any DV_INTERVAL<T>.
+	return true
 }
 
 // primitiveValueMatchesShortName reports whether an RM-side Go value

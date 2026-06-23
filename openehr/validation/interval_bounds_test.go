@@ -45,4 +45,14 @@ func TestIntervalRMTypeMatches_boundsBackedCollapse(t *testing.T) {
 	if !intervalRMTypeMatches("DV_INTERVAL", "DV_INTERVAL<DV_DATE>", unbounded) {
 		t.Error("fully unbounded interval should satisfy any DV_INTERVAL<T>")
 	}
+
+	// Every present bound must agree: a malformed interval whose bounds
+	// disagree does not satisfy the parameterised type even though one
+	// bound matches.
+	mixed := rm.DVInterval[rm.DVOrdered]{}
+	mixed.Lower = &rm.DVQuantity{Magnitude: 30, Units: "cm"}
+	mixed.Upper = &rm.DVDate{Value: "2024-01-01"}
+	if intervalRMTypeMatches("DV_INTERVAL", "DV_INTERVAL<DV_QUANTITY>", mixed) {
+		t.Error("interval with a DV_DATE upper must not satisfy DV_INTERVAL<DV_QUANTITY>")
+	}
 }
