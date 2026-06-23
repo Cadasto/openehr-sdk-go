@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // MarshalAuditDetails encodes an openEHR AUDIT_DETAILS into the
@@ -36,7 +37,7 @@ func MarshalAuditDetails(a *rm.AuditDetails) (string, error) {
 			return nil
 		}
 		if hasCtrlChars(val) {
-			return fmt.Errorf("ehr: audit detail %s contains control characters", key)
+			return fmt.Errorf("%w: audit detail %s contains control characters", transport.ErrInvalidConfig, key)
 		}
 		attrs = append(attrs, key+`="`+escapeItemTagValue(val)+`"`)
 		return nil
@@ -52,7 +53,7 @@ func MarshalAuditDetails(a *rm.AuditDetails) (string, error) {
 	}
 	name, ext, ok := committerParts(a.Committer)
 	if a.Committer != nil && !ok {
-		return "", fmt.Errorf("ehr: unsupported committer type %T", a.Committer)
+		return "", fmt.Errorf("%w: unsupported committer type %T", transport.ErrInvalidConfig, a.Committer)
 	}
 	if err := add("committer.name", name); err != nil {
 		return "", err
@@ -60,7 +61,7 @@ func MarshalAuditDetails(a *rm.AuditDetails) (string, error) {
 	if ext != nil {
 		idVal, idOK := objectIDValue(ext.ID)
 		if ext.ID != nil && !idOK {
-			return "", fmt.Errorf("ehr: unsupported committer external_ref id type %T", ext.ID)
+			return "", fmt.Errorf("%w: unsupported committer external_ref id type %T", transport.ErrInvalidConfig, ext.ID)
 		}
 		// Only emit the external_ref group when it has an id — never a
 		// reference with namespace/type but no id.
@@ -123,15 +124,27 @@ func objectIDValue(id rm.ObjectID) (value string, ok bool) {
 	switch v := id.(type) {
 	case rm.HierObjectID:
 		return v.Value, true
+	case *rm.HierObjectID:
+		return v.Value, true
 	case rm.ObjectVersionID:
+		return v.Value, true
+	case *rm.ObjectVersionID:
 		return v.Value, true
 	case rm.GenericID:
 		return v.Value, true
+	case *rm.GenericID:
+		return v.Value, true
 	case rm.ArchetypeID:
+		return v.Value, true
+	case *rm.ArchetypeID:
 		return v.Value, true
 	case rm.TemplateID:
 		return v.Value, true
+	case *rm.TemplateID:
+		return v.Value, true
 	case rm.TerminologyID:
+		return v.Value, true
+	case *rm.TerminologyID:
 		return v.Value, true
 	default:
 		return "", false

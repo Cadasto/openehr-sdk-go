@@ -277,6 +277,34 @@ func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 	}
 }
 
+func TestExecuteGETExplicitZeroOffset(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+		"SELECT c FROM EHR e", nil, query.WithGET(), query.WithOffset(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Explicit WithOffset(0) must reach the wire on the ad-hoc GET path.
+	if got := captured.URL.Query().Get("offset"); got != "0" {
+		t.Errorf("offset = %q, want explicit 0", got)
+	}
+}
+
+func TestExecuteGETRejectsReservedParamName(t *testing.T) {
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, httptest.NewServer(nil)),
+		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
+	if !errors.Is(err, query.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
+	}
+}
+
 func TestExecuteEmptyQuery(t *testing.T) {
 	_, _, err := query.Execute(context.Background(), newClient(t, httptest.NewServer(nil)), aql.Query{})
 	if err == nil {

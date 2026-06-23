@@ -1,11 +1,11 @@
 # Plan — openEHR ITS-REST conformance remediation
 
 **Date:** 2026-06-19
-**Status:** Proposed
+**Status:** Implemented (2026-06-22) — Tiers 1–3 landed; larger Tier-3 subsystems deferred (see Defers). Dedicated `testkit/probes/rest/*` probes deferred to [STRAND-09](../specifications/research-strands.md).
 **Owner:** SDK maintainers
 **Covers:** [REQ-095](../specifications/wire.md#req-095) (umbrella — OpenAPI authoritative source); [REQ-059](../specifications/wire.md#req-059) (custom headers); [REQ-093](../specifications/transport.md#req-093--openehr-error-envelope-mapping) (status mapping); [REQ-099](../specifications/module-layout.md#req-099--its-rest-admin-client-surface) (admin surface); touches [REQ-054](../specifications/wire.md#req-054), [REQ-057](../specifications/wire.md#req-057), [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation)
 **Probes:** new wire-conformance probes under `testkit/probes/rest/` (audit-details header grammar, System `OPTIONS`, Admin path, Definition `/example`); anchored to [REQ-080](../specifications/conformance.md)
-**Implementation:** proposed
+**Implementation:** landed (PR #52)
 **Source:** ITS-REST conformance audit (2026-06-19) against pinned `resources/its-rest/*.openapi.yaml` (MANIFEST commit per [resources/its-rest/MANIFEST.txt](../../resources/its-rest/MANIFEST.txt))
 **Defers (to named follow-up plans):** dedicated ITEM_TAG endpoint family (`/tags`, `DELETE …/tags/{key}`); VERSIONED_COMPOSITION / VERSIONED_EHR_STATUS / contribution-GET read families; FLAT/STRUCTURED + `wt+json` content negotiation (REQ-053, already planned); ADL2 definition family (already planned). These are capability gaps, not defects in shipped code — each merits its own plan.
 
@@ -284,17 +284,17 @@ Reuse the quoting/escaping + control-char rejection already implemented in [open
 
 ## Definition of Ready
 
-- [ ] Phase 0 normative edits reviewed (spec wins over prose per REQ-095).
-- [ ] Pinned spec lines re-confirmed against current `resources/its-rest/MANIFEST.txt` (re-run the audit greps if the pin moved).
-- [ ] Decision recorded on `created_timestamp` field rename (breaking vs JSON-tag-only).
+- [x] Phase 0 normative edits reviewed (spec wins over prose per REQ-095).
+- [x] Pinned spec lines re-confirmed against current `resources/its-rest/MANIFEST.txt` (re-run the audit greps if the pin moved).
+- [x] Decision recorded on `created_timestamp` field rename: JSON-tag-only (Go field `CreatedOn` kept; non-breaking).
 
 ## Definition of Done
 
-- [ ] All Phase 0–3 tasks land with tests; `make ci` green (includes `make spec-check`).
-- [ ] New wire-conformance probes pass and are registered in `conformance.md` + `traceability.yaml`.
-- [ ] REQ-059/093/099 prose matches the authoritative YAML; REQ.md/roadmap reflect the advanced status.
-- [ ] CHANGELOG updated; no `docs/superpowers/` tree created (plans live here).
-- [ ] Deferred Tier-3 subsystems captured as named follow-up plan stubs (or roadmap rows) so the scope cut is explicit.
+- [x] All Phase 0–3 tasks land with tests; `make ci` green (includes `make spec-check`).
+- [ ] New wire-conformance probes pass and are registered in `conformance.md` + `traceability.yaml`. — **deferred to [STRAND-09](../specifications/research-strands.md)**; wire shapes are covered by package `httptest` tests in the interim.
+- [x] REQ-059/093/099 prose matches the authoritative YAML; REQ.md/roadmap reflect the advanced status.
+- [x] CHANGELOG updated; no `docs/superpowers/` tree created (plans live here).
+- [x] Deferred Tier-3 subsystems captured (see **Defers** header) — named follow-ups, scope cut explicit.
 
 ## Self-review notes
 

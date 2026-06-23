@@ -180,7 +180,8 @@ type WireError struct {
 
 var (
     ErrPreconditionFailed   = errors.New("precondition failed")    // 412
-    ErrPreconditionRequired = errors.New("precondition required")  // 428
+    ErrUnprocessable        = errors.New("unprocessable entity")   // 422
+    ErrPreconditionRequired = errors.New("precondition required")  // 428 (defensive; not openEHR-canonical)
     ErrVersionConflict      = errors.New("version conflict")       // 409
     ErrNotFound             = errors.New("not found")              // 404
     ErrUnauthorized         = errors.New("unauthorized")           // 401

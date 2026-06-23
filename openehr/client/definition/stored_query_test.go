@@ -120,3 +120,17 @@ func TestPutStoredQueryVersionRejectsEmpty(t *testing.T) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
 }
+
+func TestPutStoredQueryVersionConflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"version already exists","code":"CONFLICT"}`))
+	}))
+	defer srv.Close()
+	_, _, err := definition.PutStoredQueryVersion(context.Background(), newClient(t, srv),
+		"org.openehr::vitals", "1.2.0", "SELECT c FROM EHR e CONTAINS COMPOSITION c")
+	if !errors.Is(err, transport.ErrVersionConflict) {
+		t.Errorf("409 should map to ErrVersionConflict, got %v", err)
+	}
+}

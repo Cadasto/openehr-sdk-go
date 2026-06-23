@@ -252,11 +252,13 @@ requirements:
     canonical: docs/specifications/wire.md#req-059
     status: draft
     implementation: partial
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
+      - openehr/client/ehr/audit_test.go
+      - openehr/client/ehr/version_header_test.go
       - transport/response_test.go
 
   - id: REQ-090
@@ -289,7 +291,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/query]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-19-its-rest-conformance-remediation.md]
+    notes: ErrUnprocessable (422) sentinel added by the ITS-REST conformance remediation.
     tests:
       - transport/client_test.go
 

@@ -147,6 +147,18 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
+## STRAND-09 — ITS-REST conformance follow-ups
+
+**Status:** Open (deferred) — opened by the [ITS-REST conformance remediation](../plans/2026-06-19-its-rest-conformance-remediation.md).
+
+**Two follow-ups carried out of that plan:**
+
+1. **Dedicated REST conformance probes (deferred).** The plan called for four `testkit/probes/rest/*` probes (audit-details header grammar, System `OPTIONS`, Admin bulk-delete, Definition `/example`). The corrected wire shapes are currently asserted by package `httptest` tests (request-capture), which provide equivalent coverage for CI but are not part of the ratifiable probe suite (REQ-080/082). **Open until:** the sandbox/cassette probe runner (REQ-082) is the gate for these surfaces; then promote the unit assertions to `rest/*` probes. Affects REQ-059, REQ-095, REQ-099.
+
+2. **Stored-query `fetch` omission vs OpenAPI `required` (decision recorded).** The Definition/Query `Query` schema marks `offset`, `fetch`, and `query_parameters` `required`, but `fetch` has no spec default ("depends on the implementation") and `fetch: 0` means *zero rows*. **Decision:** the SDK always emits `offset` (documented default 0) and `query_parameters`, but omits `fetch` unless the caller sets it (`fetchSet`), so the server applies its own default. This is a deliberate, documented deviation from the literal `required` list (`openehr/client/query/execute.go` `storedBody`). **Revisit if:** a conformant backend rejects a body without `fetch`, in which case escalate to an ADR (emit a sentinel/`-1`, or send the server's advertised default).
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -159,3 +171,4 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-06](#strand-06--concurrency-and-transport-hygiene) | Concurrency / transport hygiene | Open | REQ-021, REQ-026 |
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |
+| [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query `fetch`) | Open (deferred) | REQ-059, REQ-095, REQ-099 |

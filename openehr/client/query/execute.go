@@ -31,8 +31,12 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 		Accept: "application/json",
 	}
 	if cfg.useGET {
+		qv, err := adhocQueryValues(q, cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("query.Execute: %w", err)
+		}
 		req.Method = http.MethodGet
-		req.Query = adhocQueryValues(q, cfg)
+		req.Query = qv
 	} else {
 		raw, err := json.Marshal(adhocBody(q, cfg))
 		if err != nil {
@@ -88,8 +92,12 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 		Accept: "application/json",
 	}
 	if cfg.useGET {
+		qv, err := storedQueryValues(params, cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("query.RunStored: %w", err)
+		}
 		req.Method = http.MethodGet
-		req.Query = storedQueryValues(params, cfg)
+		req.Query = qv
 	} else {
 		raw, err := json.Marshal(storedBody(params, cfg))
 		if err != nil {
@@ -103,9 +111,14 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	return doResultSet(ctx, c, req)
 }
 
+// reservedQueryKeys are the top-level GET query keys the SDK controls; a
+// named AQL parameter colliding with one would silently corrupt the
+// request under the spec's style=form, explode=true flattening.
+var reservedQueryKeys = map[string]bool{"q": true, "offset": true, "fetch": true, "ehr_id": true}
+
 // adhocQueryValues builds the GET query string for an ad-hoc query: q plus
 // the optional offset/fetch and the form/explode query_parameters.
-func adhocQueryValues(q aql.Query, cfg executeConfig) url.Values {
+func adhocQueryValues(q aql.Query, cfg executeConfig) (url.Values, error) {
 	v := url.Values{}
 	v.Set("q", q.String())
 	switch {
@@ -120,51 +133,64 @@ func adhocQueryValues(q aql.Query, cfg executeConfig) url.Values {
 	case q.Fetch != 0:
 		v.Set("fetch", strconv.Itoa(q.Fetch))
 	}
-	addQueryParamValues(v, q.Parameters)
-	return v
+	if err := addQueryParamValues(v, q.Parameters); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // storedQueryValues builds the GET query string for a stored query: offset
 // (always, default 0) plus the optional fetch and form/explode
 // query_parameters.
-func storedQueryValues(params map[string]any, cfg executeConfig) url.Values {
+func storedQueryValues(params map[string]any, cfg executeConfig) (url.Values, error) {
 	v := url.Values{}
 	v.Set("offset", strconv.Itoa(cfg.offset))
 	if cfg.fetchSet {
 		v.Set("fetch", strconv.Itoa(cfg.fetch))
 	}
-	addQueryParamValues(v, params)
-	return v
+	if err := addQueryParamValues(v, params); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 // addQueryParamValues encodes AQL named parameters as individual query
 // parameters (the spec's style=form, explode=true for query_parameters).
 // Values are encoded consistently with the POST body's JSON rendering — a
 // float reaches the wire as 1234567, not fmt.Sprint's "1.234567e+06" — so
-// the same params produce the same value over GET and POST.
-func addQueryParamValues(v url.Values, params map[string]any) {
+// the same params produce the same value over GET and POST. A parameter
+// whose name collides with a reserved key, or whose value cannot be
+// JSON-encoded, is a caller error (ErrInvalidConfig).
+func addQueryParamValues(v url.Values, params map[string]any) error {
 	for k, val := range params {
-		v.Set(k, queryParamString(val))
+		if reservedQueryKeys[k] {
+			return fmt.Errorf("%w: query parameter %q collides with reserved GET query key", ErrInvalidConfig, k)
+		}
+		s, err := queryParamString(val)
+		if err != nil {
+			return fmt.Errorf("%w: query parameter %q: %w", ErrInvalidConfig, k, err)
+		}
+		v.Set(k, s)
 	}
+	return nil
 }
 
 // queryParamString renders an AQL parameter value the way the POST body
 // would: scalars via their JSON form (numbers unquoted, bool as true/false,
-// nil as null), strings as their bare unquoted text. Composite values fall
-// back to their JSON encoding (GET query_parameters are realistically
-// scalars).
-func queryParamString(val any) string {
+// nil as null), strings as their bare unquoted text. Composite values use
+// their JSON encoding (GET query_parameters are realistically scalars).
+func queryParamString(val any) (string, error) {
 	b, err := json.Marshal(val)
 	if err != nil {
-		return fmt.Sprint(val)
+		return "", err
 	}
 	if len(b) >= 2 && b[0] == '"' {
 		var s string
-		if json.Unmarshal(b, &s) == nil {
-			return s
+		if err := json.Unmarshal(b, &s); err == nil {
+			return s, nil
 		}
 	}
-	return string(b)
+	return string(b), nil
 }
 
 // applyEHRScope sets the openEHR REST `ehr_id` query parameter when the

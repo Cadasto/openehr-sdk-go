@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -156,6 +157,34 @@ func TestSaveSendsLifecycleStateHeader(t *testing.T) {
 	}
 	if got := captured.Header.Get("openehr-version"); got != `lifecycle_state.code_string="532"` {
 		t.Errorf("openehr-version = %q, want lifecycle_state.code_string=\"532\"", got)
+	}
+}
+
+func TestSaveSendsDottedAuditHeader(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("ETag", `"voID::cdr::1"`)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	committer := "Dr Alice"
+	audit := &rm.AuditDetails{
+		SystemID:   "cdr.example",
+		Committer:  rm.PartyIdentified{Name: &committer},
+		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
+	}
+	_, _, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{},
+		composition.WithAuditDetails(audit))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := captured.Header.Get("openehr-audit-details")
+	if strings.Contains(h, "{") {
+		t.Errorf("audit header is JSON-shaped, want dotted grammar: %q", h)
+	}
+	if !strings.Contains(h, `system_id="cdr.example"`) || !strings.Contains(h, `committer.name="Dr Alice"`) {
+		t.Errorf("audit header = %q", h)
 	}
 }
 
