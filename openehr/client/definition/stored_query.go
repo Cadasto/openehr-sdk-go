@@ -60,12 +60,15 @@ type storeConfig struct {
 // StoreOption mutates stored-query upload requests.
 type StoreOption func(*storeConfig)
 
-// WithQueryType sets the `query_type` query parameter (default "aql").
+// WithQueryType sets the `query_type` query parameter. The default is
+// "AQL" (the openEHR QueryType enum value — case-sensitive on strict
+// deployments).
 func WithQueryType(t string) StoreOption {
 	return func(c *storeConfig) { c.queryType = t }
 }
 
-// PutStoredQuery registers or updates a stored AQL query.
+// PutStoredQuery registers or updates a stored AQL query at the
+// unversioned resource (the deployment assigns the next version).
 //
 // Wire: PUT /definition/query/{qualified_query_name} with
 // Content-Type text/plain body (REQ-057).
@@ -74,11 +77,38 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 	if name == "" {
 		return nil, nil, fmt.Errorf("definition.PutStoredQuery: %w: empty qualified query name", transport.ErrInvalidConfig)
 	}
+	return putStoredQuery(ctx, c,
+		"/definition/query/"+url.PathEscape(name),
+		"/definition/query/{qualified_query_name}",
+		"definition.PutStoredQuery", name, "", aqlText, opts...)
+}
+
+// PutStoredQueryVersion registers or updates a stored AQL query at an
+// explicit version.
+//
+// Wire: PUT /definition/query/{qualified_query_name}/{version} with
+// Content-Type text/plain body (REQ-057). A 409 (the version already
+// exists with different content) surfaces as transport.ErrVersionConflict.
+func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedName, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
+	name := strings.TrimSpace(qualifiedName)
+	ver := strings.TrimSpace(version)
+	if name == "" || ver == "" {
+		return nil, nil, fmt.Errorf("definition.PutStoredQueryVersion: %w: name and version are required", transport.ErrInvalidConfig)
+	}
+	return putStoredQuery(ctx, c,
+		"/definition/query/"+url.PathEscape(name)+"/"+url.PathEscape(ver),
+		"/definition/query/{qualified_query_name}/{version}",
+		"definition.PutStoredQueryVersion", name, ver, aqlText, opts...)
+}
+
+// putStoredQuery is the shared PUT implementation for the versioned and
+// unversioned stored-query endpoints.
+func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, name, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
 	aqlText = strings.TrimSpace(aqlText)
 	if aqlText == "" {
-		return nil, nil, fmt.Errorf("definition.PutStoredQuery: %w: empty AQL body", transport.ErrInvalidConfig)
+		return nil, nil, fmt.Errorf("%s: %w: empty AQL body", op, transport.ErrInvalidConfig)
 	}
-	cfg := storeConfig{queryType: "aql"}
+	cfg := storeConfig{queryType: "AQL"}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -88,8 +118,8 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 	}
 	req := &transport.Request{
 		Method:      http.MethodPut,
-		Path:        "/definition/query/" + url.PathEscape(name),
-		Route:       "/definition/query/{qualified_query_name}",
+		Path:        path,
+		Route:       route,
 		Query:       q,
 		Body:        []byte(aqlText),
 		ContentType: "text/plain",
@@ -103,11 +133,11 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 		return nil, nil, err
 	}
 	if len(resp.Body) == 0 {
-		return &StoredQueryMetadata{Name: name, Q: aqlText}, resp.Metadata, nil
+		return &StoredQueryMetadata{Name: name, Version: version, Q: aqlText}, resp.Metadata, nil
 	}
 	var out StoredQueryMetadata
 	if err := json.Unmarshal(resp.Body, &out); err != nil {
-		return nil, resp.Metadata, fmt.Errorf("definition.PutStoredQuery: decode: %w", err)
+		return nil, resp.Metadata, fmt.Errorf("%s: decode: %w", op, err)
 	}
 	return &out, resp.Metadata, nil
 }

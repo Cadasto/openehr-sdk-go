@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -24,18 +25,22 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 	if cfg.ehrID == "" {
 		cfg.ehrID = q.EHRID
 	}
-	body := adhocBody(q, cfg)
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("query.Execute: encode body: %w", err)
-	}
 	req := &transport.Request{
-		Method:      http.MethodPost,
-		Path:        "/query/aql",
-		Route:       "/query/aql",
-		Body:        raw,
-		ContentType: "application/json",
-		Accept:      "application/json",
+		Path:   "/query/aql",
+		Route:  "/query/aql",
+		Accept: "application/json",
+	}
+	if cfg.useGET {
+		req.Method = http.MethodGet
+		req.Query = adhocQueryValues(q, cfg)
+	} else {
+		raw, err := json.Marshal(adhocBody(q, cfg))
+		if err != nil {
+			return nil, nil, fmt.Errorf("query.Execute: encode body: %w", err)
+		}
+		req.Method = http.MethodPost
+		req.Body = raw
+		req.ContentType = "application/json"
 	}
 	applyEHRScope(req, cfg)
 	return doResultSet(ctx, c, req)
@@ -71,11 +76,6 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	for _, o := range opts {
 		o(&cfg)
 	}
-	body := storedBody(params, cfg)
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("query.RunStored: encode body: %w", err)
-	}
 	path := "/query/" + url.PathEscape(name)
 	route := "/query/{qualified_query_name}"
 	if version != "" {
@@ -83,15 +83,66 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 		route += "/{version}"
 	}
 	req := &transport.Request{
-		Method:      http.MethodPost,
-		Path:        path,
-		Route:       route,
-		Body:        raw,
-		ContentType: "application/json",
-		Accept:      "application/json",
+		Path:   path,
+		Route:  route,
+		Accept: "application/json",
+	}
+	if cfg.useGET {
+		req.Method = http.MethodGet
+		req.Query = storedQueryValues(params, cfg)
+	} else {
+		raw, err := json.Marshal(storedBody(params, cfg))
+		if err != nil {
+			return nil, nil, fmt.Errorf("query.RunStored: encode body: %w", err)
+		}
+		req.Method = http.MethodPost
+		req.Body = raw
+		req.ContentType = "application/json"
 	}
 	applyEHRScope(req, cfg)
 	return doResultSet(ctx, c, req)
+}
+
+// adhocQueryValues builds the GET query string for an ad-hoc query: q plus
+// the optional offset/fetch and the form/explode query_parameters.
+func adhocQueryValues(q aql.Query, cfg executeConfig) url.Values {
+	v := url.Values{}
+	v.Set("q", q.String())
+	switch {
+	case cfg.offsetSet:
+		v.Set("offset", strconv.Itoa(cfg.offset))
+	case q.Offset != 0:
+		v.Set("offset", strconv.Itoa(q.Offset))
+	}
+	switch {
+	case cfg.fetchSet:
+		v.Set("fetch", strconv.Itoa(cfg.fetch))
+	case q.Fetch != 0:
+		v.Set("fetch", strconv.Itoa(q.Fetch))
+	}
+	addQueryParamValues(v, q.Parameters)
+	return v
+}
+
+// storedQueryValues builds the GET query string for a stored query: offset
+// (always, default 0) plus the optional fetch and form/explode
+// query_parameters.
+func storedQueryValues(params map[string]any, cfg executeConfig) url.Values {
+	v := url.Values{}
+	v.Set("offset", strconv.Itoa(cfg.offset))
+	if cfg.fetchSet {
+		v.Set("fetch", strconv.Itoa(cfg.fetch))
+	}
+	addQueryParamValues(v, params)
+	return v
+}
+
+// addQueryParamValues encodes AQL named parameters as individual query
+// parameters (the spec's style=form, explode=true for query_parameters).
+func addQueryParamValues(v url.Values, params map[string]any) {
+	for k, val := range params {
+		v.Set(k, fmt.Sprint(val))
+	}
 }
 
 // applyEHRScope sets the openEHR REST `ehr_id` query parameter when the
@@ -107,20 +158,21 @@ func applyEHRScope(req *transport.Request, cfg executeConfig) {
 }
 
 func adhocBody(q aql.Query, cfg executeConfig) map[string]any {
+	// AdhocQueryExecute requires only `q`; offset/fetch are optional, so
+	// emit them only when the caller (option) or the query literal set a
+	// value. An explicit WithOffset(0)/WithFetch(0) is honoured.
 	body := map[string]any{"q": q.String()}
-	if cfg.offset != 0 || q.Offset != 0 {
-		if cfg.offset != 0 {
-			body["offset"] = cfg.offset
-		} else {
-			body["offset"] = q.Offset
-		}
+	switch {
+	case cfg.offsetSet:
+		body["offset"] = cfg.offset
+	case q.Offset != 0:
+		body["offset"] = q.Offset
 	}
-	if cfg.fetch != 0 || q.Fetch != 0 {
-		if cfg.fetch != 0 {
-			body["fetch"] = cfg.fetch
-		} else {
-			body["fetch"] = q.Fetch
-		}
+	switch {
+	case cfg.fetchSet:
+		body["fetch"] = cfg.fetch
+	case q.Fetch != 0:
+		body["fetch"] = q.Fetch
 	}
 	params := q.Parameters
 	if params == nil {
@@ -133,11 +185,14 @@ func adhocBody(q aql.Query, cfg executeConfig) map[string]any {
 }
 
 func storedBody(params map[string]any, cfg executeConfig) map[string]any {
-	body := map[string]any{}
-	if cfg.offset != 0 {
-		body["offset"] = cfg.offset
-	}
-	if cfg.fetch != 0 {
+	// The stored Query schema marks offset, fetch, and query_parameters as
+	// required. `offset` has a documented default of 0, so it is always
+	// emitted. `fetch` has no fixed default ("depends on the
+	// implementation") — emitting fetch:0 would request zero rows — so it
+	// is sent only when the caller set it explicitly; otherwise the field
+	// is omitted to let the server apply its default.
+	body := map[string]any{"offset": cfg.offset}
+	if cfg.fetchSet {
 		body["fetch"] = cfg.fetch
 	}
 	if params == nil {

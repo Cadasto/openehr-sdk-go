@@ -101,7 +101,7 @@
 | Demographic | **Landed** | `openehr/client/demographic/` | PARTY hierarchy CRUD (five typed resources) + read-only `versioned_party` family; polymorphic decode via `typereg.DecodeAs[rm.Party]`; PROBE-073. [archived plan](plans/archive/2026-06-14-demographic-rest-client.md) |
 | Admin (ITS-REST) | **Landed** | `openehr/client/admin/` | `DeleteEHR`, `DeleteAllEHRs`, `PurgeTemplates` (REQ-099) |
 
-REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-rest-api-client.md) (archived; this roadmap reflects the tree). Demographic follow-up: [2026-06-14-demographic-rest-client.md](plans/archive/2026-06-14-demographic-rest-client.md).
+REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-rest-api-client.md) (archived; this roadmap reflects the tree). Demographic follow-up: [2026-06-14-demographic-rest-client.md](plans/archive/2026-06-14-demographic-rest-client.md). ITS-REST conformance remediation (audit-details header grammar, System `OPTIONS`, Admin/Definition paths, status mapping, `WithLifecycleState`/`WithGET`/`WithPath`, versioned stored-query PUT): [2026-06-19-its-rest-conformance-remediation.md](plans/2026-06-19-its-rest-conformance-remediation.md). Larger Tier-3 gaps (dedicated ITEM_TAG endpoints, VERSIONED_* read families, content negotiation) remain deferred to named follow-ups.
 
 ---
 

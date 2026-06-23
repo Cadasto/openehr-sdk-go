@@ -80,6 +80,25 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetWithPath(t *testing.T) {
+	var captured *http.Request
+	body := readCassette(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	_, _, err := directory.Get(context.Background(), newClient(t, srv), ehrIDFixture,
+		directory.WithPath("/episodes/episode-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.URL.Query().Get("path"); got != "/episodes/episode-1" {
+		t.Errorf("path query = %q, want /episodes/episode-1", got)
+	}
+}
+
 func TestGetAtTime(t *testing.T) {
 	var captured *http.Request
 	body := readCassette(t)
@@ -182,7 +201,8 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		context.Background(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -215,7 +235,8 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, _, err := directory.Save(
+		context.Background(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -237,7 +258,8 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		context.Background(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -266,7 +288,8 @@ func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		context.Background(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -293,7 +316,8 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	_, _, err := directory.Save(
+		context.Background(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -319,7 +343,8 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+	out, meta, err := directory.Update(
+		context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -349,7 +374,8 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+	out, _, err := directory.Update(
+		context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {

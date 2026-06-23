@@ -70,8 +70,10 @@ type TemplateMetadata struct {
 	// Version is the deployment-side version string (typically a
 	// timestamp or a semver).
 	Version string `json:"version,omitempty"`
-	// CreatedOn is when the deployment first received this template.
-	CreatedOn time.Time `json:"created_on,omitzero"`
+	// CreatedOn is when the deployment first received this template. The
+	// wire field is `created_timestamp` per the Definition API
+	// TemplateMetadata schema.
+	CreatedOn time.Time `json:"created_timestamp,omitzero"`
 	// Description is an optional free-text description.
 	Description string `json:"description,omitempty"`
 	// Extras preserves deployment-specific fields not in the standard
@@ -80,12 +82,12 @@ type TemplateMetadata struct {
 }
 
 var knownTemplateMetadataFields = map[string]struct{}{
-	"template_id":  {},
-	"concept":      {},
-	"archetype_id": {},
-	"version":      {},
-	"created_on":   {},
-	"description":  {},
+	"template_id":       {},
+	"concept":           {},
+	"archetype_id":      {},
+	"version":           {},
+	"created_timestamp": {},
+	"description":       {},
 }
 
 // UnmarshalJSON decodes both documented fields and Extras in one pass.
@@ -431,6 +433,7 @@ type Repository interface {
 	DeleteTemplate(ctx context.Context, templateID string, format TemplateFormat) (*transport.Metadata, error)
 	ExampleComposition(ctx context.Context, templateID string, format TemplateFormat, opts ...ExampleOption) (*rm.Composition, *transport.Metadata, error)
 	PutStoredQuery(ctx context.Context, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error)
+	PutStoredQueryVersion(ctx context.Context, qualifiedName, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error)
 	GetStoredQuery(ctx context.Context, qualifiedName, version string) (*StoredQueryMetadata, *transport.Metadata, error)
 	ListStoredQueries(ctx context.Context, namePattern string) ([]StoredQueryMetadata, *transport.Metadata, error)
 	DeleteStoredQuery(ctx context.Context, qualifiedName, version string) (*transport.Metadata, error)
@@ -463,6 +466,10 @@ func (r *repository) ExampleComposition(ctx context.Context, templateID string, 
 
 func (r *repository) PutStoredQuery(ctx context.Context, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
 	return PutStoredQuery(ctx, r.c, qualifiedName, aqlText, opts...)
+}
+
+func (r *repository) PutStoredQueryVersion(ctx context.Context, qualifiedName, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
+	return PutStoredQueryVersion(ctx, r.c, qualifiedName, version, aqlText, opts...)
 }
 
 func (r *repository) GetStoredQuery(ctx context.Context, qualifiedName, version string) (*StoredQueryMetadata, *transport.Metadata, error) {

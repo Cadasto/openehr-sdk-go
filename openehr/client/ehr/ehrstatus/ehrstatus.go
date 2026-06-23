@@ -93,8 +93,9 @@ func newVersionMetadata(m *transport.Metadata) *openehrclient.VersionMetadata {
 
 // putConfig is the resolved option set for [Put].
 type putConfig struct {
-	prefer       transport.Prefer
-	auditDetails *rm.AuditDetails
+	prefer         transport.Prefer
+	auditDetails   *rm.AuditDetails
+	lifecycleState string
 }
 
 // PutOption mutates [Put]'s request shape.
@@ -111,6 +112,12 @@ func WithPrefer(p transport.Prefer) PutOption {
 // encoded; nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) PutOption {
 	return func(c *putConfig) { c.auditDetails = a }
+}
+
+// WithLifecycleState sets the committed VERSION's lifecycle_state via the
+// `openehr-version` header (REQ-059). Empty omits the header.
+func WithLifecycleState(code string) PutOption {
+	return func(c *putConfig) { c.lifecycleState = code }
 }
 
 // Put updates the EHR_STATUS under ehrID. `ifMatch` is the
@@ -150,6 +157,10 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if err != nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w", err)
 	}
+	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ehrstatus.Put: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
 		Path:               basePath(ehrID),
@@ -158,6 +169,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		IfMatch:            ifMatch,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
+		RMVersion:          verHeader,
 	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {

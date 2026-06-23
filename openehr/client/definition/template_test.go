@@ -307,6 +307,14 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 	if len(roundTripped.Extras) != len(meta.Extras) {
 		t.Errorf("Extras count drifted: %d vs %d", len(roundTripped.Extras), len(meta.Extras))
 	}
+	// created_timestamp (the spec field) must decode into CreatedOn, not
+	// silently land in Extras.
+	if meta.CreatedOn.IsZero() {
+		t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
+	}
+	if _, leaked := meta.Extras["created_timestamp"]; leaked {
+		t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+	}
 }
 
 func TestRepository(t *testing.T) {
