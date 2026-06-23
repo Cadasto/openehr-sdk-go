@@ -342,10 +342,30 @@ const (
 	ExampleDetailComplete ExampleDetailLevel = "complete"
 )
 
+// IsValid reports whether t is one of the spec's `type` enum values.
+func (t ExampleType) IsValid() bool {
+	switch t {
+	case ExampleTypeInput, ExampleTypeOutput:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsValid reports whether l is one of the spec's `detail_level` enum values.
+func (l ExampleDetailLevel) IsValid() bool {
+	switch l {
+	case ExampleDetailRequired, ExampleDetailMedium, ExampleDetailComplete:
+		return true
+	default:
+		return false
+	}
+}
+
 // exampleConfig is the resolved option set for [ExampleComposition].
 type exampleConfig struct {
-	exampleType string
-	detailLevel string
+	exampleType ExampleType
+	detailLevel ExampleDetailLevel
 }
 
 // ExampleOption mutates [ExampleComposition]'s request shape.
@@ -354,14 +374,14 @@ type ExampleOption func(*exampleConfig)
 // WithExampleType sets the `type` query parameter (input or output).
 // Omitted by default — the deployment applies the spec default "input".
 func WithExampleType(t ExampleType) ExampleOption {
-	return func(c *exampleConfig) { c.exampleType = string(t) }
+	return func(c *exampleConfig) { c.exampleType = t }
 }
 
 // WithExampleDetailLevel sets the `detail_level` query parameter
 // (required, medium, or complete). Omitted by default — the deployment
 // applies the spec default "required".
 func WithExampleDetailLevel(l ExampleDetailLevel) ExampleOption {
-	return func(c *exampleConfig) { c.detailLevel = string(l) }
+	return func(c *exampleConfig) { c.detailLevel = l }
 }
 
 // ExampleComposition asks the deployment to synthesise an example
@@ -386,6 +406,12 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	for _, o := range opts {
 		o(&cfg)
 	}
+	if cfg.exampleType != "" && !cfg.exampleType.IsValid() {
+		return nil, nil, fmt.Errorf("definition.ExampleComposition: %w: invalid example type %q", transport.ErrInvalidConfig, cfg.exampleType)
+	}
+	if cfg.detailLevel != "" && !cfg.detailLevel.IsValid() {
+		return nil, nil, fmt.Errorf("definition.ExampleComposition: %w: invalid detail_level %q", transport.ErrInvalidConfig, cfg.detailLevel)
+	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID) + "/example",
@@ -395,10 +421,10 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	if cfg.exampleType != "" || cfg.detailLevel != "" {
 		q := url.Values{}
 		if cfg.exampleType != "" {
-			q.Set("type", cfg.exampleType)
+			q.Set("type", string(cfg.exampleType))
 		}
 		if cfg.detailLevel != "" {
-			q.Set("detail_level", cfg.detailLevel)
+			q.Set("detail_level", string(cfg.detailLevel))
 		}
 		req.Query = q
 	}

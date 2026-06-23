@@ -119,7 +119,7 @@ func decode(ctx context.Context, c *transport.Client, req *transport.Request) (*
 type writeConfig struct {
 	prefer         transport.Prefer
 	auditDetails   *rm.AuditDetails
-	lifecycleState string
+	lifecycleState openehrclient.LifecycleState
 }
 
 // WriteOption mutates the request shape for [Save] and [Update].
@@ -138,9 +138,10 @@ func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059). Empty omits the header.
-func WithLifecycleState(code string) WriteOption {
-	return func(c *writeConfig) { c.lifecycleState = code }
+// `openehr-version` header (REQ-059). Empty omits the header; an
+// unrecognised code fails the write with [transport.ErrInvalidConfig].
+func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
+	return func(c *writeConfig) { c.lifecycleState = s }
 }
 
 // deleteConfig is the resolved option set for [Delete].

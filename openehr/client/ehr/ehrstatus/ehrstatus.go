@@ -95,7 +95,7 @@ func newVersionMetadata(m *transport.Metadata) *openehrclient.VersionMetadata {
 type putConfig struct {
 	prefer         transport.Prefer
 	auditDetails   *rm.AuditDetails
-	lifecycleState string
+	lifecycleState openehrclient.LifecycleState
 }
 
 // PutOption mutates [Put]'s request shape.
@@ -115,9 +115,10 @@ func WithAuditDetails(a *rm.AuditDetails) PutOption {
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059). Empty omits the header.
-func WithLifecycleState(code string) PutOption {
-	return func(c *putConfig) { c.lifecycleState = code }
+// `openehr-version` header (REQ-059). Empty omits the header; an
+// unrecognised code fails the write with [transport.ErrInvalidConfig].
+func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
+	return func(c *putConfig) { c.lifecycleState = s }
 }
 
 // Put updates the EHR_STATUS under ehrID. `ifMatch` is the

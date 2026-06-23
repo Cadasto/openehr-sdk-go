@@ -287,6 +287,19 @@ func TestExampleCompositionWithParams(t *testing.T) {
 	}
 }
 
+func TestExampleCompositionRejectsInvalidParams(t *testing.T) {
+	_, _, err := definition.ExampleComposition(context.Background(), nil, "x", definition.FormatADL14,
+		definition.WithExampleType(definition.ExampleType("garbage")))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("invalid type: err = %v, want ErrInvalidConfig", err)
+	}
+	_, _, err = definition.ExampleComposition(context.Background(), nil, "x", definition.FormatADL14,
+		definition.WithExampleDetailLevel(definition.ExampleDetailLevel("deep")))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("invalid detail_level: err = %v, want ErrInvalidConfig", err)
+	}
+}
+
 func TestTemplateMetadataRoundTrip(t *testing.T) {
 	body := readCassette(t, "template_metadata.json")
 	var meta definition.TemplateMetadata

@@ -80,7 +80,7 @@ type writeConfig struct {
 	prefer          transport.Prefer
 	auditDetails    *rm.AuditDetails
 	templateID      string
-	lifecycleState  string
+	lifecycleState  openehrclient.LifecycleState
 	objectItemTags  []openehrclient.ItemTag
 	versionItemTags []openehrclient.ItemTag
 }
@@ -108,10 +108,12 @@ func WithTemplateID(id string) WriteOption {
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
-// `openehr-version` header (REQ-059) — an openEHR "version lifecycle
-// state" code (e.g. "532"). Empty omits the header (server default).
-func WithLifecycleState(code string) WriteOption {
-	return func(c *writeConfig) { c.lifecycleState = code }
+// `openehr-version` header (REQ-059) — an openEHR version-lifecycle-state
+// code (e.g. [openehrclient.LifecycleStateComplete]). The empty value omits
+// the header (server default); an unrecognised code fails the write with
+// [transport.ErrInvalidConfig].
+func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
+	return func(c *writeConfig) { c.lifecycleState = s }
 }
 
 // WithObjectItemTags sets the openehr-item-tag header (REQ-059).

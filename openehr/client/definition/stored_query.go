@@ -60,9 +60,15 @@ type storeConfig struct {
 // StoreOption mutates stored-query upload requests.
 type StoreOption func(*storeConfig)
 
+// QueryTypeAQL is the standard `query_type` value and the SDK default.
+// The Definition API's QueryType is an open string (the spec defines no
+// closed enum, only the default "AQL"), so [WithQueryType] does not
+// restrict the value — a deployment supporting another formalism can pass
+// its own.
+const QueryTypeAQL = "AQL"
+
 // WithQueryType sets the `query_type` query parameter. The default is
-// "AQL" (the openEHR QueryType enum value — case-sensitive on strict
-// deployments).
+// [QueryTypeAQL] (case-sensitive on strict deployments).
 func WithQueryType(t string) StoreOption {
 	return func(c *storeConfig) { c.queryType = t }
 }
@@ -108,7 +114,7 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 	if aqlText == "" {
 		return nil, nil, fmt.Errorf("%s: %w: empty AQL body", op, transport.ErrInvalidConfig)
 	}
-	cfg := storeConfig{queryType: "AQL"}
+	cfg := storeConfig{queryType: QueryTypeAQL}
 	for _, o := range opts {
 		o(&cfg)
 	}

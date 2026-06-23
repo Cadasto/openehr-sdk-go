@@ -1,6 +1,7 @@
 package ehr
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -65,6 +66,32 @@ func TestMarshalAuditDetails_Nil(t *testing.T) {
 	}
 	if got != "" {
 		t.Errorf("MarshalAuditDetails(nil) = %q, want empty", got)
+	}
+}
+
+func TestMarshalAuditDetails_OmitsExternalRefWithoutID(t *testing.T) {
+	name := "Alice"
+	a := &rm.AuditDetails{
+		Committer: rm.PartyIdentified{
+			Name: &name,
+			// external_ref present but its id has no value — must not emit
+			// an orphan namespace/type with no id.
+			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+				ID:        rm.HierObjectID{Value: ""},
+				Namespace: "demographic",
+				Type:      "PERSON",
+			}},
+		},
+	}
+	got, err := MarshalAuditDetails(a)
+	if err != nil {
+		t.Fatalf("MarshalAuditDetails: %v", err)
+	}
+	if strings.Contains(got, "external_ref") {
+		t.Errorf("emitted an external_ref group with no id: %q", got)
+	}
+	if !strings.Contains(got, `committer.name="Alice"`) {
+		t.Errorf("missing committer.name: %q", got)
 	}
 }
 
