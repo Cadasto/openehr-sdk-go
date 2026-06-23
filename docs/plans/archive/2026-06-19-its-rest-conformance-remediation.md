@@ -195,6 +195,8 @@ Reuse the quoting/escaping + control-char rejection already implemented in [open
 
 **Change:** Track presence (e.g. `*int` or a `set` bool in `executeConfig`) so an explicit `WithOffset(0)`/`WithFetch(0)` emits the field; for stored queries always include both (schema-required) — default to the server's documented defaults if unset, or send `0`/spec default. Ad-hoc (`adhocBody`) only requires `q`, so its current elision is fine — leave it.
 
+> **Landing note:** shipped code always emits `offset` (default 0) and omits `fetch` unless the caller sets it (`fetchSet`), so the server applies its own default — a deliberate deviation from the literal `required` list. Recorded in [STRAND-09](../../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups).
+
 **Tests:** assert the stored-query body always contains `offset` and `fetch`; assert `WithOffset(0)` round-trips.
 
 **Verify:** `go test ./openehr/client/query/...`.

@@ -3,10 +3,16 @@
 **Date:** 2026-06-23
 **Status:** Proposed (analysis only — fix approach not yet chosen; do not implement without sign-off)
 **Owner:** SDK maintainers
-**Covers (candidate):** REQ-052 (canonical JSON), REQ-040 (type registry), REQ-102/107 (`openehr/validation`, `openehr/instance` / `composition.NewSkeleton`)
+**Covers:** [REQ-052](../../specifications/wire.md#req-052), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)
+**Implementation:** planned
 **Relates:** SDK-GAP-11 (decode-side polymorphism — landed; [archive/2026-05-26-rm-polymorphic-decode-coverage.md](archive/2026-05-26-rm-polymorphic-decode-coverage.md)) and the `*Like` ergonomics note ([archive/2026-05-27-rm-like-interface-ergonomics.md](archive/2026-05-27-rm-like-interface-ergonomics.md)); SDK-GAP-12 NewSkeleton ([archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md))
 **Source (inbound):** a consuming CDR project — write-time template validation + benchmark; observed ~13% of the `NewSkeleton` corpus fails round-trip template validation (`Referral Request.v1`, `Demonstration.v1`), forcing its template validation to permissive (warn) mode instead of strict (reject).
 **Reframe vs the inbound draft:** the draft treats this as one "encode-side `_type`" gap. Investigation (below) shows it is **two distinct defects with different fixes** — only the first is an encode bug; the second is decode/validator and the wire is already correct.
+
+## Definition of Ready (analysis gate)
+
+- [ ] Maintainer sign-off on fix approach (A1/B1 lean path, or split into two delivery tracks).
+- [ ] `Covers:` finalized in canonical specs if normative acceptance criteria are promoted.
 
 ## Goal
 
@@ -16,8 +22,8 @@ Make a polymorphic RM value survive a canonical-JSON `Marshal → Unmarshal` rou
 
 openEHR canonical JSON (ITS-JSON) is **self-describing**; the responsibilities are layered, and the fixes must respect the layering:
 
-1. **Producer / encode** (`canjson.Marshal`, fed by `NewSkeleton` / `instance.Generate`) — MUST emit `_type` whenever the runtime type is a *proper subtype* of the statically-declared slot type. Emitting the subtype's discriminator is mandatory, not optional.
-2. **Codec / decode** (`canjson.Unmarshal` + `typereg`) — RM-faithful only: resolve the concrete type from `_type`, else fall back to the statically-declared type. It MUST NOT guess a subtype from the presence of properties, and MUST NOT become template-aware.
+1. **Producer / encode** (`canjson.Marshal`, fed by `NewSkeleton` / `instance.Generate`) — should emit `_type` whenever the runtime type is a *proper subtype* of the statically-declared slot type. Emitting the subtype's discriminator is mandatory on the wire (ITS-JSON), not optional.
+2. **Codec / decode** (`canjson.Unmarshal` + `typereg`) — RM-faithful only: resolve the concrete type from `_type`, else fall back to the statically-declared type. It should not guess a subtype from the presence of properties, and should not become template-aware.
 3. **Template validator** (`validation.ValidateComposition`) — the only template-aware layer; it decides whether the decoded RM value satisfies the OPT's node constraint (e.g. "this `name` must be `DV_CODED_TEXT`", "this interval must be `DV_INTERVAL<DV_QUANTITY>`").
 
 A decoder that yields `DV_TEXT` for a discriminator-less `{"value":…}` is **correct** (layer 2 default). The defects below are at layers 1 and 2/3 respectively — not a "decode silently degrades" bug.
@@ -35,7 +41,9 @@ Reproduced (`Section.Name DVTextLike`, throwaway test):
 | `Name: coded` (value `DVCodedText`) | `{"value":"Episode A","defining_code":{…}}` — **no `_type`**, and nested `defining_code` loses `CODE_PHRASE` | `DV_TEXT` (defining_code dropped) |
 | `Name: &coded` (pointer) | `{"_type":"DV_CODED_TEXT",…,"defining_code":{"_type":"CODE_PHRASE",…}}` | `DV_CODED_TEXT` ✓ |
 
-`LOCATABLE.name` is statically `DV_TEXT`, so a `DV_CODED_TEXT` there **must** carry `_type` (ITS-JSON). The value form is therefore **non-conformant encoding** — a genuine wire-level data loss. The generator triggers it: [openehr/instance/locatable.go:19](../../openehr/instance/locatable.go#L19) (and :29/:39/:49) assigns `v.Name = rm.DVText{…}` — a value into the `DVTextLike` slot.
+`LOCATABLE.name` is statically `DV_TEXT`, so a `DV_CODED_TEXT` there must carry `_type` on the wire (ITS-JSON). The value form is therefore non-conformant encoding — a genuine wire-level data loss.
+
+The **production trigger** is the instance generator walk routing OPT-pinned `name` attributes through `rmwrite`: [`internal/templateinstance/rmwrite/write.go`](../../internal/templateinstance/rmwrite/write.go) (`writeElementSingle` / `writeClusterSingle`) calls `coerceDVCodedText`, which dereferences `*DVCodedText` into a **value** stored in the `DVTextLike` slot — exactly the failure mode above. [`locatable.go`](../../openehr/instance/locatable.go) stamps `rm.DVText{…}` at construction (the declared base type); that path is not the substituted-subtype regression but illustrates the same pointer-receiver vs value-in-interface mechanism.
 
 **Layer:** 1 (encode). Decode and validator are behaving correctly given the (lossy) bytes.
 

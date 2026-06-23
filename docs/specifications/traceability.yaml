@@ -330,6 +330,7 @@ requirements:
     implementation: partial
     packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution]
     probes: [PROBE-072]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -365,6 +366,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go
 

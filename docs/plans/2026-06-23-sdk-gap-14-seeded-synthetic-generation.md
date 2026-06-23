@@ -3,14 +3,20 @@
 **Date:** 2026-06-23
 **Status:** Proposed (analysis only — fix approach not yet chosen; do not implement without sign-off)
 **Owner:** SDK maintainers
-**Covers (candidate):** REQ-103 (primitive constraint introspection / `ExampleValue`), REQ-107 (`openehr/instance` generator), REQ-101 (`composition.NewSkeleton`)
-**Relates:** SDK-GAP-12 (NewSkeleton real-world OPT coverage — landed; [archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md)); SDK-GAP-13 (encode-side `_type` — open; [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md))
+**Covers:** [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder)
+**Implementation:** planned
+**Relates:** SDK-GAP-12 (NewSkeleton real-world OPT coverage — landed; [archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md)); SDK-GAP-13 (polymorphic encode/decode round-trip — open; [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md); [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance))
 **Source (inbound):** a consuming CDR project — its template `/example` endpoint and a write benchmark need a *diverse* corpus of template-valid COMPOSITIONs (so persisted data is realistic enough to exercise AQL range / code-equality / aggregation retrieval), not byte-identical leaves.
 **Severity:** medium — no production write-path impact. Today every generated COMPOSITION for a given OPT carries byte-identical clinical leaves (only consumer-stamped uid/time/composer vary), so a CDR cannot self-seed a realistic corpus and AQL value-predicate testing has no signal.
 
+## Definition of Ready (analysis gate)
+
+- [ ] Maintainer sign-off on orthogonal `ValueFill` vs `Synthetic` policy and on `medium` structural semantics.
+- [ ] `Covers:` finalized in canonical specs if normative acceptance criteria are promoted.
+
 ## Goal
 
-Give `openehr/instance` (and therefore `composition.NewSkeleton`) a generation mode that fills each primitive leaf with a value **drawn from within its constraint** (valid by construction) and that **MAY vary** between calls, with a **seedable** source for reproducibility — plus alignment with the ITS-REST `/example` `detail_level` structural levels.
+Give `openehr/instance` (and therefore `composition.NewSkeleton`) a generation mode that fills each primitive leaf with a value **drawn from within its constraint** (valid by construction) and that **can vary** between calls, with a **seedable** source for reproducibility — plus alignment with the ITS-REST `/example` `detail_level` structural levels.
 
 ## Background — what the contract does and doesn't mandate
 
@@ -22,16 +28,16 @@ The openEHR ITS-REST `GET /definition/template/adl1.4/{template_id}/example` end
 ## Current state (verified on `main`, v0.10.0)
 
 - `instance.Options` exposes `Policy` ∈ {`Minimal`, `Example`} and a `UIDSource func() *rm.HierObjectID` seam ([openehr/instance/options.go:10-68](../../openehr/instance/options.go)). `Minimal` materialises mandatory nodes; `Example` adds every optional leaf.
-- **Both policies fill primitive leaves deterministically** from `constraints.PrimitiveConstraint.ExampleValue()` ([generate.go:119-132,720-729](../../openehr/instance/generate.go)) — a single representative value. Repeat generation for one OPT is byte-identical in its data leaves.
+- **Both policies fill primitive leaves deterministically** from `constraints.PrimitiveConstraint.ExampleValue()` ([generate.go:119-132](../../openehr/instance/generate.go#L119), [generate.go:720-729](../../openehr/instance/generate.go#L720)) — a single representative value. Repeat generation for one OPT is byte-identical in its data leaves.
 - **No `medium` structural level, no random/seeded value fill, no `Synthetic` policy** exist. (`UIDSource` already varies the uid; only that and consumer post-stamping break the byte-identity.)
 
 **Feasibility — the constraint data needed for an in-constraint sampler is already on the compiled OPT.** The `constraints` types carry ranges / lists / value-sets and a self-check `Validate(value any)`: `CInteger{Range NumericRange; List []int64}`, `CodePhrase{CodeList []string}`, and the sibling `CReal` / `CString` / `CDvOrdinal` / `DvQuantity` / `CDate*` types ([openehr/template/constraints/](../../openehr/template/constraints/)). So a "random point in constraint" fill is reachable today without new OPT plumbing.
 
-## The asks (from the inbound report, RFC-2119)
+## The asks (from the inbound report)
 
-1. **Value-fill mode** — every materialised leaf filled with a value valid against its `C_*` constraint and RM data-type invariants (in-range magnitudes, valid units, value-set-member codes, regex/enumeration-satisfying strings), which **MAY vary** between invocations.
+1. **Value-fill mode** — every materialised leaf filled with a value valid against its `C_*` constraint and RM data-type invariants (in-range magnitudes, valid units, value-set-member codes, regex/enumeration-satisfying strings), which can vary between invocations.
 2. **Seedable randomness** — a seedable source on `instance.Options` (mirroring `UIDSource`); fixed seed ⇒ byte-reproducible output, no seed ⇒ successive calls differ in leaf values.
-3. **`detail_level` alignment (SHOULD)** — expose the three ITS-REST structural levels under the spec's exact tokens (`required` ≈ `Minimal`, `medium` = new representative-optional-subset, `complete` ≈ `Example`) so a CDR `/example` handler can map the query parameter directly. `medium` is the only genuinely new structural level.
+3. **`detail_level` alignment (recommended)** — expose the three ITS-REST structural levels under the spec's exact tokens (`required` ≈ `Minimal`, `medium` = new representative-optional-subset, `complete` ≈ `Example`) so a CDR `/example` handler can map the query parameter directly. `medium` is the only genuinely new structural level.
 4. **Surface through `composition.NewSkeleton`** as an option, so COMPOSITION roots get the mode without dropping to the lower-level `instance.Generate`.
 
 ## Candidate design (decision required before implementing)
@@ -56,5 +62,5 @@ For every corpus OPT, calling the synthetic generator N times yields N COMPOSITI
 ## Out of scope
 
 - **Clinically-plausible value *distributions*** (coherent vitals curves, real problem lists — Synthea-class). This gap is constraint-conformance + variation only.
-- SDK-GAP-13 (encode-side `_type` round-trip) — independent; a synthetic instance is still subject to it until that lands.
+- SDK-GAP-13 (polymorphic encode/decode round-trip) — independent; a synthetic instance is still subject to it until that lands.
 - ITS-REST `type=input|output` semantics and FLAT/STRUCTURED `Accept` web-template formats — serialization concerns, not generation.
