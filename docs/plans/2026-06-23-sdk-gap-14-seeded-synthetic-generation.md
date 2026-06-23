@@ -1,18 +1,32 @@
 # Plan — SDK-GAP-14: seeded synthetic value generation for instance / NewSkeleton
 
 **Date:** 2026-06-23
-**Status:** Proposed (analysis only — fix approach not yet chosen; do not implement without sign-off)
+**Status:** Accepted — implementing value-fill + seed (approach chosen 2026-06-23; see [Accepted approach](#accepted-approach-2026-06-23)). `medium` detail_level deferred to a follow-up.
 **Owner:** SDK maintainers
 **Covers:** [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder)
-**Implementation:** planned
+**Implementation:** in progress (value-fill + seed)
 **Relates:** SDK-GAP-12 (NewSkeleton real-world OPT coverage — landed; [archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md)); SDK-GAP-13 (polymorphic encode/decode round-trip — open; [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md); [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance))
 **Source (inbound):** a consuming CDR project — its template `/example` endpoint and a write benchmark need a *diverse* corpus of template-valid COMPOSITIONs (so persisted data is realistic enough to exercise AQL range / code-equality / aggregation retrieval), not byte-identical leaves.
 **Severity:** medium — no production write-path impact. Today every generated COMPOSITION for a given OPT carries byte-identical clinical leaves (only consumer-stamped uid/time/composer vary), so a CDR cannot self-seed a realistic corpus and AQL value-predicate testing has no signal.
 
 ## Definition of Ready (analysis gate)
 
-- [ ] Maintainer sign-off on orthogonal `ValueFill` vs `Synthetic` policy and on `medium` structural semantics.
-- [ ] `Covers:` finalized in canonical specs if normative acceptance criteria are promoted.
+- [x] Maintainer sign-off (2026-06-23): orthogonal `ValueFill` axis (not a `Synthetic` policy); `ValueSource` seed seam; **generator-internal** sampler (no `PrimitiveConstraint` interface change); `medium` / `detail_level` **deferred**.
+- [x] `Covers:` finalized — REQ-103/107 surface is sufficient for value-fill + seed; no new normative criteria promoted.
+
+## Accepted approach (2026-06-23)
+
+Lands on the shared branch `fix/sdk-gap-13-14`. Scope this pass: **value-fill + seed only**; the `medium` structural level is deferred (it is the bulk of the new structural work and independently useful — see [Deferred](#deferred-follow-up)).
+
+- **Orthogonal `ValueFill` axis** on [`instance.Options`](../../openehr/instance/options.go): `ValueFill ∈ {ExampleFill (default — today's `ExampleValue()` behaviour), RandomFill}`, composable with any `Policy`. No `Synthetic` policy (would conflate structure and values).
+- **`ValueSource rand.Source` seam**, mirroring the existing `UIDSource`. A fixed source ⇒ byte-reproducible output; nil ⇒ a fresh (time-seeded) source so successive calls differ. Threaded through the `generator` exactly like `UIDSource`.
+- **Generator-internal sampler** (`openehr/instance/sample.go`): draws a value from within each primitive constraint by reading the fields it already carries (`CInteger.Range/List`, `CReal.Range/List`, `CodePhrase.CodeList`, `CDvOrdinal`, `DvQuantity`, `CString`, `CDate*`/temporal), self-verified against the existing `PrimitiveConstraint.Validate(value any)` so output is *valid by construction* (falls back to `ExampleValue()` for the unbounded case or any draw that fails `Validate`). The REQ-103 `PrimitiveConstraint` interface is **unchanged** — no `RandomValue` method is added.
+- `applyPrimitiveExample` routes through the sampler when `ValueFill == RandomFill`, else keeps `ExampleValue()`.
+- Surfaced through [`composition.NewSkeleton`](../../openehr/composition/skeleton.go) as `Option`s (`WithValueFill` / `WithValueSource`, names TBD in impl) so COMPOSITION roots get the mode without dropping to `instance.Generate`.
+
+### Deferred (follow-up)
+
+`detail_level` alignment (`required ≈ Minimal`, `complete ≈ Example`, new `medium` representative-optional-subset). `medium` needs a crisp, testable rule for which optional nodes/occurrences it includes; tracked for a later plan so the value-fill + seed ask (the corpus-diversity blocker) lands now.
 
 ## Goal
 
