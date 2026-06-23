@@ -6,6 +6,8 @@ Plans moved here when **implementation is landed** or the document is **supersed
 
 | Archived plan | Reason |
 |---|---|
+| [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md) | SDK-GAP-13 polymorphic `_type` round-trip stability — sub-gap A encode via `openehr/internal/jsonpoly` + sub-gap B validator interval-bounds check; corpus round-trips byte-stable. REQ-052/040/102/107. Landed (PR #55, v0.11.0) |
+| [2026-06-23-sdk-gap-14-seeded-synthetic-generation.md](2026-06-23-sdk-gap-14-seeded-synthetic-generation.md) | SDK-GAP-14 seeded synthetic value fill — orthogonal `instance.ValueFill`/`ValueSource` (+ `composition.WithValueFill`/`WithValueSource`); `medium` detail_level deferred to a follow-up. REQ-103/107/101. Landed (PR #55, v0.11.0) |
 | [2026-05-15-bmm-codegen.md](2026-05-15-bmm-codegen.md) | REQ-041..047 landed |
 | [2026-05-15-canonical-json-serialization.md](2026-05-15-canonical-json-serialization.md) | REQ-052 landed |
 | [2026-05-15-canonical-xml-serialization.md](2026-05-15-canonical-xml-serialization.md) | REQ-056 landed |

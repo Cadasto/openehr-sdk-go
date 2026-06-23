@@ -8,15 +8,6 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 No standalone active plans. The SMART-on-openEHR auth conformance audit landed and moved to [`archive/`](archive/2026-06-16-auth-smart-conformance-audit.md) (REQ-061..064/068, REQ-070..072; ADR 0008/0009; STRAND-05). The next planned body of work is the simplified-formats umbrella below.
 
-### Accepted dossiers — in implementation (branch `fix/sdk-gap-13-14`)
-
-Both approved 2026-06-23; each carries an "Accepted approach" section recording the chosen fix.
-
-| Plan | Scope | Covers REQs |
-|---|---|---|
-| [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md) | Polymorphic `_type` encode/decode round-trip stability (sub-gap A encode via `jsonpoly` helper + sub-gap B validator bounds check) | REQ-052, REQ-040, REQ-102, REQ-107 |
-| [2026-06-23-sdk-gap-14-seeded-synthetic-generation.md](2026-06-23-sdk-gap-14-seeded-synthetic-generation.md) | Seeded / varied synthetic value generation for `instance` / `NewSkeleton` (value-fill + seed; `medium` deferred) | REQ-103, REQ-107, REQ-101 |
-
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
 | Plan | Scope | Covers REQs / probes |
@@ -26,7 +17,7 @@ Both approved 2026-06-23; each carries an "Accepted approach" section recording 
 
 The Phase 2 clinical-building-blocks umbrella **landed and was archived** ([archive/2026-05-21-phase-2-clinical-building-blocks.md](archive/2026-05-21-phase-2-clinical-building-blocks.md)); its remaining deferred scope (simplified formats) is now sequenced by the umbrella above. The two AQL plans also landed and moved to `archive/` — AQL builders ([REQ-055](archive/2026-05-21-aql-builders.md)) and AQL parse + lint ([REQ-109](archive/2026-06-15-aql-lint.md)).
 
-**Landed (archived):** OPT parser, REQ-100 follow-ups (Phases 1–8), composition validation (REQ-102), composition builder (REQ-101), template-driven instance generator (REQ-107), REQ-104 slot assertions + REQ-105 terminology bindings (PR #43), C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission, BMM codegen, canonical JSON/XML, AQL builders (REQ-055), AQL static lint (REQ-109), validation beyond COMPOSITION (REQ-110 — demographic PARTY hierarchy + FOLDER / EHR_STATUS), the public compiled-template bridge (REQ-111, ADR 0010), and the SMART-on-openEHR auth conformance audit (REQ-061..064/068, REQ-070..072; ADR 0008/0009; STRAND-05) — see [archive/](archive/README.md). The umbrella validation scope first sketched in the archived [umbrella validation plan](archive/2026-05-21-validation.md) is now complete.
+**Landed (archived):** OPT parser, REQ-100 follow-ups (Phases 1–8), composition validation (REQ-102), composition builder (REQ-101), template-driven instance generator (REQ-107), REQ-104 slot assertions + REQ-105 terminology bindings (PR #43), C_PRIMITIVE_OBJECT wire parser + REQ-107 UID emission, BMM codegen, canonical JSON/XML, AQL builders (REQ-055), AQL static lint (REQ-109), validation beyond COMPOSITION (REQ-110 — demographic PARTY hierarchy + FOLDER / EHR_STATUS), the public compiled-template bridge (REQ-111, ADR 0010), the SMART-on-openEHR auth conformance audit (REQ-061..064/068, REQ-070..072; ADR 0008/0009; STRAND-05), polymorphic `_type` round-trip stability (SDK-GAP-13; REQ-052/040/102/107), and seeded synthetic value generation (SDK-GAP-14 value-fill + seed; REQ-103/107/101) — see [archive/](archive/README.md). The umbrella validation scope first sketched in the archived [umbrella validation plan](archive/2026-05-21-validation.md) is now complete.
 
 ## Header convention (load-bearing)
 

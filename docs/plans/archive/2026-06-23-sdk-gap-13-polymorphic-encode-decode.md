@@ -1,11 +1,11 @@
 # Plan — SDK-GAP-13: polymorphic `_type` encode/decode symmetry
 
 **Date:** 2026-06-23
-**Status:** Accepted — implementing (approach chosen 2026-06-23; see [Accepted approach](#accepted-approach-2026-06-23))
+**Status:** Landed (PR #55, 2026-06-24; v0.11.0)
 **Owner:** SDK maintainers
 **Covers:** [REQ-052](../../specifications/wire.md#req-052), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator)
-**Implementation:** in progress
-**Relates:** SDK-GAP-11 (decode-side polymorphism — landed; [archive/2026-05-26-rm-polymorphic-decode-coverage.md](archive/2026-05-26-rm-polymorphic-decode-coverage.md)) and the `*Like` ergonomics note ([archive/2026-05-27-rm-like-interface-ergonomics.md](archive/2026-05-27-rm-like-interface-ergonomics.md)); SDK-GAP-12 NewSkeleton ([archive/2026-06-19-sdk-gap-12-newskeleton.md](archive/2026-06-19-sdk-gap-12-newskeleton.md))
+**Implementation:** landed
+**Relates:** SDK-GAP-11 (decode-side polymorphism — landed; [archive/2026-05-26-rm-polymorphic-decode-coverage.md](2026-05-26-rm-polymorphic-decode-coverage.md)) and the `*Like` ergonomics note ([archive/2026-05-27-rm-like-interface-ergonomics.md](2026-05-27-rm-like-interface-ergonomics.md)); SDK-GAP-12 NewSkeleton ([archive/2026-06-19-sdk-gap-12-newskeleton.md](2026-06-19-sdk-gap-12-newskeleton.md))
 **Source (inbound):** a consuming CDR project — write-time template validation + benchmark; observed ~13% of the `NewSkeleton` corpus fails round-trip template validation (`Referral Request.v1`, `Demonstration.v1`), forcing its template validation to permissive (warn) mode instead of strict (reject).
 **Reframe vs the inbound draft:** the draft treats this as one "encode-side `_type`" gap. Investigation (below) shows it is **two distinct defects with different fixes** — only the first is an encode bug; the second is decode/validator and the wire is already correct.
 
