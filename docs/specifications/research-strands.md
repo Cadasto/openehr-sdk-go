@@ -57,6 +57,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 ### Still open
 
 - **Full RM inventory:** decode every BMM type through the registry; identify sites that resist the pattern (e.g. further `VERSION[T]` whitelist decisions beyond `EVENT`).
+- **Polymorphic round-trip fidelity (SDK-GAP-13):** encode-side `_type` for substituted `*Like` values and decode/validator fidelity for `DV_INTERVAL<T>` — see [analysis dossier](../plans/2026-06-23-sdk-gap-13-polymorphic-encode-decode.md).
 - **Default codec benchmark:** `encoding/json` (current, via generator-emitted `MarshalJSON`) vs `sonic` vs `easyjson` under seeder/benchmark workloads.
 - **Validation independence:** confirm `openehr/validation` can validate without taking on the codec's dependencies (REQ-013).
 
@@ -149,7 +150,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-09 — ITS-REST conformance follow-ups
 
-**Status:** Open (deferred) — opened by the [ITS-REST conformance remediation](../plans/2026-06-19-its-rest-conformance-remediation.md).
+**Status:** Open (deferred) — opened by the [ITS-REST conformance remediation](../plans/archive/2026-06-19-its-rest-conformance-remediation.md).
 
 **Two follow-ups carried out of that plan:**
 

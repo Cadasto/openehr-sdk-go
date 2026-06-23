@@ -8,6 +8,13 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 No standalone active plans. The SMART-on-openEHR auth conformance audit landed and moved to [`archive/`](archive/2026-06-16-auth-smart-conformance-audit.md) (REQ-061..064/068, REQ-070..072; ADR 0008/0009; STRAND-05). In-flight work is the Phase 2 umbrella below.
 
+### Proposed analysis dossiers (not yet approved for implementation)
+
+| Plan | Scope | Covers REQs |
+|---|---|---|
+| [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md) | Polymorphic `_type` encode/decode round-trip stability (sub-gap A encode + sub-gap B decode/validator) | REQ-052, REQ-040, REQ-102, REQ-107 |
+| [2026-06-23-sdk-gap-14-seeded-synthetic-generation.md](2026-06-23-sdk-gap-14-seeded-synthetic-generation.md) | Seeded / varied synthetic value generation for `instance` / `NewSkeleton` | REQ-103, REQ-107, REQ-101 |
+
 ### Phase 2 — clinical building blocks (in flight)
 
 | Plan | Scope | Covers REQs / probes |

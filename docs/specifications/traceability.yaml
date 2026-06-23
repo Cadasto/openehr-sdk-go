@@ -253,7 +253,7 @@ requirements:
     status: draft
     implementation: partial
     packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-19-its-rest-conformance-remediation.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     notes: >-
       PROBE-062 (dotted openehr-audit-details round-trip) is registered in
       conformance.md as Draft; encoder + write-path wire coverage via audit_test
@@ -298,7 +298,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/query]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/2026-06-19-its-rest-conformance-remediation.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     notes: ErrUnprocessable (422) sentinel added by the ITS-REST conformance remediation.
     tests:
       - transport/client_test.go
@@ -330,6 +330,7 @@ requirements:
     implementation: partial
     packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution]
     probes: [PROBE-072]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -365,6 +366,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go
 
