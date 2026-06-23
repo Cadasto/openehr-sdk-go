@@ -131,18 +131,19 @@ const (
 	healthDown = "down"
 )
 
-// Capabilities issues GET against the openEHR REST service base URL
+// Capabilities issues OPTIONS against the openEHR REST service base URL
 // and returns the typed service capabilities response.
 //
-// The endpoint is documented as "service capabilities" in openEHR REST
-// 1.1.0-development. Consumers SHOULD call this once at startup to
-// confirm the deployment's declared spec version matches the SDK's
-// pinned target. Capabilities respects the transport's configured
-// auth path — anonymous calls are possible by constructing a separate
-// transport.Client with auth.AnonymousTokenSource.
+// openEHR REST 1.1.0-development defines the System API's single operation
+// as `OPTIONS /` (operationId `options`) — see
+// resources/its-rest/system-validation.openapi.yaml line 52. Consumers
+// SHOULD call this once at startup to confirm the deployment's declared
+// spec version matches the SDK's pinned target. Capabilities respects the
+// transport's configured auth path — anonymous calls are possible by
+// constructing a separate transport.Client with auth.AnonymousTokenSource.
 func Capabilities(ctx context.Context, c *transport.Client) (*ServiceCapabilities, *transport.Metadata, error) {
 	resp, err := c.Do(ctx, &transport.Request{
-		Method: http.MethodGet,
+		Method: http.MethodOptions,
 		Path:   "/",
 		Route:  "/",
 	})
@@ -181,15 +182,15 @@ func Version(ctx context.Context, c *transport.Client) (string, error) {
 // from the response; a transport error (network failure, ctx
 // cancellation pre-response) returns a non-nil error.
 //
-// Health issues an anonymous request — a misconfigured TokenSource
-// MUST NOT skew the health signal, since monitoring tools commonly
-// run without credentials. Deployments exposing a dedicated /health
-// path SHOULD wire that up via a Cadasto-platform Extra rather than
-// this method; the SDK targets the standard ITS-REST capabilities
-// endpoint here for portability.
+// Health issues an anonymous `OPTIONS /` request (the System API's only
+// operation) — a misconfigured TokenSource MUST NOT skew the health
+// signal, since monitoring tools commonly run without credentials.
+// Deployments exposing a dedicated /health path SHOULD wire that up via a
+// Cadasto-platform Extra rather than this method; the SDK targets the
+// standard ITS-REST capabilities endpoint here for portability.
 func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
 	resp, err := c.Do(ctx, &transport.Request{
-		Method: http.MethodGet,
+		Method: http.MethodOptions,
 		Path:   "/",
 		Route:  "/",
 		NoAuth: true,

@@ -69,8 +69,8 @@ openEHR REST 1.1.0-development defines a family of `openehr-*` custom headers ca
 
 | Header | Direction | Carries | Typed option |
 |---|---|---|---|
-| `openehr-version` | request | explicit RM version negotiation for this request | `transport.WithRMVersion("1.1.0")` |
-| `openehr-audit-details` | request (writes) | commit-time audit envelope: committer, time, change-type | `transport.WithAuditDetails(*rm.AuditDetails)` |
+| `openehr-version` | request (writes) | committed VERSION lifecycle state, as `lifecycle_state.code_string="<code>"` | `WithLifecycleState(code)` on the affected write |
+| `openehr-audit-details` | request (writes) | commit-time audit envelope: committer, change-type, description, system_id | `transport.WithAuditDetails(*rm.AuditDetails)` |
 | `openehr-template-id` | request (composition writes) | declares the template id the payload conforms to | `composition.WithTemplateID(string)` |
 | `openehr-uri` | request / response | opaque openEHR resource pointer (selected endpoints) | typed on the affected method |
 | `openehr-item-tag` | request / response | ItemTag operations (REST 1.1.0 new resource) | exposed on `openehr/client/ehr/itemtags/` |
@@ -79,7 +79,9 @@ When formatting `openehr-item-tag` header values, the SDK **MUST** reject keys, 
 
 Response headers in this family **MUST** be surfaced on the typed response metadata returned by each method (alongside `ETag`, `Location`).
 
-The SDK **MUST NOT** require consumers to construct the audit envelope by hand — `*rm.AuditDetails` is a generated RM type per REQ-042, serialised via canonical JSON / canonical XML at the codec boundary.
+The SDK **MUST NOT** require consumers to construct the audit envelope by hand — `*rm.AuditDetails` is a generated RM type per REQ-042.
+
+**Header grammar (not JSON).** The `openehr-audit-details` and `openehr-version` **request headers** carry their payload as the openEHR dotted-attribute grammar — a comma-separated list of `attribute.path="value"` assignments — **not** as a JSON object. The SDK **MUST** encode `openehr-audit-details` from an `AUDIT_DETAILS` as the documented attributes (`change_type.code_string`, `description.value`, `committer.name`, `committer.external_ref.{id,namespace,type}`, `system_id`) and `openehr-version` as `lifecycle_state.code_string="<code>"`. Canonical-JSON / canonical-XML serialisation of `AUDIT_DETAILS` applies **only** to the contribution request **body** (the `commit_audit` / `UpdateAudit` field per REQ-057), never to these headers. The grammar and worked examples are normative in the upstream contract — `resources/its-rest/overview-validation.openapi.yaml` § *"openehr-version and openehr-audit-details"*. Per REQ-095 the OpenAPI contract is authoritative here. Header values **MUST** reject embedded control characters on the same header-injection grounds as `openehr-item-tag` above.
 
 ## `Prefer` negotiation and error envelope
 

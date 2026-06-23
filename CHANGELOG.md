@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **ITS-REST conformance remediation (REQ-059/093/095/099).** Corrected wire-level deviations in the landed REST clients against the vendored OpenAPI contract (headers, verbs, paths, status mapping) and vendored the EHRbase specs (`resources/ehrbase/`, Apache-2.0); see [plan](docs/plans/2026-06-19-its-rest-conformance-remediation.md). Integrator note: `composition.Get` now returns the typed `ErrDeletedAtTime` (not a nil error) on a 204 deleted-at-time read.
+
 ## [0.10.0] - 2026-06-19
 
 Tenth `v0.x` minor — RM behavioural functions (REQ-120..123) and real-world OPT synthesis/validation coverage (SDK-GAP-12). Additive; one minor `ehr.VersionUID` partial-segment change. Safe to upgrade from `v0.9.0`.

@@ -22,7 +22,12 @@ var (
 	ErrVersionConflict = errors.New("transport: version conflict")
 	// ErrPreconditionFailed maps a wire 412.
 	ErrPreconditionFailed = errors.New("transport: precondition failed")
-	// ErrPreconditionRequired maps a wire 428 (PUT without If-Match).
+	// ErrUnprocessable maps a wire 422 — a well-formed request that
+	// failed semantic / template validation (REQ-093).
+	ErrUnprocessable = errors.New("transport: unprocessable entity")
+	// ErrPreconditionRequired maps a wire 428. Note: openEHR signals a
+	// missing-but-expected If-Match as 400, not 428 — this sentinel is
+	// retained only as a defensive mapping for non-conformant servers.
 	ErrPreconditionRequired = errors.New("transport: precondition required")
 	// ErrServerError maps any 5xx.
 	ErrServerError = errors.New("transport: server error")

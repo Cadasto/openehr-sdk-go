@@ -4,7 +4,7 @@
     "concept": "Body Weight",
     "archetype_id": "openEHR-EHR-COMPOSITION.encounter.v1",
     "version": "1",
-    "created_on": "2026-05-17T12:00:00Z",
+    "created_timestamp": "2026-05-17T12:00:00Z",
     "description": "Body weight observation template",
     "uri": "/definition/template/adl1.4/body_weight.v1"
   },
@@ -13,7 +13,7 @@
     "concept": "Vital Signs",
     "archetype_id": "openEHR-EHR-COMPOSITION.encounter.v1",
     "version": "1",
-    "created_on": "2026-05-17T12:00:00Z",
+    "created_timestamp": "2026-05-17T12:00:00Z",
     "description": "Vital signs observation template",
     "uri": "/definition/template/adl1.4/vital_signs.v1"
   }

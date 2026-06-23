@@ -2,6 +2,7 @@ package composition
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,12 +15,24 @@ import (
 
 const routeTemplate = "/ehr/{ehr_id}/composition/{versioned_object_or_version_uid}"
 
+// ErrDeletedAtTime signals that the composition existed but had been
+// (logically) deleted at the requested version_at_time — the server
+// answered 204 No Content per the composition_get contract
+// (resources/its-rest/ehr-validation.openapi.yaml, 204_deleted_at_time).
+// It is a typed success signal, not a transport failure: [Get] returns it
+// alongside the response metadata and a nil Composition. Check with
+// errors.Is(err, composition.ErrDeletedAtTime).
+var ErrDeletedAtTime = errors.New("composition: deleted at requested time")
+
 // Get retrieves a Composition under the given EHR. The Ref selects
 // the target: [ehr.LatestOf](voID) for the latest version of a
 // versioned-object family, [ehr.LatestAtTime](voID, t) for the
 // as-of-time variant, or [ehr.VersionOf](uid) for a specific version.
 //
-// Wire: GET /ehr/{ehr_id}/composition/{ref} [?version_at_time=...].
+// Wire: GET /ehr/{ehr_id}/composition/{ref} [?version_at_time=...]. A 204
+// No Content response (the composition was deleted at the requested
+// version_at_time) returns a nil Composition with [ErrDeletedAtTime] — a
+// typed success signal, distinct from transport.ErrInvalidShape.
 func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ref openehrclient.Ref) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Get: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -39,8 +52,27 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	if qk, qv := ref.Query(); qk != "" {
 		req.Query = url.Values{qk: []string{qv}}
 	}
-	out, meta, err := transport.Decode[rm.Composition](ctx, c, req)
-	return out, openehrclient.NewVersionMetadata(meta), err
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		var meta *transport.Metadata
+		if resp != nil {
+			meta = resp.Metadata
+		}
+		return nil, openehrclient.NewVersionMetadata(meta), err
+	}
+	if resp.StatusCode == http.StatusNoContent {
+		return nil, openehrclient.NewVersionMetadata(resp.Metadata), ErrDeletedAtTime
+	}
+	if len(resp.Body) == 0 {
+		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
+			fmt.Errorf("composition.Get: %w: response body is empty", transport.ErrInvalidShape)
+	}
+	out := new(rm.Composition)
+	if err := canjson.Unmarshal(resp.Body, out); err != nil {
+		return nil, openehrclient.NewVersionMetadata(resp.Metadata),
+			fmt.Errorf("composition.Get: decode: %w", err)
+	}
+	return out, openehrclient.NewVersionMetadata(resp.Metadata), nil
 }
 
 // writeConfig is the resolved option set for Save / Update.
@@ -48,6 +80,7 @@ type writeConfig struct {
 	prefer          transport.Prefer
 	auditDetails    *rm.AuditDetails
 	templateID      string
+	lifecycleState  openehrclient.LifecycleState
 	objectItemTags  []openehrclient.ItemTag
 	versionItemTags []openehrclient.ItemTag
 }
@@ -72,6 +105,15 @@ func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 // template. Empty omits the header.
 func WithTemplateID(id string) WriteOption {
 	return func(c *writeConfig) { c.templateID = id }
+}
+
+// WithLifecycleState sets the committed VERSION's lifecycle_state via the
+// `openehr-version` header (REQ-059) — an openEHR version-lifecycle-state
+// code (e.g. [openehrclient.LifecycleStateComplete]). The empty value omits
+// the header (server default); an unrecognised code fails the write with
+// [transport.ErrInvalidConfig].
+func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
+	return func(c *writeConfig) { c.lifecycleState = s }
 }
 
 // WithObjectItemTags sets the openehr-item-tag header (REQ-059).
@@ -149,6 +191,10 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: %w", err)
 	}
+	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Save: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition",
@@ -156,6 +202,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 		Body:               body,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
+		RMVersion:          verHeader,
 		TemplateID:         cfg.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
@@ -168,8 +215,10 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 //
 // Wire: PUT /ehr/{ehr_id}/composition/{voID} with If-Match. Errors
 // per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
-// [transport.ErrPreconditionFailed], 428 →
-// [transport.ErrPreconditionRequired]. Forgetting ifMatch returns
+// [transport.ErrPreconditionFailed], 422 (template / semantic validation
+// failure) → [transport.ErrUnprocessable]. (428 →
+// [transport.ErrPreconditionRequired] is a defensive mapping only — openEHR
+// signals a missing If-Match as 400, not 428.) Forgetting ifMatch returns
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
@@ -203,6 +252,10 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w", err)
 	}
+	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	if err != nil {
+		return nil, nil, fmt.Errorf("composition.Update: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
 		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(voID)),
@@ -211,6 +264,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		IfMatch:            ifMatch,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
+		RMVersion:          verHeader,
 		TemplateID:         cfg.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,

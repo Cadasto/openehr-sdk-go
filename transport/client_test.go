@@ -100,7 +100,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		captured = r.Header.Clone()
 		w.Header().Set("ETag", `"v-42"`)
 		w.Header().Set("openehr-version", "1.1.0")
-		w.Header().Set("openehr-audit-details", `{"committer":"alice"}`)
+		w.Header().Set("openehr-audit-details", `committer.name="alice"`)
 		w.Header().Set("Location", "/openehr/v1/ehr/x/composition/v-42")
 		w.WriteHeader(201)
 		_, _ = w.Write([]byte(`{}`))
@@ -119,7 +119,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		Path:               "/ehr/x/composition",
 		Body:               []byte(`{"_type":"COMPOSITION"}`),
 		Prefer:             PreferRepresentation,
-		AuditDetailsHeader: `{"committer":"alice"}`,
+		AuditDetailsHeader: `committer.name="alice"`,
 		RMVersion:          "1.1.0",
 		TemplateID:         "openEHR-EHR-COMPOSITION.encounter.v1",
 		IfMatch:            "v-41",
@@ -132,7 +132,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		{"User-Agent", "sdk-test/1.0"},
 		{"Cadasto-Openehr-Spec-Version", "1.1.0-development"},
 		{"Prefer", "return=representation"},
-		{"Openehr-Audit-Details", `{"committer":"alice"}`},
+		{"Openehr-Audit-Details", `committer.name="alice"`},
 		{"Openehr-Version", "1.1.0"},
 		{"Openehr-Template-Id", "openEHR-EHR-COMPOSITION.encounter.v1"},
 		{"If-Match", `"v-41"`},
@@ -150,7 +150,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 	if resp.Metadata.RMVersion != "1.1.0" {
 		t.Errorf("RMVersion = %q", resp.Metadata.RMVersion)
 	}
-	if resp.Metadata.AuditDetails != `{"committer":"alice"}` {
+	if resp.Metadata.AuditDetails != `committer.name="alice"` {
 		t.Errorf("AuditDetails = %q", resp.Metadata.AuditDetails)
 	}
 	if resp.Metadata.Location == "" {
@@ -265,6 +265,7 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 		{"403", "403.json", 403, ErrForbidden},
 		{"409", "409.json", 409, ErrVersionConflict},
 		{"412", "412.json", 412, ErrPreconditionFailed},
+		{"422", "422.json", 422, ErrUnprocessable},
 		{"428", "428.json", 428, ErrPreconditionRequired},
 		{"400", "400.json", 400, nil}, // no sentinel; pure WireError
 	}

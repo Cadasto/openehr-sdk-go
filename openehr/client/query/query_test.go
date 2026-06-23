@@ -128,10 +128,13 @@ func TestRunStoredWithEHRID(t *testing.T) {
 }
 
 func TestRunStored(t *testing.T) {
+	var body map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
 			t.Errorf("path = %q", r.URL.Path)
 		}
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(readCassette(t, "result_set.json"))
 	}))
@@ -142,6 +145,163 @@ func TestRunStored(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	// The stored Query schema requires offset + query_parameters; both must
+	// be present even with no paging options. fetch is omitted (no spec
+	// default — letting the server choose).
+	if _, ok := body["offset"]; !ok {
+		t.Errorf("stored body missing required offset: %v", body)
+	}
+	if _, ok := body["query_parameters"]; !ok {
+		t.Errorf("stored body missing required query_parameters: %v", body)
+	}
+	if _, ok := body["fetch"]; ok {
+		t.Errorf("stored body should omit fetch when unset, got %v", body["fetch"])
+	}
+}
+
+func TestExecuteGET(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
+		map[string]any{"systolic_min": 120},
+		query.WithGET(), query.WithFetch(10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Errorf("method = %q, want GET", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/query/aql" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	q := captured.URL.Query()
+	if q.Get("q") != "SELECT c FROM EHR e CONTAINS COMPOSITION c" {
+		t.Errorf("q = %q", q.Get("q"))
+	}
+	if q.Get("fetch") != "10" {
+		t.Errorf("fetch = %q, want 10", q.Get("fetch"))
+	}
+	if q.Get("systolic_min") != "120" {
+		t.Errorf("systolic_min (form/explode query param) = %q, want 120", q.Get("systolic_min"))
+	}
+}
+
+func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+		"SELECT c FROM EHR e",
+		map[string]any{"big": float64(1234567), "flag": true},
+		query.WithGET())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := captured.URL.Query()
+	// Must match the POST/JSON rendering, NOT fmt.Sprint ("1.234567e+06").
+	if q.Get("big") != "1234567" {
+		t.Errorf("big = %q, want 1234567 (JSON-consistent, not scientific notation)", q.Get("big"))
+	}
+	if q.Get("flag") != "true" {
+		t.Errorf("flag = %q, want true", q.Get("flag"))
+	}
+}
+
+func TestRunStoredGET(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions",
+		map[string]any{"ehr_status": "active"}, query.WithGET())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Errorf("method = %q, want GET", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	q := captured.URL.Query()
+	// offset is always present (schema default 0); fetch omitted when unset.
+	if q.Get("offset") != "0" {
+		t.Errorf("offset = %q, want 0 (always present on stored GET)", q.Get("offset"))
+	}
+	if _, ok := q["fetch"]; ok {
+		t.Errorf("fetch should be omitted when unset, got %q", q.Get("fetch"))
+	}
+	if q.Get("ehr_status") != "active" {
+		t.Errorf("ehr_status param = %q, want active", q.Get("ehr_status"))
+	}
+}
+
+func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions",
+		nil, query.WithOffset(0), query.WithFetch(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Explicit zero must be representable (the *Set-flag fix), not dropped.
+	if body["fetch"] != float64(0) {
+		t.Errorf("fetch = %v, want explicit 0", body["fetch"])
+	}
+	if body["offset"] != float64(0) {
+		t.Errorf("offset = %v, want explicit 0", body["offset"])
+	}
+}
+
+func TestExecuteGETExplicitZeroOffset(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+		"SELECT c FROM EHR e", nil, query.WithGET(), query.WithOffset(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Explicit WithOffset(0) must reach the wire on the ad-hoc GET path.
+	if got := captured.URL.Query().Get("offset"); got != "0" {
+		t.Errorf("offset = %q, want explicit 0", got)
+	}
+}
+
+func TestExecuteGETRejectsReservedParamName(t *testing.T) {
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, httptest.NewServer(nil)),
+		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
+	if !errors.Is(err, query.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
 	}
 }
 

@@ -25,6 +25,23 @@ func TestItemTagHeaderRoundTrip(t *testing.T) {
 	}
 }
 
+// TestItemTagHeaderRoundTripBackslash verifies a literal backslash survives
+// encode→parse (the escaper escapes \ as well as ").
+func TestItemTagHeaderRoundTripBackslash(t *testing.T) {
+	in := []ehr.ItemTag{{Key: "path", Value: `C:\temp\"x"`}}
+	encoded, err := ehr.FormatItemTagHeader(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := ehr.ParseItemTagHeader(encoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Value != `C:\temp\"x"` {
+		t.Fatalf("backslash did not round-trip: encoded=%q got=%#v", encoded, got)
+	}
+}
+
 // TestFormatItemTagHeader_ControlCharsRejected verifies that CR/LF/NUL in any
 // of Key, Value, or TargetPath cause FormatItemTagHeader to return a non-nil
 // error mentioning "control characters", and that the returned string is empty.

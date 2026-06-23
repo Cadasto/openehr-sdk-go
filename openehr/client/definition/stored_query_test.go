@@ -2,6 +2,7 @@ package definition_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 // TestGetStoredQueryEmptyBody verifies that a 200 response with an
@@ -57,7 +59,8 @@ func TestPutStoredQuery(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	meta, _, err := definition.PutStoredQuery(context.Background(), newClient(t, srv),
+	meta, _, err := definition.PutStoredQuery(
+		context.Background(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
 	)
@@ -78,5 +81,56 @@ func TestPutStoredQuery(t *testing.T) {
 	}
 	if meta.Name != "org.openehr::vitals" {
 		t.Errorf("name = %q", meta.Name)
+	}
+	if got := captured.URL.Query().Get("query_type"); got != "AQL" {
+		t.Errorf("query_type = %q, want AQL", got)
+	}
+}
+
+func TestPutStoredQueryVersion(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.PutStoredQueryVersion(
+		context.Background(), newClient(t, srv),
+		"org.openehr::vitals", "1.2.0",
+		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodPut {
+		t.Errorf("method = %q", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/definition/query/org.openehr::vitals/1.2.0" {
+		t.Errorf("path = %q, want …/org.openehr::vitals/1.2.0", captured.URL.Path)
+	}
+	if meta.Version != "1.2.0" {
+		t.Errorf("version = %q, want 1.2.0", meta.Version)
+	}
+}
+
+func TestPutStoredQueryVersionRejectsEmpty(t *testing.T) {
+	_, _, err := definition.PutStoredQueryVersion(context.Background(), nil, "org.openehr::vitals", "", "SELECT 1")
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig, got %v", err)
+	}
+}
+
+func TestPutStoredQueryVersionConflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message":"version already exists","code":"CONFLICT"}`))
+	}))
+	defer srv.Close()
+	_, _, err := definition.PutStoredQueryVersion(context.Background(), newClient(t, srv),
+		"org.openehr::vitals", "1.2.0", "SELECT c FROM EHR e CONTAINS COMPOSITION c")
+	if !errors.Is(err, transport.ErrVersionConflict) {
+		t.Errorf("409 should map to ErrVersionConflict, got %v", err)
 	}
 }

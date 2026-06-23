@@ -452,9 +452,9 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** A write carrying `openehr-audit-details` is reflected in the resulting Contribution's audit envelope on read-back.
 - **Preconditions:** Existing EHR; a known `*rm.AuditDetails` value.
-- **Wire assertion:** Write request carries `openehr-audit-details: <canonical-JSON>`; subsequent Contribution GET returns the same audit fields (committer name, time-committed, change-type).
+- **Wire assertion:** Write request carries `openehr-audit-details` in the openEHR dotted-attribute grammar (`change_type.code_string="…",committer.name="…",system_id="…"` — REQ-059, **not** JSON); subsequent Contribution GET returns the same audit fields (committer name, change-type, system_id).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Draft. Encoder unit-covered by `openehr/client/ehr/audit_test.go` (dotted-grammar golden); the read-back round-trip remains to be probe-ratified.
 
 #### PROBE-063 — Discovery-routed request
 

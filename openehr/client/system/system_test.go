@@ -82,8 +82,8 @@ func TestCapabilitiesDecodesCassette(t *testing.T) {
 	if meta == nil {
 		t.Fatal("expected non-nil metadata")
 	}
-	if captured.Method != http.MethodGet {
-		t.Errorf("method = %q, want GET", captured.Method)
+	if captured.Method != http.MethodOptions {
+		t.Errorf("method = %q, want OPTIONS", captured.Method)
 	}
 	if captured.URL.Path != "/openehr/v1/" {
 		t.Errorf("path = %q, want /openehr/v1/", captured.URL.Path)
@@ -266,13 +266,15 @@ func TestHealthDownOnWireError(t *testing.T) {
 func TestHealthIsAnonymous(t *testing.T) {
 	// Health MUST NOT emit Authorization even when a TokenSource is
 	// configured. Monitoring tools commonly run without credentials.
-	var seenAuth string
+	var seenAuth, seenMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenAuth = r.Header.Get("Authorization")
+		seenMethod = r.Method
 		_, _ = w.Write([]byte(`{"solution":"x"}`))
 	}))
 	defer srv.Close()
-	c, _ := transport.New(newCatalog(t, srv),
+	c, _ := transport.New(
+		newCatalog(t, srv),
 		transport.WithHTTPClient(srv.Client()),
 		transport.WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "should-not-leak", Type: "Bearer"})),
 	)
@@ -281,6 +283,9 @@ func TestHealthIsAnonymous(t *testing.T) {
 	}
 	if seenAuth != "" {
 		t.Errorf("Health emitted Authorization = %q (must be anonymous)", seenAuth)
+	}
+	if seenMethod != http.MethodOptions {
+		t.Errorf("Health method = %q, want OPTIONS", seenMethod)
 	}
 }
 

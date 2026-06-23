@@ -9,7 +9,7 @@
 //   - POST   /definition/template/adl1.4
 //   - GET    /definition/template/adl1.4
 //   - GET    /definition/template/adl1.4/{template_id}
-//   - GET    /definition/template/adl1.4/{template_id}/example_composition
+//   - GET    /definition/template/adl1.4/{template_id}/example
 //   - DELETE /definition/template/adl1.4/{template_id}   (where supported)
 //
 // Templates are stored on the deployment as XML; the SDK transports
