@@ -10,6 +10,7 @@ Plans moved here when **implementation is landed** or the document is **supersed
 | [2026-05-15-canonical-json-serialization.md](2026-05-15-canonical-json-serialization.md) | REQ-052 landed |
 | [2026-05-15-canonical-xml-serialization.md](2026-05-15-canonical-xml-serialization.md) | REQ-056 landed |
 | [2026-05-21-template-parser.md](2026-05-21-template-parser.md) | REQ-100 initial delivery landed |
+| [2026-05-21-phase-2-clinical-building-blocks.md](2026-05-21-phase-2-clinical-building-blocks.md) | Phase 2 building-block umbrella — sequenced REQ-100/101/102/103/104/105/107/109/110/111 + REQ-055; all child Phase 1 rows landed. Deferred simplified-formats scope (proposed REQ-106 + REQ-053) moved to [2026-06-23-simplified-formats.md](../2026-06-23-simplified-formats.md) |
 | [2026-05-21-validation.md](2026-05-21-validation.md) | Umbrella now fully landed — composition (REQ-102), AQL lint (REQ-109), and demographic + EHR-IM roots (REQ-110, [2026-06-17](2026-06-17-validation-non-composition-roots.md)) |
 | [2026-05-24-composition-validation-template-driven.md](2026-05-24-composition-validation-template-driven.md) | REQ-102 `ValidateComposition` landed ([ADR 0006](../../adr/0006-composition-validation-walker-placement.md)) |
 | [2026-05-21-composition-builder.md](2026-05-21-composition-builder.md) | REQ-101 `composition.NewSkeleton` + `Builder.Set/Build` landed (PRs #19 + #20) |

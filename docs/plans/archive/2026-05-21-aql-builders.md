@@ -5,7 +5,7 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-055 (builders complete wire contract); PROBE-020, PROBE-021
 **Implementation:** **landed** — struct-builder (`Builder`) + verb-functions (`Select`/`From`/`FromEHR`/`Where`) share one emitter and produce byte-identical canonical AQL; PROBE-020 (Sandbox) and PROBE-021 (`aql.ErrPathResolution` mapping, Sandbox) green
-**Depends on:** [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](../2026-05-21-phase-2-clinical-building-blocks.md)
+**Depends on:** [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) Phase 5 (`openehr/client/query/`); umbrella [`2026-05-21-phase-2-clinical-building-blocks.md`](2026-05-21-phase-2-clinical-building-blocks.md)
 **Defers:** Full AQL parser / pretty-printer; stored-query builder (use `definition` client + execute by id); query optimiser
 
 ## Goal
