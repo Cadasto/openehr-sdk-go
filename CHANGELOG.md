@@ -10,9 +10,15 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-06-24
+
+Eleventh `v0.x` minor — polymorphic `_type` round-trip stability (SDK-GAP-13) and seeded synthetic value generation (SDK-GAP-14), plus the ITS-REST conformance remediation. Additive new `instance`/`composition` value-fill API; one integrator-visible change — `composition.Get` returns the typed `ErrDeletedAtTime` on a 204 deleted read. Safe to upgrade from `v0.10.0` after that note.
+
 ### Added
 
 - **ITS-REST conformance remediation (REQ-059/093/095/099).** Corrected wire-level deviations in the landed REST clients against the vendored OpenAPI contract (headers, verbs, paths, status mapping) and vendored the EHRbase specs (`resources/ehrbase/`, Apache-2.0); see [plan](docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md). Integrator note: `composition.Get` now returns the typed `ErrDeletedAtTime` (not a nil error) on a 204 deleted-at-time read.
+- **Polymorphic `_type` round-trip stability (SDK-GAP-13; REQ-052/102).** Value-in-interface RM fields now emit `_type` on encode (new `openehr/internal/jsonpoly`) and a round-tripped `DV_INTERVAL<T>` re-validates from its bounds' runtime types, restoring strict round-trip template validation. [plan](docs/plans/archive/2026-06-23-sdk-gap-13-polymorphic-encode-decode.md).
+- **Seeded synthetic value fill (SDK-GAP-14; REQ-103/107).** New orthogonal `instance.ValueFill` (`RandomFill`) + `ValueSource` seam — surfaced as `composition.WithValueFill`/`WithValueSource` — draws in-constraint, varying, reproducible leaf values; `medium` detail_level deferred. [plan](docs/plans/archive/2026-06-23-sdk-gap-14-seeded-synthetic-generation.md).
 
 ## [0.10.0] - 2026-06-19
 
