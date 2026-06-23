@@ -96,14 +96,23 @@ func committerParts(p rm.PartyProxy) (name string, ext *rm.PartyRef, ok bool) {
 	case rm.PartyIdentified:
 		return derefString(v.Name), v.ExternalRef, true
 	case *rm.PartyIdentified:
+		if v == nil {
+			return "", nil, false
+		}
 		return derefString(v.Name), v.ExternalRef, true
 	case rm.PartyRelated:
 		return derefString(v.Name), v.ExternalRef, true
 	case *rm.PartyRelated:
+		if v == nil {
+			return "", nil, false
+		}
 		return derefString(v.Name), v.ExternalRef, true
 	case rm.PartySelf:
 		return "", v.ExternalRef, true
 	case *rm.PartySelf:
+		if v == nil {
+			return "", nil, false
+		}
 		return "", v.ExternalRef, true
 	default:
 		return "", nil, false
@@ -125,26 +134,44 @@ func objectIDValue(id rm.ObjectID) (value string, ok bool) {
 	case rm.HierObjectID:
 		return v.Value, true
 	case *rm.HierObjectID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	case rm.ObjectVersionID:
 		return v.Value, true
 	case *rm.ObjectVersionID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	case rm.GenericID:
 		return v.Value, true
 	case *rm.GenericID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	case rm.ArchetypeID:
 		return v.Value, true
 	case *rm.ArchetypeID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	case rm.TemplateID:
 		return v.Value, true
 	case *rm.TemplateID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	case rm.TerminologyID:
 		return v.Value, true
 	case *rm.TerminologyID:
+		if v == nil {
+			return "", false
+		}
 		return v.Value, true
 	default:
 		return "", false

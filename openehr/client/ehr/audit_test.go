@@ -1,10 +1,12 @@
 package ehr
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
 func TestMarshalAuditDetails_DottedGrammar(t *testing.T) {
@@ -99,5 +101,37 @@ func TestMarshalAuditDetails_RejectsControlChars(t *testing.T) {
 	a := &rm.AuditDetails{SystemID: "bad\r\nInjected: header"}
 	if _, err := MarshalAuditDetails(a); err == nil {
 		t.Fatal("expected error for control characters in audit detail, got nil")
+	}
+}
+
+func TestMarshalAuditDetails_RejectsTypedNilCommitter(t *testing.T) {
+	var committer rm.PartyProxy = (*rm.PartyIdentified)(nil)
+	a := &rm.AuditDetails{
+		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
+		Committer:  committer,
+	}
+	_, err := MarshalAuditDetails(a)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Fatalf("want ErrInvalidConfig for typed-nil committer, got %v", err)
+	}
+}
+
+func TestMarshalAuditDetails_RejectsTypedNilObjectID(t *testing.T) {
+	name := "Alice"
+	var id rm.ObjectID = (*rm.HierObjectID)(nil)
+	a := &rm.AuditDetails{
+		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
+		Committer: rm.PartyIdentified{
+			Name: &name,
+			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+				ID:        id,
+				Namespace: "demographic",
+				Type:      "PERSON",
+			}},
+		},
+	}
+	_, err := MarshalAuditDetails(a)
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Fatalf("want ErrInvalidConfig for typed-nil external_ref id, got %v", err)
 	}
 }
