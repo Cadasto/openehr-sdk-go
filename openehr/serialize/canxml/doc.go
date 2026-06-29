@@ -94,6 +94,19 @@
 // perform XSD validation at the wire layer; OPT-driven validation is
 // available under openehr/template/.
 //
+// # Deferred: Hash<K,V> elements
+//
+// XML emission and decode of BMM Hash<K,V> (generic map) attributes
+// are deferred as a v1 limitation. Where an RM attribute is typed as
+// a Hash, the generator emits a documented placeholder rather than
+// wire output: encode writes nothing for the field and decode skips
+// the element (the `marshalXMLHashTODO` / `unmarshalXMLHashTODO`
+// escapes in internal/bmmgen). No RM class in the current canonical
+// scope carries a Hash-typed attribute, so the gap is latent; if one
+// enters scope under a BMM bump (see resources/bmm/README.md), the
+// emission/decode must be implemented here. The canjson codec is
+// unaffected. History: docs/plans/archive/2026-05-15-canonical-xml-serialization.md.
+//
 // # See also
 //
 //   - [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg] — the
