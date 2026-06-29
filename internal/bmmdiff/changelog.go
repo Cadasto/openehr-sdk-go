@@ -2,6 +2,7 @@ package bmmdiff
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -99,8 +100,8 @@ func parseSchemaID(id string) (pub, name, release string) {
 	// Walk from the right: collect dotted-version segments into the
 	// release; everything before is publisher (first segment) + name.
 	relStart := len(parts)
-	for i := len(parts) - 1; i >= 0; i-- {
-		if isVersionToken(parts[i]) {
+	for i, p := range slices.Backward(parts) {
+		if isVersionToken(p) {
 			relStart = i
 		} else {
 			break

@@ -46,7 +46,7 @@ func TestPrinter_RendersTree(t *testing.T) {
 		t.Fatal("Dump produced empty output")
 	}
 	// First line is the root: path "/" + RM type COMPOSITION.
-	first := strings.SplitN(out, "\n", 2)[0]
+	first, _, _ := strings.Cut(out, "\n")
 	if !strings.HasPrefix(first, "/") {
 		t.Errorf("first line = %q, want it to start with the root path \"/\"", first)
 	}
