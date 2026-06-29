@@ -1,7 +1,6 @@
 package jwtbearer
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -157,7 +156,7 @@ func TestClaimsSignerProducesValidJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := signer.Assertion(context.Background())
+	jwt, err := signer.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +194,7 @@ func TestClaimsSignerJTIUnique(t *testing.T) {
 	signer, _ := NewClaimsSigner(ClaimsTemplate{Issuer: "i", Audience: "a"}, key)
 	seen := map[string]bool{}
 	for range 4 {
-		jwt, err := signer.Assertion(context.Background())
+		jwt, err := signer.Assertion(t.Context())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -323,7 +322,7 @@ func TestClaimsSignerOpaqueSigner(t *testing.T) {
 		t.Fatalf("NewClaimsSigner with opaque signer: %v", err)
 	}
 
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatalf("Assertion with opaque signer: %v", err)
 	}
@@ -351,7 +350,7 @@ func TestClaimsSignerBypassedAlgValidation(t *testing.T) {
 		Signer:    key,
 		Algorithm: "HS256", // unsupported
 	}
-	_, err := s.Assertion(context.Background())
+	_, err := s.Assertion(t.Context())
 	if !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig for bypassed alg, got %v", err)
 	}
@@ -359,7 +358,7 @@ func TestClaimsSignerBypassedAlgValidation(t *testing.T) {
 
 func TestStaticAssertion(t *testing.T) {
 	src := StaticAssertion("pre-minted-jwt")
-	got, err := src.Assertion(context.Background())
+	got, err := src.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +395,7 @@ func TestSourceExchangesAssertion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +416,7 @@ func TestSourceCachesUntilExpiry(t *testing.T) {
 	defer srv.Close()
 	src, _ := New(srv.URL, StaticAssertion("a"), WithHTTPClient(srv.Client()))
 	for range 5 {
-		if _, err := src.Token(context.Background()); err != nil {
+		if _, err := src.Token(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -442,7 +441,7 @@ func TestSourceCoalescesConcurrent(t *testing.T) {
 	for range N {
 		go func() {
 			defer wg.Done()
-			_, _ = src.Token(context.Background())
+			_, _ = src.Token(t.Context())
 		}()
 	}
 	time.Sleep(20 * time.Millisecond)
@@ -460,7 +459,7 @@ func TestSourceMapsOAuth2Error(t *testing.T) {
 	}))
 	defer srv.Close()
 	src, _ := New(srv.URL, StaticAssertion("a"), WithHTTPClient(srv.Client()))
-	_, err := src.Token(context.Background())
+	_, err := src.Token(t.Context())
 	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
 		t.Errorf("expected ErrTokenExchangeFailed, got %v", err)
 	}
@@ -494,7 +493,7 @@ func TestClaimsSignerDefaultRS384(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -519,7 +518,7 @@ func TestClaimsSignerRS384(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -548,7 +547,7 @@ func TestClaimsSignerRS256(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -572,7 +571,7 @@ func TestClaimsSignerES384(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -600,7 +599,7 @@ func TestClaimsSignerES256(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jwt, err := s.Assertion(context.Background())
+	jwt, err := s.Assertion(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

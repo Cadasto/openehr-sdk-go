@@ -10,7 +10,7 @@ import (
 func TestStaticTokenSource(t *testing.T) {
 	tok := Token{Value: "abc", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}
 	ts := StaticTokenSource(tok)
-	got, err := ts.Token(context.Background())
+	got, err := ts.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token: %v", err)
 	}
@@ -21,7 +21,7 @@ func TestStaticTokenSource(t *testing.T) {
 
 func TestStaticTokenSourceHonoursCtx(t *testing.T) {
 	ts := StaticTokenSource(Token{Value: "abc"})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := ts.Token(ctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
@@ -30,7 +30,7 @@ func TestStaticTokenSourceHonoursCtx(t *testing.T) {
 
 func TestAnonymousTokenSource(t *testing.T) {
 	ts := AnonymousTokenSource()
-	got, err := ts.Token(context.Background())
+	got, err := ts.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestTokenIsZero(t *testing.T) {
 
 func TestWithTokenSource(t *testing.T) {
 	ts := StaticTokenSource(Token{Value: "ctx-bound"})
-	ctx := WithTokenSource(context.Background(), ts)
+	ctx := WithTokenSource(t.Context(), ts)
 	got, ok := TokenSourceFromContext(ctx)
 	if !ok {
 		t.Fatal("TokenSourceFromContext returned ok=false")
@@ -73,14 +73,14 @@ func TestWithTokenSource(t *testing.T) {
 }
 
 func TestWithTokenSourceNil(t *testing.T) {
-	ctx := WithTokenSource(context.Background(), nil)
+	ctx := WithTokenSource(t.Context(), nil)
 	if _, ok := TokenSourceFromContext(ctx); ok {
 		t.Error("nil TokenSource should not be attached to ctx")
 	}
 }
 
 func TestTokenSourceFromContextEmpty(t *testing.T) {
-	if _, ok := TokenSourceFromContext(context.Background()); ok {
+	if _, ok := TokenSourceFromContext(t.Context()); ok {
 		t.Error("expected no TokenSource on empty ctx")
 	}
 }
@@ -168,7 +168,7 @@ func TestReautherFuncSatisfiesInterface(t *testing.T) {
 		called = true
 		return nil
 	})
-	if err := r.Reauth(context.Background()); err != nil {
+	if err := r.Reauth(t.Context()); err != nil {
 		t.Fatalf("Reauth returned unexpected error: %v", err)
 	}
 	if !called {
