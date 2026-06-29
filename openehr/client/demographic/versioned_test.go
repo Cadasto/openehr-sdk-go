@@ -1,7 +1,6 @@
 package demographic_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -26,7 +25,7 @@ func TestGetVersionedParty(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	vp, _, err := demographic.GetVersionedParty(context.Background(), newClient(t, srv), personVOID)
+	vp, _, err := demographic.GetVersionedParty(t.Context(), newClient(t, srv), personVOID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +46,7 @@ func TestGetRevisionHistory(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	rh, _, err := demographic.GetRevisionHistory(context.Background(), newClient(t, srv), personVOID)
+	rh, _, err := demographic.GetRevisionHistory(t.Context(), newClient(t, srv), personVOID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +67,7 @@ func TestGetVersionLatest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	pv, _, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+	pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +135,7 @@ func TestGetVersionDecodesEachPartyType(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			pv, _, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+			pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +155,7 @@ func TestGetVersionWireError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, meta, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+	_, meta, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 	if !errors.Is(err, transport.ErrPreconditionFailed) {
 		t.Fatalf("err = %v, want ErrPreconditionFailed", err)
 	}
@@ -174,7 +173,7 @@ func TestGetVersionUnknownDataType(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+	_, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 	if !errors.Is(err, typereg.ErrUnknownType) {
 		t.Fatalf("err = %v, want typereg.ErrUnknownType", err)
 	}
@@ -189,7 +188,7 @@ func TestGetVersionAtTimeNoMatch(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "1990-01-01T00:00:00Z")
-	pv, _, err := demographic.GetVersionAtTime(context.Background(), newClient(t, srv), personVOID, at)
+	pv, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, at)
 	if err != nil || pv != nil {
 		t.Fatalf("no-match GetVersionAtTime = (%+v, %v), want (nil, nil)", pv, err)
 	}
@@ -213,7 +212,7 @@ func TestVersionedRepositoryWiring(t *testing.T) {
 	defer srv.Close()
 
 	repo := demographic.NewRepository(newClient(t, srv))
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, _, err := repo.GetVersionedParty(ctx, personVOID); err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +246,7 @@ func TestGetVersionAtTime(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-06-16T08:00:00Z")
-	_, _, err := demographic.GetVersionAtTime(context.Background(), newClient(t, srv), personVOID, at)
+	_, _, err := demographic.GetVersionAtTime(t.Context(), newClient(t, srv), personVOID, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +267,7 @@ func TestGetVersionByID(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := demographic.GetVersionByID(context.Background(), newClient(t, srv), personVOID, personVersion)
+	_, _, err := demographic.GetVersionByID(t.Context(), newClient(t, srv), personVOID, personVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +285,7 @@ func TestGetVersionEmptyBody(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		}))
 		defer srv.Close()
-		pv, _, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+		pv, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 		if err != nil {
 			t.Fatalf("204 should be a clean nil, got %v", err)
 		}
@@ -299,7 +298,7 @@ func TestGetVersionEmptyBody(t *testing.T) {
 			w.WriteHeader(http.StatusOK) // empty body
 		}))
 		defer srv.Close()
-		_, _, err := demographic.GetVersion(context.Background(), newClient(t, srv), personVOID)
+		_, _, err := demographic.GetVersion(t.Context(), newClient(t, srv), personVOID)
 		if !errors.Is(err, transport.ErrInvalidShape) {
 			t.Fatalf("empty 200 err = %v, want ErrInvalidShape", err)
 		}
@@ -307,7 +306,7 @@ func TestGetVersionEmptyBody(t *testing.T) {
 }
 
 func TestVersionedReadGuards(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, _, err := demographic.GetVersionedParty(ctx, nil, ""); !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("GetVersionedParty(empty) err = %v", err)
 	}

@@ -1,7 +1,6 @@
 package definition_test
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -26,7 +25,7 @@ func TestGetStoredQueryEmptyBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	meta, _, err := definition.GetStoredQuery(context.Background(), newClient(t, srv), wantName, wantVersion)
+	meta, _, err := definition.GetStoredQuery(t.Context(), newClient(t, srv), wantName, wantVersion)
 	if err != nil {
 		t.Fatalf("GetStoredQuery: unexpected error on empty body: %v", err)
 	}
@@ -60,7 +59,7 @@ func TestPutStoredQuery(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQuery(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
 	)
@@ -96,7 +95,7 @@ func TestPutStoredQueryVersion(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQueryVersion(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals", "1.2.0",
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
 	)
@@ -115,7 +114,7 @@ func TestPutStoredQueryVersion(t *testing.T) {
 }
 
 func TestPutStoredQueryVersionRejectsEmpty(t *testing.T) {
-	_, _, err := definition.PutStoredQueryVersion(context.Background(), nil, "org.openehr::vitals", "", "SELECT 1")
+	_, _, err := definition.PutStoredQueryVersion(t.Context(), nil, "org.openehr::vitals", "", "SELECT 1")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -128,7 +127,7 @@ func TestPutStoredQueryVersionConflict(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"version already exists","code":"CONFLICT"}`))
 	}))
 	defer srv.Close()
-	_, _, err := definition.PutStoredQueryVersion(context.Background(), newClient(t, srv),
+	_, _, err := definition.PutStoredQueryVersion(t.Context(), newClient(t, srv),
 		"org.openehr::vitals", "1.2.0", "SELECT c FROM EHR e CONTAINS COMPOSITION c")
 	if !errors.Is(err, transport.ErrVersionConflict) {
 		t.Errorf("409 should map to ErrVersionConflict, got %v", err)

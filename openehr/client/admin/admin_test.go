@@ -1,7 +1,6 @@
 package admin_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +42,7 @@ func TestDeleteEHRHappyPath(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 
-	if err := admin.DeleteEHR(context.Background(), c, ehr.EHRID("abc-123")); err != nil {
+	if err := admin.DeleteEHR(t.Context(), c, ehr.EHRID("abc-123")); err != nil {
 		t.Fatalf("DeleteEHR: %v", err)
 	}
 	if gotMethod != "DELETE" {
@@ -60,7 +59,7 @@ func TestDeleteEHRMissingEHRID(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := newClient(t, srv)
-	err := admin.DeleteEHR(context.Background(), c, "")
+	err := admin.DeleteEHR(t.Context(), c, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("err = %v, want wrap of ErrInvalidConfig", err)
 	}
@@ -73,7 +72,7 @@ func TestDeleteEHRSurfaces404AsErrNotFound(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 
-	err := admin.DeleteEHR(context.Background(), c, ehr.EHRID("ghost"))
+	err := admin.DeleteEHR(t.Context(), c, ehr.EHRID("ghost"))
 	if !errors.Is(err, transport.ErrNotFound) {
 		t.Errorf("err = %v, want wrap of ErrNotFound", err)
 	}
@@ -89,7 +88,7 @@ func TestDeleteAllEHRs(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := newClient(t, srv)
-	if err := admin.DeleteAllEHRs(context.Background(), c); err != nil {
+	if err := admin.DeleteAllEHRs(t.Context(), c); err != nil {
 		t.Fatalf("DeleteAllEHRs: %v", err)
 	}
 	if hits != 1 {
@@ -108,7 +107,7 @@ func TestDeleteAllEHRsSubset(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := newClient(t, srv)
-	if err := admin.DeleteAllEHRs(context.Background(), c, ehr.EHRID("a"), ehr.EHRID("b")); err != nil {
+	if err := admin.DeleteAllEHRs(t.Context(), c, ehr.EHRID("a"), ehr.EHRID("b")); err != nil {
 		t.Fatalf("DeleteAllEHRs subset: %v", err)
 	}
 	if gotPath != "/openehr/v1/admin/ehr/all" {
@@ -127,7 +126,7 @@ func TestPurgeTemplates(t *testing.T) {
 	}))
 	defer srv.Close()
 	c := newClient(t, srv)
-	if err := admin.PurgeTemplates(context.Background(), c); err != nil {
+	if err := admin.PurgeTemplates(t.Context(), c); err != nil {
 		t.Fatalf("PurgeTemplates: %v", err)
 	}
 	if gotMethod != "DELETE" || gotPath != "/openehr/v1/admin/template/all" {
@@ -144,13 +143,13 @@ func TestRepositoryRoundTrip(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 	repo := admin.NewRepository(c)
-	if err := repo.DeleteEHR(context.Background(), ehr.EHRID("xyz")); err != nil {
+	if err := repo.DeleteEHR(t.Context(), ehr.EHRID("xyz")); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.PurgeTemplates(context.Background()); err != nil {
+	if err := repo.PurgeTemplates(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.DeleteAllEHRs(context.Background()); err != nil {
+	if err := repo.DeleteAllEHRs(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{

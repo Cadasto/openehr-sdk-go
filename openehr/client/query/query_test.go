@@ -1,7 +1,6 @@
 package query_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -60,7 +59,7 @@ func TestExecuteAdhoc(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	rs, _, err := query.Execute(context.Background(), newClient(t, srv), aql.Query{
+	rs, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{
 		Q: "SELECT e/ehr_id/value FROM EHR e",
 		Parameters: map[string]any{
 			"ehr_id": "7d44b88c-4199-4bad-97dc-d78268e01398",
@@ -93,7 +92,7 @@ func TestExecuteWithEHRID(t *testing.T) {
 	defer srv.Close()
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
-	_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.Query{
+	_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{
 		Q:     "SELECT e/ehr_id/value FROM EHR e",
 		EHRID: ehrID,
 	})
@@ -116,7 +115,7 @@ func TestRunStoredWithEHRID(t *testing.T) {
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
 	_, _, err := query.RunStored(
-		context.Background(), newClient(t, srv), "org.openehr::compositions", nil,
+		t.Context(), newClient(t, srv), "org.openehr::compositions", nil,
 		query.WithEHRID(ehrID),
 	)
 	if err != nil {
@@ -140,7 +139,7 @@ func TestRunStored(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions", map[string]any{
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions", map[string]any{
 		"ehr_id": "7d44b88c-4199-4bad-97dc-d78268e01398",
 	})
 	if err != nil {
@@ -169,7 +168,7 @@ func TestExecuteGET(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
 		map[string]any{"systolic_min": 120},
 		query.WithGET(), query.WithFetch(10))
@@ -203,7 +202,7 @@ func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT c FROM EHR e",
 		map[string]any{"big": float64(1234567), "flag": true},
 		query.WithGET())
@@ -229,7 +228,7 @@ func TestRunStoredGET(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions",
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions",
 		map[string]any{"ehr_status": "active"}, query.WithGET())
 	if err != nil {
 		t.Fatal(err)
@@ -263,7 +262,7 @@ func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions",
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions",
 		nil, query.WithOffset(0), query.WithFetch(0))
 	if err != nil {
 		t.Fatal(err)
@@ -286,7 +285,7 @@ func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT c FROM EHR e", nil, query.WithGET(), query.WithOffset(0))
 	if err != nil {
 		t.Fatal(err)
@@ -298,7 +297,7 @@ func TestExecuteGETExplicitZeroOffset(t *testing.T) {
 }
 
 func TestExecuteGETRejectsReservedParamName(t *testing.T) {
-	_, _, err := query.ExecuteString(context.Background(), newClient(t, httptest.NewServer(nil)),
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, httptest.NewServer(nil)),
 		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
 	if !errors.Is(err, query.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
@@ -306,7 +305,7 @@ func TestExecuteGETRejectsReservedParamName(t *testing.T) {
 }
 
 func TestExecuteEmptyQuery(t *testing.T) {
-	_, _, err := query.Execute(context.Background(), newClient(t, httptest.NewServer(nil)), aql.Query{})
+	_, _, err := query.Execute(t.Context(), newClient(t, httptest.NewServer(nil)), aql.Query{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -328,7 +327,7 @@ func TestExecuteAQLError(t *testing.T) {
 	t.Run("default_client_suppresses_phi", func(t *testing.T) {
 		// Default client: WithRawErrorBodies is false (PHI suppressed).
 		c := newClient(t, srv)
-		_, _, err := query.Execute(context.Background(), c, aql.Query{
+		_, _, err := query.Execute(t.Context(), c, aql.Query{
 			Q: "SELECT e/ehr_id/value FROM EHR e",
 		})
 		if err == nil {
@@ -379,7 +378,7 @@ func TestExecuteAQLError(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, _, err = query.Execute(context.Background(), c, aql.Query{
+		_, _, err = query.Execute(t.Context(), c, aql.Query{
 			Q: "SELECT e/ehr_id/value FROM EHR e",
 		})
 		if err == nil {
@@ -446,7 +445,7 @@ func TestExecutePathResolutionError(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, _, err = query.Execute(context.Background(), c, aql.NewQuery("SELECT e FROM EHR e"))
+			_, _, err = query.Execute(t.Context(), c, aql.NewQuery("SELECT e FROM EHR e"))
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -483,7 +482,7 @@ func TestExecutePathResolutionCodeOnly(t *testing.T) {
 			defer srv.Close()
 
 			// Default client: message suppressed (PHI), so only the code is seen.
-			_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
+			_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -518,7 +517,7 @@ func TestExecuteBuiltQueryEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := query.Execute(context.Background(), newClient(t, srv), built); err != nil {
+	if _, _, err := query.Execute(t.Context(), newClient(t, srv), built); err != nil {
 		t.Fatal(err)
 	}
 	if body["q"] != built.String() {

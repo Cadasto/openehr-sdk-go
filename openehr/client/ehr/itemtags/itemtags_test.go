@@ -1,7 +1,6 @@
 package itemtags_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,7 +39,7 @@ func TestGetCompositionTags(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	tags, _, err := itemtags.GetComposition(context.Background(), newClient(t, srv),
+	tags, _, err := itemtags.GetComposition(t.Context(), newClient(t, srv),
 		"ehr-1", openehrclient.VersionOf("uid::sys::1"))
 	if err != nil {
 		t.Fatal(err)
