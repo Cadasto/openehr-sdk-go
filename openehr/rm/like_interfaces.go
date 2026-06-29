@@ -60,11 +60,20 @@ type DVTextLike interface {
 	GetDefiningCode() (CodePhrase, bool)
 }
 
-func (d DVText) isDVTextLike()                            {}
-func (d DVText) GetValue() string                         { return d.Value }
-func (d DVText) GetDefiningCode() (CodePhrase, bool)      { return CodePhrase{}, false }
-func (d DVCodedText) isDVTextLike()                       {}
-func (d DVCodedText) GetValue() string                    { return d.Value }
+func (d DVText) isDVTextLike() {}
+
+// GetValue implements DVTextLike.
+func (d DVText) GetValue() string { return d.Value }
+
+// GetDefiningCode implements DVTextLike.
+func (d DVText) GetDefiningCode() (CodePhrase, bool) { return CodePhrase{}, false }
+
+func (d DVCodedText) isDVTextLike() {}
+
+// GetValue implements DVTextLike.
+func (d DVCodedText) GetValue() string { return d.Value }
+
+// GetDefiningCode implements DVTextLike.
 func (d DVCodedText) GetDefiningCode() (CodePhrase, bool) { return d.DefiningCode, true }
 
 // --- DVURILike ------------------------------------------------------
@@ -82,9 +91,14 @@ type DVURILike interface {
 	GetValue() string
 }
 
-func (d DVURI) isDVURILike()        {}
-func (d DVURI) GetValue() string    { return d.Value }
-func (d DVEHRURI) isDVURILike()     {}
+func (d DVURI) isDVURILike() {}
+
+// GetValue implements DVURILike.
+func (d DVURI) GetValue() string { return d.Value }
+
+func (d DVEHRURI) isDVURILike() {}
+
+// GetValue implements DVURILike.
 func (d DVEHRURI) GetValue() string { return d.Value }
 
 // --- AuditDetailsLike -----------------------------------------------
@@ -114,22 +128,43 @@ type AuditDetailsLike interface {
 	GetDescription() (DVTextLike, bool)
 }
 
-func (a AuditDetails) isAuditDetailsLike()          {}
-func (a AuditDetails) GetSystemID() string          { return a.SystemID }
+func (a AuditDetails) isAuditDetailsLike() {}
+
+// GetSystemID implements AuditDetailsLike.
+func (a AuditDetails) GetSystemID() string { return a.SystemID }
+
+// GetTimeCommitted implements AuditDetailsLike.
 func (a AuditDetails) GetTimeCommitted() DVDateTime { return a.TimeCommitted }
-func (a AuditDetails) GetChangeType() DVCodedText   { return a.ChangeType }
-func (a AuditDetails) GetCommitter() PartyProxy     { return a.Committer }
+
+// GetChangeType implements AuditDetailsLike.
+func (a AuditDetails) GetChangeType() DVCodedText { return a.ChangeType }
+
+// GetCommitter implements AuditDetailsLike.
+func (a AuditDetails) GetCommitter() PartyProxy { return a.Committer }
+
+// GetDescription implements AuditDetailsLike.
 func (a AuditDetails) GetDescription() (DVTextLike, bool) {
 	if a.Description == nil {
 		return nil, false
 	}
 	return a.Description, true
 }
-func (a Attestation) isAuditDetailsLike()          {}
-func (a Attestation) GetSystemID() string          { return a.SystemID }
+
+func (a Attestation) isAuditDetailsLike() {}
+
+// GetSystemID implements AuditDetailsLike.
+func (a Attestation) GetSystemID() string { return a.SystemID }
+
+// GetTimeCommitted implements AuditDetailsLike.
 func (a Attestation) GetTimeCommitted() DVDateTime { return a.TimeCommitted }
-func (a Attestation) GetChangeType() DVCodedText   { return a.ChangeType }
-func (a Attestation) GetCommitter() PartyProxy     { return a.Committer }
+
+// GetChangeType implements AuditDetailsLike.
+func (a Attestation) GetChangeType() DVCodedText { return a.ChangeType }
+
+// GetCommitter implements AuditDetailsLike.
+func (a Attestation) GetCommitter() PartyProxy { return a.Committer }
+
+// GetDescription implements AuditDetailsLike.
 func (a Attestation) GetDescription() (DVTextLike, bool) {
 	if a.Description == nil {
 		return nil, false
@@ -162,27 +197,40 @@ type PartyIdentifiedLike interface {
 }
 
 func (p PartyIdentified) isPartyIdentifiedLike() {}
+
+// GetName implements PartyIdentifiedLike.
 func (p PartyIdentified) GetName() (string, bool) {
 	if p.Name == nil {
 		return "", false
 	}
 	return *p.Name, true
 }
+
+// GetIdentifiers implements PartyIdentifiedLike.
 func (p PartyIdentified) GetIdentifiers() []DVIdentifier { return p.Identifiers }
+
+// GetExternalRef implements PartyIdentifiedLike.
 func (p PartyIdentified) GetExternalRef() (*PartyRef, bool) {
 	if p.ExternalRef == nil {
 		return nil, false
 	}
 	return p.ExternalRef, true
 }
+
 func (p PartyRelated) isPartyIdentifiedLike() {}
+
+// GetName implements PartyIdentifiedLike.
 func (p PartyRelated) GetName() (string, bool) {
 	if p.Name == nil {
 		return "", false
 	}
 	return *p.Name, true
 }
+
+// GetIdentifiers implements PartyIdentifiedLike.
 func (p PartyRelated) GetIdentifiers() []DVIdentifier { return p.Identifiers }
+
+// GetExternalRef implements PartyIdentifiedLike.
 func (p PartyRelated) GetExternalRef() (*PartyRef, bool) {
 	if p.ExternalRef == nil {
 		return nil, false
@@ -212,16 +260,32 @@ type ObjectRefLike interface {
 	GetType() string
 }
 
-func (o ObjectRef) isObjectRefLike()          {}
-func (o ObjectRef) GetID() ObjectID           { return o.ID }
-func (o ObjectRef) GetNamespace() string      { return o.Namespace }
-func (o ObjectRef) GetType() string           { return o.Type }
-func (a AccessGroupRef) isObjectRefLike()     {}
-func (a AccessGroupRef) GetID() ObjectID      { return a.ID }
-func (a AccessGroupRef) GetNamespace() string { return a.Namespace }
-func (a AccessGroupRef) GetType() string      { return a.Type }
-func (l LocatableRef) isObjectRefLike()       {}
+func (o ObjectRef) isObjectRefLike() {}
 
+// GetID implements ObjectRefLike.
+func (o ObjectRef) GetID() ObjectID { return o.ID }
+
+// GetNamespace implements ObjectRefLike.
+func (o ObjectRef) GetNamespace() string { return o.Namespace }
+
+// GetType implements ObjectRefLike.
+func (o ObjectRef) GetType() string { return o.Type }
+
+func (a AccessGroupRef) isObjectRefLike() {}
+
+// GetID implements ObjectRefLike.
+func (a AccessGroupRef) GetID() ObjectID { return a.ID }
+
+// GetNamespace implements ObjectRefLike.
+func (a AccessGroupRef) GetNamespace() string { return a.Namespace }
+
+// GetType implements ObjectRefLike.
+func (a AccessGroupRef) GetType() string { return a.Type }
+
+func (l LocatableRef) isObjectRefLike() {}
+
+// GetID implements ObjectRefLike.
+//
 // LocatableRef shadows ObjectRef.ID with its own typed UIDBasedID id.
 // The generated UnmarshalJSON populates the shadow `l.ID` (NOT the
 // embedded `l.ObjectRef.ID`), so GetID prefers the shadow when it is
@@ -238,9 +302,20 @@ func (l LocatableRef) GetID() ObjectID {
 	}
 	return l.ObjectRef.ID
 }
+
+// GetNamespace implements ObjectRefLike.
 func (l LocatableRef) GetNamespace() string { return l.Namespace }
-func (l LocatableRef) GetType() string      { return l.Type }
-func (p PartyRef) isObjectRefLike()         {}
-func (p PartyRef) GetID() ObjectID          { return p.ID }
-func (p PartyRef) GetNamespace() string     { return p.Namespace }
-func (p PartyRef) GetType() string          { return p.Type }
+
+// GetType implements ObjectRefLike.
+func (l LocatableRef) GetType() string { return l.Type }
+
+func (p PartyRef) isObjectRefLike() {}
+
+// GetID implements ObjectRefLike.
+func (p PartyRef) GetID() ObjectID { return p.ID }
+
+// GetNamespace implements ObjectRefLike.
+func (p PartyRef) GetNamespace() string { return p.Namespace }
+
+// GetType implements ObjectRefLike.
+func (p PartyRef) GetType() string { return p.Type }

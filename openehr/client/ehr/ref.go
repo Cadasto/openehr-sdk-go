@@ -35,8 +35,12 @@ type ByVersionedObjectID struct {
 	AtTime time.Time
 }
 
-func (r ByVersionedObjectID) isRef()              {}
+func (r ByVersionedObjectID) isRef() {}
+
+// PathSegment implements Ref, yielding the versioned-object id.
 func (r ByVersionedObjectID) PathSegment() string { return string(r.VOID) }
+
+// Query implements Ref, adding version_at_time when AtTime is set.
 func (r ByVersionedObjectID) Query() (string, string) {
 	if r.AtTime.IsZero() {
 		return "", ""
@@ -52,8 +56,12 @@ type ByVersionUID struct {
 	UID VersionUID
 }
 
-func (r ByVersionUID) isRef()                  {}
-func (r ByVersionUID) PathSegment() string     { return string(r.UID) }
+func (r ByVersionUID) isRef() {}
+
+// PathSegment implements Ref, yielding the version uid.
+func (r ByVersionUID) PathSegment() string { return string(r.UID) }
+
+// Query implements Ref; a version uid needs no query parameter.
 func (r ByVersionUID) Query() (string, string) { return "", "" }
 
 // LatestOf returns a Ref addressing the latest version of voID.

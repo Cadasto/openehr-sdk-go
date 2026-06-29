@@ -22,6 +22,8 @@ import (
 // because the caller addresses an existing resource by id, not by value.
 type Type string
 
+// The concrete openEHR PARTY resource types, each addressed at its own
+// versioned-CRUD endpoint (/demographic/person, /demographic/organisation, …).
 const (
 	Person       Type = "person"
 	Organisation Type = "organisation"

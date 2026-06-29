@@ -94,10 +94,13 @@ type Interface struct {
 // definitions.
 func (i *Interface) IsGeneric() bool { return len(i.GenericParameterDefs) > 0 }
 
+// TypeP_BMM_INTERFACE is the Interface _type discriminator value.
 const TypeP_BMM_INTERFACE = "P_BMM_INTERFACE"
 
 func (*Interface) isClass() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_INTERFACE representation.
 func (i *Interface) MarshalJSON() ([]byte, error) {
 	return marshalClassObject(TypeP_BMM_INTERFACE, &i.classCommon, map[string]any{
 		"generic_parameter_defs": optMap(i.GenericParameterDefs),
@@ -122,8 +125,13 @@ type Enumeration struct {
 	ItemValuesInt      []int64  `json:"-"`
 }
 
+// Enumeration _type discriminator values.
 const (
-	TypeP_BMM_ENUMERATION_STRING  = "P_BMM_ENUMERATION_STRING"
+	// TypeP_BMM_ENUMERATION_STRING is the string-coded Enumeration
+	// _type discriminator value.
+	TypeP_BMM_ENUMERATION_STRING = "P_BMM_ENUMERATION_STRING"
+	// TypeP_BMM_ENUMERATION_INTEGER is the integer-coded Enumeration
+	// _type discriminator value.
 	TypeP_BMM_ENUMERATION_INTEGER = "P_BMM_ENUMERATION_INTEGER"
 )
 
@@ -135,6 +143,9 @@ func (e *Enumeration) IsStringEnum() bool { return e.EnumKind == TypeP_BMM_ENUME
 // IsIntegerEnum reports whether this is a P_BMM_ENUMERATION_INTEGER.
 func (e *Enumeration) IsIntegerEnum() bool { return e.EnumKind == TypeP_BMM_ENUMERATION_INTEGER }
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_ENUMERATION_STRING / P_BMM_ENUMERATION_INTEGER representation
+// (selected by EnumKind).
 func (e *Enumeration) MarshalJSON() ([]byte, error) {
 	extra := map[string]any{
 		"item_names": e.ItemNames,

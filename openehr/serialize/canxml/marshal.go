@@ -199,9 +199,9 @@ func bmmNamerAndMarshaler(v any) (BMMNamer, xml.Marshaler, bool) {
 	}
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Struct {
-		copy := reflect.New(rv.Type())
-		copy.Elem().Set(rv)
-		p := copy.Interface()
+		cp := reflect.New(rv.Type())
+		cp.Elem().Set(rv)
+		p := cp.Interface()
 		if bn, ok := p.(BMMNamer); ok {
 			if m, ok := p.(xml.Marshaler); ok {
 				return bn, m, true
