@@ -6,7 +6,15 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
-No standalone active plans. The SMART-on-openEHR auth conformance audit landed and moved to [`archive/`](archive/2026-06-16-auth-smart-conformance-audit.md) (REQ-061..064/068, REQ-070..072; ADR 0008/0009; STRAND-05). The next planned body of work is the simplified-formats umbrella below.
+### SDK-GAP-15/16/17 — v0.11.0 dossiers (Draft, 2026-06-29)
+
+Three independent gaps filed by a consuming CDR project after v0.11.0; each plan stands alone (no shared code path) and may land in any order, on the same branch or separate ones.
+
+| Plan | Scope | Covers REQs / probes |
+|---|---|---|
+| [2026-06-29-sdk-gap-15-rm-floor-validation.md](2026-06-29-sdk-gap-15-rm-floor-validation.md) | Template-less RM validation entry (`ValidateRM`) — RM-invariant floor beneath the template-driven path | proposed REQ-112; PROBE-077 |
+| [2026-06-29-sdk-gap-16-stored-query-rest-conformance.md](2026-06-29-sdk-gap-16-stored-query-rest-conformance.md) | `openehr-ehr-id` header scoping on POST execution; `Location` parsing in `PutStoredQuery` | REQ-055 / REQ-057 (no new REQ); PROBE-078 / PROBE-079 |
+| [2026-06-29-sdk-gap-17-aql-execution-ast.md](2026-06-29-sdk-gap-17-aql-execution-ast.md) | Stable, generated-type-free read AST for parsed AQL (`parse.Query`); interim `Document.Tree()` accessor | proposed REQ-113; PROBE-080 |
 
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
