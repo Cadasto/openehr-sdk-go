@@ -193,10 +193,27 @@ func queryParamString(val any) (string, error) {
 	return string(b), nil
 }
 
-// applyEHRScope sets the openEHR REST `ehr_id` query parameter when the
-// caller scoped execution to one EHR (REQ-055).
+// applyEHRScope scopes execution to one EHR per REQ-055 using the
+// verb-appropriate mechanism from the openEHR ITS-REST OAS:
+//
+//   - GET — the `ehr_id` query parameter (declared on the GET operations).
+//   - POST — the `openehr-ehr-id` request header (the spec's POST mechanism;
+//     the POST operations declare no `ehr_id` query parameter and the
+//     request bodies carry no `ehr_id` field — header is the only path).
+//
+// SDK-GAP-16 finding A: prior to this split the SDK always set the query
+// parameter, so a strict-spec server that scopes POST execution only via
+// the header would silently run population-wide. The header path closes
+// that gap by default; an explicit option is reserved for a future plan.
 func applyEHRScope(req *transport.Request, cfg executeConfig) {
 	if cfg.ehrID == "" {
+		return
+	}
+	if req.Method == http.MethodPost {
+		if req.Headers == nil {
+			req.Headers = http.Header{}
+		}
+		req.Headers.Set("openehr-ehr-id", cfg.ehrID)
 		return
 	}
 	if req.Query == nil {

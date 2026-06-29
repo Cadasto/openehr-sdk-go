@@ -33,18 +33,16 @@ Today the client diverges from the canonical OAS in two places — both consumer
 
 ## Definition of Ready (analysis gate)
 
-- [ ] Maintainer sign-off on the **Finding A surface shape** — option A1 (explicit `WithEHRIDHeader` option) or A2 (always emit the header on POST, keep query param on GET) chosen below.
+- [x] Maintainer sign-off on the **Finding A surface shape** — **A2** (verb-aware default: header on POST, query param on GET) chosen 2026-06-29.
 - [ ] PROBE-078 + PROBE-079 cassette pair specified — the two minimal HTTP exchanges captured from the vendored OAS contract.
 
-## Accepted approach (decision pending — sign-off gate above)
+## Accepted approach (2026-06-29)
 
-### Finding A — `openehr-ehr-id` header on POST
+### Finding A — `openehr-ehr-id` header on POST (A2)
 
-Two surfaces under consideration; the lean is **A2** (opinionated default, smaller call-site footprint).
+`applyEHRScope` becomes verb-aware: GET → `ehr_id` query parameter (unchanged); POST → `openehr-ehr-id` request header. Document the precedence in the package doc: an explicit option wins if/when one is later added; then header on POST; then query parameter as fallback only on GET. Removes the silent-failure mode by default for every existing POST caller. Existing in-tree callers do not need to change.
 
-**A1.** A `query.WithEHRIDHeader(id)` execute-option. Caller picks header vs query parameter explicitly. The default stays the query parameter on both verbs. Lowest risk; verbose at every call site.
-
-**A2 (recommended).** `applyEHRScope` becomes verb-aware: GET → query parameter (unchanged); POST → request header. Document the precedence: explicit option wins if/when added later, then header on POST, then query parameter as fallback only on GET. Removes the silent-failure mode by default for every existing POST caller. Existing in-tree callers do not need to change.
+An explicit `query.WithEHRIDHeader(id)` execute-option is **deferred** to a follow-up plan — additive when needed, no need to land it here.
 
 Either option carries the header through [`transport`](../../transport) via the existing custom-header mechanism (REQ-059) — no new transport plumbing.
 

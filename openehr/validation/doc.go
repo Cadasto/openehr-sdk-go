@@ -1,6 +1,9 @@
 // Package validation checks in-memory openEHR Reference Model
 // artefacts against a compiled OPT and reports every issue in one
 // pass — REQ-102 (COMPOSITION) and REQ-110 (any archetypeable root).
+// REQ-112 adds a template-less floor — [ValidateRM] and its typed
+// sugars — for resources that bind to no operational template (FOLDER,
+// EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY).
 //
 // Public entry:
 //
@@ -21,12 +24,22 @@
 //
 // # Trust model
 //
-// Validation is **template-driven**: the compiled OPT is the
-// authoritative driver and the composition is the value source.
-// For each compiled OPT node the walker reads the corresponding
-// RM property via [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
-// enforces existence / cardinality / alternatives / RM-type match
-// / archetype-id identity, and recurses into matched RM children.
+// The template-driven entries ([ValidateComposition], [Validate], the
+// REQ-110 typed wrappers) are **template-driven**: the compiled OPT is
+// the authoritative driver and the composition is the value source.
+// For each compiled OPT node the walker reads the corresponding RM
+// property via [github.com/cadasto/openehr-sdk-go/openehr/validation/rmread],
+// enforces existence / cardinality / alternatives / RM-type match /
+// archetype-id identity, and recurses into matched RM children.
+//
+// The REQ-112 floor ([ValidateRM] + typed sugars) is the **RM-only**
+// layer beneath that: a second driver that walks any RM root with
+// rminfo as the sole structural source — no OPT — and enforces
+// RM-mandatory attribute presence plus a small per-RM-type invariant
+// catalogue (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL numeric bounds,
+// OBJECT_REF type/namespace). Template validity implies RM validity,
+// so the two compose: callers with a template run [Validate], callers
+// without one run [ValidateRM], callers wanting both run both.
 //
 // Path strings in [Issue.Path] are built by appending OPT-side
 // attribute names and matched-child predicates to the parent OPT

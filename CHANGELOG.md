@@ -10,6 +10,11 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Template-less RM validation floor (SDK-GAP-15; REQ-112).** `validation.ValidateRM` + typed sugars (`ValidateRMFolder`/`EHRStatus`/`EHRAccess`/`Demographic`) walk any RM root with the BMM as sole driver and report RM-mandatory absences plus a per-type invariant catalogue (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL bounds, OBJECT_REF type/namespace); template-driven path unchanged.
+- **Stored-query/query REST conformance (SDK-GAP-16; REQ-055/057).** POST query execution now scopes via the spec's `openehr-ehr-id` request header (verb-aware: GET still uses the `ehr_id` query parameter); `PutStoredQuery` recovers the assigned `{name, version}` from the `Location` response header before falling through to body decode then synthesised metadata.
+
 ## [0.11.0] - 2026-06-24
 
 Eleventh `v0.x` minor — polymorphic `_type` round-trip stability (SDK-GAP-13) and seeded synthetic value generation (SDK-GAP-14), plus the ITS-REST conformance remediation. Additive new `instance`/`composition` value-fill API; one integrator-visible change — `composition.Get` returns the typed `ErrDeletedAtTime` on a 204 deleted read. Safe to upgrade from `v0.10.0` after that note.

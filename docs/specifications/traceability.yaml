@@ -761,6 +761,31 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-17-public-compiled-template-bridge.md
 
+  - id: REQ-112
+    title: Template-less Reference Model validation floor
+    canonical: docs/specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor
+    status: draft
+    # ValidateRM (+ typed sugars for FOLDER / EHR_STATUS / EHR_ACCESS /
+    # demographic PARTY) walks an RM root with rminfo as the sole driver —
+    # no compiled OPT. Enforces RM-mandatory attribute presence + a small
+    # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
+    # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
+    # type/namespace). Driver is a second walker alongside REQ-102/110;
+    # closed-RM-set helpers (rmTypeInfo / rmread) are shared. SDK-GAP-15.
+    implementation: landed
+    packages:
+      - openehr/validation
+      - openehr/rm/rminfo  # AttributeNames added to Lookup
+    # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
+    # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
+    # first-cycle catalogue (required-set absence + the four named
+    # leaf invariants).
+    probes: []
+    tests:
+      - openehr/validation/rmfloor_test.go
+    plans:
+      - docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md
+
   - id: REQ-120
     title: RM identifier parsing and derivation
     canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation

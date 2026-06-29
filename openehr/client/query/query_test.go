@@ -82,6 +82,10 @@ func TestExecuteAdhoc(t *testing.T) {
 	}
 }
 
+// TestExecuteWithEHRID pins SDK-GAP-16 finding A on the POST path: EHR
+// scoping is emitted via the `openehr-ehr-id` request header (the spec's
+// POST mechanism), NOT the `ehr_id` query parameter (the GET mechanism;
+// not declared on the canonical POST operations).
 func TestExecuteWithEHRID(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -99,11 +103,19 @@ func TestExecuteWithEHRID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if captured.URL.Query().Get("ehr_id") != ehrID {
-		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	if captured.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", captured.Method)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != ehrID {
+		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != "" {
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
 	}
 }
 
+// TestRunStoredWithEHRID mirrors TestExecuteWithEHRID for the stored-query
+// POST path (SDK-GAP-16 finding A).
 func TestRunStoredWithEHRID(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -121,8 +133,44 @@ func TestRunStoredWithEHRID(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if captured.URL.Query().Get("ehr_id") != ehrID {
-		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	if captured.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", captured.Method)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != ehrID {
+		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != "" {
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
+	}
+}
+
+// TestExecuteGETWithEHRID pins SDK-GAP-16 finding A on the GET path: EHR
+// scoping uses the `ehr_id` query parameter (declared on the canonical
+// GET operations) and MUST NOT send the `openehr-ehr-id` header.
+func TestExecuteGETWithEHRID(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
+	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+		"SELECT e/ehr_id/value FROM EHR e", nil,
+		query.WithGET(), query.WithEHRID(ehrID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Fatalf("method = %q, want GET", captured.Method)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != ehrID {
+		t.Errorf("ehr_id query param = %q, want %q (GET keeps query-param scoping)", got, ehrID)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != "" {
+		t.Errorf("openehr-ehr-id header leaked on GET = %q, want empty (SDK-GAP-16 finding A)", got)
 	}
 }
 

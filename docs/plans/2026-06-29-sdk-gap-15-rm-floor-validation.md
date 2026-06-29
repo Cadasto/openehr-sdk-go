@@ -24,15 +24,15 @@ The SDK already carries every building block required: `rminfo` (`RequiredAttrib
 
 Implementation may start when:
 
-- [ ] Maintainer sign-off on the **driver split** (option A vs B below) — chosen approach recorded inline once decided.
-- [ ] **Covers:** finalized — promote a new normative section under [`clinical-modeling.md`](../specifications/clinical-modeling.md) (`REQ-112 — template-less RM validation`) **before** the implementation PR, or extend REQ-110 in-place with an explicit "template-less floor" subsection. Maintainer chooses.
+- [x] Maintainer sign-off on the **driver split** — **Option A** (second driver alongside `*Compiled`) chosen 2026-06-29.
+- [x] **Covers:** finalized — promote new REQ-112 section under [`clinical-modeling.md`](../specifications/clinical-modeling.md) 2026-06-29; REQ-110 stays exactly as-is. REQ.md row added at status `Draft` in Phase 2 alongside the prose.
 - [ ] PROBE-077 cassette set agreed — minimum: an `EHR_STATUS` missing `subject`, a `FOLDER` missing `name`, a `DV_INTERVAL` with `lower>upper`, a `CODE_PHRASE` with empty `code_string`. Each cassette: input JSON + expected `Issue` (path + code).
 
-## Accepted approach (decision pending — sign-off gate above)
+## Accepted approach (2026-06-29)
 
 Two drivers are under consideration; both share the **walker** (the existing `walk_composition` shape generalised) and the **invariant evaluators** (small, declarative — one per RM type).
 
-### Option A — second driver alongside `*Compiled` (recommended)
+### Option A — second driver alongside `*Compiled` (chosen 2026-06-29)
 
 A new internal driver type — e.g. `validate.rmFloorDriver` — that satisfies the same walk contract as the template-driven driver but sources mandatory-attribute and type-membership facts from `rminfo` instead of an OPT. The walker reuses `rmread/` for the value-side and dispatches per-RM-type invariant evaluators alongside the existing structural checks. The public API forks once at the entry layer:
 

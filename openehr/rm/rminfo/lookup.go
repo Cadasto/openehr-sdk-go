@@ -32,6 +32,14 @@ type Lookup interface {
 	// is unknown.
 	IsContainer(parentRMType, attrName string) (bool, bool)
 
+	// AttributeNames returns every attribute on the given RM type in
+	// BMM declaration order (ancestors first, then own). Includes
+	// inherited attributes. Returns nil when rmType is unknown.
+	// Consumers walking the RM graph without an OPT — e.g. the
+	// template-less validation floor (REQ-112) — use this to
+	// enumerate the descend candidates.
+	AttributeNames(rmType string) []string
+
 	// KnownRMTypes returns all RM class names this Lookup recognises,
 	// sorted alphabetically. Used by validators that need to walk the
 	// universe of types (e.g. discovery probes).
@@ -108,6 +116,14 @@ func (l *lookup) AttributeRMType(parentRMType, attrName string) (string, bool) {
 		return "", false
 	}
 	return attr.TypeName, true
+}
+
+func (l *lookup) AttributeNames(rmType string) []string {
+	meta, ok := l.data[rmType]
+	if !ok {
+		return nil
+	}
+	return slices.Clone(meta.AttrOrder)
 }
 
 func (l *lookup) IsContainer(parentRMType, attrName string) (bool, bool) {
