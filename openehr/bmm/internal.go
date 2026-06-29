@@ -3,7 +3,7 @@ package bmm
 import (
 	"bytes"
 	"encoding/json"
-	"sort"
+	"slices"
 )
 
 // sortedKeys returns the keys of m in lexicographic order. Used to
@@ -13,7 +13,7 @@ func sortedKeys[V any](m map[string]V) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }
 

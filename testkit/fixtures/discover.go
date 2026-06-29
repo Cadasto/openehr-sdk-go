@@ -1,10 +1,11 @@
 package fixtures
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -69,7 +70,7 @@ func ListCompositionJSON() ([]CompositionJSONRel, error) {
 			return nil, err
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Rel < out[j].Rel })
+	slices.SortFunc(out, func(a, b CompositionJSONRel) int { return cmp.Compare(a.Rel, b.Rel) })
 	return out, nil
 }
 
@@ -131,7 +132,7 @@ func TemplateIDsWithCompositionXML() ([]string, error) {
 		}
 		ids = append(ids, tid)
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	return ids, nil
 }
 
@@ -160,6 +161,6 @@ func ListRMXML() ([]string, error) {
 			out = append(out, filepath.ToSlash(filepath.Join(kind, e.Name())))
 		}
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out, nil
 }

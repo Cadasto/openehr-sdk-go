@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"sort"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
@@ -45,7 +45,7 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		}
 		classNames = append(classNames, name)
 	}
-	sort.Strings(classNames)
+	slices.Sort(classNames)
 
 	entries := make([]entry, 0, len(classNames))
 	for _, name := range classNames {
@@ -69,7 +69,7 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		for n := range e.attrs {
 			innerNames = append(innerNames, n)
 		}
-		sort.Strings(innerNames)
+		slices.Sort(innerNames)
 		for _, n := range innerNames {
 			a := e.attrs[n]
 			fmt.Fprintf(&body, "\t\t\t%q: {TypeName: %q, Required: %t, Container: %t},\n",

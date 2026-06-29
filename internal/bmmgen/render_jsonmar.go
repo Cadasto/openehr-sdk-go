@@ -6,7 +6,6 @@ import (
 	"go/format"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"sync"
 
@@ -450,6 +449,6 @@ func genericTypeArgList(sc *bmm.SimpleClass) string {
 	for k := range sc.GenericParameterDefs {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return "[" + strings.Join(keys, ", ") + "]"
 }

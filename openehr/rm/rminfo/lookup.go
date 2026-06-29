@@ -2,7 +2,6 @@ package rminfo
 
 import (
 	"slices"
-	"sort"
 	"sync"
 )
 
@@ -129,7 +128,7 @@ func (l *lookup) KnownRMTypes() []string {
 		for k := range l.data {
 			l.known = append(l.known, k)
 		}
-		sort.Strings(l.known)
+		slices.Sort(l.known)
 	})
 	// Return a copy so callers may sort/mutate without corrupting the cache.
 	return slices.Clone(l.known)
