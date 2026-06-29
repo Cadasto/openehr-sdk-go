@@ -94,6 +94,25 @@ func Parse(q string) (*Document, error) {
 // Parsed reports whether d is the result of a successful [Parse] call.
 func (d *Document) Parsed() bool { return d != nil && d.tree != nil }
 
+// Tree returns the validated ANTLR parse tree backing this document.
+//
+// Unstable consumer contract — the return type comes from the generated
+// parser package ([gen.ISelectQueryContext]) and may change shape on
+// any grammar regeneration. The accessor is the SDK-GAP-17 Tier-1
+// interim (REQ-113); prefer the structured [Query] AST (Tier 2 — to be
+// landed under REQ-113) for new consumers that need to read SELECT /
+// CONTAINS / WHERE / ORDER BY / LIMIT structure without coupling to
+// the generated typed-context tree.
+//
+// Returns nil for a zero-value document — call only after a successful
+// [Parse], or guard with [Document.Parsed].
+func (d *Document) Tree() gen.ISelectQueryContext {
+	if d == nil {
+		return nil
+	}
+	return d.tree
+}
+
 func (d *Document) populate() {
 	if sc := d.tree.SelectClause(); sc != nil {
 		d.Distinct = sc.DISTINCT() != nil

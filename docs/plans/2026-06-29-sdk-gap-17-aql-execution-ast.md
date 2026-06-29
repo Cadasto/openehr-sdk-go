@@ -28,14 +28,15 @@ An execution engine — the read-side use-case — has no choice but to descend 
 
 Implementation may start when:
 
-- [ ] Maintainer sign-off on the **roll-out shape** — interim `Document.Tree()` accessor only, target AST only, or both in one cycle. Recorded inline below once chosen.
-- [ ] Maintainer sign-off on the **vocabulary unification** — whether the existing `WhereExpr`/`Value` interfaces gain readable accessors on the SAME types (one model, two directions), or whether parse emits a *parallel* set of exported types (`parse.WhereExpr` etc.) that the Builder later mirrors. (The dossier and this plan both lean **unify**.)
-- [ ] **Covers:** finalized — promote REQ-113 prose under `clinical-modeling.md`, register the row in [`REQ.md`](../specifications/REQ.md) at status `Draft` before the implementation PR.
+- [x] Maintainer sign-off on the **roll-out shape** — **both in one cycle** (interim `Document.Tree()` accessor + target `parse.Query` AST) chosen 2026-06-29.
+- [x] Maintainer sign-off on the **vocabulary unification** — **unify on the same concrete types**: export the existing concrete `WhereExpr`/`Value` types with read accessors; Parse populates them; Builder constructs them. One model, two directions. Chosen 2026-06-29.
+- [x] Maintainer sign-off on the **placement** — **`parse.Query`** in the parser package (mirror of `Parse → Document`); the unified vocabulary stays in `aql`. Chosen 2026-06-29.
+- [ ] **Covers:** finalized — promote REQ-113 prose under `clinical-modeling.md`, register the row in [`REQ.md`](../specifications/REQ.md) at status `Draft` alongside the implementation in Phase 3.
 - [ ] PROBE-080 round-trip corpus seeded — at least: a SELECT with COUNT and AS alias; a nested CONTAINS chain; a WHERE with `AND`/`OR`/`NOT`/`EXISTS`/`MATCHES`/`LIKE`; an ORDER BY with mixed directions; a LIMIT+OFFSET.
 
-## Accepted approach (decision pending — sign-off gates above)
+## Accepted approach (2026-06-29)
 
-Two tiers, either independently acceptable; the second is the target. Recommend landing **both** in sequence on the same branch (interim ships value immediately while the target settles).
+Two tiers landed on the same branch: the interim ships value immediately while the target settles. Vocabulary unifies on the existing concrete write-side types (one model, two directions); the new structured AST type lives in `parse` as `parse.Query`.
 
 ### Tier 1 — interim: `Document.Tree()` accessor (cheap, ~one day)
 
