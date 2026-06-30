@@ -131,8 +131,6 @@ func describeClassExpr(c parse.ClassExpr) string {
 	switch {
 	case c.Archetype != "":
 		out += "[" + c.Archetype + "]"
-	case c.ParamArchetype:
-		out += "[$archetype]"
 	case c.Predicate != "":
 		out += "[" + c.Predicate + "]"
 	}

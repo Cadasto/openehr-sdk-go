@@ -216,20 +216,33 @@ go run ./cmd/examples/aql-parse-structured
 **Sample output:**
 
 ```text
-structured AST:
-  SELECT:
-    [0] o (PathExpr)
+input AQL:
+  SELECT
+    c/uid/value,
+    c/name/value
   FROM EHR e
     CONTAINS COMPOSITION c
-      CONTAINS OBSERVATION o
+  WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%'
+  ORDER BY c/uid/value DESC
+  LIMIT 50 OFFSET 100
+
+structured AST:
+  SELECT:
+    [0] c/uid/value
+    [1] c/name/value
+  FROM EHR e
+    CONTAINS COMPOSITION c
   WHERE:
     AND:
-      o/active = true (bool)
-      o/data > 37.5 (real)
+      c/uid/value = $cid (param)
+      c/name/value LIKE 'Vital%' (string)
+  ORDER BY:
+    [0] c/uid/value DESC
   LIMIT 50 (int)
+  OFFSET 100 (int)
 
 canonical emission:
-  SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o WHERE o/active = true AND o/data > 37.5 LIMIT 50
+  SELECT c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%' ORDER BY c/uid/value DESC LIMIT 50 OFFSET 100
 ```
 
 **What to copy into your app:** use `parse.ParseQuery(src)` to get the structured AST when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings); check `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution against the CDR.

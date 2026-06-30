@@ -71,7 +71,14 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 	if lc := tree.LimitClause(); lc != nil {
 		q.Limit, q.Offset = ex.extractLimit(lc)
 	}
-	return q, ex.err()
+	err := ex.err()
+	if err != nil {
+		// Record the gap on the AST so [Query.Emit] refuses to
+		// render an incomplete tree even when the caller ignored
+		// this error return.
+		q.incomplete = err
+	}
+	return q, err
 }
 
 // --- SELECT ----------------------------------------------------------
@@ -334,7 +341,12 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				ap := pp.ArchetypePredicate()
 				if hrid := ap.ARCHETYPE_HRID(); hrid != nil {
 					ce.Archetype = hrid.GetText()
-				} else if ap.PARAMETER() != nil {
+				} else if p := ap.PARAMETER(); p != nil {
+					// `[$name]` archetype predicate — store the
+					// placeholder verbatim (with the leading `$`)
+					// so the emitter re-emits the exact source
+					// token; ParamArchetype is the typed signal.
+					ce.Archetype = p.GetText()
 					ce.ParamArchetype = true
 				}
 			default:

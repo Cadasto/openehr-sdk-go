@@ -743,18 +743,24 @@ The SDK **MUST** expose a **stable, generated-type-free, readable** structured A
 // Package github.com/cadasto/openehr-sdk-go/openehr/aql/parse
 
 // Tier 2 — the target read AST.
-func ParseQuery(q string) (*Query, error)
-func (d *Document) Query() *Query
+func ParseQuery(q string) (*Query, error)              // (*Query, aql.ErrIncompleteAST) on catalogue gap
+func (d *Document) Query() *Query                       // best-effort partial AST
+func (d *Document) QueryErr() error                     // aql.ErrIncompleteAST diagnostic, nil otherwise
 
 type Query struct {
     Select  SelectClause
     From    FromClause
     Where   aql.WhereExpr  // nil when no WHERE clause
     OrderBy []OrderTerm
-    Limit   *int           // nil when no LIMIT
-    Offset  *int           // nil when no OFFSET
+    Limit   LimitExpr      // nil when no LIMIT
+    Offset  LimitExpr      // nil when no OFFSET
 }
-func (q *Query) Emit() (string, error)
+func (q *Query) Emit() (string, error)                  // refuses (returns aql.ErrIncompleteAST) on an extractor-incomplete AST
+
+// LIMIT / OFFSET — sealed union of literal and parameter forms.
+type LimitExpr  interface { /* sealed */ }
+type IntLimit   struct { N int }                        // `LIMIT 50`
+type ParamLimit struct { Name string }                  // `LIMIT $rows`
 
 // SELECT
 type SelectClause struct {
@@ -765,7 +771,7 @@ type SelectClause struct {
 type SelectItem  struct { Expr SelectExpr; Alias string }
 type SelectExpr  interface{ isSelectExpr() }
 type PathExpr    struct { IdentifiedPath }
-type FunctionCall struct { Name string; Args []SelectExpr }
+type FunctionCall struct { Name string; Args []SelectExpr; Distinct, Star bool }
 
 // FROM / CONTAINS — nested containment tree
 type FromClause   struct { Root ClassExpr; Contains *Containment }
@@ -776,6 +782,8 @@ type ContainsJoin int  // ContainsAnd / ContainsOr
 type OrderTerm struct { Path IdentifiedPath; Dir OrderDir }
 type OrderDir  int  // OrderAsc / OrderDesc
 ```
+
+The shared `aql.Value` vocabulary additionally exposes [`aql.NullValue`](../../openehr/aql/value.go) (typed NULL sentinel) so the unquoted `NULL` keyword round-trips without colliding with a `StringValue{"NULL"}`. [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) is the sentinel surfaced by `ParseQuery` / `Document.QueryErr` and is also returned by `(*Query).Emit` when the AST came from an incomplete extraction.
 
 Tier 1 — the cheap interim — exposes the validated ANTLR tree via [`(*Document).Tree`](../../openehr/aql/parse/parse.go) (return type `gen.ISelectQueryContext`, explicitly unstable). It removes the re-parse cost for consumers already recursing the generated parser but does not solve the generated-coupling concern; Tier 2 is the stable read AST.
 

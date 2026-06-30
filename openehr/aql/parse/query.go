@@ -60,6 +60,14 @@ type Query struct {
 	// Offset is the row offset when present; nil when no OFFSET
 	// clause appeared in the source. Same concrete shapes as [Limit].
 	Offset LimitExpr
+
+	// incomplete records the catalogue-gap error from the extractor
+	// (an error wrapping [aql.ErrIncompleteAST] when present). Emit
+	// refuses to render an incomplete AST so a caller who ignored
+	// [ParseQuery]'s error cannot accidentally produce semantically
+	// wrong AQL. Direct-construction Querys leave this nil (the
+	// caller owns the AST shape).
+	incomplete error
 }
 
 // LimitExpr is the sealed type of a LIMIT / OFFSET value. Concrete shapes
@@ -241,18 +249,30 @@ func (d OrderDir) String() string {
 // byte (PROBE-020 / REQ-113).
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
-// valid q produced by [ParseQuery] — the v1 catalogue of supported
-// shapes is the buildable grammar plus the parser-only shapes
-// (NotExpr / ExistsExpr / LikeExpr / MatchesExpr). Shapes outside the
-// catalogue (Primitive-in-SELECT, parameter-bound LIMIT) round-trip on
-// a best-effort basis.
+// q produced by [ParseQuery] — the v1 catalogue is the buildable
+// grammar plus the parser-only shapes (NotExpr / ExistsExpr / LikeExpr
+// / MatchesExpr) and the typed LIMIT / OFFSET forms ([IntLimit] +
+// [ParamLimit]). Source shapes outside the v1 extractor catalogue do
+// not produce a Query at all — [ParseQuery] returns the partial AST
+// alongside [aql.ErrIncompleteAST], and Emit on that AST refuses with
+// the same error so a caller who ignored the parse return cannot
+// emit semantically wrong AQL.
 //
 // Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
 // a malformed sub-expression (a nil WHERE comparison value, an empty
-// SELECT projection, …).
+// SELECT projection, an OFFSET without LIMIT, a duplicate alias …), or
+// [aql.ErrIncompleteAST] when the AST came from an extractor-
+// incomplete parse.
 func (q *Query) Emit() (string, error) {
 	if q == nil {
 		return "", fmt.Errorf("%w: nil query", aql.ErrInvalidQuery)
+	}
+	// Refuse to render an extractor-incomplete AST so a caller who
+	// ignored [ParseQuery]'s error cannot accidentally emit
+	// semantically wrong AQL (the extractor recorded which clauses
+	// were dropped). The error wraps [aql.ErrIncompleteAST].
+	if q.incomplete != nil {
+		return "", q.incomplete
 	}
 	var sb strings.Builder
 
@@ -392,11 +412,12 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 
 func emitClassExpr(c ClassExpr) string {
 	if c.Version {
-		// VERSION class — `VERSION <alias>` (predicate emission deferred
-		// to the version-aware emitter, not in the v1 catalogue).
 		out := "VERSION"
 		if c.Alias != "" {
 			out += " " + c.Alias
+		}
+		if c.Predicate != "" {
+			out += "[" + c.Predicate + "]"
 		}
 		return out
 	}
@@ -406,13 +427,10 @@ func emitClassExpr(c ClassExpr) string {
 	}
 	switch {
 	case c.Archetype != "":
+		// Archetype carries either a literal HRID or, when
+		// ParamArchetype is true, the source `$name` placeholder
+		// verbatim — both forms wrap in brackets unchanged.
 		out += "[" + c.Archetype + "]"
-	case c.ParamArchetype:
-		// `$param` archetype predicate — the parser recorded the
-		// placeholder shape but not the name (it lives on the surrounding
-		// Document.Params slice). The wire form is the literal `$`
-		// placeholder token.
-		out += "[$archetype]"
 	case c.Predicate != "":
 		out += "[" + c.Predicate + "]"
 	}

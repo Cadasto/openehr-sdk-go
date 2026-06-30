@@ -64,6 +64,9 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"count_distinct", "SELECT COUNT(DISTINCT o/data) FROM EHR e CONTAINS OBSERVATION o"},
 		{"standing_predicate", "SELECT e/ehr_id/value FROM EHR e[ehr_id/value=$id]"},
 		{"archetype_hrid", "SELECT o FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.report.v1] CONTAINS OBSERVATION o"},
+		{"param_archetype", "SELECT c FROM EHR e CONTAINS COMPOSITION c[$template]"},
+		{"version_predicate", "SELECT v FROM EHR e CONTAINS VERSION v[all_versions]"},
+		{"version_latest", "SELECT v FROM EHR e CONTAINS VERSION v[latest_version]"},
 		{"limit_param", "SELECT e FROM EHR e LIMIT $rows"},
 		{"limit_offset_param", "SELECT e FROM EHR e LIMIT $rows OFFSET $skip"},
 	}
@@ -111,6 +114,8 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT COUNT(*) FROM EHR e",
 		"SELECT COUNT(DISTINCT o/data) FROM EHR e CONTAINS OBSERVATION o",
 		"SELECT e/ehr_id/value FROM EHR e[ehr_id/value=$id]",
+		"SELECT c FROM EHR e CONTAINS COMPOSITION c[$template]",
+		"SELECT v FROM EHR e CONTAINS VERSION v[all_versions]",
 		"SELECT e FROM EHR e LIMIT $rows OFFSET $skip",
 	}
 	for _, in := range canonical {
@@ -143,6 +148,8 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 		{"function_call_where_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name) > 5", "function-call WHERE LHS"},
 		{"path_vs_path", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/y", "identifiedPath RHS"},
 		{"from_junction", "SELECT e FROM EHR e OR EHR f", "FROM top-level boolean junction"},
+		{"matches_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')", "MATCHES terminology"},
+		{"matches_uri", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}", "MATCHES terminology"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -160,6 +167,14 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 			// caller can inspect what survived.
 			if q == nil {
 				t.Errorf("ParseQuery returned nil *Query on catalogue gap; want best-effort partial AST")
+			}
+			// Emit on an incomplete AST MUST refuse with the same
+			// ErrIncompleteAST so a caller who ignored the parse
+			// return cannot accidentally emit semantically wrong
+			// AQL (the structural recommendation from the PR #58
+			// re-review).
+			if _, eerr := q.Emit(); !errors.Is(eerr, aql.ErrIncompleteAST) {
+				t.Errorf("Emit on incomplete AST: want ErrIncompleteAST, got %v", eerr)
 			}
 		})
 	}

@@ -200,3 +200,186 @@ func TestParseQueryStarSelect(t *testing.T) {
 		t.Errorf("Select.Items len = %d, want 0 for SELECT *", len(q.Select.Items))
 	}
 }
+
+// TestParseQueryAggregateCountStar pins extraction shape for COUNT(*):
+// FunctionCall with Star=true and empty Args.
+func TestParseQueryAggregateCountStar(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT COUNT(*) FROM EHR e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q.Select.Items) != 1 {
+		t.Fatalf("Select.Items len = %d, want 1", len(q.Select.Items))
+	}
+	fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+	}
+	if fc.Name != "COUNT" {
+		t.Errorf("FunctionCall.Name = %q, want COUNT", fc.Name)
+	}
+	if !fc.Star {
+		t.Errorf("FunctionCall.Star = false; want true for COUNT(*)")
+	}
+	if len(fc.Args) != 0 {
+		t.Errorf("FunctionCall.Args len = %d, want 0 for COUNT(*)", len(fc.Args))
+	}
+}
+
+// TestParseQueryAggregateCountDistinct pins COUNT(DISTINCT path):
+// FunctionCall with Distinct=true and the path operand in Args.
+func TestParseQueryAggregateCountDistinct(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT COUNT(DISTINCT o/data) FROM EHR e CONTAINS OBSERVATION o")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !fc.Distinct {
+		t.Errorf("FunctionCall.Distinct = false; want true for COUNT(DISTINCT ...)")
+	}
+	if len(fc.Args) != 1 {
+		t.Fatalf("FunctionCall.Args len = %d, want 1", len(fc.Args))
+	}
+}
+
+// TestParseQueryNotContains pins the NOT CONTAINS extraction shape:
+// the chained child carries Negated=true so the parent emits
+// `NOT CONTAINS` for the connector.
+func TestParseQueryNotContains(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c FROM EHR e CONTAINS COMPOSITION c NOT CONTAINS SECTION s")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.From.Contains == nil {
+		t.Fatal("From.Contains unexpectedly nil")
+	}
+	if q.From.Contains.Class.RMType != "COMPOSITION" {
+		t.Errorf("From.Contains.Class.RMType = %q, want COMPOSITION", q.From.Contains.Class.RMType)
+	}
+	if len(q.From.Contains.Children) != 1 {
+		t.Fatalf("From.Contains.Children len = %d, want 1", len(q.From.Contains.Children))
+	}
+	child := q.From.Contains.Children[0]
+	if !child.Negated {
+		t.Errorf("Children[0].Negated = false; want true for `NOT CONTAINS`")
+	}
+	if child.Class.RMType != "SECTION" {
+		t.Errorf("Children[0].Class.RMType = %q, want SECTION", child.Class.RMType)
+	}
+}
+
+// TestParseQueryBoolValue pins boolean WHERE extraction: the source
+// keyword `true` / `false` (lexed as IDENTIFIER per lexer rule order)
+// surfaces in Comparison.Val as aql.BoolValue.
+func TestParseQueryBoolValue(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/active = true")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmp, ok := q.Where.(aql.Comparison)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.Comparison", q.Where)
+	}
+	bv, ok := cmp.Val.(aql.BoolValue)
+	if !ok {
+		t.Fatalf("Comparison.Val = %T, want aql.BoolValue", cmp.Val)
+	}
+	if !bv.B {
+		t.Errorf("BoolValue.B = false; want true")
+	}
+}
+
+// TestParseQueryNullValue pins NULL extraction as the typed sentinel
+// (not StringValue{"NULL"}).
+func TestParseQueryNullValue(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/data = NULL")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmp := q.Where.(aql.Comparison)
+	if _, ok := cmp.Val.(aql.NullValue); !ok {
+		t.Errorf("Comparison.Val = %T, want aql.NullValue", cmp.Val)
+	}
+}
+
+// TestParseQueryParamLimit pins the parameter-bound LIMIT/OFFSET
+// extraction shape: ParamLimit concrete with the placeholder name.
+func TestParseQueryParamLimit(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT e FROM EHR e LIMIT $rows OFFSET $skip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lim, ok := q.Limit.(parse.ParamLimit)
+	if !ok || lim.Name != "rows" {
+		t.Errorf("Limit = %v, want ParamLimit{rows}", q.Limit)
+	}
+	off, ok := q.Offset.(parse.ParamLimit)
+	if !ok || off.Name != "skip" {
+		t.Errorf("Offset = %v, want ParamLimit{skip}", q.Offset)
+	}
+}
+
+// TestParseQueryStandingPredicate pins the standing class predicate
+// extraction shape: HasPredicate true, Predicate carries the bracket
+// body verbatim, Archetype empty.
+func TestParseQueryStandingPredicate(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT e FROM EHR e[ehr_id/value=$id]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !q.From.Root.HasPredicate {
+		t.Errorf("From.Root.HasPredicate = false; want true")
+	}
+	if q.From.Root.Predicate != "ehr_id/value=$id" {
+		t.Errorf("From.Root.Predicate = %q, want ehr_id/value=$id", q.From.Root.Predicate)
+	}
+	if q.From.Root.Archetype != "" {
+		t.Errorf("From.Root.Archetype = %q, want empty for non-archetype predicate", q.From.Root.Archetype)
+	}
+}
+
+// TestParseQueryParamArchetype pins the `[$name]` archetype predicate:
+// the actual placeholder text (including the leading `$`) lives in
+// Archetype, and the ParamArchetype flag is the typed signal.
+func TestParseQueryParamArchetype(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c FROM EHR e CONTAINS COMPOSITION c[$template]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.From.Contains == nil {
+		t.Fatal("From.Contains unexpectedly nil")
+	}
+	if !q.From.Contains.Class.ParamArchetype {
+		t.Errorf("Contains.Class.ParamArchetype = false; want true")
+	}
+	if q.From.Contains.Class.Archetype != "$template" {
+		t.Errorf("Contains.Class.Archetype = %q, want $template", q.From.Contains.Class.Archetype)
+	}
+}
+
+// TestParseQueryVersionPredicate pins VERSION class predicate
+// extraction + emission round-trip.
+func TestParseQueryVersionPredicate(t *testing.T) {
+	src := "SELECT v FROM EHR e CONTAINS VERSION v[all_versions]"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q.From.Contains == nil {
+		t.Fatal("From.Contains unexpectedly nil")
+	}
+	cls := q.From.Contains.Class
+	if !cls.Version {
+		t.Errorf("Contains.Class.Version = false; want true")
+	}
+	if cls.Predicate != "all_versions" {
+		t.Errorf("Contains.Class.Predicate = %q, want all_versions", cls.Predicate)
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out != src {
+		t.Errorf("VERSION predicate round-trip\n  in:  %s\n  out: %s", src, out)
+	}
+}
