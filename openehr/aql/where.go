@@ -159,3 +159,130 @@ func junctionOf(op BoolOp, terms []WhereExpr) WhereExpr {
 		return Junction{Op: op, Terms: kept}
 	}
 }
+
+// NotExpr is a single-operand boolean negation (`NOT <operand>`). Parsed
+// queries populate this when the source carries an explicit NOT prefix.
+// The Builder does not yet expose a constructor — [Not] is the symmetric
+// helper if authoring NOT predicates becomes common; for now [Not] exists
+// for round-trip emission only.
+type NotExpr struct {
+	Operand WhereExpr
+}
+
+func (n NotExpr) expr() string {
+	if n.Operand == nil {
+		return "NOT"
+	}
+	// Parenthesise any junction operand so the precedence reads
+	// unambiguously regardless of which junctions surround the NOT.
+	if _, ok := n.Operand.(Junction); ok {
+		return "NOT (" + n.Operand.expr() + ")"
+	}
+	return "NOT " + n.Operand.expr()
+}
+
+func (n NotExpr) validate() error {
+	if n.Operand == nil {
+		return fmt.Errorf("%w: NOT with nil operand", ErrInvalidQuery)
+	}
+	return n.Operand.validate()
+}
+
+// Not constructs a [NotExpr]. A nil operand yields nil (the emitter has
+// nothing to express and the builder skips the clause).
+func Not(operand WhereExpr) WhereExpr {
+	if operand == nil {
+		return nil
+	}
+	return NotExpr{Operand: operand}
+}
+
+// ExistsExpr is the `EXISTS <path>` AQL predicate (presence of a node
+// at the path). The parser populates this from the EXISTS form.
+type ExistsExpr struct {
+	Path string
+}
+
+func (e ExistsExpr) expr() string { return "EXISTS " + e.Path }
+
+func (e ExistsExpr) validate() error {
+	if strings.TrimSpace(e.Path) == "" {
+		return fmt.Errorf("%w: empty path in EXISTS", ErrInvalidQuery)
+	}
+	return nil
+}
+
+// Exists constructs an [ExistsExpr]. An empty path is rejected at
+// build time, not at construction.
+func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
+
+// MatchesExpr is the `<path> MATCHES { <value-list> }` AQL predicate.
+// The right-hand side is one or more [Value] alternatives, joined with
+// commas inside the braces.
+type MatchesExpr struct {
+	Path   string
+	Values []Value
+}
+
+func (m MatchesExpr) expr() string {
+	parts := make([]string, len(m.Values))
+	for i, v := range m.Values {
+		if v == nil {
+			parts[i] = ""
+			continue
+		}
+		parts[i] = v.token()
+	}
+	return m.Path + " MATCHES {" + strings.Join(parts, ", ") + "}"
+}
+
+func (m MatchesExpr) validate() error {
+	if strings.TrimSpace(m.Path) == "" {
+		return fmt.Errorf("%w: empty path in MATCHES", ErrInvalidQuery)
+	}
+	if len(m.Values) == 0 {
+		return fmt.Errorf("%w: empty value list in MATCHES on %q", ErrInvalidQuery, m.Path)
+	}
+	for i, v := range m.Values {
+		if v == nil {
+			return fmt.Errorf("%w: nil value at index %d in MATCHES on %q", ErrInvalidQuery, i, m.Path)
+		}
+	}
+	return nil
+}
+
+// Matches constructs a [MatchesExpr].
+func Matches(path string, values ...Value) WhereExpr {
+	return MatchesExpr{Path: path, Values: values}
+}
+
+// LikeExpr is the `<path> LIKE <pattern>` AQL predicate. Pattern is a
+// string literal carrying AQL wildcards (`_` single char, `%` any
+// sequence). Pattern is a [Value] so the same shape covers both a
+// literal pattern and a parameter-bound pattern.
+type LikeExpr struct {
+	Path    string
+	Pattern Value
+}
+
+func (l LikeExpr) expr() string {
+	if l.Pattern == nil {
+		return l.Path + " LIKE "
+	}
+	return l.Path + " LIKE " + l.Pattern.token()
+}
+
+func (l LikeExpr) validate() error {
+	if strings.TrimSpace(l.Path) == "" {
+		return fmt.Errorf("%w: empty path in LIKE", ErrInvalidQuery)
+	}
+	if l.Pattern == nil {
+		return fmt.Errorf("%w: nil pattern in LIKE on %q", ErrInvalidQuery, l.Path)
+	}
+	return nil
+}
+
+// Like constructs a [LikeExpr].
+func Like(path string, pattern Value) WhereExpr {
+	return LikeExpr{Path: path, Pattern: pattern}
+}
