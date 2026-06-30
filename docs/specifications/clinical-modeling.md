@@ -727,7 +727,7 @@ These exclusions are by design: a CDR may layer template-driven validation on to
 
 - **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle.
-- **Plan:** [`docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15.
+- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15 (archived after PR #57).
 
 ---
 
