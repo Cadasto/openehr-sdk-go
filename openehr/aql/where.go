@@ -7,7 +7,11 @@ import (
 
 // WhereExpr is a boolean expression in a WHERE clause. The interface is sealed;
 // construct expressions with the comparison helpers ([Eq], [Ne], [Gt], [Ge],
-// [Lt], [Le]) and combine them with [And] / [Or].
+// [Lt], [Le]) and combine them with [And] / [Or]. Parsed queries populate the
+// same concrete types ([Comparison] / [Junction]) — the read AST and the
+// write AST share one vocabulary (REQ-113 / SDK-GAP-17). Concrete-type
+// fields are READ-ONLY: consumers MUST NOT mutate them; the emitter relies
+// on stable inputs.
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
@@ -17,63 +21,113 @@ type WhereExpr interface {
 	validate() error
 }
 
-type comparison struct {
-	path string
-	op   string
-	val  Value
+// Operator is a comparison operator on a [Comparison]. The wire string is
+// the typed string itself; values are not interpolated, so consumers can
+// safely match on `c.Op == aql.OpEq` etc.
+type Operator string
+
+const (
+	// OpEq is `=`.
+	OpEq Operator = "="
+	// OpNe is `!=`.
+	OpNe Operator = "!="
+	// OpGt is `>`.
+	OpGt Operator = ">"
+	// OpGe is `>=`.
+	OpGe Operator = ">="
+	// OpLt is `<`.
+	OpLt Operator = "<"
+	// OpLe is `<=`.
+	OpLe Operator = "<="
+)
+
+// Comparison is a `path <op> value` predicate. It is the concrete type both
+// the construction helpers ([Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]) and the
+// parser populate; consumers reading a parsed query type-assert
+// `w.(aql.Comparison)` and read the fields directly.
+//
+// Path is the alias-qualified RM path as it appears in the AQL text (e.g.
+// `e/ehr_status/subject/external_ref/id/value`); Op is one of the [Operator]
+// constants; Val is the [Value] on the right-hand side ([ParamValue] for a
+// placeholder, [StringValue] / [IntValue] / [RealValue] / [BoolValue] for a
+// literal).
+type Comparison struct {
+	Path string
+	Op   Operator
+	Val  Value
 }
 
-func (c comparison) expr() string { return c.path + " " + c.op + " " + c.val.token() }
+func (c Comparison) expr() string { return c.Path + " " + string(c.Op) + " " + c.Val.token() }
 
-func (c comparison) validate() error {
-	if strings.TrimSpace(c.path) == "" {
-		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, c.op)
+func (c Comparison) validate() error {
+	if strings.TrimSpace(c.Path) == "" {
+		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, string(c.Op))
 	}
-	if c.val == nil {
-		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.path)
+	if c.Val == nil {
+		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.Path)
 	}
 	return nil
 }
 
 // Eq is `path = value`.
-func Eq(path string, v Value) WhereExpr { return comparison{path: path, op: "=", val: v} }
+func Eq(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpEq, Val: v} }
 
 // Ne is `path != value`.
-func Ne(path string, v Value) WhereExpr { return comparison{path: path, op: "!=", val: v} }
+func Ne(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpNe, Val: v} }
 
 // Gt is `path > value`.
-func Gt(path string, v Value) WhereExpr { return comparison{path: path, op: ">", val: v} }
+func Gt(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpGt, Val: v} }
 
 // Ge is `path >= value`.
-func Ge(path string, v Value) WhereExpr { return comparison{path: path, op: ">=", val: v} }
+func Ge(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpGe, Val: v} }
 
 // Lt is `path < value`.
-func Lt(path string, v Value) WhereExpr { return comparison{path: path, op: "<", val: v} }
+func Lt(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLt, Val: v} }
 
 // Le is `path <= value`.
-func Le(path string, v Value) WhereExpr { return comparison{path: path, op: "<=", val: v} }
+func Le(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLe, Val: v} }
 
-type junction struct {
-	op    string // "AND" or "OR"
-	terms []WhereExpr
+// BoolOp is a boolean junction operator (AND or OR) joining terms in a
+// [Junction]. NOT is a single-operand prefix; see [Not] (when introduced
+// by the parser-side AST extension).
+type BoolOp string
+
+const (
+	// OpAnd is the AND junction.
+	OpAnd BoolOp = "AND"
+	// OpOr is the OR junction.
+	OpOr BoolOp = "OR"
+)
+
+// Junction is a multi-term boolean junction (`a AND b`, `a OR b OR c`,
+// …). Op is one of the [BoolOp] constants; Terms is the ordered list of
+// operands. Parsed queries flatten same-operator chains: a literal
+// `a OR b OR c` populates a single [Junction] with three Terms; a
+// mixed-operator expression `a AND (b OR c)` populates an outer AND
+// [Junction] whose second term is itself a [Junction]. The emitter
+// re-parenthesises a nested OR inside an AND to preserve precedence
+// (and vice-versa is unnecessary because OR has lower precedence).
+type Junction struct {
+	Op    BoolOp
+	Terms []WhereExpr
 }
 
-func (j junction) expr() string {
-	parts := make([]string, len(j.terms))
-	for i, t := range j.terms {
+func (j Junction) expr() string {
+	parts := make([]string, len(j.Terms))
+	for i, t := range j.Terms {
 		// Parenthesise a nested OR inside an AND to preserve precedence;
 		// a bare comparison or same-operator junction needs no grouping.
-		if inner, ok := t.(junction); ok && inner.op == "OR" && j.op == "AND" {
+		if inner, ok := t.(Junction); ok && inner.Op == OpOr && j.Op == OpAnd {
 			parts[i] = "(" + t.expr() + ")"
 			continue
 		}
 		parts[i] = t.expr()
 	}
-	return strings.Join(parts, " "+j.op+" ")
+	return strings.Join(parts, " "+string(j.Op)+" ")
 }
 
-func (j junction) validate() error {
-	for _, t := range j.terms {
+func (j Junction) validate() error {
+	for _, t := range j.Terms {
 		if err := t.validate(); err != nil {
 			return err
 		}
@@ -84,12 +138,12 @@ func (j junction) validate() error {
 // And joins predicates with AND. nil terms are dropped; a single surviving term
 // is returned unchanged; no terms yields nil (a vacuously-true conjunction —
 // the builder emits no WHERE rather than invalid AQL).
-func And(terms ...WhereExpr) WhereExpr { return junctionOf("AND", terms) }
+func And(terms ...WhereExpr) WhereExpr { return junctionOf(OpAnd, terms) }
 
 // Or joins predicates with OR, with the same nil/empty handling as [And].
-func Or(terms ...WhereExpr) WhereExpr { return junctionOf("OR", terms) }
+func Or(terms ...WhereExpr) WhereExpr { return junctionOf(OpOr, terms) }
 
-func junctionOf(op string, terms []WhereExpr) WhereExpr {
+func junctionOf(op BoolOp, terms []WhereExpr) WhereExpr {
 	kept := make([]WhereExpr, 0, len(terms))
 	for _, t := range terms {
 		if t != nil {
@@ -102,6 +156,6 @@ func junctionOf(op string, terms []WhereExpr) WhereExpr {
 	case 1:
 		return kept[0]
 	default:
-		return junction{op: op, terms: kept}
+		return Junction{Op: op, Terms: kept}
 	}
 }
