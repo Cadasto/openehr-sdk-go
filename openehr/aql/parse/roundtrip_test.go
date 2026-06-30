@@ -150,6 +150,9 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 		{"from_junction", "SELECT e FROM EHR e OR EHR f", "FROM top-level boolean junction"},
 		{"matches_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')", "MATCHES terminology"},
 		{"matches_uri", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}", "MATCHES terminology"},
+		{"and_junction_dropped_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5", "AND/OR junction dropped"},
+		{"concat_primitive_arg", "SELECT CONCAT('hello', p/name) FROM EHR e CONTAINS PERSON p", "Parameter or Primitive argument"},
+		{"limit_overflow", "SELECT e FROM EHR e LIMIT 9223372036854775808", "out of range"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

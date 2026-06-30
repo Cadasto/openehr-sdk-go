@@ -243,20 +243,24 @@ func (d OrderDir) String() string {
 }
 
 // Emit renders the structured [Query] back to canonical AQL text — the
-// round-trip mirror of [ParseQuery]. The same Comparison / Junction
-// emitter the builder uses is consumed via [aql.FormatWhere], so a
-// parsed-then-emitted predicate matches a builder-built one byte for
-// byte (PROBE-020 / REQ-113).
+// round-trip mirror of [ParseQuery]. The WHERE predicate is rendered
+// via [aql.FormatWhere], the same renderer the construction-side
+// [aql.Builder] consumes — so a parsed-then-emitted predicate matches
+// a builder-built one byte-for-byte. SELECT / FROM / CONTAINS /
+// ORDER BY / LIMIT clauses are emitted by this package's helpers;
+// the canonical form across both entry points is pinned by PROBE-020
+// (Builder) and the round-trip suites here (parse).
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
 // q produced by [ParseQuery] — the v1 catalogue is the buildable
 // grammar plus the parser-only shapes (NotExpr / ExistsExpr / LikeExpr
 // / MatchesExpr) and the typed LIMIT / OFFSET forms ([IntLimit] +
-// [ParamLimit]). Source shapes outside the v1 extractor catalogue do
-// not produce a Query at all — [ParseQuery] returns the partial AST
-// alongside [aql.ErrIncompleteAST], and Emit on that AST refuses with
-// the same error so a caller who ignored the parse return cannot
-// emit semantically wrong AQL.
+// [ParamLimit]). Source shapes outside the v1 extractor catalogue
+// produce a PARTIAL Query — clauses that extracted cleanly are
+// populated, dropped clauses are left zero-value — plus an
+// [aql.ErrIncompleteAST] error from [ParseQuery]. Emit on a partial
+// AST refuses with the same error so a caller who ignored the parse
+// return cannot accidentally emit semantically wrong AQL.
 //
 // Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
 // a malformed sub-expression (a nil WHERE comparison value, an empty

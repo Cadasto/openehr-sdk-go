@@ -798,11 +798,16 @@ requirements:
     # WhereExpr + Value vocabulary is SHARED with the construction side:
     # parse populates the same Comparison/Junction/NotExpr/ExistsExpr/
     # MatchesExpr/LikeExpr/ParamValue/StringValue/IntValue/RealValue/
-    # BoolValue the Builder constructs. (*Query).Emit + aql.FormatWhere
-    # close the round-trip loop (idempotence pinned by 16 cases in
-    # roundtrip_test.go). Tier 1 — Document.Tree — exposes the
+    # BoolValue/NullValue the Builder constructs. (*Query).Emit +
+    # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
+    # property) is carried inline by openehr/aql/parse/roundtrip_test.go
+    # — 34 idempotence cases plus 11 canonical-input preservation cases
+    # across the v1 catalogue, plus a 7-case incomplete-AST suite
+    # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
+    # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
+    # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
-    # contract). SDK-GAP-17.
+    # contract; marked // Deprecated:). SDK-GAP-17.
     implementation: landed
     packages:
       - openehr/aql

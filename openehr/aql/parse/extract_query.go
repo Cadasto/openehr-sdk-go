@@ -511,19 +511,26 @@ func (ex *astExtractor) extractOrderBy(c gen.IOrderByClauseContext) []OrderTerm 
 }
 
 func (ex *astExtractor) extractLimit(c gen.ILimitClauseContext) (limit, offset LimitExpr) {
-	limit = limitValueAsExpr(c.GetLimit())
-	offset = limitValueAsExpr(c.GetOffset())
+	limit = ex.limitValueAsExpr(c.GetLimit(), "LIMIT")
+	offset = ex.limitValueAsExpr(c.GetOffset(), "OFFSET")
 	return
 }
 
-func limitValueAsExpr(v gen.ILimitValueContext) LimitExpr {
+func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string) LimitExpr {
 	if v == nil {
 		return nil
 	}
 	if t := v.INTEGER(); t != nil {
-		if n, err := strconv.Atoi(t.GetText()); err == nil {
+		text := t.GetText()
+		n, err := strconv.Atoi(text)
+		if err == nil {
 			return IntLimit{N: n}
 		}
+		// Integer too large for int (overflow / out of range). Record a
+		// catalogue gap so the clause isn't silently dropped — the
+		// emit-on-partial-AST guard then refuses to render this AST.
+		ex.incomplete("%s integer literal %q out of range for int (%v)", clause, text, err)
+		return nil
 	}
 	if t := v.PARAMETER(); t != nil {
 		return ParamLimit{Name: strings.TrimPrefix(t.GetText(), "$")}

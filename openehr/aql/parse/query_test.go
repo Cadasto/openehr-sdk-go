@@ -383,3 +383,121 @@ func TestParseQueryVersionPredicate(t *testing.T) {
 		t.Errorf("VERSION predicate round-trip\n  in:  %s\n  out: %s", src, out)
 	}
 }
+
+// TestParseQueryWhereNotExpr pins the NotExpr shape extracted from a
+// WHERE NOT predicate.
+func TestParseQueryWhereNotExpr(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE NOT o/x = $a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ne, ok := q.Where.(aql.NotExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.NotExpr", q.Where)
+	}
+	if _, ok := ne.Operand.(aql.Comparison); !ok {
+		t.Errorf("NotExpr.Operand = %T, want aql.Comparison", ne.Operand)
+	}
+}
+
+// TestParseQueryWhereExistsExpr pins the ExistsExpr shape extracted
+// from a WHERE EXISTS path predicate.
+func TestParseQueryWhereExistsExpr(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE EXISTS o/data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ex, ok := q.Where.(aql.ExistsExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.ExistsExpr", q.Where)
+	}
+	if ex.Path != "o/data" {
+		t.Errorf("ExistsExpr.Path = %q, want o/data", ex.Path)
+	}
+}
+
+// TestParseQueryWhereLikeExpr pins the LikeExpr shape extracted from
+// a WHERE LIKE pattern predicate; carries Pattern as a StringValue.
+func TestParseQueryWhereLikeExpr(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT p FROM EHR e CONTAINS PERSON p WHERE p/name LIKE 'Dr%'")
+	if err != nil {
+		t.Fatal(err)
+	}
+	le, ok := q.Where.(aql.LikeExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.LikeExpr", q.Where)
+	}
+	if le.Path != "p/name" {
+		t.Errorf("LikeExpr.Path = %q, want p/name", le.Path)
+	}
+	sv, ok := le.Pattern.(aql.StringValue)
+	if !ok || sv.S != "Dr%" {
+		t.Errorf("LikeExpr.Pattern = %v, want StringValue{Dr%%}", le.Pattern)
+	}
+}
+
+// TestParseQueryWhereMatchesExpr pins the MatchesExpr shape extracted
+// from a value-list MATCHES predicate; carries the value list in
+// document order.
+func TestParseQueryWhereMatchesExpr(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/status MATCHES {'active', 'archived'}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	me, ok := q.Where.(aql.MatchesExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.MatchesExpr", q.Where)
+	}
+	if me.Path != "o/status" {
+		t.Errorf("MatchesExpr.Path = %q, want o/status", me.Path)
+	}
+	if len(me.Values) != 2 {
+		t.Fatalf("MatchesExpr.Values len = %d, want 2", len(me.Values))
+	}
+	if sv, ok := me.Values[0].(aql.StringValue); !ok || sv.S != "active" {
+		t.Errorf("Values[0] = %v, want StringValue{active}", me.Values[0])
+	}
+	if sv, ok := me.Values[1].(aql.StringValue); !ok || sv.S != "archived" {
+		t.Errorf("Values[1] = %v, want StringValue{archived}", me.Values[1])
+	}
+}
+
+// TestDocumentQueryErrContract pins the QueryErr accessor: nil for a
+// clean parse, an ErrIncompleteAST wrap for a catalogue-gap parse,
+// stable across repeated calls (same sync.Once guard as Query).
+func TestDocumentQueryErrContract(t *testing.T) {
+	doc, err := parse.Parse("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qerr := doc.QueryErr(); qerr != nil {
+		t.Errorf("QueryErr on clean parse = %v, want nil", qerr)
+	}
+	// Same accessor on a catalogue-gap query returns the gap error.
+	gapDoc, err := parse.Parse("SELECT 1 FROM EHR e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	qerr := gapDoc.QueryErr()
+	if !errors.Is(qerr, aql.ErrIncompleteAST) {
+		t.Errorf("QueryErr on incomplete-AST parse = %v, want ErrIncompleteAST", qerr)
+	}
+	// Repeated calls return the stable cached error (sync.Once guard).
+	// errors.Is so we compare via the wrapped sentinel rather than
+	// pointer identity, and the message stability check confirms the
+	// same underlying error instance.
+	qerr2 := gapDoc.QueryErr()
+	if !errors.Is(qerr2, aql.ErrIncompleteAST) || qerr2.Error() != qerr.Error() {
+		t.Errorf("QueryErr second call = %v, want stable %v", qerr2, qerr)
+	}
+}
+
+// TestParseQueryLimitOverflow pins the integer-overflow gap: a LIMIT
+// literal that overflows Go `int` surfaces ErrIncompleteAST rather
+// than silently dropping the clause.
+func TestParseQueryLimitOverflow(t *testing.T) {
+	_, err := parse.ParseQuery("SELECT e FROM EHR e LIMIT 9223372036854775808")
+	if !errors.Is(err, aql.ErrIncompleteAST) {
+		t.Fatalf("ParseQuery overflow: want ErrIncompleteAST, got %v", err)
+	}
+}

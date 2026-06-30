@@ -801,19 +801,31 @@ The first emit normalises whitespace, keyword casing, optional defaults (ASC), a
 
 ### Trust model
 
-The structured AST is **syntax-faithful for the v1 catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`), the function names as written, and the canonical AQL emission. It does **not** evaluate:
+The structured AST is **syntax-faithful for the v1 catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`); function names are normalised to upper case (`count` → `COUNT`) so emission produces canonical AQL regardless of source casing. It does **not** evaluate:
 
 - archetype / template constraints (that is REQ-102 / REQ-110);
 - terminology binding;
 - semantic validity beyond the SDK grammar profile (the server remains the execute-time authority, [PROBE-021](#req-109--aql-static-lint)).
 
-**v1 catalogue gaps** (shapes the grammar accepts but the structured extractor does not yet model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), so a partial AST is never silently emitted as canonical text. Today the catalogue gaps are: Primitive literal in SELECT projection (`SELECT 1`); mixed `SELECT *, col` star plus columns; function-call WHERE LHS (`LENGTH(x) > 5`); MATCHES with `terminology(...)` or `{URI}` operand; path-vs-path comparisons (`WHERE a/x = b/y`); top-level boolean junction at the FROM root (`FROM A OR B`). Each gap is a forward-compatible extension. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
+**v1 catalogue gaps** (shapes the grammar accepts but the structured extractor does not yet model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), and a partial AST refuses to render through [`(*Query).Emit`](../../openehr/aql/parse/query.go) (same error) so the loss is never silently emitted as canonical text. Today the catalogue gaps are:
+
+- Primitive literal in SELECT projection (`SELECT 1 FROM …`)
+- Mixed `SELECT *, col` (star + column projections in the same SELECT)
+- Function-call WHERE LHS (`WHERE LENGTH(x) > 5`)
+- MATCHES with `terminology(...)` or `{URI}` operand
+- Path-vs-path comparisons (`WHERE a/x = b/y`)
+- Top-level boolean junction at the FROM root (`FROM A OR B`)
+- Parameter or Primitive argument inside a function call in SELECT (`SELECT CONCAT('a', p/name) FROM …`)
+- AND/OR WHERE junction where one or more operands is itself an out-of-catalogue shape (each dropped operand records a gap reason)
+- LIMIT / OFFSET integer literal that overflows Go `int` (`LIMIT 9223372036854775808`)
+
+Each gap is a forward-compatible extension. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
 
 ### Building-block independence (REQ-013)
 
 `openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
-- **Verification:** unit pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT/FROM/WHERE/ORDER BY/LIMIT) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (16 cases across the v1 catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (34 idempotence cases + 11 canonical-input preservation cases across the v1 catalogue, plus a 7-case incomplete-AST suite that asserts ParseQuery and Emit both surface `aql.ErrIncompleteAST`). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
 - **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17 (archived after PR #58).
 
