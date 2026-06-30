@@ -94,11 +94,24 @@ func describeSelectExpr(e parse.SelectExpr) string {
 	case parse.PathExpr:
 		return v.Raw
 	case parse.FunctionCall:
-		args := make([]string, 0, len(v.Args))
-		for _, a := range v.Args {
-			args = append(args, describeSelectExpr(a))
+		var body string
+		switch {
+		case v.Star:
+			body = "*"
+		case v.Distinct:
+			args := make([]string, 0, len(v.Args))
+			for _, a := range v.Args {
+				args = append(args, describeSelectExpr(a))
+			}
+			body = "DISTINCT " + strings.Join(args, ", ")
+		default:
+			args := make([]string, 0, len(v.Args))
+			for _, a := range v.Args {
+				args = append(args, describeSelectExpr(a))
+			}
+			body = strings.Join(args, ", ")
 		}
-		return v.Name + "(" + strings.Join(args, ", ") + ")"
+		return v.Name + "(" + body + ")"
 	}
 	return fmt.Sprintf("%T", e)
 }
@@ -115,8 +128,13 @@ func describeClassExpr(c parse.ClassExpr) string {
 	if c.Alias != "" {
 		out += " " + c.Alias
 	}
-	if c.Archetype != "" {
+	switch {
+	case c.Archetype != "":
 		out += "[" + c.Archetype + "]"
+	case c.ParamArchetype:
+		out += "[$archetype]"
+	case c.Predicate != "":
+		out += "[" + c.Predicate + "]"
 	}
 	return out
 }
@@ -179,19 +197,25 @@ func describeValue(v aql.Value) string {
 	if v == nil {
 		return "<nil>"
 	}
-	switch x := v.(type) {
+	// Delegate the wire form to aql.FormatValue so embedded apostrophes
+	// are escape-doubled consistently with the emitter; append a
+	// type-tag suffix for the demo.
+	wire := aql.FormatValue(v)
+	switch v.(type) {
 	case aql.ParamValue:
-		return "$" + x.Name + " (param)"
+		return wire + " (param)"
 	case aql.StringValue:
-		return fmt.Sprintf("'%s' (string)", x.S)
+		return wire + " (string)"
 	case aql.IntValue:
-		return fmt.Sprintf("%d (int)", x.N)
+		return wire + " (int)"
 	case aql.RealValue:
-		return fmt.Sprintf("%v (real)", x.F)
+		return wire + " (real)"
 	case aql.BoolValue:
-		return fmt.Sprintf("%v (bool)", x.B)
+		return wire + " (bool)"
+	case aql.NullValue:
+		return wire + " (null)"
 	}
-	return aql.FormatValue(v)
+	return wire
 }
 
 func printOrderBy(terms []parse.OrderTerm) {
@@ -204,11 +228,21 @@ func printOrderBy(terms []parse.OrderTerm) {
 	}
 }
 
-func printPaging(limit, offset *int) {
+func printPaging(limit, offset parse.LimitExpr) {
 	if limit != nil {
-		fmt.Printf("  LIMIT %d\n", *limit)
+		fmt.Printf("  LIMIT %s\n", describeLimit(limit))
 	}
 	if offset != nil {
-		fmt.Printf("  OFFSET %d\n", *offset)
+		fmt.Printf("  OFFSET %s\n", describeLimit(offset))
 	}
+}
+
+func describeLimit(l parse.LimitExpr) string {
+	switch v := l.(type) {
+	case parse.IntLimit:
+		return fmt.Sprintf("%d (int)", v.N)
+	case parse.ParamLimit:
+		return "$" + v.Name + " (param)"
+	}
+	return fmt.Sprintf("%T", l)
 }

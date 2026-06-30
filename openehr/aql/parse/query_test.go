@@ -8,6 +8,7 @@ package parse_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -76,10 +77,10 @@ func TestParseQueryReturnsStructuredAST(t *testing.T) {
 
 	// LIMIT/OFFSET — absent
 	if q.Limit != nil {
-		t.Errorf("Limit = %d, want nil", *q.Limit)
+		t.Errorf("Limit = %v, want nil", q.Limit)
 	}
 	if q.Offset != nil {
-		t.Errorf("Offset = %d, want nil", *q.Offset)
+		t.Errorf("Offset = %v, want nil", q.Offset)
 	}
 }
 
@@ -115,6 +116,38 @@ func TestDocumentQueryCachesExtraction(t *testing.T) {
 	}
 }
 
+// TestDocumentQueryConcurrent asserts that concurrent callers of
+// Document.Query() see a single stable *Query pointer — the sync.Once
+// guard around lazy extraction. Run under -race for write-write
+// detection; the assertion below also catches a non-Once
+// implementation that double-builds.
+func TestDocumentQueryConcurrent(t *testing.T) {
+	doc, err := parse.Parse("SELECT c FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = $id")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const n = 32
+	results := make([]*parse.Query, n)
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := range n {
+		go func(i int) {
+			defer wg.Done()
+			results[i] = doc.Query()
+		}(i)
+	}
+	wg.Wait()
+	first := results[0]
+	if first == nil {
+		t.Fatal("concurrent Document.Query: first result is nil")
+	}
+	for i, r := range results {
+		if r != first {
+			t.Errorf("concurrent Document.Query: result %d (%p) != first (%p)", i, r, first)
+		}
+	}
+}
+
 // TestParseQueryContainmentChain pins the CONTAINS extraction shape
 // — FROM root + a one-level CONTAINS subtree carrying its own class.
 func TestParseQueryContainmentChain(t *testing.T) {
@@ -136,17 +169,20 @@ func TestParseQueryContainmentChain(t *testing.T) {
 	}
 }
 
-// TestParseQueryLimitOffset pins LIMIT/OFFSET extraction as *int.
+// TestParseQueryLimitOffset pins LIMIT/OFFSET extraction as
+// IntLimit concrete shapes.
 func TestParseQueryLimitOffset(t *testing.T) {
 	q, err := parse.ParseQuery("SELECT e FROM EHR e LIMIT 50 OFFSET 100")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if q.Limit == nil || *q.Limit != 50 {
-		t.Errorf("Limit = %v, want 50", q.Limit)
+	lim, ok := q.Limit.(parse.IntLimit)
+	if !ok || lim.N != 50 {
+		t.Errorf("Limit = %v, want IntLimit{50}", q.Limit)
 	}
-	if q.Offset == nil || *q.Offset != 100 {
-		t.Errorf("Offset = %v, want 100", q.Offset)
+	off, ok := q.Offset.(parse.IntLimit)
+	if !ok || off.N != 100 {
+		t.Errorf("Offset = %v, want IntLimit{100}", q.Offset)
 	}
 }
 

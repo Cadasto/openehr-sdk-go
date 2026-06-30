@@ -12,10 +12,11 @@ import (
 // injection guard (REQ-055).
 //
 // Parsed queries populate the same concrete types ([ParamValue] /
-// [StringValue] / [IntValue] / [RealValue] / [BoolValue]) — the read AST
-// and the write AST share one vocabulary (REQ-113 / SDK-GAP-17). Fields
-// on concrete values are READ-ONLY: consumers MUST NOT mutate them; the
-// emitter relies on stable inputs.
+// [StringValue] / [IntValue] / [RealValue] / [BoolValue] / [NullValue])
+// — the read AST and the write AST share one vocabulary (REQ-113 /
+// SDK-GAP-17). Concrete-type fields are intended for read access;
+// mutating a value already embedded in a [WhereExpr] passed to
+// [FormatWhere] / [Builder.Build] is undefined.
 type Value interface {
 	// token is the canonical wire form: `$name` for a parameter, an escaped
 	// literal otherwise.
@@ -83,3 +84,12 @@ func (v BoolValue) token() string { return strconv.FormatBool(v.B) }
 
 // Bool constructs a [BoolValue].
 func Bool(b bool) Value { return BoolValue{B: b} }
+
+// NullValue is the AQL `NULL` literal. The token form is the bare keyword
+// (no quoting) — distinguishing it from a [StringValue] carrying "NULL".
+type NullValue struct{}
+
+func (NullValue) token() string { return "NULL" }
+
+// Null is the AQL NULL literal as a [Value].
+func Null() Value { return NullValue{} }

@@ -1,12 +1,13 @@
 package aql_test
 
-// introspect_test.go pins the SDK-GAP-17 Phase 3a vocabulary unification:
-// the WhereExpr / Value constructor helpers (Eq, Ne, …, Param, String,
-// Int, Real, Bool, And, Or) return the EXPORTED concrete types
-// (Comparison, Junction, ParamValue, StringValue, IntValue, RealValue,
-// BoolValue) whose fields a consumer can read after a type assertion.
-// Builder API itself is unchanged — these tests assert the introspection
-// surface; the emitter parity is covered by builder_test.go.
+// introspect_test.go pins the SDK-GAP-17 Phase 3a vocabulary unification
+// (REQ-113): the WhereExpr / Value constructor helpers (Eq, Ne, …,
+// Param, String, Int, Real, Bool, Null, And, Or) return the EXPORTED
+// concrete types (Comparison, Junction, ParamValue, StringValue,
+// IntValue, RealValue, BoolValue, NullValue) whose fields a consumer
+// can read after a type assertion. Builder API itself is unchanged —
+// these tests assert the introspection surface; the emitter parity
+// is covered by builder_test.go.
 
 import (
 	"testing"
@@ -97,5 +98,17 @@ func TestParamValueStripsLeadingDollar(t *testing.T) {
 		if p.Name != "ehr_id" {
 			t.Errorf("Param(%q).Name = %q, want ehr_id", in, p.Name)
 		}
+	}
+}
+
+// REQ-113: NullValue is a typed sentinel distinct from StringValue{"NULL"};
+// its token form is the unquoted keyword.
+func TestNullValueTokenIsUnquoted(t *testing.T) {
+	v := aql.Null()
+	if _, ok := v.(aql.NullValue); !ok {
+		t.Fatalf("aql.Null() returned %T, want NullValue", v)
+	}
+	if got := aql.FormatValue(v); got != "NULL" {
+		t.Errorf("FormatValue(Null) = %q, want NULL (no quotes)", got)
 	}
 }

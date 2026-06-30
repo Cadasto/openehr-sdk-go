@@ -10,8 +10,9 @@ import (
 // [Lt], [Le]) and combine them with [And] / [Or]. Parsed queries populate the
 // same concrete types ([Comparison] / [Junction]) — the read AST and the
 // write AST share one vocabulary (REQ-113 / SDK-GAP-17). Concrete-type
-// fields are READ-ONLY: consumers MUST NOT mutate them; the emitter relies
-// on stable inputs.
+// fields are intended for read access; mutating an expression already
+// passed to [FormatWhere] / [Builder.Build] is undefined (the emitter
+// caches a `validate()` outcome the mutation would invalidate).
 //
 // Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
 // when emitting a parsed [parse.Query] back to a string).
@@ -195,9 +196,11 @@ func junctionOf(op BoolOp, terms []WhereExpr) WhereExpr {
 
 // NotExpr is a single-operand boolean negation (`NOT <operand>`). Parsed
 // queries populate this when the source carries an explicit NOT prefix.
-// The Builder does not yet expose a constructor — [Not] is the symmetric
-// helper if authoring NOT predicates becomes common; for now [Not] exists
-// for round-trip emission only.
+// The Builder composes NOT predicates via the package-level [Not] helper
+// passed into [Builder.Where] — mirroring how [And] / [Or] / [Eq] are
+// also package-level helpers rather than Builder methods. No dedicated
+// Builder.Not method exists by design; predicate composition is intended
+// to flow through the helper functions.
 type NotExpr struct {
 	Operand WhereExpr
 }

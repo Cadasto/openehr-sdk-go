@@ -9,9 +9,11 @@ package parse
 // MatchesExpr / LikeExpr / ParamValue / StringValue / etc. all live
 // in `openehr/aql`, populated by both Builder and Parse.
 //
-// Returned by [ParseQuery]; consumers MUST NOT mutate it (the
-// document-side IdentifiedPath / ClassExpr slices are owned by the
-// document, not the consumer).
+// Returned by [ParseQuery]; mutation of fields after the Query has
+// been emitted via [Query.Emit] (or shared across goroutines that may
+// emit it) is undefined — the document-side IdentifiedPath /
+// ClassExpr slices are intended to read identical equality with
+// [Document.Paths] / [Document.Classes].
 
 import (
 	"fmt"
@@ -50,13 +52,42 @@ type Query struct {
 	OrderBy []OrderTerm
 
 	// Limit is the row-count limit when present; nil when no LIMIT
-	// clause appeared in the source.
-	Limit *int
+	// clause appeared in the source. Concrete shapes are [IntLimit] for
+	// integer literals (`LIMIT 50`) and [ParamLimit] for parameter-bound
+	// limits (`LIMIT $n`).
+	Limit LimitExpr
 
 	// Offset is the row offset when present; nil when no OFFSET
-	// clause appeared in the source.
-	Offset *int
+	// clause appeared in the source. Same concrete shapes as [Limit].
+	Offset LimitExpr
 }
+
+// LimitExpr is the sealed type of a LIMIT / OFFSET value. Concrete shapes
+// are [IntLimit] (integer literal) and [ParamLimit] (parameter-bound limit
+// — the AQL `LIMIT $n` form). Consumers dispatch via type assertion.
+type LimitExpr interface {
+	isLimitExpr()
+	// token is the canonical wire form: an integer literal for [IntLimit],
+	// `$name` for [ParamLimit].
+	token() string
+}
+
+// IntLimit is an integer-literal LIMIT / OFFSET value.
+type IntLimit struct {
+	N int
+}
+
+func (IntLimit) isLimitExpr()    {}
+func (l IntLimit) token() string { return strconv.Itoa(l.N) }
+
+// ParamLimit is a parameter-bound LIMIT / OFFSET value (`LIMIT $n`).
+// Name carries the placeholder identifier WITHOUT the leading `$`.
+type ParamLimit struct {
+	Name string
+}
+
+func (ParamLimit) isLimitExpr()    {}
+func (l ParamLimit) token() string { return "$" + l.Name }
 
 // SelectClause is the SELECT projection list.
 //
@@ -100,9 +131,15 @@ func (PathExpr) isSelectExpr() {}
 // `CONCAT(p/given_name, ' ', p/family_name)`, etc. `Name` is the
 // upper-cased function name as it appears in the source; `Args` is
 // the ordered operand list.
+//
+// `Star` is true for the `COUNT(*)` aggregate form (Args is empty in
+// that case); `Distinct` is true when the aggregate carried the
+// `DISTINCT` keyword (`COUNT(DISTINCT path)`).
 type FunctionCall struct {
-	Name string
-	Args []SelectExpr
+	Name     string
+	Args     []SelectExpr
+	Distinct bool
+	Star     bool
 }
 
 func (FunctionCall) isSelectExpr() {}
@@ -246,10 +283,19 @@ func (q *Query) Emit() (string, error) {
 	if q.From.Root.RMType == "" {
 		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
 	}
+	if dup := duplicateAlias(q.From); dup != "" {
+		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
+	}
 	sb.WriteString(" FROM ")
 	sb.WriteString(emitClassExpr(q.From.Root))
 	if q.From.Contains != nil {
-		sb.WriteString(" CONTAINS ")
+		// Containment.Negated belongs to the connector: the parent of a
+		// negated subtree writes `NOT CONTAINS` instead of `CONTAINS`.
+		if q.From.Contains.Negated {
+			sb.WriteString(" NOT CONTAINS ")
+		} else {
+			sb.WriteString(" CONTAINS ")
+		}
 		sb.WriteString(emitContainment(*q.From.Contains))
 	}
 
@@ -278,14 +324,18 @@ func (q *Query) Emit() (string, error) {
 		}
 	}
 
-	// LIMIT / OFFSET
+	// LIMIT / OFFSET — grammar requires LIMIT before OFFSET, so emitting
+	// OFFSET without LIMIT would produce text the parser rejects.
+	if q.Offset != nil && q.Limit == nil {
+		return "", fmt.Errorf("%w: OFFSET without LIMIT", aql.ErrInvalidQuery)
+	}
 	if q.Limit != nil {
 		sb.WriteString(" LIMIT ")
-		sb.WriteString(strconv.Itoa(*q.Limit))
+		sb.WriteString(q.Limit.token())
 	}
 	if q.Offset != nil {
 		sb.WriteString(" OFFSET ")
-		sb.WriteString(strconv.Itoa(*q.Offset))
+		sb.WriteString(q.Offset.token())
 	}
 
 	return sb.String(), nil
@@ -307,15 +357,32 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 	case PathExpr:
 		return v.Raw, nil
 	case FunctionCall:
-		args := make([]string, 0, len(v.Args))
-		for _, a := range v.Args {
-			s, err := emitSelectExpr(a)
-			if err != nil {
-				return "", err
+		var body string
+		switch {
+		case v.Star:
+			body = "*"
+		case v.Distinct:
+			args := make([]string, 0, len(v.Args))
+			for _, a := range v.Args {
+				s, err := emitSelectExpr(a)
+				if err != nil {
+					return "", err
+				}
+				args = append(args, s)
 			}
-			args = append(args, s)
+			body = "DISTINCT " + strings.Join(args, ", ")
+		default:
+			args := make([]string, 0, len(v.Args))
+			for _, a := range v.Args {
+				s, err := emitSelectExpr(a)
+				if err != nil {
+					return "", err
+				}
+				args = append(args, s)
+			}
+			body = strings.Join(args, ", ")
 		}
-		return v.Name + "(" + strings.Join(args, ", ") + ")", nil
+		return v.Name + "(" + body + ")", nil
 	}
 	if e == nil {
 		return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
@@ -337,17 +404,63 @@ func emitClassExpr(c ClassExpr) string {
 	if c.Alias != "" {
 		out += " " + c.Alias
 	}
-	if c.Archetype != "" {
+	switch {
+	case c.Archetype != "":
 		out += "[" + c.Archetype + "]"
+	case c.ParamArchetype:
+		// `$param` archetype predicate — the parser recorded the
+		// placeholder shape but not the name (it lives on the surrounding
+		// Document.Params slice). The wire form is the literal `$`
+		// placeholder token.
+		out += "[$archetype]"
+	case c.Predicate != "":
+		out += "[" + c.Predicate + "]"
 	}
 	return out
 }
 
-func emitContainment(c Containment) string {
-	prefix := ""
-	if c.Negated {
-		prefix = "NOT "
+// duplicateAlias walks the FROM tree and returns the first non-empty
+// alias seen more than once, or "" when all aliases are unique. Mirrors
+// the alias-uniqueness guard in [aql.Builder.Build] so emission errors
+// surface symmetrically on the read side.
+func duplicateAlias(from FromClause) string {
+	seen := make(map[string]struct{})
+	check := func(a string) string {
+		if a == "" {
+			return ""
+		}
+		if _, ok := seen[a]; ok {
+			return a
+		}
+		seen[a] = struct{}{}
+		return ""
 	}
+	if dup := check(from.Root.Alias); dup != "" {
+		return dup
+	}
+	var walk func(c *Containment) string
+	walk = func(c *Containment) string {
+		if c == nil {
+			return ""
+		}
+		if dup := check(c.Class.Alias); dup != "" {
+			return dup
+		}
+		for i := range c.Children {
+			if dup := walk(&c.Children[i]); dup != "" {
+				return dup
+			}
+		}
+		return ""
+	}
+	return walk(from.Contains)
+}
+
+// emitContainment renders a Containment node. The Negated flag is
+// consumed by the PARENT (which writes `NOT CONTAINS` instead of
+// `CONTAINS`) — emitContainment itself ignores it and just renders
+// the class + chained children.
+func emitContainment(c Containment) string {
 	// Boolean junction: render each child and join with the operator.
 	if len(c.Children) > 0 && c.Class.RMType == "" {
 		parts := make([]string, len(c.Children))
@@ -355,14 +468,18 @@ func emitContainment(c Containment) string {
 			parts[i] = emitContainment(ch)
 		}
 		joiner := " " + c.ChildJoin.String() + " "
-		return prefix + "(" + strings.Join(parts, joiner) + ")"
+		return "(" + strings.Join(parts, joiner) + ")"
 	}
-	// Class + optional inner chain.
+	// Class + optional inner chain. A child's Negated flag selects
+	// `NOT CONTAINS` over `CONTAINS` for the connector to that child.
 	var sb strings.Builder
-	sb.WriteString(prefix)
 	sb.WriteString(emitClassExpr(c.Class))
 	for _, ch := range c.Children {
-		sb.WriteString(" CONTAINS ")
+		if ch.Negated {
+			sb.WriteString(" NOT CONTAINS ")
+		} else {
+			sb.WriteString(" CONTAINS ")
+		}
 		sb.WriteString(emitContainment(ch))
 	}
 	return sb.String()

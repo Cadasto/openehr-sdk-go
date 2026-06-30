@@ -66,6 +66,13 @@ type ClassExpr struct {
 	// or a version predicate. Distinguishes an identifiable EHR/VERSION root
 	// from a bare one.
 	HasPredicate bool
+	// Predicate is the raw text inside the class predicate brackets when
+	// HasPredicate is true and the predicate is NOT a literal archetype HRID
+	// (which lives on [Archetype]) or a `$param` archetype (signalled by
+	// [ParamArchetype]). Carries standing predicates such as
+	// `ehr_id/value=$x` so the emitter can round-trip them — brackets
+	// stripped, content verbatim from the source.
+	Predicate string
 	// Pos is the source position of the class expression.
 	Pos Position
 }
