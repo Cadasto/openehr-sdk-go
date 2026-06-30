@@ -335,7 +335,7 @@ func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	if !ok {
 		return
 	}
-	if ref.GetID() == nil {
+	if id := ref.GetID(); id == nil || rmread.IsTypedNilPointer(id) {
 		w.emit(Issue{
 			Path:   joinPath(path, "/id"),
 			Code:   "rm_invariant",
