@@ -784,7 +784,43 @@ requirements:
     tests:
       - openehr/validation/rmfloor_test.go
     plans:
-      - docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md
+      - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
+
+  - id: REQ-113
+    title: Execution-oriented parsed AQL AST
+    canonical: docs/specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast
+    status: draft
+    # ParseQuery + Document.Query expose a stable, generated-type-free
+    # structured AQL AST (parse.Query) — the read-side mirror of
+    # aql.Builder. SELECT items / FROM containment tree / WHERE
+    # expression tree / ORDER BY / LIMIT / OFFSET, populated from the
+    # validated ANTLR tree (parse/gen) via the private extractor.
+    # WhereExpr + Value vocabulary is SHARED with the construction side:
+    # parse populates the same Comparison/Junction/NotExpr/ExistsExpr/
+    # MatchesExpr/LikeExpr/ParamValue/StringValue/IntValue/RealValue/
+    # BoolValue/NullValue the Builder constructs. (*Query).Emit +
+    # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
+    # property) is carried inline by openehr/aql/parse/roundtrip_test.go
+    # — 34 idempotence cases plus 11 canonical-input preservation cases
+    # across the v1 catalogue, plus a 7-case incomplete-AST suite
+    # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
+    # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
+    # the trust-model surface. Tier 1 — Document.Tree — exposes the
+    # validated ANTLR tree as a cheap interim (unstable consumer
+    # contract; marked // Deprecated:). SDK-GAP-17.
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/parse
+    probes:
+      - PROBE-080
+    tests:
+      - openehr/aql/introspect_test.go
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/roundtrip_test.go
+    plans:
+      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation

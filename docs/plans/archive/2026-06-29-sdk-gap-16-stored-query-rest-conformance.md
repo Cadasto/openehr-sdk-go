@@ -1,14 +1,14 @@
 # Plan — SDK-GAP-16: stored-query / query-client REST conformance
 
 **Date:** 2026-06-29
-**Status:** Draft
+**Status:** Landed (PR #57, 2026-06-30)
 **Owner:** SDK maintainers
-**Covers:** [REQ-055](../specifications/wire.md#req-055--aql-query) (AQL query — execution client) and [REQ-057](../specifications/wire.md#req-057--definition) (Definition — stored-query store/get). No new REQ; both findings are spec-conformance corrections within the existing contracts.
-**Probes:** extend the existing query / definition PROBE coverage with two new arms — proposed **PROBE-078** (POST execution with `openehr-ehr-id` header scoping) and **PROBE-079** (no-version `PutStoredQuery` recovers the assigned version from `Location`).
-**Implementation:** planned
-**Depends on:** nothing new — both fixes are local to [`openehr/client/query/execute.go`](../../openehr/client/query/execute.go) and [`openehr/client/definition/stored_query.go`](../../openehr/client/definition/stored_query.go) and the vendored OAS under [`resources/ehrbase/`](../../resources/ehrbase/).
+**Covers:** [REQ-055](../../specifications/wire.md#req-055--aql-query) (AQL query — execution client) and [REQ-057](../../specifications/wire.md#req-057--definition) (Definition — stored-query store/get). No new REQ; both findings are spec-conformance corrections within the existing contracts.
+**Probes:** PROBE-078 (POST execution with `openehr-ehr-id` header scoping) and PROBE-079 (no-version `PutStoredQuery` recovers the assigned version from `Location`) — deferred to a follow-up cycle; unit pins in `execute_test.go` and `stored_query_test.go` cover the first-cycle wire shape.
+**Implementation:** landed
+**Depends on:** nothing new — both fixes are local to [`openehr/client/query/execute.go`](../../../openehr/client/query/execute.go) and [`openehr/client/definition/stored_query.go`](../../../openehr/client/definition/stored_query.go) and the vendored OAS under [`resources/ehrbase/`](../../../resources/ehrbase/).
 **Defers:** the `DeleteStoredQuery` operation (intentional EHRbase-aligned extension, explicitly *not* in scope per the dossier); server-side query execution semantics.
-**Inbound source:** [SDK-GAP-16 dossier](../../docs/sdk-gap-drafts/SDK-GAP-16.md) (cross-check of the SDK client against `specifications-ITS-REST@master computable/OAS/query-validation.openapi.yaml` + `definition-validation.openapi.yaml`, by a consuming CDR project — both findings are wire-level deviations against a strict-spec third-party server).
+**Source (inbound):** a consuming CDR project — cross-check of the SDK client against the canonical openEHR ITS-REST OAS surfaced both wire-level deviations (header scoping on POST execution; `Location`-only stored-query store response) that would fail interop against a strict-spec third-party server.
 
 ## Goal
 
@@ -25,11 +25,11 @@ Today the client diverges from the canonical OAS in two places — both consumer
 
 ### Finding A — `applyEHRScope` always sets the query parameter, never the header
 
-[`openehr/client/query/execute.go`](../../openehr/client/query/execute.go) `applyEHRScope` calls `req.Query.Set("ehr_id", …)` on **both** GET and POST paths and never sends the `openehr-ehr-id` header. The OAS declares the `ehr_id` query parameter only on the GET operations; the POST operations (`query_execute_adhoc_query_body`, `query_execute_stored_query_body`, `…_version_body`) declare no `ehr_id` query parameter, and their request bodies (`AdhocQueryExecute`, `Query`) carry no `ehr_id` field — so for POST the **header is the spec's mechanism**. A server that scopes POST execution only via the header receives an unscoped query from the SDK and silently runs population-wide instead of single-EHR.
+[`openehr/client/query/execute.go`](../../../openehr/client/query/execute.go) `applyEHRScope` calls `req.Query.Set("ehr_id", …)` on **both** GET and POST paths and never sends the `openehr-ehr-id` header. The OAS declares the `ehr_id` query parameter only on the GET operations; the POST operations (`query_execute_adhoc_query_body`, `query_execute_stored_query_body`, `…_version_body`) declare no `ehr_id` query parameter, and their request bodies (`AdhocQueryExecute`, `Query`) carry no `ehr_id` field — so for POST the **header is the spec's mechanism**. A server that scopes POST execution only via the header receives an unscoped query from the SDK and silently runs population-wide instead of single-EHR.
 
 ### Finding B — `putStoredQuery` ignores `Location`, relies on a non-spec body
 
-[`openehr/client/definition/stored_query.go:110`](../../openehr/client/definition/stored_query.go) decodes the response body into `StoredQueryMetadata`, and on an empty body returns `&StoredQueryMetadata{Name: name, Version: version, …}` — where `version` is the caller's input (`""` on the no-version path). The OAS `200_StoredQuery_stored` response defines a `Location` header and no body; the server-assigned version lives in `Location: …/definition/query/{name}/{version}`. Against a body-less spec-conformant server (and against EHRbase when the request was `Content-Type: text/plain`, which the SDK always sends), the no-version `PutStoredQuery` therefore yields `Version: ""` — the caller cannot learn the assigned version.
+[`openehr/client/definition/stored_query.go:110`](../../../openehr/client/definition/stored_query.go) decodes the response body into `StoredQueryMetadata`, and on an empty body returns `&StoredQueryMetadata{Name: name, Version: version, …}` — where `version` is the caller's input (`""` on the no-version path). The OAS `200_StoredQuery_stored` response defines a `Location` header and no body; the server-assigned version lives in `Location: …/definition/query/{name}/{version}`. Against a body-less spec-conformant server (and against EHRbase when the request was `Content-Type: text/plain`, which the SDK always sends), the no-version `PutStoredQuery` therefore yields `Version: ""` — the caller cannot learn the assigned version.
 
 ## Definition of Ready (analysis gate)
 
@@ -44,7 +44,7 @@ Today the client diverges from the canonical OAS in two places — both consumer
 
 An explicit `query.WithEHRIDHeader(id)` execute-option is **deferred** to a follow-up plan — additive when needed, no need to land it here.
 
-Either option carries the header through [`transport`](../../transport) via the existing custom-header mechanism (REQ-059) — no new transport plumbing.
+Either option carries the header through [`transport`](../../../transport) via the existing custom-header mechanism (REQ-059) — no new transport plumbing.
 
 ### Finding B — parse `Location` in `putStoredQuery`
 
@@ -64,7 +64,7 @@ The Location parse is forgiving: the host/scheme are ignored, only the last two 
 
 **Tasks:**
 - Record maintainer sign-off on A1 vs A2.
-- Lock the PROBE-078 + PROBE-079 cassette pair — capture the OAS-defined headers/bodies; commit the cassettes under [`testkit/cassettes/query/`](../../testkit/cassettes/query/) and [`testkit/cassettes/definition/`](../../testkit/cassettes/definition/).
+- Lock the PROBE-078 + PROBE-079 cassette pair — capture the OAS-defined headers/bodies; commit the cassettes under [`testkit/cassettes/query/`](../../../testkit/cassettes/query/) and [`testkit/cassettes/definition/`](../../../testkit/cassettes/definition/).
 
 **Definition of done:** sign-off recorded; cassettes in place; this plan flipped Draft → Ready.
 
@@ -82,8 +82,8 @@ The Location parse is forgiving: the host/scheme are ignored, only the last two 
 **Tasks:**
 - Land **PROBE-078** at `testkit/probes/query/` — POST execution with header scoping.
 - Land **PROBE-079** at `testkit/probes/definition/` — no-version store recovers version from Location.
-- Update [`traceability.yaml`](../specifications/traceability.yaml): map PROBE-078 → REQ-055, PROBE-079 → REQ-057.
-- Refresh [`docs/specifications/wire.md`](../specifications/wire.md) REQ-055 / REQ-057 with one-line notes on the header / Location dual mechanism (no behavioural prose duplication).
+- Update [`traceability.yaml`](../../specifications/traceability.yaml): map PROBE-078 → REQ-055, PROBE-079 → REQ-057.
+- Refresh [`docs/specifications/wire.md`](../../specifications/wire.md) REQ-055 / REQ-057 with one-line notes on the header / Location dual mechanism (no behavioural prose duplication).
 
 **Definition of done:** probes pass against the vendored cassettes; `make spec-check` green; CHANGELOG `[Unreleased]` bullet drafted.
 
@@ -108,6 +108,6 @@ The Location parse is forgiving: the host/scheme are ignored, only the last two 
 
 ## Mapping to specs
 
-- [docs/specifications/wire.md § REQ-055 / REQ-057](../specifications/wire.md) — REQ rows extended with the header / Location dual-mechanism note.
-- [docs/specifications/REQ.md](../specifications/REQ.md) — registry rows unchanged (no new REQ).
-- [docs/specifications/traceability.yaml](../specifications/traceability.yaml) — PROBE-078 / PROBE-079 → REQ-055 / REQ-057.
+- [docs/specifications/wire.md § REQ-055 / REQ-057](../../specifications/wire.md) — REQ rows extended with the header / Location dual-mechanism note.
+- [docs/specifications/REQ.md](../../specifications/REQ.md) — registry rows unchanged (no new REQ).
+- [docs/specifications/traceability.yaml](../../specifications/traceability.yaml) — PROBE-078 / PROBE-079 → REQ-055 / REQ-057.

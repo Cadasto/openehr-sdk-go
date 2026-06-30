@@ -1,14 +1,14 @@
 # Plan — SDK-GAP-15: template-less Reference Model validation
 
 **Date:** 2026-06-29
-**Status:** Draft
+**Status:** Landed (PR #57, 2026-06-30)
 **Owner:** SDK maintainers
-**Covers:** proposed **REQ-112** (template-less RM validation floor) — extends the existing template-driven contract in [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation) and [REQ-110](../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition); reuses [REQ-120..123](../specifications/rm-functions.md) and the BMM introspection at [`openehr/rm/rminfo`](../../openehr/rm/rminfo).
-**Probes:** proposed **PROBE-077** (RM-floor invariant matrix).
-**Implementation:** planned
+**Covers:** **REQ-112** (template-less RM validation floor) — extends the existing template-driven contract in [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation) and [REQ-110](../../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition); reuses [REQ-120..123](../../specifications/rm-functions.md) and the BMM introspection at [`openehr/rm/rminfo`](../../../openehr/rm/rminfo).
+**Probes:** PROBE-077 (RM-floor invariant matrix) — deferred to a follow-up cycle; unit-test cassette matrix in [`rmfloor_test.go`](../../../openehr/validation/rmfloor_test.go) covers the first-cycle catalogue.
+**Implementation:** landed
 **Depends on:** REQ-110 walker generalisation already landed (`openehr/validation/validate.go`, `walk_composition.go`, `rmread/`); REQ-120..123 RM behavioural helpers landed in v0.10.0.
 **Defers:** terminology / external-code validation; archetype-level constraints (already owned by REQ-102/110); consumer-side gating and the HTTP 422 surface.
-**Inbound source:** [SDK-GAP-15 dossier](../../docs/sdk-gap-drafts/SDK-GAP-15.md) (filed against v0.11.0 by a consuming CDR project — RM-structural validation of non-template-bound writes, today running on a strict-canjson-decode proxy that catches type-shape but not RM invariants).
+**Source (inbound):** a consuming CDR project — filed against v0.11.0 for RM-structural validation of non-template-bound writes (FOLDER, EHR_STATUS, EHR_ACCESS, untemplated demographic PARTY) where the consumer had been running on a strict-canjson-decode proxy that catches type-shape but not RM invariants.
 
 ## Goal
 
@@ -16,7 +16,7 @@ Expose a **template-less** Reference Model validation entry point — `validatio
 
 ## Problem
 
-Every entry point in [`openehr/validation`](../../openehr/validation) ([`validate.go`](../../openehr/validation/validate.go), [`ValidateComposition`](../../openehr/validation/composition.go), `ValidateFolder` / `ValidateEHRStatus` / `ValidateDemographic`) accepts a `*templatecompile.Compiled` as the authoritative driver — the package doc states *"Validation is template-driven."* A CDR persisting non-template-bound resources therefore has no SDK call to assert RM conformance. Its strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — RM-mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, mis-paired `DV_ORDINAL` symbol/value, and cardinality violations on container attributes.
+Every entry point in [`openehr/validation`](../../../openehr/validation) ([`validate.go`](../../../openehr/validation/validate.go), [`ValidateComposition`](../../../openehr/validation/composition.go), `ValidateFolder` / `ValidateEHRStatus` / `ValidateDemographic`) accepts a `*templatecompile.Compiled` as the authoritative driver — the package doc states *"Validation is template-driven."* A CDR persisting non-template-bound resources therefore has no SDK call to assert RM conformance. Its strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — RM-mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, mis-paired `DV_ORDINAL` symbol/value, and cardinality violations on container attributes.
 
 The SDK already carries every building block required: `rminfo` (`RequiredAttributes` / `AttributeRMType` / `KnownRMTypes`), the RM behavioural functions, and the value-source-generic walker `rmread`. Only an OPT-independent driver is missing.
 
@@ -25,7 +25,7 @@ The SDK already carries every building block required: `rminfo` (`RequiredAttrib
 Implementation may start when:
 
 - [x] Maintainer sign-off on the **driver split** — **Option A** (second driver alongside `*Compiled`) chosen 2026-06-29.
-- [x] **Covers:** finalized — promote new REQ-112 section under [`clinical-modeling.md`](../specifications/clinical-modeling.md) 2026-06-29; REQ-110 stays exactly as-is. REQ.md row added at status `Draft` in Phase 2 alongside the prose.
+- [x] **Covers:** finalized — promote new REQ-112 section under [`clinical-modeling.md`](../../specifications/clinical-modeling.md) 2026-06-29; REQ-110 stays exactly as-is. REQ.md row added at status `Draft` in Phase 2 alongside the prose.
 - [ ] PROBE-077 cassette set agreed — minimum: an `EHR_STATUS` missing `subject`, a `FOLDER` missing `name`, a `DV_INTERVAL` with `lower>upper`, a `CODE_PHRASE` with empty `code_string`. Each cassette: input JSON + expected `Issue` (path + code).
 
 ## Accepted approach (2026-06-29)
@@ -71,7 +71,7 @@ Each evaluator returns `[]Issue` with the standard path + code; codes reuse the 
 
 **Tasks:**
 - Record maintainer sign-off on Option A vs B.
-- Finalise REQ-112 prose under `clinical-modeling.md` (or REQ-110 extension); register the row in [`REQ.md`](../specifications/REQ.md) at status `Draft`.
+- Finalise REQ-112 prose under `clinical-modeling.md` (or REQ-110 extension); register the row in [`REQ.md`](../../specifications/REQ.md) at status `Draft`.
 - Pick the PROBE-077 cassette matrix; add the stub cassettes to `testkit/cassettes/rm/floor/`.
 
 **Definition of done:** REQ-112 row exists; cassette directory in place; this plan flipped Draft → Ready.
@@ -89,7 +89,7 @@ Each evaluator returns `[]Issue` with the standard path + code; codes reuse the 
 
 **Tasks:**
 - Land the PROBE-077 test driving the cassette matrix; assert path + code per Issue.
-- Update [`traceability.yaml`](../specifications/traceability.yaml): REQ-112 → `openehr/validation` + PROBE-077.
+- Update [`traceability.yaml`](../../specifications/traceability.yaml): REQ-112 → `openehr/validation` + PROBE-077.
 - Add a paragraph to `openehr/validation/doc.go` distinguishing the two surfaces; flip REQ-112 row status to `Stable` once probes pass.
 
 **Definition of done:** PROBE-077 green; `make spec-check` green; CHANGELOG `[Unreleased]` bullet drafted.
@@ -115,6 +115,6 @@ Each evaluator returns `[]Issue` with the standard path + code; codes reuse the 
 
 ## Mapping to specs
 
-- [docs/specifications/clinical-modeling.md § REQ-112 (to be added)](../specifications/clinical-modeling.md) — normative contract.
-- [docs/specifications/REQ.md](../specifications/REQ.md) — registry row.
-- [docs/specifications/traceability.yaml](../specifications/traceability.yaml) — REQ → package / probe.
+- [docs/specifications/clinical-modeling.md § REQ-112 (to be added)](../../specifications/clinical-modeling.md) — normative contract.
+- [docs/specifications/REQ.md](../../specifications/REQ.md) — registry row.
+- [docs/specifications/traceability.yaml](../../specifications/traceability.yaml) — REQ → package / probe.

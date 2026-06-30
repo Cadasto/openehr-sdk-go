@@ -1,14 +1,14 @@
 # Plan — SDK-GAP-17: execution-oriented parsed AQL AST
 
 **Date:** 2026-06-29
-**Status:** Draft
+**Status:** Landed (PR #58, 2026-06-30)
 **Owner:** SDK maintainers
-**Covers:** proposed **REQ-113** (structured AQL AST — read side) — extends [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (parse + lint) and the write-side [REQ-055](../specifications/wire.md#req-055--aql-query) (Builder / verb-functions / `WhereExpr` / `Value`). The two sides converge on one introspectable expression vocabulary.
-**Probes:** proposed **PROBE-080** (round-trip — emitter byte-identical-equivalent property across the buildable grammar, mirroring the existing PROBE-020 emitter contract).
-**Implementation:** planned — recommend a two-step roll-out (interim accessor, then the target AST). Maintainer chooses whether to land both in one cycle.
+**Covers:** **REQ-113** (structured AQL AST — read side) — extends [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (parse + lint) and the write-side [REQ-055](../../specifications/wire.md#req-055--aql-query) (Builder / verb-functions / `WhereExpr` / `Value`). The two sides converge on one introspectable expression vocabulary.
+**Probes:** **PROBE-080** (round-trip property pinned by `openehr/aql/parse/roundtrip_test.go` — emitter idempotence + canonical-input preservation across the v1 catalogue, mirroring the existing PROBE-020 emitter contract).
+**Implementation:** landed — both tiers (Tier-1 `Document.Tree()` interim accessor + Tier-2 `parse.Query` structured AST) shipped in PR #58; out-of-catalogue shapes surface as `aql.ErrIncompleteAST` per review feedback.
 **Depends on:** REQ-109 parse infrastructure landed (`openehr/aql/parse/parse.go`, `parse/gen/`); REQ-055 Builder + `WhereExpr`/`Value` landed (`openehr/aql/`).
 **Defers:** execution / planning semantics (the consumer's job); archetype/template path resolution against an OPT; semantic validation beyond the grammar (PROBE-021 already disclaims this).
-**Inbound source:** [SDK-GAP-17 dossier](../../docs/sdk-gap-drafts/SDK-GAP-17.md) (filed against v0.11.0 by a consuming CDR project — building an AQL execution engine that today recurses the SDK's generated `parse/gen` ANTLR tree behind a single isolated seam; the dossier asks for a stable, generated-type-free read AST that mirrors the existing write-side Builder).
+**Source (inbound):** a consuming CDR project — filed against v0.11.0 by a consumer building an AQL execution engine that today recurses the SDK's generated `parse/gen` ANTLR tree behind a single isolated seam; the request was a stable, generated-type-free read AST that mirrors the existing write-side Builder.
 
 ## Goal
 
@@ -18,7 +18,7 @@ Expose a **stable, generated-type-free, readable** parsed AQL AST — a `string 
 
 Today the SDK exposes two surfaces — both incomplete for an execution consumer:
 
-1. **`parse.Document` is lint-oriented and structure-erased.** Per its own contract, it flattens FROM/CONTAINS ("nesting is not retained because the lint contract reasons over the *set* of bound classes, not their containment shape") and exposes only the class *set* (`Classes`), the path *set* (`Paths`), the param *set* (`Params`), and presence/shape flags (`HasWhere`, `HasOrderBy`, `HasLimit`, `Distinct`, `Star`, `NumSelect`). It does **not** expose: which class CONTAINS which; the WHERE comparison/junction tree (only the paths in WHERE survive — operators and values are dropped); the function/aggregate wrapper around a SELECT item; ORDER BY direction; or the LIMIT/OFFSET values. The parsed ANTLR tree is an unexported field ([`parse.go:44` `tree gen.ISelectQueryContext`](../../openehr/aql/parse/parse.go#L44)).
+1. **`parse.Document` is lint-oriented and structure-erased.** Per its own contract, it flattens FROM/CONTAINS ("nesting is not retained because the lint contract reasons over the *set* of bound classes, not their containment shape") and exposes only the class *set* (`Classes`), the path *set* (`Paths`), the param *set* (`Params`), and presence/shape flags (`HasWhere`, `HasOrderBy`, `HasLimit`, `Distinct`, `Star`, `NumSelect`). It does **not** expose: which class CONTAINS which; the WHERE comparison/junction tree (only the paths in WHERE survive — operators and values are dropped); the function/aggregate wrapper around a SELECT item; ORDER BY direction; or the LIMIT/OFFSET values. The parsed ANTLR tree is an unexported field ([`parse.go:44` `tree gen.ISelectQueryContext`](../../../openehr/aql/parse/parse.go#L44)).
 
 2. **`Builder` / `WhereExpr` / `Value` is write-only.** `WhereExpr` and `Value` are sealed interfaces whose only methods (`expr()`, `token()`) **emit** text; concrete types (`comparison{path,op,val}`, `junction`, `paramValue`, `stringValue`, …) are unexported with no readable fields. You can build and emit a string; you cannot read what you parsed.
 
@@ -28,14 +28,15 @@ An execution engine — the read-side use-case — has no choice but to descend 
 
 Implementation may start when:
 
-- [ ] Maintainer sign-off on the **roll-out shape** — interim `Document.Tree()` accessor only, target AST only, or both in one cycle. Recorded inline below once chosen.
-- [ ] Maintainer sign-off on the **vocabulary unification** — whether the existing `WhereExpr`/`Value` interfaces gain readable accessors on the SAME types (one model, two directions), or whether parse emits a *parallel* set of exported types (`parse.WhereExpr` etc.) that the Builder later mirrors. (The dossier and this plan both lean **unify**.)
-- [ ] **Covers:** finalized — promote REQ-113 prose under `clinical-modeling.md`, register the row in [`REQ.md`](../specifications/REQ.md) at status `Draft` before the implementation PR.
+- [x] Maintainer sign-off on the **roll-out shape** — **both in one cycle** (interim `Document.Tree()` accessor + target `parse.Query` AST) chosen 2026-06-29.
+- [x] Maintainer sign-off on the **vocabulary unification** — **unify on the same concrete types**: export the existing concrete `WhereExpr`/`Value` types with read accessors; Parse populates them; Builder constructs them. One model, two directions. Chosen 2026-06-29.
+- [x] Maintainer sign-off on the **placement** — **`parse.Query`** in the parser package (mirror of `Parse → Document`); the unified vocabulary stays in `aql`. Chosen 2026-06-29.
+- [ ] **Covers:** finalized — promote REQ-113 prose under `clinical-modeling.md`, register the row in [`REQ.md`](../../specifications/REQ.md) at status `Draft` alongside the implementation in Phase 3.
 - [ ] PROBE-080 round-trip corpus seeded — at least: a SELECT with COUNT and AS alias; a nested CONTAINS chain; a WHERE with `AND`/`OR`/`NOT`/`EXISTS`/`MATCHES`/`LIKE`; an ORDER BY with mixed directions; a LIMIT+OFFSET.
 
-## Accepted approach (decision pending — sign-off gates above)
+## Accepted approach (2026-06-29)
 
-Two tiers, either independently acceptable; the second is the target. Recommend landing **both** in sequence on the same branch (interim ships value immediately while the target settles).
+Two tiers landed on the same branch: the interim ships value immediately while the target settles. Vocabulary unifies on the existing concrete write-side types (one model, two directions); the new structured AST type lives in `parse` as `parse.Query`.
 
 ### Tier 1 — interim: `Document.Tree()` accessor (cheap, ~one day)
 
@@ -145,6 +146,6 @@ Sits alongside `Parse` (which returns `Document` for the lint contract). Both re
 
 ## Mapping to specs
 
-- [docs/specifications/clinical-modeling.md § REQ-113 (to be added)](../specifications/clinical-modeling.md) — normative contract.
-- [docs/specifications/REQ.md](../specifications/REQ.md) — registry row.
-- [docs/specifications/traceability.yaml](../specifications/traceability.yaml) — REQ-113 → `openehr/aql/parse` + `openehr/aql` + PROBE-080.
+- [docs/specifications/clinical-modeling.md § REQ-113 (to be added)](../../specifications/clinical-modeling.md) — normative contract.
+- [docs/specifications/REQ.md](../../specifications/REQ.md) — registry row.
+- [docs/specifications/traceability.yaml](../../specifications/traceability.yaml) — REQ-113 → `openehr/aql/parse` + `openehr/aql` + PROBE-080.

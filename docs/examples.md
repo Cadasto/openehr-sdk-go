@@ -25,6 +25,7 @@ make build
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
+| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
@@ -201,6 +202,50 @@ byte-identical : true
 ```
 
 **What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`.
+
+### aql-parse-structured
+
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (SDK-GAP-17 Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+
+```bash
+go run ./cmd/examples/aql-parse-structured
+```
+
+**Packages:** `openehr/aql`, `openehr/aql/parse`
+
+**Sample output:**
+
+```text
+input AQL:
+  SELECT
+    c/uid/value,
+    c/name/value
+  FROM EHR e
+    CONTAINS COMPOSITION c
+  WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%'
+  ORDER BY c/uid/value DESC
+  LIMIT 50 OFFSET 100
+
+structured AST:
+  SELECT:
+    [0] c/uid/value
+    [1] c/name/value
+  FROM EHR e
+    CONTAINS COMPOSITION c
+  WHERE:
+    AND:
+      c/uid/value = $cid (param)
+      c/name/value LIKE 'Vital%' (string)
+  ORDER BY:
+    [0] c/uid/value DESC
+  LIMIT 50 (int)
+  OFFSET 100 (int)
+
+canonical emission:
+  SELECT c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%' ORDER BY c/uid/value DESC LIMIT 50 OFFSET 100
+```
+
+**What to copy into your app:** use `parse.ParseQuery(src)` to get the structured AST when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings); check `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution against the CDR.
 
 ### lint-aql
 

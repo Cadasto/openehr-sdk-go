@@ -66,6 +66,13 @@ type ClassExpr struct {
 	// or a version predicate. Distinguishes an identifiable EHR/VERSION root
 	// from a bare one.
 	HasPredicate bool
+	// Predicate is the raw text inside the class predicate brackets when
+	// HasPredicate is true and the predicate is NOT a literal archetype HRID
+	// (which lives on [Archetype]) or a `$param` archetype (signalled by
+	// [ParamArchetype]). Carries standing predicates such as
+	// `ehr_id/value=$x` so the emitter can round-trip them — brackets
+	// stripped, content verbatim from the source.
+	Predicate string
 	// Pos is the source position of the class expression.
 	Pos Position
 }
@@ -120,6 +127,12 @@ func (d *Document) extract() {
 	d.Params = ex.params
 }
 
+// EnterClassExpression populates [Document.Classes]. Keep in lockstep
+// with the structured extractor's extractClassExprOperand
+// (extract_query.go) so a consumer reading the flat lint view and the
+// structured Query sees identical [ClassExpr] values for the same
+// source — including the standing-predicate body (Predicate) and the
+// param-archetype placeholder name carried verbatim in Archetype.
 func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	ce := ClassExpr{Pos: posOf(c.GetStart())}
 	if ids := c.AllIDENTIFIER(); len(ids) > 0 {
@@ -130,12 +143,17 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	}
 	if pp := c.PathPredicate(); pp != nil {
 		ce.HasPredicate = true
-		if ap := pp.ArchetypePredicate(); ap != nil {
+		switch {
+		case pp.ArchetypePredicate() != nil:
+			ap := pp.ArchetypePredicate()
 			if hrid := ap.ARCHETYPE_HRID(); hrid != nil {
 				ce.Archetype = hrid.GetText()
-			} else if ap.PARAMETER() != nil {
+			} else if p := ap.PARAMETER(); p != nil {
+				ce.Archetype = p.GetText()
 				ce.ParamArchetype = true
 			}
+		default:
+			ce.Predicate = trimBrackets(pp.GetText())
 		}
 	}
 	e.classes = append(e.classes, ce)
@@ -146,8 +164,9 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 	if v := c.GetVariable(); v != nil {
 		ce.Alias = v.GetText()
 	}
-	if c.VersionPredicate() != nil {
+	if vp := c.VersionPredicate(); vp != nil {
 		ce.HasPredicate = true
+		ce.Predicate = trimBrackets(vp.GetText())
 	}
 	e.classes = append(e.classes, ce)
 }
