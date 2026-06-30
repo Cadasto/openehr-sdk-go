@@ -6,9 +6,9 @@ package validation
 //
 //   - RM-mandatory attribute absences (rminfo.RequiredAttributes per type
 //     plus the container "lower bound ≥ 1" reading);
-//   - per-RM-type invariants on the leaves it touches (CODE_PHRASE,
-//     DV_INTERVAL bounds, DV_QUANTITY magnitude/units coherence, the
-//     OBJECT_REF id+type floor).
+//   - per-RM-type invariants on the leaves it touches (CODE_PHRASE
+//     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision, the
+//     OBJECT_REF id/type/namespace floor).
 //
 // SDK-GAP-15 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
@@ -21,11 +21,18 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
+
+// maxWalkDepth bounds the RM-floor descent. RM graphs decoded from the
+// wire are acyclic trees, but ValidateRM accepts any caller-built value;
+// a pathological cyclic graph is stopped here rather than overflowing the
+// stack. The deepest legitimate RM nesting is far below this bound.
+const maxWalkDepth = 256
 
 // ValidateRM validates root against the openEHR Reference Model alone
 // (REQ-112). It checks every RM-mandatory attribute on every node
@@ -57,7 +64,7 @@ func ValidateRM(root any) Result {
 		}})
 	}
 	w := &rmFloorWalker{info: rminfo.Default}
-	w.walk(root, rmType, "/")
+	w.walk(root, rmType, "/", 0)
 	return resultFromIssues(w.issues)
 }
 
@@ -100,8 +107,9 @@ func ValidateRMDemographic(party rm.Party) Result {
 
 // rmFloorWalker accumulates issues as it descends the RM graph driven
 // by rminfo. There is no notion of "OPT-declared attribute" here —
-// every BMM-known attribute is a descend candidate; cycle-breaking
-// uses a visited set keyed on identity-comparable RM nodes.
+// every BMM-known attribute is a descend candidate. Recursion depth is
+// bounded by maxWalkDepth so a pathological cyclic in-memory graph
+// terminates instead of overflowing the stack.
 type rmFloorWalker struct {
 	info   rminfo.Lookup
 	issues []Issue
@@ -115,20 +123,44 @@ func (w *rmFloorWalker) emit(i Issue) {
 }
 
 // walk descends value (of declared BMM type rmType) at the given AQL
-// path. It first runs the per-type invariants on the current node,
-// then iterates every BMM-known attribute — emits `required` for any
-// RM-mandatory attribute that is absent or empty, and recurses into
-// every present attribute. Unknown rmType (not registered with
-// rminfo.Default) is a no-op descent — invariants and required-set
-// checks both consult rminfo, so an unknown class yields no issues
-// from this node, only what its parent already emitted.
-func (w *rmFloorWalker) walk(value any, rmType string, path string) {
+// path. It first runs the per-type invariants on the current node, then
+// — for types rmread models — iterates every BMM-known attribute,
+// emitting `required` for any RM-mandatory attribute that is absent or
+// empty and recursing into every present attribute.
+//
+// A type rmread does NOT model (OBJECT_REF, PARTICIPATION, LINK, … — see
+// [rmread.Handles]) is an opaque leaf here: its members are unreadable, so
+// reading them would report every one absent and fabricate `required`.
+// Such a node is validated solely by its per-type invariant evaluator
+// (run above). The same gate stops descent into a flattened scalar a
+// reader surfaces directly — e.g. CODE_PHRASE.terminology_id comes back
+// as a Go string, which is not an RM node to walk.
+func (w *rmFloorWalker) walk(value any, rmType string, path string, depth int) {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return
 	}
 	w.checkInvariants(value, rmType, path)
 
-	attrs := w.info.AttributeNames(rmType)
+	if !rmread.Handles(value) {
+		return
+	}
+	if depth >= maxWalkDepth {
+		w.emit(Issue{
+			Path:   path,
+			Code:   "max_depth",
+			Detail: fmt.Sprintf("RM-floor walk exceeded max depth %d at %s (possible cyclic graph)", maxWalkDepth, rmType),
+		})
+		return
+	}
+
+	// AttributeNames is an optional rminfo extension (kept off the stable
+	// rminfo.Lookup interface per idiom.md § public-API stability). Default
+	// implements it; absence would only mean "cannot enumerate" → no descend.
+	lister, ok := w.info.(rminfo.AttributeLister)
+	if !ok {
+		return
+	}
+	attrs := lister.AttributeNames(rmType)
 	if attrs == nil {
 		return
 	}
@@ -165,7 +197,7 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string) {
 				})
 			}
 			for i, k := range kids {
-				w.walk(k, attrType, fmt.Sprintf("%s[%d]", attrPath, i))
+				w.walk(k, runtimeRMType(k, attrType), fmt.Sprintf("%s[%d]", attrPath, i), depth+1)
 			}
 			continue
 		}
@@ -182,16 +214,21 @@ func (w *rmFloorWalker) walk(value any, rmType string, path string) {
 			}
 			continue
 		}
-		// Recurse with the value's *runtime* RM type when we know it;
-		// otherwise honour the BMM-declared attribute type. The runtime
-		// type may be a subtype of the declared one (Liskov), so reading
-		// rmTypeInfo first lets the invariant checks dispatch correctly.
-		runtimeType := attrType
-		if rt, _, ok := rmTypeInfo(val); ok {
-			runtimeType = rt
-		}
-		w.walk(val, runtimeType, attrPath)
+		w.walk(val, runtimeRMType(val, attrType), attrPath, depth+1)
 	}
+}
+
+// runtimeRMType resolves the RM type to descend into: the value's runtime
+// type when the closed RM-node set recognises it (so polymorphic subtypes
+// — an OBSERVATION inside a CONTENT_ITEM container, a DV_QUANTITY inside a
+// DV_ORDERED slot — dispatch their own invariants and required-set),
+// otherwise the BMM-declared attribute type. Applied uniformly to single-
+// and multi-valued attributes.
+func runtimeRMType(val any, declared string) string {
+	if rt, _, ok := rmTypeInfo(val); ok {
+		return rt
+	}
+	return declared
 }
 
 // setFromSlice is a small helper that turns a (possibly-nil) slice into
@@ -212,14 +249,17 @@ func setFromSlice(s []string) map[string]bool {
 // land per the BMM-bump runbook and any spec refresh. Unknown types are
 // silently skipped (this is a floor, not an exhaustive RM check).
 func (w *rmFloorWalker) checkInvariants(value any, rmType, path string) {
-	switch rmType {
-	case "CODE_PHRASE":
+	switch {
+	case rmType == "CODE_PHRASE":
 		w.checkCodePhrase(value, path)
-	case "DV_QUANTITY":
+	case rmType == "DV_QUANTITY":
 		w.checkDVQuantity(value, path)
-	case "DV_INTERVAL":
+	case strings.HasPrefix(rmType, "DV_INTERVAL"):
+		// rmTypeInfo reports the numeric instantiations as
+		// "DV_INTERVAL<DV_QUANTITY>" / "<DV_COUNT>" (and "DV_INTERVAL" for
+		// the bare collapsed form); all dispatch to the bounds check.
 		w.checkDVInterval(value, path)
-	case "OBJECT_REF", "PARTY_REF", "ACCESS_GROUP_REF", "LOCATABLE_REF":
+	case rmType == "OBJECT_REF", rmType == "PARTY_REF", rmType == "ACCESS_GROUP_REF", rmType == "LOCATABLE_REF":
 		w.checkObjectRef(value, path)
 	}
 }
@@ -242,20 +282,22 @@ func (w *rmFloorWalker) checkCodePhrase(value any, path string) {
 	}
 }
 
-// checkDVQuantity enforces the spec floor on DV_QUANTITY: precision,
-// when set, must be non-negative; units is RM-required (so caught by
-// the floor's required-set walk). The magnitude is always a number on
-// the wire so no separate presence check is needed.
+// checkDVQuantity enforces the spec floor on DV_QUANTITY: precision, when
+// set, must be ≥ -1. Per the RM, precision is a number of decimal places
+// where 0 means integral and -1 means "no limit" (any number of decimal
+// places) — so -1 is valid and only precision < -1 is out of range. units
+// is RM-required (caught by the floor's required-set walk); magnitude is
+// always a number on the wire so needs no separate presence check.
 func (w *rmFloorWalker) checkDVQuantity(value any, path string) {
 	q, ok := asDVQuantity(value)
 	if !ok {
 		return
 	}
-	if q.Precision != nil && int(*q.Precision) < 0 {
+	if q.Precision != nil && int(*q.Precision) < -1 {
 		w.emit(Issue{
 			Path:   path,
 			Code:   "rm_invariant",
-			Detail: fmt.Sprintf("DV_QUANTITY.precision must be non-negative; got %d", *q.Precision),
+			Detail: fmt.Sprintf("DV_QUANTITY.precision must be ≥ -1 (-1 = no limit); got %d", *q.Precision),
 		})
 	}
 }
@@ -281,34 +323,37 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 }
 
 // checkObjectRef enforces the spec floor on OBJECT_REF (and subtypes):
-// the parent struct's id, type, and namespace are RM-required. The
-// required-set walk already catches absent fields by name; this
-// invariant adds the "empty-string vs nil" reading that rminfo can't
-// express, since the generated Go shape sets the field to zero rather
-// than omitting it.
+// id, type, and namespace are RM-mandatory. rmread models OBJECT_REF as an
+// opaque leaf (the walk does not read its members), so this evaluator is
+// the floor's sole check for the reference — reading the fields through the
+// [rm.ObjectRefLike] interface (SDK-GAP-11) so any BMM subtype is covered.
 func (w *rmFloorWalker) checkObjectRef(value any, path string) {
-	id, refType, namespace, ok := objectRefBaseFields(value)
+	if value == nil || rmread.IsTypedNilPointer(value) {
+		return
+	}
+	ref, ok := value.(rm.ObjectRefLike)
 	if !ok {
 		return
 	}
-	if refType == "" {
+	if ref.GetID() == nil {
+		w.emit(Issue{
+			Path:   joinPath(path, "/id"),
+			Code:   "rm_invariant",
+			Detail: "OBJECT_REF.id must be present",
+		})
+	}
+	if ref.GetType() == "" {
 		w.emit(Issue{
 			Path:   joinPath(path, "/type"),
 			Code:   "rm_invariant",
 			Detail: "OBJECT_REF.type must be non-empty",
 		})
 	}
-	if namespace == "" {
+	if ref.GetNamespace() == "" {
 		w.emit(Issue{
 			Path:   joinPath(path, "/namespace"),
 			Code:   "rm_invariant",
 			Detail: "OBJECT_REF.namespace must be non-empty",
 		})
-	}
-	// id is an OBJECT_ID polymorphic interface; the required-set walk
-	// emits `required` on a nil id, so we only sanity-check the
-	// printable value here when one is present.
-	if id != "" {
-		return
 	}
 }

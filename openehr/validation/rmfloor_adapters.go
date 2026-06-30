@@ -8,7 +8,6 @@ package validation
 
 import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
 // asCodePhrase recovers a CODE_PHRASE value (by value or by pointer)
@@ -43,39 +42,64 @@ func asDVQuantity(value any) (rm.DVQuantity, bool) {
 }
 
 // dvIntervalNumericBounds returns the lower/upper magnitudes of a
-// DV_INTERVAL when its bound type is a numerically-comparable RM
-// concrete (DV_QUANTITY or DV_COUNT) and neither side is unbounded.
-// Returns ok=false otherwise (including for DV_DATE / DV_TIME / etc. —
-// temporal interval bounds need richer comparison semantics deferred
-// to a follow-up cycle, see REQ-123's temporal helpers).
+// DV_INTERVAL when its bound type is a numerically-comparable RM concrete
+// (DV_QUANTITY or DV_COUNT) and neither side is unbounded. It handles the
+// monomorphised instantiations RM data actually carries —
+// DVInterval[DVQuantity] (e.g. DV_QUANTITY.normal_range), DVInterval[DVCount]
+// — as well as the bare DVInterval[DVOrdered] collapsed form. Returns
+// ok=false otherwise (including DV_DATE / DV_TIME / etc. — temporal interval
+// bounds need richer comparison semantics deferred to a follow-up cycle, see
+// REQ-123's temporal helpers).
 func dvIntervalNumericBounds(value any) (lower, upper float64, ok bool) {
 	switch v := value.(type) {
+	case *rm.DVInterval[rm.DVQuantity]:
+		if v == nil {
+			return 0, 0, false
+		}
+		return numericBounds(v, dvQuantityMagnitude)
+	case rm.DVInterval[rm.DVQuantity]:
+		return numericBounds(&v, dvQuantityMagnitude)
+	case *rm.DVInterval[rm.DVCount]:
+		if v == nil {
+			return 0, 0, false
+		}
+		return numericBounds(v, dvCountMagnitude)
+	case rm.DVInterval[rm.DVCount]:
+		return numericBounds(&v, dvCountMagnitude)
 	case *rm.DVInterval[rm.DVOrdered]:
 		if v == nil {
 			return 0, 0, false
 		}
-		return numericBounds(v)
+		return numericBounds(v, dvOrderedAsFloat)
 	case rm.DVInterval[rm.DVOrdered]:
-		return numericBounds(&v)
+		return numericBounds(&v, dvOrderedAsFloat)
 	}
 	return 0, 0, false
 }
 
-// numericBounds is the worker for dvIntervalNumericBounds. Honours the
-// `lower_unbounded` / `upper_unbounded` flags — an unbounded side means
-// the comparison is undefined and we skip the invariant check by
-// returning ok=false.
-func numericBounds(iv *rm.DVInterval[rm.DVOrdered]) (lower, upper float64, ok bool) {
+// numericBounds is the worker for dvIntervalNumericBounds, generic over the
+// interval's bound element type. mag lifts a bound to a float64 magnitude
+// (ok=false when it carries none). Honours the `lower_unbounded` /
+// `upper_unbounded` flags — an unbounded side means the comparison is
+// undefined and we skip the invariant check by returning ok=false.
+func numericBounds[T rm.DVOrdered](iv *rm.DVInterval[T], mag func(T) (float64, bool)) (lower, upper float64, ok bool) {
 	if iv.LowerUnbounded || iv.UpperUnbounded {
 		return 0, 0, false
 	}
-	lo, loOK := dvOrderedAsFloat(iv.Lower)
-	hi, hiOK := dvOrderedAsFloat(iv.Upper)
+	lo, loOK := mag(iv.Lower)
+	hi, hiOK := mag(iv.Upper)
 	if !loOK || !hiOK {
 		return 0, 0, false
 	}
 	return lo, hi, true
 }
+
+// dvQuantityMagnitude / dvCountMagnitude are the per-element magnitude
+// liftings for the numeric DV_INTERVAL instantiations; both bound elements
+// are always present (typed value fields), so ok is always true.
+func dvQuantityMagnitude(q rm.DVQuantity) (float64, bool) { return float64(q.Magnitude), true }
+
+func dvCountMagnitude(c rm.DVCount) (float64, bool) { return float64(c.Magnitude), true }
 
 // dvOrderedAsFloat lifts a DVOrdered bound to a float64 magnitude when
 // the concrete carries one (DV_QUANTITY, DV_COUNT). Returns ok=false
@@ -99,47 +123,4 @@ func dvOrderedAsFloat(v rm.DVOrdered) (float64, bool) {
 		return float64(x.Magnitude), true
 	}
 	return 0, false
-}
-
-// objectRefBaseFields recovers the OBJECT_REF parent's id (rendered),
-// type, and namespace from any OBJECT_REF subtype. Routes through the
-// SDK-GAP-11 [rm.ObjectRefLike] interface so adding a new BMM subtype
-// is a no-op here — satisfying the interface is enough. The typed-nil
-// guard upfront prevents a panic when a nil pointer is passed boxed in
-// the interface (the *Like accessors have value receivers; calling
-// them on a nil pointer would deref).
-func objectRefBaseFields(value any) (id, refType, namespace string, ok bool) {
-	if value == nil || rmread.IsTypedNilPointer(value) {
-		return "", "", "", false
-	}
-	ref, isRef := value.(rm.ObjectRefLike)
-	if !isRef {
-		return "", "", "", false
-	}
-	if oid := ref.GetID(); oid != nil {
-		id = describeObjectID(oid)
-	}
-	return id, ref.GetType(), ref.GetNamespace(), true
-}
-
-// describeObjectID renders an OBJECT_ID for diagnostic purposes. The
-// rendition is loose — the invariant check only cares whether the id
-// has any printable identity at all.
-func describeObjectID(oid rm.ObjectID) string {
-	if oid == nil {
-		return ""
-	}
-	// Every ObjectID concrete carries a .Value string (HierObjectID,
-	// UUID, ISO_OID, GenericID, …); render it through fmt to keep the
-	// adapter generic without importing the closed UID set.
-	type valuer interface{ GetValue() string }
-	if vv, ok := oid.(valuer); ok {
-		return vv.GetValue()
-	}
-	// Fallback: a Stringer or default Go formatting.
-	type stringer interface{ String() string }
-	if vv, ok := oid.(stringer); ok {
-		return vv.String()
-	}
-	return ""
 }

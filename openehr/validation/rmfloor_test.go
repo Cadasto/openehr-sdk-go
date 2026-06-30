@@ -91,33 +91,40 @@ func TestValidateRM_CodePhraseEmptyCodeString(t *testing.T) {
 	}
 }
 
-// TestValidateRM_DVQuantityNegativePrecision covers the
-// DV_QUANTITY.precision floor: a negative precision is invalid.
-// Surfaced as a stand-alone DV_QUANTITY root via the generic
-// ValidateRM entry — even though DV_QUANTITY is rarely a *root*, the
-// floor must catch the invariant when the walker descends into one.
-func TestValidateRM_DVQuantityNegativePrecision(t *testing.T) {
-	neg := rm.Integer(-1)
-	q := &rm.DVQuantity{
-		Magnitude: 1.0,
-		Units:     "mg",
-		Precision: &neg,
-	}
-	r := validation.ValidateRM(q)
+// TestValidateRM_DVQuantityPrecision covers the DV_QUANTITY.precision
+// floor: precision < -1 is out of range, but -1 ("no limit") and any
+// non-negative value are valid per the RM. Surfaced as a stand-alone
+// DV_QUANTITY root via the generic ValidateRM entry.
+func TestValidateRM_DVQuantityPrecision(t *testing.T) {
+	// precision = -2 is out of range → rm_invariant.
+	bad := rm.Integer(-2)
+	r := validation.ValidateRM(&rm.DVQuantity{Magnitude: 1.0, Units: "mg", Precision: &bad})
 	if r.OK {
-		t.Fatalf("ValidateRM(DV_QUANTITY with precision=-1) should not be OK; issues=%+v", r.Issues)
+		t.Fatalf("ValidateRM(DV_QUANTITY precision=-2) should not be OK; issues=%+v", r.Issues)
 	}
 	if !containsCode(r.Issues, "rm_invariant") {
-		t.Errorf("expected rm_invariant for negative DV_QUANTITY.precision, got %+v", r.Issues)
+		t.Errorf("expected rm_invariant for precision=-2, got %+v", r.Issues)
+	}
+
+	// precision = -1 means "no limit" and is valid — regression guard for
+	// the formerly over-strict `< 0` check.
+	noLimit := rm.Integer(-1)
+	r = validation.ValidateRM(&rm.DVQuantity{Magnitude: 1.0, Units: "mg", Precision: &noLimit})
+	if !r.OK {
+		t.Errorf("ValidateRM(DV_QUANTITY precision=-1, no-limit) want OK; got %+v", r.Issues)
 	}
 }
 
-// TestValidateRM_DVIntervalLowerGreaterThanUpper covers the
-// DV_INTERVAL bound-ordering floor for numerically-comparable bound
-// types (DV_QUANTITY): lower > upper surfaces rm_invariant.
+// TestValidateRM_DVIntervalLowerGreaterThanUpper covers the DV_INTERVAL
+// bound-ordering floor on the *typed* numeric instantiation RM data
+// actually carries (DVInterval[DVQuantity], e.g. DV_QUANTITY.normal_range):
+// lower > upper surfaces rm_invariant. Regression guard for the dispatch
+// gap where rmTypeInfo reports "DV_INTERVAL<DV_QUANTITY>" while the
+// catalogue only matched the bare "DV_INTERVAL" and the adapter only the
+// bare DVInterval[DVOrdered] — so inverted typed intervals validated clean.
 func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
-	iv := rm.DVInterval[rm.DVOrdered]{
-		Interval: rm.Interval[rm.DVOrdered]{
+	iv := rm.DVInterval[rm.DVQuantity]{
+		Interval: rm.Interval[rm.DVQuantity]{
 			Lower:         rm.DVQuantity{Magnitude: 10, Units: "mg"},
 			Upper:         rm.DVQuantity{Magnitude: 5, Units: "mg"},
 			LowerIncluded: true,
@@ -126,7 +133,7 @@ func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
 	}
 	r := validation.ValidateRM(&iv)
 	if r.OK {
-		t.Fatalf("ValidateRM(DV_INTERVAL with lower>upper) should not be OK; issues=%+v", r.Issues)
+		t.Fatalf("ValidateRM(DVInterval[DVQuantity] lower>upper) should not be OK; issues=%+v", r.Issues)
 	}
 	if !containsCode(r.Issues, "rm_invariant") {
 		t.Errorf("expected rm_invariant for DV_INTERVAL lower>upper, got %+v", r.Issues)
@@ -136,10 +143,10 @@ func TestValidateRM_DVIntervalLowerGreaterThanUpper(t *testing.T) {
 // TestValidateRM_DVIntervalUnboundedSkipped: an unbounded side means
 // the comparison is undefined; the floor walker skips the invariant
 // check (it does not falsely emit rm_invariant on a half-open
-// interval).
+// interval). Exercised on the typed instantiation.
 func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
-	iv := rm.DVInterval[rm.DVOrdered]{
-		Interval: rm.Interval[rm.DVOrdered]{
+	iv := rm.DVInterval[rm.DVQuantity]{
+		Interval: rm.Interval[rm.DVQuantity]{
 			Lower:          rm.DVQuantity{Magnitude: 10, Units: "mg"},
 			UpperUnbounded: true,
 		},
@@ -153,6 +160,80 @@ func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
 		if i.Code == "rm_invariant" && containsSubstring(i.Detail, "DV_INTERVAL") {
 			t.Errorf("unexpected rm_invariant on unbounded DV_INTERVAL: %s", i.Detail)
 		}
+	}
+}
+
+// TestValidateRM_CodePhraseValid is the regression guard for the
+// terminology_id false-positive: a fully-populated CODE_PHRASE validates
+// cleanly. The walker formerly recursed into the flattened terminology_id
+// string as a TERMINOLOGY_ID node and fabricated a `required` on its value.
+func TestValidateRM_CodePhraseValid(t *testing.T) {
+	cp := &rm.CodePhrase{
+		TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"},
+		CodeString:    "73211009",
+	}
+	r := validation.ValidateRM(cp)
+	if !r.OK {
+		t.Errorf("ValidateRM(valid CODE_PHRASE) want OK; got %+v", r.Issues)
+	}
+}
+
+// TestValidateRMFolder_ObjectRefItemValid is the regression guard for the
+// OBJECT_REF false-positive: a FOLDER carrying a fully-populated OBJECT_REF
+// item validates cleanly. rmread does not model OBJECT_REF, so the walker
+// formerly read its id/type/namespace back as absent and emitted three
+// spurious `required` issues.
+func TestValidateRMFolder_ObjectRefItemValid(t *testing.T) {
+	folder := &rm.Folder{
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+		Name:            rm.DVText{Value: "root"},
+		Items: []rm.ObjectRefLike{rm.ObjectRef{
+			ID:        &rm.HierObjectID{Value: "8849182c-82ad-4088-a07f-48ead4180515"},
+			Type:      "COMPOSITION",
+			Namespace: "local",
+		}},
+	}
+	r := validation.ValidateRMFolder(folder)
+	if !r.OK {
+		t.Errorf("ValidateRMFolder with a valid OBJECT_REF item want OK; got %+v", r.Issues)
+	}
+}
+
+// TestValidateRMFolder_ObjectRefItemMissingType covers the OBJECT_REF
+// invariant via the items container: an item missing type/namespace
+// surfaces rm_invariant (the evaluator, not a spurious `required`).
+func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
+	folder := &rm.Folder{
+		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
+		Name:            rm.DVText{Value: "root"},
+		Items: []rm.ObjectRefLike{rm.ObjectRef{
+			ID: &rm.HierObjectID{Value: "abc"},
+			// Type and Namespace intentionally empty.
+		}},
+	}
+	r := validation.ValidateRMFolder(folder)
+	if r.OK {
+		t.Fatalf("ValidateRMFolder with OBJECT_REF missing type/namespace should not be OK; issues=%+v", r.Issues)
+	}
+	if !hasIssue(r.Issues, "/items[0]/type", "rm_invariant") {
+		t.Errorf("expected rm_invariant at /items[0]/type, got %+v", r.Issues)
+	}
+}
+
+// TestValidateRMEHRAccess_Valid is the regression guard for the EHR_ACCESS
+// dispatch gap: a non-nil EHR_ACCESS is recognised and walked (returns OK)
+// rather than reported as rm_type_unknown.
+func TestValidateRMEHRAccess_Valid(t *testing.T) {
+	access := &rm.EHRAccess{
+		ArchetypeNodeID: "openEHR-EHR-EHR_ACCESS.generic.v1",
+		Name:            rm.DVText{Value: "EHR Access"},
+	}
+	r := validation.ValidateRMEHRAccess(access)
+	if !r.OK {
+		t.Errorf("ValidateRMEHRAccess(valid) want OK; got %+v", r.Issues)
+	}
+	if containsCode(r.Issues, "rm_type_unknown") {
+		t.Errorf("EHR_ACCESS should be recognised, got rm_type_unknown: %+v", r.Issues)
 	}
 }
 

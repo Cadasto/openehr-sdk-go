@@ -32,18 +32,24 @@ type Lookup interface {
 	// is unknown.
 	IsContainer(parentRMType, attrName string) (bool, bool)
 
-	// AttributeNames returns every attribute on the given RM type in
-	// BMM declaration order (ancestors first, then own). Includes
-	// inherited attributes. Returns nil when rmType is unknown.
-	// Consumers walking the RM graph without an OPT — e.g. the
-	// template-less validation floor (REQ-112) — use this to
-	// enumerate the descend candidates.
-	AttributeNames(rmType string) []string
-
 	// KnownRMTypes returns all RM class names this Lookup recognises,
 	// sorted alphabetically. Used by validators that need to walk the
 	// universe of types (e.g. discovery probes).
 	KnownRMTypes() []string
+}
+
+// AttributeLister is an optional extension of [Lookup]: it enumerates a
+// type's attributes in BMM declaration order. It is kept off the Lookup
+// interface so adding it does not break external Lookup implementers
+// (idiom.md § Public-API stability — prefer a new interface plus a runtime
+// type-assertion to introduce optional behaviour). [Default] implements it;
+// consumers walking the RM graph without an OPT — e.g. the template-less
+// validation floor (REQ-112) — assert for it.
+type AttributeLister interface {
+	// AttributeNames returns every attribute on the given RM type in BMM
+	// declaration order (ancestors first, then own), including inherited
+	// attributes. Returns nil when rmType is unknown.
+	AttributeNames(rmType string) []string
 }
 
 // Default is the package-level Lookup populated by the generated

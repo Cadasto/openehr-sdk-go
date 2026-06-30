@@ -36,8 +36,9 @@
 // layer beneath that: a second driver that walks any RM root with
 // rminfo as the sole structural source — no OPT — and enforces
 // RM-mandatory attribute presence plus a small per-RM-type invariant
-// catalogue (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL numeric bounds,
-// OBJECT_REF type/namespace). Template validity implies RM validity,
+// catalogue (CODE_PHRASE, DV_QUANTITY precision, DV_INTERVAL numeric
+// bounds, OBJECT_REF id/type/namespace). Template validity implies RM
+// validity,
 // so the two compose: callers with a template run [Validate], callers
 // without one run [ValidateRM], callers wanting both run both.
 //
