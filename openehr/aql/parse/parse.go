@@ -44,6 +44,12 @@ func (e *SyntaxError) Unwrap() error { return aql.ErrSyntax }
 type Document struct {
 	tree gen.ISelectQueryContext
 
+	// query is the structured AST populated lazily on the first call to
+	// [Document.Query] or [ParseQuery] (SDK-GAP-17 Tier 2, REQ-113).
+	// Extraction cost is only paid when a consumer asks for the
+	// structured shape; lint-only callers stay on the existing flat view.
+	query *Query
+
 	// Distinct is true for SELECT DISTINCT.
 	Distinct bool
 	// Star is true for a bare SELECT * (SDK-AQL-002 relaxation).
@@ -94,13 +100,33 @@ func Parse(q string) (*Document, error) {
 // Parsed reports whether d is the result of a successful [Parse] call.
 func (d *Document) Parsed() bool { return d != nil && d.tree != nil }
 
+// ParseQuery is the SDK-GAP-17 Tier-2 entry (REQ-113): it validates q
+// against the SDK grammar profile (the same grammar [Parse] uses) and
+// returns the structured [Query] AST directly — the read-side mirror
+// of the [aql.Builder] construction model.
+//
+// On a syntax error it returns a *[SyntaxError] (wrapping
+// [aql.ErrSyntax]) and a nil query, matching [Parse]'s error contract.
+//
+// Internally one parse pass produces both the flat [Document] view
+// (returned by [Parse], drives lint per REQ-109) and the structured
+// [Query] AST. Callers that need both should use [Parse] and then
+// [Document.Query] — there is no double-parse cost.
+func ParseQuery(q string) (*Query, error) {
+	doc, err := Parse(q)
+	if err != nil {
+		return nil, err
+	}
+	return doc.Query(), nil
+}
+
 // Tree returns the validated ANTLR parse tree backing this document.
 //
 // Unstable consumer contract — the return type comes from the generated
 // parser package ([gen.ISelectQueryContext]) and may change shape on
 // any grammar regeneration. The accessor is the SDK-GAP-17 Tier-1
-// interim (REQ-113); prefer the structured [Query] AST (Tier 2 — to be
-// landed under REQ-113) for new consumers that need to read SELECT /
+// interim (REQ-113); prefer the structured [Query] AST ([Document.Query]
+// or [ParseQuery]) for new consumers that need to read SELECT /
 // CONTAINS / WHERE / ORDER BY / LIMIT structure without coupling to
 // the generated typed-context tree.
 //
@@ -111,6 +137,28 @@ func (d *Document) Tree() gen.ISelectQueryContext {
 		return nil
 	}
 	return d.tree
+}
+
+// Query returns the structured AQL AST for this document (SDK-GAP-17
+// Tier 2, REQ-113). Lazily extracted on the first call and cached;
+// repeated calls return the same pointer. Returns nil for a
+// zero-value document.
+//
+// The structured AST is the read-side mirror of [aql.Builder] — its
+// SELECT items, FROM containment tree, WHERE expression tree, ORDER BY
+// terms, and LIMIT / OFFSET values can all be traversed without
+// importing the generated parser package or any internal/ package.
+// The [aql.WhereExpr] and [aql.Value] vocabularies are SHARED with the
+// construction side: emitting a parsed [Query] back to AQL via the
+// existing emitter is the round-trip property pinned by Phase 3e.
+func (d *Document) Query() *Query {
+	if d == nil || d.tree == nil {
+		return nil
+	}
+	if d.query == nil {
+		d.query = extractQuery(d.tree)
+	}
+	return d.query
 }
 
 func (d *Document) populate() {

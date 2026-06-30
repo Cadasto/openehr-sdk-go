@@ -180,26 +180,31 @@ func extractFromClause(c gen.IFromClauseContext) FromClause {
 	if ce == nil {
 		return out
 	}
-	// The first ContainsExpr is the FROM root. If it has a CONTAINS
-	// chain or a boolean junction below it, extractContainment returns
-	// a node with Children populated.
 	root := extractContainment(ce)
 	if root == nil {
 		return out
 	}
+	// FromClause.Root captures the class at the FROM root; Contains
+	// captures the chain BELOW it. The simple chain (single child)
+	// unwraps to a direct Containment so a consumer reads
+	// `From.Contains.Class.RMType` directly; multi-child junctions
+	// stay as a synthetic Containment carrying the operands.
 	out.Root = root.Class
-	if len(root.Children) > 0 || root.Negated || root.ChildJoin != ContainsAnd {
-		// Containment-only root: rare (the grammar requires a class
-		// at the FROM root). Preserve the structure anyway.
+	switch {
+	case len(root.Children) == 1 && !root.Negated && root.ChildJoin == ContainsAnd:
+		// `FROM <class> CONTAINS <subtree>` — promote the single
+		// child to the From.Contains slot so the chained class is
+		// directly readable.
+		child := root.Children[0]
+		out.Contains = &child
+	case len(root.Children) > 0 || root.Negated:
+		// Multi-child or negated subtree — preserve the synthetic
+		// node so the operator and operands are both visible.
 		out.Contains = &Containment{
 			Children:  root.Children,
 			ChildJoin: root.ChildJoin,
 			Negated:   root.Negated,
 		}
-	} else if hasContainsChain(ce) {
-		// The root binds a class AND introduces a CONTAINS chain or
-		// nested operands — the chain becomes the containment subtree.
-		out.Contains = extractContainsChildren(ce)
 	}
 	return out
 }
