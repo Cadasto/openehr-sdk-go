@@ -786,6 +786,36 @@ requirements:
     plans:
       - docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md
 
+  - id: REQ-113
+    title: Execution-oriented parsed AQL AST
+    canonical: docs/specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast
+    status: draft
+    # ParseQuery + Document.Query expose a stable, generated-type-free
+    # structured AQL AST (parse.Query) — the read-side mirror of
+    # aql.Builder. SELECT items / FROM containment tree / WHERE
+    # expression tree / ORDER BY / LIMIT / OFFSET, populated from the
+    # validated ANTLR tree (parse/gen) via the private extractor.
+    # WhereExpr + Value vocabulary is SHARED with the construction side:
+    # parse populates the same Comparison/Junction/NotExpr/ExistsExpr/
+    # MatchesExpr/LikeExpr/ParamValue/StringValue/IntValue/RealValue/
+    # BoolValue the Builder constructs. (*Query).Emit + aql.FormatWhere
+    # close the round-trip loop (idempotence pinned by 16 cases in
+    # roundtrip_test.go). Tier 1 — Document.Tree — exposes the
+    # validated ANTLR tree as a cheap interim (unstable consumer
+    # contract). SDK-GAP-17.
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/parse
+    probes: []
+    tests:
+      - openehr/aql/introspect_test.go
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/roundtrip_test.go
+    plans:
+      - docs/plans/2026-06-29-sdk-gap-17-aql-execution-ast.md
+
   - id: REQ-120
     title: RM identifier parsing and derivation
     canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation

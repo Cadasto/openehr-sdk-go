@@ -729,3 +729,81 @@ These exclusions are by design: a CDR may layer template-driven validation on to
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle.
 - **Plan:** [`docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15.
 
+---
+
+## REQ-113 — Execution-oriented parsed AQL AST
+
+REQ-109's [`openehr/aql/parse`](../../openehr/aql/parse) returns a lint-shaped [`Document`](../../openehr/aql/parse/parse.go) that flattens the FROM/CONTAINS tree to a class set and erases the WHERE expression structure: the lint contract reasons over the *set* of bound classes and the *set* of paths, not their containment shape or the operator tree. An execution consumer — a server lowering AQL to SQL, a planner picking up CONTAINS nesting, a query rewriter — needs to read the *structure*. The construction-side [`aql.Builder`](../../openehr/aql/builder.go) (REQ-055) is the write-side mirror of that need; until REQ-113 the read side had no symmetric surface.
+
+The SDK **MUST** expose a **stable, generated-type-free, readable** structured AQL AST: a `string → structured query` entry point whose result a consumer can traverse without importing `openehr/aql/parse/gen` or any `internal/` package. The AST **MUST** preserve containment nesting, the WHERE operator/value tree, SELECT function/aggregate wrappers and aliases, ORDER BY direction, and LIMIT / OFFSET values. The WHERE and Value vocabularies are SHARED with the construction side — `aql.Comparison` / `aql.Junction` / `aql.NotExpr` / `aql.ExistsExpr` / `aql.MatchesExpr` / `aql.LikeExpr` / `aql.ParamValue` / `aql.StringValue` / `aql.IntValue` / `aql.RealValue` / `aql.BoolValue` are populated by both Builder and Parse: one model, two directions.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/aql/parse
+
+// Tier 2 — the target read AST.
+func ParseQuery(q string) (*Query, error)
+func (d *Document) Query() *Query
+
+type Query struct {
+    Select  SelectClause
+    From    FromClause
+    Where   aql.WhereExpr  // nil when no WHERE clause
+    OrderBy []OrderTerm
+    Limit   *int           // nil when no LIMIT
+    Offset  *int           // nil when no OFFSET
+}
+func (q *Query) Emit() (string, error)
+
+// SELECT
+type SelectClause struct {
+    Distinct bool
+    Star     bool
+    Items    []SelectItem
+}
+type SelectItem  struct { Expr SelectExpr; Alias string }
+type SelectExpr  interface{ isSelectExpr() }
+type PathExpr    struct { IdentifiedPath }
+type FunctionCall struct { Name string; Args []SelectExpr }
+
+// FROM / CONTAINS — nested containment tree
+type FromClause   struct { Root ClassExpr; Contains *Containment }
+type Containment  struct { Class ClassExpr; Children []Containment; ChildJoin ContainsJoin; Negated bool }
+type ContainsJoin int  // ContainsAnd / ContainsOr
+
+// ORDER BY
+type OrderTerm struct { Path IdentifiedPath; Dir OrderDir }
+type OrderDir  int  // OrderAsc / OrderDesc
+```
+
+Tier 1 — the cheap interim — exposes the validated ANTLR tree via [`(*Document).Tree`](../../openehr/aql/parse/parse.go) (return type `gen.ISelectQueryContext`, explicitly unstable). It removes the re-parse cost for consumers already recursing the generated parser but does not solve the generated-coupling concern; Tier 2 is the stable read AST.
+
+The WhereExpr vocabulary on the construction side gains [`aql.NotExpr`](../../openehr/aql/where.go) / [`aql.ExistsExpr`](../../openehr/aql/where.go) / [`aql.MatchesExpr`](../../openehr/aql/where.go) / [`aql.LikeExpr`](../../openehr/aql/where.go) (and their `Not` / `Exists` / `Matches` / `Like` constructors) so the parser populates the same shapes the Builder constructs. [`aql.FormatWhere`](../../openehr/aql/where.go) is the public read-side mirror of the internal `.expr()` emitter — used by `(*Query).Emit()` to render the structured AST back to canonical AQL.
+
+### Round-trip property
+
+For any AQL query the parser accepts and the v1 emitter catalogue supports:
+
+```
+Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
+```
+
+The first emit normalises whitespace, keyword casing, optional defaults (ASC), and clause ordering against the canonical write form; the second parse-emit MUST be a fixed point. The buildable-grammar equivalent of [PROBE-020](#req-055--aql-wire-boundary).
+
+### Trust model
+
+The structured AST is **syntax-faithful**: it carries the source path text verbatim (`IdentifiedPath.Raw`), the function names as written, and the canonical AQL emission. It does **not** evaluate:
+
+- archetype / template constraints (that is REQ-102 / REQ-110);
+- terminology binding;
+- semantic validity beyond the SDK grammar profile (the server remains the execute-time authority, [PROBE-021](#req-109--aql-static-lint)).
+
+### Building-block independence (REQ-013)
+
+`openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
+
+- **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
+- **Verification:** unit pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT/FROM/WHERE/ORDER BY/LIMIT) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (16 cases across the v1 catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Plan:** [`docs/plans/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17.
+
