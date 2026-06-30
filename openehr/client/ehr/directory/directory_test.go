@@ -1,7 +1,6 @@
 package directory_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +62,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := directory.Get(context.Background(), newClient(t, srv), ehrIDFixture)
+	got, meta, err := directory.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +89,7 @@ func TestGetWithPath(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := directory.Get(context.Background(), newClient(t, srv), ehrIDFixture,
+	_, _, err := directory.Get(t.Context(), newClient(t, srv), ehrIDFixture,
 		directory.WithPath("/episodes/episode-1"))
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +109,7 @@ func TestGetAtTimeAndVersionedWithPath(t *testing.T) {
 	defer srv.Close()
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
 
-	if _, _, err := directory.GetAtTime(context.Background(), newClient(t, srv), ehrIDFixture, at,
+	if _, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at,
 		directory.WithPath("/episodes")); err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +120,7 @@ func TestGetAtTimeAndVersionedWithPath(t *testing.T) {
 		t.Error("GetAtTime dropped version_at_time when path supplied")
 	}
 
-	if _, _, err := directory.GetVersioned(context.Background(), newClient(t, srv), ehrIDFixture, folderVUID,
+	if _, _, err := directory.GetVersioned(t.Context(), newClient(t, srv), ehrIDFixture, folderVUID,
 		directory.WithPath("/episodes")); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +139,7 @@ func TestGetAtTime(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
-	_, _, err := directory.GetAtTime(context.Background(), newClient(t, srv), ehrIDFixture, at)
+	_, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +157,7 @@ func TestGetVersioned(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := directory.GetVersioned(context.Background(), newClient(t, srv), ehrIDFixture, folderVUID)
+	_, _, err := directory.GetVersioned(t.Context(), newClient(t, srv), ehrIDFixture, folderVUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +167,7 @@ func TestGetVersioned(t *testing.T) {
 }
 
 func TestGetRejectsEmptyVersionUID(t *testing.T) {
-	_, _, err := directory.GetVersioned(context.Background(), nil, ehrIDFixture, "")
+	_, _, err := directory.GetVersioned(t.Context(), nil, ehrIDFixture, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -181,7 +180,7 @@ func TestRepository(t *testing.T) {
 	}))
 	defer srv.Close()
 	repo := directory.NewRepository(newClient(t, srv))
-	if _, _, err := repo.Get(context.Background(), ehrIDFixture); err != nil {
+	if _, _, err := repo.Get(t.Context(), ehrIDFixture); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -199,7 +198,7 @@ func TestSaveDirectory(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	_, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder)
+	_, meta, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture, folder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +220,7 @@ func TestSaveSendsLifecycleStateHeader(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer srv.Close()
-	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture,
+	_, _, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture,
 		&rm.Folder{Name: rm.DVText{Value: "Root"}},
 		directory.WithLifecycleState("532"))
 	if err != nil {
@@ -245,7 +244,7 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 		Committer:  rm.PartyIdentified{Name: &committer},
 		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
 	}
-	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture,
+	_, _, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture,
 		&rm.Folder{Name: rm.DVText{Value: "Root"}}, directory.WithAuditDetails(audit))
 	if err != nil {
 		t.Fatal(err)
@@ -278,7 +277,7 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -312,7 +311,7 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, _, err := directory.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -335,7 +334,7 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -365,7 +364,7 @@ func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -393,7 +392,7 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	_, _, err := directory.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -420,7 +419,7 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, meta, err := directory.Update(
-		context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -451,7 +450,7 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
 	out, _, err := directory.Update(
-		context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+		t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -460,7 +459,7 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 }
 
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
-	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
+	_, _, err := directory.Update(t.Context(), nil, ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -477,7 +476,7 @@ func TestUpdateDirectory(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	if _, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {
+	if _, _, err := directory.Update(t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {
 		t.Fatal(err)
 	}
 	if captured.Method != http.MethodPut {
@@ -495,7 +494,7 @@ func TestDeleteDirectory(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	if _, err := directory.Delete(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID)); err != nil {
+	if _, err := directory.Delete(t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID)); err != nil {
 		t.Fatal(err)
 	}
 	if captured.Method != http.MethodDelete {

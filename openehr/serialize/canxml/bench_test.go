@@ -37,8 +37,7 @@ func loadCompositionFromJSON(b *testing.B, name string) *rm.Composition {
 // "encoding/xml vs encoding/json" trade-off documented in STRAND-04.
 func BenchmarkMarshalComposition(b *testing.B) {
 	c := loadCompositionFromJSON(b, "body_weight.json")
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := canxml.Marshal(c); err != nil {
 			b.Fatal(err)
 		}
@@ -54,8 +53,7 @@ func BenchmarkUnmarshalComposition(b *testing.B) {
 	if err != nil {
 		b.Fatalf("seed encode: %v", err)
 	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var into rm.Composition
 		if err := canxml.Unmarshal(body, &into); err != nil {
 			b.Fatal(err)

@@ -85,7 +85,7 @@ func TestTokenSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestTokenSuccess(t *testing.T) {
 	}
 
 	// Second call should hit cache.
-	if _, err := src.Token(context.Background()); err != nil {
+	if _, err := src.Token(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := hits.Load(); got != 1 {
@@ -135,8 +135,8 @@ func TestTokenRefreshOnExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t1, _ := src.Token(context.Background())
-	t2, _ := src.Token(context.Background())
+	t1, _ := src.Token(t.Context())
+	t2, _ := src.Token(t.Context())
 	if t1.Value == t2.Value {
 		t.Errorf("expected refresh on stale; got same token %q", t1.Value)
 	}
@@ -164,7 +164,7 @@ func TestTokenAuthBasicOAuth2FormEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := src.Token(context.Background()); err != nil {
+	if _, err := src.Token(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -194,7 +194,7 @@ func TestTokenAuthMethodPost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := src.Token(context.Background()); err != nil {
+	if _, err := src.Token(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -207,7 +207,7 @@ func TestTokenOAuth2Error(t *testing.T) {
 	}))
 	defer srv.Close()
 	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
-	_, err := src.Token(context.Background())
+	_, err := src.Token(t.Context())
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -240,7 +240,7 @@ func TestTokenConcurrentCoalesce(t *testing.T) {
 	for range N {
 		go func() {
 			defer wg.Done()
-			if _, err := src.Token(context.Background()); err != nil {
+			if _, err := src.Token(t.Context()); err != nil {
 				t.Error(err)
 			}
 		}()
@@ -260,7 +260,7 @@ func TestTokenCtxCancel(t *testing.T) {
 	}))
 	defer srv.Close()
 	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := src.Token(ctx)
 	if !errors.Is(err, context.Canceled) {
@@ -274,7 +274,7 @@ func TestTokenMalformedResponse(t *testing.T) {
 	}))
 	defer srv.Close()
 	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
-	_, err := src.Token(context.Background())
+	_, err := src.Token(t.Context())
 	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
 		t.Errorf("expected ErrTokenExchangeFailed, got %v", err)
 	}
@@ -286,7 +286,7 @@ func TestTokenMissingAccessToken(t *testing.T) {
 	}))
 	defer srv.Close()
 	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
-	_, err := src.Token(context.Background())
+	_, err := src.Token(t.Context())
 	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
 		t.Errorf("expected ErrTokenExchangeFailed, got %v", err)
 	}
@@ -355,7 +355,7 @@ func TestClientCredentialsWithClientAssertion(t *testing.T) {
 		t.Fatalf("New with client assertion: %v", err)
 	}
 
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token: %v", err)
 	}

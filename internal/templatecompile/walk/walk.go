@@ -71,7 +71,7 @@ func (f VisitorFunc) PostHandle(ctx *Context) error {
 // The name intentionally omits the "Err" prefix to mirror
 // [filepath.SkipDir] / [filepath.SkipAll], which use the same
 // signalling-via-sentinel pattern rather than denoting a true error.
-var SkipSubtree = errors.New("walk: skip subtree") //nolint:staticcheck // ST1012: sentinel control value, see comment above
+var SkipSubtree = errors.New("walk: skip subtree") //nolint:staticcheck,revive // ST1012 / error-naming: deliberate sentinel control value mirroring filepath.SkipDir, see comment above
 
 // Context carries the current walk position. It is rebuilt for each
 // visited node — callers MUST NOT retain pointers past the visitor

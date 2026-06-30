@@ -17,13 +17,10 @@ func unifiedDiff(path string, got, want []byte) string {
 	fmt.Fprintf(&b, "+++ %s (regenerated)\n", path)
 	gotLines := strings.Split(string(got), "\n")
 	wantLines := strings.Split(string(want), "\n")
-	max := len(gotLines)
-	if len(wantLines) > max {
-		max = len(wantLines)
-	}
+	lineCount := max(len(gotLines), len(wantLines))
 	context := 3
 	lastDiff := -100
-	for i := 0; i < max; i++ {
+	for i := range lineCount {
 		var gl, wl string
 		if i < len(gotLines) {
 			gl = gotLines[i]

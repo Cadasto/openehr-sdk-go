@@ -75,6 +75,7 @@ The normative, elaborate idiom spec is [`docs/specifications/idiom.md`](docs/spe
 - **No reflection** (REQ-024) — closed type-switches only on RM polymorphism. Generics are fine; `reflect.Value` is not.
 - **Strict-encode / permissive-decode** numerics per [ADR 0004](docs/adr/0004-numeric-wire-tolerance.md).
 - **Comments**: WHY, not WHAT — identifiers carry the WHAT. Cite REQ-NNN / PROBE-NNN where relevant; do NOT cite issue numbers or commit SHAs (those rot). One short line per non-obvious choice; no multi-paragraph docstrings except package-level `doc.go`.
+- **Test contexts**: in the I/O-bearing test packages (`transport/`, `auth/`, `smart/`, `openehr/client/*`) use `t.Context()` (Go 1.24+) for request-scoped contexts — it is cancelled at test cleanup, so leaks surface. Don't reintroduce `context.Background()` there; derive timeouts/cancellation from `t.Context()`. Pure-compute test packages are unaffected.
 
 ## Releases
 

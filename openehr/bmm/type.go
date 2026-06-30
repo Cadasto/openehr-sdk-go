@@ -22,7 +22,7 @@ type SimpleType struct {
 	TypeName string `json:"type"`
 }
 
-// SimpleType _type discriminator value.
+// TypeP_BMM_SIMPLE_TYPE is the SimpleType _type discriminator value.
 const TypeP_BMM_SIMPLE_TYPE = "P_BMM_SIMPLE_TYPE"
 
 func (*SimpleType) isType() {}
@@ -57,7 +57,7 @@ type GenericType struct {
 	GenericParameterDefs map[string]Type `json:"generic_parameter_defs,omitempty"`
 }
 
-// GenericType _type discriminator value.
+// TypeP_BMM_GENERIC_TYPE is the GenericType _type discriminator value.
 const TypeP_BMM_GENERIC_TYPE = "P_BMM_GENERIC_TYPE"
 
 func (*GenericType) isType() {}
@@ -140,7 +140,7 @@ type ContainerType struct {
 	TypeDef       Type   `json:"type_def"`
 }
 
-// ContainerType _type discriminator value.
+// TypeP_BMM_CONTAINER_TYPE is the ContainerType _type discriminator value.
 const TypeP_BMM_CONTAINER_TYPE = "P_BMM_CONTAINER_TYPE"
 
 func (*ContainerType) isType() {}

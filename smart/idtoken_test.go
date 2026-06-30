@@ -1,7 +1,6 @@
 package smart_test
 
 import (
-	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -107,7 +106,7 @@ func TestValidateIDTokenRS256(t *testing.T) {
 	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
 
-	claims, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	claims, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err != nil {
 		t.Fatalf("RS256 should verify: %v", err)
@@ -124,7 +123,7 @@ func TestValidateIDTokenRS384(t *testing.T) {
 	jwks := jwksServer(t, "kid-rs384", &priv.PublicKey, "RS384")
 	tok := joseSign(t, gojose.RS384, priv, "kid-rs384", defaultIDClaims(now))
 
-	claims, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	claims, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err != nil {
 		t.Fatalf("RS384 should verify: %v", err)
@@ -141,7 +140,7 @@ func TestValidateIDTokenES384(t *testing.T) {
 	jwks := jwksServer(t, "kid-es384", &priv.PublicKey, "ES384")
 	tok := joseSign(t, gojose.ES384, priv, "kid-es384", defaultIDClaims(now))
 
-	claims, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	claims, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err != nil {
 		t.Fatalf("ES384 should verify: %v", err)
@@ -158,7 +157,7 @@ func TestValidateIDTokenES256(t *testing.T) {
 	jwks := jwksServer(t, "kid-es256", &priv.PublicKey, "ES256")
 	tok := joseSign(t, gojose.ES256, priv, "kid-es256", defaultIDClaims(now))
 
-	claims, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	claims, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err != nil {
 		t.Fatalf("ES256 should verify: %v", err)
@@ -178,7 +177,7 @@ func TestValidateIDTokenRejectsUnlistedAlg(t *testing.T) {
 	tok := joseSign(t, gojose.ES384, priv, "kid-es384", defaultIDClaims(now))
 
 	// Allowlist permits only RS256; ES384 must be rejected.
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, []string{"RS256"})
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("unlisted alg should be rejected with JWKS failure, got %v", err)
@@ -197,7 +196,7 @@ func TestValidateIDTokenFailsClosedOnUnsupportedAdvertisedAlgs(t *testing.T) { /
 
 	// AS advertises only HS256/HS384 (unsupported). The RS256 token would verify
 	// against the default set, but the advertised constraint must be honoured.
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, []string{"HS256", "HS384"})
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("unsupported advertised alg set must fail closed with JWKS failure, got %v", err)
@@ -216,7 +215,7 @@ func TestValidateIDTokenRejectsAlgNone(t *testing.T) {
 	tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
 		base64.RawURLEncoding.EncodeToString(pl) + "."
 
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("alg:none should be rejected with JWKS failure, got %v", err)
@@ -231,7 +230,7 @@ func TestValidateIDTokenRejectsBadNonce(t *testing.T) {
 	jwks := jwksServer(t, "kid-rs256", &priv.PublicKey, "RS256")
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", defaultIDClaims(now))
 
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "wrong-nonce", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("nonce mismatch should be rejected, got %v", err)
@@ -268,7 +267,7 @@ func TestValidateIDTokenRejectsSymmetricJWK(t *testing.T) {
 	// returns the symmetric key entry.
 	tok := joseSign(t, gojose.RS256, priv, "kid-oct", defaultIDClaims(now))
 
-	_, gotErr := smart.ValidateIDToken(context.Background(), tok, octJWKS,
+	_, gotErr := smart.ValidateIDToken(t.Context(), tok, octJWKS,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if gotErr == nil {
 		t.Fatal("expected error for symmetric JWK, got nil")
@@ -291,7 +290,7 @@ func TestValidateIDTokenWithinExpirySkew(t *testing.T) {
 	claims["exp"] = now.Add(-10 * time.Second).Unix()
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
 
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err != nil {
 		t.Fatalf("token 10s past exp should be accepted within 30s skew, got: %v", err)
@@ -310,7 +309,7 @@ func TestValidateIDTokenExpiredBeyondSkew(t *testing.T) {
 	claims["exp"] = now.Add(-time.Hour).Unix()
 	tok := joseSign(t, gojose.RS256, priv, "kid-rs256", claims)
 
-	_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+	_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 		"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("token expired 1h ago should be rejected, got %v", err)
@@ -331,7 +330,7 @@ func TestValidateIDTokenRejectsAlgNoneCaseVariants(t *testing.T) {
 			tok := base64.RawURLEncoding.EncodeToString(hdr) + "." +
 				base64.RawURLEncoding.EncodeToString(pl) + "."
 
-			_, err := smart.ValidateIDToken(context.Background(), tok, jwks,
+			_, err := smart.ValidateIDToken(t.Context(), tok, jwks,
 				"https://issuer.example", "client-id", "nonce-xyz", now, nil)
 			if err == nil {
 				t.Fatalf("alg:%s should be rejected, got nil", algVariant)

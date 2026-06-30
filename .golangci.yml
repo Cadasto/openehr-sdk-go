@@ -19,17 +19,40 @@ linters:
     - contextcheck           # context not propagated through the call chain
     - containedctx           # context.Context stored in a struct field
     - perfsprint             # fmt.Sprintf where a cheaper call exists
-    # revive (reference set) is deferred: its default ruleset surfaces ~40
-    # `exported` doc-comment gaps in openehr/bmm + openehr/rm plus intentional
-    # BMM-schema underscore naming. Enabling it needs a doc-comment/naming
-    # policy decision — track separately before turning on.
-    # - revive
+    - revive                 # curated rule set — see linters.settings.revive
+                             # (exported doc coverage, redefines-builtin-id,
+                             # error-naming). var-naming is a non-issue: the
+                             # underscore-named BMM schema types are generated
+                             # (excluded by `generated: lax`).
     # repo additions retained on top of the reference set
     - copyloopvar
     - misspell
     - unconvert
   disable:
     - depguard               # no third-party deps yet; enable when the module grows
+  settings:
+    revive:
+      # Curated high-signal set. Listing rules explicitly keeps the policy
+      # predictable (rather than tracking revive's shifting defaults).
+      rules:
+        # Doc comments on exported symbols — the long-deferred gap. Stutter
+        # check OFF: ehr.EHRID / discovery.DiscoveryError / walk.WalkSubtree
+        # are deliberate, stable public API (idiom.md § public-API stability).
+        - name: exported
+          arguments:
+            - disableStutteringCheck
+        # Shadowing builtins (max, copy, …).
+        - name: redefines-builtin-id
+        # Sentinels named ErrXxx; the one deliberate exception
+        # (walk.SkipSubtree, mirroring filepath.SkipDir) carries //nolint:revive.
+        - name: error-naming
+        # Listed-but-disabled to record the decision, not to toggle it: with an
+        # explicit rules list only listed rules run, so an unlisted rule is
+        # already off. unused-parameter is too noisy for httptest handler
+        # (w, r) signatures and interface implementations, and renaming the
+        # params to _ hurts readability.
+        - name: unused-parameter
+          disabled: true
   exclusions:
     generated: lax           # skip bmmgen output (// Code generated … DO NOT EDIT.)
 

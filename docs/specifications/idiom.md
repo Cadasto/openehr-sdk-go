@@ -29,6 +29,8 @@ func (c *Client) GetComposition(id ObjectVersionID, ctx context.Context) (*rm.Co
 
 Pure functions (codecs, validators with no I/O, AQL string builders) **MUST NOT** take `context.Context` — adding it for "consistency" is noise.
 
+**In tests**, the same pure-vs-I/O split applies. Test code that drives an I/O-bearing call (the `transport`, `auth`, `smart`, and `openehr/client` packages, all `httptest`-backed) **SHOULD** use `t.Context()` (Go 1.24+) rather than `context.Background()`/`context.TODO()`, so cancellation and deadlines propagate to the call under test and are released at test cleanup. Pure-compute test packages (codec/validator/builder tests, e.g. `internal/bmmgen`, `openehr/instance`) **MAY** keep `context.Background()` — there `t.Context()` is cosmetic. The conformance probes under `testkit/probes/` are a separate tier and are intentionally left on `context.Background()` for now. The rule of thumb: if the production method takes `ctx` to do real I/O, its test passes `t.Context()`.
+
 ## HTTP client injection (REQ-021)
 
 The SDK **MUST NOT** allocate its own `*http.Client`. Constructors accept one via functional option or wrapper. Acceptable patterns:

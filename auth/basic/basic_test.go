@@ -25,7 +25,7 @@ func TestNewAllowsEmptyPassword(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestTokenEncoding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestTokenHonoursContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	if _, err := src.Token(ctx); !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
@@ -73,7 +73,7 @@ func TestTokenConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	for range 32 {
 		wg.Go(func() {
-			if _, err := src.Token(context.Background()); err != nil {
+			if _, err := src.Token(t.Context()); err != nil {
 				t.Errorf("Token: %v", err)
 			}
 		})

@@ -14,7 +14,7 @@ package bmmdiff
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -191,8 +191,8 @@ func diffClass(name string, oldC, newC bmm.Class) (ClassChange, bool) {
 	// semantically meaningful in BMM).
 	oldAnc := append([]string(nil), oldC.Ancestors()...)
 	newAnc := append([]string(nil), newC.Ancestors()...)
-	sort.Strings(oldAnc)
-	sort.Strings(newAnc)
+	slices.Sort(oldAnc)
+	slices.Sort(newAnc)
 	if !stringSliceEqual(oldAnc, newAnc) {
 		ch.OldAncestors = oldAnc
 		ch.NewAncestors = newAnc
@@ -474,7 +474,7 @@ func sortedKeys[V any](m map[string]V) []string {
 	for k := range m {
 		out = append(out, k)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 

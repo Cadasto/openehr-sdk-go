@@ -55,9 +55,8 @@ func BenchmarkEncodeComposition_400(b *testing.B) {
 	if err := canjson.Unmarshal(payload, &c); err != nil {
 		b.Fatalf("setup decode: %v", err)
 	}
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := canjson.Marshal(&c); err != nil {
 			b.Fatalf("Marshal: %v", err)
 		}
@@ -69,9 +68,8 @@ func BenchmarkEncodeComposition_400(b *testing.B) {
 func BenchmarkDecodeComposition_400(b *testing.B) {
 	payload := benchCompositionPayload(b, 400)
 	b.SetBytes(int64(len(payload)))
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var c rm.Composition
 		if err := canjson.Unmarshal(payload, &c); err != nil {
 			b.Fatalf("Unmarshal: %v", err)
@@ -84,9 +82,8 @@ func BenchmarkDecodeComposition_400(b *testing.B) {
 // visible in profiles.
 func BenchmarkEncodeDVQuantity(b *testing.B) {
 	q := &rm.DVQuantity{Magnitude: 80.5, Units: "kg"}
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if _, err := canjson.Marshal(q); err != nil {
 			b.Fatalf("Marshal: %v", err)
 		}
@@ -100,9 +97,8 @@ func BenchmarkEncodeDVQuantity(b *testing.B) {
 func BenchmarkDecodeDVQuantity(b *testing.B) {
 	body := []byte(`{"_type":"DV_QUANTITY","magnitude":80.5,"units":"kg"}`)
 	b.SetBytes(int64(len(body)))
-	b.ResetTimer()
 	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var q rm.DVQuantity
 		if err := canjson.Unmarshal(body, &q); err != nil {
 			b.Fatalf("Unmarshal: %v", err)

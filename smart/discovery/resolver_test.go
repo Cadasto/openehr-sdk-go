@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -60,7 +59,7 @@ func TestResolveCassette(t *testing.T) {
 	srv := newCassetteServer(t, "smart-configuration.json", nil)
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestResolveSpecVersionMismatch(t *testing.T) {
 	srv := newCassetteServer(t, "smart-configuration-mismatch.json", nil)
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	_, err := r.Resolve(context.Background(), srv.URL)
+	_, err := r.Resolve(t.Context(), srv.URL)
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonSpecVersionMismatch {
 		t.Fatalf("expected spec_version_mismatch, got %v", err)
@@ -110,7 +109,7 @@ func TestResolveAcceptedVersionsWiden(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithAcceptedSpecVersions(SpecVersionPin, "1.0.3"),
 	)
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatalf("widened accept should succeed: %v", err)
 	}
 }
@@ -124,10 +123,10 @@ func TestResolveCacheHit(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
 	if got := hits.Load(); got != 1 {
@@ -147,11 +146,11 @@ func TestResolveCacheExpiry(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithDefaultTTL(1*time.Millisecond),
 	)
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(10 * time.Millisecond)
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
 	if got := hits.Load(); got != 2 {
@@ -168,10 +167,10 @@ func TestResolveRefreshInvalidates(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	if _, err := r.Resolve(context.Background(), srv.URL); err != nil {
+	if _, err := r.Resolve(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.Refresh(context.Background(), srv.URL); err != nil {
+	if _, err := r.Refresh(t.Context(), srv.URL); err != nil {
 		t.Fatal(err)
 	}
 	if got := hits.Load(); got != 2 {
@@ -196,7 +195,7 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 	for range N {
 		go func() {
 			defer wg.Done()
-			_, _ = r.Resolve(context.Background(), srv.URL)
+			_, _ = r.Resolve(t.Context(), srv.URL)
 		}()
 	}
 	time.Sleep(20 * time.Millisecond)
@@ -219,7 +218,7 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	_, err := r.Resolve(context.Background(), srv.URL)
+	_, err := r.Resolve(t.Context(), srv.URL)
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonMissingService {
 		t.Fatalf("expected missing_service, got %v", err)
@@ -235,7 +234,7 @@ func TestResolveMalformedURL(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	_, err := r.Resolve(context.Background(), srv.URL)
+	_, err := r.Resolve(t.Context(), srv.URL)
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonMalformedURL {
 		t.Fatalf("expected malformed_url, got %v", err)
@@ -248,7 +247,7 @@ func TestResolveParseError(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	_, err := r.Resolve(context.Background(), srv.URL)
+	_, err := r.Resolve(t.Context(), srv.URL)
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonParseError {
 		t.Fatalf("expected parse_error, got %v", err)
@@ -261,7 +260,7 @@ func TestResolveFetchFailedNon2xx(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	_, err := r.Resolve(context.Background(), srv.URL)
+	_, err := r.Resolve(t.Context(), srv.URL)
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonFetchFailed {
 		t.Fatalf("expected fetch_failed, got %v", err)
@@ -273,7 +272,7 @@ func TestResolveInsecureIssuerRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = r.Resolve(context.Background(), "http://insecure.example.com")
+	_, err = r.Resolve(t.Context(), "http://insecure.example.com")
 	var derr *DiscoveryError
 	if !errors.As(err, &derr) || derr.Reason != ReasonInsecureURL {
 		t.Fatalf("expected insecure_url, got %v", err)
@@ -347,7 +346,7 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	}))
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if cat != nil {
 		t.Error("expected nil catalog on issuer mismatch")
 	}
@@ -372,7 +371,7 @@ func TestResolveIssuerMatch(t *testing.T) {
 	srv.Start()
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if err != nil {
 		t.Fatalf("expected success when document issuer matches requested issuer, got: %v", err)
 	}
@@ -403,7 +402,7 @@ func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if cat != nil {
 		t.Error("expected nil catalog when endpoint URLs are non-https in strict mode")
 	}
@@ -430,7 +429,7 @@ func TestResolveInsecureEndpointAllowedWhenAllowInsecure(t *testing.T) {
 	// mustResolver includes WithAllowInsecure, so both the issuer fetch
 	// and the endpoint-URL scheme check should permit http.
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if err != nil {
 		t.Fatalf("WithAllowInsecure should permit http endpoint URLs, got: %v", err)
 	}
@@ -461,7 +460,7 @@ func TestResolveCanonicalServicesMap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cat, err := res.Resolve(context.Background(), srv.URL)
+	cat, err := res.Resolve(t.Context(), srv.URL)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -506,7 +505,7 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 	defer srv.Close()
 
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
-	cat, err := r.Resolve(context.Background(), srv.URL)
+	cat, err := r.Resolve(t.Context(), srv.URL)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
@@ -568,7 +567,7 @@ func TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil(t *testing.T) { // RE
 		defer srv.Close()
 
 		r := mustResolver(t, WithHTTPClient(srv.Client()))
-		cat, err := r.Resolve(context.Background(), srv.URL)
+		cat, err := r.Resolve(t.Context(), srv.URL)
 		if err != nil {
 			t.Fatalf("resolve: %v", err)
 		}

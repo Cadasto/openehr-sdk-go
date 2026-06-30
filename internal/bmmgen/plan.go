@@ -1,10 +1,11 @@
 package bmmgen
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -275,8 +276,8 @@ func PlanFromSchemaForTarget(schema *bmm.Schema, t Target) (*Plan, error) {
 
 	// Sort each file's classes deterministically.
 	for _, f := range files {
-		sort.Slice(f.Classes, func(i, j int) bool {
-			return f.Classes[i].GoName < f.Classes[j].GoName
+		slices.SortFunc(f.Classes, func(a, b *PlannedClass) int {
+			return cmp.Compare(a.GoName, b.GoName)
 		})
 	}
 	for _, fb := range sortedFileKeys(files) {
@@ -502,7 +503,7 @@ func computeAbstractDescendants(p *Plan) {
 		}
 	}
 	for _, list := range children {
-		sort.Strings(list)
+		slices.Sort(list)
 	}
 
 	// For each abstract class, BFS for concrete descendants.
@@ -556,7 +557,7 @@ func computeAbstractDescendants(p *Plan) {
 			}
 			queue = append(queue, children[next]...)
 		}
-		sort.Strings(p.AbstractDescendants[pc.BMMName])
+		slices.Sort(p.AbstractDescendants[pc.BMMName])
 	}
 }
 
@@ -621,7 +622,7 @@ func computeConcreteSubtypes(p *Plan) {
 		}
 	}
 	for _, list := range children {
-		sort.Strings(list)
+		slices.Sort(list)
 	}
 	// Set of class names that appear as the declared type of at least
 	// one property somewhere in the plan.
@@ -669,7 +670,7 @@ func computeConcreteSubtypes(p *Plan) {
 			}
 			queue = append(queue, children[next]...)
 		}
-		sort.Strings(p.ConcreteSubtypes[pc.BMMName])
+		slices.Sort(p.ConcreteSubtypes[pc.BMMName])
 		// If no concrete descendants survived the filter, drop the
 		// parent so emitNarrowInterface skips it.
 		if len(p.ConcreteSubtypes[pc.BMMName]) == 0 {
@@ -684,7 +685,7 @@ func sortedStringKeys[V any](m map[string]V) []string {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }
 
@@ -693,7 +694,7 @@ func sortedFileKeys(files map[string]*PlannedFile) []string {
 	for k := range files {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }
 

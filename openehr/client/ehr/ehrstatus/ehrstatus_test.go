@@ -1,7 +1,6 @@
 package ehrstatus_test
 
 import (
-	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -64,7 +63,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := ehrstatus.Get(context.Background(), newClient(t, srv), ehrIDFixture)
+	got, meta, err := ehrstatus.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +91,7 @@ func TestGetAtTime(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
-	_, _, err := ehrstatus.GetAtTime(context.Background(), newClient(t, srv), ehrIDFixture, at)
+	_, _, err := ehrstatus.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +101,7 @@ func TestGetAtTime(t *testing.T) {
 }
 
 func TestGetAtTimeRejectsZero(t *testing.T) {
-	_, _, err := ehrstatus.GetAtTime(context.Background(), nil, ehrIDFixture, time.Time{})
+	_, _, err := ehrstatus.GetAtTime(t.Context(), nil, ehrIDFixture, time.Time{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig on zero time, got %v", err)
 	}
@@ -117,7 +116,7 @@ func TestGetVersioned(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := ehrstatus.GetVersioned(context.Background(), newClient(t, srv), ehrIDFixture, ehrStatusUID)
+	_, _, err := ehrstatus.GetVersioned(t.Context(), newClient(t, srv), ehrIDFixture, ehrStatusUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +131,7 @@ func TestErrorEnvelope(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"not found","code":"NOT_FOUND"}`))
 	}))
 	defer srv.Close()
-	_, _, err := ehrstatus.Get(context.Background(), newClient(t, srv), ehrIDFixture)
+	_, _, err := ehrstatus.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if !errors.Is(err, transport.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -145,7 +144,7 @@ func TestRepository(t *testing.T) {
 	}))
 	defer srv.Close()
 	repo := ehrstatus.NewRepository(newClient(t, srv))
-	if _, _, err := repo.Get(context.Background(), ehrIDFixture); err != nil {
+	if _, _, err := repo.Get(t.Context(), ehrIDFixture); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -170,7 +169,7 @@ func TestPutMinimal(t *testing.T) {
 		IsQueryable:     true,
 		Subject:         rm.PartySelf{},
 	}
-	got, meta, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status)
+	got, meta, err := ehrstatus.Put(t.Context(), newClient(t, srv), ehrIDFixture, "old-version-uid", status)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +213,7 @@ func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
 		Subject:         rm.PartySelf{},
 	}
 	out, meta, err := ehrstatus.Put(
-		context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		t.Context(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -247,7 +246,7 @@ func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 		Subject:         rm.PartySelf{},
 	}
 	out, meta, err := ehrstatus.Put(
-		context.Background(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
+		t.Context(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -262,7 +261,7 @@ func TestPutIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 }
 
 func TestPutRejectsEmptyIfMatch(t *testing.T) {
-	_, _, err := ehrstatus.Put(context.Background(), nil, ehrIDFixture, "", &rm.EHRStatus{})
+	_, _, err := ehrstatus.Put(t.Context(), nil, ehrIDFixture, "", &rm.EHRStatus{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -277,7 +276,7 @@ func TestPutMapsPreconditionRequired(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"PUT requires If-Match","code":"PRECONDITION_REQUIRED"}`))
 	}))
 	defer srv.Close()
-	_, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{})
+	_, _, err := ehrstatus.Put(t.Context(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{})
 	if !errors.Is(err, transport.ErrPreconditionRequired) {
 		t.Errorf("expected ErrPreconditionRequired, got %v", err)
 	}
@@ -289,7 +288,7 @@ func TestPutMapsVersionConflict(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"stale If-Match","code":"VERSION_CONFLICT"}`))
 	}))
 	defer srv.Close()
-	_, _, err := ehrstatus.Put(context.Background(), newClient(t, srv), ehrIDFixture, "stale", &rm.EHRStatus{})
+	_, _, err := ehrstatus.Put(t.Context(), newClient(t, srv), ehrIDFixture, "stale", &rm.EHRStatus{})
 	if !errors.Is(err, transport.ErrVersionConflict) {
 		t.Errorf("expected ErrVersionConflict, got %v", err)
 	}
@@ -313,7 +312,7 @@ func TestPutWithAuditDetails(t *testing.T) {
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
 	if _, _, err := ehrstatus.Put(
-		context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
+		t.Context(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
 		ehrstatus.WithAuditDetails(audit),
 	); err != nil {
 		t.Fatal(err)
@@ -335,7 +334,7 @@ func TestPutSendsLifecycleStateHeader(t *testing.T) {
 	}))
 	defer srv.Close()
 	if _, _, err := ehrstatus.Put(
-		context.Background(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
+		t.Context(), newClient(t, srv), ehrIDFixture, "v-1", &rm.EHRStatus{},
 		ehrstatus.WithLifecycleState("532"),
 	); err != nil {
 		t.Fatal(err)

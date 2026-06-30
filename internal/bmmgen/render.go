@@ -2,10 +2,11 @@ package bmmgen
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"go/format"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -99,7 +100,7 @@ func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 	b.WriteString("func init() {\n")
 	// Stable order: by BMM name.
 	concrete := append([]*PlannedClass(nil), plan.ConcreteClasses...)
-	sort.Slice(concrete, func(i, j int) bool { return concrete[i].BMMName < concrete[j].BMMName })
+	slices.SortFunc(concrete, func(a, b *PlannedClass) int { return cmp.Compare(a.BMMName, b.BMMName) })
 	for _, pc := range concrete {
 		goType := pc.GoName
 		if sc, ok := pc.Class.(*bmm.SimpleClass); ok && sc.IsGeneric() {
@@ -355,7 +356,7 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 	for k := range props {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, name := range keys {
 		prop := props[name]
 		field, err := renderField(plan, sc, pc.BMMName, prop)

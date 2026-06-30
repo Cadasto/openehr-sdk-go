@@ -1,7 +1,6 @@
 package composition_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -64,7 +63,7 @@ func TestGetLatest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := composition.Get(context.Background(), newClient(t, srv), ehrIDFixture, openehrclient.LatestOf(compositionVOID))
+	got, meta, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.LatestOf(compositionVOID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +90,7 @@ func TestGetSpecificVersion(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := composition.Get(context.Background(), newClient(t, srv), ehrIDFixture, openehrclient.VersionOf(compositionVUID))
+	_, _, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.VersionOf(compositionVUID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +109,7 @@ func TestGetAtTime(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
-	_, _, err := composition.Get(context.Background(), newClient(t, srv), ehrIDFixture, openehrclient.LatestAtTime(compositionVOID, at))
+	_, _, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.LatestAtTime(compositionVOID, at))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +125,7 @@ func TestGetDeletedAtTimeReturns204Signal(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
-	comp, meta, err := composition.Get(context.Background(), newClient(t, srv), ehrIDFixture, openehrclient.LatestAtTime(compositionVOID, at))
+	comp, meta, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.LatestAtTime(compositionVOID, at))
 	if !errors.Is(err, composition.ErrDeletedAtTime) {
 		t.Fatalf("expected ErrDeletedAtTime, got %v", err)
 	}
@@ -150,7 +149,7 @@ func TestSaveSendsLifecycleStateHeader(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{},
+	_, _, err := composition.Save(t.Context(), newClient(t, srv), ehrIDFixture, &rm.Composition{},
 		composition.WithLifecycleState("532"))
 	if err != nil {
 		t.Fatal(err)
@@ -174,7 +173,7 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 		Committer:  rm.PartyIdentified{Name: &committer},
 		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
 	}
-	_, _, err := composition.Save(context.Background(), newClient(t, srv), ehrIDFixture, &rm.Composition{},
+	_, _, err := composition.Save(t.Context(), newClient(t, srv), ehrIDFixture, &rm.Composition{},
 		composition.WithAuditDetails(audit))
 	if err != nil {
 		t.Fatal(err)
@@ -189,14 +188,14 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 }
 
 func TestGetRejectsNilRef(t *testing.T) {
-	_, _, err := composition.Get(context.Background(), nil, ehrIDFixture, nil)
+	_, _, err := composition.Get(t.Context(), nil, ehrIDFixture, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
 }
 
 func TestGetRejectsEmptyEHRID(t *testing.T) {
-	_, _, err := composition.Get(context.Background(), nil, "", openehrclient.LatestOf(compositionVOID))
+	_, _, err := composition.Get(t.Context(), nil, "", openehrclient.LatestOf(compositionVOID))
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -208,7 +207,7 @@ func TestGetSurfacesNotFound(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"not found","code":"NOT_FOUND"}`))
 	}))
 	defer srv.Close()
-	_, _, err := composition.Get(context.Background(), newClient(t, srv), ehrIDFixture, openehrclient.LatestOf(compositionVOID))
+	_, _, err := composition.Get(t.Context(), newClient(t, srv), ehrIDFixture, openehrclient.LatestOf(compositionVOID))
 	if !errors.Is(err, transport.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -221,7 +220,7 @@ func TestRepository(t *testing.T) {
 	}))
 	defer srv.Close()
 	repo := composition.NewRepository(newClient(t, srv))
-	if _, _, err := repo.Get(context.Background(), ehrIDFixture, openehrclient.LatestOf(compositionVOID)); err != nil {
+	if _, _, err := repo.Get(t.Context(), ehrIDFixture, openehrclient.LatestOf(compositionVOID)); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -238,7 +237,7 @@ func TestSaveMinimal(t *testing.T) {
 
 	comp := readComposition(t)
 	out, meta, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		t.Context(), newClient(t, srv), ehrIDFixture, comp,
 		composition.WithTemplateID("openEHR-EHR-COMPOSITION.body_weight.v1"),
 	)
 	if err != nil {
@@ -280,7 +279,7 @@ func TestSaveRepresentationDecodesBareComposition(t *testing.T) {
 
 	comp := readComposition(t)
 	out, meta, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		t.Context(), newClient(t, srv), ehrIDFixture, comp,
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -311,7 +310,7 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 
 	comp := readComposition(t)
 	out, _, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, comp,
+		t.Context(), newClient(t, srv), ehrIDFixture, comp,
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -332,7 +331,7 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 	defer srv.Close()
 
 	out, meta, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -357,7 +356,7 @@ func TestUpdateRepresentationEmptyBodyErrors(t *testing.T) {
 	defer srv.Close()
 
 	out, _, err := composition.Update(
-		context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t),
+		t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -381,7 +380,7 @@ func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 	defer srv.Close()
 
 	out, meta, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -407,7 +406,7 @@ func TestSaveIdentifierPrefersLocation(t *testing.T) {
 	defer srv.Close()
 
 	_, meta, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -429,7 +428,7 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 	defer srv.Close()
 
 	_, _, err := composition.Save(
-		context.Background(), newClient(t, srv), ehrIDFixture, readComposition(t),
+		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferIdentifier),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -438,14 +437,14 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 }
 
 func TestSaveRejectsNil(t *testing.T) {
-	_, _, err := composition.Save(context.Background(), nil, ehrIDFixture, nil)
+	_, _, err := composition.Save(t.Context(), nil, ehrIDFixture, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
 }
 
 func TestUpdateRequiresIfMatch(t *testing.T) {
-	_, _, err := composition.Update(context.Background(), nil, ehrIDFixture, compositionVOID, "", &rm.Composition{})
+	_, _, err := composition.Update(t.Context(), nil, ehrIDFixture, compositionVOID, "", &rm.Composition{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig on empty If-Match, got %v", err)
 	}
@@ -463,7 +462,7 @@ func TestUpdateRoundTrip(t *testing.T) {
 	defer srv.Close()
 
 	comp := readComposition(t)
-	_, meta, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp)
+	_, meta, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -497,7 +496,7 @@ func TestUpdateRepresentationDecodesBareComposition(t *testing.T) {
 
 	comp := readComposition(t)
 	out, meta, err := composition.Update(
-		context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
+		t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -527,7 +526,7 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 
 	comp := readComposition(t)
 	out, _, err := composition.Update(
-		context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
+		t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), comp,
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -541,7 +540,7 @@ func TestUpdateMapsPreconditionFailed(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"stale","code":"PRECONDITION_FAILED"}`))
 	}))
 	defer srv.Close()
-	_, _, err := composition.Update(context.Background(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
+	_, _, err := composition.Update(t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, "stale", &rm.Composition{})
 	if !errors.Is(err, transport.ErrPreconditionFailed) {
 		t.Errorf("expected ErrPreconditionFailed, got %v", err)
 	}
@@ -554,7 +553,7 @@ func TestDelete(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	_, err := composition.Delete(context.Background(), newClient(t, srv), ehrIDFixture, compositionVUID, string(compositionVUID))
+	_, err := composition.Delete(t.Context(), newClient(t, srv), ehrIDFixture, compositionVUID, string(compositionVUID))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,7 +569,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDeleteRequiresIfMatch(t *testing.T) {
-	_, err := composition.Delete(context.Background(), nil, ehrIDFixture, compositionVUID, "")
+	_, err := composition.Delete(t.Context(), nil, ehrIDFixture, compositionVUID, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}

@@ -2,7 +2,6 @@ package definition
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -17,7 +16,7 @@ func TestUploadTemplate_inputTooLarge(t *testing.T) {
 
 	// Feed 100 bytes — over the 16-byte cap.
 	body := bytes.NewReader(bytes.Repeat([]byte("x"), 100))
-	_, _, err := UploadTemplate(context.Background(), nil, FormatADL14, body)
+	_, _, err := UploadTemplate(t.Context(), nil, FormatADL14, body)
 	if err == nil {
 		t.Fatal("expected error when body exceeds maxUploadBytes")
 	}
