@@ -14,6 +14,10 @@ package parse
 // document, not the consumer).
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 )
 
@@ -191,4 +195,175 @@ func (d OrderDir) String() string {
 		return "DESC"
 	}
 	return "ASC"
+}
+
+// Emit renders the structured [Query] back to canonical AQL text — the
+// round-trip mirror of [ParseQuery]. The same Comparison / Junction
+// emitter the builder uses is consumed via [aql.FormatWhere], so a
+// parsed-then-emitted predicate matches a builder-built one byte for
+// byte (PROBE-020 / REQ-113).
+//
+// Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
+// valid q produced by [ParseQuery] — the v1 catalogue of supported
+// shapes is the buildable grammar plus the parser-only shapes
+// (NotExpr / ExistsExpr / LikeExpr / MatchesExpr). Shapes outside the
+// catalogue (Primitive-in-SELECT, parameter-bound LIMIT) round-trip on
+// a best-effort basis.
+//
+// Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
+// a malformed sub-expression (a nil WHERE comparison value, an empty
+// SELECT projection, …).
+func (q *Query) Emit() (string, error) {
+	if q == nil {
+		return "", fmt.Errorf("%w: nil query", aql.ErrInvalidQuery)
+	}
+	var sb strings.Builder
+
+	// SELECT
+	sb.WriteString("SELECT ")
+	if q.Select.Distinct {
+		sb.WriteString("DISTINCT ")
+	}
+	switch {
+	case q.Select.Star:
+		sb.WriteByte('*')
+	case len(q.Select.Items) == 0:
+		return "", fmt.Errorf("%w: empty SELECT projection", aql.ErrInvalidQuery)
+	default:
+		for i, item := range q.Select.Items {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			s, err := emitSelectItem(item)
+			if err != nil {
+				return "", err
+			}
+			sb.WriteString(s)
+		}
+	}
+
+	// FROM
+	if q.From.Root.RMType == "" {
+		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
+	}
+	sb.WriteString(" FROM ")
+	sb.WriteString(emitClassExpr(q.From.Root))
+	if q.From.Contains != nil {
+		sb.WriteString(" CONTAINS ")
+		sb.WriteString(emitContainment(*q.From.Contains))
+	}
+
+	// WHERE
+	if q.Where != nil {
+		pred, err := aql.FormatWhere(q.Where)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(pred) != "" {
+			sb.WriteString(" WHERE ")
+			sb.WriteString(pred)
+		}
+	}
+
+	// ORDER BY
+	if len(q.OrderBy) > 0 {
+		sb.WriteString(" ORDER BY ")
+		for i, t := range q.OrderBy {
+			if i > 0 {
+				sb.WriteString(", ")
+			}
+			sb.WriteString(t.Path.Raw)
+			sb.WriteByte(' ')
+			sb.WriteString(t.Dir.String())
+		}
+	}
+
+	// LIMIT / OFFSET
+	if q.Limit != nil {
+		sb.WriteString(" LIMIT ")
+		sb.WriteString(strconv.Itoa(*q.Limit))
+	}
+	if q.Offset != nil {
+		sb.WriteString(" OFFSET ")
+		sb.WriteString(strconv.Itoa(*q.Offset))
+	}
+
+	return sb.String(), nil
+}
+
+func emitSelectItem(item SelectItem) (string, error) {
+	s, err := emitSelectExpr(item.Expr)
+	if err != nil {
+		return "", err
+	}
+	if item.Alias != "" {
+		s += " AS " + item.Alias
+	}
+	return s, nil
+}
+
+func emitSelectExpr(e SelectExpr) (string, error) {
+	switch v := e.(type) {
+	case PathExpr:
+		return v.IdentifiedPath.Raw, nil
+	case FunctionCall:
+		args := make([]string, 0, len(v.Args))
+		for _, a := range v.Args {
+			s, err := emitSelectExpr(a)
+			if err != nil {
+				return "", err
+			}
+			args = append(args, s)
+		}
+		return v.Name + "(" + strings.Join(args, ", ") + ")", nil
+	}
+	if e == nil {
+		return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
+	}
+	return "", fmt.Errorf("%w: unsupported SELECT expression %T", aql.ErrInvalidQuery, e)
+}
+
+func emitClassExpr(c ClassExpr) string {
+	if c.Version {
+		// VERSION class — `VERSION <alias>` (predicate emission deferred
+		// to the version-aware emitter, not in the v1 catalogue).
+		out := "VERSION"
+		if c.Alias != "" {
+			out += " " + c.Alias
+		}
+		return out
+	}
+	out := c.RMType
+	if c.Alias != "" {
+		out += " " + c.Alias
+	}
+	if c.Archetype != "" {
+		out += "[" + c.Archetype + "]"
+	}
+	return out
+}
+
+func emitContainment(c Containment) string {
+	prefix := ""
+	if c.Negated {
+		prefix = "NOT "
+	}
+	// Boolean junction: render each child and join with the operator.
+	if len(c.Children) > 0 && c.Class.RMType == "" {
+		parts := make([]string, len(c.Children))
+		for i, ch := range c.Children {
+			parts[i] = emitContainment(ch)
+		}
+		joiner := " " + c.ChildJoin.String() + " "
+		return prefix + "(" + strings.Join(parts, joiner) + ")"
+	}
+	// Class + optional inner chain.
+	out := prefix + emitClassExpr(c.Class)
+	if len(c.Children) > 0 {
+		// CONTAINS chain — emit the chain child(ren).
+		for _, ch := range c.Children {
+			out += " CONTAINS " + emitContainment(ch)
+		}
+	}
+	return out
 }

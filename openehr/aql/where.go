@@ -12,6 +12,9 @@ import (
 // write AST share one vocabulary (REQ-113 / SDK-GAP-17). Concrete-type
 // fields are READ-ONLY: consumers MUST NOT mutate them; the emitter relies
 // on stable inputs.
+//
+// Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
+// when emitting a parsed [parse.Query] back to a string).
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
@@ -19,6 +22,36 @@ type WhereExpr interface {
 	// [Builder.Build] can surface it as ErrInvalidQuery instead of panicking
 	// or emitting invalid AQL.
 	validate() error
+}
+
+// FormatWhere renders a [WhereExpr] to canonical AQL text. It validates
+// the expression first; a malformed predicate (empty path, nil value,
+// …) returns an error wrapping [ErrInvalidQuery]. A nil expression
+// returns "" with no error (a vacuously-true WHERE — the builder skips
+// the clause in that case).
+//
+// This is the public read-side mirror of the internal expr() method:
+// consumers of a parsed [parse.Query] use FormatWhere to round-trip
+// the WHERE predicate back to AQL without depending on package-local
+// internals.
+func FormatWhere(w WhereExpr) (string, error) {
+	if w == nil {
+		return "", nil
+	}
+	if err := w.validate(); err != nil {
+		return "", err
+	}
+	return w.expr(), nil
+}
+
+// FormatValue renders an [aql.Value] to canonical AQL text (the same
+// emission the Builder uses internally). Returns "" for a nil Value.
+// Mirrors [FormatWhere] for the value side of the vocabulary.
+func FormatValue(v Value) string {
+	if v == nil {
+		return ""
+	}
+	return v.token()
 }
 
 // Operator is a comparison operator on a [Comparison]. The wire string is
