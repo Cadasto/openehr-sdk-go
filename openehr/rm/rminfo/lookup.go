@@ -52,6 +52,15 @@ type AttributeLister interface {
 	AttributeNames(rmType string) []string
 }
 
+// Compile-time guarantee that the backing concrete type satisfies both the
+// stable Lookup interface and the optional AttributeLister. Consumers assert
+// Default.(AttributeLister) at runtime; this turns a future signature drift on
+// AttributeNames into a build break rather than a silently-failing assertion.
+var (
+	_ Lookup          = (*lookup)(nil)
+	_ AttributeLister = (*lookup)(nil)
+)
+
 // Default is the package-level Lookup populated by the generated
 // data tables (see lookup_gen.go). Tests and consumers should use
 // this value; New is provided for unit testing with synthetic data.
