@@ -807,14 +807,15 @@ requirements:
     packages:
       - openehr/aql
       - openehr/aql/parse
-    probes: []
+    probes:
+      - PROBE-080
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
-      - docs/plans/2026-06-29-sdk-gap-17-aql-execution-ast.md
+      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation

@@ -25,6 +25,7 @@ make build
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
+| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113) |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
@@ -201,6 +202,37 @@ byte-identical : true
 ```
 
 **What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`.
+
+### aql-parse-structured
+
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (SDK-GAP-17 Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+
+```bash
+go run ./cmd/examples/aql-parse-structured
+```
+
+**Packages:** `openehr/aql`, `openehr/aql/parse`
+
+**Sample output:**
+
+```text
+structured AST:
+  SELECT:
+    [0] o (PathExpr)
+  FROM EHR e
+    CONTAINS COMPOSITION c
+      CONTAINS OBSERVATION o
+  WHERE:
+    AND:
+      o/active = true (bool)
+      o/data > 37.5 (real)
+  LIMIT 50 (int)
+
+canonical emission:
+  SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o WHERE o/active = true AND o/data > 37.5 LIMIT 50
+```
+
+**What to copy into your app:** use `parse.ParseQuery(src)` to get the structured AST when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings); check `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution against the CDR.
 
 ### lint-aql
 

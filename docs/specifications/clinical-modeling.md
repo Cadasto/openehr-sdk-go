@@ -793,11 +793,13 @@ The first emit normalises whitespace, keyword casing, optional defaults (ASC), a
 
 ### Trust model
 
-The structured AST is **syntax-faithful**: it carries the source path text verbatim (`IdentifiedPath.Raw`), the function names as written, and the canonical AQL emission. It does **not** evaluate:
+The structured AST is **syntax-faithful for the v1 catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`), the function names as written, and the canonical AQL emission. It does **not** evaluate:
 
 - archetype / template constraints (that is REQ-102 / REQ-110);
 - terminology binding;
 - semantic validity beyond the SDK grammar profile (the server remains the execute-time authority, [PROBE-021](#req-109--aql-static-lint)).
+
+**v1 catalogue gaps** (shapes the grammar accepts but the structured extractor does not yet model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), so a partial AST is never silently emitted as canonical text. Today the catalogue gaps are: Primitive literal in SELECT projection (`SELECT 1`); mixed `SELECT *, col` star plus columns; function-call WHERE LHS (`LENGTH(x) > 5`); MATCHES with `terminology(...)` or `{URI}` operand; path-vs-path comparisons (`WHERE a/x = b/y`); top-level boolean junction at the FROM root (`FROM A OR B`). Each gap is a forward-compatible extension. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
 
 ### Building-block independence (REQ-013)
 
@@ -805,5 +807,5 @@ The structured AST is **syntax-faithful**: it carries the source path text verba
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
 - **Verification:** unit pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT/FROM/WHERE/ORDER BY/LIMIT) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (16 cases across the v1 catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
-- **Plan:** [`docs/plans/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17.
+- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17 (archived after PR #58).
 
