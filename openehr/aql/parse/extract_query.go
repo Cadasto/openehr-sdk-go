@@ -277,27 +277,6 @@ func extractContainment(c gen.IContainsExprContext) *Containment {
 	return node
 }
 
-// hasContainsChain reports whether the top-level contains-expr carries
-// a CONTAINS keyword (the chain marker). Used by [extractFromClause]
-// to decide whether the root binds a sub-tree.
-func hasContainsChain(c gen.IContainsExprContext) bool {
-	return c != nil && c.CONTAINS() != nil
-}
-
-// extractContainsChildren returns the containment sub-tree under a
-// FROM root, dropping the root class (which was already captured in
-// FromClause.Root). This is the post-CONTAINS body.
-func extractContainsChildren(c gen.IContainsExprContext) *Containment {
-	if c == nil || c.CONTAINS() == nil {
-		return nil
-	}
-	kids := c.AllContainsExpr()
-	if len(kids) == 0 {
-		return nil
-	}
-	return extractContainment(kids[0])
-}
-
 func extractClassExprOperand(c gen.IClassExprOperandContext) ClassExpr {
 	switch v := c.(type) {
 	case *gen.ClassExpressionContext:

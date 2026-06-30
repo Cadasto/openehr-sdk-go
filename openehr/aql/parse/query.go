@@ -305,7 +305,7 @@ func emitSelectItem(item SelectItem) (string, error) {
 func emitSelectExpr(e SelectExpr) (string, error) {
 	switch v := e.(type) {
 	case PathExpr:
-		return v.IdentifiedPath.Raw, nil
+		return v.Raw, nil
 	case FunctionCall:
 		args := make([]string, 0, len(v.Args))
 		for _, a := range v.Args {
@@ -358,12 +358,12 @@ func emitContainment(c Containment) string {
 		return prefix + "(" + strings.Join(parts, joiner) + ")"
 	}
 	// Class + optional inner chain.
-	out := prefix + emitClassExpr(c.Class)
-	if len(c.Children) > 0 {
-		// CONTAINS chain — emit the chain child(ren).
-		for _, ch := range c.Children {
-			out += " CONTAINS " + emitContainment(ch)
-		}
+	var sb strings.Builder
+	sb.WriteString(prefix)
+	sb.WriteString(emitClassExpr(c.Class))
+	for _, ch := range c.Children {
+		sb.WriteString(" CONTAINS ")
+		sb.WriteString(emitContainment(ch))
 	}
-	return out
+	return sb.String()
 }
