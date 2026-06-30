@@ -109,6 +109,15 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 
 // putStoredQuery is the shared PUT implementation for the versioned and
 // unversioned stored-query endpoints.
+//
+// SDK-GAP-16 finding B: the canonical OAS `200_StoredQuery_stored` response
+// defines a `Location` header and no body — the server-assigned version is
+// conveyed via `Location: …/definition/query/{name}/{version}`. EHRbase
+// returns the same `Location`-only shape when the request is
+// `Content-Type: text/plain` (which the SDK always sends). The decode
+// order is therefore: (1) Location header (canonical), (2) JSON body
+// (lenient — some deployments return one), (3) synthesised metadata with
+// the caller's input version (graceful fallback for a deficient server).
 func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, name, version, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error) {
 	aqlText = strings.TrimSpace(aqlText)
 	if aqlText == "" {
@@ -138,6 +147,11 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 		}
 		return nil, nil, err
 	}
+	if loc := resp.Metadata.Location; loc != "" {
+		if locName, locVer, ok := parseStoredQueryLocation(loc); ok {
+			return &StoredQueryMetadata{Name: locName, Version: locVer, Q: aqlText}, resp.Metadata, nil
+		}
+	}
 	if len(resp.Body) == 0 {
 		return &StoredQueryMetadata{Name: name, Version: version, Q: aqlText}, resp.Metadata, nil
 	}
@@ -146,6 +160,59 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 		return nil, resp.Metadata, fmt.Errorf("%s: decode: %w", op, err)
 	}
 	return &out, resp.Metadata, nil
+}
+
+// parseStoredQueryLocation recovers the assigned {name, version} from a
+// `Location: …/definition/query/{name}/{version}` response header
+// (SDK-GAP-16 finding B). Returns ok=false on a malformed value so the
+// caller can fall through to body / synthesised metadata; no error is
+// surfaced for a malformed Location — a deficient server should not break
+// the call.
+func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
+	// Tolerate absolute and relative forms. Strip scheme+host if present,
+	// then take the last two non-empty path segments — `{name}` and
+	// `{version}`. PathEscape on the way in is reversed by PathUnescape on
+	// the way out so the returned values match the caller's input forms.
+	p := loc
+	if u, err := url.Parse(loc); err == nil && u.Path != "" {
+		p = u.Path
+	}
+	parts := strings.Split(strings.Trim(p, "/"), "/")
+	clean := make([]string, 0, len(parts))
+	for _, seg := range parts {
+		if seg != "" {
+			clean = append(clean, seg)
+		}
+	}
+	// Anchor on the canonical `…/definition/query/{name}/{version}` shape:
+	// the (last) "query" segment must be followed by exactly two segments,
+	// `{name}` then `{version}`. Without this anchor a version-less Location
+	// (`…/definition/query/{name}`) mis-parses "query"/{name} as
+	// {name}/{version} and returns confidently-wrong values; that case must
+	// fall through to body / synthesised metadata instead.
+	qi := -1
+	for i, seg := range clean {
+		if seg == "query" {
+			qi = i
+		}
+	}
+	if qi < 0 || qi+2 != len(clean)-1 {
+		return "", "", false
+	}
+	// PathEscape on the way in is reversed by PathUnescape on the way out so
+	// the returned values match the caller's input forms.
+	n, err := url.PathUnescape(clean[qi+1])
+	if err != nil {
+		n = clean[qi+1]
+	}
+	v, err := url.PathUnescape(clean[qi+2])
+	if err != nil {
+		v = clean[qi+2]
+	}
+	if n == "" || v == "" {
+		return "", "", false
+	}
+	return n, v, true
 }
 
 // GetStoredQuery retrieves a stored query at a specific version.

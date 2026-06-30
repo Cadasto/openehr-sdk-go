@@ -377,7 +377,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 
 **Tasks:**
 
-1. Migrate `cmd/benchmark/internal/client/` in the CDR repo to use:
+1. Migrate the CDR benchmark harness's client layer to use:
    - `transport.Client` with the same HTTP transport tuning (MaxIdleConnsPerHost, KeepAlive — the SDK's `transport` MUST accept these via the injected `*http.Client`).
    - The leaf clients here (`system`, `ehr/composition`, `ehr/ehrstatus`, `ehr/directory`, `definition`).
 2. Confirm: the `BuildEHRStatusBody` / `BuildDirectoryBody` `map[string]any` body builders disappear from the benchmark; the benchmark builds typed `rm.EhrStatus` / `rm.Folder` values and the codec emits bytes.
@@ -420,7 +420,7 @@ Sequenced so each phase delivers a runnable surface (or framework gate) and the 
 ## Out-of-band considerations
 
 - **Cross-SDK parity (REQ-080, REQ-081).** The PHP SDK's wire request for the same SDK call MUST be byte-equivalent (modulo header order / case). Cassettes are shared across SDKs once the cassette format stabilises.
-- **CDR benchmark as the reference consumer.** The CDR's `cmd/benchmark/internal/client/client.go` (currently on `claude/implement-v4`) is the closest existing code to what this plan produces. It demonstrates: HTTP transport tuning per worker, ETag round-trip, `If-Match` quoting, version-UID extraction, and Cadasto-specific `X-Tenant-Id` / `X-Subject-Id` headers. The SDK extracts the **patterns** (transport tuning is consumer config; ETag/If-Match plumbing is in `transport/`); it does not lift Cadasto-specific headers into the openEHR-core surface.
+- **CDR benchmark as the reference consumer.** The CDR benchmark's client layer is the closest existing code to what this plan produces. It demonstrates: HTTP transport tuning per worker, ETag round-trip, `If-Match` quoting, version-UID extraction, and Cadasto-specific `X-Tenant-Id` / `X-Subject-Id` headers. The SDK extracts the **patterns** (transport tuning is consumer config; ETag/If-Match plumbing is in `transport/`); it does not lift Cadasto-specific headers into the openEHR-core surface.
 - **Sandbox transport equivalence.** Every leaf client MUST be testable against `sandbox/` without code changes — `sandbox.NewInMemory()` implements the same `transport.Client`-like interface so the leaf clients can swap transports at construction time. This is the building block for hermetic SDK-consumer tests.
 - **Federator implications.** Phase 1's `transport.Client` is per-issuer / per-tenant (REQ-065). The federator constructs multiple clients with independent `*http.Client`, `ServiceCatalog`, and `TokenSource` configurations — see [`docs/specifications/research-strands.md § STRAND-06`](../../../docs/specifications/research-strands.md). This plan does not resolve STRAND-06 but it does provide the per-node primitive.
 - **Future: streaming bodies.** Out of scope. Large composition payloads (>10 MB) are rare in v1; if a use case appears, add a `transport.WithStreaming(...)` option later.

@@ -38,6 +38,29 @@ type Lookup interface {
 	KnownRMTypes() []string
 }
 
+// AttributeLister is an optional extension of [Lookup]: it enumerates a
+// type's attributes in BMM declaration order. It is kept off the Lookup
+// interface so adding it does not break external Lookup implementers
+// (idiom.md § Public-API stability — prefer a new interface plus a runtime
+// type-assertion to introduce optional behaviour). [Default] implements it;
+// consumers walking the RM graph without an OPT — e.g. the template-less
+// validation floor (REQ-112) — assert for it.
+type AttributeLister interface {
+	// AttributeNames returns every attribute on the given RM type in BMM
+	// declaration order (ancestors first, then own), including inherited
+	// attributes. Returns nil when rmType is unknown.
+	AttributeNames(rmType string) []string
+}
+
+// Compile-time guarantee that the backing concrete type satisfies both the
+// stable Lookup interface and the optional AttributeLister. Consumers assert
+// Default.(AttributeLister) at runtime; this turns a future signature drift on
+// AttributeNames into a build break rather than a silently-failing assertion.
+var (
+	_ Lookup          = (*lookup)(nil)
+	_ AttributeLister = (*lookup)(nil)
+)
+
 // Default is the package-level Lookup populated by the generated
 // data tables (see lookup_gen.go). Tests and consumers should use
 // this value; New is provided for unit testing with synthetic data.
@@ -108,6 +131,14 @@ func (l *lookup) AttributeRMType(parentRMType, attrName string) (string, bool) {
 		return "", false
 	}
 	return attr.TypeName, true
+}
+
+func (l *lookup) AttributeNames(rmType string) []string {
+	meta, ok := l.data[rmType]
+	if !ok {
+		return nil
+	}
+	return slices.Clone(meta.AttrOrder)
 }
 
 func (l *lookup) IsContainer(parentRMType, attrName string) (bool, bool) {

@@ -294,6 +294,80 @@ func ReadSingle(parent any, _ /* parentType */, attrName string) (any, bool) {
 	return nil, false
 }
 
+// Handles reports whether rmread models parent's RM type for attribute
+// reading — i.e. whether [ReadSingle] / [ReadMultiple] dispatch to a typed
+// reader rather than falling through to (nil, false). A BMM-driven walker
+// (e.g. the REQ-112 RM-floor validator) uses this to avoid descending into
+// or required-checking the attributes of a type rmread does not model
+// (OBJECT_REF, PARTICIPATION, LINK, …): those are opaque leaves here and
+// must be validated by their own evaluators, not by reading their members
+// (which would all read back as absent and fabricate `required`).
+//
+// MUST track the type set of ReadSingle/ReadMultiple above. A type added
+// there but omitted here is treated as a leaf — its RM-mandatory attributes
+// go unchecked (a missed check, never a false positive), so erring toward
+// omission is the safe failure mode.
+func Handles(parent any) bool {
+	switch parent.(type) {
+	case *rm.Composition, rm.Composition,
+		*rm.Observation, rm.Observation,
+		*rm.Evaluation, rm.Evaluation,
+		*rm.Instruction, rm.Instruction,
+		*rm.Action, rm.Action,
+		*rm.AdminEntry, rm.AdminEntry,
+		*rm.GenericEntry, rm.GenericEntry,
+		*rm.Section, rm.Section,
+		*rm.Activity, rm.Activity,
+		*rm.EventContext, rm.EventContext,
+		*rm.History[rm.ItemStructure], rm.History[rm.ItemStructure],
+		*rm.PointEvent[rm.ItemStructure], rm.PointEvent[rm.ItemStructure],
+		*rm.IntervalEvent[rm.ItemStructure], rm.IntervalEvent[rm.ItemStructure],
+		*rm.ItemTree, rm.ItemTree,
+		*rm.ItemList, rm.ItemList,
+		*rm.ItemSingle, rm.ItemSingle,
+		*rm.ItemTable, rm.ItemTable,
+		*rm.Cluster, rm.Cluster,
+		*rm.Element, rm.Element,
+		*rm.DVText, rm.DVText,
+		*rm.DVCodedText, rm.DVCodedText,
+		*rm.CodePhrase, rm.CodePhrase,
+		*rm.DVDate, rm.DVDate,
+		*rm.DVTime, rm.DVTime,
+		*rm.DVDateTime, rm.DVDateTime,
+		*rm.DVDuration, rm.DVDuration,
+		*rm.DVBoolean, rm.DVBoolean,
+		*rm.DVIdentifier, rm.DVIdentifier,
+		*rm.DVMultimedia, rm.DVMultimedia,
+		*rm.DVCount, rm.DVCount,
+		*rm.DVQuantity, rm.DVQuantity,
+		*rm.DVProportion, rm.DVProportion,
+		*rm.DVURI, rm.DVURI,
+		*rm.DVEHRURI, rm.DVEHRURI,
+		*rm.DVParsable, rm.DVParsable,
+		*rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity],
+		*rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount],
+		*rm.DVInterval[rm.DVDateTime], rm.DVInterval[rm.DVDateTime],
+		*rm.DVInterval[rm.DVDate], rm.DVInterval[rm.DVDate],
+		*rm.DVInterval[rm.DVTime], rm.DVInterval[rm.DVTime],
+		*rm.DVInterval[rm.DVProportion], rm.DVInterval[rm.DVProportion],
+		*rm.DVInterval[rm.DVOrdered], rm.DVInterval[rm.DVOrdered],
+		*rm.Person, rm.Person,
+		*rm.Organisation, rm.Organisation,
+		*rm.Group, rm.Group,
+		*rm.Agent, rm.Agent,
+		*rm.Role, rm.Role,
+		*rm.Address, rm.Address,
+		*rm.Contact, rm.Contact,
+		*rm.PartyIdentity, rm.PartyIdentity,
+		*rm.PartyRelationship, rm.PartyRelationship,
+		*rm.Capability, rm.Capability,
+		*rm.Folder, rm.Folder,
+		*rm.EHRStatus, rm.EHRStatus:
+		return true
+	}
+	return false
+}
+
 // ReadMultiple returns the slice at `attrName` on `parent`, each
 // element boxed as `any`. `ok` is true when the parent type
 // carries the attribute (the returned slice may still be empty);

@@ -671,3 +671,61 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
 - **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 
+## REQ-112 — Template-less Reference Model validation floor
+
+The validators introduced by REQ-102 and generalised by REQ-110 are **template-driven** — every entry point accepts a `*templatecompile.Compiled` as the authoritative driver. A consumer persisting RM roots that bind to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) has no SDK call to assert RM conformance. The strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision<0`.
+
+The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on the leaves it touches. The OPT-driven path stays the authoritative template-conformance layer; this floor is what runs when no template applies (template validity implies RM validity, so the two compose).
+
+### Surface
+
+```go
+// Generic entry — any RM concrete in the v2 closed set.
+func ValidateRM(root any) Result
+
+// Typed convenience wrappers (delegate to ValidateRM):
+func ValidateRMFolder(folder *rm.Folder) Result
+func ValidateRMEHRStatus(status *rm.EHRStatus) Result
+func ValidateRMEHRAccess(access *rm.EHRAccess) Result
+func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / GROUP / AGENT / ROLE
+```
+
+The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
+
+### Driver
+
+The floor walker is a **second driver** alongside the template-driven walker — separate type, shared closed-RM-set helpers (`rmTypeInfo` / `describeRMType` / `rmread.ReadSingle` / `rmread.ReadMultiple`). It consumes [`openehr/rm/rminfo`](../../openehr/rm/rminfo) for the structural knowledge:
+
+- `RequiredAttributes(rmType)` drives the per-node required-set check. A single-valued attribute absent (or typed-nil) emits `required`; a multi-valued attribute absent emits `required`, present-but-empty emits `cardinality`.
+- `AttributeNames(rmType)` enumerates the descend candidates (the per-type attribute list extends `Lookup` with this method — additive on the existing surface).
+- `AttributeRMType` / `IsContainer` carry the declared shape for each attribute. The walker recurses into every present attribute, using the value's *runtime* RM type (from `rmTypeInfo`) when known so the invariant evaluators dispatch correctly across Liskov substitution (`DV_TEXT` carrying `DV_CODED_TEXT`, `PARTY_IDENTIFIED` carrying `PARTY_RELATED`, etc.).
+
+### Per-RM-type invariant catalogue (v1 first cycle)
+
+The catalogue is intentionally small; the value is in the structural required-set walk above, plus a focused set of leaf invariants that the canjson lenient decode accepts but the RM forbids:
+
+- **CODE_PHRASE** — `code_string` non-empty.
+- **DV_QUANTITY** — `precision`, when set, non-negative.
+- **DV_INTERVAL** — `lower` ≤ `upper` when both bounds are numerically comparable (DV_QUANTITY / DV_COUNT) and neither side is unbounded. Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer comparison semantics that integrate with the REQ-123 temporal helpers in a follow-up cycle.
+- **OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF** — `type` and `namespace` non-empty. The `id` floor is covered by the required-set walk (the field is RM-mandatory).
+
+Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Each invariant emits `Issue.Code = "rm_invariant"`; consumers dispatch on the code as with the rest of the issue taxonomy.
+
+### Trust model
+
+The floor is the structural RM-only layer. It does **not** evaluate:
+
+- archetype-level or template-level constraints (that is REQ-102 / REQ-110);
+- terminology binding or external-code validation;
+- semantic validity beyond the BMM and the explicit invariant catalogue.
+
+These exclusions are by design: a CDR may layer template-driven validation on top of the floor, or run the floor alone for resources where no template applies.
+
+### Building-block independence (REQ-013)
+
+`openehr/validation/` continues to import only `openehr/rm`, `openehr/rm/rminfo`, `openehr/template`, `openehr/template/constraints`, `openehr/templatecompile`, `openehr/validation/rmread`, and the internal compile-engine — REQ-112's additions are local to the package. The forbidden-import set is unchanged and is enforced by `TestValidationForbiddenImports`.
+
+- **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
+- **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle.
+- **Plan:** [`docs/plans/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15.
+
