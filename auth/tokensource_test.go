@@ -79,9 +79,9 @@ func TestWithTokenSourceNil(t *testing.T) {
 	}
 }
 
-func TestTokenSourceFromContextEmpty(t *testing.T) {
+func TestTokenSourceFromContextAbsent(t *testing.T) {
 	if _, ok := TokenSourceFromContext(t.Context()); ok {
-		t.Error("expected no TokenSource on empty ctx")
+		t.Error("expected no TokenSource on a context that carries none")
 	}
 }
 
