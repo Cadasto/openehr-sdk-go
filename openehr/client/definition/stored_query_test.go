@@ -100,7 +100,7 @@ func TestPutStoredQueryParsesLocationHeader(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQuery(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
 	)
@@ -125,7 +125,7 @@ func TestPutStoredQueryAbsoluteLocation(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQuery(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT 1",
 	)
@@ -152,7 +152,7 @@ func TestPutStoredQueryMalformedLocationFallsThrough(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQuery(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT 1",
 	)
@@ -169,6 +169,35 @@ func TestPutStoredQueryMalformedLocationFallsThrough(t *testing.T) {
 	}
 }
 
+// TestPutStoredQueryVersionlessLocationFallsThrough covers a Location that
+// names the query but omits the assigned version
+// (…/definition/query/{name}). The parser is anchored on the `query`
+// segment requiring exactly {name}/{version} after it, so this falls
+// through to the synthesised metadata rather than mis-parsing
+// "query"/{name} into a wrong {name, version}.
+func TestPutStoredQueryVersionlessLocationFallsThrough(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/openehr/v1/definition/query/org.openehr::vitals")
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	meta, _, err := definition.PutStoredQuery(
+		t.Context(), newClient(t, srv),
+		"org.openehr::vitals",
+		"SELECT 1",
+	)
+	if err != nil {
+		t.Fatalf("version-less Location should not surface an error: %v", err)
+	}
+	if meta.Name != "org.openehr::vitals" {
+		t.Errorf("name = %q, want org.openehr::vitals (synthesised, not mis-parsed 'query')", meta.Name)
+	}
+	if meta.Version != "" {
+		t.Errorf("version = %q, want \"\" (no version assigned; must not mis-parse the name as version)", meta.Version)
+	}
+}
+
 // TestPutStoredQueryLocationPreferredOverBody pins the decode order:
 // Location wins over body when both are present.
 func TestPutStoredQueryLocationPreferredOverBody(t *testing.T) {
@@ -181,7 +210,7 @@ func TestPutStoredQueryLocationPreferredOverBody(t *testing.T) {
 	defer srv.Close()
 
 	meta, _, err := definition.PutStoredQuery(
-		context.Background(), newClient(t, srv),
+		t.Context(), newClient(t, srv),
 		"org.openehr::vitals",
 		"SELECT 1",
 	)

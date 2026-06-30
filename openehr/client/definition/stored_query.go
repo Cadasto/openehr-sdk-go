@@ -147,7 +147,7 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 		}
 		return nil, nil, err
 	}
-	if loc := resp.Header.Get("Location"); loc != "" {
+	if loc := resp.Metadata.Location; loc != "" {
 		if locName, locVer, ok := parseStoredQueryLocation(loc); ok {
 			return &StoredQueryMetadata{Name: locName, Version: locVer, Q: aqlText}, resp.Metadata, nil
 		}
@@ -184,18 +184,30 @@ func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 			clean = append(clean, seg)
 		}
 	}
-	if len(clean) < 2 {
+	// Anchor on the canonical `…/definition/query/{name}/{version}` shape:
+	// the (last) "query" segment must be followed by exactly two segments,
+	// `{name}` then `{version}`. Without this anchor a version-less Location
+	// (`…/definition/query/{name}`) mis-parses "query"/{name} as
+	// {name}/{version} and returns confidently-wrong values; that case must
+	// fall through to body / synthesised metadata instead.
+	qi := -1
+	for i, seg := range clean {
+		if seg == "query" {
+			qi = i
+		}
+	}
+	if qi < 0 || qi+2 != len(clean)-1 {
 		return "", "", false
 	}
-	rawName := clean[len(clean)-2]
-	rawVer := clean[len(clean)-1]
-	n, err := url.PathUnescape(rawName)
+	// PathEscape on the way in is reversed by PathUnescape on the way out so
+	// the returned values match the caller's input forms.
+	n, err := url.PathUnescape(clean[qi+1])
 	if err != nil {
-		n = rawName
+		n = clean[qi+1]
 	}
-	v, err := url.PathUnescape(rawVer)
+	v, err := url.PathUnescape(clean[qi+2])
 	if err != nil {
-		v = rawVer
+		v = clean[qi+2]
 	}
 	if n == "" || v == "" {
 		return "", "", false
