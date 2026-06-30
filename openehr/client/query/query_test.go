@@ -157,7 +157,7 @@ func TestExecuteGETWithEHRID(t *testing.T) {
 	defer srv.Close()
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
-	_, _, err := query.ExecuteString(context.Background(), newClient(t, srv),
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
 		"SELECT e/ehr_id/value FROM EHR e", nil,
 		query.WithGET(), query.WithEHRID(ehrID))
 	if err != nil {
