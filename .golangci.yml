@@ -46,8 +46,11 @@ linters:
         # Sentinels named ErrXxx; the one deliberate exception
         # (walk.SkipSubtree, mirroring filepath.SkipDir) carries //nolint:revive.
         - name: error-naming
-        # Too noisy for httptest handler (w, r) signatures and interface
-        # implementations; renaming to _ hurts readability.
+        # Listed-but-disabled to record the decision, not to toggle it: with an
+        # explicit rules list only listed rules run, so an unlisted rule is
+        # already off. unused-parameter is too noisy for httptest handler
+        # (w, r) signatures and interface implementations, and renaming the
+        # params to _ hurts readability.
         - name: unused-parameter
           disabled: true
   exclusions:
