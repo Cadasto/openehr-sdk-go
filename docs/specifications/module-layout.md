@@ -8,7 +8,7 @@ Authoritative package taxonomy, dependency rules, and versioning policy for `git
 
 The module path is **`github.com/cadasto/openehr-sdk-go`** (REQ-001). The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login; consumer imports MUST use this exact spelling.
 
-The module is licensed **MIT** (REQ-003) and targets **Go 1.25.x** (REQ-002), tracking the N-1 release line per the Go team's support policy.
+The module is licensed **MIT** (REQ-003) and targets **Go 1.26.x** (REQ-002), tracking the current stable Go release line (N) as a deliberate project policy.
 
 ## Package taxonomy
 

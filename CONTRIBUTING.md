@@ -60,7 +60,7 @@ make spec-context REQ=NNN  # assemble the SDD context bundle for a REQ
 make probe-status  # each PROBE's status + whether its test file exists
 ```
 
-Go `1.25.x` on the host is the fast path; the Makefile transparently routes through a Docker dev image if host Go is missing. See [`docs/ci.md`](docs/ci.md).
+Go `1.26.x` on the host is the fast path; the Makefile transparently routes through a Docker dev image if host Go is missing. See [`docs/ci.md`](docs/ci.md).
 
 ### Hooks and IDE integration
 
