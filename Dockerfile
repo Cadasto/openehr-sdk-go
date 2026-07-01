@@ -13,8 +13,10 @@
 # One pinned version keeps `make fmt` / `make lint` reproducible whether they
 # run on the host or in this image.
 
-# Pin the PATCH version for reproducible builds (matches go.mod's `go`
-# line). Bump explicitly when a new stable patch ships — same policy as
+# Pin the dev toolchain to a specific recent PATCH for reproducible builds.
+# This is the build toolchain, not the module floor: it only has to be >=
+# go.mod's `go` line (which stays at the minor's `.0`, e.g. 1.26.0, per
+# REQ-002). Bump explicitly when a new stable patch ships — same policy as
 # the Makefile's LINT_IMAGE pin.
 ARG GO_VERSION=1.26.4
 ARG ALPINE_VERSION=3.20

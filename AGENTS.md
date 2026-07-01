@@ -10,7 +10,7 @@ A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`. **
 |---|---|
 | Module path | `github.com/cadasto/openehr-sdk-go` |
 | License | MIT |
-| Go version | `1.26.x` (current stable line, min `1.26.4`) |
+| Go version | `1.26.x` (current stable line, floor `1.26.0`) |
 | openEHR REST | `1.1.0-development` |
 | Status | **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md) |
 
