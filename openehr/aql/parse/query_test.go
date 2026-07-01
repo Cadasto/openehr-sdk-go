@@ -129,12 +129,10 @@ func TestDocumentQueryConcurrent(t *testing.T) {
 	const n = 32
 	results := make([]*parse.Query, n)
 	var wg sync.WaitGroup
-	wg.Add(n)
 	for i := range n {
-		go func(i int) {
-			defer wg.Done()
+		wg.Go(func() {
 			results[i] = doc.Query()
-		}(i)
+		})
 	}
 	wg.Wait()
 	first := results[0]
