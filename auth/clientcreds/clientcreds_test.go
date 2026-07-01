@@ -236,14 +236,12 @@ func TestTokenConcurrentCoalesce(t *testing.T) {
 	src, _ := New("c", "s", srv.URL, WithHTTPClient(srv.Client()))
 	var wg sync.WaitGroup
 	const N = 8
-	wg.Add(N)
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if _, err := src.Token(t.Context()); err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	// Let goroutines pile up on the in-flight exchange.
 	time.Sleep(20 * time.Millisecond)

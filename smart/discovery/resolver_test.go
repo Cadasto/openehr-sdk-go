@@ -191,12 +191,10 @@ func TestResolveCoalescesConcurrent(t *testing.T) {
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	var wg sync.WaitGroup
 	const N = 8
-	wg.Add(N)
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = r.Resolve(t.Context(), srv.URL)
-		}()
+		})
 	}
 	time.Sleep(20 * time.Millisecond)
 	close(gate)

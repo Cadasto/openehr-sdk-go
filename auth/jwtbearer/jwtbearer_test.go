@@ -437,12 +437,10 @@ func TestSourceCoalescesConcurrent(t *testing.T) {
 	src, _ := New(srv.URL, StaticAssertion("a"), WithHTTPClient(srv.Client()))
 	var wg sync.WaitGroup
 	const N = 5
-	wg.Add(N)
 	for range N {
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = src.Token(t.Context())
-		}()
+		})
 	}
 	time.Sleep(20 * time.Millisecond)
 	close(gate)
