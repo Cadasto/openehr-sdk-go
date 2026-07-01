@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Go toolchain minimum raised to `1.26.4` (REQ-002).** `go.mod`, the Docker/Make toolchain, and CI now track the current stable Go line (N) instead of N-1; consumers must build with Go ≥ 1.26.4.
+
 ## [0.12.0] - 2026-07-01
 
 Twelfth `v0.x` minor — three inbound CDR-dossier gaps closed: template-less RM validation (SDK-GAP-15; REQ-112), stored-query / query REST conformance (SDK-GAP-16; REQ-055/057), and the execution-oriented parsed AQL AST (SDK-GAP-17; REQ-113), plus the repo-wide modernization sweep. Additive across the board — no integrator-visible behaviour changes from v0.11.0; the WHERE / Value vocabulary types are now exported on `openehr/aql` so a parsed query is introspectable.

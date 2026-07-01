@@ -10,7 +10,7 @@ A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`. **
 |---|---|
 | Module path | `github.com/cadasto/openehr-sdk-go` |
 | License | MIT |
-| Go version | `1.25.x` (N-1 release line) |
+| Go version | `1.26.x` (current stable line, min `1.26.4`) |
 | openEHR REST | `1.1.0-development` |
 | Status | **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md) |
 
@@ -79,7 +79,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 
 ## Tooling & workflow
 
-Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
+Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
 
 | Task | Command |
 |---|---|

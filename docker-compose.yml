@@ -3,7 +3,7 @@
 # Single service, gated behind the `dev` profile so a default
 # `docker compose up` does nothing (this is a library — no runtime
 # service to start). The Makefile shells Go calls through the service
-# via `docker compose run --rm go …` when host Go 1.25.x is missing.
+# via `docker compose run --rm go …` when host Go 1.26.x is missing.
 
 services:
   go:

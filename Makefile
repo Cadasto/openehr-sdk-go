@@ -3,7 +3,7 @@
 # Policy in AGENTS.md > Tooling policy. Single entry point — extend here,
 # don't add ad-hoc scripts.
 #
-# Fast path  : host Go 1.25.x (recommended for daily development).
+# Fast path  : host Go 1.26.x (recommended for daily development).
 # Fallback   : `docker compose run --rm go …` using the `dev` stage in
 #              Dockerfile (gated behind the `dev` compose profile).
 .DEFAULT_GOAL := help
@@ -23,7 +23,7 @@ ANTLR_IMAGE     ?= openehr-sdk-go/antlr:$(ANTLR_VERSION)
 AQL_GRAMMAR_DIR := resources/aql/grammar/active
 AQL_GEN_DIR     := openehr/aql/parse/gen
 
-HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.25(\.|$$|[[:space:]])' && echo yes)
+HOST_GO_OK   := $(shell command -v go >/dev/null 2>&1 && go version 2>/dev/null | grep -qE 'go1\.26(\.|$$|[[:space:]])' && echo yes)
 HOST_GLCI_OK := $(shell command -v golangci-lint >/dev/null 2>&1 && echo yes)
 
 ifeq ($(HOST_GO_OK),yes)
@@ -70,7 +70,7 @@ help: ## Show grouped targets and tooling policy
 	@echo "openehr-sdk-go"
 	@echo ""
 	@if [ "$(HOST_GO_OK)" = "yes" ]; then \
-		echo "Toolchain : host Go 1.25.x (fast path)"; \
+		echo "Toolchain : host Go 1.26.x (fast path)"; \
 		echo "  $$(go version 2>/dev/null)"; \
 	else \
 		echo "Toolchain : Docker fallback (compose profile dev)"; \
@@ -113,11 +113,14 @@ fmt-check: ## Fail if any file needs formatting (gofumpt/goimports)
 		exit 1; \
 	}
 
-vet: ## Run go vet (excludes the generated ANTLR parser)
+vet: ## Run go vet (generated ANTLR parser's unreachable code suppressed)
 	@# The generated parser (openehr/aql/parse/gen) emits unreachable code after
-	@# panics — inherent to ANTLR's Go target, not a defect. golangci-lint already
-	@# skips generated files (generated: lax); mirror that for plain `go vet`.
-	@$(GO) vet $$($(GO) list ./... | grep -v '/openehr/aql/parse/gen$$')
+	@# panics — inherent to ANTLR's Go target, not a defect. Go 1.26's `go vet`
+	@# surfaces those diagnostics through the importing openehr/aql/parse package,
+	@# so excluding the gen package from the list no longer suppresses them.
+	@# Disable only the `unreachable` analyzer; `make lint` (golangci-lint,
+	@# generated: lax) keeps `unreachable` on hand-written code.
+	@$(GO) vet -unreachable=false $$($(GO) list ./... | grep -v '/openehr/aql/parse/gen$$')
 
 ##@ Codegen
 
