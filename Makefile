@@ -117,10 +117,10 @@ vet: ## Run go vet (generated ANTLR parser's unreachable code suppressed)
 	@# The generated parser (openehr/aql/parse/gen) emits unreachable code after
 	@# panics — inherent to ANTLR's Go target, not a defect. Go 1.26's `go vet`
 	@# surfaces those diagnostics through the importing openehr/aql/parse package,
-	@# so excluding the gen package from the list no longer suppresses them.
-	@# Disable only the `unreachable` analyzer; `make lint` (golangci-lint,
-	@# generated: lax) keeps `unreachable` on hand-written code.
-	@$(GO) vet -unreachable=false $$($(GO) list ./... | grep -v '/openehr/aql/parse/gen$$')
+	@# so a package-list exclusion can't suppress them. Disable only the
+	@# `unreachable` analyzer instead; `make lint` (golangci-lint, generated: lax)
+	@# keeps `unreachable` on hand-written code.
+	@$(GO) vet -unreachable=false ./...
 
 ##@ Codegen
 
