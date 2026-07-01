@@ -688,6 +688,10 @@ func ValidateRMFolder(folder *rm.Folder) Result
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result
 func ValidateRMEHRAccess(access *rm.EHRAccess) Result
 func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / GROUP / AGENT / ROLE
+
+// Presence-aware EHR_STATUS entry (SDK-GAP-18) — decides value-typed
+// mandatory presence from JSON keys; see § Value-typed mandatory presence.
+func ValidateRMEHRStatusBytes(data []byte) Result
 ```
 
 The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
@@ -721,12 +725,24 @@ The floor is the structural RM-only layer. It does **not** evaluate:
 
 These exclusions are by design: a CDR may layer template-driven validation on top of the floor, or run the floor alone for resources where no template applies.
 
+### Value-typed mandatory presence (SDK-GAP-18)
+
+The required-set walk reads presence from the decoded Go value, which cannot detect an omitted **value-typed** mandatory attribute — a Go zero value is indistinguishable from an absent one. `EHR_STATUS.subject` is the case: typed `rm.PartySelf`, a value struct whose only field (`external_ref`) is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value. Interface- / pointer- / slice-typed mandatories (e.g. `name`, typed `rm.DVTextLike`) are unaffected — nil is a reliable absence signal — as are the value-level invariants, which inspect fields rather than presence.
+
+The floor closes this by deciding presence from the **source JSON key set** rather than the Go zero value:
+
+```go
+func ValidateRMEHRStatusBytes(data []byte) Result
+```
+
+`ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and additionally emits `required` at `/subject` when the top-level `subject` key is absent from `data`. A supplied subject — even the bare form — yields no spurious `required`; a non-object or undecodable input surfaces a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` is retained, with its value-typed-subject blind spot documented on the function. Per REQ-013 the decode uses the standard library, not `openehr/serialize/canjson` — the RM types carry their own `UnmarshalJSON`.
+
 ### Building-block independence (REQ-013)
 
 `openehr/validation/` continues to import only `openehr/rm`, `openehr/rm/rminfo`, `openehr/template`, `openehr/template/constraints`, `openehr/templatecompile`, `openehr/validation/rmread`, and the internal compile-engine — REQ-112's additions are local to the package. The forbidden-import set is unchanged and is enforced by `TestValidationForbiddenImports`.
 
-- **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
-- **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle.
+- **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
+- **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
 - **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15 (archived after PR #57).
 
 ---

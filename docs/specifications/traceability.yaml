@@ -779,10 +779,14 @@ requirements:
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
     # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants).
-    probes: []
+    # leaf invariants). PROBE-081 (SDK-GAP-18) covers value-typed
+    # mandatory presence — EHR_STATUS.subject — decided from JSON-key
+    # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
+    # inline by rmfloor_bytes_test.go.
+    probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmfloor_bytes_test.go
     plans:
       - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
 
