@@ -19,7 +19,9 @@ The path is all lowercase, matching idiomatic Go module naming and the GitHub or
 
 ## REQ-002 — Go version
 
-The SDK **MUST** set the `go.mod` `go` directive to a version on the **current stable Go release line (N)**, pinned to the latest stable patch of that line — as of this revision `go 1.26.4`. When a newer major Go release becomes stable, the minimum **MUST** be raised to the new line; raising it is a **minor** SemVer bump ([releases.md § Versioning](../releases.md#versioning)). The directive **MUST NOT** name a pre-release (rc/beta) toolchain.
+The SDK **MUST** set the `go.mod` `go` directive to the latest stable patch of the **current stable Go release line (N)**; the authoritative pinned value is the `go` directive in [`go.mod`](../../go.mod) itself. When a newer major Go release becomes stable, the minimum **MUST** be raised to the new line — a **minor** SemVer bump ([releases.md § Versioning](../releases.md#versioning)). The directive **MUST NOT** name a pre-release (rc/beta) toolchain.
+
+*Informative: at the time of writing the pin is `go 1.26.4`.*
 
 - **Lives in:** [`go.mod`](../../go.mod)
 - **Related:** [module-layout.md § Versioning](module-layout.md#versioning), [releases.md § Versioning](../releases.md#versioning)
