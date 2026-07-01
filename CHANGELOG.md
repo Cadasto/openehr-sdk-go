@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Go toolchain minimum raised to `1.26.4` (REQ-002).** `go.mod`, the Docker/Make toolchain, and CI now track the current stable Go line (N) instead of N-1; consumers must build with Go ≥ 1.26.4.
+- **Go toolchain minimum raised to Go 1.26 (`go 1.26.0` floor) (REQ-002).** `go.mod`, the Docker/Make toolchain, and CI now track the current stable Go line (N) instead of N-1; consumers must build with Go ≥ 1.26.0.
 
 ## [0.12.0] - 2026-07-01
 
