@@ -443,6 +443,14 @@ func AsObservation(v any) (*rm.Observation, error)
 
 Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via the parsed REQ-104 include grammar when a safe example id can be derived, or via the RM-type-prefix fallback only when no include assertions were parsed — same compromise as validation slot-fit.
 
+### Primitive-leaf value fill
+
+`Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued. The SDK **MUST** offer two fills: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls. A `ValueFill` other than `RandomFill` **MUST** degrade to `ExampleFill` rather than error.
+
+`RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible; `nil` draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam. A `Source` is not safe for concurrent use: each concurrent `Generate` **MUST** own its source (or leave it `nil` for the concurrency-safe global). The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
+
+**Deferred.** A third `medium` / `detail_level` structural level — a representative optional-subset fill between `Minimal` and full population — is planned but not delivered; it is **not** part of the v1 `ValueFill` contract. Tracked in the roadmap.
+
 ### Trust model
 
 The compiled OPT is **authoritative for structure**. The RM graph is assembled attribute-by-attribute from compiled metadata; the generator never guesses paths from an empty composition. Primitive leaves come from `PrimitiveConstraint.ExampleValue()` (REQ-103), which guarantees `Validate(ExampleValue()) == nil` for bounded constraints. Optional OPT `<assumed_value>` / `<default_value>` (when compile captures them — a Phase 0 follow-up) **override** the factory.

@@ -666,6 +666,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-sdk-gap-12-newskeleton.md
+    notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
     title: Generic OPT-driven composition builder
