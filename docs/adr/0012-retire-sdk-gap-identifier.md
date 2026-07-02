@@ -1,6 +1,6 @@
 # ADR 0012 — Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register
 
-- **Status:** Proposed, 2026-07-02. (Becomes **Accepted** when PR1 — this ADR plus the three normative promotions — lands.)
+- **Status:** Accepted, 2026-07-02.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** none — direct process/convention decision (brainstormed 2026-07-02); no prior open research strand.

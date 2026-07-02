@@ -17,6 +17,6 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | [0009](0009-smart-auth-library-scope.md) | SMART-on-openEHR auth library scope and dependency model | Accepted (2026-06-18) |
 | [0010](0010-public-compiled-template-bridge.md) | Public compiled-template bridge placement (`openehr/templatecompile`) | Accepted (2026-06-17) |
 | [0011](0011-rm-behavioural-functions-surface.md) | RM behavioural-function surface and fallibility policy | Accepted (2026-06-19) |
-| [0012](0012-retire-sdk-gap-identifier.md) | Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register | Proposed (2026-07-02) |
+| [0012](0012-retire-sdk-gap-identifier.md) | Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register | Accepted (2026-07-02) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.

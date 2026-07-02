@@ -35,6 +35,16 @@ The rules at each rung are canonical elsewhere — read them there, don't duplic
   [ai-workflow.md](ai-workflow.md).
 - **REQ style, paths, build targets, PROBE/STRAND toggles, ground-truth** → [`.sdd.yaml`](.sdd.yaml).
 
+**`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** `SDK-GAP-NN` was an
+ad-hoc, pre-SDD label for implementation increments — it named the *distance* between spec and code,
+not a durable capability, and duplicated what `REQ`/`PROBE` already do once a gap closed. It is retired:
+a newly discovered gap is worked **under a REQ** — extend an existing one or create a new one via
+`sdd-specify` — with a `PROBE` added for wire-level conformance. A GAP-style label may still appear as
+an **ephemeral in-flight plan filename**, but it must never be threaded into `traceability.yaml`, test
+names/identifiers, `doc.go`, or normative prose. See [ADR 0012](adr/0012-retire-sdk-gap-identifier.md)
+for the rationale and the permanent `SDK-GAP-NN` → `REQ`/`PROBE` crosswalk for anything encountered in
+git history.
+
 ## superpowers + SDD
 
 When the **superpowers** engineering loop runs alongside these `sdd-*` skills, the split is clean: SDD owns
