@@ -812,16 +812,23 @@ requirements:
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
     # contract; marked // Deprecated:). SDK-GAP-17.
+    # SDK-GAP-19: the standing class predicate (ClassExpr.PredicateComparison)
+    # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
+    # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
+    # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
+    # aliases. PROBE-082 pins it inline in structured_test.go.
     implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
     probes:
       - PROBE-080
+      - PROBE-082
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
