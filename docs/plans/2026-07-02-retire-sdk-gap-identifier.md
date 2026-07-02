@@ -246,12 +246,12 @@ git mv 2026-06-29-sdk-gap-17-aql-execution-ast.md 2026-06-29-aql-execution-ast.m
 Run: `cd /src/cadasto/openehr-sdk-go-retire-gap && grep -rIn 'sdk-gap-1[234567]' docs/ --include='*.md' --include='*.yaml'`
 This lists the ~15 links in `docs/roadmap.md`, `docs/specifications/traceability.yaml`, `docs/plans/README.md`, `docs/plans/archive/README.md`, and any spec cross-links. Update each path to its new name (drop the `sdk-gap-NN-` infix per the map above).
 
-- [ ] **Step 3: Strip GAP tokens from the renamed plan bodies.** Each renamed file's title line (`# Plan — SDK-GAP-NN: …`) and any inline tokens → the governing REQ per the ADR crosswalk (e.g. `# Plan — SDK-GAP-17: execution-oriented parsed AQL AST` → `# Plan — REQ-113: execution-oriented parsed AQL AST`). The `Covers:` lines already carry the REQ.
+- [ ] **Step 3: Strip GAP tokens from ALL archived plan bodies** (`docs/plans/archive/*.md`) — not only the six renamed ones. The non-gap-named archived plans also cite SDK-GAP in prose: `2026-05-26-rm-polymorphic-decode-coverage.md`, `2026-05-26-contribution-submission-shape.md`, `2026-05-25-req094-prefer-followups.md`, `2026-05-27-rm-like-interface-ergonomics.md`, `2026-05-15-rest-api-client.md`, `2026-06-11-contribution-update-audit-dv-coded-text.md` (and the archived-plan `README.md`). Replace each token with its governing REQ/PROBE per the ADR crosswalk. For the renamed six, that includes the title line (`# Plan — SDK-GAP-NN: …` → `# Plan — REQ-NNN: …`; `Covers:` already carries the REQ). Read each body in context so narrative sentences stay grammatical (e.g. "SDK-GAP-16 finding A" → "the verb-aware-scoping fix (REQ-055)"). These are frozen delivery records: change only the identifier tokens, not the substance.
 
-- [ ] **Step 4: Verify** no dangling old paths and links resolve.
+- [ ] **Step 4: Verify** no dangling old paths, links resolve, and no token survives in the plans tree.
 
-Run: `grep -rIn 'sdk-gap' docs/ --include='*.md' --include='*.yaml' | grep -v '0012-retire-sdk-gap\|2026-07-02-retire-sdk-gap'`
-Expected: empty (no old filenames, no tokens in bodies, except the ADR/plan pair).
+Run: `grep -rInE 'SDK-GAP|sdk-gap' docs/plans/ | grep -vE '2026-07-02-retire-sdk-gap'`
+Expected: empty (no old filenames, no tokens in any archived body; this plan file is the only permitted residual and is excluded).
 Run: `make spec-check` → PASS.
 
 - [ ] **Step 5: Commit**
