@@ -102,6 +102,28 @@ func TestValidateRMEHRStatusBytes_MalformedSubject(t *testing.T) {
 	}
 }
 
+// TestValidateRMEHRStatusBytes_SubjectNull covers an explicit JSON null:
+// a null value does not satisfy the RM-mandatory `subject` (it decodes to
+// the same zero PartySelf as an absent subject), so it is treated as absent
+// — required @ /subject — rather than reading OK because the key exists.
+func TestValidateRMEHRStatusBytes_SubjectNull(t *testing.T) {
+	data := []byte(`{
+		"_type": "EHR_STATUS",
+		"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+		"subject": null,
+		"is_modifiable": true,
+		"is_queryable": true
+	}`)
+	r := validation.ValidateRMEHRStatusBytes(data)
+	if r.OK {
+		t.Fatalf("subject: null must not be OK; issues=%+v", r.Issues)
+	}
+	if !hasIssue(r.Issues, "/subject", "required") {
+		t.Errorf("expected required @ /subject for a null subject, got %+v", r.Issues)
+	}
+}
+
 // TestValidateRMEHRStatusBytes_InvalidShape covers non-object and
 // malformed inputs: each surfaces a single invalid_shape issue at "/".
 func TestValidateRMEHRStatusBytes_InvalidShape(t *testing.T) {

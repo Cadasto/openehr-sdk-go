@@ -10,6 +10,7 @@ package validation
 // the presence of the `subject` key in the source JSON carries it.
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -24,8 +25,10 @@ import (
 // `/subject` when the top-level `subject` key is absent from the JSON —
 // the one signal the Go value cannot carry (a valid bare
 // `{"_type":"PARTY_SELF"}` and an omitted subject both decode to the zero
-// rm.PartySelf). A supplied subject, even the bare form, yields no
-// spurious `required`.
+// rm.PartySelf). A present-but-null `subject` (`"subject": null`) is
+// treated as absent: a null does not satisfy the mandatory attribute and
+// decodes to the same zero rm.PartySelf. A supplied subject, even the bare
+// form, yields no spurious `required`.
 //
 // Attributes the value-based floor already catches — the interface- /
 // pointer- / slice-typed mandatories (e.g. `name`, typed rm.DVTextLike) —
@@ -65,16 +68,24 @@ func ValidateRMEHRStatusBytes(data []byte) Result {
 
 	r := ValidateRMEHRStatus(&status)
 
-	if _, present := keys["subject"]; !present {
+	if raw, present := keys["subject"]; !present || isJSONNull(raw) {
 		// subject is RM-mandatory (rminfo) and value-typed (rm.PartySelf);
 		// the value-based floor reads its zero value as present, so the
-		// absence is decided here from JSON-key presence.
+		// absence is decided here from JSON-key presence. A present-but-null
+		// value is treated as absent — a null does not satisfy a mandatory
+		// attribute and decodes to the same zero PartySelf as an omitted one.
 		return resultFromIssues(append(r.Issues, Issue{
 			Path:     "/subject",
 			Code:     "required",
-			Detail:   `RM-mandatory attribute "subject" absent on EHR_STATUS`,
+			Detail:   `RM-mandatory attribute "subject" is absent or null on EHR_STATUS`,
 			Severity: Error,
 		}))
 	}
 	return r
+}
+
+// isJSONNull reports whether a raw JSON value is the literal `null` token
+// (tolerating surrounding whitespace).
+func isJSONNull(raw json.RawMessage) bool {
+	return bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }

@@ -735,7 +735,7 @@ The floor closes this by deciding presence from the **source JSON key set** rath
 func ValidateRMEHRStatusBytes(data []byte) Result
 ```
 
-`ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and additionally emits `required` at `/subject` when the top-level `subject` key is absent from `data`. A supplied subject — even the bare form — yields no spurious `required`; a non-object or undecodable input surfaces a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` is retained; its docstring documents the value-typed-subject blind spot and points to the `…Bytes` entry. Per REQ-013 the decode uses the standard library, not `openehr/serialize/canjson` — the RM types carry their own `UnmarshalJSON`.
+`ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and additionally emits `required` at `/subject` when the top-level `subject` key is absent from `data` — or present but JSON `null`, which does not satisfy the mandatory attribute and decodes to the same zero `PartySelf`. A supplied subject — even the bare form — yields no spurious `required`; a non-object or undecodable input surfaces a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` is retained; its docstring documents the value-typed-subject blind spot and points to the `…Bytes` entry. Per REQ-013 the decode uses the standard library, not `openehr/serialize/canjson` — the RM types carry their own `UnmarshalJSON`.
 
 ### Building-block independence (REQ-013)
 

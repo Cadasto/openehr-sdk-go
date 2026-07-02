@@ -374,7 +374,7 @@ client scenarios to SDK coverage:
 
 - **Title:** `validation.ValidateRMEHRStatusBytes(data)` flags an omitted RM-mandatory `subject` (typed `rm.PartySelf`, a value struct) from JSON-key presence, without false-positiving on a valid bare `PARTY_SELF`.
 - **Preconditions:** Canonical-JSON EHR_STATUS bodies — one omitting the `subject` key; one supplying `subject` as a bare `{"_type":"PARTY_SELF"}` (no external_ref); one omitting the interface-typed `name`.
-- **Wire assertion:** In-repo property — an EHR_STATUS whose top-level `subject` key is absent MUST surface `required` at `/subject`; a present subject (even the bare `PARTY_SELF` that decodes to the Go zero value) MUST NOT; the interface-typed mandatory `name`, when absent, MUST still surface `required` at `/name` (no regression). A non-object / malformed input surfaces a single `invalid_shape` at `/`.
+- **Wire assertion:** In-repo property — an EHR_STATUS whose top-level `subject` key is absent (or present but JSON `null`) MUST surface `required` at `/subject`; a present non-null subject (even the bare `PARTY_SELF` that decodes to the Go zero value) MUST NOT; the interface-typed mandatory `name`, when absent, MUST still surface `required` at `/name` (no regression). A non-object / malformed input surfaces a single `invalid_shape` at `/`.
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline) — see [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
 - **Satisfies:** REQ-112.
