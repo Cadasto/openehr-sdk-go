@@ -350,9 +350,12 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 					ce.ParamArchetype = true
 				}
 			default:
-				// Standing predicate (e.g. `[ehr_id/value=$x]`) —
-				// capture verbatim so the emitter round-trips it.
+				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
+				// verbatim so the emitter round-trips it, and expose a
+				// structured {path, op, value} when it is a simple
+				// comparison (SDK-GAP-19).
 				ce.Predicate = trimBrackets(pp.GetText())
+				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
 		}
 		return ce
@@ -475,7 +478,11 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return nil
 				}
 				if v != nil {
-					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v}
+					// SDK-GAP-19: carry the structured path (alias +
+					// segments) alongside the raw string so a consumer
+					// reads it without re-splitting.
+					parsed := extractIdentifiedPath(ip, ClauseWhere)
+					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: &parsed.IdentifiedPath}
 				}
 			}
 		}
@@ -545,11 +552,8 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 // IdentifiedPath values, so consumers can compare paths from
 // Document.Paths and Query SELECT/WHERE/ORDER BY by equality.
 func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) IdentifiedPath {
-	ip := IdentifiedPath{
-		Raw:    c.GetText(),
-		Pos:    posOf(c.GetStart()),
-		Clause: clause,
-	}
+	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clause}
+	ip.Raw = c.GetText()
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}
@@ -573,6 +577,45 @@ func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) Identifi
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
 	return c.GetText()
+}
+
+// standingComparison lifts a class standing predicate's standardPredicate
+// (`objectPath <op> operand`) into an [*aql.Comparison] for SDK-GAP-19, or
+// nil when the predicate is absent or its RHS operand is not a scalar value
+// (an objectPath / node-code operand). Path is the relative object path as
+// written; ParsedPath is left nil (a class predicate path has no alias to
+// structure). The verbatim [ClassExpr.Predicate] text remains the round-trip
+// source regardless.
+func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
+	if sp == nil {
+		return nil
+	}
+	op, cmp, operand := sp.ObjectPath(), sp.COMPARISON_OPERATOR(), sp.PathPredicateOperand()
+	if op == nil || cmp == nil || operand == nil {
+		return nil
+	}
+	v := pathPredicateOperandValue(operand)
+	if v == nil {
+		return nil
+	}
+	return &aql.Comparison{Path: op.GetText(), Op: aql.Operator(cmp.GetText()), Val: v}
+}
+
+// pathPredicateOperandValue lifts a standing-predicate RHS operand into an
+// [aql.Value] — a primitive literal or a $parameter. A path-valued operand
+// (objectPath) or a node code (ID_CODE / AT_CODE) is not a scalar value and
+// returns nil, leaving [ClassExpr.PredicateComparison] nil.
+func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
+	if c == nil {
+		return nil
+	}
+	if p := c.Primitive(); p != nil {
+		return primitiveAsValue(p)
+	}
+	if t := c.PARAMETER(); t != nil {
+		return aql.ParamValue{Name: strings.TrimPrefix(t.GetText(), "$")}
+	}
+	return nil
 }
 
 // terminalAsValue lifts a comparison-RHS terminal into an [aql.Value].

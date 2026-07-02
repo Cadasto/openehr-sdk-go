@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
@@ -61,7 +62,7 @@ func TestExtractMetadata(t *testing.T) {
 func TestExtractDoesNotAliasDocumentSlices(t *testing.T) {
 	doc := mustParse(t, query)
 	md := lint.Extract(doc)
-	md.Paths = append(md.Paths, parse.IdentifiedPath{Alias: "z"})
+	md.Paths = append(md.Paths, parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Alias: "z"}})
 	if len(doc.Paths) == len(md.Paths) {
 		t.Fatal("document paths aliased metadata paths slice")
 	}

@@ -85,10 +85,20 @@ const (
 // constants; Val is the [Value] on the right-hand side ([ParamValue] for a
 // placeholder, [StringValue] / [IntValue] / [RealValue] / [BoolValue] for a
 // literal).
+//
+// ParsedPath is the structured form of Path (alias + segments), populated
+// by the parser on the read side so a consumer reads alias/segments without
+// re-splitting the raw string (SDK-GAP-19); it is nil on the write side
+// (the construction helpers set only Path) and MAY be nil on the read side
+// for a path shape the parser does not structure. When non-nil,
+// ParsedPath.Raw equals Path (both derive from the same source path).
+// Emission uses Path, not ParsedPath, so round-trip is unaffected by its
+// presence or absence.
 type Comparison struct {
-	Path string
-	Op   Operator
-	Val  Value
+	Path       string
+	Op         Operator
+	Val        Value
+	ParsedPath *IdentifiedPath
 }
 
 func (c Comparison) expr() string { return c.Path + " " + string(c.Op) + " " + c.Val.token() }

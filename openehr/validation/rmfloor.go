@@ -79,6 +79,11 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 
 // ValidateRMEHRStatus is the typed convenience wrapper for EHR_STATUS.
 // Delegates to [ValidateRM]; a nil status surfaces `nil_ehr_status`.
+//
+// It cannot flag an omitted value-typed mandatory `subject` (typed
+// rm.PartySelf, whose zero value is indistinguishable from an absent one):
+// use [ValidateRMEHRStatusBytes], which decides subject presence from the
+// source JSON key set (SDK-GAP-18).
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})

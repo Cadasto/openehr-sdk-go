@@ -10,6 +10,11 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Presence-aware EHR_STATUS RM-floor entry (SDK-GAP-18; REQ-112).** New `validation.ValidateRMEHRStatusBytes` flags an omitted value-typed mandatory `subject` via JSON-key presence, which the value-based `ValidateRMEHRStatus` cannot (a bare `PARTY_SELF` decodes identically to an absent one).
+- **Structured AQL path access (SDK-GAP-19; REQ-113).** `parse.ClassExpr.PredicateComparison` exposes a class standing predicate as a structured `aql.Comparison`, and `aql.Comparison.ParsedPath` exposes a WHERE path's alias+segments; the shared `aql.IdentifiedPath`/`PathSegment` vocabulary moved into `openehr/aql` (parse-side names preserved). Emission/round-trip unchanged.
+
 ## [0.13.0] - 2026-07-01
 
 Thirteenth `v0.x` minor — raises the minimum Go toolchain to the current stable line (Go 1.26, `go 1.26.0` floor; REQ-002). Toolchain, build, and docs only — no openEHR API, wire, or behaviour change from v0.12.0; upgrade once your build runs Go ≥ 1.26.

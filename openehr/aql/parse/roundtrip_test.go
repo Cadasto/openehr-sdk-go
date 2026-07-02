@@ -187,7 +187,7 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 // the grammar rejects on re-parse: `OFFSET n` with no preceding LIMIT.
 func TestEmitOffsetWithoutLimit(t *testing.T) {
 	q := &parse.Query{
-		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{Raw: "e"}}}}},
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "e"}}}}}},
 		From:   parse.FromClause{Root: parse.ClassExpr{RMType: "EHR", Alias: "e"}},
 		Offset: parse.IntLimit{N: 100},
 	}
@@ -205,7 +205,7 @@ func TestEmitOffsetWithoutLimit(t *testing.T) {
 // alias-uniqueness check.
 func TestEmitDuplicateAlias(t *testing.T) {
 	q := &parse.Query{
-		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{Raw: "c"}}}}},
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c"}}}}}},
 		From: parse.FromClause{
 			Root: parse.ClassExpr{RMType: "EHR", Alias: "c"},
 			Contains: &parse.Containment{

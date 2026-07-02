@@ -156,6 +156,13 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     done
     continue
   fi
+  if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*$ ]]; then
+    in_probes=1
+    in_packages=0
+    in_tests=0
+    in_plans=0
+    continue
+  fi
   if [[ "$line" =~ ^[[:space:]]*tests:[[:space:]]*$ ]]; then
     in_tests=1
     in_packages=0
@@ -170,14 +177,20 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       [[ -n "$_p" ]] && plan_paths+=("$_p")
     done
     in_tests=0
+    in_probes=0
     continue
   fi
   if [[ $in_tests -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)[[:space:]]*$ ]]; then
     test_paths+=("${BASH_REMATCH[1]}")
     continue
   fi
+  if [[ $in_probes -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(PROBE-[0-9]+) ]]; then
+    probe_ids+=("${BASH_REMATCH[1]}")
+    continue
+  fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
     in_tests=0
+    in_probes=0
   fi
 done < "$YAML"
 flush_req

@@ -779,10 +779,14 @@ requirements:
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
     # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants).
-    probes: []
+    # leaf invariants). PROBE-081 (SDK-GAP-18) covers value-typed
+    # mandatory presence — EHR_STATUS.subject — decided from JSON-key
+    # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
+    # inline by rmfloor_bytes_test.go.
+    probes: [PROBE-081]
     tests:
       - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmfloor_bytes_test.go
     plans:
       - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
 
@@ -802,22 +806,29 @@ requirements:
     # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
     # property) is carried inline by openehr/aql/parse/roundtrip_test.go
     # — 34 idempotence cases plus 11 canonical-input preservation cases
-    # across the v1 catalogue, plus a 7-case incomplete-AST suite
+    # across the v1 catalogue, plus a 10-case incomplete-AST suite
     # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
     # contract; marked // Deprecated:). SDK-GAP-17.
+    # SDK-GAP-19: the standing class predicate (ClassExpr.PredicateComparison)
+    # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
+    # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
+    # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
+    # aliases. PROBE-082 pins it inline in structured_test.go.
     implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
     probes:
       - PROBE-080
+      - PROBE-082
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
