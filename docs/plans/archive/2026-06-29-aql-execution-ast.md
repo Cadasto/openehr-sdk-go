@@ -1,4 +1,4 @@
-# Plan — SDK-GAP-17: execution-oriented parsed AQL AST
+# Plan — REQ-113: execution-oriented parsed AQL AST
 
 **Date:** 2026-06-29
 **Status:** Landed (PR #58, 2026-06-30)

@@ -1,11 +1,11 @@
-# Plan — SDK-GAP-14: seeded synthetic value generation for instance / NewSkeleton
+# Plan — REQ-107: seeded synthetic value generation for instance / NewSkeleton
 
 **Date:** 2026-06-23
 **Status:** Landed — value-fill + seed (PR #55, 2026-06-24; v0.11.0). `medium` detail_level deferred to a follow-up plan.
 **Owner:** SDK maintainers
 **Covers:** [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder)
 **Implementation:** landed (value-fill + seed); `medium` detail_level deferred
-**Relates:** SDK-GAP-12 (NewSkeleton real-world OPT coverage — landed; [2026-06-19-sdk-gap-12-newskeleton.md](2026-06-19-sdk-gap-12-newskeleton.md)); SDK-GAP-13 (polymorphic encode/decode round-trip — landed; [2026-06-23-sdk-gap-13-polymorphic-encode-decode.md](2026-06-23-sdk-gap-13-polymorphic-encode-decode.md); [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance))
+**Relates:** the real-world OPT `NewSkeleton` coverage (REQ-102/107/110 — landed; [2026-06-19-realworld-opt-synthesis.md](2026-06-19-realworld-opt-synthesis.md)); the polymorphic encode/decode round-trip fix (REQ-052/040/102/107 — landed; [2026-06-23-polymorphic-encode-decode.md](2026-06-23-polymorphic-encode-decode.md); [STRAND-04](../../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance))
 **Source (inbound):** a consuming CDR project — its template `/example` endpoint and a write benchmark need a *diverse* corpus of template-valid COMPOSITIONs (so persisted data is realistic enough to exercise AQL range / code-equality / aggregation retrieval), not byte-identical leaves.
 **Severity:** medium — no production write-path impact. Today every generated COMPOSITION for a given OPT carries byte-identical clinical leaves (only consumer-stamped uid/time/composer vary), so a CDR cannot self-seed a realistic corpus and AQL value-predicate testing has no signal.
 
@@ -76,5 +76,5 @@ For every corpus OPT, calling the synthetic generator N times yields N COMPOSITI
 ## Out of scope
 
 - **Clinically-plausible value *distributions*** (coherent vitals curves, real problem lists — Synthea-class). This gap is constraint-conformance + variation only.
-- SDK-GAP-13 (polymorphic encode/decode round-trip) — independent; a synthetic instance is still subject to it until that lands.
+- The polymorphic encode/decode round-trip fix (REQ-052/040/102/107) — independent; a synthetic instance is still subject to it until that lands.
 - ITS-REST `type=input|output` semantics and FLAT/STRUCTURED `Accept` web-template formats — serialization concerns, not generation.

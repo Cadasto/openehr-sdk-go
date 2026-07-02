@@ -665,7 +665,7 @@ requirements:
       - cmd/examples/generate-example/main.go
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
-      - docs/plans/archive/2026-06-19-sdk-gap-12-newskeleton.md
+      - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
     notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
@@ -791,7 +791,7 @@ requirements:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmfloor_bytes_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
+      - docs/plans/archive/2026-06-29-rm-floor-validation.md
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
@@ -834,7 +834,7 @@ requirements:
       - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
+      - docs/plans/archive/2026-06-29-aql-execution-ast.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation

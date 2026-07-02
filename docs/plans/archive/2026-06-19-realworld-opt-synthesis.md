@@ -1,4 +1,4 @@
-# Plan — Close SDK-GAP-12 (`NewSkeleton` real-world OPT coverage)
+# Plan — REQ-102/107/110: `NewSkeleton` real-world OPT coverage
 
 **Date:** 2026-06-19  
 **Status:** Landed  
@@ -8,11 +8,11 @@
 **Implementation:** landed  
 **Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
 **Consumer:** a consuming CDR project — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
-**External reference:** the consuming CDR project's SDK-GAP-12 draft (tracked in that project).
+**External reference:** the consuming CDR project's real-world OPT coverage draft (tracked in that project).
 
 ## Goal
 
-`composition.NewSkeleton` (via `instance.Generate` + `rmwrite`) MUST produce a `*rm.Composition` that passes `validation.ValidateComposition` for every OPT that `templatecompile.Compile` accepts — including the three real-world corpus fixtures filed in SDK-GAP-12.
+`composition.NewSkeleton` (via `instance.Generate` + `rmwrite`) MUST produce a `*rm.Composition` that passes `validation.ValidateComposition` for every OPT that `templatecompile.Compile` accepts — including the three real-world corpus fixtures filed against this gap.
 
 ## Gap confirmation (reproduced 2026-06-19 on `main` @ fe79feb)
 
@@ -126,7 +126,7 @@ go test ./internal/templateinstance/rmwrite/... ./openehr/instance/... ./openehr
 make ci   # full gate when Docker available
 ```
 
-**Acceptance (matches SDK-GAP-12):** for all three fixtures, `templatecompile.Compile` + `composition.NewSkeleton` + `validation.ValidateComposition(...).OK == true`.
+**Acceptance (matches REQ-102/107/110):** for all three fixtures, `templatecompile.Compile` + `composition.NewSkeleton` + `validation.ValidateComposition(...).OK == true`.
 
 ## Out of scope
 
@@ -147,4 +147,4 @@ make ci   # full gate when Docker available
 1. `fix(rmwrite): allow ELEMENT.name attachment`
 2. `fix(instance): resolve DV_INTERVAL generic RM types from OPT`
 3. `fix(instance): respect cardinality upper in Minimal materialiseMultiple`
-4. `test(probes): extend PROBE-027 for SDK-GAP-12 corpus`
+4. `test(probes): extend PROBE-027 for the real-world OPT corpus (REQ-102/107/110)`

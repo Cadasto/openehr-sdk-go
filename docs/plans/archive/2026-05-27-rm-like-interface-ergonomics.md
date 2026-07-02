@@ -1,9 +1,9 @@
-# Plan — RM `*Like` interface ergonomics (post SDK-GAP-11)
+# Plan — RM `*Like` interface ergonomics (post REQ-052/040)
 
 **Date:** 2026-05-27
 **Status:** **Landed 2026-05-27.** Phases 1–3 shipped on PR #25. Method names use the `Get*` prefix (not bare `Value()` as originally drafted) because Go forbids a struct field and a method with the same name — see [§ Recommended direction](#recommended-direction-this-sdk).
 **Owner:** SDK maintainers
-**Covers:** SDK-GAP-11 follow-up (consumer ergonomics); [REQ-024](../../specifications/idiom.md#generics-policy-req-024), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-052](../../specifications/wire.md#req-052)
+**Covers:** REQ-052/040 follow-up (consumer ergonomics); [REQ-024](../../specifications/idiom.md#generics-policy-req-024), [REQ-040](../../specifications/rm-modeling.md#type-registry-req-040), [REQ-052](../../specifications/wire.md#req-052)
 **Probes:** PROBE-038 (regression guard — no behaviour change required if decode/re-marshal unchanged)
 **Implementation:** **landed** — narrow `<Parent>Like` interface declarations moved out of the generator into hand-written [`openehr/rm/like_interfaces.go`](../../../openehr/rm/like_interfaces.go) with Get-prefixed accessor methods on all five interfaces. Compat helpers in [`openehr/rm/like_accessors.go`](../../../openehr/rm/like_accessors.go) delegate to the methods.
 **Depends on:** [archive/2026-05-26-rm-polymorphic-decode-coverage.md](2026-05-26-rm-polymorphic-decode-coverage.md) (landed — `DVTextLike`, `DVURILike`, `AuditDetailsLike`, `PartyIdentifiedLike`, `ObjectRefLike`)
@@ -11,7 +11,7 @@
 
 ## Goal
 
-Improve **consumer ergonomics** after SDK-GAP-11 without weakening lossless decode/re-marshal. Callers should reach RM-common attributes on substitution slots (especially `LOCATABLE.name`) in a way that matches openEHR intuition (“`DV_TEXT` slot always has a `value`”) while staying idiomatic Go and keeping `typereg` as the single `_type` dispatch path for generated codecs.
+Improve **consumer ergonomics** after the REQ-052/040 decode-side polymorphism fix without weakening lossless decode/re-marshal. Callers should reach RM-common attributes on substitution slots (especially `LOCATABLE.name`) in a way that matches openEHR intuition (“`DV_TEXT` slot always has a `value`”) while staying idiomatic Go and keeping `typereg` as the single `_type` dispatch path for generated codecs.
 
 **Non-goals:** Reverting to concrete `Name DVText` fields; reflection-based dynamic property access; changing PROBE-038 wire semantics.
 
@@ -34,7 +34,7 @@ Today, `Composition.Name` (and every `LOCATABLE.name`) is `DVTextLike` — a sea
 - `c.Name.Value` does not compile.
 - `rm.DVTextValueOf(c.Name)` works but feels foreign to RM-familiar users and PHP/SDK parity expectations.
 
-The same pattern applies to other `*Like` families, but **`DVTextLike` is the hot path** (`name` on almost every locatable). `DataValue`, `Item`, `ContentItem`, and `UIDBasedID` were already interfaces before GAP-11 — users type-assert those; only concrete-with-subtype slots changed.
+The same pattern applies to other `*Like` families, but **`DVTextLike` is the hot path** (`name` on almost every locatable). `DataValue`, `Item`, `ContentItem`, and `UIDBasedID` were already interfaces before the REQ-052/040 fix — users type-assert those; only concrete-with-subtype slots changed.
 
 ## Survey: `Cadasto/gopenehr`
 
@@ -79,7 +79,7 @@ Discriminator handling (representative — `internal/openehr/rm/dv_text.go`):
 
 ### Comparison to openehr-sdk-go (this repo)
 
-| Aspect | `gopenehr` | `openehr-sdk-go` (GAP-11) |
+| Aspect | `gopenehr` | `openehr-sdk-go` (REQ-052/040) |
 |--------|------------|---------------------------|
 | Storage | `Kind` + `any` union struct | Sealed `*Like` interface + `typereg` |
 | Decode | Per-union `UnmarshalJSON` + `_type` peek | Generated `json.RawMessage` + `typereg.DecodeAs[<Like>]` |
@@ -149,7 +149,7 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 
    Derive the exact method list from `like_accessors.go` call sites + `grep` across `openehr/`, `testkit/`, `cmd/examples/`.
 2. `openehr/rm/doc.go` — § substitution slots:
-   - `*Like` = concrete parent + allowed subtypes (GAP-11); use **methods** for shared parent attributes.
+   - `*Like` = concrete parent + allowed subtypes (REQ-052/040); use **methods** for shared parent attributes.
    - `DataValue` / `Item` / `ContentItem` / `UIDBasedID` = abstract interfaces; use **type assert** (unchanged).
 3. Update [`docs/adr/0001-bmm-version-bump-runbook.md`](../../adr/0001-bmm-version-bump-runbook.md) step 10 cross-link: new subtype → new interface method implementations (in addition to `like_accessors` switch arms until removed).
 4. Migrate in-repo call sites from `DVURIValueOf`, `AuditDetailsBase`, etc. to methods where it improves readability (optional within phase; at minimum new code uses methods).
@@ -173,7 +173,7 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 4. **Optional (same phase, only if Phase 1–2 insufficient):** gopenehr-style typed getters on `DVTextLike` — e.g. `AsDVTextPtr() *DVText`, `AsDVCodedTextPtr() *DVCodedText` — for callers who want concrete structs without a type switch.
 5. PR #24 / plan cross-links: note `wire.md` BMM-bump wording already aligned with ADR-0001 ([54d3f57](https://github.com/Cadasto/openehr-sdk-go/commit/54d3f57)) — no further wire.md edit required unless idiom cross-ref needs it.
 
-**Definition of done:** `make spec-check` green; `idiom.md` + CHANGELOG + `.gitignore` landed; examples and `doc.go` readable without reading GAP-11 archive.
+**Definition of done:** `make spec-check` green; `idiom.md` + CHANGELOG + `.gitignore` landed; examples and `doc.go` readable without reading the [REQ-052/040 decode-coverage archive](2026-05-26-rm-polymorphic-decode-coverage.md).
 
 ---
 

@@ -1,4 +1,4 @@
-# Plan — SDK-GAP-15: template-less Reference Model validation
+# Plan — REQ-112: template-less Reference Model validation
 
 **Date:** 2026-06-29
 **Status:** Landed (PR #57, 2026-06-30)
