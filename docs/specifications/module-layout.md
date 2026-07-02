@@ -68,7 +68,7 @@ Application-specific layer. Shipped in the same module in v1 for adoption conven
 | `cadasto/datamap/` | Datamap **V2** client and builder (REQ-058). |
 | `cadasto/care/` | Application aggregates over EHR + Demographic: Patient, User, CaseLoad, CareTeam, Episode. |
 | `cadasto/mpi/` | Minimal MPI search (preview surface). |
-| `cadasto/admin/` | Tenant, env, system info, healthcheck. |
+| `cadasto/admin/` | Tenant, env, system info, healthcheck (health-probe contract: REQ-083). |
 
 ### Support trees
 

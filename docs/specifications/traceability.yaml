@@ -1083,4 +1083,7 @@ requirements:
     canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
     status: draft
     implementation: planned
-    packages: [cadasto]
+    packages: [cadasto, cadasto/admin]
+    notes: "Health probes (Live/Ready) landed: default paths, WithLivePath/WithReadyPath, origin-derived URL, public/no-auth, status→sentinel map. Platform-API fixtures Phase 4."
+    tests:
+      - cadasto/admin/probes_test.go

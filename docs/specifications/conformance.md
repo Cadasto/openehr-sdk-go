@@ -51,6 +51,18 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 **Status: planned.** The `cadasto/*` surfaces are Phase 4; the conformance fixtures land with them.
 
+#### Health probes (`cadasto/admin`)
+
+`cadasto/admin` exposes deployment liveness/readiness probes (`Live`, `Ready`) with a wire contract independent of the (planned) Cadasto platform API surface:
+
+- **Default paths** `DefaultLivePath = "/health/live"`, `DefaultReadyPath = "/health/ready"`, each overridable per call via `WithLivePath` / `WithReadyPath` (e.g. `/healthz`).
+- **URL derivation.** The probe URL derives from the **origin (scheme + host) of the openEHR REST service entry** — the openEHR REST API path prefix is **NOT** inherited.
+- **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a probe.
+- **Status mapping** (`errors.Is`-compatible): `2xx → nil`; `401 → transport.ErrUnauthorized`; `403 → transport.ErrForbidden`; `404 → transport.ErrNotFound`; `5xx → transport.ErrServerError`. Other non-2xx codes (400, 405, 408, 429, …) surface as a plain formatted error with no sentinel.
+- Probes borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries. Use `openehr/client/admin` when those concerns matter.
+
+**Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
+
 ### Vendored cassettes (`testkit/cassettes/`)
 
 Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
