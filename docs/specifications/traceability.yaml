@@ -388,6 +388,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-05-21-aql-builders.md
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go
@@ -401,6 +402,7 @@ requirements:
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
     plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go

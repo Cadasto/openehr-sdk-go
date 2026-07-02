@@ -217,6 +217,8 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 
 **AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
+**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares: `GET /query/aql/{qualified_query_name}` carries the `ehr_id` **query parameter**; `POST /query/aql` carries the **`openehr-ehr-id` request header** — the POST operations declare no `ehr_id` query parameter and the request body carries no `ehr_id` field, so the header is the only channel. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
+
 ### Stored AQL
 
 ### REQ-057
@@ -227,6 +229,8 @@ The platform supports **stored AQL queries** — queries registered ahead of tim
 - **`openehr/client/query/`** — execute a stored query by ID (`GET /query/{qualified_query_name}`) in addition to the ad-hoc execution path.
 
 A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK passes it through verbatim. Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK does not pre-validate the qualified name — that's the backend's responsibility.
+
+**Store-response version recovery.** The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns. The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation). A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
 
 ## Optimistic concurrency
 
