@@ -14,10 +14,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// gap19Query exercises both asks in one parse: a standing class predicate on
+// standingPredicateQuery exercises both asks in one parse: a standing class predicate on
 // the EHR root (`ehr_id/value=$ehr`) and a WHERE comparison over an
 // alias-qualified path (`o/data[at0001]/events[at0006]/value/magnitude`).
-const gap19Query = "SELECT o/data[at0001]/events[at0006]/value/magnitude " +
+const standingPredicateQuery = "SELECT o/data[at0001]/events[at0006]/value/magnitude " +
 	"FROM EHR e[ehr_id/value=$ehr] " +
 	"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
 	"WHERE o/data[at0001]/events[at0006]/value/magnitude > $threshold"
@@ -26,7 +26,7 @@ const gap19Query = "SELECT o/data[at0001]/events[at0006]/value/magnitude " +
 // standing predicate is readable as a structured comparison, with the
 // verbatim text retained for round-trip.
 func TestStandingPredicateStructured(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestStandingPredicateStructured(t *testing.T) {
 // TestWhereComparisonStructuredPath is the Ask #2 case: a WHERE comparison
 // carries the structured alias + segments alongside the raw path string.
 func TestWhereComparisonStructuredPath(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}
@@ -103,7 +103,7 @@ func TestClassArchetypePredicateNotComparison(t *testing.T) {
 // round-trips, the standing predicate survives a parse→emit→parse cycle, and
 // emission is idempotent.
 func TestStandingPredicateRoundTrip(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}

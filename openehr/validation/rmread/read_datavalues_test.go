@@ -7,11 +7,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
-// TestReadSingle_DataValuesGAP12 covers the SDK-GAP-12 read-side
+// TestReadSingle_DataValues covers the SDK-GAP-12 read-side
 // accessors that mirror the new writers (DV_COUNT, DV_QUANTITY,
 // DV_PROPORTION, DV_URI, DV_PARSABLE) and the generic DV_INTERVAL<T>
 // reader across several T's — present scalars report ok=true.
-func TestReadSingle_DataValuesGAP12(t *testing.T) {
+func TestReadSingle_DataValues(t *testing.T) {
 	prec := rm.Integer(2)
 	cases := []struct {
 		name   string
@@ -43,9 +43,9 @@ func TestReadSingle_DataValuesGAP12(t *testing.T) {
 	}
 }
 
-// TestReadSingle_DataValuesGAP12_unknownAttr — an attr the reader does
+// TestReadSingle_DataValues_unknownAttr — an attr the reader does
 // not recognise reports ok=false so the walker can flag it.
-func TestReadSingle_DataValuesGAP12_unknownAttr(t *testing.T) {
+func TestReadSingle_DataValues_unknownAttr(t *testing.T) {
 	if _, ok := rmread.ReadSingle(&rm.DVCount{}, "DV_COUNT", "no_such_attr"); ok {
 		t.Error("ReadSingle(DV_COUNT, no_such_attr) ok=true, want false")
 	}

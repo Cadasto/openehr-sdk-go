@@ -14,10 +14,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// gap14CounterUID yields deterministic uids so a reproducibility check
+// counterUID yields deterministic uids so a reproducibility check
 // isolates the value-fill seam: with the clock and uids pinned, the only
 // thing that can vary between two runs is the sampled leaf values.
-func gap14CounterUID() func() *rm.HierObjectID {
+func counterUID() func() *rm.HierObjectID {
 	n := 0
 	return func() *rm.HierObjectID {
 		n++
@@ -40,7 +40,7 @@ func TestGenerateRandomFillReproducibleAndValid(t *testing.T) {
 			Territory:   "NL",
 			Composer:    &rm.PartyIdentified{Name: &name},
 			Now:         now,
-			UIDSource:   gap14CounterUID(),
+			UIDSource:   counterUID(),
 			ValueFill:   vf,
 			ValueSource: src,
 		})

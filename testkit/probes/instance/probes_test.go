@@ -89,11 +89,11 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 	}
 }
 
-// TestProbe027_GAP12Corpus extends PROBE-027 to the real-world OPTs
+// TestProbe027_RealWorldCorpus extends PROBE-027 to the real-world OPTs
 // filed in SDK-GAP-12 (by a consuming CDR project). Minimal policy only —
 // Example on social.opt still emits every optional content archetype
 // root and fails validation (out of scope per SDK-GAP-12 plan).
-func TestProbe027_GAP12Corpus(t *testing.T) {
+func TestProbe027_RealWorldCorpus(t *testing.T) {
 	opts := instance.Options{
 		Policy:    instance.Minimal,
 		Territory: "NL",
@@ -101,7 +101,7 @@ func TestProbe027_GAP12Corpus(t *testing.T) {
 	}
 	for _, name := range []string{"Referral Request.v1", "Demonstration.v1", "social"} {
 		t.Run(name, func(t *testing.T) {
-			c := compileGAP12Fixture(t, name)
+			c := compileRealWorldFixture(t, name)
 			out, err := instance.Generate(context.Background(), c, opts)
 			if err != nil {
 				t.Fatalf("Generate: %v", err)
@@ -118,7 +118,7 @@ func TestProbe027_GAP12Corpus(t *testing.T) {
 	}
 }
 
-func compileGAP12Fixture(t *testing.T, name string) *templatecompile.Compiled {
+func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOptForName(name))
 	if err != nil {
