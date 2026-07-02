@@ -11,12 +11,12 @@
 
 ## Definition of Ready (analysis gate)
 
-- [x] Maintainer sign-off on fix approach (2026-06-23: A1 *shared poly helper* variant + B1; A3 doc-note only; one branch, `fix/sdk-gap-13-14`).
+- [x] Maintainer sign-off on fix approach (2026-06-23: A1 *shared poly helper* variant + B1; A3 doc-note only; one shared delivery branch).
 - [x] `Covers:` finalized — no new normative acceptance criteria promoted; the existing REQ-052/040/102/107 surface is sufficient.
 
 ## Accepted approach (2026-06-23)
 
-Chosen after re-verifying the A/B split on `main`. Both sub-gaps land together on `fix/sdk-gap-13-14`.
+Chosen after re-verifying the A/B split on `main`. Both sub-gaps land together on one shared delivery branch.
 
 ### Sub-gap A — **A1, shared poly helper** (not the value-receiver regen variant)
 
@@ -125,4 +125,4 @@ For every corpus OPT, `canjson.Unmarshal(canjson.Marshal(NewSkeleton(…)))` yie
 ## Notes
 
 - Reproductions in this dossier were throwaway tests under `openehr/serialize/canjson/` (not committed). They can be promoted to permanent round-trip tests (`canjson` + a `testkit/probes` round-trip-stability probe) as part of whichever fix lands.
-- The inbound CDR-project SDK-GAP-13 draft should be updated to reflect the A/B split (its interval section attributes the failure to missing encode-side `_type`, which the repro disproves — the interval wire form is correct).
+- The consuming CDR project's inbound draft should be updated to reflect the A/B split (its interval section attributes the failure to missing encode-side `_type`, which the repro disproves — the interval wire form is correct).

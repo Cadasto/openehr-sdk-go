@@ -16,7 +16,7 @@
 
 ## Accepted approach (2026-06-23)
 
-Lands on the shared branch `fix/sdk-gap-13-14`. Scope this pass: **value-fill + seed only**; the `medium` structural level is deferred (it is the bulk of the new structural work and independently useful — see [Deferred](#deferred-follow-up)).
+Lands on the shared delivery branch. Scope this pass: **value-fill + seed only**; the `medium` structural level is deferred (it is the bulk of the new structural work and independently useful — see [Deferred](#deferred-follow-up)).
 
 - **Orthogonal `ValueFill` axis** on [`instance.Options`](../../openehr/instance/options.go): `ValueFill ∈ {ExampleFill (default — today's `ExampleValue()` behaviour), RandomFill}`, composable with any `Policy`. No `Synthetic` policy (would conflate structure and values).
 - **`ValueSource rand.Source` seam**, mirroring the existing `UIDSource`. A fixed source ⇒ byte-reproducible output; nil ⇒ a fresh (time-seeded) source so successive calls differ. Threaded through the `generator` exactly like `UIDSource`.

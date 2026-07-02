@@ -64,5 +64,5 @@ Close the remaining REQ-094 gaps on versioned **write** paths after the REQ-094 
 
 ## References
 
-- Deferred in commit `c19fddc` on branch `feat/sdk-gap-09-composition-save-update-decode`
+- Deferred in commit `c19fddc` on a dedicated delivery branch
 - `openehr/client/ehr/composition/composition.go` — `doWrite` guard at representation branch

@@ -16,7 +16,7 @@
 
 ## Gap confirmation (reproduced 2026-06-19 on `main` @ fe79feb)
 
-Worktree: `.worktrees/sdk-gap-12` (`feat/sdk-gap-12-newskeleton`). Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_GAP12Corpus`).
+Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_RealWorldCorpus`).
 
 | Fixture | Phase | Observed error (matches the consumer's draft) |
 |---|---|---|
