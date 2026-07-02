@@ -80,6 +80,28 @@ func TestValidateRMEHRStatusBytes_MissingNameStillFlagged(t *testing.T) {
 	}
 }
 
+// TestValidateRMEHRStatusBytes_MalformedSubject covers the second decode
+// branch: a well-formed JSON object whose `subject` is the wrong shape
+// passes the key-presence map decode but fails the typed EHR_STATUS decode,
+// surfacing invalid_shape at "/".
+func TestValidateRMEHRStatusBytes_MalformedSubject(t *testing.T) {
+	data := []byte(`{
+		"_type": "EHR_STATUS",
+		"name": {"_type": "DV_TEXT", "value": "EHR Status"},
+		"archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+		"subject": "not-an-object",
+		"is_modifiable": true,
+		"is_queryable": true
+	}`)
+	r := validation.ValidateRMEHRStatusBytes(data)
+	if r.OK {
+		t.Fatalf("malformed subject must not be OK; issues=%+v", r.Issues)
+	}
+	if !hasIssue(r.Issues, "/", "invalid_shape") {
+		t.Errorf("expected invalid_shape @ /, got %+v", r.Issues)
+	}
+}
+
 // TestValidateRMEHRStatusBytes_InvalidShape covers non-object and
 // malformed inputs: each surfaces a single invalid_shape issue at "/".
 func TestValidateRMEHRStatusBytes_InvalidShape(t *testing.T) {

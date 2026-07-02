@@ -131,9 +131,12 @@ func (d *Document) extract() {
 // EnterClassExpression populates [Document.Classes]. Keep in lockstep
 // with the structured extractor's extractClassExprOperand
 // (extract_query.go) so a consumer reading the flat lint view and the
-// structured Query sees identical [ClassExpr] values for the same
-// source — including the standing-predicate body (Predicate) and the
-// param-archetype placeholder name carried verbatim in Archetype.
+// structured Query sees identical raw [ClassExpr] fields for the same
+// source — RMType / Alias / Archetype / Predicate / HasPredicate,
+// including the standing-predicate body and the param-archetype
+// placeholder name carried verbatim in Archetype. The structured
+// extractor additionally populates [ClassExpr.PredicateComparison],
+// which this flat lint view intentionally omits.
 func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	ce := ClassExpr{Pos: posOf(c.GetStart())}
 	if ids := c.AllIDENTIFIER(); len(ids) > 0 {

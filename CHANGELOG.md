@@ -13,7 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **Presence-aware EHR_STATUS RM-floor entry (SDK-GAP-18; REQ-112).** New `validation.ValidateRMEHRStatusBytes` flags an omitted value-typed mandatory `subject` via JSON-key presence, which the value-based `ValidateRMEHRStatus` cannot (a bare `PARTY_SELF` decodes identically to an absent one).
-- **Structured AQL path access (SDK-GAP-19; REQ-113).** `parse.ClassExpr.PredicateComparison` exposes a class standing predicate as a structured `aql.Comparison`, and `aql.Comparison.ParsedPath` exposes a WHERE path's alias+segments; the shared `aql.IdentifiedPath`/`PathSegment` vocabulary moved into `openehr/aql` (parse aliases preserved). Emission/round-trip unchanged.
+- **Structured AQL path access (SDK-GAP-19; REQ-113).** `parse.ClassExpr.PredicateComparison` exposes a class standing predicate as a structured `aql.Comparison`, and `aql.Comparison.ParsedPath` exposes a WHERE path's alias+segments; the shared `aql.IdentifiedPath`/`PathSegment` vocabulary moved into `openehr/aql` (parse-side names preserved). Emission/round-trip unchanged.
 
 ## [0.13.0] - 2026-07-01
 

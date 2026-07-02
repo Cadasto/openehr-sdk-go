@@ -293,7 +293,7 @@ client scenarios to SDK coverage:
 #### PROBE-080 — AQL parse/emit round-trip property
 
 - **Title:** Parsing a catalogue AQL string into `parse.Query` and re-emitting via `(*Query).Emit` is stable — canonical inputs are preserved, re-emission is idempotent, and out-of-catalogue shapes surface `aql.ErrIncompleteAST` at both parse and emit rather than round-tripping silently.
-- **Preconditions:** The v1 AQL catalogue exercised in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) — 34 idempotence cases, 11 canonical-input preservation cases, and a 7-case incomplete-AST suite.
+- **Preconditions:** The v1 AQL catalogue exercised in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) — 34 idempotence cases, 11 canonical-input preservation cases, and a 10-case incomplete-AST suite.
 - **Wire assertion:** In-repo property — for every catalogue query, `parse.ParseQuery(q)` → `(*Query).Emit()` MUST equal the canonical form of `q`, and a second `Emit` MUST equal the first (idempotence). Out-of-catalogue shapes MUST return `aql.ErrIncompleteAST` from both `ParseQuery` and `Emit`, never a partial emit. The `WhereExpr`/`Value` vocabulary is identical across the read (`parse`) and write (`aql.Builder`) sides.
 - **Modes:** In-repo (unit-level property; no backend).
 - **Status:** Implemented (inline) — see [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go).

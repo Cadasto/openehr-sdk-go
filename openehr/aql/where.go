@@ -90,8 +90,10 @@ const (
 // by the parser on the read side so a consumer reads alias/segments without
 // re-splitting the raw string (SDK-GAP-19); it is nil on the write side
 // (the construction helpers set only Path) and MAY be nil on the read side
-// for a path shape the parser does not structure. Emission uses Path, not
-// ParsedPath, so round-trip is unaffected by its presence or absence.
+// for a path shape the parser does not structure. When non-nil,
+// ParsedPath.Raw equals Path (both derive from the same source path).
+// Emission uses Path, not ParsedPath, so round-trip is unaffected by its
+// presence or absence.
 type Comparison struct {
 	Path       string
 	Op         Operator

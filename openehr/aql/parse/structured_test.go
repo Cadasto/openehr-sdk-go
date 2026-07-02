@@ -126,3 +126,24 @@ func TestStandingPredicateRoundTrip(t *testing.T) {
 		t.Errorf("emit not idempotent:\n  %q\n  %q", emitted, emitted2)
 	}
 }
+
+// TestStandingPredicateLiteralValue exercises the literal-RHS operand branch
+// (`primitiveAsValue`), distinct from the `$param` branch above: a standing
+// predicate with a string literal yields a structured `aql.StringValue`.
+func TestStandingPredicateLiteralValue(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c FROM COMPOSITION c[name/value='Vital signs']")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	pc := q.From.Root.PredicateComparison
+	if pc == nil {
+		t.Fatalf("literal standing predicate not structured; Predicate=%q", q.From.Root.Predicate)
+	}
+	if pc.Path != "name/value" || pc.Op != aql.OpEq {
+		t.Errorf("PredicateComparison = {%q %q}, want {name/value =}", pc.Path, pc.Op)
+	}
+	sv, ok := pc.Val.(aql.StringValue)
+	if !ok || sv.S != "Vital signs" {
+		t.Errorf("PredicateComparison.Val = %#v, want StringValue{Vital signs}", pc.Val)
+	}
+}

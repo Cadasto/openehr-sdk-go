@@ -22,6 +22,11 @@ type PathSegment struct {
 // is the alias (root binding into the FROM / CONTAINS tree); the remaining
 // steps are Segments. It is the structured form of a path a consumer would
 // otherwise re-tokenize from raw text.
+//
+// Raw is authoritative for emission; Alias / Predicate / Segments are a
+// read-only structured decomposition of it. The single producer (the
+// parser) sets all fields consistently from one source node; a consumer
+// mutating one without the others desynchronizes the value.
 type IdentifiedPath struct {
 	// Alias is the root binding (e.g. "o"); for a WHERE path it MUST
 	// resolve to a FROM / CONTAINS class alias. "" when the path is

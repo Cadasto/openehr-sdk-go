@@ -806,7 +806,7 @@ requirements:
     # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
     # property) is carried inline by openehr/aql/parse/roundtrip_test.go
     # — 34 idempotence cases plus 11 canonical-input preservation cases
-    # across the v1 catalogue, plus a 7-case incomplete-AST suite
+    # across the v1 catalogue, plus a 10-case incomplete-AST suite
     # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
