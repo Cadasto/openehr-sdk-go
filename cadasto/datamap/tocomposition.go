@@ -508,10 +508,23 @@ func encodeAction(out map[string]any, r contentRoot, payload map[string]any, sta
 	}
 	out["description"] = encodeStructuredContainer(descConstraint, items, "Tree", r.terms)
 	out["time"] = dvDateTime(stringOrDefault(payload["time"], startTime))
-	out["ism_transition"] = map[string]any{
-		"_type":         "ISM_TRANSITION",
-		"current_state": dvCodedText("completed", "openehr", "532"),
+	// Lifecycle state: default to completed(532) for backward compatibility;
+	// a caller (e.g. the protocol-enrollment engine, REQ-0029) may supply an
+	// explicit current_state and/or careflow_step as expanded coded-text
+	// {code, value, terminology} to record a pathway state (planned/active/
+	// abandoned/…) instead.
+	currentState := dvCodedText("completed", "openehr", "532")
+	if cs, ok := codedTextFromPayload(payload["current_state"]); ok {
+		currentState = cs
 	}
+	ism := map[string]any{
+		"_type":         "ISM_TRANSITION",
+		"current_state": currentState,
+	}
+	if step, ok := codedTextFromPayload(payload["careflow_step"]); ok {
+		ism["careflow_step"] = step
+	}
+	out["ism_transition"] = ism
 	return out, nil
 }
 
@@ -1207,6 +1220,26 @@ func dvDateTime(value string) map[string]any {
 
 func dvCodedText(value, terminology, code string) map[string]any {
 	return map[string]any{"_type": "DV_CODED_TEXT", "value": value, "defining_code": codePhrase(terminology, code)}
+}
+
+// codedTextFromPayload builds a DV_CODED_TEXT from a payload map with string
+// keys code/value/terminology. Returns ok=false when the value is absent or
+// not a well-formed coded-text map (caller keeps its default). REQ-0029.
+func codedTextFromPayload(v any) (map[string]any, bool) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	code, _ := m["code"].(string)
+	value, _ := m["value"].(string)
+	term, _ := m["terminology"].(string)
+	if code == "" || term == "" {
+		return nil, false
+	}
+	if value == "" {
+		value = code
+	}
+	return dvCodedText(value, term, code), true
 }
 
 func codePhrase(terminology, code string) map[string]any {

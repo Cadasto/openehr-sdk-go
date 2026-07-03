@@ -214,6 +214,97 @@ func TestToCompositionRequiresStartTime(t *testing.T) {
 	}
 }
 
+// actionRoot loads the minimal ACTION fixture and returns its content
+// archetype root, for unit-testing encodeAction directly (no INSTRUCTION/
+// activity scaffolding needed — ACTION.description is a plain ITEM_TREE).
+func actionRoot(t *testing.T) contentRoot {
+	t.Helper()
+	opt := loadOPT(t, "minimal_action_2")
+	root, _ := opt.Root().(template.ObjectNode)
+	for _, r := range findContentArchetypeRoots(root) {
+		if r.node.RMTypeName() == "ACTION" {
+			return r
+		}
+	}
+	t.Fatal("minimal_action_2 fixture: no ACTION content root found")
+	return contentRoot{}
+}
+
+// PROBE-0553 proves REQ-0029 — encodeAction honors a payload-supplied
+// current_state (enrollment lifecycle) and preserves the completed default.
+func TestEncodeAction_CurrentStateFromPayload(t *testing.T) {
+	out := map[string]any{}
+	got, err := encodeAction(out, actionRoot(t), map[string]any{
+		"current_state": map[string]any{"code": "245", "value": "active", "terminology": "openehr"},
+	}, "2026-07-03T00:00:00Z")
+	if err != nil {
+		t.Fatalf("encodeAction: %v", err)
+	}
+	ism := got["ism_transition"].(map[string]any)
+	cs := ism["current_state"].(map[string]any)
+	dv := cs["defining_code"].(map[string]any) // dvCodedText nests the code under defining_code
+	if dv["code_string"] != "245" {
+		t.Fatalf("current_state code = %v, want 245", dv["code_string"])
+	}
+}
+
+// PROBE-0554 proves REQ-0029 — absent current_state → completed(532) default (backward compat).
+func TestEncodeAction_DefaultCompletedPreserved(t *testing.T) {
+	got, err := encodeAction(map[string]any{}, actionRoot(t), map[string]any{}, "2026-07-03T00:00:00Z")
+	if err != nil {
+		t.Fatalf("encodeAction: %v", err)
+	}
+	ism := got["ism_transition"].(map[string]any)
+	cs := ism["current_state"].(map[string]any)
+	dv := cs["defining_code"].(map[string]any)
+	if dv["code_string"] != "532" {
+		t.Fatalf("default current_state code = %v, want 532", dv["code_string"])
+	}
+}
+
+// PROBE-0569 proves REQ-0029 — encodeAction emits a payload-supplied
+// careflow_step alongside current_state on the ism_transition.
+func TestEncodeAction_CareflowStepFromPayload(t *testing.T) {
+	got, err := encodeAction(map[string]any{}, actionRoot(t), map[string]any{
+		"current_state": map[string]any{"code": "245", "value": "active", "terminology": "openehr"},
+		"careflow_step": map[string]any{"code": "at0003", "value": "active", "terminology": "local"},
+	}, "2026-07-03T00:00:00Z")
+	if err != nil {
+		t.Fatalf("encodeAction: %v", err)
+	}
+	ism := got["ism_transition"].(map[string]any)
+	step, ok := ism["careflow_step"].(map[string]any)
+	if !ok {
+		t.Fatalf("careflow_step missing on ism_transition: %v", ism)
+	}
+	dv := step["defining_code"].(map[string]any)
+	if dv["code_string"] != "at0003" {
+		t.Fatalf("careflow_step code = %v, want at0003", dv["code_string"])
+	}
+	// current_state must still be honored alongside careflow_step.
+	cs := ism["current_state"].(map[string]any)
+	if cs["defining_code"].(map[string]any)["code_string"] != "245" {
+		t.Fatalf("current_state code = %v, want 245", cs["defining_code"])
+	}
+}
+
+// PROBE-0570 proves REQ-0029 — a present-but-malformed current_state (missing
+// code) is rejected by codedTextFromPayload and falls back to completed(532).
+func TestEncodeAction_MalformedCurrentStateFallsBack(t *testing.T) {
+	got, err := encodeAction(map[string]any{}, actionRoot(t), map[string]any{
+		"current_state": map[string]any{"value": "active", "terminology": "openehr"}, // no code
+	}, "2026-07-03T00:00:00Z")
+	if err != nil {
+		t.Fatalf("encodeAction: %v", err)
+	}
+	ism := got["ism_transition"].(map[string]any)
+	cs := ism["current_state"].(map[string]any)
+	dv := cs["defining_code"].(map[string]any)
+	if dv["code_string"] != "532" {
+		t.Fatalf("malformed current_state code = %v, want 532 (default fallback)", dv["code_string"])
+	}
+}
+
 // collectLeafValues gathers all scalar leaf values (recursing maps/slices) so
 // the round-trip assertion is robust to the exact key labels.
 func collectLeafValues(v any) []any {
