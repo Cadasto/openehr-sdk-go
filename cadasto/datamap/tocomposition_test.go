@@ -405,3 +405,51 @@ func TestToCompositionInstructionProtocolAndNarrative(t *testing.T) {
 		t.Errorf("activity (at0121) niet ge-encodeerd:\n%s", s)
 	}
 }
+
+// PROBE-0592 proves REQ-0029 — category is taken from the OPT: a persistent OPT
+// (advance_care pins 431|persistent) yields category persistent AND no context
+// (a persistent COMPOSITION has none); an event OPT keeps 433|event + context.
+func TestToComposition_CategoryFromOPT(t *testing.T) {
+	ctxOnly := map[string]any{"context": map[string]any{"start_time": "2026-01-01T00:00:00Z"}}
+
+	// Persistent care_plan OPT.
+	b, err := os.ReadFile("testdata/examples/pzp.template.opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	optP, err := template.ParseOPT(bytes.NewReader(b))
+	if err != nil {
+		t.Fatalf("ParseOPT(pzp): %v", err)
+	}
+	comp, err := ToComposition(optP, ctxOnly)
+	if err != nil {
+		t.Fatalf("ToComposition(persistent): %v", err)
+	}
+	if code := categoryCodeOf(comp); code != "431" {
+		t.Errorf("persistent category code = %q, want 431", code)
+	}
+	if _, hasCtx := comp["context"]; hasCtx {
+		t.Errorf("persistent COMPOSITION must have no context, got %v", comp["context"])
+	}
+
+	// Event OPT (regression): unchanged default 433 + context present.
+	compE, err := ToComposition(loadOPT(t, "vital_signs_v1"), ctxOnly)
+	if err != nil {
+		t.Fatalf("ToComposition(event): %v", err)
+	}
+	if code := categoryCodeOf(compE); code != "433" {
+		t.Errorf("event category code = %q, want 433", code)
+	}
+	if _, hasCtx := compE["context"]; !hasCtx {
+		t.Errorf("event COMPOSITION must have a context")
+	}
+}
+
+// categoryCodeOf digs COMPOSITION.category.defining_code.code_string out of the
+// encoded map for assertions.
+func categoryCodeOf(comp map[string]any) string {
+	cat, _ := comp["category"].(map[string]any)
+	dc, _ := cat["defining_code"].(map[string]any)
+	s, _ := dc["code_string"].(string)
+	return s
+}

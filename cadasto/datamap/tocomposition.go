@@ -136,6 +136,17 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 		)
 	}
 
+	// Category is taken from the OPT (REQ-0029): a care_plan/persistent OPT pins
+	// 431|persistent, most others 433|event. A persistent COMPOSITION has no
+	// context (RM: COMPOSITION.context is absent iff category is persistent), so
+	// omit the EVENT_CONTEXT block entirely in that case. Falls back to event/433
+	// when the OPT does not pin the category.
+	catCode := optCategoryCode(root)
+	if catCode == "" {
+		catCode = "433"
+	}
+	persistent := catCode == "431"
+
 	comp := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": rootArchetypeID(root),
@@ -143,22 +154,27 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 		"archetype_details": archetypeDetails(rootArchetypeID(root), opt.TemplateID()),
 		"language":          codePhrase("ISO_639-1", language),
 		"territory":         codePhrase("ISO_3166-1", territory),
-		"category":          dvCodedText("event", "openehr", "433"),
+		"category":          dvCodedText(categoryValueForCode(catCode), "openehr", catCode),
 		"composer":          composer,
-		"context": map[string]any{
+		"content":           content,
+	}
+	if !persistent {
+		comp["context"] = map[string]any{
 			"_type":      "EVENT_CONTEXT",
 			"start_time": dvDateTime(startTime),
 			"setting":    dvCodedText("other care", "openehr", "238"),
-		},
-		"content": content,
+		}
 	}
 
 	// other_context (ITEM_TREE op EVENT_CONTEXT, bv. een annotations-cluster)
 	// — alleen wanneer de datamap er inhoud voor levert; geen leeg skelet.
-	if oc, err := encodeOtherContext(root, payload); err != nil {
-		return nil, err
-	} else if oc != nil {
-		comp["context"].(map[string]any)["other_context"] = oc
+	// Persistent compositions have no context, so there is nowhere to attach it.
+	if !persistent {
+		if oc, err := encodeOtherContext(root, payload); err != nil {
+			return nil, err
+		} else if oc != nil {
+			comp["context"].(map[string]any)["other_context"] = oc
+		}
 	}
 
 	// feeder_audit is een RM-attribuut op COMPOSITION (geen archetyped
@@ -1220,6 +1236,61 @@ func dvDateTime(value string) map[string]any {
 
 func dvCodedText(value, terminology, code string) map[string]any {
 	return map[string]any{"_type": "DV_CODED_TEXT", "value": value, "defining_code": codePhrase(terminology, code)}
+}
+
+// categoryValueForCode maps an openEHR "composition category" code to its
+// rubric. Covers the two codes the encoder emits; an unknown code falls back to
+// "event" (the RM default category). REQ-0029.
+func categoryValueForCode(code string) string {
+	switch code {
+	case "431":
+		return "persistent"
+	default:
+		return "event"
+	}
+}
+
+// optCategoryCode returns the composition category code the OPT pins on
+// /category/defining_code (openEHR terminology group "composition category":
+// 431|persistent, 433|event, …), or "" when the OPT leaves it unconstrained.
+// A care_plan OPT pins 431|persistent, which the caller uses to omit the
+// EVENT_CONTEXT block (a persistent COMPOSITION has no context). REQ-0029.
+func optCategoryCode(root template.ObjectNode) string {
+	for _, attr := range root.Attributes() {
+		if attr.Name() != "category" {
+			continue
+		}
+		for _, child := range attr.Children() {
+			obj, ok := child.(template.ObjectNode)
+			if !ok {
+				continue
+			}
+			for _, a2 := range obj.Attributes() {
+				if a2.Name() != "defining_code" {
+					continue
+				}
+				for _, leaf := range a2.Children() {
+					pc, ok := leaf.(interface {
+						PrimitiveConstraint() constraints.PrimitiveConstraint
+					})
+					if !ok {
+						continue
+					}
+					switch cp := pc.PrimitiveConstraint().(type) {
+					case constraints.CodePhrase:
+						if len(cp.CodeList) > 0 {
+							return cp.CodeList[0]
+						}
+					case *constraints.CodePhrase:
+						if len(cp.CodeList) > 0 {
+							return cp.CodeList[0]
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // codedTextFromPayload builds a DV_CODED_TEXT from a payload map with string
