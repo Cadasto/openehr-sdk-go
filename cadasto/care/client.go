@@ -729,6 +729,39 @@ func (c *Client) SaveCompositionRaw(ctx context.Context, patientID, templateID s
 	return "", nil
 }
 
+// GetCompositionDatamap reads a stored composition back as a DECODED datamap
+// payload — the read-path symmetric counterpart of SaveData/UpdateData
+// (REQ-0029): fetch the OPT for templateID (same resolveOPT + cache SaveData/
+// UpdateData use), GET the canonical composition, then codec.FromComposition(
+// opt, canonical). Passing the OPT matters: FromComposition keys each content
+// entry "<archetype-id>|<label>" using the OPT's own term_definitions
+// (decodeArchetypeRoot) so the decoded keys match what ToComposition emits
+// (and what a consumer's own key constants expect) — a nil-OPT decode falls
+// back to the runtime node's own "name" field, which will NOT match a
+// template-authored key constant.
+//
+// Returns the same shape GetComposition+FromComposition(opt, …) would, so a
+// caller that only has a raw *care.Client (no local OPT) does not have to
+// resolve+cache the OPT itself.
+func (c *Client) GetCompositionDatamap(ctx context.Context, patientID, versionUID, templateID string) (map[string]any, error) {
+	if c.codec == nil {
+		return nil, errors.New("care: no Codec configured")
+	}
+	opt, err := c.resolveOPT(ctx, templateID)
+	if err != nil {
+		return nil, err
+	}
+	comp, err := c.GetComposition(ctx, patientID, versionUID)
+	if err != nil {
+		return nil, err
+	}
+	dm, err := c.codec.FromComposition(opt, comp)
+	if err != nil {
+		return nil, fmt.Errorf("care: decode composition %s: %w", versionUID, err)
+	}
+	return dm, nil
+}
+
 // GetComposition retrieves a stored composition by EHR id and version uid and
 // returns it as a canonical-JSON map (read-only). The caller can run the
 // datamap decoder (FromComposition) on the result with the matching OPT.
