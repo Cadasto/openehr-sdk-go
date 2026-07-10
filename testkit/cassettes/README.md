@@ -86,7 +86,7 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
 **Persistent:** `persistent_minimal.en.v1` (OPT + JSON + XML, round-trip).
 
-**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip, SDK-GAP-11). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
+**Constraint templates:** `clinical_content_validation` (OPT + JSON, round-trip); `Test_dv_*` (24 OPT+JSON pairs, round-trip except four `Test_dv_interval_*` — probes skip; see PROBE-038). Not vendored: `cardinality_of_section`, `composition_evaluation_test` (duplicate AQL on compile).
 
 **RM JSON** (`rm/`, flat names): 8 `ehr_status_valid_*` in PROBE-030/033 (excludes ECIS alternate wire); 12 `ehr_status_invalid_*` on disk for client/validation work but excluded from probe discovery (`ehr_status_invalid_*` prefix); 14 `folder_*` including `folder_update_*`.
 

@@ -205,7 +205,7 @@ byte-identical : true
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (SDK-GAP-17 Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured

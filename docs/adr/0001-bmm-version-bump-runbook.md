@@ -66,7 +66,7 @@ A BMM version bump MUST follow the numbered procedure below. CI enforces the det
 
 9. **Remove the old BMM file in the same commit.** Never leave both versions in `resources/bmm/` — the SDK pins exactly one version per schema id at a time. The paired add/remove makes the rename reviewable.
 
-10. **Audit narrow-interface accessors** (SDK-GAP-11 / PROBE-038). If `bmmdiff -suggest-changelog` reports an Added class whose `ancestors` chain includes any of `DV_TEXT`, `DV_URI`, `AUDIT_DETAILS`, `PARTY_IDENTIFIED`, or `OBJECT_REF`, the generator's field-lift picks the new subtype up automatically — but two non-generated files need explicit updates:
+10. **Audit narrow-interface accessors** (REQ-052 / PROBE-038). If `bmmdiff -suggest-changelog` reports an Added class whose `ancestors` chain includes any of `DV_TEXT`, `DV_URI`, `AUDIT_DETAILS`, `PARTY_IDENTIFIED`, or `OBJECT_REF`, the generator's field-lift picks the new subtype up automatically — but two non-generated files need explicit updates:
 
     - [`openehr/rm/like_interfaces.go`](../../openehr/rm/like_interfaces.go): add the marker line `func (NewSubtype) is<Parent>Like() {}` AND a method body for every accessor on the parent interface (`GetValue`, `GetDefiningCode`, …). Without these, the new subtype fails to satisfy the `<Parent>Like` interface and codec emission won't compile.
     - [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go): add a `case *NewSubtype:` arm to the matching `*Base` closed type-switch so the helpers recover the parent struct from the new subtype.

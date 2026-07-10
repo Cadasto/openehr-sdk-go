@@ -213,7 +213,7 @@ Method names must avoid clashes with RM attribute names used as struct fields on
 - [REQ-024](../../specifications/idiom.md) — methods replace reflection; keep typereg dispatch in codecs.
 - [REQ-040](../../specifications/rm-modeling.md) — registry unchanged.
 - [REQ-052](../../specifications/wire.md) — wire.md BMM-bump note (ADR-0001 step 10) already aligned ([54d3f57](https://github.com/Cadasto/openehr-sdk-go/commit/54d3f57)).
-- [PROBE-038](../../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage-sdk-gap-11) — no wire assertion change.
+- [PROBE-038](../../specifications/conformance.md#probe-038--rm-polymorphic-decode-coverage) — no wire assertion change.
 
 ## Cross-references
 

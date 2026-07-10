@@ -45,7 +45,7 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/client/system/` | System API — capabilities, version, infrastructure discovery. |
 | `openehr/client/ehr/` | EHR API — EHR identity, common sub-resource types (`EhrID`, `VersionedObjectID`, `VersionMetadata`). Sub-leaves below carry the per-resource CRUD. |
 | `openehr/client/ehr/composition/` | Composition CRUD (REQ-054 optimistic concurrency). |
-| `openehr/client/ehr/contribution/` | Multi-version atomic commits. Submission body is the ITS-REST `Contribution_create` shape (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); the audit envelope is carried in the JSON body (REQ-059) — unlike single-resource writes there is no `openehr-audit-details` header. Response decodes as persisted `rm.Contribution`. PROBE-072 / SDK-GAP-10. |
+| `openehr/client/ehr/contribution/` | Multi-version atomic commits. Submission body is the ITS-REST `Contribution_create` shape (inline `ORIGINAL_VERSION`/`IMPORTED_VERSION` with `data: T`); the audit envelope is carried in the JSON body (REQ-059) — unlike single-resource writes there is no `openehr-audit-details` header. Response decodes as persisted `rm.Contribution`. PROBE-072 (REQ-050/095). |
 | `openehr/client/ehr/directory/` | Folder / Directory CRUD. |
 | `openehr/client/ehr/ehrstatus/` | EHR_STATUS read/update. |
 | `openehr/client/ehr/itemtags/` | ItemTag operations (REST 1.1.0 new resource — REQ-059). |
