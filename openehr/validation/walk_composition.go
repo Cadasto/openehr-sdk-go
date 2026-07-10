@@ -386,7 +386,7 @@ func primitiveInput(rmValue any) any {
 	case rm.Real:
 		// Normalise the named float64 to a bare float64 so a C_REAL
 		// constraint validates it instead of rejecting it as
-		// wrong_type (SDK-GAP-12: REAL on DV_QUANTITY.magnitude).
+		// wrong_type (REQ-110: REAL on DV_QUANTITY.magnitude).
 		return float64(v)
 	}
 	return rmValue
@@ -597,9 +597,9 @@ func rmTypeIsSubtypeOf(concrete, abstract string) bool {
 }
 
 // intervalRMTypeMatches reports whether a concrete interval RM type
-// name satisfies an OPT-declared generic interval type (SDK-GAP-11/12).
+// name satisfies an OPT-declared generic interval type (REQ-052 / REQ-110).
 //
-// SDK-GAP-13 sub-gap B: a DV_INTERVAL<T> value that has been through a
+// REQ-052 sub-gap B: a DV_INTERVAL<T> value that has been through a
 // canonical-JSON round-trip re-decodes as the bare DVInterval[DVOrdered]
 // (typereg has a single "DV_INTERVAL" registration), so describeRMType
 // reports "DV_INTERVAL" and the OPT's "DV_INTERVAL<DV_QUANTITY>" would

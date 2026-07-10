@@ -366,7 +366,7 @@ func renderConcreteClass(plan *Plan, pc *PlannedClass, sc *bmm.SimpleClass) (str
 		b.WriteString(field)
 	}
 	b.WriteString("}\n")
-	// SDK-GAP-11 narrow `<GoName>Like` interfaces were previously
+	// REQ-052 narrow `<GoName>Like` interfaces were previously
 	// emitted here. They now live in the non-generated
 	// `openehr/rm/like_interfaces.go` so callers can use RM-shaped
 	// accessor methods (GetValue, GetDefiningCode, …) without the
@@ -823,7 +823,7 @@ func singleTypeRef(plan *Plan, owner *bmm.SimpleClass, name string) (string, boo
 		if sc, isSimple := pc.Class.(*bmm.SimpleClass); isSimple && sc.IsGeneric() {
 			return qualifyClassRef(plan, pc) + defaultGenericArgs(plan, sc), true, nil
 		}
-		// SDK-GAP-11: concrete class with registered subtypes is lifted
+		// REQ-052: concrete class with registered subtypes is lifted
 		// to a narrow `<Parent>Like` Go interface. The struct field
 		// adopts the interface so the wire-decode dispatch via typereg
 		// is lossless across subtype payloads.
@@ -903,7 +903,7 @@ func goNameForRef(plan *Plan, name string) string {
 // isInterfaceTypeRef reports whether the named BMM class resolves to
 // an interface in the generated Go code (abstract class, P_BMM_INTERFACE,
 // or a concrete-with-subtypes parent lifted to a narrow `<Parent>Like`
-// interface per SDK-GAP-11). Optional properties typed by an interface
+// interface per REQ-052). Optional properties typed by an interface
 // do NOT need an extra `*` indirection.
 func isInterfaceTypeRef(plan *Plan, name string) bool {
 	pc, ok := plan.Classes[name]

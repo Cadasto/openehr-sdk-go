@@ -201,7 +201,7 @@ func queryParamString(val any) (string, error) {
 //     the POST operations declare no `ehr_id` query parameter and the
 //     request bodies carry no `ehr_id` field — header is the only path).
 //
-// SDK-GAP-16 finding A: prior to this split the SDK always set the query
+// REQ-055 finding A: prior to this split the SDK always set the query
 // parameter, so a strict-spec server that scopes POST execution only via
 // the header would silently run population-wide. The header path closes
 // that gap by default; an explicit option is reserved for a future plan.

@@ -91,7 +91,7 @@ func (c *Client) Catalog() *discovery.ServiceCatalog { return c.catalog }
 // HTTPClient returns the injected *http.Client (REQ-021). Exposed so
 // SDK packages that need to issue requests outside the catalog-routed
 // Do pipeline — e.g. cadasto/admin/ deployment-level health probes
-// (SDK-GAP-07) — can reuse the configured HTTP transport without
+// (REQ-083) — can reuse the configured HTTP transport without
 // re-injection or wrapping. Returns nil only when New rejected the
 // configuration (which is impossible for a constructed Client).
 func (c *Client) HTTPClient() *http.Client { return c.cfg.httpClient }

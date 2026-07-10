@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// TestEnsureSingleNumericAndInterval pins the SDK-GAP-12 writers that
+// TestEnsureSingleNumericAndInterval pins the REQ-107 writers that
 // the OPT corpus reaches only transitively (so they were otherwise
 // 0%): the DV_COUNT/DV_QUANTITY scalar writers and the generic
 // DV_INTERVAL<T> bound writer across two distinct T's (DVCount value
@@ -102,7 +102,7 @@ func TestEnsureSingleNumericAndInterval(t *testing.T) {
 			},
 		},
 		{
-			// SDK-GAP-12 fix #2: an un-terminologised media_type code
+			// REQ-107 fix #2: an un-terminologised media_type code
 			// defaults to the IANA media-types code set, not openehr.
 			name:   "DVMultimedia.media_type (IANA default)",
 			parent: &rm.DVMultimedia{},

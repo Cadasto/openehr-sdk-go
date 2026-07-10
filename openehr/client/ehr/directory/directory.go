@@ -164,7 +164,7 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //
 // Wire: POST /ehr/{ehr_id}/directory. The response shape follows the
 // Prefer option (REQ-094): `PreferRepresentation` returns a bare `Folder`
-// (SDK-GAP-09, ITS-REST `201_directory`); `PreferIdentifier` returns the
+// (REQ-094, ITS-REST `201_directory`); `PreferIdentifier` returns the
 // ITS-REST `Identifier` body, resolved into the metadata `VersionUID`;
 // `PreferMinimal` (the spec default) returns an empty body with only
 // metadata (`ETag` → `VersionUID`) populated.
@@ -208,7 +208,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 //
 // Wire: PUT /ehr/{ehr_id}/directory with If-Match. Response shape
 // matches [Save]: bare `*rm.Folder` per the ITS-REST OpenAPI
-// `200_FOLDER_retrieved` (SDK-GAP-09).
+// `200_FOLDER_retrieved` (REQ-094).
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, ifMatch string, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -290,7 +290,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 
 // doWrite executes a Save / Update request and decodes the response
 // body per the Prefer mode (REQ-094). Per ITS-REST OpenAPI `201_directory`
-// / `200_FOLDER_retrieved` (SDK-GAP-09), Prefer=representation decodes a
+// / `200_FOLDER_retrieved` (REQ-094), Prefer=representation decodes a
 // bare `Folder` — not an `ORIGINAL_VERSION<Folder>` envelope — and returns
 // [transport.ErrInvalidShape] on an empty body; Prefer=identifier resolves
 // the ITS-REST Identifier body into the version metadata; for minimal /

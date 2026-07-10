@@ -19,7 +19,7 @@ var ErrPathResolution = errors.New("aql: path resolution failed")
 var ErrSyntax = errors.New("aql: syntax error")
 
 // ErrIncompleteAST indicates that the source AQL parsed cleanly but contains
-// a shape outside the SDK-GAP-17 Tier-2 extraction catalogue (REQ-113) — the
+// a shape outside the Tier-2 extraction catalogue (REQ-113) — the
 // parser cannot surface it as a structured [parse.Query] without losing
 // semantics. Returned wrapped by parse.ParseQuery (and surfaced via
 // parse.Document.QueryErr) so callers can branch on errors.Is.

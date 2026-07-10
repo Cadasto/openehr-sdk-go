@@ -110,7 +110,7 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 // putStoredQuery is the shared PUT implementation for the versioned and
 // unversioned stored-query endpoints.
 //
-// SDK-GAP-16 finding B: the canonical OAS `200_StoredQuery_stored` response
+// REQ-057 finding B: the canonical OAS `200_StoredQuery_stored` response
 // defines a `Location` header and no body — the server-assigned version is
 // conveyed via `Location: …/definition/query/{name}/{version}`. EHRbase
 // returns the same `Location`-only shape when the request is
@@ -164,7 +164,7 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 
 // parseStoredQueryLocation recovers the assigned {name, version} from a
 // `Location: …/definition/query/{name}/{version}` response header
-// (SDK-GAP-16 finding B). Returns ok=false on a malformed value so the
+// (REQ-057 finding B). Returns ok=false on a malformed value so the
 // caller can fall through to body / synthesised metadata; no error is
 // surfaced for a malformed Location — a deficient server should not break
 // the call.

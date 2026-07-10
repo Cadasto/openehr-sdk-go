@@ -28,7 +28,7 @@ func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compile
 	return c
 }
 
-// TestGenerateSocialMinimal_respectsContentUpper pins SDK-GAP-12 Task 3:
+// TestGenerateSocialMinimal_respectsContentUpper pins REQ-107 Task 3:
 // social.opt content has existence.upper=1 with multiple optional
 // archetype roots sharing node_id at0000 — Minimal synthesis must
 // emit at most one content entry so validation binds cleanly.

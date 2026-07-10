@@ -11,7 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// TestDocumentTreeReturnsValidatedTree pins SDK-GAP-17 Tier 1 (REQ-113):
+// TestDocumentTreeReturnsValidatedTree pins REQ-113 Tier 1:
 // a successful Parse exposes the validated ANTLR tree via the
 // Document.Tree() accessor — non-nil, with a SelectClause reachable.
 // The accessor's *type* is an unstable consumer contract per its doc;

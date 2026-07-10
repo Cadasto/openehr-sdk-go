@@ -90,9 +90,9 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 }
 
 // TestProbe027_RealWorldCorpus extends PROBE-027 to the real-world OPTs
-// filed in SDK-GAP-12 (by a consuming CDR project). Minimal policy only —
+// filed against REQ-107 (by a consuming CDR project). Minimal policy only —
 // Example on social.opt still emits every optional content archetype
-// root and fails validation (out of scope per SDK-GAP-12 plan).
+// root and fails validation (out of scope per REQ-107 plan).
 func TestProbe027_RealWorldCorpus(t *testing.T) {
 	opts := instance.Options{
 		Policy:    instance.Minimal,

@@ -1,8 +1,8 @@
 package parse
 
-// extract_query.go: SDK-GAP-17 Tier 2 — translate a validated ANTLR
+// extract_query.go: REQ-113 Tier 2 — translate a validated ANTLR
 // parse tree (gen.ISelectQueryContext) into the readable, generated-
-// type-free [Query] AST (REQ-113). Pure recursive descent — no
+// type-free [Query] AST. Pure recursive descent — no
 // listeners, no shared mutable state between calls.
 //
 // Catalogue: the v1 supported shapes are the buildable grammar plus the
@@ -353,7 +353,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
 				// verbatim so the emitter round-trips it, and expose a
 				// structured {path, op, value} when it is a simple
-				// comparison (SDK-GAP-19).
+				// comparison (REQ-113).
 				ce.Predicate = trimBrackets(pp.GetText())
 				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
@@ -478,7 +478,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return nil
 				}
 				if v != nil {
-					// SDK-GAP-19: carry the structured path (alias +
+					// REQ-113: carry the structured path (alias +
 					// segments) alongside the raw string so a consumer
 					// reads it without re-splitting.
 					parsed := extractIdentifiedPath(ip, ClauseWhere)
@@ -580,7 +580,7 @@ func pathRaw(c gen.IIdentifiedPathContext) string {
 }
 
 // standingComparison lifts a class standing predicate's standardPredicate
-// (`objectPath <op> operand`) into an [*aql.Comparison] for SDK-GAP-19, or
+// (`objectPath <op> operand`) into an [*aql.Comparison] for REQ-113, or
 // nil when the predicate is absent or its RHS operand is not a scalar value
 // (an objectPath / node-code operand). Path is the relative object path as
 // written; ParsedPath is left nil (a class predicate path has no alias to

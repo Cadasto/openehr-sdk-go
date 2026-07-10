@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
 )
 
-// TestReadSingle_DataValues covers the SDK-GAP-12 read-side
+// TestReadSingle_DataValues covers the REQ-110 read-side
 // accessors that mirror the new writers (DV_COUNT, DV_QUANTITY,
 // DV_PROPORTION, DV_URI, DV_PARSABLE) and the generic DV_INTERVAL<T>
 // reader across several T's — present scalars report ok=true.

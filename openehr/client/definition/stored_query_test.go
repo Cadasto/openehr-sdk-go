@@ -86,7 +86,7 @@ func TestPutStoredQuery(t *testing.T) {
 	}
 }
 
-// TestPutStoredQueryParsesLocationHeader pins SDK-GAP-16 finding B: the
+// TestPutStoredQueryParsesLocationHeader pins REQ-057 finding B: the
 // canonical ITS-REST `200_StoredQuery_stored` response shape is a
 // `Location` header and no body. The no-version PutStoredQuery MUST
 // recover the server-assigned `{name, version}` from

@@ -34,7 +34,7 @@
 // as fail-loud panic stubs (temporal arithmetic, PATHABLE.parent /
 // path_of_item, VERSIONED_OBJECT container ops) are deferred by design.
 //
-// # Substitution slots and the `*Like` interfaces (SDK-GAP-11)
+// # Substitution slots and the `*Like` interfaces (REQ-052)
 //
 // The openEHR RM permits Liskov substitution at every property slot.
 // The SDK exposes this on two surfaces, with two distinct call patterns:
@@ -60,7 +60,7 @@
 //     assert to concrete types; helper functions land per-package as
 //     needed.
 //
-// # Encoding substitution slots (SDK-GAP-13)
+// # Encoding substitution slots (REQ-052)
 //
 // A concrete RM type may be stored in such a `*Like` / abstract-category
 // slot either by pointer (`&rm.DVCodedText{…}`) or by value

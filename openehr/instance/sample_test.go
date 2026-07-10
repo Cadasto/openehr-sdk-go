@@ -24,7 +24,7 @@ func distinct(vals []any) int {
 	return len(set)
 }
 
-// TestSampleValue_validReproducibleVaried covers the three SDK-GAP-14
+// TestSampleValue_validReproducibleVaried covers the three REQ-107
 // guarantees for the in-constraint sampler: every draw is valid against
 // the constraint, a fixed seed is reproducible, and the values vary.
 func TestSampleValue_validReproducibleVaried(t *testing.T) {
@@ -232,7 +232,7 @@ func TestSampleValue_boolean(t *testing.T) {
 	}
 }
 
-// TestSampleValue_enumerableDoesNotCollapse is the SDK-GAP-14 regression
+// TestSampleValue_enumerableDoesNotCollapse is the REQ-107 regression
 // guard for the silent ExampleFill collapse: a multi-member enumerable
 // constraint must actually draw values other than ExampleValue. A future
 // filter/bounds bug that made the sampler always fall back would otherwise

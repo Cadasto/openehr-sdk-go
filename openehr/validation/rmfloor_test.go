@@ -1,7 +1,7 @@
 package validation_test
 
 // rmfloor_test.go: unit pins for REQ-112 — the template-less
-// Reference Model validation floor (SDK-GAP-15). Each test exercises
+// Reference Model validation floor. Each test exercises
 // one cassette in the PROBE-077 matrix:
 //
 //   - structurally-decodable but RM-invalid roots must surface the

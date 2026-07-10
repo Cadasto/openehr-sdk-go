@@ -1,6 +1,6 @@
 package parse_test
 
-// structured_test.go: PROBE-082 — REQ-113 / SDK-GAP-19. The parser must
+// structured_test.go: PROBE-082 — REQ-113. The parser must
 // expose the two path-bearing sub-structures as parsed structure, not only
 // raw text: a class standing predicate as a {path, op, value} comparison,
 // and a WHERE comparison's alias-qualified path as alias + segments — so a
@@ -22,7 +22,7 @@ const standingPredicateQuery = "SELECT o/data[at0001]/events[at0006]/value/magni
 	"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
 	"WHERE o/data[at0001]/events[at0006]/value/magnitude > $threshold"
 
-// TestStandingPredicateStructured is the SDK-GAP-19 Ask #1 case: a class
+// TestStandingPredicateStructured is the PROBE-082 Ask #1 case: a class
 // standing predicate is readable as a structured comparison, with the
 // verbatim text retained for round-trip.
 func TestStandingPredicateStructured(t *testing.T) {

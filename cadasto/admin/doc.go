@@ -1,7 +1,7 @@
 // Package admin is the client for tenant, environment, system info,
 // and healthcheck endpoints on a Cadasto deployment.
 //
-// # Health probes (SDK-GAP-07)
+// # Health probes (REQ-083)
 //
 // Live and Ready probe deployment-level liveness and readiness. The
 // SDK ships default paths (DefaultLivePath = "/health/live",

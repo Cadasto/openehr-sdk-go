@@ -24,7 +24,7 @@ var compositionJSONExcluded = map[string]bool{
 	"Address.v2":       true, // ADDRESS / PARTY_IDENTITY DV_CODED_TEXT
 	"Demonstration.v1": true, // DV_MULTIMEDIA in composition
 	"TestPerson.v2":    true, // PERSON / PARTY_IDENTITY DV_CODED_TEXT
-	// Robot / ehrbase Test_dv_interval_* — DV_INTERVAL[T] over DV_ORDERED (SDK-GAP-11).
+	// Robot / ehrbase Test_dv_interval_* — DV_INTERVAL[T] over DV_ORDERED (REQ-052).
 	"Test_dv_interval_dv_count_lower_upper_constraint.v0":    true,
 	"Test_dv_interval_dv_count_open_constraint.v0":           true,
 	"Test_dv_interval_dv_quantity_lower_upper_constraint.v0": true,

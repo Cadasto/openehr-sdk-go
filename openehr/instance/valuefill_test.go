@@ -25,7 +25,7 @@ func counterUID() func() *rm.HierObjectID {
 	}
 }
 
-// TestGenerateRandomFillReproducibleAndValid covers SDK-GAP-14 end to
+// TestGenerateRandomFillReproducibleAndValid covers REQ-107 end to
 // end: RandomFill output (a) validates clean, (b) is byte-reproducible
 // under a fixed ValueSource, and (c) varies from the fixed ExampleFill.
 func TestGenerateRandomFillReproducibleAndValid(t *testing.T) {

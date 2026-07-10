@@ -148,7 +148,7 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // Wire: POST /ehr/{ehr_id}/composition.
 //
 // The response shape follows the Prefer option (REQ-094) per the
-// ITS-REST OpenAPI `201_COMPOSITION` response (SDK-GAP-09):
+// ITS-REST OpenAPI `201_COMPOSITION` response (REQ-094):
 //   - PreferMinimal (default) — server returns the new version's
 //     identifier in the `Location` header; the returned
 //     `*rm.Composition` is nil and only the metadata is populated
@@ -222,7 +222,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 // [transport.ErrInvalidConfig] without issuing a request.
 //
 // Response shape matches [Save]: bare `*rm.Composition` per the
-// ITS-REST OpenAPI `200_COMPOSITION_updated` response (SDK-GAP-09).
+// ITS-REST OpenAPI `200_COMPOSITION_updated` response (REQ-094).
 func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, voID openehrclient.VersionedObjectID, ifMatch string, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("composition.Update: %w: empty EHRID", transport.ErrInvalidConfig)
@@ -321,7 +321,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 // returned Composition pointer is nil.
 //
 // Per ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated`
-// (SDK-GAP-09), the response body is a bare `Composition` — not an
+// (REQ-094), the response body is a bare `Composition` — not an
 // `ORIGINAL_VERSION<COMPOSITION>` envelope. The full audit / lifecycle
 // version envelope lives at `GET /versioned_composition/{vo_uid}/
 // version/{version_uid}` (`UVersionOfComposition`) which the

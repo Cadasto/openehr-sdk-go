@@ -1,6 +1,6 @@
 package rm
 
-// like_interfaces.go: non-generated declarations of the SDK-GAP-11
+// like_interfaces.go: non-generated declarations of the REQ-052
 // narrow polymorphic interfaces and their RM-shaped accessor methods.
 //
 // The generator (`internal/bmmgen`) populates `plan.ConcreteSubtypes`
@@ -38,7 +38,7 @@ package rm
 
 // --- DVTextLike -----------------------------------------------------
 
-// DVTextLike is the SDK-GAP-11 narrow polymorphic interface for DV_TEXT.
+// DVTextLike is the REQ-052 narrow polymorphic interface for DV_TEXT.
 // Concrete-typed RM slots declared as DV_TEXT (LOCATABLE.name,
 // LOCATABLE.null_reason, …) admit Liskov substitution by any descendant
 // per the openEHR RM; the wire decoder dispatches via typereg using
@@ -78,7 +78,7 @@ func (d DVCodedText) GetDefiningCode() (CodePhrase, bool) { return d.DefiningCod
 
 // --- DVURILike ------------------------------------------------------
 
-// DVURILike is the SDK-GAP-11 narrow polymorphic interface for DV_URI.
+// DVURILike is the REQ-052 narrow polymorphic interface for DV_URI.
 // Concrete-typed RM slots declared as DV_URI admit Liskov substitution
 // by DV_EHR_URI on the wire.
 //
@@ -103,7 +103,7 @@ func (d DVEHRURI) GetValue() string { return d.Value }
 
 // --- AuditDetailsLike -----------------------------------------------
 
-// AuditDetailsLike is the SDK-GAP-11 narrow polymorphic interface for
+// AuditDetailsLike is the REQ-052 narrow polymorphic interface for
 // AUDIT_DETAILS. Concrete-typed RM slots declared as AUDIT_DETAILS
 // (Version.commit_audit, Contribution.audit, …) admit Liskov
 // substitution by ATTESTATION on the wire.
@@ -174,7 +174,7 @@ func (a Attestation) GetDescription() (DVTextLike, bool) {
 
 // --- PartyIdentifiedLike --------------------------------------------
 
-// PartyIdentifiedLike is the SDK-GAP-11 narrow polymorphic interface
+// PartyIdentifiedLike is the REQ-052 narrow polymorphic interface
 // for PARTY_IDENTIFIED. Concrete-typed RM slots declared as
 // PARTY_IDENTIFIED (EVENT_CONTEXT.health_care_facility,
 // Participation.performer, …) admit Liskov substitution by
@@ -240,7 +240,7 @@ func (p PartyRelated) GetExternalRef() (*PartyRef, bool) {
 
 // --- ObjectRefLike --------------------------------------------------
 
-// ObjectRefLike is the SDK-GAP-11 narrow polymorphic interface for
+// ObjectRefLike is the REQ-052 narrow polymorphic interface for
 // OBJECT_REF. Concrete-typed RM slots declared as OBJECT_REF admit
 // Liskov substitution by ACCESS_GROUP_REF, LOCATABLE_REF, or PARTY_REF
 // on the wire.

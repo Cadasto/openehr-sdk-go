@@ -1,5 +1,5 @@
-// Example: parse an AQL query into the SDK-GAP-17 Tier-2 structured
-// AST (parse.Query, REQ-113) and walk its shape.
+// Example: parse an AQL query into the REQ-113 Tier-2 structured
+// AST (parse.Query) and walk its shape.
 //
 // Demonstrates the read-side mirror of aql.Builder: SELECT items / FROM
 // containment tree / WHERE expression tree / ORDER BY / LIMIT / OFFSET,

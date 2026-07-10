@@ -17,7 +17,7 @@ import (
 // `IMPORTED_VERSION<T>`) with the payload under `data`, NOT the
 // persisted `rm.Contribution` shape where `versions[]` is `[]OBJECT_REF`.
 //
-// Pins [SDK-GAP-10]. The persisted shape carries OBJECT_REFs pointing
+// Pins REQ-050/095. The persisted shape carries OBJECT_REFs pointing
 // at versions that do not yet exist at submission time, so a spec-
 // conformant CDR rejects it. The probe inspects the captured request
 // body (Sandbox mode; the caller supplies a transport.Client wired to
@@ -103,7 +103,7 @@ func Probe072ContributionSubmissionShape(ctx context.Context, c *transport.Clien
 			}
 		case "OBJECT_REF":
 			r.Status = "fail"
-			r.Detail = fmt.Sprintf("versions[%d]._type=OBJECT_REF — persisted rm.Contribution shape leaked into the submission body (SDK-GAP-10 regression)", i)
+			r.Detail = fmt.Sprintf("versions[%d]._type=OBJECT_REF — persisted rm.Contribution shape leaked into the submission body (REQ-050/095 regression)", i)
 			return r, nil
 		default:
 			r.Status = "fail"

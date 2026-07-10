@@ -13,8 +13,8 @@ import (
 //
 // Parsed queries populate the same concrete types ([ParamValue] /
 // [StringValue] / [IntValue] / [RealValue] / [BoolValue] / [NullValue])
-// — the read AST and the write AST share one vocabulary (REQ-113 /
-// SDK-GAP-17). Concrete-type fields are intended for read access;
+// — the read AST and the write AST share one vocabulary (REQ-113).
+// Concrete-type fields are intended for read access;
 // mutating a value already embedded in a [WhereExpr] passed to
 // [FormatWhere] / [Builder.Build] is undefined.
 type Value interface {

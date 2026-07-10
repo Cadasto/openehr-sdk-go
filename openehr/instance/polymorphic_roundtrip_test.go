@@ -13,7 +13,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// TestCorpusRoundTripValidates is the SDK-GAP-13 dossier acceptance
+// TestCorpusRoundTripValidates is the REQ-107 dossier acceptance
 // criterion exercised on the real-world OPT corpus: a generated
 // composition survives a canonical-JSON round-trip (marshal → decode)
 // intact. Two complementary assertions, because the two sub-gaps fail

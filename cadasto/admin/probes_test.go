@@ -49,7 +49,7 @@ func captureHandler(status int, gotPath *string) http.HandlerFunc {
 }
 
 func TestLiveDefaultPathAtDeploymentRoot(t *testing.T) {
-	// SDK-GAP-07: probes target the deployment origin, NOT the openEHR
+	// REQ-083: probes target the deployment origin, NOT the openEHR
 	// REST base URL. Catalog base is .../openehr/v1; probe MUST hit
 	// /health/live at the same host without the /openehr/v1 prefix.
 	var got string

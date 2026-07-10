@@ -1,7 +1,7 @@
 package parse
 
-// query.go: SDK-GAP-17 Tier 2 — the readable, generated-type-free AST
-// (REQ-113). Mirrors the write-side aql.Builder: SELECT items / FROM
+// query.go: REQ-113 Tier 2 — the readable, generated-type-free AST.
+// Mirrors the write-side aql.Builder: SELECT items / FROM
 // containment tree / WHERE expression tree / ORDER BY terms / LIMIT
 // + OFFSET, all readable without importing parse/gen or any internal/
 // package. The WHERE and Value vocabularies are SHARED with the

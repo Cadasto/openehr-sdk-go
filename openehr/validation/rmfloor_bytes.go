@@ -1,6 +1,6 @@
 package validation
 
-// rmfloor_bytes.go: REQ-112 / SDK-GAP-18 — the presence-aware EHR_STATUS
+// rmfloor_bytes.go: PROBE-081 — REQ-112 — the presence-aware EHR_STATUS
 // entry to the template-less RM floor. It closes the value-typed
 // mandatory-attribute blind spot that the value-based [ValidateRMEHRStatus]
 // structurally cannot: EHR_STATUS.subject is typed rm.PartySelf — a value
@@ -18,7 +18,7 @@ import (
 
 // ValidateRMEHRStatusBytes validates a canonical-JSON EHR_STATUS against
 // the template-less RM floor (REQ-112), consulting JSON-key presence so
-// the value-typed mandatory `subject` is checked correctly (SDK-GAP-18).
+// the value-typed mandatory `subject` is checked correctly (PROBE-081).
 //
 // It decodes data into a *rm.EHRStatus, runs the value-based
 // [ValidateRMEHRStatus] floor, and additionally emits `required` at

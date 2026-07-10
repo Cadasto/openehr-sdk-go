@@ -9,7 +9,7 @@ import (
 
 // leaf mimics an RM data type: `_type` is emitted only by a
 // pointer-receiver MarshalJSON, so a value-in-interface would drop it
-// under plain encoding/json — the exact SDK-GAP-13 sub-gap A mechanism.
+// under plain encoding/json — the exact REQ-052 sub-gap A mechanism.
 type leaf struct {
 	Value string `json:"value"`
 }
