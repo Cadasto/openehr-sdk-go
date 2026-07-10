@@ -1,10 +1,10 @@
 module github.com/cadasto/openehr-sdk-go
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/antlr4-go/antlr/v4 v4.13.1
-	github.com/coreos/go-oidc/v3 v3.18.0
+	github.com/coreos/go-oidc/v3 v3.19.0
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.opentelemetry.io/otel v1.44.0

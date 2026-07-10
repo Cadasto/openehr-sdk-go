@@ -1,7 +1,6 @@
 package introspect_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -51,7 +50,7 @@ func TestIntrospectActiveToken(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	result, err := client.Introspect(context.Background(), "access-token-under-test", "rs-bearer-token")
+	result, err := client.Introspect(t.Context(), "access-token-under-test", "rs-bearer-token")
 	if err != nil {
 		t.Fatalf("Introspect: %v", err)
 	}
@@ -97,7 +96,7 @@ func TestIntrospectInactiveToken(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	result, err := client.Introspect(context.Background(), "expired-token", "bearer")
+	result, err := client.Introspect(t.Context(), "expired-token", "bearer")
 	if err != nil {
 		t.Fatalf("Introspect returned error for inactive token (should be nil): %v", err)
 	}
@@ -119,7 +118,7 @@ func TestIntrospectNonTwoXX(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	_, err = client.Introspect(context.Background(), "some-token", "bad-bearer")
+	_, err = client.Introspect(t.Context(), "some-token", "bad-bearer")
 	if err == nil {
 		t.Fatal("expected error on 401, got nil")
 	}
@@ -167,7 +166,7 @@ func TestIntrospectAudArray(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	result, err := client.Introspect(context.Background(), "token", "bearer")
+	result, err := client.Introspect(t.Context(), "token", "bearer")
 	if err != nil {
 		t.Fatalf("Introspect: %v", err)
 	}
@@ -195,7 +194,7 @@ func TestIntrospectAudString(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	result, err := client.Introspect(context.Background(), "token", "bearer")
+	result, err := client.Introspect(t.Context(), "token", "bearer")
 	if err != nil {
 		t.Fatalf("Introspect: %v", err)
 	}

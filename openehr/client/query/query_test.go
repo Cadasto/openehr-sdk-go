@@ -1,7 +1,6 @@
 package query_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -60,7 +59,7 @@ func TestExecuteAdhoc(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	rs, _, err := query.Execute(context.Background(), newClient(t, srv), aql.Query{
+	rs, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{
 		Q: "SELECT e/ehr_id/value FROM EHR e",
 		Parameters: map[string]any{
 			"ehr_id": "7d44b88c-4199-4bad-97dc-d78268e01398",
@@ -83,6 +82,10 @@ func TestExecuteAdhoc(t *testing.T) {
 	}
 }
 
+// TestExecuteWithEHRID pins SDK-GAP-16 finding A on the POST path: EHR
+// scoping is emitted via the `openehr-ehr-id` request header (the spec's
+// POST mechanism), NOT the `ehr_id` query parameter (the GET mechanism;
+// not declared on the canonical POST operations).
 func TestExecuteWithEHRID(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,18 +96,26 @@ func TestExecuteWithEHRID(t *testing.T) {
 	defer srv.Close()
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
-	_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.Query{
+	_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.Query{
 		Q:     "SELECT e/ehr_id/value FROM EHR e",
 		EHRID: ehrID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if captured.URL.Query().Get("ehr_id") != ehrID {
-		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	if captured.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", captured.Method)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != ehrID {
+		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != "" {
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
 	}
 }
 
+// TestRunStoredWithEHRID mirrors TestExecuteWithEHRID for the stored-query
+// POST path (SDK-GAP-16 finding A).
 func TestRunStoredWithEHRID(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -116,37 +127,233 @@ func TestRunStoredWithEHRID(t *testing.T) {
 
 	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
 	_, _, err := query.RunStored(
-		context.Background(), newClient(t, srv), "org.openehr::compositions", nil,
+		t.Context(), newClient(t, srv), "org.openehr::compositions", nil,
 		query.WithEHRID(ehrID),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if captured.URL.Query().Get("ehr_id") != ehrID {
-		t.Errorf("ehr_id query = %q", captured.URL.Query().Get("ehr_id"))
+	if captured.Method != http.MethodPost {
+		t.Fatalf("method = %q, want POST", captured.Method)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != ehrID {
+		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != "" {
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
 	}
 }
 
-func TestRunStored(t *testing.T) {
+// TestExecuteGETWithEHRID pins SDK-GAP-16 finding A on the GET path: EHR
+// scoping uses the `ehr_id` query parameter (declared on the canonical
+// GET operations) and MUST NOT send the `openehr-ehr-id` header.
+func TestExecuteGETWithEHRID(t *testing.T) {
+	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
-			t.Errorf("path = %q", r.URL.Path)
-		}
+		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write(readCassette(t, "result_set.json"))
 	}))
 	defer srv.Close()
 
-	_, _, err := query.RunStored(context.Background(), newClient(t, srv), "org.openehr::compositions", map[string]any{
+	ehrID := "7d44b88c-4199-4bad-97dc-d78268e01398"
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
+		"SELECT e/ehr_id/value FROM EHR e", nil,
+		query.WithGET(), query.WithEHRID(ehrID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Fatalf("method = %q, want GET", captured.Method)
+	}
+	if got := captured.URL.Query().Get("ehr_id"); got != ehrID {
+		t.Errorf("ehr_id query param = %q, want %q (GET keeps query-param scoping)", got, ehrID)
+	}
+	if got := captured.Header.Get("openehr-ehr-id"); got != "" {
+		t.Errorf("openehr-ehr-id header leaked on GET = %q, want empty (SDK-GAP-16 finding A)", got)
+	}
+}
+
+func TestRunStored(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
+			t.Errorf("path = %q", r.URL.Path)
+		}
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions", map[string]any{
 		"ehr_id": "7d44b88c-4199-4bad-97dc-d78268e01398",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The stored Query schema requires offset + query_parameters; both must
+	// be present even with no paging options. fetch is omitted (no spec
+	// default — letting the server choose).
+	if _, ok := body["offset"]; !ok {
+		t.Errorf("stored body missing required offset: %v", body)
+	}
+	if _, ok := body["query_parameters"]; !ok {
+		t.Errorf("stored body missing required query_parameters: %v", body)
+	}
+	if _, ok := body["fetch"]; ok {
+		t.Errorf("stored body should omit fetch when unset, got %v", body["fetch"])
+	}
+}
+
+func TestExecuteGET(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
+		"SELECT c FROM EHR e CONTAINS COMPOSITION c",
+		map[string]any{"systolic_min": 120},
+		query.WithGET(), query.WithFetch(10))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Errorf("method = %q, want GET", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/query/aql" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	q := captured.URL.Query()
+	if q.Get("q") != "SELECT c FROM EHR e CONTAINS COMPOSITION c" {
+		t.Errorf("q = %q", q.Get("q"))
+	}
+	if q.Get("fetch") != "10" {
+		t.Errorf("fetch = %q, want 10", q.Get("fetch"))
+	}
+	if q.Get("systolic_min") != "120" {
+		t.Errorf("systolic_min (form/explode query param) = %q, want 120", q.Get("systolic_min"))
+	}
+}
+
+func TestExecuteGETEncodesScalarsLikeJSON(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
+		"SELECT c FROM EHR e",
+		map[string]any{"big": float64(1234567), "flag": true},
+		query.WithGET())
+	if err != nil {
+		t.Fatal(err)
+	}
+	q := captured.URL.Query()
+	// Must match the POST/JSON rendering, NOT fmt.Sprint ("1.234567e+06").
+	if q.Get("big") != "1234567" {
+		t.Errorf("big = %q, want 1234567 (JSON-consistent, not scientific notation)", q.Get("big"))
+	}
+	if q.Get("flag") != "true" {
+		t.Errorf("flag = %q, want true", q.Get("flag"))
+	}
+}
+
+func TestRunStoredGET(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions",
+		map[string]any{"ehr_status": "active"}, query.WithGET())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Errorf("method = %q, want GET", captured.Method)
+	}
+	if captured.URL.Path != "/openehr/v1/query/org.openehr::compositions" {
+		t.Errorf("path = %q", captured.URL.Path)
+	}
+	q := captured.URL.Query()
+	// offset is always present (schema default 0); fetch omitted when unset.
+	if q.Get("offset") != "0" {
+		t.Errorf("offset = %q, want 0 (always present on stored GET)", q.Get("offset"))
+	}
+	if _, ok := q["fetch"]; ok {
+		t.Errorf("fetch should be omitted when unset, got %q", q.Get("fetch"))
+	}
+	if q.Get("ehr_status") != "active" {
+		t.Errorf("ehr_status param = %q, want active", q.Get("ehr_status"))
+	}
+}
+
+func TestRunStoredPOSTExplicitZeroOffset(t *testing.T) {
+	var body map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(b, &body)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.RunStored(t.Context(), newClient(t, srv), "org.openehr::compositions",
+		nil, query.WithOffset(0), query.WithFetch(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Explicit zero must be representable (the *Set-flag fix), not dropped.
+	if body["fetch"] != float64(0) {
+		t.Errorf("fetch = %v, want explicit 0", body["fetch"])
+	}
+	if body["offset"] != float64(0) {
+		t.Errorf("offset = %v, want explicit 0", body["offset"])
+	}
+}
+
+func TestExecuteGETExplicitZeroOffset(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "result_set.json"))
+	}))
+	defer srv.Close()
+
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, srv),
+		"SELECT c FROM EHR e", nil, query.WithGET(), query.WithOffset(0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Explicit WithOffset(0) must reach the wire on the ad-hoc GET path.
+	if got := captured.URL.Query().Get("offset"); got != "0" {
+		t.Errorf("offset = %q, want explicit 0", got)
+	}
+}
+
+func TestExecuteGETRejectsReservedParamName(t *testing.T) {
+	_, _, err := query.ExecuteString(t.Context(), newClient(t, httptest.NewServer(nil)),
+		"SELECT c FROM EHR e", map[string]any{"offset": 5}, query.WithGET())
+	if !errors.Is(err, query.ErrInvalidConfig) {
+		t.Errorf("expected ErrInvalidConfig for reserved-key collision, got %v", err)
+	}
 }
 
 func TestExecuteEmptyQuery(t *testing.T) {
-	_, _, err := query.Execute(context.Background(), newClient(t, httptest.NewServer(nil)), aql.Query{})
+	_, _, err := query.Execute(t.Context(), newClient(t, httptest.NewServer(nil)), aql.Query{})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -168,7 +375,7 @@ func TestExecuteAQLError(t *testing.T) {
 	t.Run("default_client_suppresses_phi", func(t *testing.T) {
 		// Default client: WithRawErrorBodies is false (PHI suppressed).
 		c := newClient(t, srv)
-		_, _, err := query.Execute(context.Background(), c, aql.Query{
+		_, _, err := query.Execute(t.Context(), c, aql.Query{
 			Q: "SELECT e/ehr_id/value FROM EHR e",
 		})
 		if err == nil {
@@ -219,7 +426,7 @@ func TestExecuteAQLError(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, _, err = query.Execute(context.Background(), c, aql.Query{
+		_, _, err = query.Execute(t.Context(), c, aql.Query{
 			Q: "SELECT e/ehr_id/value FROM EHR e",
 		})
 		if err == nil {
@@ -286,7 +493,7 @@ func TestExecutePathResolutionError(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, _, err = query.Execute(context.Background(), c, aql.NewQuery("SELECT e FROM EHR e"))
+			_, _, err = query.Execute(t.Context(), c, aql.NewQuery("SELECT e FROM EHR e"))
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -323,7 +530,7 @@ func TestExecutePathResolutionCodeOnly(t *testing.T) {
 			defer srv.Close()
 
 			// Default client: message suppressed (PHI), so only the code is seen.
-			_, _, err := query.Execute(context.Background(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
+			_, _, err := query.Execute(t.Context(), newClient(t, srv), aql.NewQuery("SELECT e FROM EHR e"))
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
@@ -358,7 +565,7 @@ func TestExecuteBuiltQueryEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := query.Execute(context.Background(), newClient(t, srv), built); err != nil {
+	if _, _, err := query.Execute(t.Context(), newClient(t, srv), built); err != nil {
 		t.Fatal(err)
 	}
 	if body["q"] != built.String() {

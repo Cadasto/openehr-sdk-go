@@ -23,6 +23,8 @@ import (
 // because the caller addresses an existing resource by id, not by value.
 type Type string
 
+// The concrete openEHR PARTY resource types, each addressed at its own
+// versioned-CRUD endpoint (/demographic/person, /demographic/organisation, …).
 const (
 	Person       Type = "person"
 	Organisation Type = "organisation"
@@ -105,8 +107,9 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 
 // writeConfig is the resolved option set for Create / Update.
 type writeConfig struct {
-	prefer       transport.Prefer
-	auditDetails *rm.AuditDetails
+	prefer         transport.Prefer
+	auditDetails   *rm.AuditDetails
+	lifecycleState openehrclient.LifecycleState
 }
 
 // WriteOption mutates the request shape for [Create] and [Update].
@@ -122,6 +125,13 @@ func WithPrefer(p transport.Prefer) WriteOption {
 // `openehr-audit-details` header (REQ-059). Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
 	return func(c *writeConfig) { c.auditDetails = a }
+}
+
+// WithLifecycleState sets the committed VERSION's lifecycle_state via the
+// `openehr-version` header (REQ-059). Empty omits the header; an
+// unrecognised code fails the write with [transport.ErrInvalidConfig].
+func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
+	return func(c *writeConfig) { c.lifecycleState = s }
 }
 
 // Create commits a new PARTY. The resource path is derived from party's
@@ -152,6 +162,10 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
 	}
+	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	if err != nil {
+		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               basePath(t),
@@ -159,6 +173,7 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 		Body:               body,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
+		RMVersion:          verHeader,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }
@@ -198,6 +213,10 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
 	}
+	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	if err != nil {
+		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
+	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
 		Path:               basePath(t) + "/" + uidBasedIDPathSegment(string(voID)),
@@ -206,6 +225,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 		IfMatch:            ifMatch,
 		Prefer:             cfg.prefer,
 		AuditDetailsHeader: auditHeader,
+		RMVersion:          verHeader,
 	}
 	return doWrite(ctx, c, req, cfg.prefer)
 }

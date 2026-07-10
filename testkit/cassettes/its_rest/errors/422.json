@@ -1,0 +1,10 @@
+{
+  "message": "Composition does not validate against the operational template",
+  "code": "UNPROCESSABLE_ENTITY",
+  "coded_text": [
+    {
+      "terminology_id": {"value": "openehr"},
+      "code_string": "VALIDATION_FAILED"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ package bmmgen
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -442,7 +442,7 @@ func methodDocBlock(goMethod string, fn *bmm.Function) string {
 			b.WriteString("//\n")
 		}
 		aliases := append([]string(nil), fn.Aliases...)
-		sort.Strings(aliases)
+		slices.Sort(aliases)
 		fmt.Fprintf(&b, "// Aliases: %s (Go does not support operator overloading)\n",
 			strings.Join(aliases, ", "))
 	}

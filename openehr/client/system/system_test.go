@@ -1,7 +1,6 @@
 package system_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -75,15 +74,15 @@ func TestCapabilitiesDecodesCassette(t *testing.T) {
 	defer srv.Close()
 
 	c := newClient(t, srv)
-	caps, meta, err := system.Capabilities(context.Background(), c)
+	caps, meta, err := system.Capabilities(t.Context(), c)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if meta == nil {
 		t.Fatal("expected non-nil metadata")
 	}
-	if captured.Method != http.MethodGet {
-		t.Errorf("method = %q, want GET", captured.Method)
+	if captured.Method != http.MethodOptions {
+		t.Errorf("method = %q, want OPTIONS", captured.Method)
 	}
 	if captured.URL.Path != "/openehr/v1/" {
 		t.Errorf("path = %q, want /openehr/v1/", captured.URL.Path)
@@ -115,7 +114,7 @@ func TestCapabilitiesPreservesExtras(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	caps, _, err := system.Capabilities(context.Background(), newClient(t, srv))
+	caps, _, err := system.Capabilities(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +169,7 @@ func TestVersion(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	v, err := system.Version(context.Background(), newClient(t, srv))
+	v, err := system.Version(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +197,7 @@ func TestCapabilitiesSurfacesWireError(t *testing.T) {
 				_, _ = w.Write([]byte(tc.body))
 			}))
 			defer srv.Close()
-			_, _, err := system.Capabilities(context.Background(), newClient(t, srv))
+			_, _, err := system.Capabilities(t.Context(), newClient(t, srv))
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -219,7 +218,7 @@ func TestCapabilitiesEmptyBodyIsInvalidShape(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 	}))
 	defer srv.Close()
-	_, _, err := system.Capabilities(context.Background(), newClient(t, srv))
+	_, _, err := system.Capabilities(t.Context(), newClient(t, srv))
 	if !errors.Is(err, transport.ErrInvalidShape) {
 		t.Errorf("expected ErrInvalidShape, got %v", err)
 	}
@@ -231,7 +230,7 @@ func TestHealthUp(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	h, err := system.Health(context.Background(), newClient(t, srv))
+	h, err := system.Health(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +250,7 @@ func TestHealthDownOnWireError(t *testing.T) {
 		w.WriteHeader(503)
 	}))
 	defer srv.Close()
-	h, err := system.Health(context.Background(), newClient(t, srv))
+	h, err := system.Health(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatalf("expected wire error to fold into HealthStatus, got err: %v", err)
 	}
@@ -266,21 +265,26 @@ func TestHealthDownOnWireError(t *testing.T) {
 func TestHealthIsAnonymous(t *testing.T) {
 	// Health MUST NOT emit Authorization even when a TokenSource is
 	// configured. Monitoring tools commonly run without credentials.
-	var seenAuth string
+	var seenAuth, seenMethod string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seenAuth = r.Header.Get("Authorization")
+		seenMethod = r.Method
 		_, _ = w.Write([]byte(`{"solution":"x"}`))
 	}))
 	defer srv.Close()
-	c, _ := transport.New(newCatalog(t, srv),
+	c, _ := transport.New(
+		newCatalog(t, srv),
 		transport.WithHTTPClient(srv.Client()),
 		transport.WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "should-not-leak", Type: "Bearer"})),
 	)
-	if _, err := system.Health(context.Background(), c); err != nil {
+	if _, err := system.Health(t.Context(), c); err != nil {
 		t.Fatal(err)
 	}
 	if seenAuth != "" {
 		t.Errorf("Health emitted Authorization = %q (must be anonymous)", seenAuth)
+	}
+	if seenMethod != http.MethodOptions {
+		t.Errorf("Health method = %q, want OPTIONS", seenMethod)
 	}
 }
 
@@ -296,7 +300,7 @@ func TestHealthDownOnNetworkError(t *testing.T) {
 		},
 	})
 	c, _ := transport.New(cat, transport.WithHTTPClient(&http.Client{Timeout: 50 * time.Millisecond}))
-	h, err := system.Health(context.Background(), c)
+	h, err := system.Health(t.Context(), c)
 	if err == nil {
 		t.Fatal("expected network error to surface")
 	}
@@ -313,21 +317,21 @@ func TestRepositoryMirrorsPackageFunctions(t *testing.T) {
 	defer srv.Close()
 	repo := system.NewRepository(newClient(t, srv))
 
-	caps, _, err := repo.Capabilities(context.Background())
+	caps, _, err := repo.Capabilities(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if caps.Solution != "Cadasto" {
 		t.Errorf("Repository.Capabilities Solution = %q", caps.Solution)
 	}
-	v, err := repo.Version(context.Background())
+	v, err := repo.Version(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if v != "1.1.0-development" {
 		t.Errorf("Repository.Version = %q", v)
 	}
-	h, err := repo.Health(context.Background())
+	h, err := repo.Health(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,7 +1,6 @@
 package smart_test
 
 import (
-	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -28,14 +27,14 @@ func TestLaunchContextFromTokenResponse(t *testing.T) {
 		FHIRUser:  "Practitioner/abc",
 		Raw:       map[string]any{"patient": "patient-1"},
 	}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if lc.Patient != "patient-1" || lc.User != "Practitioner/abc" || len(lc.Scopes) != 2 {
 		t.Fatalf("lc = %#v", lc)
 	}
-	ctx := smart.WithLaunchContext(context.Background(), lc)
+	ctx := smart.WithLaunchContext(t.Context(), lc)
 	got, ok := smart.LaunchContextFromContext(ctx)
 	if !ok || got.Patient != "patient-1" {
 		t.Fatalf("context = %#v ok=%v", got, ok)
@@ -76,7 +75,7 @@ func TestLaunchContextValidatesIDToken(t *testing.T) {
 		Scope:       "openid",
 	}
 	lc, err := smart.LaunchContextFromTokenResponse(
-		context.Background(), tr,
+		t.Context(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -114,7 +113,7 @@ func TestValidateIDTokenRejectsExpired(t *testing.T) {
 		"iat": now.Add(-2 * time.Hour).Unix(),
 	}
 	idTok := signJWT(t, priv, "test-kid", claims)
-	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
+	_, err = smart.ValidateIDToken(t.Context(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("err = %v", err)
 	}
@@ -138,7 +137,7 @@ func TestLaunchContextRequiresTrustAnchorsForIDToken(t *testing.T) {
 	})
 	tr := authsmart.TokenResponse{IDToken: idTok}
 
-	_, err = smart.LaunchContextFromTokenResponse(context.Background(), tr, smart.WithJWKS(jwks))
+	_, err = smart.LaunchContextFromTokenResponse(t.Context(), tr, smart.WithJWKS(jwks))
 	if err == nil || !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Fatalf("missing issuer/client_id: err = %v", err)
 	}
@@ -164,7 +163,7 @@ func TestValidateIDTokenRejectsFutureNBF(t *testing.T) {
 		"nbf": now.Add(2 * time.Hour).Unix(),
 	}
 	idTok := signJWT(t, priv, "test-kid", claims)
-	_, err = smart.ValidateIDToken(context.Background(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
+	_, err = smart.ValidateIDToken(t.Context(), idTok, jwks, "https://issuer.example", "c", "", now, nil)
 	if err == nil || !isJWKSFail(err) {
 		t.Fatalf("err = %v", err)
 	}
@@ -178,7 +177,7 @@ func TestPrincipalFromTokenResponseBody(t *testing.T) {
 			"principal_type": "PERSON",
 		},
 	}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +208,7 @@ func TestPrincipalFromCustomClaimNames(t *testing.T) {
 	})
 	tr := authsmart.TokenResponse{IDToken: idTok}
 	lc, err := smart.LaunchContextFromTokenResponse(
-		context.Background(), tr,
+		t.Context(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -248,7 +247,7 @@ func TestPrincipalFromFHIRUserClaimName(t *testing.T) {
 	})
 	tr := authsmart.TokenResponse{IDToken: idTok}
 	lc, err := smart.LaunchContextFromTokenResponse(
-		context.Background(), tr,
+		t.Context(), tr,
 		smart.WithJWKS(jwks),
 		smart.WithIssuer("https://issuer.example"),
 		smart.WithClientID("client-id"),
@@ -265,7 +264,7 @@ func TestPrincipalFromFHIRUserClaimName(t *testing.T) {
 
 func TestPrincipalAbsentWhenNoClaims(t *testing.T) {
 	tr := authsmart.TokenResponse{Patient: "p"}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +281,7 @@ func TestLaunchContextOpenEHRClaims(t *testing.T) {
 		EHRID:       "ehr-1",
 		EpisodeID:   "ep-9",
 	}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,7 +305,7 @@ func TestLaunchContextSMARTCompatExtras(t *testing.T) {
 		NeedPatientBanner: &wantBanner,
 		Tenant:            "tenant-42",
 	}
-	lc, err := smart.LaunchContextFromTokenResponse(context.Background(), tr)
+	lc, err := smart.LaunchContextFromTokenResponse(t.Context(), tr)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ package aom14
 import (
 	"encoding/json"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -82,7 +83,7 @@ type CComplexObjectJSONMarshaller struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Attributes List of constraints on attributes of the reference model type represented by this object.
-	Attributes []CAttribute `json:"attributes,omitempty"`
+	Attributes json.RawMessage `json:"attributes,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for CComplexObject with `_type`
@@ -91,13 +92,17 @@ type CComplexObjectJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *CComplexObject) MarshalJSON() ([]byte, error) {
+	rawAttributes, err := jsonpoly.MarshalSlice(c.Attributes)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CComplexObjectJSONMarshaller{
 		Class:        "C_COMPLEX_OBJECT",
 		AssumedValue: c.AssumedValue,
 		RMTypeName:   c.RMTypeName,
 		Occurrences:  c.Occurrences,
 		NodeID:       c.NodeID,
-		Attributes:   c.Attributes,
+		Attributes:   rawAttributes,
 	})
 }
 
@@ -108,7 +113,7 @@ type CMultipleAttributeJSONMarshaller struct {
 	// Existence Constraint on every attribute, regardless of whether it is singular or of a container type, which indicates whether its target object exists or not (i.e. is mandatory or not).
 	Existence rm.Interval[Integer] `json:"existence"`
 	// Children Child C_OBJECT nodes. Each such node represents a constraint on the type of this attribute in its reference model. Multiples occur both for multiple items in the case of container attributes, and alternatives in the case of singular attributes.
-	Children []CObject `json:"children,omitempty"`
+	Children json.RawMessage `json:"children,omitempty"`
 	// Cardinality Cardinality of this attribute constraint, if it constraints a container attribute.
 	Cardinality Cardinality `json:"cardinality"`
 }
@@ -119,11 +124,15 @@ type CMultipleAttributeJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *CMultipleAttribute) MarshalJSON() ([]byte, error) {
+	rawChildren, err := jsonpoly.MarshalSlice(c.Children)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CMultipleAttributeJSONMarshaller{
 		Class:           "C_MULTIPLE_ATTRIBUTE",
 		RMAttributeName: c.RMAttributeName,
 		Existence:       c.Existence,
-		Children:        c.Children,
+		Children:        rawChildren,
 		Cardinality:     c.Cardinality,
 	})
 }
@@ -140,7 +149,7 @@ type CPrimitiveObjectJSONMarshaller struct {
 	// For C_PRIMITIVE_OBJECTs, it will have the special value Primitive_node_id.
 	NodeID string `json:"node_id"`
 	// Item Object actually defining the constraint.
-	Item CPrimitive `json:"item"`
+	Item json.RawMessage `json:"item"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for CPrimitiveObject with `_type`
@@ -149,13 +158,17 @@ type CPrimitiveObjectJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *CPrimitiveObject) MarshalJSON() ([]byte, error) {
+	rawItem, err := jsonpoly.Marshal(c.Item)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CPrimitiveObjectJSONMarshaller{
 		Class:        "C_PRIMITIVE_OBJECT",
 		AssumedValue: c.AssumedValue,
 		RMTypeName:   c.RMTypeName,
 		Occurrences:  c.Occurrences,
 		NodeID:       c.NodeID,
-		Item:         c.Item,
+		Item:         rawItem,
 	})
 }
 
@@ -166,7 +179,7 @@ type CSingleAttributeJSONMarshaller struct {
 	// Existence Constraint on every attribute, regardless of whether it is singular or of a container type, which indicates whether its target object exists or not (i.e. is mandatory or not).
 	Existence rm.Interval[Integer] `json:"existence"`
 	// Children Child C_OBJECT nodes. Each such node represents a constraint on the type of this attribute in its reference model. Multiples occur both for multiple items in the case of container attributes, and alternatives in the case of singular attributes.
-	Children []CObject `json:"children,omitempty"`
+	Children json.RawMessage `json:"children,omitempty"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for CSingleAttribute with `_type`
@@ -175,11 +188,15 @@ type CSingleAttributeJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (c *CSingleAttribute) MarshalJSON() ([]byte, error) {
+	rawChildren, err := jsonpoly.MarshalSlice(c.Children)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&CSingleAttributeJSONMarshaller{
 		Class:           "C_SINGLE_ATTRIBUTE",
 		RMAttributeName: c.RMAttributeName,
 		Existence:       c.Existence,
-		Children:        c.Children,
+		Children:        rawChildren,
 	})
 }
 

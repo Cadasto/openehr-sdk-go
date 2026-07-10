@@ -161,7 +161,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, tr, err := src.ExchangeAuthorizationCode(context.Background(), "code-xyz", "state-abc", req)
+	tok, tr, err := src.ExchangeAuthorizationCode(t.Context(), "code-xyz", "state-abc", req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestExchangeAndRefresh(t *testing.T) {
 
 	// Force stale and refresh.
 	src.SetTokens(auth.Token{Value: "at-1", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
-	tok2, err := src.Token(context.Background())
+	tok2, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,10 +202,10 @@ func TestJWKSRefreshOnMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	jwks.TTL = time.Hour
-	if _, err := jwks.Key(context.Background(), "key-2026-04"); err != nil {
+	if _, err := jwks.Key(t.Context(), "key-2026-04"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := jwks.Key(context.Background(), "missing-kid"); err == nil {
+	if _, err := jwks.Key(t.Context(), "missing-kid"); err == nil {
 		t.Fatal("expected miss")
 	}
 	if fetches != 2 {
@@ -221,7 +221,7 @@ func TestExchangeRequiresAuthorizationRequest(t *testing.T) {
 	srv := httptest.NewServer(http.NotFoundHandler())
 	defer srv.Close()
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
-	_, _, err := src.ExchangeAuthorizationCode(context.Background(), "code", "", smart.AuthorizationRequest{})
+	_, _, err := src.ExchangeAuthorizationCode(t.Context(), "code", "", smart.AuthorizationRequest{})
 	if !errors.Is(err, auth.ErrInvalidConfig) {
 		t.Fatalf("err = %v, want ErrInvalidConfig (empty-request guard, not state mismatch)", err)
 	}
@@ -249,7 +249,7 @@ func TestExchangeAuthorizationCodeStateMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, exchangeErr := src.ExchangeAuthorizationCode(context.Background(), "code", "WRONG-state", req)
+	_, _, exchangeErr := src.ExchangeAuthorizationCode(t.Context(), "code", "WRONG-state", req)
 	if !errors.Is(exchangeErr, smart.ErrLaunchInvalidState) {
 		t.Fatalf("expected ErrLaunchInvalidState, got %v", exchangeErr)
 	}
@@ -280,7 +280,7 @@ func TestExchangeAuthorizationCodeStateMatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, exchangeErr := src.ExchangeAuthorizationCode(context.Background(), "code", "correct-state", req)
+	tok, _, exchangeErr := src.ExchangeAuthorizationCode(t.Context(), "code", "correct-state", req)
 	if exchangeErr != nil {
 		t.Fatalf("expected no error on state match, got %v", exchangeErr)
 	}
@@ -344,10 +344,10 @@ func TestConcurrentLaunchesDoNotClobberPKCE(t *testing.T) {
 	if reqA.PKCE.Verifier == reqB.PKCE.Verifier {
 		t.Fatal("expected distinct verifiers")
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-a", reqA.State, reqA); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-a", reqA.State, reqA); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-b", reqB.State, reqB); err != nil {
+	if _, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-b", reqB.State, reqB); err != nil {
 		t.Fatal(err)
 	}
 	if len(seen) != 2 || seen[0] != reqA.PKCE.Verifier || seen[1] != reqB.PKCE.Verifier {
@@ -405,7 +405,7 @@ func TestExchangeWithPrivateKeyJWT(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-1", "state-pkjwt", req)
+	tok, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-1", "state-pkjwt", req)
 	if err != nil {
 		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
 	}
@@ -519,7 +519,7 @@ func TestExchangeWithClientSecretBasic(t *testing.T) { // REQ-068
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-sym", "state-sym", req)
+	tok, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-sym", "state-sym", req)
 	if err != nil {
 		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
 	}
@@ -616,7 +616,7 @@ func TestExchangeWithClientSecretPost(t *testing.T) { // REQ-068
 	if err != nil {
 		t.Fatal(err)
 	}
-	tok, _, err := src.ExchangeAuthorizationCode(context.Background(), "code-post", "state-post", req)
+	tok, _, err := src.ExchangeAuthorizationCode(t.Context(), "code-post", "state-post", req)
 	if err != nil {
 		t.Fatalf("ExchangeAuthorizationCode error = %v", err)
 	}
@@ -731,7 +731,7 @@ func TestTokenStaleWithoutRefreshDoesNotDeadlock(t *testing.T) {
 	// deadlocking on concurrent calls.
 	src.SetTokens(auth.Token{Value: "cached", Type: "Bearer", ExpiresAt: time.Now().Add(10 * time.Second)}, "")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 	defer cancel()
 	done := make(chan struct{})
 	go func() {
@@ -757,7 +757,7 @@ func TestTokenExpiredWithoutRefreshReturnsReauthRequired(t *testing.T) { // REQ-
 	src, _ := smart.New("c", testAuthEndpoints(srv), smart.WithHTTPClient(srv.Client()), smart.WithRedirectURI("https://cb"))
 	src.SetTokens(auth.Token{Value: "stale", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "")
 
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if !errors.Is(err, auth.ErrReauthRequired) {
 		t.Fatalf("Token() err = %v, want ErrReauthRequired", err)
 	}
@@ -799,7 +799,7 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
 
 		// First call: should hit the endpoint, get 400 invalid_grant, classify as terminal.
-		_, firstErr := src.Token(context.Background())
+		_, firstErr := src.Token(t.Context())
 		if !errors.Is(firstErr, auth.ErrReauthRequired) {
 			t.Fatalf("Token() after terminal refresh failure: got %v, want ErrReauthRequired", firstErr)
 		}
@@ -809,7 +809,7 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 
 		// Second call: refresh token should be cleared — must return ErrReauthRequired
 		// immediately without a second endpoint call.
-		_, secondErr := src.Token(context.Background())
+		_, secondErr := src.Token(t.Context())
 		if !errors.Is(secondErr, auth.ErrReauthRequired) {
 			t.Fatalf("second Token() after terminal: got %v, want ErrReauthRequired", secondErr)
 		}
@@ -836,14 +836,14 @@ func TestRefreshFailureClearsRefreshTokenOnlyWhenTerminal(t *testing.T) { // REQ
 		}
 		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
 
-		_, firstErr := src.Token(context.Background())
+		_, firstErr := src.Token(t.Context())
 		if !errors.Is(firstErr, auth.ErrRefreshFailed) {
 			t.Fatalf("Token() after 503: got %v, want ErrRefreshFailed", firstErr)
 		}
 		// s.cur and s.refresh are both retained after a transient failure — no
 		// re-seed needed. A second Token() call must use the retained refresh
 		// token and hit the endpoint again (proving s.refresh was not cleared).
-		_, _ = src.Token(context.Background())
+		_, _ = src.Token(t.Context())
 		if calls != 2 {
 			t.Fatalf("expected 2 endpoint calls (refresh retained and reused), got %d", calls)
 		}
@@ -875,7 +875,7 @@ func TestRefreshIfNeeded(t *testing.T) { // REQ-063
 		// Seed a non-stale token (expires well in the future).
 		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "rt-1")
 
-		if err := src.RefreshIfNeeded(context.Background()); err != nil {
+		if err := src.RefreshIfNeeded(t.Context()); err != nil {
 			t.Fatalf("RefreshIfNeeded on fresh token: %v", err)
 		}
 		if calls != 0 {
@@ -902,7 +902,7 @@ func TestRefreshIfNeeded(t *testing.T) { // REQ-063
 		}
 		src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(-time.Minute)}, "rt-1")
 
-		if err := src.RefreshIfNeeded(context.Background()); err != nil {
+		if err := src.RefreshIfNeeded(t.Context()); err != nil {
 			t.Fatalf("RefreshIfNeeded on stale token: %v", err)
 		}
 		if calls != 1 {
@@ -944,7 +944,7 @@ func TestRefreshThresholdConfigurable(t *testing.T) { // REQ-063
 	// under the 2-minute threshold we configured.
 	src.SetTokens(auth.Token{Value: "at", Type: "Bearer", ExpiresAt: time.Now().Add(90 * time.Second)}, "rt-1")
 
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token() = %v", err)
 	}
@@ -987,14 +987,14 @@ func TestSourceReauthForcesRefresh(t *testing.T) { // REQ-063
 	src.SetTokens(auth.Token{Value: "at-old", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "rt-1")
 
 	// Reauth must ignore freshness and force a refresh POST.
-	if err := src.Reauth(context.Background()); err != nil {
+	if err := src.Reauth(t.Context()); err != nil {
 		t.Fatalf("Reauth: %v", err)
 	}
 	if calls != 1 {
 		t.Fatalf("expected 1 endpoint call from Reauth, got %d", calls)
 	}
 	// After Reauth, Token() should return the new token without another call.
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token() after Reauth: %v", err)
 	}
@@ -1025,11 +1025,11 @@ func TestSourceReauthNoRefreshTokenKeepsValidToken(t *testing.T) { // REQ-063
 	// Still-valid token, no refresh_token.
 	src.SetTokens(auth.Token{Value: "at-valid", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "")
 
-	if err := src.Reauth(context.Background()); !errors.Is(err, auth.ErrReauthRequired) {
+	if err := src.Reauth(t.Context()); !errors.Is(err, auth.ErrReauthRequired) {
 		t.Fatalf("Reauth err = %v, want ErrReauthRequired", err)
 	}
 	// The still-valid cached token must survive — Token() returns it as-is.
-	tok, err := src.Token(context.Background())
+	tok, err := src.Token(t.Context())
 	if err != nil {
 		t.Fatalf("Token() after Reauth: %v", err)
 	}

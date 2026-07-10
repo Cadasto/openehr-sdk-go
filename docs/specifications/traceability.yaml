@@ -55,7 +55,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-052
     status: draft
     implementation: landed
-    packages: [openehr/serialize/canjson, testkit/cassettes, testkit/fixtures]
+    packages: [openehr/serialize/canjson, openehr/internal/jsonpoly, testkit/cassettes, testkit/fixtures]
     plans: [docs/plans/archive/2026-05-15-canonical-json-serialization.md, docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md]
     probes: [PROBE-030, PROBE-031, PROBE-038]
     adrs: [docs/adr/0004-numeric-wire-tolerance.md]
@@ -63,6 +63,8 @@ requirements:
       - openehr/serialize/canjson/encode_test.go
       - openehr/serialize/canjson/roundtrip_test.go
       - openehr/serialize/canjson/polymorphic_decode_test.go
+      - openehr/serialize/canjson/polymorphic_encode_test.go
+      - openehr/internal/jsonpoly/jsonpoly_test.go
       - testkit/probes/serialize/probe_030_canjson_round_trip.go
       - testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go
 
@@ -252,11 +254,20 @@ requirements:
     canonical: docs/specifications/wire.md#req-059
     status: draft
     implementation: partial
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/itemtags, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/demographic]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
+    notes: >-
+      PROBE-062 (dotted openehr-audit-details round-trip) is registered in
+      conformance.md as Draft; encoder + write-path wire coverage via audit_test
+      and composition/directory tests. Full probe implementation deferred per
+      STRAND-09 until REQ-082 sandbox gate — not listed under probes: while Draft.
     tests:
       - openehr/client/ehr/itemtag_wire_test.go
       - openehr/client/ehr/itemtags/itemtags_test.go
+      - openehr/client/ehr/audit_test.go
+      - openehr/client/ehr/version_header_test.go
+      - openehr/client/ehr/composition/composition_test.go
+      - openehr/client/ehr/directory/directory_test.go
       - transport/response_test.go
 
   - id: REQ-090
@@ -289,7 +300,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/query]
-    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md]
+    plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
+    notes: ErrUnprocessable (422) sentinel added by the ITS-REST conformance remediation.
     tests:
       - transport/client_test.go
 
@@ -320,6 +332,7 @@ requirements:
     implementation: partial
     packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution]
     probes: [PROBE-072]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
@@ -355,6 +368,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
+    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go
 
@@ -635,6 +649,9 @@ requirements:
       - openehr/validation/constraint_cassettes_test.go
       - openehr/instance/instance_test.go
       - openehr/instance/gap12_test.go
+      - openehr/instance/gap13_test.go
+      - openehr/instance/gap14_test.go
+      - openehr/instance/sample_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/imports_test.go
       - internal/templateinstance/rmwrite/write_test.go
@@ -682,6 +699,7 @@ requirements:
     probes: [PROBE-025, PROBE-026]
     tests:
       - openehr/validation/composition_test.go
+      - openehr/validation/interval_bounds_test.go
       - openehr/validation/rmread/read_test.go
       - testkit/probes/validation/probes_test.go
     plans:
@@ -742,6 +760,78 @@ requirements:
       - cmd/examples/template-explore/main.go
     plans:
       - docs/plans/archive/2026-06-17-public-compiled-template-bridge.md
+
+  - id: REQ-112
+    title: Template-less Reference Model validation floor
+    canonical: docs/specifications/clinical-modeling.md#req-112--template-less-reference-model-validation-floor
+    status: draft
+    # ValidateRM (+ typed sugars for FOLDER / EHR_STATUS / EHR_ACCESS /
+    # demographic PARTY) walks an RM root with rminfo as the sole driver —
+    # no compiled OPT. Enforces RM-mandatory attribute presence + a small
+    # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
+    # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
+    # type/namespace). Driver is a second walker alongside REQ-102/110;
+    # closed-RM-set helpers (rmTypeInfo / rmread) are shared. SDK-GAP-15.
+    implementation: landed
+    packages:
+      - openehr/validation
+      - openehr/rm/rminfo  # AttributeNames added to Lookup
+    # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
+    # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
+    # first-cycle catalogue (required-set absence + the four named
+    # leaf invariants). PROBE-081 (SDK-GAP-18) covers value-typed
+    # mandatory presence — EHR_STATUS.subject — decided from JSON-key
+    # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
+    # inline by rmfloor_bytes_test.go.
+    probes: [PROBE-081]
+    tests:
+      - openehr/validation/rmfloor_test.go
+      - openehr/validation/rmfloor_bytes_test.go
+    plans:
+      - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
+
+  - id: REQ-113
+    title: Execution-oriented parsed AQL AST
+    canonical: docs/specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast
+    status: draft
+    # ParseQuery + Document.Query expose a stable, generated-type-free
+    # structured AQL AST (parse.Query) — the read-side mirror of
+    # aql.Builder. SELECT items / FROM containment tree / WHERE
+    # expression tree / ORDER BY / LIMIT / OFFSET, populated from the
+    # validated ANTLR tree (parse/gen) via the private extractor.
+    # WhereExpr + Value vocabulary is SHARED with the construction side:
+    # parse populates the same Comparison/Junction/NotExpr/ExistsExpr/
+    # MatchesExpr/LikeExpr/ParamValue/StringValue/IntValue/RealValue/
+    # BoolValue/NullValue the Builder constructs. (*Query).Emit +
+    # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
+    # property) is carried inline by openehr/aql/parse/roundtrip_test.go
+    # — 34 idempotence cases plus 11 canonical-input preservation cases
+    # across the v1 catalogue, plus a 10-case incomplete-AST suite
+    # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
+    # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
+    # the trust-model surface. Tier 1 — Document.Tree — exposes the
+    # validated ANTLR tree as a cheap interim (unstable consumer
+    # contract; marked // Deprecated:). SDK-GAP-17.
+    # SDK-GAP-19: the standing class predicate (ClassExpr.PredicateComparison)
+    # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
+    # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
+    # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
+    # aliases. PROBE-082 pins it inline in structured_test.go.
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/parse
+    probes:
+      - PROBE-080
+      - PROBE-082
+    tests:
+      - openehr/aql/introspect_test.go
+      - openehr/aql/parse/parse_test.go
+      - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/structured_test.go
+      - openehr/aql/parse/roundtrip_test.go
+    plans:
+      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation

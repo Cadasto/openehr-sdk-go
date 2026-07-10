@@ -10,48 +10,86 @@ import (
 // or [Bool]. Caller-supplied data MUST flow through [Param] (or a literal
 // constructor), never by interpolating into a path string — this is the AQL
 // injection guard (REQ-055).
+//
+// Parsed queries populate the same concrete types ([ParamValue] /
+// [StringValue] / [IntValue] / [RealValue] / [BoolValue] / [NullValue])
+// — the read AST and the write AST share one vocabulary (REQ-113 /
+// SDK-GAP-17). Concrete-type fields are intended for read access;
+// mutating a value already embedded in a [WhereExpr] passed to
+// [FormatWhere] / [Builder.Build] is undefined.
 type Value interface {
 	// token is the canonical wire form: `$name` for a parameter, an escaped
 	// literal otherwise.
 	token() string
 }
 
-type paramValue struct{ name string }
+// ParamValue is a named placeholder. Name is the placeholder identifier
+// WITHOUT the leading `$` (e.g. `ehr_id`, not `$ehr_id`); the emitter
+// re-attaches the dollar on the wire. Bind via [Builder.Bind] or set
+// [Query.Parameters] directly.
+type ParamValue struct {
+	Name string
+}
 
-func (p paramValue) token() string { return "$" + p.name }
+func (p ParamValue) token() string { return "$" + p.Name }
 
-// Param is a named placeholder. It emits `$name`; supply the bound value via
-// [Builder.Bind] (or set [Query.Parameters] directly).
-func Param(name string) Value { return paramValue{name: strings.TrimPrefix(name, "$")} }
+// Param constructs a [ParamValue] for the named placeholder. A leading
+// `$` in name is stripped — `Param("$ehr_id")` and `Param("ehr_id")`
+// produce the same value.
+func Param(name string) Value { return ParamValue{Name: strings.TrimPrefix(name, "$")} }
 
-type stringValue struct{ s string }
+// StringValue is a string literal. Use [Param] for caller-supplied data;
+// reaching for a literal directly is only safe for compile-time constants.
+type StringValue struct {
+	S string
+}
 
 // token quotes the string as an AQL literal, doubling embedded single quotes.
-func (v stringValue) token() string { return "'" + strings.ReplaceAll(v.s, "'", "''") + "'" }
+func (v StringValue) token() string { return "'" + strings.ReplaceAll(v.S, "'", "''") + "'" }
 
-// String is a string literal. Prefer [Param] for caller-supplied data.
-func String(s string) Value { return stringValue{s: s} }
+// String constructs a [StringValue]. Prefer [Param] for caller-supplied data.
+func String(s string) Value { return StringValue{S: s} }
 
-type intValue struct{ n int64 }
+// IntValue is an integer literal.
+type IntValue struct {
+	N int64
+}
 
-func (v intValue) token() string { return strconv.FormatInt(v.n, 10) }
+func (v IntValue) token() string { return strconv.FormatInt(v.N, 10) }
 
-// Int is an integer literal.
-func Int(n int64) Value { return intValue{n: n} }
+// Int constructs an [IntValue].
+func Int(n int64) Value { return IntValue{N: n} }
 
-type realValue struct{ f float64 }
+// RealValue is a floating-point literal. The emitter uses decimal ('f')
+// notation — never scientific ('g'/'e') — since the latter is not
+// universally accepted as an AQL REAL literal by all backends.
+type RealValue struct {
+	F float64
+}
 
 // token uses 'f' (decimal) notation, never 'g'/'e' — scientific notation
 // (1e+20) is not universally accepted as an AQL REAL literal, and the typed
 // builders must not emit anything a backend could reject syntactically.
-func (v realValue) token() string { return strconv.FormatFloat(v.f, 'f', -1, 64) }
+func (v RealValue) token() string { return strconv.FormatFloat(v.F, 'f', -1, 64) }
 
-// Real is a floating-point literal.
-func Real(f float64) Value { return realValue{f: f} }
+// Real constructs a [RealValue].
+func Real(f float64) Value { return RealValue{F: f} }
 
-type boolValue struct{ b bool }
+// BoolValue is a boolean literal.
+type BoolValue struct {
+	B bool
+}
 
-func (v boolValue) token() string { return strconv.FormatBool(v.b) }
+func (v BoolValue) token() string { return strconv.FormatBool(v.B) }
 
-// Bool is a boolean literal.
-func Bool(b bool) Value { return boolValue{b: b} }
+// Bool constructs a [BoolValue].
+func Bool(b bool) Value { return BoolValue{B: b} }
+
+// NullValue is the AQL `NULL` literal. The token form is the bare keyword
+// (no quoting) — distinguishing it from a [StringValue] carrying "NULL".
+type NullValue struct{}
+
+func (NullValue) token() string { return "NULL" }
+
+// Null is the AQL NULL literal as a [Value].
+func Null() Value { return NullValue{} }

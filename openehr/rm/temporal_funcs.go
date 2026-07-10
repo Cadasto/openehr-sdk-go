@@ -463,7 +463,7 @@ func parseDuration(s string) (durationParts, error) {
 	s = s[1:]
 	inTime := false
 	num := ""
-	any := false
+	sawComponent := false
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		switch {
@@ -506,12 +506,12 @@ func parseDuration(s string) (durationParts, error) {
 		default:
 			return p, fmt.Errorf("bad duration designator %q in %q", string(c), s)
 		}
-		any = true
+		sawComponent = true
 	}
 	if num != "" {
 		return p, fmt.Errorf("dangling number in duration %q", s)
 	}
-	if !any {
+	if !sawComponent {
 		return p, fmt.Errorf("empty duration %q", s)
 	}
 	return p, nil

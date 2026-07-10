@@ -8,7 +8,7 @@ Authoritative package taxonomy, dependency rules, and versioning policy for `git
 
 The module path is **`github.com/cadasto/openehr-sdk-go`** (REQ-001). The path is all lowercase, matching idiomatic Go module naming and the GitHub organisation login; consumer imports MUST use this exact spelling.
 
-The module is licensed **MIT** (REQ-003) and targets **Go 1.25.x** (REQ-002), tracking the N-1 release line per the Go team's support policy.
+The module is licensed **MIT** (REQ-003) and targets **Go 1.26.x** (REQ-002), tracking the current stable Go release line (N) as a deliberate project policy.
 
 ## Package taxonomy
 
@@ -146,9 +146,11 @@ Imports between SDK packages **MUST** flow strictly downward through the depende
 
 `openehr/client/admin/` **MUST** expose typed package-level functions for the ITS-REST `/admin/*` housekeeping endpoints that deployments commonly ship for test setup/teardown:
 
-- `DeleteEHR(ctx, c, ehrID) error` — admin-mode delete (404 surfaces as `transport.ErrNotFound`).
-- `DeleteAllEHRs(ctx, c) error` — wholesale reset (deployments **MAY** disable; failures surface as the typed wire error).
-- `PurgeTemplates(ctx, c) error` — clear the template registry.
+- `DeleteEHR(ctx, c, ehrID) error` — admin-mode delete on `DELETE /admin/ehr/{ehr_id}` (404 surfaces as `transport.ErrNotFound`).
+- `DeleteAllEHRs(ctx, c, ...) error` — wholesale reset on `DELETE /admin/ehr/all` (the literal `/all` segment per `resources/its-rest/admin-validation.openapi.yaml` line 78), with the optional repeatable `ehr_id` subset query parameter; deployments **MAY** disable it (failures surface as the typed wire error).
+- `PurgeTemplates(ctx, c) error` — clear the template registry. This is **not** part of the ITS-REST Admin contract (which defines only `/admin/ehr/{ehr_id}` and `/admin/ehr/all`); it is an EHRbase-specific extension (`DELETE admin/template/all`, `deleteAllTemplates`) and **MUST** be documented as such on its godoc rather than presented as ITS-REST-conformant.
+
+The Admin API is upstream `x-status: DEVELOPMENT`; this client therefore ships as **Draft** and **MAY** change between minor versions.
 
 The package **MUST** mirror the `Repository` pattern used by `openehr/client/ehr/*` so it composes with the dependency-injection seams in REQ-023. The Cadasto admin extras (`cadasto/admin/`) **MUST NOT** be conflated with this surface — they target distinct endpoint families and the module-layout cut line under `cadasto/` (REQ-010, REQ-011) keeps them separated.
 

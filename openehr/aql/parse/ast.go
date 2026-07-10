@@ -5,6 +5,7 @@ import (
 
 	"github.com/antlr4-go/antlr/v4"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse/gen"
 )
 
@@ -66,33 +67,40 @@ type ClassExpr struct {
 	// or a version predicate. Distinguishes an identifiable EHR/VERSION root
 	// from a bare one.
 	HasPredicate bool
+	// Predicate is the raw text inside the class predicate brackets when
+	// HasPredicate is true and the predicate is NOT a literal archetype HRID
+	// (which lives on [Archetype]) or a `$param` archetype (signalled by
+	// [ParamArchetype]). Carries standing predicates such as
+	// `ehr_id/value=$x` so the emitter can round-trip them — brackets
+	// stripped, content verbatim from the source.
+	Predicate string
+	// PredicateComparison is the standing class predicate parsed as a
+	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
+	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary
+	// (SDK-GAP-19). Non-nil only when the predicate is a simple comparison;
+	// nil for an archetype HRID (see [Archetype]), a version predicate, or
+	// a non-scalar / complex standing predicate — the verbatim [Predicate]
+	// text stays authoritative there. The comparison's Path is the relative
+	// object path as written; its ParsedPath is not populated (a class
+	// predicate path is relative, with no alias to structure).
+	PredicateComparison *aql.Comparison
 	// Pos is the source position of the class expression.
 	Pos Position
 }
 
-// PathSegment is one step of an identified path: an attribute name and an
-// optional predicate (the raw text inside `[...]`, brackets stripped — e.g.
-// "at0001" or "name/value='Systolic'").
-type PathSegment struct {
-	Name      string
-	Predicate string
-}
+// PathSegment is one step of an identified path — re-exported from
+// [aql.PathSegment], the shared path vocabulary (SDK-GAP-19).
+type PathSegment = aql.PathSegment
 
 // IdentifiedPath is an alias-qualified path referenced in SELECT, WHERE, or
-// ORDER BY (e.g. `o/data[at0001]/events[at0006]/value/magnitude`). The leading
-// IDENTIFIER is the alias (root binding into the FROM / CONTAINS tree); the
-// remaining steps are Segments.
+// ORDER BY (e.g. `o/data[at0001]/events[at0006]/value/magnitude`). It embeds
+// the shared [aql.IdentifiedPath] (Alias / Predicate / Segments / Raw) — the
+// same structured type an [aql.Comparison] carries on the WHERE side, without
+// a package cycle (SDK-GAP-19) — and adds the parse-only Clause and source
+// Position. The embedded fields (Alias, Segments, …) are promoted, so
+// existing field access is unchanged.
 type IdentifiedPath struct {
-	// Alias is the root binding (e.g. "o"); it MUST resolve to a
-	// FROM / CONTAINS [ClassExpr.Alias].
-	Alias string
-	// Predicate is a predicate applied directly to the alias root
-	// (`o[...]/...`), brackets stripped; "" in the common case.
-	Predicate string
-	// Segments are the path steps after the alias, in order.
-	Segments []PathSegment
-	// Raw is the whitespace-collapsed source text of the whole path.
-	Raw string
+	aql.IdentifiedPath
 	// Clause is the enclosing top-level clause.
 	Clause Clause
 	// Pos is the source position of the path.
@@ -120,6 +128,15 @@ func (d *Document) extract() {
 	d.Params = ex.params
 }
 
+// EnterClassExpression populates [Document.Classes]. Keep in lockstep
+// with the structured extractor's extractClassExprOperand
+// (extract_query.go) so a consumer reading the flat lint view and the
+// structured Query sees identical raw [ClassExpr] fields for the same
+// source — RMType / Alias / Archetype / Predicate / HasPredicate,
+// including the standing-predicate body and the param-archetype
+// placeholder name carried verbatim in Archetype. The structured
+// extractor additionally populates [ClassExpr.PredicateComparison],
+// which this flat lint view intentionally omits.
 func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	ce := ClassExpr{Pos: posOf(c.GetStart())}
 	if ids := c.AllIDENTIFIER(); len(ids) > 0 {
@@ -130,12 +147,17 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 	}
 	if pp := c.PathPredicate(); pp != nil {
 		ce.HasPredicate = true
-		if ap := pp.ArchetypePredicate(); ap != nil {
+		switch {
+		case pp.ArchetypePredicate() != nil:
+			ap := pp.ArchetypePredicate()
 			if hrid := ap.ARCHETYPE_HRID(); hrid != nil {
 				ce.Archetype = hrid.GetText()
-			} else if ap.PARAMETER() != nil {
+			} else if p := ap.PARAMETER(); p != nil {
+				ce.Archetype = p.GetText()
 				ce.ParamArchetype = true
 			}
+		default:
+			ce.Predicate = trimBrackets(pp.GetText())
 		}
 	}
 	e.classes = append(e.classes, ce)
@@ -146,18 +168,16 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 	if v := c.GetVariable(); v != nil {
 		ce.Alias = v.GetText()
 	}
-	if c.VersionPredicate() != nil {
+	if vp := c.VersionPredicate(); vp != nil {
 		ce.HasPredicate = true
+		ce.Predicate = trimBrackets(vp.GetText())
 	}
 	e.classes = append(e.classes, ce)
 }
 
 func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
-	ip := IdentifiedPath{
-		Raw:    c.GetText(),
-		Pos:    posOf(c.GetStart()),
-		Clause: clauseOf(c),
-	}
+	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clauseOf(c)}
+	ip.Raw = c.GetText()
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}

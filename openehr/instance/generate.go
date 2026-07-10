@@ -59,6 +59,9 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 		compiled: c,
 		opts:     opts,
 	}
+	if opts.ValueFill == RandomFill {
+		g.valueSampler = newSampler(opts.ValueSource)
+	}
 
 	root, err := rmwrite.NewRM(rootType)
 	if err != nil {
@@ -88,6 +91,10 @@ func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (a
 type generator struct {
 	compiled *templatecompile.Compiled
 	opts     Options
+	// valueSampler draws in-constraint leaf values when opts.ValueFill
+	// is RandomFill; the zero value (used under ExampleFill) is never
+	// consulted. SDK-GAP-14.
+	valueSampler sampler
 }
 
 // nextUID returns the next LOCATABLE.uid pointer. Honours
@@ -727,6 +734,11 @@ func (g *generator) applyPrimitiveExample(
 	pc constraints.PrimitiveConstraint,
 ) error {
 	ex := pc.ExampleValue()
+	if g.opts.ValueFill == RandomFill {
+		// In-constraint sampled value (valid by construction); same Go
+		// shape as ExampleValue so the switch below is unchanged. SDK-GAP-14.
+		ex = sampleValue(pc, g.valueSampler)
+	}
 	switch v := rmValue.(type) {
 	case *rm.DVQuantity:
 		q, ok := ex.(constraints.QuantityValue)

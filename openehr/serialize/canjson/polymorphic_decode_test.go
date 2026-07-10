@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
-	"sort"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -88,7 +88,7 @@ func collectDiscriminators(t *testing.T, b []byte) map[string]int {
 			for k := range tt {
 				keys = append(keys, k)
 			}
-			sort.Strings(keys)
+			slices.Sort(keys)
 			for _, k := range keys {
 				walk(tt[k])
 			}

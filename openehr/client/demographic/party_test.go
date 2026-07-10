@@ -1,7 +1,6 @@
 package demographic_test
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -102,7 +101,7 @@ func TestGetDecodesEachPartyType(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			got, _, err := demographic.Get(context.Background(), newClient(t, srv),
+			got, _, err := demographic.Get(t.Context(), newClient(t, srv),
 				tc.typ, openehrclient.LatestOf(personVOID))
 			if err != nil {
 				t.Fatal(err)
@@ -129,7 +128,7 @@ func TestGetSendsVersionMetadata(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, meta, err := demographic.Get(context.Background(), newClient(t, srv),
+	_, meta, err := demographic.Get(t.Context(), newClient(t, srv),
 		demographic.Person, openehrclient.LatestOf(personVOID))
 	if err != nil {
 		t.Fatal(err)
@@ -165,7 +164,7 @@ func TestCreateRoutesByConcreteType(t *testing.T) {
 			}))
 			defer srv.Close()
 
-			if _, _, err := demographic.Create(context.Background(), newClient(t, srv), tc.party); err != nil {
+			if _, _, err := demographic.Create(t.Context(), newClient(t, srv), tc.party); err != nil {
 				t.Fatal(err)
 			}
 			if captured.Method != http.MethodPost {
@@ -188,7 +187,7 @@ func TestCreatePreferRepresentation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := demographic.Create(context.Background(), newClient(t, srv),
+	got, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
 		demographic.WithPrefer(transport.PreferRepresentation))
 	if err != nil {
@@ -210,7 +209,7 @@ func TestCreatePreferMinimalNoBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := demographic.Create(context.Background(), newClient(t, srv),
+	got, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Organisation{Name: rm.DVText{Value: "Acme"}})
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +231,7 @@ func TestCreatePreferIdentifier(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := demographic.Create(context.Background(), newClient(t, srv),
+	got, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
 		demographic.WithPrefer(transport.PreferIdentifier))
 	if err != nil {
@@ -247,7 +246,7 @@ func TestCreatePreferIdentifier(t *testing.T) {
 }
 
 func TestCreateNilParty(t *testing.T) {
-	_, _, err := demographic.Create(context.Background(), nil, nil)
+	_, _, err := demographic.Create(t.Context(), nil, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("nil Party: err = %v, want ErrInvalidConfig", err)
 	}
@@ -262,7 +261,7 @@ func TestUpdateRoutesAndSendsIfMatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := demographic.Update(context.Background(), newClient(t, srv),
+	_, _, err := demographic.Update(t.Context(), newClient(t, srv),
 		demographic.Person, personVOID, personVersion, &rm.Person{Name: rm.DVText{Value: "Jane Roe"}})
 	if err != nil {
 		t.Fatal(err)
@@ -279,7 +278,7 @@ func TestUpdateRoutesAndSendsIfMatch(t *testing.T) {
 }
 
 func TestUpdateRequiresIfMatch(t *testing.T) {
-	_, _, err := demographic.Update(context.Background(), nil,
+	_, _, err := demographic.Update(t.Context(), nil,
 		demographic.Person, personVOID, "", &rm.Person{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("empty If-Match: err = %v, want ErrInvalidConfig", err)
@@ -295,7 +294,7 @@ func TestUpdatePreconditionFailed(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, meta, err := demographic.Update(context.Background(), newClient(t, srv),
+	_, meta, err := demographic.Update(t.Context(), newClient(t, srv),
 		demographic.Person, personVOID, "stale::v::1", &rm.Person{Name: rm.DVText{Value: "x"}})
 	if !errors.Is(err, transport.ErrPreconditionFailed) {
 		t.Fatalf("err = %v, want ErrPreconditionFailed", err)
@@ -313,7 +312,7 @@ func TestDeleteRoutesAndSendsIfMatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := demographic.Delete(context.Background(), newClient(t, srv),
+	_, err := demographic.Delete(t.Context(), newClient(t, srv),
 		demographic.Person, personVersion, personVersion)
 	if err != nil {
 		t.Fatal(err)
@@ -337,7 +336,7 @@ func TestDeleteVersionConflict(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, err := demographic.Delete(context.Background(), newClient(t, srv),
+	_, err := demographic.Delete(t.Context(), newClient(t, srv),
 		demographic.Person, personVersion, personVersion)
 	if !errors.Is(err, transport.ErrVersionConflict) {
 		t.Fatalf("err = %v, want ErrVersionConflict", err)
@@ -345,7 +344,7 @@ func TestDeleteVersionConflict(t *testing.T) {
 }
 
 func TestGetInvalidType(t *testing.T) {
-	_, _, err := demographic.Get(context.Background(), nil,
+	_, _, err := demographic.Get(t.Context(), nil,
 		demographic.Type("widget"), openehrclient.LatestOf(personVOID))
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("invalid type: err = %v, want ErrInvalidConfig", err)
@@ -353,14 +352,14 @@ func TestGetInvalidType(t *testing.T) {
 }
 
 func TestGetRejectsNilRef(t *testing.T) {
-	_, _, err := demographic.Get(context.Background(), nil, demographic.Person, nil)
+	_, _, err := demographic.Get(t.Context(), nil, demographic.Person, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("nil Ref: err = %v, want ErrInvalidConfig", err)
 	}
 }
 
 func TestUpdateRejectsNilParty(t *testing.T) {
-	_, _, err := demographic.Update(context.Background(), nil,
+	_, _, err := demographic.Update(t.Context(), nil,
 		demographic.Person, personVOID, personVersion, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Fatalf("nil Party: err = %v, want ErrInvalidConfig", err)
@@ -381,7 +380,7 @@ func TestGetAtTimeNoVersion(t *testing.T) {
 	defer srv.Close()
 
 	at := time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC)
-	got, meta, err := demographic.Get(context.Background(), newClient(t, srv),
+	got, meta, err := demographic.Get(t.Context(), newClient(t, srv),
 		demographic.Person, openehrclient.LatestAtTime(personVOID, at))
 	if err != nil {
 		t.Fatalf("204 read: unexpected error %v", err)
@@ -406,7 +405,7 @@ func TestGetEmptyBodyAnomaly(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := demographic.Get(context.Background(), newClient(t, srv),
+	_, _, err := demographic.Get(t.Context(), newClient(t, srv),
 		demographic.Person, openehrclient.LatestOf(personVOID))
 	if !errors.Is(err, transport.ErrInvalidShape) {
 		t.Fatalf("empty 200 read: err = %v, want ErrInvalidShape", err)
@@ -425,7 +424,7 @@ func TestGetSpecificVersion(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, _, err := demographic.Get(context.Background(), newClient(t, srv),
+	if _, _, err := demographic.Get(t.Context(), newClient(t, srv),
 		demographic.Person, openehrclient.VersionOf(personVersion)); err != nil {
 		t.Fatal(err)
 	}
@@ -463,13 +462,16 @@ func TestCreateSendsAuditAndPreferHeaders(t *testing.T) {
 		},
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
-	if _, _, err := demographic.Create(context.Background(), newClient(t, srv),
+	if _, _, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
-		demographic.WithAuditDetails(audit)); err != nil {
+		demographic.WithAuditDetails(audit), demographic.WithLifecycleState("532")); err != nil {
 		t.Fatal(err)
 	}
-	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `system_id="cdr.example"`) {
 		t.Errorf("openehr-audit-details header = %q", h)
+	}
+	if h := captured.Header.Get("openehr-version"); h != `lifecycle_state.code_string="532"` {
+		t.Errorf("openehr-version header = %q, want lifecycle_state.code_string=\"532\"", h)
 	}
 	if h := captured.Header.Get("Prefer"); h != "return=minimal" {
 		t.Errorf("Prefer = %q, want return=minimal", h)
@@ -489,7 +491,7 @@ func TestCreatePreferRepresentationEmptyBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, meta, err := demographic.Create(context.Background(), newClient(t, srv),
+	_, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
 		demographic.WithPrefer(transport.PreferRepresentation))
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -521,12 +523,12 @@ func TestDeleteSendsAuditDetails(t *testing.T) {
 		},
 		TimeCommitted: rm.DVDateTime{Value: "2026-05-17T10:00:00Z"},
 	}
-	if _, err := demographic.Delete(context.Background(), newClient(t, srv),
+	if _, err := demographic.Delete(t.Context(), newClient(t, srv),
 		demographic.Person, personVersion, personVersion,
 		demographic.WithDeleteAudit(audit)); err != nil {
 		t.Fatal(err)
 	}
-	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `"system_id":"cdr.example"`) {
+	if h := captured.Header.Get("openehr-audit-details"); !strings.Contains(h, `system_id="cdr.example"`) {
 		t.Errorf("openehr-audit-details header = %q", h)
 	}
 }

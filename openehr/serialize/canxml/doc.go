@@ -94,6 +94,28 @@
 // perform XSD validation at the wire layer; OPT-driven validation is
 // available under openehr/template/.
 //
+// # Unsupported: Hash<K,V> elements
+//
+// BMM Hash<K,V> (map-typed) RM attributes are not supported by this
+// codec, and the gap is reachable today — not latent. Concrete
+// resource-metadata types carry such fields: ResourceDescription
+// (original_author, other_details, details), ResourceDescriptionItem
+// (other_details), and TranslationDetails (author, other_details),
+// all map[string]… attributes.
+//
+// Decode skips these elements (the unmarshalXMLHashTODO escape →
+// xml.Decoder.Skip). Encode cannot emit them at all: the generated
+// codec hands the Go map to encoding/xml, which rejects map types, so
+// [Marshal] of any AuthoredResource / ResourceDescription fails with
+// "xml: unsupported type: map[string]…" — even when the maps are nil,
+// since original_author is always encoded. Canonical XML for these
+// resource-metadata types is therefore unavailable pending a real
+// Hash codec (the marshalXMLHashTODO / unmarshalXMLHashTODO escapes in
+// internal/bmmgen mark the sites).
+//
+// The canjson codec is unaffected (encoding/json handles maps).
+// History: docs/plans/archive/2026-05-15-canonical-xml-serialization.md.
+//
 // # See also
 //
 //   - [github.com/cadasto/openehr-sdk-go/openehr/rm/typereg] — the

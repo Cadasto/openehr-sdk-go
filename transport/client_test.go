@@ -66,7 +66,7 @@ func TestDoBuildsURLFromCatalog(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, err := c.Do(context.Background(), &Request{
+	_, err := c.Do(t.Context(), &Request{
 		Method: "GET",
 		Path:   "/ehr/abc",
 		Query:  url.Values{"subject_id": {"42"}},
@@ -88,7 +88,7 @@ func TestDoServiceUnavailable(t *testing.T) {
 		Services: map[string]discovery.ServiceEntry{},
 	})
 	c, _ := New(cat, WithHTTPClient(http.DefaultClient))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if !errors.Is(err, ErrServiceUnavailable) {
 		t.Errorf("expected ErrServiceUnavailable, got %v", err)
 	}
@@ -100,7 +100,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		captured = r.Header.Clone()
 		w.Header().Set("ETag", `"v-42"`)
 		w.Header().Set("openehr-version", "1.1.0")
-		w.Header().Set("openehr-audit-details", `{"committer":"alice"}`)
+		w.Header().Set("openehr-audit-details", `committer.name="alice"`)
 		w.Header().Set("Location", "/openehr/v1/ehr/x/composition/v-42")
 		w.WriteHeader(201)
 		_, _ = w.Write([]byte(`{}`))
@@ -114,12 +114,12 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		WithSpecVersion("1.1.0-development"),
 		WithCadastoSpecVersionHeader(true),
 	)
-	resp, err := c.Do(context.Background(), &Request{
+	resp, err := c.Do(t.Context(), &Request{
 		Method:             "POST",
 		Path:               "/ehr/x/composition",
 		Body:               []byte(`{"_type":"COMPOSITION"}`),
 		Prefer:             PreferRepresentation,
-		AuditDetailsHeader: `{"committer":"alice"}`,
+		AuditDetailsHeader: `committer.name="alice"`,
 		RMVersion:          "1.1.0",
 		TemplateID:         "openEHR-EHR-COMPOSITION.encounter.v1",
 		IfMatch:            "v-41",
@@ -132,7 +132,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 		{"User-Agent", "sdk-test/1.0"},
 		{"Cadasto-Openehr-Spec-Version", "1.1.0-development"},
 		{"Prefer", "return=representation"},
-		{"Openehr-Audit-Details", `{"committer":"alice"}`},
+		{"Openehr-Audit-Details", `committer.name="alice"`},
 		{"Openehr-Version", "1.1.0"},
 		{"Openehr-Template-Id", "openEHR-EHR-COMPOSITION.encounter.v1"},
 		{"If-Match", `"v-41"`},
@@ -150,7 +150,7 @@ func TestDoPlumbsHeaders(t *testing.T) {
 	if resp.Metadata.RMVersion != "1.1.0" {
 		t.Errorf("RMVersion = %q", resp.Metadata.RMVersion)
 	}
-	if resp.Metadata.AuditDetails != `{"committer":"alice"}` {
+	if resp.Metadata.AuditDetails != `committer.name="alice"` {
 		t.Errorf("AuditDetails = %q", resp.Metadata.AuditDetails)
 	}
 	if resp.Metadata.Location == "" {
@@ -170,7 +170,7 @@ func TestDoNoAuthSuppressesAuthorization(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "tok"})),
 	)
-	if _, err := c.Do(context.Background(), &Request{Path: "/capabilities", NoAuth: true}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/capabilities", NoAuth: true}); err != nil {
 		t.Fatal(err)
 	}
 	if captured != "" {
@@ -190,7 +190,7 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(auth.StaticTokenSource(auth.Token{Value: "default-tok"})),
 	)
-	ctx := auth.WithTokenSource(context.Background(), auth.StaticTokenSource(auth.Token{Value: "ctx-tok"}))
+	ctx := auth.WithTokenSource(t.Context(), auth.StaticTokenSource(auth.Token{Value: "ctx-tok"}))
 	if _, err := c.Do(ctx, &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 		t.Errorf("Authorization = %q, want Bearer ctx-tok (PROBE-064)", captured)
 	}
 	// Without ctx override, falls back to default.
-	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
 	if captured != "Bearer default-tok" {
@@ -222,7 +222,7 @@ func TestDoBasicAuthAuthorization(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithTokenSource(src),
 	)
-	if _, err := c.Do(context.Background(), &Request{Path: "/ehr"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/ehr"}); err != nil {
 		t.Fatal(err)
 	}
 	want := "Basic " + base64.StdEncoding.EncodeToString([]byte("alice:secret"))
@@ -239,7 +239,7 @@ func TestDoCallerHeadersOverrideCaseInsensitive(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, err := c.Do(context.Background(), &Request{
+	_, err := c.Do(t.Context(), &Request{
 		Path: "/x",
 		Headers: http.Header{
 			"accept": {"application/xml"},
@@ -265,6 +265,7 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 		{"403", "403.json", 403, ErrForbidden},
 		{"409", "409.json", 409, ErrVersionConflict},
 		{"412", "412.json", 412, ErrPreconditionFailed},
+		{"422", "422.json", 422, ErrUnprocessable},
 		{"428", "428.json", 428, ErrPreconditionRequired},
 		{"400", "400.json", 400, nil}, // no sentinel; pure WireError
 	}
@@ -278,7 +279,7 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 			}))
 			defer srv.Close()
 			c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-			_, err := c.Do(context.Background(), &Request{Path: "/x"})
+			_, err := c.Do(t.Context(), &Request{Path: "/x"})
 			if err == nil {
 				t.Fatal("expected error")
 			}
@@ -317,7 +318,7 @@ func TestDoServerError5xxWrapsServerSentinel(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if !errors.Is(err, ErrServerError) {
 		t.Errorf("expected ErrServerError, got %v", err)
 	}
@@ -344,7 +345,7 @@ func TestRetryOnRetriableStatus(t *testing.T) {
 			Multiplier:     2.0,
 		}),
 	)
-	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
 	if got := hits.Load(); got != 3 {
@@ -386,7 +387,7 @@ func TestRetryNotAppliedToNonRetriableStatus(t *testing.T) {
 					InitialBackoff: time.Millisecond,
 				}),
 			)
-			_, _ = c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
+			_, _ = c.Do(t.Context(), &Request{Method: "GET", Path: "/x"})
 			if got := hits.Load(); got != 1 {
 				t.Errorf("status %d under retry: got %d attempts, want 1 (status not in RetriableStatus)", tc.status, got)
 			}
@@ -406,7 +407,7 @@ func TestRetryNotAppliedToPOSTByDefault(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 5, InitialBackoff: time.Millisecond}),
 	)
-	_, _ = c.Do(context.Background(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
+	_, _ = c.Do(t.Context(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
 	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 attempt for POST (non-idempotent), got %d", got)
 	}
@@ -424,7 +425,7 @@ func TestRetryOptIntoNonIdempotent(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Millisecond, RetryNonIdempotent: true}),
 	)
-	_, _ = c.Do(context.Background(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
+	_, _ = c.Do(t.Context(), &Request{Method: "POST", Path: "/x", Body: []byte(`{}`)})
 	if got := hits.Load(); got != 3 {
 		t.Errorf("expected 3 attempts with RetryNonIdempotent, got %d", got)
 	}
@@ -438,7 +439,7 @@ func TestRetryDisabledByDefault(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, _ = c.Do(context.Background(), &Request{Path: "/x"})
+	_, _ = c.Do(t.Context(), &Request{Path: "/x"})
 	if got := hits.Load(); got != 1 {
 		t.Errorf("expected 1 attempt by default, got %d", got)
 	}
@@ -470,7 +471,7 @@ func TestRetryNoRetrySentinel(t *testing.T) {
 				WithHTTPClient(srv.Client()),
 				WithRetry(tc.policy),
 			)
-			_, _ = c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
+			_, _ = c.Do(t.Context(), &Request{Method: "GET", Path: "/x"})
 			if got := hits.Load(); got != 1 {
 				t.Errorf("policy %+v: got %d attempts, want 1", tc.policy, got)
 			}
@@ -490,7 +491,7 @@ func TestRetryCtxCancellation(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 10, InitialBackoff: 50 * time.Millisecond}),
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Millisecond)
 	defer cancel()
 	_, err := c.Do(ctx, &Request{Path: "/x"})
 	if !errors.Is(err, context.DeadlineExceeded) {
@@ -513,7 +514,7 @@ func TestCallerAttributionDefault(t *testing.T) {
 			ModelProvider: "anthropic",
 		}),
 	)
-	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(got, `"agent_id":"mcp-claude-code/1.0"`) {
@@ -536,7 +537,7 @@ func TestCallerAttributionPerRequest(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithCallerAttribution(CallerAttribution{AgentID: "default"}),
 	)
-	ctx := WithCallerAttributionCtx(context.Background(), CallerAttribution{AgentID: "override"})
+	ctx := WithCallerAttributionCtx(t.Context(), CallerAttribution{AgentID: "override"})
 	if _, err := c.Do(ctx, &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +554,7 @@ func TestCallerAttributionOmittedWhenEmpty(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
 	if got != "" {
@@ -576,14 +577,14 @@ func TestETagRoundTrip(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	getResp, err := c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
+	getResp, err := c.Do(t.Context(), &Request{Method: "GET", Path: "/x"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if getResp.Metadata.ETag != "v-1" {
 		t.Errorf("ETag captured = %q, want v-1", getResp.Metadata.ETag)
 	}
-	if _, err := c.Do(context.Background(), &Request{
+	if _, err := c.Do(t.Context(), &Request{
 		Method:  "PUT",
 		Path:    "/x",
 		IfMatch: getResp.Metadata.ETag,
@@ -603,7 +604,7 @@ func TestETagAlreadyQuotedNotDoubleQuoted(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	if _, err := c.Do(context.Background(), &Request{Method: "PUT", Path: "/x", IfMatch: `"v-1"`}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Method: "PUT", Path: "/x", IfMatch: `"v-1"`}); err != nil {
 		t.Fatal(err)
 	}
 	if captured != `"v-1"` {
@@ -625,7 +626,7 @@ func TestDecodeGeneric(t *testing.T) {
 	_, _ = c, DVText{} // ensure types are referenced
 	// We use canjson under the hood; round-trip through rm.DVText via reflection
 	// is unnecessary here — just verify the Decode wrapper plumbs the body.
-	resp, err := c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
+	resp, err := c.Do(t.Context(), &Request{Method: "GET", Path: "/x"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -642,7 +643,7 @@ func TestDecodeInvalidShape(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, _, err := Decode[rmFake](context.Background(), c, &Request{Path: "/x"})
+	_, _, err := Decode[rmFake](t.Context(), c, &Request{Path: "/x"})
 	if !errors.Is(err, ErrInvalidShape) {
 		t.Errorf("expected ErrInvalidShape, got %v", err)
 	}
@@ -660,7 +661,7 @@ func TestNetworkError(t *testing.T) {
 		},
 	})
 	c, _ := New(cat, WithHTTPClient(&http.Client{Timeout: 50 * time.Millisecond}))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err == nil {
 		t.Fatal("expected network error")
 	}
@@ -680,7 +681,7 @@ func TestTraceparentInjected(t *testing.T) {
 	}))
 	defer srv.Close()
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	if _, err := c.Do(context.Background(), &Request{Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Path: "/x"}); err != nil {
 		t.Fatal(err)
 	}
 	// No-op tracer => no traceparent. Asserting absence is the noop
@@ -706,7 +707,7 @@ func TestWireErrorDefaultOmitsMessageAndRawBody(t *testing.T) {
 
 	// Default client — no WithRawErrorBodies.
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -762,7 +763,7 @@ func TestWireErrorOptInPreservesMessageAndRawBody(t *testing.T) {
 
 	// Opt-in client.
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()), WithRawErrorBodies(true))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -809,7 +810,7 @@ func TestMaxResponseBody(t *testing.T) {
 			WithHTTPClient(srv.Client()),
 			WithMaxResponseBody(1<<10),
 		)
-		_, err := c.Do(context.Background(), &Request{Path: "/x"})
+		_, err := c.Do(t.Context(), &Request{Path: "/x"})
 		if err == nil {
 			t.Fatal("expected error for oversized body, got nil")
 		}
@@ -825,7 +826,7 @@ func TestMaxResponseBody(t *testing.T) {
 		}))
 		defer srv.Close()
 		c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-		resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+		resp, err := c.Do(t.Context(), &Request{Path: "/x"})
 		if err != nil {
 			t.Fatalf("unexpected error for small body: %v", err)
 		}
@@ -903,7 +904,7 @@ func TestDoReauthOn401(t *testing.T) { // REQ-063
 		WithTokenSource(stub),
 		WithReauthOn401(stub),
 	)
-	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	resp, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err != nil {
 		t.Fatalf("expected success after reauth; got %v", err)
 	}
@@ -944,7 +945,7 @@ func TestDoReauthOn401TwiceFails(t *testing.T) { // REQ-063
 		WithTokenSource(stub),
 		WithReauthOn401(stub),
 	)
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}
@@ -968,7 +969,7 @@ func TestDoNoReautherUnchanged(t *testing.T) { // REQ-063
 	defer srv.Close()
 
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected ErrUnauthorized, got %v", err)
 	}
@@ -996,7 +997,7 @@ func TestDoReauthReturnsError(t *testing.T) { // REQ-063
 		WithTokenSource(stub),
 		WithReauthOn401(auth.ReautherFunc(func(context.Context) error { return errBoom })),
 	)
-	_, err := c.Do(context.Background(), &Request{Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if !errors.Is(err, errBoom) {
 		t.Fatalf("expected wrapped reauth error, got %v", err)
 	}
@@ -1047,7 +1048,7 @@ func TestDoReauthWithRealSmartSource(t *testing.T) { // REQ-063
 	src.SetTokens(auth.Token{Value: "stale-tok", Type: "Bearer", ExpiresAt: time.Now().Add(time.Hour)}, "refresh-xyz")
 
 	c, _ := New(newCatalog(t, srv), WithHTTPClient(srv.Client()), WithTokenSource(src), WithReauthOn401(src))
-	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	resp, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err != nil {
 		t.Fatalf("expected success after real-Source reauth, got %v", err)
 	}
@@ -1108,7 +1109,7 @@ func TestDoReauthDoesNotRestartRetryBudget(t *testing.T) { // REQ-063
 			RetriableStatus: []int{503},
 		}),
 	)
-	resp, err := c.Do(context.Background(), &Request{Path: "/x"})
+	resp, err := c.Do(t.Context(), &Request{Path: "/x"})
 	if err != nil {
 		t.Fatalf("expected success after reauth; got %v", err)
 	}

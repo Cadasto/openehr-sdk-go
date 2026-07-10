@@ -1,0 +1,375 @@
+openapi: 3.0.3
+info:
+  title: HIP EHRbase
+  description: >-
+    HIP EHRbase Enterprise operations that are not part of the OSS, but are part
+    of enterprise feature.
+
+    Requires authorization with a tenant user upfront.
+  version: 2.0.0
+  contact: {}
+servers:
+  - url: https://{ehrbaseBaseUrl}
+    description: An example HIP EHRbase API URL.
+    variables:
+      ehrbaseBaseUrl:
+        default: hip-ehrbase.dev
+paths:
+  /plugin/event-trigger/service/:
+    get:
+      tags:
+        - Event Trigger
+      summary: Get All Event Triggers
+      description: Get All Event Triggers
+      operationId: getAll
+      parameters:
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 'false'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventTrigger'
+    post:
+      tags:
+        - Event Trigger
+      summary: Create Event Trigger
+      description: Create Event Trigger
+      operationId: store
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventTrigger'
+            example:
+              id: composition_trigger_v1
+              language:
+                original_language: ISO_639-1::en
+              state: active
+              author:
+                date: '2021-11-02T00:00:00.000+00:00'
+                name: Me
+                email: info@vitagroup.ag
+                organisation: VitaGroup AG
+              definition:
+                mode: AFTER
+                data_type: COMPOSITION
+                event_type:
+                  - CREATE
+                  - UPDATE
+                  - DELETE
+                rules:
+                  - high diastolic:
+                      when:
+                        aql: >-
+                          select c/uid/value as diastolic from EHR e contains
+                          COMPOSITION c
+                      then:
+                        - notify:
+                            command: publish
+                            channel: amqp
+                            exchange: ex
+                            routing-key: ex
+                        - log:
+                            command: notify
+                            channel: logger
+                pre_condition: []
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: object
+  /plugin/event-trigger/service/{uuid}:
+    put:
+      tags:
+        - Event Trigger
+      summary: Activate Event Trigger
+      description: Activate Event Trigger
+      operationId: activate
+      parameters:
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            example: 06345e0e-3b79-4dba-8c99-c0e632d328bf
+            format: uuid
+        - name: activate
+          in: query
+          required: true
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: NOT FOUND
+          content:
+            text/plain:
+              schema:
+                type: string
+  /plugin/event-trigger/service/{id}:
+    get:
+      tags:
+        - Event Trigger
+      summary: Get Event Trigger By Trigger-Id Or Trigger-UUID
+      description: Get Event Trigger By Trigger-Id Or Trigger-UUID
+      operationId: getBy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EventTrigger'
+        '404':
+          description: NOT FOUND
+          content:
+            text/plain:
+              schema:
+                type: string
+    delete:
+      tags:
+        - Event Trigger
+      summary: Delete Event Trigger By Trigger-UUID
+      description: Delete Event Trigger By Trigger-UUID
+      operationId: deleteBy
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: c1246a5c-07e8-4601-a5b5-7eab501d3bd9
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: NOT FOUND
+  /plugin/multi-tenant/service:
+    get:
+      tags:
+        - Multi tenant
+      summary: Get tenants
+      description: Get tenants
+      operationId: getTenants
+      responses:
+        '200':
+          description: ''
+    post:
+      tags:
+        - Multi tenant
+      summary: Store tenant
+      description: Store tenant
+      operationId: storeTenant
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tenantId:
+                  type: string
+                  example: '{{$guid}}'
+                tenantName:
+                  type: string
+                  example: cdr-core-sanity-check
+                tenantProperties:
+                  type: object
+                  properties:
+                    client-id:
+                      type: string
+                      example: HIP-CDR-EHRbase-Service
+                    host:
+                      type: string
+                      example: '{{keycloakUrl}}'
+                    realm:
+                      type: string
+                      example: cdr-core-sanity-check
+            examples:
+              Store tenant:
+                value:
+                  tenantId: '{{$guid}}'
+                  tenantName: cdr-core-sanity-check
+                  tenantProperties:
+                    client-id: HIP-CDR-EHRbase-Service
+                    host: '{{keycloakUrl}}'
+                    realm: cdr-core-sanity-check
+      responses:
+        '200':
+          description: ''
+  /plugin/multi-tenant/service/{tenant_id}:
+    delete:
+      tags:
+        - Multi tenant
+      summary: Delete Tenant
+      description: Delete Tenants
+      operationId: deleteTenant
+      responses:
+        '200':
+          description: ''
+      parameters:
+        - name: tenant_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: '{{$guid}}'
+  /plugin/transaction-management/ehr/{ehr_id}/contribution/{contribution_id}/rollback:
+    post:
+      tags:
+        - Compensation
+      summary: Rollback
+      description: Rollback
+      operationId: rollback
+      responses:
+        '200':
+          description: ''
+      parameters:
+        - name: ehr_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: '{{ehrId}}'
+        - name: contribution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: c25c5c9c-0463-4ce3-9753-fb6732827859
+components:
+  schemas:
+    EventTrigger:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        id:
+          type: string
+        language:
+          $ref: '#/components/schemas/Languange'
+        state:
+          type: string
+          enum:
+            - active
+            - inactive
+        author:
+          $ref: '#/components/schemas/Author'
+        definition:
+          $ref: '#/components/schemas/Definition'
+    Languange:
+      type: object
+      properties:
+        original_language:
+          type: string
+    Author:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date-time
+        name:
+          type: string
+        email:
+          type: string
+        organisation:
+          type: string
+    Definition:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rule'
+        data_type:
+          type: string
+          enum:
+            - EHR_STATUS
+            - COMPOSITION
+        event_type:
+          type: array
+          items:
+            type: string
+            enum:
+              - CREATE
+              - UPDATE
+              - DELETE
+              - HARD_DELETE
+              - ROLLBACK
+        pre_condition:
+          type: array
+          items:
+            type: string
+    Rule:
+      type: object
+      properties:
+        name:
+          type: string
+        conditions:
+          type: object
+          additionalProperties:
+            type: string
+          writeOnly: true
+        when:
+          $ref: '#/components/schemas/Condition'
+        then:
+          type: array
+          items:
+            $ref: '#/components/schemas/Consequence'
+    Condition:
+      type: object
+      properties:
+        type:
+          type: string
+        expression:
+          type: string
+    Consequence:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum:
+            - SPEL
+            - AQL
+            - EL
+        arguments:
+          type: object
+          additionalProperties:
+            type: string
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+security:
+  - bearerAuth: []
+tags:
+  - name: Event Trigger
+  - name: Multi tenant
+  - name: Compensation

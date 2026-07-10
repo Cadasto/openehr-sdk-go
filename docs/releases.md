@@ -26,7 +26,7 @@ The repo pins four versions independently; the git tag tracks only the first. Th
 | Concept | Pin location | Bumps when |
 |---|---|---|
 | **SDK semver** | git tag `vX.Y.Z` | every release |
-| Go toolchain (minimum) | `go.mod` `go` line | N-1 release line (REQ-002) |
+| Go toolchain (minimum) | `go.mod` `go` line | current stable line (N) (REQ-002) |
 | openEHR REST | [REQ-050](specifications/wire.md#req-050) → `1.1.0-development` | spec bump; discovery mismatch fails fast |
 | BMM corpus | `resources/bmm/*.bmm.json` | [ADR 0001](adr/0001-bmm-version-bump-runbook.md) |
 

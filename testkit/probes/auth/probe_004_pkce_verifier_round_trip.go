@@ -40,7 +40,7 @@ type pkceFlowCapture struct {
 // success body that echoes the requested scope (mirroring an authorization
 // server that grants exactly what was asked).
 func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlowCapture, error) {
-	cap := &pkceFlowCapture{}
+	capture := &pkceFlowCapture{}
 	var mu sync.Mutex
 
 	// The authorization server grants the scope bound to the code at
@@ -54,7 +54,7 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 			return
 		}
 		mu.Lock()
-		cap.tokenForm = req.Form
+		capture.tokenForm = req.Form
 		mu.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(w, `{"access_token":"at-1","token_type":"Bearer","expires_in":3600,"scope":%q,"refresh_token":"rt-1"}`, grantedScope)
@@ -82,8 +82,8 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 		srv.Close()
 		return nil, fmt.Errorf("BeginAuthorization: %w", err)
 	}
-	cap.verifier = areq.PKCE.Verifier
-	cap.challenge = areq.PKCE.Challenge
+	capture.verifier = areq.PKCE.Verifier
+	capture.challenge = areq.PKCE.Challenge
 
 	authURL, err := src.AuthorizeURL(areq, launch)
 	if err != nil {
@@ -95,7 +95,7 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 		srv.Close()
 		return nil, fmt.Errorf("parse authorize URL: %w", err)
 	}
-	cap.authQuery = parsed.Query()
+	capture.authQuery = parsed.Query()
 
 	// The redirect callback returns the issued code and the same state.
 	_, tr, err := src.ExchangeAuthorizationCode(ctx, "auth-code-xyz", areq.State, areq)
@@ -103,9 +103,9 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 		srv.Close()
 		return nil, fmt.Errorf("ExchangeAuthorizationCode: %w", err)
 	}
-	cap.tokenResp = tr
+	capture.tokenResp = tr
 	srv.Close()
-	return cap, nil
+	return capture, nil
 }
 
 // Probe004PKCEVerifierRoundTrip implements PROBE-004: a SMART launch using
@@ -121,37 +121,37 @@ func runPKCEFlow(ctx context.Context, scopes []string, launch string) (*pkceFlow
 //     x/oauth2.S256ChallengeFromVerifier — with method S256.
 func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PROBE-004 (REQ-061)
 	r := Result{Probe: "PROBE-004"}
-	cap, err := runPKCEFlow(ctx, []string{"patient/COMPOSITION.read"}, "")
+	capture, err := runPKCEFlow(ctx, []string{"patient/COMPOSITION.read"}, "")
 	if err != nil {
 		return r, fmt.Errorf("PROBE-004: %w", err)
 	}
 
 	// Authorization-request assertions.
-	if got := cap.authQuery.Get("code_challenge"); got != cap.challenge {
+	if got := capture.authQuery.Get("code_challenge"); got != capture.challenge {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("authorization code_challenge = %q; want %q", got, cap.challenge)
+		r.Detail = fmt.Sprintf("authorization code_challenge = %q; want %q", got, capture.challenge)
 		return r, nil
 	}
-	if got := cap.authQuery.Get("code_challenge_method"); got != "S256" {
+	if got := capture.authQuery.Get("code_challenge_method"); got != "S256" {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("code_challenge_method = %q; want S256", got)
 		return r, nil
 	}
 
 	// Token-exchange assertion: the verifier travels on the token request.
-	if got := cap.tokenForm.Get("code_verifier"); got != cap.verifier {
+	if got := capture.tokenForm.Get("code_verifier"); got != capture.verifier {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("token code_verifier = %q; want %q", got, cap.verifier)
+		r.Detail = fmt.Sprintf("token code_verifier = %q; want %q", got, capture.verifier)
 		return r, nil
 	}
-	if got := cap.tokenForm.Get("grant_type"); got != "authorization_code" {
+	if got := capture.tokenForm.Get("grant_type"); got != "authorization_code" {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("token grant_type = %q; want authorization_code", got)
 		return r, nil
 	}
 
 	// G-7 parity: verifier entropy + alphabet.
-	raw, decErr := base64.RawURLEncoding.DecodeString(cap.verifier)
+	raw, decErr := base64.RawURLEncoding.DecodeString(capture.verifier)
 	if decErr != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("verifier is not base64.RawURLEncoding (no padding, URL-safe): %v", decErr)
@@ -162,7 +162,7 @@ func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PRO
 		r.Detail = fmt.Sprintf("verifier carries %d bytes of entropy; RFC 7636 RECOMMENDS >= 32", len(raw))
 		return r, nil
 	}
-	if strings.ContainsAny(cap.verifier, "+/=") {
+	if strings.ContainsAny(capture.verifier, "+/=") {
 		r.Status = "fail"
 		r.Detail = "verifier contains standard-base64 / padding characters; want URL-safe unpadded"
 		return r, nil
@@ -170,18 +170,18 @@ func Probe004PKCEVerifierRoundTrip(ctx context.Context) (Result, error) { // PRO
 
 	// G-7 parity: challenge == base64url(SHA256(verifier)), cross-checked
 	// against x/oauth2 and recomputed directly.
-	wantChallenge := xoauth2.S256ChallengeFromVerifier(cap.verifier)
-	sum := sha256.Sum256([]byte(cap.verifier))
+	wantChallenge := xoauth2.S256ChallengeFromVerifier(capture.verifier)
+	sum := sha256.Sum256([]byte(capture.verifier))
 	direct := base64.RawURLEncoding.EncodeToString(sum[:])
-	if cap.challenge != wantChallenge || cap.challenge != direct {
+	if capture.challenge != wantChallenge || capture.challenge != direct {
 		r.Status = "fail"
-		r.Detail = fmt.Sprintf("challenge %q != base64url(SHA256(verifier)) (x/oauth2=%q, direct=%q)", cap.challenge, wantChallenge, direct)
+		r.Detail = fmt.Sprintf("challenge %q != base64url(SHA256(verifier)) (x/oauth2=%q, direct=%q)", capture.challenge, wantChallenge, direct)
 		return r, nil
 	}
 
 	// Explicit pass condition: the token exchange must have returned a non-empty
 	// access_token, confirming the 200 + access_token outcome (REQ-061).
-	if cap.tokenResp.AccessToken == "" {
+	if capture.tokenResp.AccessToken == "" {
 		r.Status = "fail"
 		r.Detail = "token exchange succeeded without error but access_token is empty; want non-empty access_token in 200 response"
 		return r, nil

@@ -2,8 +2,10 @@ package composition
 
 import (
 	"errors"
+	mrand "math/rand/v2"
 	"time"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/instance"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
@@ -16,11 +18,13 @@ type Option func(*config)
 // instance.Options inside NewSkeleton / NewBuilder so this package
 // stays the single source of composition-specific knobs.
 type config struct {
-	language  string
-	territory string
-	composer  rm.PartyProxy
-	category  *rm.DVCodedText
-	now       time.Time
+	language    string
+	territory   string
+	composer    rm.PartyProxy
+	category    *rm.DVCodedText
+	now         time.Time
+	valueFill   instance.ValueFill
+	valueSource mrand.Source
 }
 
 // WithLanguage overrides the OPT-declared language for
@@ -62,6 +66,27 @@ func WithCategory(c rm.DVCodedText) Option {
 // determinism.
 func WithNow(t time.Time) Option {
 	return func(c *config) { c.now = t }
+}
+
+// WithValueFill selects how primitive leaves are valued. The default
+// (instance.ExampleFill) emits the REQ-103 representative value;
+// instance.RandomFill draws in-constraint values that vary per call —
+// seed via WithValueSource for reproducibility. SDK-GAP-14.
+func WithValueFill(f instance.ValueFill) Option {
+	return func(c *config) { c.valueFill = f }
+}
+
+// WithValueSource seeds the in-constraint sampler used under
+// instance.RandomFill. A fixed source (e.g. rand.NewPCG(seed, seed))
+// makes the generated leaf values byte-reproducible; nil draws from the
+// auto-seeded global generator so successive calls differ. Ignored
+// under ExampleFill.
+//
+// A math/rand/v2.Source is not safe for concurrent use: do not share one
+// Source across concurrent NewSkeleton / Build calls — give each its own
+// (or leave it nil to use the concurrency-safe global). SDK-GAP-14.
+func WithValueSource(src mrand.Source) Option {
+	return func(c *config) { c.valueSource = src }
 }
 
 // ErrUnknownPath signals that the supplied path is not addressable in

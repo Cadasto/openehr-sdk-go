@@ -90,7 +90,7 @@ func TestProbe027MissingTerritoryFails(t *testing.T) {
 }
 
 // TestProbe027_GAP12Corpus extends PROBE-027 to the real-world OPTs
-// filed in SDK-GAP-12 (openehr-go-poc PR #31). Minimal policy only —
+// filed in SDK-GAP-12 (by a consuming CDR project). Minimal policy only —
 // Example on social.opt still emits every optional content archetype
 // root and fails validation (out of scope per SDK-GAP-12 plan).
 func TestProbe027_GAP12Corpus(t *testing.T) {

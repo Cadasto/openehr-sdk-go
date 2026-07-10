@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -54,7 +53,7 @@ func TestObserverFiresOncePerLogicalCall(t *testing.T) {
 		WithObserver(rec),
 	)
 	start := time.Now()
-	_, err := c.Do(context.Background(), &Request{Method: "GET", Path: "/x", Route: "/x"})
+	_, err := c.Do(t.Context(), &Request{Method: "GET", Path: "/x", Route: "/x"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +94,7 @@ func TestObserverFiresOnWireError(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithObserver(rec),
 	)
-	_, _ = c.Do(context.Background(), &Request{Method: "GET", Path: "/missing"})
+	_, _ = c.Do(t.Context(), &Request{Method: "GET", Path: "/missing"})
 	calls := rec.snapshot()
 	if len(calls) != 1 {
 		t.Fatalf("observer fired %d times, want 1", len(calls))
@@ -125,7 +124,7 @@ func TestObservationTagsRoundTrip(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithObserver(rec),
 	)
-	ctx := WithObservationTag(context.Background(), "phase", "warmup")
+	ctx := WithObservationTag(t.Context(), "phase", "warmup")
 	ctx = WithObservationTag(ctx, "scenario", "ehr-create")
 	_, err := c.Do(ctx, &Request{Method: "GET", Path: "/x"})
 	if err != nil {
@@ -159,7 +158,7 @@ func TestObservationTagsDefensiveCopy(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithObserver(mutating),
 	)
-	ctx := WithObservationTag(context.Background(), "phase", "warmup")
+	ctx := WithObservationTag(t.Context(), "phase", "warmup")
 	_, err := c.Do(ctx, &Request{Method: "GET", Path: "/x"})
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +180,7 @@ func TestObserverPanicIsRecovered(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithObserver(observerFunc(func(Observation) { panic("boom") })),
 	)
-	_, err := c.Do(context.Background(), &Request{Method: "GET", Path: "/x"})
+	_, err := c.Do(t.Context(), &Request{Method: "GET", Path: "/x"})
 	if err != nil {
 		t.Errorf("panic in observer broke request: %v", err)
 	}
@@ -197,7 +196,7 @@ func TestNilObserverIsNoop(t *testing.T) {
 		WithHTTPClient(srv.Client()),
 		WithObserver(nil),
 	)
-	if _, err := c.Do(context.Background(), &Request{Method: "GET", Path: "/x"}); err != nil {
+	if _, err := c.Do(t.Context(), &Request{Method: "GET", Path: "/x"}); err != nil {
 		t.Errorf("nil observer broke request: %v", err)
 	}
 }

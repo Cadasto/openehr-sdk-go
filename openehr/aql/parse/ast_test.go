@@ -119,6 +119,10 @@ func TestExtractVersionClass(t *testing.T) {
 
 // TestExtractParamArchetype covers a $param standing in for an archetype HRID
 // in a containment predicate (SDK admits identifiable-by-param scope).
+// Archetype carries the source placeholder verbatim (with the leading `$`)
+// so emission can round-trip the exact placeholder name; ParamArchetype
+// stays as the typed signal — aligned with the structured extractor
+// (SDK-GAP-17 review).
 func TestExtractParamArchetype(t *testing.T) {
 	doc, err := parse.Parse("SELECT c FROM COMPOSITION c[$arch]")
 	if err != nil {
@@ -128,8 +132,8 @@ func TestExtractParamArchetype(t *testing.T) {
 		t.Fatalf("Classes = %d, want 1", len(doc.Classes))
 	}
 	c := doc.Classes[0]
-	if !c.ParamArchetype || c.Archetype != "" {
-		t.Errorf("class = %+v, want ParamArchetype with empty Archetype", c)
+	if !c.ParamArchetype || c.Archetype != "$arch" {
+		t.Errorf("class = %+v, want ParamArchetype=true Archetype=$arch", c)
 	}
 	if len(doc.Params) != 1 || doc.Params[0] != "arch" {
 		t.Errorf("Params = %v, want [arch]", doc.Params)

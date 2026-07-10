@@ -3,20 +3,24 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.integration — canonical-JSON MarshalJSON companions
 
 type GenericEntryJSONMarshaller struct {
 	Class string `json:"_type"`
 	// Name Runtime name of this fragment, used to build runtime paths. This is the term provided via a clinical application or batch process to name this EHR construct: its retention in the EHR faithfully preserves the original label by which this entry was known to end users.
-	Name DVTextLike `json:"name"`
+	Name json.RawMessage `json:"name"`
 	// ArchetypeNodeID Design-time archetype identifier of this node taken from its generating archetype; used to build archetype paths. Always in the form of an at-code, e.g.  `at0005`. This value enables a 'standardised' name for this node to be generated, by referring to the generating archetype local terminology.
 	//
 	// At an archetype root point, the value of this attribute is always the stringified form of the `_archetype_id_` found in the `_archetype_details_` object.
 	ArchetypeNodeID string `json:"archetype_node_id"`
 	// UID Optional globally unique object identifier for root points of archetyped structures.
-	UID UIDBasedID `json:"uid,omitempty"`
+	UID json.RawMessage `json:"uid,omitempty"`
 	// Links Links to other archetyped structures (data whose root object inherits from `ARCHETYPED`, such as `ENTRY`, `SECTION` and so on). Links may be to structures in other compositions.
 	Links []Link `json:"links,omitempty"`
 	// ArchetypeDetails Details of archetyping used on this node.
@@ -24,7 +28,7 @@ type GenericEntryJSONMarshaller struct {
 	// FeederAudit Audit trail from non-openEHR system of original commit of information forming the content of this node, or from a conversion gateway which has synthesised this node.
 	FeederAudit *FeederAudit `json:"feeder_audit,omitempty"`
 	// Data The data from the source message or record. May be recorded in any structural openEHR representation.
-	Data Item `json:"data"`
+	Data json.RawMessage `json:"data"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for GenericEntry with `_type`
@@ -33,14 +37,26 @@ type GenericEntryJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (g *GenericEntry) MarshalJSON() ([]byte, error) {
+	rawName, err := jsonpoly.Marshal(g.Name)
+	if err != nil {
+		return nil, err
+	}
+	rawUID, err := jsonpoly.Marshal(g.UID)
+	if err != nil {
+		return nil, err
+	}
+	rawData, err := jsonpoly.Marshal(g.Data)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&GenericEntryJSONMarshaller{
 		Class:            "GENERIC_ENTRY",
-		Name:             g.Name,
+		Name:             rawName,
 		ArchetypeNodeID:  g.ArchetypeNodeID,
-		UID:              g.UID,
+		UID:              rawUID,
 		Links:            g.Links,
 		ArchetypeDetails: g.ArchetypeDetails,
 		FeederAudit:      g.FeederAudit,
-		Data:             g.Data,
+		Data:             rawData,
 	})
 }

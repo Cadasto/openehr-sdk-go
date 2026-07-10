@@ -32,6 +32,18 @@ func mustDecodeJSON(t *testing.T, path string, dst any) {
 	}
 }
 
+// mustReplaceOnce replaces the first occurrence of old in s, failing the
+// test if old is absent. Guards corruption-based descent tests against a
+// silently-vacuous pass when a re-vendored fixture no longer contains the
+// literal being corrupted.
+func mustReplaceOnce(t *testing.T, s, old, replacement string) string {
+	t.Helper()
+	if !strings.Contains(s, old) {
+		t.Fatalf("fixture no longer contains %q — descent guard would pass vacuously; update the literal", old)
+	}
+	return strings.Replace(s, old, replacement, 1)
+}
+
 func mustCompileOPT(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
 	opt, err := template.ParseFile(fixtures.TemplateOpt(name))
@@ -61,14 +73,17 @@ func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 // REQ-110 — a real demographic OPT (PERSON root, 174 compiled nodes) +
 // its instance walk end-to-end through ValidateDemographic. The walk
 // descends the full PARTY hierarchy (identities / contacts → addresses /
-// details → cluster trees); residual issues are confined to two known
-// categories, proving the demographic structure itself validates clean:
-//   - DV_INTERVAL<DV_DATE> rm_type_mismatch — SDK-GAP-11: DV_INTERVAL
-//     over DV_ORDERED is not yet type-matched by the walker (a DataValue
-//     limitation, not demographic-specific);
-//   - a genuine `relationships` cardinality finding — the instance has
-//     no relationships while the template pins >= 1 (the validator
-//     correctly catching a real violation).
+// details → cluster trees); the only residual issue is a genuine
+// `relationships` cardinality finding — the instance has no relationships
+// while the template pins >= 1 (the validator correctly catching a real
+// violation).
+//
+// SDK-GAP-13 sub-gap B regression guard: the fixture's DV_INTERVAL<DV_DATE>
+// bounds previously surfaced a spurious rm_type_mismatch — a round-tripped
+// DV_INTERVAL re-decodes as the bare DVInterval[DVOrdered], which the
+// walker could not type-match against DV_INTERVAL<DV_DATE>. The validator
+// now decides interval conformance from the bounds' runtime types, so NO
+// rm_type_mismatch should remain (the test fails if any reappears).
 func TestValidateDemographic_PersonFixture(t *testing.T) {
 	c := mustCompileOPT(t, "TestPerson.v2")
 	var person rm.Person
@@ -76,37 +91,55 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	r := validation.ValidateDemographic(&person, c)
 
-	sawContacts, sawDetailsCluster, sawCardinality := false, false, false
+	// The fixture validates clean except the genuine /relationships
+	// cardinality finding (instance has none; template pins >= 1). After
+	// SDK-GAP-13 sub-gap B no spurious DV_INTERVAL rm_type_mismatch remains.
+	sawCardinality := false
 	for _, iss := range r.Issues {
 		switch iss.Code {
-		case "rm_type_mismatch":
-			if !strings.Contains(iss.Detail, "DV_INTERVAL") {
-				t.Errorf("unexpected rm_type_mismatch at %s — %s", iss.Path, iss.Detail)
-			}
 		case "cardinality":
-			sawCardinality = true // genuine instance non-conformance (relationships >= 1)
+			sawCardinality = true
 		default:
 			t.Errorf("unexpected %s issue at %s — %s", iss.Code, iss.Path, iss.Detail)
 		}
-		if strings.Contains(iss.Path, "/contacts[") {
-			sawContacts = true
-		}
-		if strings.Contains(iss.Path, "/details/items[") {
-			sawDetailsCluster = true
-		}
 	}
-	// The deep paths in the residual issues prove the walker descended
-	// PERSON → contacts → addresses and PERSON → details → cluster trees.
-	if !sawContacts {
-		t.Error("walk did not descend into PERSON.contacts → addresses")
-	}
-	if !sawDetailsCluster {
-		t.Error("walk did not descend into PERSON.details cluster trees")
-	}
-	// Enforce the "genuine relationships finding" the comment claims, so a
-	// regression that drops it does not pass silently.
 	if !sawCardinality {
 		t.Error("expected the genuine /relationships cardinality finding")
+	}
+
+	// Positive descent guard: the clean fixture leaves no residual deep
+	// issues, so corrupt one DV_DATE interval bound under contacts and one
+	// under details, then confirm the walker reaches both deep paths. This
+	// also exercises SDK-GAP-13 sub-gap B end-to-end — a round-tripped
+	// DV_INTERVAL now type-matches DV_INTERVAL<DV_DATE>, so the walker
+	// descends into and validates its bounds.
+	raw, err := os.ReadFile(fixtures.CompositionJSON("TestPerson.v2"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	corrupt := mustReplaceOnce(t, string(raw), `"value": "2024-07-22"`, `"value": "not-a-date"`)
+	corrupt = mustReplaceOnce(t, corrupt, `"value": "2025-06-19"`, `"value": "also-not-a-date"`)
+	var bad rm.Person
+	if err := json.Unmarshal([]byte(corrupt), &bad); err != nil {
+		t.Fatalf("decode corrupted fixture: %v", err)
+	}
+	sawContactsDate, sawDetailsDate := false, false
+	for _, iss := range validation.ValidateDemographic(&bad, c).Issues {
+		if iss.Code != "primitive_invalid_value" {
+			continue
+		}
+		if strings.Contains(iss.Path, "/contacts[") {
+			sawContactsDate = true
+		}
+		if strings.Contains(iss.Path, "/details/items[") {
+			sawDetailsDate = true
+		}
+	}
+	if !sawContactsDate {
+		t.Error("walker did not descend into PERSON.contacts → addresses → DV_INTERVAL bounds")
+	}
+	if !sawDetailsDate {
+		t.Error("walker did not descend into PERSON.details cluster → DV_INTERVAL bounds")
 	}
 }
 

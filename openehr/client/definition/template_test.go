@@ -2,7 +2,6 @@ package definition_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -62,7 +61,7 @@ func TestUploadTemplate(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	meta, transportMeta, err := definition.UploadTemplate(context.Background(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	meta, transportMeta, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +101,7 @@ func TestUploadTemplateLocationFallback(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	meta, _, err := definition.UploadTemplate(context.Background(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
+	meta, _, err := definition.UploadTemplate(t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,15 +111,15 @@ func TestUploadTemplateLocationFallback(t *testing.T) {
 }
 
 func TestUploadRejectsInvalidInputs(t *testing.T) {
-	_, _, err := definition.UploadTemplate(context.Background(), nil, "unknown", bytes.NewReader([]byte("x")))
+	_, _, err := definition.UploadTemplate(t.Context(), nil, "unknown", bytes.NewReader([]byte("x")))
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("invalid format: expected ErrInvalidConfig, got %v", err)
 	}
-	_, _, err = definition.UploadTemplate(context.Background(), nil, definition.FormatADL14, nil)
+	_, _, err = definition.UploadTemplate(t.Context(), nil, definition.FormatADL14, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("nil body: expected ErrInvalidConfig, got %v", err)
 	}
-	_, _, err = definition.UploadTemplate(context.Background(), nil, definition.FormatADL14, bytes.NewReader(nil))
+	_, _, err = definition.UploadTemplate(t.Context(), nil, definition.FormatADL14, bytes.NewReader(nil))
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("empty body: expected ErrInvalidConfig, got %v", err)
 	}
@@ -134,7 +133,8 @@ func TestUploadTemplateWithVersion(t *testing.T) {
 		_, _ = w.Write(readCassette(t, "template_metadata.json"))
 	}))
 	defer srv.Close()
-	if _, _, err := definition.UploadTemplate(context.Background(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt),
+	if _, _, err := definition.UploadTemplate(
+		t.Context(), newClient(t, srv), definition.FormatADL14, bytes.NewReader(opt),
 		definition.WithUploadVersion("2"),
 	); err != nil {
 		t.Fatal(err)
@@ -154,7 +154,7 @@ func TestGetTemplate(t *testing.T) {
 		_, _ = w.Write(opt)
 	}))
 	defer srv.Close()
-	got, _, err := definition.GetTemplate(context.Background(), newClient(t, srv), "body_weight.v1", definition.FormatADL14)
+	got, _, err := definition.GetTemplate(t.Context(), newClient(t, srv), "body_weight.v1", definition.FormatADL14)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +164,7 @@ func TestGetTemplate(t *testing.T) {
 }
 
 func TestGetTemplateRejectsEmpty(t *testing.T) {
-	_, _, err := definition.GetTemplate(context.Background(), nil, "", definition.FormatADL14)
+	_, _, err := definition.GetTemplate(t.Context(), nil, "", definition.FormatADL14)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -176,7 +176,7 @@ func TestListTemplates(t *testing.T) {
 		_, _ = w.Write(readCassette(t, "template_list.json"))
 	}))
 	defer srv.Close()
-	list, _, err := definition.ListTemplates(context.Background(), newClient(t, srv), definition.FormatADL14)
+	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestListTemplatesEmpty(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	list, _, err := definition.ListTemplates(context.Background(), newClient(t, srv), definition.FormatADL14)
+	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestDeleteTemplate(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	if _, err := definition.DeleteTemplate(context.Background(), newClient(t, srv), "body_weight.v1", definition.FormatADL14); err != nil {
+	if _, err := definition.DeleteTemplate(t.Context(), newClient(t, srv), "body_weight.v1", definition.FormatADL14); err != nil {
 		t.Fatal(err)
 	}
 	if captured.Method != http.MethodDelete {
@@ -229,7 +229,7 @@ func TestDeleteTemplateMethodNotAllowed(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":"template delete disabled","code":"FORBIDDEN"}`))
 	}))
 	defer srv.Close()
-	_, err := definition.DeleteTemplate(context.Background(), newClient(t, srv), "x", definition.FormatADL14)
+	_, err := definition.DeleteTemplate(t.Context(), newClient(t, srv), "x", definition.FormatADL14)
 	// Server returns 405 (no SDK sentinel for that — surfaces as WireError).
 	var we *transport.WireError
 	if !errors.As(err, &we) || we.StatusCode != http.StatusMethodNotAllowed {
@@ -251,29 +251,52 @@ func TestExampleComposition(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	comp, _, err := definition.ExampleComposition(context.Background(), newClient(t, srv), "body_weight.v1", definition.FormatADL14)
+	comp, _, err := definition.ExampleComposition(t.Context(), newClient(t, srv), "body_weight.v1", definition.FormatADL14)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if comp == nil {
 		t.Fatal("nil Composition")
 	}
-	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/body_weight.v1/example_composition" {
+	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/body_weight.v1/example" {
 		t.Errorf("path = %q", captured.URL.Path)
 	}
 }
 
-func TestExampleCompositionWithFormat(t *testing.T) {
+func TestExampleCompositionWithParams(t *testing.T) {
+	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("format"); got != "FLAT" {
-			t.Errorf("?format = %q, want FLAT", got)
-		}
+		captured = r.Clone(r.Context())
 		w.WriteHeader(http.StatusNotImplemented) // we only assert the request shape here
 	}))
 	defer srv.Close()
-	_, _, _ = definition.ExampleComposition(context.Background(), newClient(t, srv), "x", definition.FormatADL14,
-		definition.WithExampleFormat("FLAT"),
+	_, _, _ = definition.ExampleComposition(
+		t.Context(), newClient(t, srv), "x", definition.FormatADL14,
+		definition.WithExampleType(definition.ExampleTypeOutput),
+		definition.WithExampleDetailLevel(definition.ExampleDetailComplete),
 	)
+	if got := captured.URL.Query().Get("type"); got != "output" {
+		t.Errorf("?type = %q, want output", got)
+	}
+	if got := captured.URL.Query().Get("detail_level"); got != "complete" {
+		t.Errorf("?detail_level = %q, want complete", got)
+	}
+	if captured.URL.Path != "/openehr/v1/definition/template/adl1.4/x/example" {
+		t.Errorf("path = %q, want …/example", captured.URL.Path)
+	}
+}
+
+func TestExampleCompositionRejectsInvalidParams(t *testing.T) {
+	_, _, err := definition.ExampleComposition(t.Context(), nil, "x", definition.FormatADL14,
+		definition.WithExampleType(definition.ExampleType("garbage")))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("invalid type: err = %v, want ErrInvalidConfig", err)
+	}
+	_, _, err = definition.ExampleComposition(t.Context(), nil, "x", definition.FormatADL14,
+		definition.WithExampleDetailLevel(definition.ExampleDetailLevel("deep")))
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("invalid detail_level: err = %v, want ErrInvalidConfig", err)
+	}
 }
 
 func TestTemplateMetadataRoundTrip(t *testing.T) {
@@ -296,6 +319,14 @@ func TestTemplateMetadataRoundTrip(t *testing.T) {
 	if len(roundTripped.Extras) != len(meta.Extras) {
 		t.Errorf("Extras count drifted: %d vs %d", len(roundTripped.Extras), len(meta.Extras))
 	}
+	// created_timestamp (the spec field) must decode into CreatedOn, not
+	// silently land in Extras.
+	if meta.CreatedOn.IsZero() {
+		t.Errorf("CreatedOn not populated from created_timestamp: %+v", meta)
+	}
+	if _, leaked := meta.Extras["created_timestamp"]; leaked {
+		t.Error("created_timestamp leaked into Extras instead of CreatedOn")
+	}
 }
 
 func TestRepository(t *testing.T) {
@@ -310,10 +341,10 @@ func TestRepository(t *testing.T) {
 	}))
 	defer srv.Close()
 	repo := definition.NewRepository(newClient(t, srv))
-	if _, _, err := repo.UploadTemplate(context.Background(), definition.FormatADL14, bytes.NewReader(opt)); err != nil {
+	if _, _, err := repo.UploadTemplate(t.Context(), definition.FormatADL14, bytes.NewReader(opt)); err != nil {
 		t.Fatal(err)
 	}
-	got, _, err := repo.GetTemplate(context.Background(), "body_weight.v1", definition.FormatADL14)
+	got, _, err := repo.GetTemplate(t.Context(), "body_weight.v1", definition.FormatADL14)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -147,6 +147,9 @@ func readQuotedItemTagValue(valPart string) (val, rest string, err error) {
 }
 
 func escapeItemTagValue(s string) string {
+	// Escape backslash first so the reader (which unescapes \x) round-trips
+	// a literal backslash, then escape the quote delimiter.
+	s = strings.ReplaceAll(s, `\`, `\\`)
 	return strings.ReplaceAll(s, `"`, `\"`)
 }
 

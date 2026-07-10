@@ -3,7 +3,11 @@
 
 package aom14
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.am.aom14.archetype.assertion — canonical-JSON MarshalJSON companions
 
@@ -14,7 +18,7 @@ type AssertionJSONMarshaller struct {
 	// StringExpression String form of expression, in case an expression evaluator taking String expressions is used for evaluation.
 	StringExpression *string `json:"string_expression,omitempty"`
 	// Expression Root of expression tree.
-	Expression ExprItem `json:"expression"`
+	Expression json.RawMessage `json:"expression"`
 	// Variables Definitions of variables used in the assertion expression.
 	Variables []AssertionVariable `json:"variables,omitempty"`
 }
@@ -25,11 +29,15 @@ type AssertionJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (a *Assertion) MarshalJSON() ([]byte, error) {
+	rawExpression, err := jsonpoly.Marshal(a.Expression)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&AssertionJSONMarshaller{
 		Class:            "ASSERTION",
 		Tag:              a.Tag,
 		StringExpression: a.StringExpression,
-		Expression:       a.Expression,
+		Expression:       rawExpression,
 		Variables:        a.Variables,
 	})
 }
@@ -64,9 +72,9 @@ type ExprBinaryOperatorJSONMarshaller struct {
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
 	Type string `json:"type"`
 	// LeftOperand Left operand node.
-	LeftOperand ExprItem `json:"left_operand"`
+	LeftOperand json.RawMessage `json:"left_operand"`
 	// RightOperand Right operand node.
-	RightOperand ExprItem `json:"right_operand"`
+	RightOperand json.RawMessage `json:"right_operand"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for ExprBinaryOperator with `_type`
@@ -75,13 +83,21 @@ type ExprBinaryOperatorJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *ExprBinaryOperator) MarshalJSON() ([]byte, error) {
+	rawLeftOperand, err := jsonpoly.Marshal(e.LeftOperand)
+	if err != nil {
+		return nil, err
+	}
+	rawRightOperand, err := jsonpoly.Marshal(e.RightOperand)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ExprBinaryOperatorJSONMarshaller{
 		Class:                "EXPR_BINARY_OPERATOR",
 		PrecedenceOverridden: e.PrecedenceOverridden,
 		Operator:             e.Operator,
 		Type:                 e.Type,
-		LeftOperand:          e.LeftOperand,
-		RightOperand:         e.RightOperand,
+		LeftOperand:          rawLeftOperand,
+		RightOperand:         rawRightOperand,
 	})
 }
 
@@ -118,7 +134,7 @@ type ExprUnaryOperatorJSONMarshaller struct {
 	// Type Type name of this item in the mathematical sense. For leaf nodes, must be the name of a primitive type, or else a reference model type. The type for any relational or boolean operator will be “Boolean”, while the type for any arithmetic operator, will be “Real” or “Integer”.
 	Type string `json:"type"`
 	// Operand Operand node.
-	Operand ExprItem `json:"operand"`
+	Operand json.RawMessage `json:"operand"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for ExprUnaryOperator with `_type`
@@ -127,11 +143,15 @@ type ExprUnaryOperatorJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (e *ExprUnaryOperator) MarshalJSON() ([]byte, error) {
+	rawOperand, err := jsonpoly.Marshal(e.Operand)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ExprUnaryOperatorJSONMarshaller{
 		Class:                "EXPR_UNARY_OPERATOR",
 		PrecedenceOverridden: e.PrecedenceOverridden,
 		Operator:             e.Operator,
 		Type:                 e.Type,
-		Operand:              e.Operand,
+		Operand:              rawOperand,
 	})
 }

@@ -11,7 +11,7 @@ How `openehr-sdk-go` is checked on GitHub and how to reproduce those checks loca
 
 ### CI jobs (`ci.yml`)
 
-Jobs run in parallel. All use Go **1.25.x** (`actions/setup-go@v6` with module cache).
+Jobs run in parallel. All use Go **1.26.x** (`actions/setup-go@v6` with module cache).
 
 | Job | Makefile targets | Purpose |
 |---|---|---|

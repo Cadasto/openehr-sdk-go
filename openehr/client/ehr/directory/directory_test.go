@@ -1,13 +1,13 @@
 package directory_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,7 +62,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := directory.Get(context.Background(), newClient(t, srv), ehrIDFixture)
+	got, meta, err := directory.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,6 +80,55 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestGetWithPath(t *testing.T) {
+	var captured *http.Request
+	body := readCassette(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	_, _, err := directory.Get(t.Context(), newClient(t, srv), ehrIDFixture,
+		directory.WithPath("/episodes/episode-1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.URL.Query().Get("path"); got != "/episodes/episode-1" {
+		t.Errorf("path query = %q, want /episodes/episode-1", got)
+	}
+}
+
+func TestGetAtTimeAndVersionedWithPath(t *testing.T) {
+	var captured *http.Request
+	body := readCassette(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
+
+	if _, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at,
+		directory.WithPath("/episodes")); err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.URL.Query().Get("path"); got != "/episodes" {
+		t.Errorf("GetAtTime path query = %q", got)
+	}
+	if got := captured.URL.Query().Get("version_at_time"); got == "" {
+		t.Error("GetAtTime dropped version_at_time when path supplied")
+	}
+
+	if _, _, err := directory.GetVersioned(t.Context(), newClient(t, srv), ehrIDFixture, folderVUID,
+		directory.WithPath("/episodes")); err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.URL.Query().Get("path"); got != "/episodes" {
+		t.Errorf("GetVersioned path query = %q", got)
+	}
+}
+
 func TestGetAtTime(t *testing.T) {
 	var captured *http.Request
 	body := readCassette(t)
@@ -90,7 +139,7 @@ func TestGetAtTime(t *testing.T) {
 	defer srv.Close()
 
 	at, _ := time.Parse(time.RFC3339, "2026-05-17T08:00:00Z")
-	_, _, err := directory.GetAtTime(context.Background(), newClient(t, srv), ehrIDFixture, at)
+	_, _, err := directory.GetAtTime(t.Context(), newClient(t, srv), ehrIDFixture, at)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +157,7 @@ func TestGetVersioned(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := directory.GetVersioned(context.Background(), newClient(t, srv), ehrIDFixture, folderVUID)
+	_, _, err := directory.GetVersioned(t.Context(), newClient(t, srv), ehrIDFixture, folderVUID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +167,7 @@ func TestGetVersioned(t *testing.T) {
 }
 
 func TestGetRejectsEmptyVersionUID(t *testing.T) {
-	_, _, err := directory.GetVersioned(context.Background(), nil, ehrIDFixture, "")
+	_, _, err := directory.GetVersioned(t.Context(), nil, ehrIDFixture, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -131,7 +180,7 @@ func TestRepository(t *testing.T) {
 	}))
 	defer srv.Close()
 	repo := directory.NewRepository(newClient(t, srv))
-	if _, _, err := repo.Get(context.Background(), ehrIDFixture); err != nil {
+	if _, _, err := repo.Get(t.Context(), ehrIDFixture); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -149,7 +198,7 @@ func TestSaveDirectory(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	_, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder)
+	_, meta, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture, folder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,6 +210,51 @@ func TestSaveDirectory(t *testing.T) {
 	}
 	if meta.VersionUID != folderVUID {
 		t.Errorf("VersionUID = %q", meta.VersionUID)
+	}
+}
+
+func TestSaveSendsLifecycleStateHeader(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	_, _, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture,
+		&rm.Folder{Name: rm.DVText{Value: "Root"}},
+		directory.WithLifecycleState("532"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.Header.Get("openehr-version"); got != `lifecycle_state.code_string="532"` {
+		t.Errorf("openehr-version = %q, want lifecycle_state.code_string=\"532\"", got)
+	}
+}
+
+func TestSaveSendsDottedAuditHeader(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer srv.Close()
+	committer := "Dr Bob"
+	audit := &rm.AuditDetails{
+		SystemID:   "cdr.example",
+		Committer:  rm.PartyIdentified{Name: &committer},
+		ChangeType: rm.DVCodedText{DefiningCode: rm.CodePhrase{CodeString: "249"}},
+	}
+	_, _, err := directory.Save(t.Context(), newClient(t, srv), ehrIDFixture,
+		&rm.Folder{Name: rm.DVText{Value: "Root"}}, directory.WithAuditDetails(audit))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := captured.Header.Get("openehr-audit-details")
+	if strings.Contains(h, "{") {
+		t.Errorf("audit header is JSON-shaped, want dotted grammar: %q", h)
+	}
+	if !strings.Contains(h, `system_id="cdr.example"`) || !strings.Contains(h, `committer.name="Dr Bob"`) {
+		t.Errorf("audit header = %q", h)
 	}
 }
 
@@ -182,7 +276,8 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -215,7 +310,8 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, _, err := directory.Save(
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -237,7 +333,8 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -266,7 +363,8 @@ func TestSaveIdentifierPopulatesVersionUIDFromBody(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	out, meta, err := directory.Save(
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if err != nil {
@@ -293,7 +391,8 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	_, _, err := directory.Save(context.Background(), newClient(t, srv), ehrIDFixture, folder,
+	_, _, err := directory.Save(
+		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferIdentifier),
 	)
 	if !errors.Is(err, transport.ErrInvalidShape) {
@@ -319,7 +418,8 @@ func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {
 		Name:            rm.DVText{Value: "Root Directory"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, meta, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+	out, meta, err := directory.Update(
+		t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err != nil {
@@ -349,7 +449,8 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	out, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
+	out, _, err := directory.Update(
+		t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
 	if err == nil {
@@ -358,7 +459,7 @@ func TestUpdateRepresentationRejectsOriginalVersionShape(t *testing.T) {
 }
 
 func TestUpdateDirectoryRequiresIfMatch(t *testing.T) {
-	_, _, err := directory.Update(context.Background(), nil, ehrIDFixture, "", &rm.Folder{})
+	_, _, err := directory.Update(t.Context(), nil, ehrIDFixture, "", &rm.Folder{})
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -375,7 +476,7 @@ func TestUpdateDirectory(t *testing.T) {
 		Name:            rm.DVText{Value: "Root"},
 		ArchetypeNodeID: "openEHR-EHR-FOLDER.generic.v1",
 	}
-	if _, _, err := directory.Update(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {
+	if _, _, err := directory.Update(t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID), folder); err != nil {
 		t.Fatal(err)
 	}
 	if captured.Method != http.MethodPut {
@@ -393,7 +494,7 @@ func TestDeleteDirectory(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
-	if _, err := directory.Delete(context.Background(), newClient(t, srv), ehrIDFixture, string(folderVUID)); err != nil {
+	if _, err := directory.Delete(t.Context(), newClient(t, srv), ehrIDFixture, string(folderVUID)); err != nil {
 		t.Fatal(err)
 	}
 	if captured.Method != http.MethodDelete {

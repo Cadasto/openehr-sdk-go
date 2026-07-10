@@ -10,7 +10,7 @@ A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`. **
 |---|---|
 | Module path | `github.com/cadasto/openehr-sdk-go` |
 | License | MIT |
-| Go version | `1.25.x` (N-1 release line) |
+| Go version | `1.26.x` (current stable line, floor `1.26.0`) |
 | openEHR REST | `1.1.0-development` |
 | Status | **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md) |
 
@@ -79,7 +79,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 
 ## Tooling & workflow
 
-Host Go `1.25.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
+Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev image when host Go is missing ([Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml)). **Use the Makefile as the single entry point** — extend it, don't add ad-hoc scripts.
 
 | Task | Command |
 |---|---|
@@ -105,7 +105,7 @@ Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** The machine-readable openEHR REST API contract is vendored in [`resources/its-rest/`](resources/its-rest/README.md) — the upstream `*-validation.openapi.yaml` OpenAPI 3.0 documents (EHR, Query, Definition, Admin, Demographic, System). When you need endpoint paths, request/response bodies, headers, or status codes for any REST resource, read those files rather than guessing. Refresh / verify the pin with `make its-rest-sync` / `make its-rest-check`.
+**REST API schema.** The machine-readable openEHR REST API contract is vendored in [`resources/its-rest/`](resources/its-rest/README.md) — the upstream `*-validation.openapi.yaml` OpenAPI 3.0 documents (EHR, Query, Definition, Admin, Demographic, System). When you need endpoint paths, request/response bodies, headers, or status codes for any REST resource, read those files rather than guessing. Refresh / verify the pin with `make its-rest-sync` / `make its-rest-check`. EHRbase-specific endpoints and deployment extensions (e.g. the `/admin/template/all` template purge) are referenced separately in [`resources/ehrbase/`](resources/ehrbase/README.md) — vendored EHRbase OpenAPI specs, **not** the normative contract.
 
 ## Do not touch (yet)
 

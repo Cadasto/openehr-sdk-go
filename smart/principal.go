@@ -5,6 +5,7 @@ import "maps"
 // PrincipalType is a platform-issued principal category (REQ-067).
 type PrincipalType string
 
+// The platform-issued principal categories carried on the ID token (REQ-067).
 const (
 	PrincipalTypePerson  PrincipalType = "PERSON"
 	PrincipalTypeAgent   PrincipalType = "AGENT"

@@ -8,7 +8,7 @@ Get from zero to a working import in a few minutes. This guide targets **applica
 
 | Requirement | Notes |
 |---|---|
-| **Go 1.25.x** | Matches `go.mod`. Host Go is the fast path for `go run` and IDE tooling. |
+| **Go 1.26.x** | Matches `go.mod` (minimum `1.26.0`). Host Go is the fast path for `go run` and IDE tooling. |
 | **Make** (optional) | Recommended for contributors and CI-parity checks (`make ci`). |
 | **An openEHR backend** (optional) | Only needed for live REST calls. Most building-block examples run offline with vendored fixtures. |
 

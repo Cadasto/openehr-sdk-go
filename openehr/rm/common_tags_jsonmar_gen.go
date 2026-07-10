@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.common.tags — canonical-JSON MarshalJSON companions
 
@@ -14,11 +18,11 @@ type ItemTagJSONMarshaller struct {
 	// Value The value. If set, may not be empty.
 	Value *string `json:"value,omitempty"`
 	// Target Identifier of target, which may be a `VERSIONED_OBJECT<T>` or a `VERSION<T>`.
-	Target UIDBasedID `json:"target"`
+	Target json.RawMessage `json:"target"`
 	// TargetPath Optional archetype (i.e. AQL) or RM path within `_target_`, used to tag a fine-grained element.
 	TargetPath *string `json:"target_path,omitempty"`
 	// OwnerID Identifier of owner object, such as EHR.
-	OwnerID ObjectRefLike `json:"owner_id"`
+	OwnerID json.RawMessage `json:"owner_id"`
 }
 
 // MarshalJSON emits canonical openEHR JSON for ItemTag with `_type`
@@ -27,12 +31,20 @@ type ItemTagJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (i *ItemTag) MarshalJSON() ([]byte, error) {
+	rawTarget, err := jsonpoly.Marshal(i.Target)
+	if err != nil {
+		return nil, err
+	}
+	rawOwnerID, err := jsonpoly.Marshal(i.OwnerID)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&ItemTagJSONMarshaller{
 		Class:      "ITEM_TAG",
 		Key:        i.Key,
 		Value:      i.Value,
-		Target:     i.Target,
+		Target:     rawTarget,
 		TargetPath: i.TargetPath,
-		OwnerID:    i.OwnerID,
+		OwnerID:    rawOwnerID,
 	})
 }

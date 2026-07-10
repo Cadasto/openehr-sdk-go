@@ -19,10 +19,12 @@ The path is all lowercase, matching idiomatic Go module naming and the GitHub or
 
 ## REQ-002 — Go version
 
-The SDK **MUST** declare `go 1.25` (or later patch within the 1.25 line) in `go.mod` and **MUST NOT** require a more recent Go release than is currently on the upstream supported line (N-1 policy).
+The SDK **MUST** set the `go.mod` `go` directive to the **current stable Go minor line (N) at its `.0` patch** — e.g. `go 1.26.0` — expressing the minimum Go the module needs, not a specific patch. Patch releases add no language or standard-library API surface, so a mid-line patch floor buys nothing and would force every consumer, linter image, and CI runner on an *earlier* patch of the same minor to fetch a newer toolchain (`GOTOOLCHAIN=auto`), breaking offline/air-gapped builds. When a newer major Go release becomes stable, the minimum **MUST** be raised to the new line at its `.0` patch — a **minor** SemVer bump ([releases.md § Versioning](../releases.md#versioning)). The directive **MUST NOT** name a specific mid-line patch, nor a pre-release (rc/beta) toolchain.
+
+*Informative: at the time of writing the directive is `go 1.26.0`.*
 
 - **Lives in:** [`go.mod`](../../go.mod)
-- **Related:** [module-layout.md § Versioning](module-layout.md#versioning)
+- **Related:** [module-layout.md § Versioning](module-layout.md#versioning), [releases.md § Versioning](../releases.md#versioning)
 
 ---
 

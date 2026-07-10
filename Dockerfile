@@ -4,7 +4,7 @@
 #
 # This is a library module — there is no service binary to ship. The image
 # exists so the Makefile can shell Go toolchain calls (gofmt, go vet, go
-# test, go build, go mod) through it when a host Go 1.25.x install is not
+# test, go build, go mod) through it when a host Go 1.26.x install is not
 # available.
 #
 # golangci-lint is installed from the same pinned image the Makefile uses
@@ -13,10 +13,12 @@
 # One pinned version keeps `make fmt` / `make lint` reproducible whether they
 # run on the host or in this image.
 
-# Pin the PATCH version for reproducible builds (matches go.mod's `go`
-# line). Bump explicitly when a new stable patch ships — same policy as
+# Pin the dev toolchain to a specific recent PATCH for reproducible builds.
+# This is the build toolchain, not the module floor: it only has to be >=
+# go.mod's `go` line (which stays at the minor's `.0`, e.g. 1.26.0, per
+# REQ-002). Bump explicitly when a new stable patch ships — same policy as
 # the Makefile's LINT_IMAGE pin.
-ARG GO_VERSION=1.25.0
+ARG GO_VERSION=1.26.4
 ARG ALPINE_VERSION=3.20
 ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.11.4-alpine
 # ANTLR generator (Java) version — MUST track the antlr4-go/antlr runtime in

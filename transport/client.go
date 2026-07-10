@@ -456,6 +456,8 @@ func statusToSentinel(s int) error {
 		return ErrVersionConflict
 	case http.StatusPreconditionFailed:
 		return ErrPreconditionFailed
+	case http.StatusUnprocessableEntity:
+		return ErrUnprocessable
 	case http.StatusPreconditionRequired:
 		return ErrPreconditionRequired
 	}

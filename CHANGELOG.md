@@ -10,6 +10,44 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-02
+
+Fourteenth `v0.x` minor — two consumer-driven gaps closed on the RM-floor and AQL-parse surfaces: presence-aware EHR_STATUS validation (SDK-GAP-18; REQ-112) and structured access to AQL standing-predicate + WHERE paths (SDK-GAP-19; REQ-113). Additive new public API; one minor source break — `parse.IdentifiedPath` now embeds the relocated `aql.IdentifiedPath`, so field reads are unchanged but composite-literal construction must wrap the embedded struct.
+
+### Added
+
+- **Presence-aware EHR_STATUS RM-floor entry (SDK-GAP-18; REQ-112).** New `validation.ValidateRMEHRStatusBytes` flags an omitted value-typed mandatory `subject` via JSON-key presence, which the value-based `ValidateRMEHRStatus` cannot (a bare `PARTY_SELF` decodes identically to an absent one).
+- **Structured AQL path access (SDK-GAP-19; REQ-113).** `parse.ClassExpr.PredicateComparison` exposes a class standing predicate as a structured `aql.Comparison`, and `aql.Comparison.ParsedPath` exposes a WHERE path's alias+segments; the shared `aql.IdentifiedPath`/`PathSegment` vocabulary moved into `openehr/aql` (parse-side names preserved); emission/round-trip unchanged.
+
+## [0.13.0] - 2026-07-01
+
+Thirteenth `v0.x` minor — raises the minimum Go toolchain to the current stable line (Go 1.26, `go 1.26.0` floor; REQ-002). Toolchain, build, and docs only — no openEHR API, wire, or behaviour change from v0.12.0; upgrade once your build runs Go ≥ 1.26.
+
+### Added
+
+- **Go toolchain minimum raised to Go 1.26 (`go 1.26.0` floor) (REQ-002).** `go.mod`, the Docker/Make toolchain, and CI now track the current stable Go line (N) instead of N-1; consumers must build with Go ≥ 1.26.0.
+
+## [0.12.0] - 2026-07-01
+
+Twelfth `v0.x` minor — three inbound CDR-dossier gaps closed: template-less RM validation (SDK-GAP-15; REQ-112), stored-query / query REST conformance (SDK-GAP-16; REQ-055/057), and the execution-oriented parsed AQL AST (SDK-GAP-17; REQ-113), plus the repo-wide modernization sweep. Additive across the board — no integrator-visible behaviour changes from v0.11.0; the WHERE / Value vocabulary types are now exported on `openehr/aql` so a parsed query is introspectable.
+
+### Added
+
+- **Template-less RM validation floor (SDK-GAP-15; REQ-112).** `validation.ValidateRM` + typed sugars (`ValidateRMFolder`/`EHRStatus`/`EHRAccess`/`Demographic`) walk any RM root with the BMM as sole driver and report RM-mandatory absences plus a per-type invariant catalogue (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL bounds, OBJECT_REF type/namespace); template-driven path unchanged.
+- **Stored-query/query REST conformance (SDK-GAP-16; REQ-055/057).** POST query execution now scopes via the spec's `openehr-ehr-id` request header (verb-aware: GET still uses the `ehr_id` query parameter); `PutStoredQuery` recovers the assigned `{name, version}` from the `Location` response header before falling through to body decode then synthesised metadata.
+- **Execution-oriented parsed AQL AST (SDK-GAP-17; REQ-113).** Read-side `parse.Query` AST mirrors `aql.Builder`; `WhereExpr`/`Value` vocabulary unified across read and write sides; `Emit` closes the round-trip loop. Out-of-catalogue shapes surface as `aql.ErrIncompleteAST`.
+- **Modernization sweep (lint, tests, idioms).** `.golangci.yml` enables `revive` with a curated rule set; tests across `auth/`, `smart/`, `transport/`, `openehr/client/*` and `testkit/probes/*` adopt `t.Context()` instead of `context.Background()`; benchmark loops adopt `b.Loop`; `sort.*` replaced with `slices.Sort`/`SortFunc`. No public-API change.
+
+## [0.11.0] - 2026-06-24
+
+Eleventh `v0.x` minor — polymorphic `_type` round-trip stability (SDK-GAP-13) and seeded synthetic value generation (SDK-GAP-14), plus the ITS-REST conformance remediation. Additive new `instance`/`composition` value-fill API; one integrator-visible change — `composition.Get` returns the typed `ErrDeletedAtTime` on a 204 deleted read. Safe to upgrade from `v0.10.0` after that note.
+
+### Added
+
+- **ITS-REST conformance remediation (REQ-059/093/095/099).** Corrected wire-level deviations in the landed REST clients against the vendored OpenAPI contract (headers, verbs, paths, status mapping) and vendored the EHRbase specs (`resources/ehrbase/`, Apache-2.0); see [plan](docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md). Integrator note: `composition.Get` now returns the typed `ErrDeletedAtTime` (not a nil error) on a 204 deleted-at-time read.
+- **Polymorphic `_type` round-trip stability (SDK-GAP-13; REQ-052/102).** Value-in-interface RM fields now emit `_type` on encode (new `openehr/internal/jsonpoly`) and a round-tripped `DV_INTERVAL<T>` re-validates from its bounds' runtime types, restoring strict round-trip template validation. [plan](docs/plans/archive/2026-06-23-sdk-gap-13-polymorphic-encode-decode.md).
+- **Seeded synthetic value fill (SDK-GAP-14; REQ-103/107).** New orthogonal `instance.ValueFill` (`RandomFill`) + `ValueSource` seam — surfaced as `composition.WithValueFill`/`WithValueSource` — draws in-constraint, varying, reproducible leaf values; `medium` detail_level deferred. [plan](docs/plans/archive/2026-06-23-sdk-gap-14-seeded-synthetic-generation.md).
+
 ## [0.10.0] - 2026-06-19
 
 Tenth `v0.x` minor — RM behavioural functions (REQ-120..123) and real-world OPT synthesis/validation coverage (SDK-GAP-12). Additive; one minor `ehr.VersionUID` partial-segment change. Safe to upgrade from `v0.9.0`.

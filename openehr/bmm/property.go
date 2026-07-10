@@ -44,6 +44,8 @@ type SingleProperty struct {
 	TypeName string `json:"type"`
 }
 
+// TypeP_BMM_SINGLE_PROPERTY is the SingleProperty _type discriminator
+// value.
 const TypeP_BMM_SINGLE_PROPERTY = "P_BMM_SINGLE_PROPERTY"
 
 func (*SingleProperty) isProperty() {}
@@ -63,10 +65,14 @@ type SinglePropertyOpen struct {
 	TypeName string `json:"type"`
 }
 
+// TypeP_BMM_SINGLE_PROPERTY_OPEN is the SinglePropertyOpen _type
+// discriminator value.
 const TypeP_BMM_SINGLE_PROPERTY_OPEN = "P_BMM_SINGLE_PROPERTY_OPEN"
 
 func (*SinglePropertyOpen) isProperty() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_SINGLE_PROPERTY_OPEN representation.
 func (s *SinglePropertyOpen) MarshalJSON() ([]byte, error) {
 	return marshalDiscriminated(TypeP_BMM_SINGLE_PROPERTY_OPEN, s.propertyCommon, map[string]any{
 		"type": s.TypeName,
@@ -84,10 +90,14 @@ type ContainerProperty struct {
 	Cardinality *Cardinality   `json:"cardinality,omitempty"`
 }
 
+// TypeP_BMM_CONTAINER_PROPERTY is the ContainerProperty _type
+// discriminator value.
 const TypeP_BMM_CONTAINER_PROPERTY = "P_BMM_CONTAINER_PROPERTY"
 
 func (*ContainerProperty) isProperty() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_CONTAINER_PROPERTY representation.
 func (c *ContainerProperty) MarshalJSON() ([]byte, error) {
 	extra := map[string]any{}
 	if c.TypeDef != nil {
@@ -106,10 +116,14 @@ type GenericProperty struct {
 	TypeDef *GenericType `json:"type_def"`
 }
 
+// TypeP_BMM_GENERIC_PROPERTY is the GenericProperty _type discriminator
+// value.
 const TypeP_BMM_GENERIC_PROPERTY = "P_BMM_GENERIC_PROPERTY"
 
 func (*GenericProperty) isProperty() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_GENERIC_PROPERTY representation.
 func (g *GenericProperty) MarshalJSON() ([]byte, error) {
 	extra := map[string]any{}
 	if g.TypeDef != nil {

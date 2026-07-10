@@ -30,10 +30,14 @@ type SingleFunctionParameter struct {
 	TypeName string `json:"type"`
 }
 
+// TypeP_BMM_SINGLE_FUNCTION_PARAMETER is the SingleFunctionParameter
+// _type discriminator value.
 const TypeP_BMM_SINGLE_FUNCTION_PARAMETER = "P_BMM_SINGLE_FUNCTION_PARAMETER"
 
 func (*SingleFunctionParameter) isFunctionParameter() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_SINGLE_FUNCTION_PARAMETER representation.
 func (s *SingleFunctionParameter) MarshalJSON() ([]byte, error) {
 	return marshalDiscriminated(TypeP_BMM_SINGLE_FUNCTION_PARAMETER, s.functionParameterCommon, map[string]any{
 		"type": s.TypeName,
@@ -47,10 +51,14 @@ type SingleFunctionParameterOpen struct {
 	TypeName string `json:"type"`
 }
 
+// TypeP_BMM_SINGLE_FUNCTION_PARAMETER_OPEN is the
+// SingleFunctionParameterOpen _type discriminator value.
 const TypeP_BMM_SINGLE_FUNCTION_PARAMETER_OPEN = "P_BMM_SINGLE_FUNCTION_PARAMETER_OPEN"
 
 func (*SingleFunctionParameterOpen) isFunctionParameter() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_SINGLE_FUNCTION_PARAMETER_OPEN representation.
 func (s *SingleFunctionParameterOpen) MarshalJSON() ([]byte, error) {
 	return marshalDiscriminated(TypeP_BMM_SINGLE_FUNCTION_PARAMETER_OPEN, s.functionParameterCommon, map[string]any{
 		"type": s.TypeName,
@@ -65,10 +73,14 @@ type ContainerFunctionParameter struct {
 	Cardinality *Cardinality   `json:"cardinality,omitempty"`
 }
 
+// TypeP_BMM_CONTAINER_FUNCTION_PARAMETER is the
+// ContainerFunctionParameter _type discriminator value.
 const TypeP_BMM_CONTAINER_FUNCTION_PARAMETER = "P_BMM_CONTAINER_FUNCTION_PARAMETER"
 
 func (*ContainerFunctionParameter) isFunctionParameter() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_CONTAINER_FUNCTION_PARAMETER representation.
 func (c *ContainerFunctionParameter) MarshalJSON() ([]byte, error) {
 	extra := map[string]any{}
 	if c.TypeDef != nil {
@@ -87,10 +99,14 @@ type GenericFunctionParameter struct {
 	TypeDef *GenericType `json:"type_def"`
 }
 
+// TypeP_BMM_GENERIC_FUNCTION_PARAMETER is the GenericFunctionParameter
+// _type discriminator value.
 const TypeP_BMM_GENERIC_FUNCTION_PARAMETER = "P_BMM_GENERIC_FUNCTION_PARAMETER"
 
 func (*GenericFunctionParameter) isFunctionParameter() {}
 
+// MarshalJSON implements [encoding/json.Marshaler] for the
+// P_BMM_GENERIC_FUNCTION_PARAMETER representation.
 func (g *GenericFunctionParameter) MarshalJSON() ([]byte, error) {
 	extra := map[string]any{}
 	if g.TypeDef != nil {

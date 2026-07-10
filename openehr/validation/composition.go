@@ -280,6 +280,10 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 		return "EHR_STATUS", x.ArchetypeNodeID, true
 	case rm.EHRStatus:
 		return "EHR_STATUS", x.ArchetypeNodeID, true
+	case *rm.EHRAccess:
+		return "EHR_ACCESS", x.ArchetypeNodeID, true
+	case rm.EHRAccess:
+		return "EHR_ACCESS", x.ArchetypeNodeID, true
 	}
 	return "", "", false
 }

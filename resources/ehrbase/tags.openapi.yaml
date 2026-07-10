@@ -1,0 +1,364 @@
+openapi: 3.0.1
+info:
+  title: EHRbase Item Tag Experimental API
+  description: Experimental API for working with Item Tags
+  license:
+    name: Apache 2.0
+    url: https://github.com/ehrbase/ehrbase/blob/develop/LICENSE.md
+  version: v1
+externalDocs:
+  description: EHRbase Documentation
+  url: https://docs.ehrbase.org/
+servers:
+  - url: http://localhost:8080/ehrbase
+    description: Generated server url
+paths:
+  /rest/experimental/tags/ehr/{ehr_id}/ehr_status/{versioned_object_uid}/item_tag:
+    get:
+      tags:
+        - EHR_STATUS ITEM_TAGS
+      summary: Get tags
+      description: Returns all tags for or filters based on the given ids and/or keys.
+      operationId: getEhrStatusItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+        - name: ids
+          in: query
+          description: Filter for tag Identifier.
+          required: false
+          schema:
+            type: string($uuid)
+        - name: keys
+          in: query
+          description: Filter for tag keys.
+          required: false
+          schema:
+            type: string($key)
+      responses:
+        '200':
+          description: ItemTag for the composition
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemTagDto'
+    put:
+      tags:
+        - EHR_STATUS ITEM_TAGS
+      summary: Create or Update tags
+      description: >-
+        Bulk creation/update of tags. Tags without IDs are created, those with
+        IDs are updated.
+      operationId: upsertEhrStatusItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          description: Preferred response type.
+          required: false
+          schema:
+            type: string($prefer)
+            enum:
+              - return=minimal
+              - return=representation
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ItemTagDto'
+            example:
+              - key: tag::1
+                value: some textual value
+                target_path: /context/end_time[at0001]|value
+        required: true
+      responses:
+        '200':
+          description: >-
+            ItemTag ids in case Header Prefer is missing or contains
+            return=representation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemTagDto'
+    delete:
+      tags:
+        - EHR_STATUS ITEM_TAGS
+      summary: Deletes tags
+      description: Deletes all tags for matching the given uuid or ItemTag.id.
+      operationId: deleteEhrStatusItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: List of ItemTag string($uuid) or entries to delete
+              oneOf:
+                - type: string
+                  format: uuid
+                - $ref: '#/components/schemas/ItemTagDto'
+        required: true
+      responses:
+        '204':
+          description: No Content
+  /rest/experimental/tags/ehr/{ehr_id}/composition/{versioned_object_uid}/item_tag:
+    get:
+      tags:
+        - COMPOSITION ITEM_TAG
+      summary: Get tags
+      description: Returns all tags for or filters based on the given ids and/or keys.
+      operationId: getCompositionItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+        - name: ids
+          in: query
+          description: Filter for tag Identifier.
+          required: false
+          schema:
+            type: string($uuid)
+        - name: keys
+          in: query
+          description: Filter for tag keys.
+          required: false
+          schema:
+            type: string($key)
+      responses:
+        '200':
+          description: ItemTag for the composition
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemTagDto'
+    put:
+      tags:
+        - COMPOSITION ITEM_TAG
+      summary: Create or Update tags
+      description: >-
+        Bulk creation/update of tags. Tags without IDs are created, those with
+        IDs are updated.
+      operationId: upsertCompositionItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: Prefer
+          in: header
+          description: Preferred response type.
+          required: false
+          schema:
+            type: string($prefer)
+            enum:
+              - return=minimal
+              - return=representation
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ItemTagDto'
+            example:
+              - key: tag::1
+                value: some textual value
+                target_path: /context/end_time[at0001]|value
+        required: true
+      responses:
+        '200':
+          description: >-
+            ItemTag ids in case Header Prefer is missing or contains
+            return=representation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ItemTagDto'
+    delete:
+      tags:
+        - COMPOSITION ITEM_TAG
+      summary: Deletes tags
+      description: Deletes all tags for matching the given uuid or ItemTag.id.
+      operationId: deleteCompositionItemTags
+      parameters:
+        - name: openEHR-VERSION
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: openEHR-AUDIT_DETAILS
+          in: header
+          required: false
+          schema:
+            type: string
+        - name: ehr_id
+          in: path
+          description: Identifier of owner object, such as EHR.
+          required: true
+          schema:
+            type: string($uuid)
+        - name: versioned_object_uid
+          in: path
+          description: >-
+            Identifier of target, which may be a VERSIONED_OBJECT<T> or a
+            VERSION<T>.
+          required: true
+          schema:
+            type: string($uuid|$version)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: List of ItemTag string($uuid) or entries to delete
+              oneOf:
+                - type: string
+                  format: uuid
+                - $ref: '#/components/schemas/ItemTagDto'
+        required: true
+      responses:
+        '204':
+          description: No Content
+components:
+  schemas:
+    ItemTagDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        target:
+          type: string
+          format: uuid
+        key:
+          type: string
+        value:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+        target_type:
+          type: string
+          enum:
+            - EHR_STATUS
+            - COMPOSITION
+        target_path:
+          type: string

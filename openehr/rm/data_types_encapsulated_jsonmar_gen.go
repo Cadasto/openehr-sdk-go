@@ -3,7 +3,11 @@
 
 package rm
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
+)
 
 // BMM package: org.openehr.rm.data_types.encapsulated — canonical-JSON MarshalJSON companions
 
@@ -16,7 +20,7 @@ type DVMultimediaJSONMarshaller struct {
 	// AlternateText Text to display in lieu of multimedia display/replay.
 	AlternateText *string `json:"alternate_text,omitempty"`
 	// URI URI reference to electronic information stored outside the record as a file, database entry etc, if supplied as a reference.
-	URI DVURILike `json:"uri,omitempty"`
+	URI json.RawMessage `json:"uri,omitempty"`
 	// Data The actual data found at `_uri_`, if supplied inline.
 	Data []byte `json:"data,omitempty"`
 	// MediaType Data media type coded from openEHR code set  media types  (interface for the IANA MIME types code set).
@@ -39,12 +43,16 @@ type DVMultimediaJSONMarshaller struct {
 // first (in their original order), then own + flattened-abstract
 // ancestor fields in BMM property declaration order.
 func (d *DVMultimedia) MarshalJSON() ([]byte, error) {
+	rawURI, err := jsonpoly.Marshal(d.URI)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(&DVMultimediaJSONMarshaller{
 		Class:                   "DV_MULTIMEDIA",
 		Charset:                 d.Charset,
 		Language:                d.Language,
 		AlternateText:           d.AlternateText,
-		URI:                     d.URI,
+		URI:                     rawURI,
 		Data:                    d.Data,
 		MediaType:               d.MediaType,
 		CompressionAlgorithm:    d.CompressionAlgorithm,

@@ -1,7 +1,6 @@
 package ehr_test
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -67,7 +66,7 @@ func TestGet(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	got, meta, err := openehrclient.Get(context.Background(), newClient(t, srv), ehrIDFixture)
+	got, meta, err := openehrclient.Get(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +88,7 @@ func TestGet(t *testing.T) {
 }
 
 func TestGetRejectsEmptyID(t *testing.T) {
-	_, _, err := openehrclient.Get(context.Background(), nil, "")
+	_, _, err := openehrclient.Get(t.Context(), nil, "")
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("expected ErrInvalidConfig, got %v", err)
 	}
@@ -103,7 +102,7 @@ func TestExistsTrue(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(context.Background(), newClient(t, srv), ehrIDFixture)
+	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestExistsFalseOn404(t *testing.T) {
 		w.WriteHeader(404)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(context.Background(), newClient(t, srv), ehrIDFixture)
+	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if err != nil {
 		t.Errorf("404 must fold into exists=false, got err: %v", err)
 	}
@@ -131,7 +130,7 @@ func TestExistsBubblesNon404Errors(t *testing.T) {
 		w.WriteHeader(403)
 	}))
 	defer srv.Close()
-	exists, err := openehrclient.Exists(context.Background(), newClient(t, srv), ehrIDFixture)
+	exists, err := openehrclient.Exists(t.Context(), newClient(t, srv), ehrIDFixture)
 	if !errors.Is(err, transport.ErrForbidden) {
 		t.Errorf("expected ErrForbidden bubbled, got %v", err)
 	}
@@ -148,7 +147,7 @@ func TestGetBySubject(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	got, _, err := openehrclient.GetBySubject(context.Background(), newClient(t, srv), "demographic", "patient-123")
+	got, _, err := openehrclient.GetBySubject(t.Context(), newClient(t, srv), "demographic", "patient-123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +191,7 @@ func TestCreateServerAssigned(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	got, meta, err := openehrclient.Create(context.Background(), newClient(t, srv))
+	got, meta, err := openehrclient.Create(t.Context(), newClient(t, srv))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -218,7 +217,7 @@ func TestCreateClientSupplied(t *testing.T) {
 		_, _ = w.Write(body)
 	}))
 	defer srv.Close()
-	_, _, err := openehrclient.Create(context.Background(), newClient(t, srv),
+	_, _, err := openehrclient.Create(t.Context(), newClient(t, srv),
 		openehrclient.WithEHRID(ehrIDFixture),
 	)
 	if err != nil {

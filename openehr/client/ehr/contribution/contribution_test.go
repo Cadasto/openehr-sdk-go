@@ -1,7 +1,6 @@
 package contribution_test
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -96,7 +95,7 @@ func TestCommitMinimal(t *testing.T) {
 		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
-	out, meta, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch)
+	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, batch)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,11 +120,11 @@ func TestCommitMinimal(t *testing.T) {
 }
 
 func TestCommitRejectsInputs(t *testing.T) {
-	_, _, err := contribution.Commit(context.Background(), nil, "", nil)
+	_, _, err := contribution.Commit(t.Context(), nil, "", nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("empty EHRID: expected ErrInvalidConfig, got %v", err)
 	}
-	_, _, err = contribution.Commit(context.Background(), nil, ehrIDFixture, nil)
+	_, _, err = contribution.Commit(t.Context(), nil, ehrIDFixture, nil)
 	if !errors.Is(err, transport.ErrInvalidConfig) {
 		t.Errorf("nil batch: expected ErrInvalidConfig, got %v", err)
 	}
@@ -152,7 +151,7 @@ func TestCommitSubmissionShape(t *testing.T) {
 		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
-	if _, _, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch); err != nil {
+	if _, _, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, batch); err != nil {
 		t.Fatal(err)
 	}
 
@@ -212,7 +211,7 @@ func TestCommitMapsVersionConflict(t *testing.T) {
 		Audit:    newAudit(),
 		Versions: []contribution.CommitVersion{newOriginalVersion()},
 	}
-	_, _, err := contribution.Commit(context.Background(), newClient(t, srv), ehrIDFixture, batch)
+	_, _, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, batch)
 	if !errors.Is(err, transport.ErrVersionConflict) {
 		t.Errorf("expected ErrVersionConflict, got %v", err)
 	}

@@ -671,3 +671,186 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
 - **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 
+## REQ-112 — Template-less Reference Model validation floor
+
+The validators introduced by REQ-102 and generalised by REQ-110 are **template-driven** — every entry point accepts a `*templatecompile.Compiled` as the authoritative driver. A consumer persisting RM roots that bind to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) has no SDK call to assert RM conformance. The strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision<0`.
+
+The SDK **MUST** expose a **template-less RM validation floor** beneath the OPT-driven path — an entry point that walks any RM root with the BMM as its sole driver and reports `Issue`s for (a) RM-mandatory attribute breaches and (b) per-RM-type invariants on the leaves it touches. The OPT-driven path stays the authoritative template-conformance layer; this floor is what runs when no template applies (template validity implies RM validity, so the two compose).
+
+### Surface
+
+```go
+// Generic entry — any RM concrete in the v2 closed set.
+func ValidateRM(root any) Result
+
+// Typed convenience wrappers (delegate to ValidateRM):
+func ValidateRMFolder(folder *rm.Folder) Result
+func ValidateRMEHRStatus(status *rm.EHRStatus) Result
+func ValidateRMEHRAccess(access *rm.EHRAccess) Result
+func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / GROUP / AGENT / ROLE
+
+// Presence-aware EHR_STATUS entry (SDK-GAP-18) — decides value-typed
+// mandatory presence from JSON keys; see § Value-typed mandatory presence.
+func ValidateRMEHRStatusBytes(data []byte) Result
+```
+
+The typed wrappers carry the same nil-guard contract REQ-110 introduced: `nil_folder` / `nil_ehr_status` / `nil_ehr_access` / `nil_party` distinguish wrapper-side guards from the generic `nil_root` that `ValidateRM(nil)` emits. A Go value outside the v2 closed RM set surfaces `rm_type_unknown` at `/`; the floor cannot descend further but does not panic.
+
+### Driver
+
+The floor walker is a **second driver** alongside the template-driven walker — separate type, shared closed-RM-set helpers (`rmTypeInfo` / `describeRMType` / `rmread.ReadSingle` / `rmread.ReadMultiple`). It consumes [`openehr/rm/rminfo`](../../openehr/rm/rminfo) for the structural knowledge:
+
+- `RequiredAttributes(rmType)` drives the per-node required-set check. A single-valued attribute absent (or typed-nil) emits `required`; a multi-valued attribute absent emits `required`, present-but-empty emits `cardinality`.
+- `AttributeNames(rmType)` enumerates the descend candidates (the per-type attribute list extends `Lookup` with this method — additive on the existing surface).
+- `AttributeRMType` / `IsContainer` carry the declared shape for each attribute. The walker recurses into every present attribute, using the value's *runtime* RM type (from `rmTypeInfo`) when known so the invariant evaluators dispatch correctly across Liskov substitution (`DV_TEXT` carrying `DV_CODED_TEXT`, `PARTY_IDENTIFIED` carrying `PARTY_RELATED`, etc.).
+
+### Per-RM-type invariant catalogue (v1 first cycle)
+
+The catalogue is intentionally small; the value is in the structural required-set walk above, plus a focused set of leaf invariants that the canjson lenient decode accepts but the RM forbids:
+
+- **CODE_PHRASE** — `code_string` non-empty.
+- **DV_QUANTITY** — `precision`, when set, non-negative.
+- **DV_INTERVAL** — `lower` ≤ `upper` when both bounds are numerically comparable (DV_QUANTITY / DV_COUNT) and neither side is unbounded. Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer comparison semantics that integrate with the REQ-123 temporal helpers in a follow-up cycle.
+- **OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF** — `type` and `namespace` non-empty. The `id` floor is covered by the required-set walk (the field is RM-mandatory).
+
+Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Each invariant emits `Issue.Code = "rm_invariant"`; consumers dispatch on the code as with the rest of the issue taxonomy.
+
+### Trust model
+
+The floor is the structural RM-only layer. It does **not** evaluate:
+
+- archetype-level or template-level constraints (that is REQ-102 / REQ-110);
+- terminology binding or external-code validation;
+- semantic validity beyond the BMM and the explicit invariant catalogue.
+
+These exclusions are by design: a CDR may layer template-driven validation on top of the floor, or run the floor alone for resources where no template applies.
+
+### Value-typed mandatory presence (SDK-GAP-18)
+
+The required-set walk reads presence from the decoded Go value, which cannot detect an omitted **value-typed** mandatory attribute — a Go zero value is indistinguishable from an absent one. `EHR_STATUS.subject` is the case: typed `rm.PartySelf`, a value struct whose only field (`external_ref`) is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value. Interface- / pointer- / slice-typed mandatories (e.g. `name`, typed `rm.DVTextLike`) are unaffected — nil is a reliable absence signal — as are the value-level invariants, which inspect fields rather than presence.
+
+The floor closes this by deciding presence from the **source JSON key set** rather than the Go zero value:
+
+```go
+func ValidateRMEHRStatusBytes(data []byte) Result
+```
+
+`ValidateRMEHRStatusBytes` decodes the EHR_STATUS, runs the value-based `ValidateRMEHRStatus` floor, and additionally emits `required` at `/subject` when the top-level `subject` key is absent from `data` — or present but JSON `null`, which does not satisfy the mandatory attribute and decodes to the same zero `PartySelf`. A supplied subject — even the bare form — yields no spurious `required`; a non-object or undecodable input surfaces a single `invalid_shape` at `/`. The value-based `ValidateRMEHRStatus(*rm.EHRStatus)` is retained; its docstring documents the value-typed-subject blind spot and points to the `…Bytes` entry. Per REQ-013 the decode uses the standard library, not `openehr/serialize/canjson` — the RM types carry their own `UnmarshalJSON`.
+
+### Building-block independence (REQ-013)
+
+`openehr/validation/` continues to import only `openehr/rm`, `openehr/rm/rminfo`, `openehr/template`, `openehr/template/constraints`, `openehr/templatecompile`, `openehr/validation/rmread`, and the internal compile-engine — REQ-112's additions are local to the package. The forbidden-import set is unchanged and is enforced by `TestValidationForbiddenImports`.
+
+- **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
+- **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
+- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15 (archived after PR #57).
+
+---
+
+## REQ-113 — Execution-oriented parsed AQL AST
+
+REQ-109's [`openehr/aql/parse`](../../openehr/aql/parse) returns a lint-shaped [`Document`](../../openehr/aql/parse/parse.go) that flattens the FROM/CONTAINS tree to a class set and erases the WHERE expression structure: the lint contract reasons over the *set* of bound classes and the *set* of paths, not their containment shape or the operator tree. An execution consumer — a server lowering AQL to SQL, a planner picking up CONTAINS nesting, a query rewriter — needs to read the *structure*. The construction-side [`aql.Builder`](../../openehr/aql/builder.go) (REQ-055) is the write-side mirror of that need; until REQ-113 the read side had no symmetric surface.
+
+The SDK **MUST** expose a **stable, generated-type-free, readable** structured AQL AST: a `string → structured query` entry point whose result a consumer can traverse without importing `openehr/aql/parse/gen` or any `internal/` package. The AST **MUST** preserve containment nesting, the WHERE operator/value tree, SELECT function/aggregate wrappers and aliases, ORDER BY direction, and LIMIT / OFFSET values. The WHERE and Value vocabularies are SHARED with the construction side — `aql.Comparison` / `aql.Junction` / `aql.NotExpr` / `aql.ExistsExpr` / `aql.MatchesExpr` / `aql.LikeExpr` / `aql.ParamValue` / `aql.StringValue` / `aql.IntValue` / `aql.RealValue` / `aql.BoolValue` are populated by both Builder and Parse: one model, two directions.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/aql/parse
+
+// Tier 2 — the target read AST.
+func ParseQuery(q string) (*Query, error)              // (*Query, aql.ErrIncompleteAST) on catalogue gap
+func (d *Document) Query() *Query                       // best-effort partial AST
+func (d *Document) QueryErr() error                     // aql.ErrIncompleteAST diagnostic, nil otherwise
+
+type Query struct {
+    Select  SelectClause
+    From    FromClause
+    Where   aql.WhereExpr  // nil when no WHERE clause
+    OrderBy []OrderTerm
+    Limit   LimitExpr      // nil when no LIMIT
+    Offset  LimitExpr      // nil when no OFFSET
+}
+func (q *Query) Emit() (string, error)                  // refuses (returns aql.ErrIncompleteAST) on an extractor-incomplete AST
+
+// LIMIT / OFFSET — sealed union of literal and parameter forms.
+type LimitExpr  interface { /* sealed */ }
+type IntLimit   struct { N int }                        // `LIMIT 50`
+type ParamLimit struct { Name string }                  // `LIMIT $rows`
+
+// SELECT
+type SelectClause struct {
+    Distinct bool
+    Star     bool
+    Items    []SelectItem
+}
+type SelectItem  struct { Expr SelectExpr; Alias string }
+type SelectExpr  interface{ isSelectExpr() }
+type PathExpr    struct { IdentifiedPath }
+type FunctionCall struct { Name string; Args []SelectExpr; Distinct, Star bool }
+
+// FROM / CONTAINS — nested containment tree
+type FromClause   struct { Root ClassExpr; Contains *Containment }
+type Containment  struct { Class ClassExpr; Children []Containment; ChildJoin ContainsJoin; Negated bool }
+type ContainsJoin int  // ContainsAnd / ContainsOr
+
+// ORDER BY
+type OrderTerm struct { Path IdentifiedPath; Dir OrderDir }
+type OrderDir  int  // OrderAsc / OrderDesc
+```
+
+The shared `aql.Value` vocabulary additionally exposes [`aql.NullValue`](../../openehr/aql/value.go) (typed NULL sentinel) so the unquoted `NULL` keyword round-trips without colliding with a `StringValue{"NULL"}`. [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) is the sentinel surfaced by `ParseQuery` / `Document.QueryErr` and is also returned by `(*Query).Emit` when the AST came from an incomplete extraction.
+
+Tier 1 — the cheap interim — exposes the validated ANTLR tree via [`(*Document).Tree`](../../openehr/aql/parse/parse.go) (return type `gen.ISelectQueryContext`, explicitly unstable). It removes the re-parse cost for consumers already recursing the generated parser but does not solve the generated-coupling concern; Tier 2 is the stable read AST.
+
+The WhereExpr vocabulary on the construction side gains [`aql.NotExpr`](../../openehr/aql/where.go) / [`aql.ExistsExpr`](../../openehr/aql/where.go) / [`aql.MatchesExpr`](../../openehr/aql/where.go) / [`aql.LikeExpr`](../../openehr/aql/where.go) (and their `Not` / `Exists` / `Matches` / `Like` constructors) so the parser populates the same shapes the Builder constructs. [`aql.FormatWhere`](../../openehr/aql/where.go) is the public read-side mirror of the internal `.expr()` emitter — used by `(*Query).Emit()` to render the structured AST back to canonical AQL.
+
+### Structured path access (SDK-GAP-19)
+
+Two path-bearing sub-structures are exposed as parsed structure, not only raw text, so an execution consumer reads them without re-tokenizing AQL grammar the SDK already parsed once:
+
+- **`ClassExpr.PredicateComparison`** — a class *standing* predicate (e.g. `EHR e[ehr_id/value = $x]`) is exposed as an optional `*aql.Comparison` (`{path, operator, value}`, reusing the shared vocabulary) when it is a simple comparison; it is nil for an archetype-HRID predicate (on `ClassExpr.Archetype`), a version predicate, or a non-scalar / complex standing predicate — so a comparison is distinguishable from a non-comparison. The verbatim `ClassExpr.Predicate` text is retained.
+- **`aql.Comparison.ParsedPath`** — a WHERE comparison carries the structured alias-qualified path (`*aql.IdentifiedPath`: alias + segments) alongside the raw `Path` string, populated by the parser (nil on the write side, and for a path shape the parser does not structure).
+
+To carry the structured path on `aql.Comparison` without a package cycle (`aql` cannot import `openehr/aql/parse`), the shared path vocabulary — [`aql.IdentifiedPath`](../../openehr/aql/path.go) and `aql.PathSegment` — lives in `openehr/aql`. `parse.IdentifiedPath` embeds `aql.IdentifiedPath` and adds the parse-only `Clause` / source `Position` (promoted fields keep existing access unchanged); `parse.PathSegment` re-exports `aql.PathSegment`. Emission uses `Comparison.Path` and the verbatim class `Predicate`, so the round-trip property below is unaffected by the structured fields.
+
+### Round-trip property
+
+For any AQL query the parser accepts and the v1 emitter catalogue supports:
+
+```
+Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))
+```
+
+The first emit normalises whitespace, keyword casing, optional defaults (ASC), and clause ordering against the canonical write form; the second parse-emit MUST be a fixed point. The buildable-grammar equivalent of [PROBE-020](#req-055--aql-wire-boundary).
+
+### Trust model
+
+The structured AST is **syntax-faithful for the v1 catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`); function names are normalised to upper case (`count` → `COUNT`) so emission produces canonical AQL regardless of source casing. It does **not** evaluate:
+
+- archetype / template constraints (that is REQ-102 / REQ-110);
+- terminology binding;
+- semantic validity beyond the SDK grammar profile (the server remains the execute-time authority, [PROBE-021](#req-109--aql-static-lint)).
+
+**v1 catalogue gaps** (shapes the grammar accepts but the structured extractor does not yet model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), and a partial AST refuses to render through [`(*Query).Emit`](../../openehr/aql/parse/query.go) (same error) so the loss is never silently emitted as canonical text. Today the catalogue gaps are:
+
+- Primitive literal in SELECT projection (`SELECT 1 FROM …`)
+- Mixed `SELECT *, col` (star + column projections in the same SELECT)
+- Function-call WHERE LHS (`WHERE LENGTH(x) > 5`)
+- MATCHES with `terminology(...)` or `{URI}` operand
+- Path-vs-path comparisons (`WHERE a/x = b/y`)
+- Top-level boolean junction at the FROM root (`FROM A OR B`)
+- Parameter or Primitive argument inside a function call in SELECT (`SELECT CONCAT('a', p/name) FROM …`)
+- AND/OR WHERE junction where one or more operands is itself an out-of-catalogue shape (each dropped operand records a gap reason)
+- LIMIT / OFFSET integer literal that overflows Go `int` (`LIMIT 9223372036854775808`)
+
+Each gap is a forward-compatible extension. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
+
+### Building-block independence (REQ-013)
+
+`openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
+
+- **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
+- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (34 idempotence cases + 11 canonical-input preservation cases across the v1 catalogue, plus a 10-case incomplete-AST suite that asserts ParseQuery and Emit both surface `aql.ErrIncompleteAST`). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (SDK-GAP-19) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17 (archived after PR #58).
+

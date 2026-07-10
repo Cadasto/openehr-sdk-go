@@ -290,6 +290,24 @@ client scenarios to SDK coverage:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go).
 - **Satisfies:** REQ-109.
 
+#### PROBE-080 — AQL parse/emit round-trip property
+
+- **Title:** Parsing a catalogue AQL string into `parse.Query` and re-emitting via `(*Query).Emit` is stable — canonical inputs are preserved, re-emission is idempotent, and out-of-catalogue shapes surface `aql.ErrIncompleteAST` at both parse and emit rather than round-tripping silently.
+- **Preconditions:** The v1 AQL catalogue exercised in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) — 34 idempotence cases, 11 canonical-input preservation cases, and a 10-case incomplete-AST suite.
+- **Wire assertion:** In-repo property — for every catalogue query, `parse.ParseQuery(q)` → `(*Query).Emit()` MUST equal the canonical form of `q`, and a second `Emit` MUST equal the first (idempotence). Out-of-catalogue shapes MUST return `aql.ErrIncompleteAST` from both `ParseQuery` and `Emit`, never a partial emit. The `WhereExpr`/`Value` vocabulary is identical across the read (`parse`) and write (`aql.Builder`) sides.
+- **Modes:** In-repo (unit-level property; no backend).
+- **Status:** Implemented (inline) — see [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go).
+- **Satisfies:** REQ-113.
+
+#### PROBE-082 — AQL structured path access (standing predicate + WHERE path)
+
+- **Title:** A class standing predicate is readable as a structured `{path, operator, value}` (`ClassExpr.PredicateComparison`) and a WHERE comparison's alias-qualified path as alias + segments (`aql.Comparison.ParsedPath`), without importing `parse/gen` or re-tokenizing raw text (SDK-GAP-19).
+- **Preconditions:** A parsed query carrying a standing class predicate (`EHR e[ehr_id/value=$ehr]`) and a WHERE comparison over an alias path (`o/data[at0001]/events[at0006]/value/magnitude > $threshold`).
+- **Wire assertion:** In-repo property — `ParseQuery`'s `From.Root.PredicateComparison` MUST expose `{ehr_id/value, =, $ehr}` for the standing comparison and be nil for an archetype-HRID (non-comparison) predicate; the WHERE `aql.Comparison.ParsedPath` MUST expose alias `o` + the ordered segments, with `ParsedPath.Raw == Comparison.Path`. Emission is unaffected — the standing predicate and path survive a parse→emit→parse round-trip, and Emit is idempotent.
+- **Modes:** In-repo (unit-level property; no backend).
+- **Status:** Implemented (inline) — see [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go).
+- **Satisfies:** REQ-113.
+
 #### PROBE-022 — OPT path resolution
 
 - **Title:** Parsing an ADL 1.4 operational template (OPT) and resolving a fixture-defined list of openEHR paths returns nodes whose RM type, archetype node id, and (for archetype roots) archetype id match the expected values; explicitly unknown attributes and unmatched predicates produce `ErrPathNotFound`.
@@ -351,6 +369,15 @@ client scenarios to SDK coverage:
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_074_noncomposition_validate.go`](../../testkit/probes/validation/probe_074_noncomposition_validate.go).
 - **Satisfies:** REQ-110, REQ-102, REQ-103.
+
+#### PROBE-081 — EHR_STATUS value-typed mandatory presence (subject)
+
+- **Title:** `validation.ValidateRMEHRStatusBytes(data)` flags an omitted RM-mandatory `subject` (typed `rm.PartySelf`, a value struct) from JSON-key presence, without false-positiving on a valid bare `PARTY_SELF`.
+- **Preconditions:** Canonical-JSON EHR_STATUS bodies — one omitting the `subject` key; one supplying `subject` as a bare `{"_type":"PARTY_SELF"}` (no external_ref); one omitting the interface-typed `name`.
+- **Wire assertion:** In-repo property — an EHR_STATUS whose top-level `subject` key is absent (or present but JSON `null`) MUST surface `required` at `/subject`; a present non-null subject (even the bare `PARTY_SELF` that decodes to the Go zero value) MUST NOT; the interface-typed mandatory `name`, when absent, MUST still surface `required` at `/name` (no regression). A non-object / malformed input surfaces a single `invalid_shape` at `/`.
+- **Modes:** In-repo (unit-level property; no backend).
+- **Status:** Implemented (inline) — see [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
+- **Satisfies:** REQ-112.
 
 ### Canonical JSON and formats
 
@@ -452,9 +479,9 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** A write carrying `openehr-audit-details` is reflected in the resulting Contribution's audit envelope on read-back.
 - **Preconditions:** Existing EHR; a known `*rm.AuditDetails` value.
-- **Wire assertion:** Write request carries `openehr-audit-details: <canonical-JSON>`; subsequent Contribution GET returns the same audit fields (committer name, time-committed, change-type).
+- **Wire assertion:** Write request carries `openehr-audit-details` in the openEHR dotted-attribute grammar (`change_type.code_string="…",committer.name="…",system_id="…"` — REQ-059, **not** JSON); subsequent Contribution GET returns the same audit fields (committer name, change-type, system_id).
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Draft.
+- **Status:** Draft. Encoder unit-covered by `openehr/client/ehr/audit_test.go` (dotted-grammar golden); the read-back round-trip remains to be probe-ratified.
 
 #### PROBE-063 — Discovery-routed request
 
@@ -594,8 +621,8 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | **all implemented (Sandbox)** — [`testkit/probes/auth/`](../../testkit/probes/auth/). PROBE-001/002/003 drive the real `discovery.Resolver`; PROBE-004 (PKCE + G-7 parity) / PROBE-005 (scope) drive a full `auth/smart` authorization-code launch; PROBE-006 (JWKS rotation), PROBE-007 (transport + proactive refresh halves), PROBE-008 (principal claims), PROBE-009 (caller attribution). Launch-mode coverage (standalone / embedded / backend, REQ-068) lives alongside in [`launch_modes.go`](../../testkit/probes/auth/launch_modes.go). |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
-| AQL | PROBE-020 … 021, PROBE-028 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go) |
-| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots. |
+| AQL | PROBE-020 … 021, PROBE-028, PROBE-080, PROBE-082 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go); PROBE-080 (REQ-113 parse/emit round-trip) + PROBE-082 (REQ-113 / SDK-GAP-19 structured predicate + WHERE path) implemented inline — [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go), [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go) |
+| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074, PROBE-081 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots; PROBE-081 (REQ-112 / SDK-GAP-18) pins EHR_STATUS value-typed `subject` presence, implemented inline — [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go). |
 | Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../../transport/client_test.go); *planned* — `testkit/probes/observability/` |

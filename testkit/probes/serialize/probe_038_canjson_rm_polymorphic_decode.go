@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -85,7 +85,7 @@ func (want typeSet) Diff(got typeSet) []string {
 			out = append(out, fmt.Sprintf("%s (want %d, got %d)", k, n, got[k]))
 		}
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 
@@ -109,7 +109,7 @@ func collectDiscriminators(b []byte) typeSet {
 			for k := range t {
 				keys = append(keys, k)
 			}
-			sort.Strings(keys)
+			slices.Sort(keys)
 			for _, k := range keys {
 				walk(t[k])
 			}
