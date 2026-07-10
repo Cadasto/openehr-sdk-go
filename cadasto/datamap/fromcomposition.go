@@ -62,6 +62,13 @@ func fromComposition(opt *template.OperationalTemplate, composition map[string]a
 		if root, ok := opt.Root().(template.ObjectNode); ok {
 			for _, r := range findContentArchetypeRoots(root) {
 				r.expanded = expanded
+				// opt lets decodeItems re-resolve a NESTED archetype root's own
+				// term dictionary (REQ-0029, see decodeItems' CLUSTER case) —
+				// without it, a CLUSTER that is itself a fixed archetype root
+				// (e.g. knowledge_base_reference nested in an INSTRUCTION's
+				// activity description) decodes with the wrong/bare key and
+				// loses its own items' term labels.
+				r.opt = opt
 				rootsByID[r.id] = r
 			}
 		}
@@ -364,10 +371,26 @@ func decodeItems(items []any, r contentRoot) (map[string]any, error) {
 		var decoded any
 		switch item["_type"] {
 		case "CLUSTER":
-			// A CLUSTER that is itself an archetype root (slot fill) carries its
-			// own term dictionary — re-scope so its at-codes resolve against the
-			// right archetype, not an ancestor's (at-codes recur across archetypes).
+			// A CLUSTER that is itself an archetype root (slot fill, or REQ-0029
+			// a FIXED nested archetype root such as a knowledge_base_reference
+			// CLUSTER nested inside an INSTRUCTION's activity description)
+			// carries its own term dictionary — re-scope so its at-codes resolve
+			// against the right archetype, not an ancestor's (at-codes recur
+			// across archetypes). rescopeForArchetype resolves it via a generic
+			// OPT tree-walk (findArchetypeInTree), independent of where in the
+			// tree the archetype is actually nested.
 			childR := rescopeForArchetype(r, archetypeIDOf(item))
+			// archetype_node_id for such a node IS its own archetype id — a
+			// string that never appears in the PARENT's at-code term map (r.terms
+			// above), so the bare-key fallback always won for it. Use the
+			// rescoped root's own label instead, matching what ToComposition's
+			// encodeItems produces/expects for the same node (tocomposition.go
+			// lines ~607-619) — without this the key silently loses its
+			// "|label" suffix and the datamap no longer matches a caller's
+			// "<archetype-id>|<label>" key constant (REQ-0029).
+			if childR.id == nodeID && childR.label != "" {
+				key = nodeID + "|" + childR.label
+			}
 			sub, err := decodeItems(asList(item["items"]), childR)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", nodeID, err)
