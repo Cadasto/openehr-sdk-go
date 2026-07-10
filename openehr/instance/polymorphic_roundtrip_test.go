@@ -16,8 +16,8 @@ import (
 // TestCorpusRoundTripValidates is the REQ-107 dossier acceptance
 // criterion exercised on the real-world OPT corpus: a generated
 // composition survives a canonical-JSON round-trip (marshal → decode)
-// intact. Two complementary assertions, because the two sub-gaps fail
-// differently:
+// intact. Two complementary assertions, because the two REQ-052
+// sub-gaps fail differently:
 //
 //   - byte-stability: re-marshalling the decoded tree must reproduce the
 //     original bytes. This catches sub-gap A (a value-in-interface field
