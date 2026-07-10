@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-07-02
-**Status:** Draft
+**Status:** Landed
 **Owner:** SDK maintainers
 **Covers:** No new REQ. **Promotes content into** [REQ-055 / REQ-057](../specifications/wire.md#req-055--wire-boundary) (wire), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance value-fill), [REQ-083](../specifications/conformance.md#req-083--cadasto-platform-api-conformance) (cadasto health probes). Governed by **[ADR 0012](../adr/0012-retire-sdk-gap-identifier.md)**.
 **Probes:** none built here. PROBE-077 / 078 / 079 stay `Deferred` catalog entries.
-**Implementation:** planned.
+**Implementation:** landed.
 **Depends on:** ADR 0012 committed (`7cb4436`, this branch); the GAP→REQ/PROBE crosswalk in that ADR is the authoritative mapping for every replacement below.
 **Defers:** building PROBE-077/078/079; implementing the GAP-14 `medium`/`detail_level` synthesis level (recorded as `Planned`, not built).
 

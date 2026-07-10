@@ -425,12 +425,14 @@ const (
 )
 
 type Options struct {
-    Policy    Policy
-    Language  string                       // ISO 639-1; defaults from Compiled.Language()
-    Territory string                       // for COMPOSITION roots
-    Composer  rm.PartyProxy                // required when root is COMPOSITION
-    Now       time.Time                    // clock for EVENT / context times
-    UIDSource func() *rm.HierObjectID      // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    Policy      Policy
+    Language    string                  // ISO 639-1; defaults from Compiled.Language()
+    Territory   string                  // for COMPOSITION roots
+    Composer    rm.PartyProxy           // required when root is COMPOSITION
+    Now         time.Time               // clock for EVENT / context times
+    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    ValueFill   ValueFill               // ExampleFill (default) or RandomFill
+    ValueSource mrand.Source            // seeds RandomFill; nil = auto-seeded global
 }
 
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error)
