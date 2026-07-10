@@ -59,7 +59,7 @@ flowchart TD
 | `openehr/instance/generate_test.go` (extend) | Unit tests for cardinality-cap + first-child selection without full OPT |
 | `openehr/template/constraints/` (maybe) | `ExampleValue` for interval primitive constraints if REQ-103 lacks one — check `Test_dv_interval_dv_quantity_*.opt` cassettes first |
 | `testkit/cassettes/templates/` | Add `Referral Request.v1.opt`, `social.opt` (or slim fixtures) |
-| `testkit/probes/instance/` | Extend PROBE-027 or add `TestProbe027_GAP12Corpus` |
+| `testkit/probes/instance/` | Extend PROBE-027 or add `TestProbe027_RealWorldCorpus` |
 
 ## Implementation checklist
 
@@ -104,7 +104,7 @@ flowchart TD
 ### Task 4: Soundness gate (PROBE-027 extension)
 
 **Files:**
-- Modify: `testkit/probes/instance/probes_test.go` (or new `gap12_corpus_test.go` in same package)
+- Modify: `testkit/probes/instance/probes_test.go` (or new `realworld_corpus_test.go` in same package)
 - Modify: `docs/specifications/traceability.yaml` if new test files added
 
 - [x] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused; avoid duplicating the consumer's private helper.
