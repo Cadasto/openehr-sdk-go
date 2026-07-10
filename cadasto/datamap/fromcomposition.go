@@ -279,6 +279,19 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 			return "", nil, err
 		}
 		maps.Copy(payload, items)
+		// ism_transition.current_state/careflow_step — mirror encodeAction's
+		// codedTextFromPayload so a read→merge→write round-trip (REQ-0029
+		// multi-pathway care_plan enrollment) preserves every pathway's careflow
+		// state instead of silently resetting untouched ones to completed(532)
+		// on re-encode.
+		if ism, ok := node["ism_transition"].(map[string]any); ok {
+			if cs, ok := codedTextToPayload(ism["current_state"]); ok {
+				payload["current_state"] = cs
+			}
+			if step, ok := codedTextToPayload(ism["careflow_step"]); ok {
+				payload["careflow_step"] = step
+			}
+		}
 	case "EVALUATION", "ADMIN_ENTRY":
 		items, err := decodeItems(structuredItemsList(data), r)
 		if err != nil {
@@ -505,6 +518,37 @@ func structuredItemsList(container map[string]any) []any {
 		return []any{v}
 	}
 	return nil
+}
+
+// codedTextToPayload reverses dvCodedText/codedTextFromPayload: given a
+// DV_CODED_TEXT map ({_type, value, defining_code:{terminology_id:{value},
+// code_string}}), it returns the datamap short map {code, value, terminology}
+// that encodeAction's codedTextFromPayload consumes on the next encode.
+// Returns ok=false for anything absent or not a well-formed coded-text map
+// (caller leaves the payload key unset rather than writing a partial value).
+// REQ-0029.
+func codedTextToPayload(v any) (map[string]any, bool) {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	dc, ok := m["defining_code"].(map[string]any)
+	if !ok {
+		return nil, false
+	}
+	code, _ := dc["code_string"].(string)
+	if code == "" {
+		return nil, false
+	}
+	term := ""
+	if ti, ok := dc["terminology_id"].(map[string]any); ok {
+		term, _ = ti["value"].(string)
+	}
+	if term == "" {
+		return nil, false
+	}
+	value, _ := m["value"].(string)
+	return map[string]any{"code": code, "value": value, "terminology": term}, true
 }
 
 func readCodePhraseCode(v any) string {

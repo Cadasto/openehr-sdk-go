@@ -196,3 +196,93 @@ func TestContentRoot_SingleMapStaysBareMap(t *testing.T) {
 		t.Fatalf("decoded %s = %#v, want a map[string]any", multiEntryRootKey, backContent[multiEntryRootKey])
 	}
 }
+
+// PROBE-0795 proves REQ-0029 — an ACTION's ism_transition (current_state +
+// careflow_step) round-trips through ToComposition → FromComposition. Without
+// this, GetComposition → FromComposition → (edit another pathway) →
+// ToComposition → PUT silently resets every untouched pathway's careflow to
+// the completed(532) default, because encodeAction falls back to that
+// default whenever payload["current_state"] is absent.
+func TestContentRoot_ActionIsmTransitionRoundTrip(t *testing.T) {
+	opt := loadOPT(t, "minimal_action_2")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-07-10T09:00:00Z"},
+		"content": map[string]any{
+			multiEntryRootKey: map[string]any{
+				"current_state": map[string]any{"code": "245", "value": "active", "terminology": "openehr"},
+				"careflow_step": map[string]any{"code": "prescribed", "value": "Prescribed", "terminology": "local"},
+			},
+		},
+	}
+
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+
+	back, err := FromComposition(opt, comp)
+	if err != nil {
+		t.Fatalf("FromComposition: %v", err)
+	}
+	backContent, _ := back["content"].(map[string]any)
+	root, ok := backContent[multiEntryRootKey].(map[string]any)
+	if !ok {
+		t.Fatalf("decoded %s = %#v, want a map[string]any", multiEntryRootKey, backContent[multiEntryRootKey])
+	}
+
+	cs, ok := root["current_state"].(map[string]any)
+	if !ok {
+		t.Fatalf("current_state missing/wrong type: %#v", root["current_state"])
+	}
+	if cs["code"] != "245" || cs["value"] != "active" || cs["terminology"] != "openehr" {
+		t.Errorf("current_state = %#v, want {code:245 value:active terminology:openehr}", cs)
+	}
+
+	step, ok := root["careflow_step"].(map[string]any)
+	if !ok {
+		t.Fatalf("careflow_step missing/wrong type: %#v", root["careflow_step"])
+	}
+	if step["code"] != "prescribed" || step["value"] != "Prescribed" || step["terminology"] != "local" {
+		t.Errorf("careflow_step = %#v, want {code:prescribed value:Prescribed terminology:local}", step)
+	}
+}
+
+// PROBE-0796 proves REQ-0029 — an ACTION with no ism_transition at all (a
+// hand-built RM composition, or any pre-existing fixture that predates the
+// current_state/careflow_step decode) still decodes without error and simply
+// omits both keys — no panic on a missing/malformed ism_transition.
+func TestDecodeAction_NoIsmTransition_NoPanic(t *testing.T) {
+	opt := loadOPT(t, "minimal_action_2")
+	comp := map[string]any{
+		"_type": "COMPOSITION",
+		"context": map[string]any{
+			"start_time": map[string]any{"_type": "DV_DATE_TIME", "value": "2026-07-10T09:00:00Z"},
+		},
+		"content": []any{
+			map[string]any{
+				"_type":             "ACTION",
+				"archetype_node_id": "openEHR-EHR-ACTION.minimal_2.v1",
+				"name":              map[string]any{"value": "Minimal 2"},
+				"time":              map[string]any{"_type": "DV_DATE_TIME", "value": "2026-07-10T09:00:00Z"},
+				"description":       map[string]any{"items": []any{}},
+				// no ism_transition at all
+			},
+		},
+	}
+
+	back, err := FromComposition(opt, comp)
+	if err != nil {
+		t.Fatalf("FromComposition: %v", err)
+	}
+	backContent, _ := back["content"].(map[string]any)
+	root, ok := backContent[multiEntryRootKey].(map[string]any)
+	if !ok {
+		t.Fatalf("decoded %s = %#v, want a map[string]any", multiEntryRootKey, backContent[multiEntryRootKey])
+	}
+	if _, has := root["current_state"]; has {
+		t.Errorf("current_state should be absent when ism_transition is absent, got %#v", root["current_state"])
+	}
+	if _, has := root["careflow_step"]; has {
+		t.Errorf("careflow_step should be absent when ism_transition is absent, got %#v", root["careflow_step"])
+	}
+}
