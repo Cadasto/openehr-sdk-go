@@ -122,7 +122,19 @@ func fromComposition(opt *template.OperationalTemplate, composition map[string]a
 			if err != nil {
 				return nil, fmt.Errorf("content[%d]: %w", i, err)
 			}
-			content[key] = value
+			// A root archetype occurring more than once (REQ-0029, e.g. a
+			// persistent care_plan holding N pathway enrollments of the same
+			// archetype) accumulates into a []any instead of overwriting down to
+			// the last entry; a single occurrence stays a bare map (unchanged).
+			if prev, dup := content[key]; dup {
+				if list, isList := prev.([]any); isList {
+					content[key] = append(list, value)
+				} else {
+					content[key] = []any{prev, value}
+				}
+			} else {
+				content[key] = value
+			}
 		}
 		out["content"] = content
 	}

@@ -108,3 +108,91 @@ func keysOf(m map[string]any) []string {
 	}
 	return ks
 }
+
+// multiEntryRootKey is the "<archetype-id>|<label>" content-root key for the
+// minimal_action_2 fixture's ACTION root, which the OPT constrains to
+// occurrences 0..* (unbounded upper) — a repeatable content root, i.e. one
+// archetype allowed to appear N times in the same COMPOSITION (REQ-0029: a
+// persistent care_plan holding N pathway enrollments).
+const multiEntryRootKey = "openEHR-EHR-ACTION.minimal_2.v1|Minimal 2"
+
+// multiEntryPayload builds a distinct ACTION payload for the minimal_action_2
+// root, distinguished by an explicit current_state code (the same short-form
+// this OPT's ACTION already exercises in TestEncodeAction_CurrentStateFromPayload)
+// so ToComposition's two emitted entries are not byte-identical.
+func multiEntryPayload(code string) map[string]any {
+	return map[string]any{
+		"current_state": map[string]any{"code": code, "value": "active", "terminology": "openehr"},
+	}
+}
+
+// PROBE-0782 proves REQ-0029 — a content-root key holding a []any of 2
+// entry-maps round-trips: ToComposition emits 2 entries of that root, and
+// FromComposition decodes back to a 2-element []any (instead of overwriting
+// down to the last entry, the pre-REQ-0029 behavior).
+func TestContentRoot_MultiEntryRoundTrip(t *testing.T) {
+	opt := loadOPT(t, "minimal_action_2")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-07-10T09:00:00Z"},
+		"content": map[string]any{
+			multiEntryRootKey: []any{
+				multiEntryPayload("245"), // active
+				multiEntryPayload("532"), // completed
+			},
+		},
+	}
+
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+	content, _ := comp["content"].([]any)
+	if len(content) != 2 {
+		t.Fatalf("content entries = %d, want 2", len(content))
+	}
+
+	back, err := FromComposition(opt, comp)
+	if err != nil {
+		t.Fatalf("FromComposition: %v", err)
+	}
+	backContent, _ := back["content"].(map[string]any)
+	got, ok := backContent[multiEntryRootKey].([]any)
+	if !ok || len(got) != 2 {
+		t.Fatalf("decoded %s = %#v, want a 2-element []any", multiEntryRootKey, backContent[multiEntryRootKey])
+	}
+}
+
+// PROBE-0783 proves REQ-0029 — backward compatibility: a content-root value
+// that is a single map[string]any (the shape every template used before
+// REQ-0029) still yields exactly one COMPOSITION content entry on encode and
+// decodes back to a bare map, not a single-element []any.
+func TestContentRoot_SingleMapStaysBareMap(t *testing.T) {
+	opt := loadOPT(t, "minimal_action_2")
+	dm := map[string]any{
+		"context": map[string]any{"start_time": "2026-07-10T09:00:00Z"},
+		"content": map[string]any{
+			multiEntryRootKey: multiEntryPayload("245"),
+		},
+	}
+
+	comp, err := ToComposition(opt, dm)
+	if err != nil {
+		t.Fatalf("ToComposition: %v", err)
+	}
+	content, _ := comp["content"].([]any)
+	if len(content) != 1 {
+		t.Fatalf("content entries = %d, want 1", len(content))
+	}
+
+	back, err := FromComposition(opt, comp)
+	if err != nil {
+		t.Fatalf("FromComposition: %v", err)
+	}
+	backContent, _ := back["content"].(map[string]any)
+	if _, isList := backContent[multiEntryRootKey].([]any); isList {
+		t.Fatalf("decoded %s is a []any, want a bare map for a single occurrence", multiEntryRootKey)
+	}
+	if _, ok := backContent[multiEntryRootKey].(map[string]any); !ok {
+		t.Fatalf("decoded %s = %#v, want a map[string]any", multiEntryRootKey, backContent[multiEntryRootKey])
+	}
+}

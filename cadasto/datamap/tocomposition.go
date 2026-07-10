@@ -111,18 +111,28 @@ func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (m
 	}
 	contentPayload, _ := payload["content"].(map[string]any)
 
+	// A content-root payload is normally a single map (one entry); a []any of
+	// entry-maps (REQ-0029, e.g. a persistent care_plan holding N pathway
+	// enrollments of the same archetype root) emits one COMPOSITION content
+	// entry per element instead of overwriting down to the last one.
 	content := make([]any, 0, len(roots))
 	for i := range roots {
 		r := roots[i]
-		rootPayload := lookupRootPayload(contentPayload, r.id, r.label)
-		if rootPayload == nil {
+		raw := lookupRootValue(contentPayload, r.id, r.label)
+		if raw == nil {
 			continue
 		}
-		entry, err := encodeArchetypeRoot(r, rootPayload, startTime, language)
+		payloads, err := rootPayloadList(raw)
 		if err != nil {
-			return nil, fmt.Errorf("encode %s: %w", r.id, err)
+			return nil, fmt.Errorf("content root %s: %w", r.id, err)
 		}
-		content = append(content, entry)
+		for _, rp := range payloads {
+			entry, err := encodeArchetypeRoot(r, rp, startTime, language)
+			if err != nil {
+				return nil, fmt.Errorf("encode %s: %w", r.id, err)
+			}
+			content = append(content, entry)
+		}
 	}
 
 	// A payload that carried content but matched no root means its content keys
@@ -1361,23 +1371,57 @@ func termOrFallback(terms map[string]string, code, fallback string) string {
 // lookupRootPayload finds the content-root payload for an archetype id,
 // tolerating any "|label" suffix: FromComposition keys roots by the
 // composition's stored name, which may differ from the OPT term label that
-// ToComposition computes for the same root.
+// ToComposition computes for the same root. Delegates the key-matching to
+// lookupRootValue and coerces the result to a single map — a []any value
+// (a multi-entry root, REQ-0029) does not coerce and yields nil, which is
+// correct for this function's callers (toparty.go party sections are always
+// single-map payloads).
 func lookupRootPayload(content map[string]any, id, label string) map[string]any {
-	if v, ok := content[id+"|"+label].(map[string]any); ok {
+	v, _ := lookupRootValue(content, id, label).(map[string]any)
+	return v
+}
+
+// lookupRootValue returns the raw content-root payload for an archetype id —
+// a map[string]any (single entry) or a []any (multiple entries of the same
+// root, REQ-0029) — tolerating any "|label" suffix per lookupRootPayload's
+// matching rules. Returns nil when no key matches.
+func lookupRootValue(content map[string]any, id, label string) any {
+	if v, ok := content[id+"|"+label]; ok {
 		return v
 	}
-	if v, ok := content[id].(map[string]any); ok {
+	if v, ok := content[id]; ok {
 		return v
 	}
 	prefix := id + "|"
 	for k, v := range content {
 		if k == id || (len(k) >= len(prefix) && k[:len(prefix)] == prefix) {
-			if m, ok := v.(map[string]any); ok {
-				return m
-			}
+			return v
 		}
 	}
 	return nil
+}
+
+// rootPayloadList normalizes a content-root value to a list of entry-maps: a
+// single map → one element (unchanged, backward-compatible behavior); a
+// []any of maps → that list, one COMPOSITION content entry per element
+// (REQ-0029, multi-pathway care_plan enrollment); anything else → error.
+func rootPayloadList(v any) ([]map[string]any, error) {
+	switch t := v.(type) {
+	case map[string]any:
+		return []map[string]any{t}, nil
+	case []any:
+		out := make([]map[string]any, 0, len(t))
+		for i, e := range t {
+			m, ok := e.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("entry[%d] is not an object", i)
+			}
+			out = append(out, m)
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("content-root payload must be an object or array of objects, got %T", v)
+	}
 }
 
 func lookupChildPayload(payload map[string]any, nodeID, label string) (any, bool) {
