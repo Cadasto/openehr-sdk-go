@@ -82,7 +82,7 @@ The decode-by-Prefer state machine is copy-pasted four times — `composition/co
 - [ ] `internal/templateinstance/rmwrite` — add `coerceValueOrPtr[T]` + `assign[T](child any, dst *T, attr, rmName string) error` generalizing the existing `coerceBound[T]` (`interval_write.go:85`); replace the ~10 inlined `switch v := child.(type) { case *T … case T … }` blocks (`write.go:225, 372, 584, 605, 660, 693, 706, 776, 795, 818`). The interval (`writeIntervalSingle[T]`) and temporal (`writeDVTemporalValueSingle`) sub-families already prove the pattern in-package.
 - [ ] `openehr/instance/generate.go` — extract the string-leaf setter repeated across the `DVText/DVDate/DVTime/DVDateTime/DVDuration` arms of `applyPrimitiveExample` (`:751–825`) via a small generic assert-or-error helper.
 
-**Verification / DoD:** `make ci`; `rmwrite/write_test.go` + `rmread` closed-taxonomy tables; `openehr/instance` gap12/13/14 + instance tests green.
+**Verification / DoD:** `make ci`; `rmwrite/write_test.go` + `rmread` closed-taxonomy tables; `openehr/instance` `realworld_opt_synthesis`/`polymorphic_roundtrip`/`valuefill` + instance tests green.
 
 ### Phase 5 — `feat(bmmgen,rm)`: generated Locatable accessors + reverse type map (ADR-gated)
 
