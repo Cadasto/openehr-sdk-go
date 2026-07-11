@@ -13,11 +13,11 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 )
 
-// TestGAP13_CorpusRoundTripValidates is the SDK-GAP-13 dossier acceptance
+// TestCorpusRoundTripValidates is the REQ-107 dossier acceptance
 // criterion exercised on the real-world OPT corpus: a generated
 // composition survives a canonical-JSON round-trip (marshal → decode)
-// intact. Two complementary assertions, because the two sub-gaps fail
-// differently:
+// intact. Two complementary assertions, because the two REQ-052
+// sub-gaps fail differently:
 //
 //   - byte-stability: re-marshalling the decoded tree must reproduce the
 //     original bytes. This catches sub-gap A (a value-in-interface field
@@ -31,18 +31,18 @@ import (
 //     Comparing against a baseline keeps it robust to policy-driven
 //     findings unrelated to the round-trip (e.g. social.opt's
 //     colliding-at0000 content alternatives).
-func TestGAP13_CorpusRoundTripValidates(t *testing.T) {
+func TestCorpusRoundTripValidates(t *testing.T) {
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for _, name := range []string{"vital_signs", "social", "Referral Request.v1", "Demonstration.v1"} {
 		t.Run(name, func(t *testing.T) {
-			c := compileGAP12Fixture(t, name)
+			c := compileRealWorldFixture(t, name)
 			composer := "Test Composer"
 			out, err := instance.Generate(context.Background(), c, instance.Options{
 				Policy:    instance.Example,
 				Territory: "NL",
 				Composer:  &rm.PartyIdentified{Name: &composer},
 				Now:       now,
-				UIDSource: gap14CounterUID(),
+				UIDSource: counterUID(),
 			})
 			if err != nil {
 				t.Fatalf("Generate: %v", err)

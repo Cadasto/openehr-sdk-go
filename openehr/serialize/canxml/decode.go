@@ -32,7 +32,7 @@ type decoderConfig struct {
 // descendant). Scope: abstract slots only — slot types like
 // `DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY`.
 //
-// SDK-GAP-11 narrow-interface slots (`<Parent>Like` — DVTextLike,
+// REQ-052 narrow-interface slots (`<Parent>Like` — DVTextLike,
 // PartyIdentifiedLike, …) have an independent, always-on fallback:
 // a missing `xsi:type` defaults to the declared parent's concrete
 // type, served by [DecodeAsOrDefault] from the generator emission.
@@ -209,7 +209,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	}
 }
 
-// DecodeAsOrDefault is the polySingleNarrow (SDK-GAP-11) XML
+// DecodeAsOrDefault is the polySingleNarrow (REQ-052) XML
 // counterpart of [DecodeAs]. When the element carries an `xsi:type`,
 // dispatch goes through [typereg.Default] exactly like DecodeAs.
 // When `xsi:type` is absent, the supplied defaultCtor instantiates

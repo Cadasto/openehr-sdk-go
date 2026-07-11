@@ -10,7 +10,7 @@ package validation
 //     code_string, DV_INTERVAL numeric bounds, DV_QUANTITY precision, the
 //     OBJECT_REF id/type/namespace floor).
 //
-// SDK-GAP-15 surface. Independent of REQ-102/110 (template-driven); both
+// REQ-112 surface. Independent of REQ-102/110 (template-driven); both
 // drivers may run against the same root — REQ-110 enforces template
 // constraints, REQ-112 enforces the RM-only floor.
 //
@@ -83,7 +83,7 @@ func ValidateRMFolder(folder *rm.Folder) Result {
 // It cannot flag an omitted value-typed mandatory `subject` (typed
 // rm.PartySelf, whose zero value is indistinguishable from an absent one):
 // use [ValidateRMEHRStatusBytes], which decides subject presence from the
-// source JSON key set (SDK-GAP-18).
+// source JSON key set (REQ-112).
 func ValidateRMEHRStatus(status *rm.EHRStatus) Result {
 	if status == nil {
 		return resultFromIssues([]Issue{{Path: "/", Code: "nil_ehr_status", Detail: "ValidateRMEHRStatus: status is nil", Severity: Error}})
@@ -331,7 +331,7 @@ func (w *rmFloorWalker) checkDVInterval(value any, path string) {
 // id, type, and namespace are RM-mandatory. rmread models OBJECT_REF as an
 // opaque leaf (the walk does not read its members), so this evaluator is
 // the floor's sole check for the reference — reading the fields through the
-// [rm.ObjectRefLike] interface (SDK-GAP-11) so any BMM subtype is covered.
+// [rm.ObjectRefLike] interface (REQ-052) so any BMM subtype is covered.
 func (w *rmFloorWalker) checkObjectRef(value any, path string) {
 	if value == nil || rmread.IsTypedNilPointer(value) {
 		return

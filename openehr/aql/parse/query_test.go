@@ -1,6 +1,6 @@
 package parse_test
 
-// query_test.go pins SDK-GAP-17 Tier 2 (REQ-113) end-to-end on simple
+// query_test.go pins REQ-113 Tier 2 end-to-end on simple
 // AQL inputs: ParseQuery returns a populated *Query whose SELECT /
 // FROM / WHERE / ORDER BY / LIMIT shapes match the source. The
 // round-trip property (parsed → emit → byte-compare) is Phase 3e's

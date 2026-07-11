@@ -8,7 +8,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
-// TestEncodeSubstitutedSubtypeKeepsType reproduces SDK-GAP-13 sub-gap A:
+// TestEncodeSubstitutedSubtypeKeepsType reproduces REQ-052 sub-gap A:
 // a DV_CODED_TEXT *value* (not pointer) placed in a DVTextLike slot must
 // still emit its mandatory `_type` on the wire — and keep the nested
 // CODE_PHRASE `_type` — so the value round-trips as DV_CODED_TEXT rather
@@ -78,7 +78,7 @@ func TestEncodeSubstitutedSubtypeInSliceKeepsType(t *testing.T) {
 // bounds still emits each bound's `_type` — the bound is an addressable
 // struct field, so its pointer-receiver MarshalJSON runs when the wire
 // struct is marshalled by-pointer. The `_type` must also survive a
-// round-trip (SDK-GAP-13).
+// round-trip (REQ-052).
 func TestEncodeConcreteIntervalKeepsBoundType(t *testing.T) {
 	iv := &rm.DVInterval[rm.DVQuantity]{}
 	iv.Lower = rm.DVQuantity{Magnitude: 5, Units: "cm"}

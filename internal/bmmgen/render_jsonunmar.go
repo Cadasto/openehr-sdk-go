@@ -64,7 +64,7 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 
 	body.WriteString("import (\n")
 	body.WriteString("\t\"encoding/json\"\n")
-	// SDK-GAP-11 polySingleNarrow path needs errors.Is for the
+	// REQ-052 polySingleNarrow path needs errors.Is for the
 	// missing-_type fallback. Always-included; gofmt prunes unused
 	// imports? No — generated code must declare only what it uses,
 	// so add only when at least one chunk uses it.
@@ -106,7 +106,7 @@ func RenderUnmarshalJSONFile(plan *Plan, file *PlannedFile) ([]byte, error) {
 // polyKind enumerates the polymorphism shapes the generator can
 // handle: a single polymorphic value, a container of polymorphic
 // values, or a single polymorphic value over a NARROW interface
-// (SDK-GAP-11) where the wire MAY omit the `_type` discriminator and
+// (REQ-052) where the wire MAY omit the `_type` discriminator and
 // the decoder falls back to the parent's concrete type.
 //
 // Container-of-container or Hash<K, Iface> would extend this — neither
@@ -135,14 +135,14 @@ const (
 // (`Interval.T conforms_to Ordered`) or the narrowed emitting view
 // (`DV_INTERVAL.T conforms_to DV_ORDERED`). The narrowed view wins
 // when it resolves to an abstract type the plan knows — that is the
-// SDK-GAP-11 Issue B fix.
+// REQ-052 Issue B fix.
 func polymorphicProperty(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) (string, polyKind) {
 	switch p := prop.(type) {
 	case *bmm.SingleProperty:
 		if name, ok := abstractGoName(plan, p.TypeName); ok {
 			return name, polySingle
 		}
-		// SDK-GAP-11 Issue A: concrete-typed slot whose declared type
+		// REQ-052 Issue A: concrete-typed slot whose declared type
 		// has registered subtypes per BMM ancestry. The openEHR RM
 		// permits Liskov substitution at every such slot, so the wire
 		// may carry any descendant's `_type` — and the generator lifts
@@ -234,7 +234,7 @@ func containerElementPolymorphicName(plan *Plan, td *bmm.ContainerType) (string,
 
 // narrowInterfaceGoName returns the Go interface name (`<GoName>Like`)
 // for a concrete BMM class that has registered subtypes per
-// plan.ConcreteSubtypes. The narrow interface is the SDK-GAP-11 lift
+// plan.ConcreteSubtypes. The narrow interface is the REQ-052 lift
 // that lets concrete-typed RM slots accept Liskov-substituted subtype
 // payloads (e.g. LOCATABLE.name DV_TEXT carrying DV_CODED_TEXT). Returns
 // ("", false) when the type has no registered subtypes — the field
@@ -397,7 +397,7 @@ func renderUnmarshalJSON(plan *Plan, pc *PlannedClass, fields []emittedField) (s
 			b.WriteString("\t\t}\n")
 			b.WriteString("\t}\n")
 		case polySliceNarrow:
-			// SDK-GAP-11: slice of narrow-interface elements. Each item
+			// REQ-052: slice of narrow-interface elements. Each item
 			// MAY omit `_type` (declared parent fixes the concrete
 			// subtype); fall back to the parent type when typereg
 			// returns ErrMissingType.

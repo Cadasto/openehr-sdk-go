@@ -21,7 +21,7 @@ import (
 // are optional defaults documented per Option. WithValueFill
 // (instance.RandomFill) + WithValueSource switch leaves from the fixed
 // REQ-103 ExampleValue to seeded in-constraint sampled values for a
-// diverse-but-valid corpus (SDK-GAP-14).
+// diverse-but-valid corpus (REQ-107).
 func NewSkeleton(ctx context.Context, c *templatecompile.Compiled, opts ...Option) (*rm.Composition, error) {
 	if c == nil || c.Root() == nil {
 		return nil, instance.ErrNilCompiled

@@ -70,7 +70,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
 | REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
 | REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#req-082--runnability) | partial |
-| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | planned |
+| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | partial |
 | REQ-090 | OpenTelemetry hooks | [transport.md § REQ-090](transport.md#req-090--opentelemetry-hooks) | landed |
 | REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091--retry-policy) | landed |
 | REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092--tls-posture) | landed |

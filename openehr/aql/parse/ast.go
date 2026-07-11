@@ -77,7 +77,7 @@ type ClassExpr struct {
 	// PredicateComparison is the standing class predicate parsed as a
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
 	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary
-	// (SDK-GAP-19). Non-nil only when the predicate is a simple comparison;
+	// (REQ-113). Non-nil only when the predicate is a simple comparison;
 	// nil for an archetype HRID (see [Archetype]), a version predicate, or
 	// a non-scalar / complex standing predicate — the verbatim [Predicate]
 	// text stays authoritative there. The comparison's Path is the relative
@@ -89,14 +89,14 @@ type ClassExpr struct {
 }
 
 // PathSegment is one step of an identified path — re-exported from
-// [aql.PathSegment], the shared path vocabulary (SDK-GAP-19).
+// [aql.PathSegment], the shared path vocabulary (REQ-113).
 type PathSegment = aql.PathSegment
 
 // IdentifiedPath is an alias-qualified path referenced in SELECT, WHERE, or
 // ORDER BY (e.g. `o/data[at0001]/events[at0006]/value/magnitude`). It embeds
 // the shared [aql.IdentifiedPath] (Alias / Predicate / Segments / Raw) — the
 // same structured type an [aql.Comparison] carries on the WHERE side, without
-// a package cycle (SDK-GAP-19) — and adds the parse-only Clause and source
+// a package cycle (REQ-113) — and adds the parse-only Clause and source
 // Position. The embedded fields (Alias, Segments, …) are promoted, so
 // existing field access is unchanged.
 type IdentifiedPath struct {

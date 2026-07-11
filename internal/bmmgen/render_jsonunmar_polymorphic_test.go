@@ -8,7 +8,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
 )
 
-// TestPolymorphicPropertyEmittingClassNarrowing pins the SDK-GAP-11
+// TestPolymorphicPropertyEmittingClassNarrowing pins the REQ-052
 // Phase 1 fix: when an inherited open generic parameter (e.g.
 // `Interval[T Ordered].lower: T`) is rendered for an emitting class
 // that narrows the bound to an abstract Go type (e.g. DVInterval

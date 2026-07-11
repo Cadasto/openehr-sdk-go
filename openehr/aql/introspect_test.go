@@ -1,7 +1,7 @@
 package aql_test
 
-// introspect_test.go pins the SDK-GAP-17 Phase 3a vocabulary unification
-// (REQ-113): the WhereExpr / Value constructor helpers (Eq, Ne, …,
+// introspect_test.go pins the REQ-113 Phase 3a vocabulary unification:
+// the WhereExpr / Value constructor helpers (Eq, Ne, …,
 // Param, String, Int, Real, Bool, Null, And, Or) return the EXPORTED
 // concrete types (Comparison, Junction, ParamValue, StringValue,
 // IntValue, RealValue, BoolValue, NullValue) whose fields a consumer

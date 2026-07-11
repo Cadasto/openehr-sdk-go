@@ -12,7 +12,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// TestPolymorphicDecodeCoverage pins SDK-GAP-11 / PROBE-038. All three
+// TestPolymorphicDecodeCoverage pins REQ-052 / PROBE-038. All three
 // fixtures decode + re-marshal cleanly after Phase 2 lands the
 // ancestry-driven narrow polymorphic interfaces (DVTextLike etc.) on
 // top of Phase 1's generic-abstract-bound dispatch (DVInterval[T]).

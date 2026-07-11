@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
-// TestPrimitiveInput_RealMagnitude pins SDK-GAP-12: a REAL constraint
+// TestPrimitiveInput_RealMagnitude pins REQ-110: a REAL constraint
 // reached on a DV_QUANTITY.magnitude scalar channel receives a named
 // rm.Real (rm.DVQuantity.Magnitude's type). primitiveInput must
 // normalise it to a bare float64 so CReal.Validate accepts it —

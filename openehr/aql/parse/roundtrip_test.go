@@ -1,6 +1,6 @@
 package parse_test
 
-// roundtrip_test.go pins the SDK-GAP-17 Tier 2 round-trip property
+// roundtrip_test.go pins the PROBE-080 Tier 2 round-trip property
 // (REQ-113): for any AQL query the parser accepts and the v1 emitter
 // catalogue supports, `Emit(ParseQuery(Emit(ParseQuery(x)))) ==
 // Emit(ParseQuery(x))` — parse → emit is idempotent on the second
@@ -50,7 +50,7 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"limit_only", "SELECT e FROM EHR e LIMIT 10"},
 
 		// Critical-fix shapes (REQ-113 review feedback): each was a
-		// silent-drop or invalid-emit case before SDK-GAP-17 review.
+		// silent-drop or invalid-emit case before REQ-113 review.
 		{"where_bool_true", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/active = true"},
 		{"where_bool_false", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/active = false"},
 		{"where_null", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/data = NULL"},
@@ -138,7 +138,7 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 // TestParseQuerySurfacesIncompleteAST pins that catalogue gaps surface
 // as aql.ErrIncompleteAST on ParseQuery rather than silently dropping
 // the dropped clause / argument / projection — the structural
-// recommendation from the SDK-GAP-17 review.
+// recommendation from the REQ-113 review.
 func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 	cases := []struct {
 		name, in, reason string

@@ -6,12 +6,12 @@
 **Covers:** [REQ-050](../../specifications/wire.md#req-050), [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation), [REQ-095](../../specifications/wire.md#req-095) (OpenAPI authoritative source); proposed addendum to REQ-059
 **Probes:** **PROBE-072** — Implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../../testkit/probes/versioned/probe_072_contribution_submission_shape.go)
 **Implementation:** **landed** — `contribution.Commit` takes `*contribution.Submission` whose `Versions` are inline `ORIGINAL_VERSION<T>` / `IMPORTED_VERSION<T>`; response decode (persisted `*rm.Contribution`) unchanged. Unit pin `TestCommitSubmissionShape` + PROBE-072 cover the wire-shape assertion.
-**Depends on:** [SDK-GAP-09 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) (bare-response decode contract — already landed); ITS-REST OpenAPI [`ehr-html.openapi.yaml`](https://github.com/openEHR/specifications-ITS-REST/blob/master/computable/OAS/ehr-html.openapi.yaml) §`Contribution_create`
+**Depends on:** [REQ-094 (+052) / PROBE-061/071 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) (bare-response decode contract — already landed); ITS-REST OpenAPI [`ehr-html.openapi.yaml`](https://github.com/openEHR/specifications-ITS-REST/blob/master/computable/OAS/ehr-html.openapi.yaml) §`Contribution_create`
 **Defers:** SMART-on-openEHR token forwarding for multi-version commits (orthogonal); cross-SDK Sandbox-vs-Live conformance survey (Phase 3 — pick up if a CDR rejects `Contribution_create`)
 
 ## Goal
 
-Close **SDK-GAP-10** — symmetric to the SDK-GAP-09 fix for `composition.Save/Update`. The openEHR ITS-REST `POST /ehr/{ehr_id}/contribution` endpoint expects a `Contribution_create` payload whose `versions[]` carries the **inline** `ORIGINAL_VERSION<T>` (with `data: T` for `T ∈ {Composition, EHRStatus, Folder, EHRAccess}`), not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
+Close the **REQ-050/095** submission-shape gap — symmetric to the REQ-094 (+052) fix for `composition.Save/Update`. The openEHR ITS-REST `POST /ehr/{ehr_id}/contribution` endpoint expects a `Contribution_create` payload whose `versions[]` carries the **inline** `ORIGINAL_VERSION<T>` (with `data: T` for `T ∈ {Composition, EHRStatus, Folder, EHRAccess}`), not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
 
 ## Out of scope
 
@@ -86,7 +86,7 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
    func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
        batch *Submission, opts ...CommitOption) (*rm.Contribution, *VersionMetadata, error)
    ```
-   Returns the persisted `*rm.Contribution` (response shape unchanged — that's GAP-09 territory).
+   Returns the persisted `*rm.Contribution` (response shape unchanged — that's the REQ-094 (+052) fix's territory).
 3. **`Repository.Commit`** updated; internal callers (none in-tree today, but document the breaking-change call surface in the commit message).
 4. **Unit tests**: round-trip `Submission` → canjson bytes → byte-fragment assertions that `_type:ORIGINAL_VERSION` appears, `data._type:COMPOSITION` appears, `OBJECT_REF` does NOT appear.
 
@@ -118,8 +118,8 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
 **Tasks:**
 
 1. **Consumer round-trip coverage** that currently bypasses `contribution.Commit` via a hand-rolled helper can be migrated to use the new `Submission` type. Coordinate the switch in the private consumer checkout.
-2. **Cross-SDK survey** — ehrbase, Better, Ocean, DIPS. If any major implementation accepts only the persisted shape, this gap escalates to "spec ambiguity" per the GAP-10 acceptance criteria. Expectation: the spec is explicit; survey confirms uniform implementation of `Contribution_create`.
-3. **CHANGELOG** entry: add to the REST-clients bullet (mirrors SDK-GAP-09's CHANGELOG note).
+2. **Cross-SDK survey** — ehrbase, Better, Ocean, DIPS. If any major implementation accepts only the persisted shape, this gap escalates to "spec ambiguity" per this plan's acceptance criteria. Expectation: the spec is explicit; survey confirms uniform implementation of `Contribution_create`.
+3. **CHANGELOG** entry: add to the REST-clients bullet (mirrors the REQ-094 (+052) CHANGELOG note).
 
 **Definition of done:**
 
@@ -128,8 +128,8 @@ The CDR rejects this — at submission time the OBJECT_REFs point to versions th
 
 ## Cross-references
 
-- SDK-GAP-10 — consumer gap report (private; not linked from this repo).
-- [SDK-GAP-09 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) — symmetric **response**-side fix; landed.
+- **REQ-050/095 / PROBE-072** — this submission-shape gap; consumer report kept private (not linked from this repo).
+- [REQ-094 (+052) / PROBE-061/071 / PR #17](https://github.com/Cadasto/openehr-sdk-go/pull/17) — symmetric **response**-side fix; landed.
 - [`2026-05-15-rest-api-client.md`](2026-05-15-rest-api-client.md) §Phase 4 — original contribution surface; this plan is the corrective.
 - ITS-REST OpenAPI: `Contribution_create` schema definition.
 

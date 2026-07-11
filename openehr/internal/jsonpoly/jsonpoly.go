@@ -7,8 +7,7 @@
 // field (e.g. a DV_CODED_TEXT value placed in a LOCATABLE.name
 // DVTextLike slot), that value is not in the pointer method set, so
 // encoding/json falls back to default struct encoding and drops the
-// mandatory `_type` key — non-conformant ITS-JSON (REQ-052). See
-// SDK-GAP-13.
+// mandatory `_type` key — non-conformant ITS-JSON (REQ-052).
 //
 // These helpers box such values into a pointer so the pointer-receiver
 // MarshalJSON runs regardless of whether the interface holds a value or

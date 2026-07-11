@@ -6,7 +6,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// TestIntervalRMTypeMatches_boundsBackedCollapse covers SDK-GAP-13
+// TestIntervalRMTypeMatches_boundsBackedCollapse covers REQ-052
 // sub-gap B: a round-tripped DV_INTERVAL<T> re-decodes as the bare
 // DVInterval[DVOrdered] (typereg has a single "DV_INTERVAL"
 // registration), so describeRMType reports "DV_INTERVAL". Conformance

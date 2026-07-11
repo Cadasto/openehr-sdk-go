@@ -9,7 +9,7 @@ import (
 // construct expressions with the comparison helpers ([Eq], [Ne], [Gt], [Ge],
 // [Lt], [Le]) and combine them with [And] / [Or]. Parsed queries populate the
 // same concrete types ([Comparison] / [Junction]) — the read AST and the
-// write AST share one vocabulary (REQ-113 / SDK-GAP-17). Concrete-type
+// write AST share one vocabulary (REQ-113). Concrete-type
 // fields are intended for read access; mutating an expression already
 // passed to [FormatWhere] / [Builder.Build] is undefined (the emitter
 // caches a `validate()` outcome the mutation would invalidate).
@@ -88,7 +88,7 @@ const (
 //
 // ParsedPath is the structured form of Path (alias + segments), populated
 // by the parser on the read side so a consumer reads alias/segments without
-// re-splitting the raw string (SDK-GAP-19); it is nil on the write side
+// re-splitting the raw string (REQ-113); it is nil on the write side
 // (the construction helpers set only Path) and MAY be nil on the read side
 // for a path shape the parser does not structure. When non-nil,
 // ParsedPath.Raw equals Path (both derive from the same source path).

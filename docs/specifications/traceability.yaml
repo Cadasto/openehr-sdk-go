@@ -319,7 +319,7 @@ requirements:
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
     notes: >-
       All three write-path modes landed: return=representation bare-body decode
-      (SDK-GAP-09, PROBE-061/071); return=identifier populates the VersionMetadata
+      (PROBE-061/071); return=identifier populates the VersionMetadata
       identifier slot from the ITS-REST Identifier body (ehr.ResolveIdentifierBody);
       representation + empty body returns transport.ErrInvalidShape (no silent
       downgrade) across composition / directory / ehr_status doWrite. Deferred:
@@ -388,6 +388,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-05-21-aql-builders.md
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go
@@ -401,6 +402,7 @@ requirements:
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
     plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go
@@ -648,14 +650,14 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_cassettes_test.go
       - openehr/instance/instance_test.go
-      - openehr/instance/gap12_test.go
-      - openehr/instance/gap13_test.go
-      - openehr/instance/gap14_test.go
+      - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/instance/valuefill_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/imports_test.go
       - internal/templateinstance/rmwrite/write_test.go
-      - internal/templateinstance/rmwrite/write_gap12_test.go
+      - internal/templateinstance/rmwrite/write_datavalue_test.go
       - openehr/rm/coerce_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
@@ -663,7 +665,8 @@ requirements:
       - cmd/examples/generate-example/main.go
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
-      - docs/plans/archive/2026-06-19-sdk-gap-12-newskeleton.md
+      - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
+    notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
     title: Generic OPT-driven composition builder
@@ -725,7 +728,7 @@ requirements:
     tests:
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmread/read_demographic_test.go
-      - openehr/validation/rmread/read_gap12_test.go
+      - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/constraint_cassettes_test.go
       - openehr/validation/primitive_input_test.go
       - testkit/probes/validation/probe_074_test.go
@@ -771,7 +774,7 @@ requirements:
     # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
     # type/namespace). Driver is a second walker alongside REQ-102/110;
-    # closed-RM-set helpers (rmTypeInfo / rmread) are shared. SDK-GAP-15.
+    # closed-RM-set helpers (rmTypeInfo / rmread) are shared across REQ-102/110/112.
     implementation: landed
     packages:
       - openehr/validation
@@ -779,7 +782,7 @@ requirements:
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
     # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants). PROBE-081 (SDK-GAP-18) covers value-typed
+    # leaf invariants). PROBE-081 (REQ-112) covers value-typed
     # mandatory presence — EHR_STATUS.subject — decided from JSON-key
     # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
     # inline by rmfloor_bytes_test.go.
@@ -788,7 +791,7 @@ requirements:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmfloor_bytes_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
+      - docs/plans/archive/2026-06-29-rm-floor-validation.md
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
@@ -811,8 +814,8 @@ requirements:
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
-    # contract; marked // Deprecated:). SDK-GAP-17.
-    # SDK-GAP-19: the standing class predicate (ClassExpr.PredicateComparison)
+    # contract; marked // Deprecated:) ahead of the REQ-113 Tier-2 AST.
+    # The standing class predicate (ClassExpr.PredicateComparison)
     # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
     # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
     # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
@@ -831,7 +834,7 @@ requirements:
       - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
+      - docs/plans/archive/2026-06-29-aql-execution-ast.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation
@@ -1079,5 +1082,8 @@ requirements:
     title: Cadasto platform API conformance
     canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
     status: draft
-    implementation: planned
-    packages: [cadasto]
+    implementation: partial
+    packages: [cadasto, cadasto/admin]
+    notes: "Health probes (Live/Ready) landed: default paths, WithLivePath/WithReadyPath, origin-derived URL, public/no-auth, status→sentinel map. Platform-API fixtures Phase 4."
+    tests:
+      - cadasto/admin/probes_test.go

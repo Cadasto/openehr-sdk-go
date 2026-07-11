@@ -1,4 +1,4 @@
-# Plan — SDK-GAP-16: stored-query / query-client REST conformance
+# Plan — REQ-055/057: stored-query / query-client REST conformance
 
 **Date:** 2026-06-29
 **Status:** Landed (PR #57, 2026-06-30)

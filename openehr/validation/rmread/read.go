@@ -715,7 +715,7 @@ func readEventContextSingle(c *rm.EventContext, attr string) (any, bool) {
 		}
 		return c.Location, true
 	case "health_care_facility":
-		// SDK-GAP-11: rm.PartyIdentifiedLike is an interface — nilable
+		// REQ-052: rm.PartyIdentifiedLike is an interface — nilable
 		// on its own; ifacePresent is the right predicate.
 		return ifacePresent(c.HealthCareFacility)
 	case "other_context":
@@ -936,7 +936,7 @@ func readElementSingle(e *rm.Element, attr string) (any, bool) {
 	case "null_flavour":
 		return ptrPresent(e.NullFlavour)
 	case "null_reason":
-		// SDK-GAP-11: rm.DVTextLike is an interface — nilable on its
+		// REQ-052: rm.DVTextLike is an interface — nilable on its
 		// own; ifacePresent is the right predicate.
 		return ifacePresent(e.NullReason)
 	}
@@ -1282,7 +1282,7 @@ func strPresent(s string) (any, bool) {
 }
 
 func dvTextPresent(v rm.DVTextLike) (any, bool) {
-	// SDK-GAP-11: name / narrative slots are typed as rm.DVTextLike
+	// REQ-052: name / narrative slots are typed as rm.DVTextLike
 	// (DVText OR DVCodedText subtype). Unwrap to the parent DVText
 	// payload — absence means nil interface or empty .Value.
 	if v == nil {

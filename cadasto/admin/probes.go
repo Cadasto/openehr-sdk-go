@@ -19,7 +19,7 @@ import (
 // absolute path on that origin.
 var ErrInvalidPath = errors.New("admin: invalid probe path")
 
-// Default probe paths (SDK-GAP-07). Override per call via WithLivePath
+// Default probe paths (REQ-083). Override per call via WithLivePath
 // or WithReadyPath when a deployment serves health on different paths
 // (e.g. "/healthz").
 const (
@@ -82,7 +82,7 @@ func WithReadyPath(p string) ReadyOption {
 // endpoints, not API-scoped ones.
 //
 // No Authorization header is attached by this code: health endpoints
-// are public per the SDK-GAP-07 contract. (An injected
+// are public per the REQ-083 contract. (An injected
 // http.RoundTripper may still inject headers.) Deployments that gate
 // /health behind auth should not use this surface.
 //

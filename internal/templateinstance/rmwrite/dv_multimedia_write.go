@@ -15,7 +15,7 @@ func writeDVMultimediaSingle(m *rm.DVMultimedia, attr string, child any) error {
 		}
 		if v.TerminologyID.Value == "" {
 			// media_type codes are drawn from the IANA media-types
-			// code set, not the openEHR terminology (SDK-GAP-12).
+			// code set, not the openEHR terminology (REQ-107).
 			v.TerminologyID = rm.TerminologyID{Value: "IANA_media-types"}
 		}
 		m.MediaType = v

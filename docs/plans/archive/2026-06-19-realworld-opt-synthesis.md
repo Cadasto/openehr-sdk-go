@@ -1,4 +1,4 @@
-# Plan — Close SDK-GAP-12 (`NewSkeleton` real-world OPT coverage)
+# Plan — REQ-102/107/110: `NewSkeleton` real-world OPT coverage
 
 **Date:** 2026-06-19  
 **Status:** Landed  
@@ -8,15 +8,15 @@
 **Implementation:** landed  
 **Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
 **Consumer:** a consuming CDR project — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  
-**External reference:** the consuming CDR project's SDK-GAP-12 draft (tracked in that project).
+**External reference:** the consuming CDR project's real-world OPT coverage draft (tracked in that project).
 
 ## Goal
 
-`composition.NewSkeleton` (via `instance.Generate` + `rmwrite`) MUST produce a `*rm.Composition` that passes `validation.ValidateComposition` for every OPT that `templatecompile.Compile` accepts — including the three real-world corpus fixtures filed in SDK-GAP-12.
+`composition.NewSkeleton` (via `instance.Generate` + `rmwrite`) MUST produce a `*rm.Composition` that passes `validation.ValidateComposition` for every OPT that `templatecompile.Compile` accepts — including the three real-world corpus fixtures filed against this gap.
 
 ## Gap confirmation (reproduced 2026-06-19 on `main` @ fe79feb)
 
-Worktree: `.worktrees/sdk-gap-12` (`feat/sdk-gap-12-newskeleton`). Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_GAP12Corpus`).
+Corpus coverage lives in `testkit/probes/instance/probes_test.go` (`TestProbe027_RealWorldCorpus`).
 
 | Fixture | Phase | Observed error (matches the consumer's draft) |
 |---|---|---|
@@ -59,7 +59,7 @@ flowchart TD
 | `openehr/instance/generate_test.go` (extend) | Unit tests for cardinality-cap + first-child selection without full OPT |
 | `openehr/template/constraints/` (maybe) | `ExampleValue` for interval primitive constraints if REQ-103 lacks one — check `Test_dv_interval_dv_quantity_*.opt` cassettes first |
 | `testkit/cassettes/templates/` | Add `Referral Request.v1.opt`, `social.opt` (or slim fixtures) |
-| `testkit/probes/instance/` | Extend PROBE-027 or add `TestProbe027_GAP12Corpus` |
+| `testkit/probes/instance/` | Extend PROBE-027 or add `TestProbe027_RealWorldCorpus` |
 
 ## Implementation checklist
 
@@ -104,7 +104,7 @@ flowchart TD
 ### Task 4: Soundness gate (PROBE-027 extension)
 
 **Files:**
-- Modify: `testkit/probes/instance/probes_test.go` (or new `gap12_corpus_test.go` in same package)
+- Modify: `testkit/probes/instance/probes_test.go` (or new `realworld_corpus_test.go` in same package)
 - Modify: `docs/specifications/traceability.yaml` if new test files added
 
 - [x] **Step 1: Add corpus helpers** — `parseOPTBytes` normaliser (OPERATIONAL_TEMPLATE → template) in `testkit/fixtures` if reused; avoid duplicating the consumer's private helper.
@@ -126,7 +126,7 @@ go test ./internal/templateinstance/rmwrite/... ./openehr/instance/... ./openehr
 make ci   # full gate when Docker available
 ```
 
-**Acceptance (matches SDK-GAP-12):** for all three fixtures, `templatecompile.Compile` + `composition.NewSkeleton` + `validation.ValidateComposition(...).OK == true`.
+**Acceptance (matches REQ-102/107/110):** for all three fixtures, `templatecompile.Compile` + `composition.NewSkeleton` + `validation.ValidateComposition(...).OK == true`.
 
 ## Out of scope
 
@@ -147,4 +147,4 @@ make ci   # full gate when Docker available
 1. `fix(rmwrite): allow ELEMENT.name attachment`
 2. `fix(instance): resolve DV_INTERVAL generic RM types from OPT`
 3. `fix(instance): respect cardinality upper in Minimal materialiseMultiple`
-4. `test(probes): extend PROBE-027 for SDK-GAP-12 corpus`
+4. `test(probes): extend PROBE-027 for the real-world OPT corpus (REQ-102/107/110)`

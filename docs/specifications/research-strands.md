@@ -53,7 +53,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 |---|---|---|
 | Abstract generic `EVENT` polymorphism (`History.events`) | Promote `EVENT` to a Go interface; `POINT_EVENT` / `INTERVAL_EVENT` concrete; whitelist in generator | [ADR 0003](../adr/0003-rm-event-polymorphism.md) |
 | `Real` / `Integer` wire tolerance (quoted vs numeric JSON) | Strict encode, permissive decode via `rm.Real` / `rm.Integer` defined types | [ADR 0004](../adr/0004-numeric-wire-tolerance.md) |
-| Polymorphic round-trip fidelity (SDK-GAP-13) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable | [archived plan](../plans/archive/2026-06-23-sdk-gap-13-polymorphic-encode-decode.md) |
+| Polymorphic round-trip fidelity (REQ-052/040) | Value-in-interface `_type` on encode via `openehr/internal/jsonpoly`; round-tripped `DV_INTERVAL<T>` validated from its bounds' runtime types; corpus round-trips byte-stable | [archived plan](../plans/archive/2026-06-23-polymorphic-encode-decode.md) |
 
 ### Still open
 
@@ -66,7 +66,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 - Benchmark throughput, allocations, and memory residency for codec candidates.
 - Document any remaining abstract-generic classes requiring ADR whitelist (generator policy today: `EVENT` only).
-- `encoding/json/v2` fit-gap: whether `jsontext` + marshal options reproduce byte-stable canonical JSON (PROBE-030/031/038) and the polymorphic `_type` round-trip (SDK-GAP-13) without the generator's marshaler emit — and quantify the generated + `jsonpoly` LOC it would remove.
+- `encoding/json/v2` fit-gap: whether `jsontext` + marshal options reproduce byte-stable canonical JSON (PROBE-030/031/038) and the polymorphic `_type` round-trip (REQ-052/040) without the generator's marshaler emit — and quantify the generated + `jsonpoly` LOC it would remove.
 - `encoding/json/v2` stability/timeline: experimental behind `GOEXPERIMENT=jsonv2` in Go 1.25; gate any adoption on a stable, un-gated API so the SDK's public-API and wire-stability promises hold.
 
 **Resolution form (remaining):** ADR choosing the default codec (with tuning-knob notes for swapping). Amends REQ-052, REQ-053, possibly REQ-040 if registry shape needs tweaking. A `encoding/json/v2` resolution would additionally touch the codegen policy in [ADR 0002](../adr/0002-bmm-codegen-decisions.md), since it changes what the generator emits.

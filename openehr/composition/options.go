@@ -71,7 +71,7 @@ func WithNow(t time.Time) Option {
 // WithValueFill selects how primitive leaves are valued. The default
 // (instance.ExampleFill) emits the REQ-103 representative value;
 // instance.RandomFill draws in-constraint values that vary per call —
-// seed via WithValueSource for reproducibility. SDK-GAP-14.
+// seed via WithValueSource for reproducibility. REQ-107.
 func WithValueFill(f instance.ValueFill) Option {
 	return func(c *config) { c.valueFill = f }
 }
@@ -84,7 +84,7 @@ func WithValueFill(f instance.ValueFill) Option {
 //
 // A math/rand/v2.Source is not safe for concurrent use: do not share one
 // Source across concurrent NewSkeleton / Build calls — give each its own
-// (or leave it nil to use the concurrency-safe global). SDK-GAP-14.
+// (or leave it nil to use the concurrency-safe global). REQ-107.
 func WithValueSource(src mrand.Source) Option {
 	return func(c *config) { c.valueSource = src }
 }

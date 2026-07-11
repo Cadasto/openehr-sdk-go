@@ -1,7 +1,7 @@
 package rm
 
 // like_accessors.go: parent-struct helpers that complement the
-// SDK-GAP-11 narrow polymorphic interfaces (DVTextLike, DVURILike,
+// REQ-052 narrow polymorphic interfaces (DVTextLike, DVURILike,
 // AuditDetailsLike, PartyIdentifiedLike, ObjectRefLike).
 //
 // The interfaces themselves and their Get-prefixed accessor methods

@@ -11,7 +11,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-func compileGAP12Fixture(t *testing.T, name string) *templatecompile.Compiled {
+func compileRealWorldFixture(t *testing.T, name string) *templatecompile.Compiled {
 	t.Helper()
 	raw, err := os.ReadFile(fixtures.TemplateOptForName(name))
 	if err != nil {
@@ -28,12 +28,12 @@ func compileGAP12Fixture(t *testing.T, name string) *templatecompile.Compiled {
 	return c
 }
 
-// TestGenerateSocialMinimal_respectsContentUpper pins SDK-GAP-12 Task 3:
+// TestGenerateSocialMinimal_respectsContentUpper pins REQ-107 Task 3:
 // social.opt content has existence.upper=1 with multiple optional
 // archetype roots sharing node_id at0000 — Minimal synthesis must
 // emit at most one content entry so validation binds cleanly.
 func TestGenerateSocialMinimal_respectsContentUpper(t *testing.T) {
-	c := compileGAP12Fixture(t, "social")
+	c := compileRealWorldFixture(t, "social")
 	name := "Test Composer"
 	out, err := instance.Generate(context.Background(), c, instance.Options{
 		Policy:    instance.Minimal,

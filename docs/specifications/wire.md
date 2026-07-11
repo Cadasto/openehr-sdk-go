@@ -111,7 +111,7 @@ Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` m
 
 Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
-### Polymorphic substitution (SDK-GAP-11)
+### Polymorphic substitution
 
 The openEHR RM permits Liskov substitution at every property slot: a slot whose declared type is `T` admits any concrete subtype of `T` as a runtime instance, by AOM `valid_value` semantics. Two cases the canonical-JSON codec **MUST** handle losslessly:
 
@@ -120,7 +120,7 @@ The openEHR RM permits Liskov substitution at every property slot: a slot whose 
 
 **Missing-`_type` tolerance:** canonical JSON SHOULD carry `_type` everywhere, but real-world cassettes elide it on concrete-typed slots where the static field fixes the subtype (e.g. `"name": {"value": "Tree"}` on an `ITEM_TREE`). The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
 
-The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage-sdk-gap-11) (decode + re-marshal preserves every input `_type` discriminator). On BMM bumps that introduce new subtypes ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) step 10), `make codegen` auto-extends the relevant `<Parent>Like` interface (marker methods on the new concrete class); the closed type-switches in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) still need an explicit `case *NewSubtype:` arm per new descendant, plus a round-trip case in [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go), so PROBE-038's substitution guarantee covers it.
+The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator). On BMM bumps that introduce new subtypes ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) step 10), `make codegen` auto-extends the relevant `<Parent>Like` interface (marker methods on the new concrete class); the closed type-switches in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) still need an explicit `case *NewSubtype:` arm per new descendant, plus a round-trip case in [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go), so PROBE-038's substitution guarantee covers it.
 
 ## Canonical XML
 
@@ -173,8 +173,8 @@ The exact envelope shapes are openEHR REST 1.1.0-development; this spec does not
 
 Two endpoints carry **distinct request and response shapes** that are easy to conflate because the RM ships only the persisted (response) form:
 
-- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** (SDK-GAP-09, [PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition-sdk-gap-09)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
-- **`POST /ehr/{ehr_id}/contribution`** (SDK-GAP-10, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create-sdk-gap-10)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
+- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
+- **`POST /ehr/{ehr_id}/contribution`** ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
   - **Commit-audit DTO asymmetry (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).** The request-side commit audit (the batch `audit` and each version's `commit_audit`) is the `UPDATE_AUDIT` DTO, **not** the persisted `AUDIT_DETAILS`: it MUST omit the server-assigned `time_committed`, treats `system_id` as optional, and types `change_type` (and `UpdateVersion.lifecycle_state`) as `DV_CODED_TEXT` — never the withdrawn flat `TERMINOLOGY_CODE`. A client SHOULD send `_type:"UPDATE_AUDIT"`; servers SHOULD accept `AUDIT_DETAILS` or an omitted `_type`. The Go SDK emits `AUDIT_DETAILS` by default (`contribution.UpdateAudit`) and exposes `AuditType` to fall back to `UPDATE_AUDIT` for non-conformant servers.
 
 Implementations **MUST NOT** serialise the persisted shape on either submission path. The Go SDK enforces this via [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) (distinct from `rm.Contribution`) and the composition / directory write surfaces that take bare RM types.
@@ -217,6 +217,8 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 
 **AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
+**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares: `GET /query/aql/{qualified_query_name}` carries the `ehr_id` **query parameter**; `POST /query/aql` carries the **`openehr-ehr-id` request header** — the POST operations declare no `ehr_id` query parameter and the request body carries no `ehr_id` field, so the header is the only channel. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
+
 ### Stored AQL
 
 ### REQ-057
@@ -227,6 +229,8 @@ The platform supports **stored AQL queries** — queries registered ahead of tim
 - **`openehr/client/query/`** — execute a stored query by ID (`GET /query/{qualified_query_name}`) in addition to the ad-hoc execution path.
 
 A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK passes it through verbatim. Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK does not pre-validate the qualified name — that's the backend's responsibility.
+
+**Store-response version recovery.** The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns. The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation). A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
 
 ## Optimistic concurrency
 

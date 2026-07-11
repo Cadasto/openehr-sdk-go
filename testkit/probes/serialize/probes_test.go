@@ -47,7 +47,7 @@ func TestProbe030(t *testing.T) {
 // TestProbe038 runs PROBE-038 across the polymorphic-decode fixture
 // set vendored under testkit/cassettes/rm/polymorphic/ and asserts
 // every input decodes + re-marshals with the original `_type`
-// discriminators preserved (the SDK-GAP-11 substitutability guarantee).
+// discriminators preserved (the REQ-052 substitutability guarantee).
 func TestProbe038(t *testing.T) {
 	if len(serializeprobes.Probe038Inputs) == 0 {
 		t.Fatal("Probe038Inputs is empty — polymorphic fixture set missing")

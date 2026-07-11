@@ -263,7 +263,7 @@ func TestSaveMinimal(t *testing.T) {
 	}
 }
 
-// TestSaveRepresentationDecodesBareComposition pins SDK-GAP-09:
+// TestSaveRepresentationDecodesBareComposition pins REQ-094:
 // `Prefer: return=representation` on POST returns a bare COMPOSITION
 // (not an ORIGINAL_VERSION<COMPOSITION>) per the ITS-REST OpenAPI
 // `201_COMPOSITION` schema (oneOf: Composition | Identifier).
@@ -477,7 +477,7 @@ func TestUpdateRoundTrip(t *testing.T) {
 	}
 }
 
-// TestUpdateRepresentationDecodesBareComposition pins SDK-GAP-09 on
+// TestUpdateRepresentationDecodesBareComposition pins REQ-094 on
 // the PUT path: `Prefer: return=representation` on PUT returns a bare
 // COMPOSITION per the ITS-REST OpenAPI `200_COMPOSITION_updated`
 // schema. Save and Update share `doWrite` but the catalog title for
