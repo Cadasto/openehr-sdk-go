@@ -71,6 +71,61 @@ func UIDValue(u UID) string {
 	return ""
 }
 
+// ObjectIDValue returns the raw string value carried by any concrete
+// OBJECT_ID, and whether id was a recognised, non-nil type. Unlike
+// UIDValue, callers can distinguish "" as an actual empty value from ""
+// meaning "could not be read" (a nil or unrecognised id) — silently
+// treating the latter as an empty value risks emitting an unencodable
+// or misleading reference. REQ-120.
+func ObjectIDValue(id ObjectID) (value string, ok bool) {
+	switch v := id.(type) {
+	case HierObjectID:
+		return v.Value, true
+	case *HierObjectID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	case ObjectVersionID:
+		return v.Value, true
+	case *ObjectVersionID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	case GenericID:
+		return v.Value, true
+	case *GenericID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	case ArchetypeID:
+		return v.Value, true
+	case *ArchetypeID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	case TemplateID:
+		return v.Value, true
+	case *TemplateID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	case TerminologyID:
+		return v.Value, true
+	case *TerminologyID:
+		if v == nil {
+			return "", false
+		}
+		return v.Value, true
+	default:
+		return "", false
+	}
+}
+
 // --- UID_BASED_ID (root '::' extension) ---------------------------------
 
 // uidBasedRoot returns the part left of the first "::" (or the whole

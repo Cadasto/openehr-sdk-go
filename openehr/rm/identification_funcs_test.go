@@ -243,6 +243,54 @@ func TestLocatableRefAsURI(t *testing.T) {
 	}
 }
 
+func TestObjectIDValue(t *testing.T) {
+	tests := []struct {
+		name   string
+		id     rm.ObjectID
+		want   string
+		wantOK bool
+	}{
+		{"HierObjectID value", rm.HierObjectID{Value: "abc"}, "abc", true},
+		{"HierObjectID pointer", &rm.HierObjectID{Value: "abc"}, "abc", true},
+		{"HierObjectID nil pointer", (*rm.HierObjectID)(nil), "", false},
+		{"HierObjectID empty value", rm.HierObjectID{}, "", true},
+
+		{"ObjectVersionID value", rm.ObjectVersionID{Value: "obj::sys::1"}, "obj::sys::1", true},
+		{"ObjectVersionID pointer", &rm.ObjectVersionID{Value: "obj::sys::1"}, "obj::sys::1", true},
+		{"ObjectVersionID nil pointer", (*rm.ObjectVersionID)(nil), "", false},
+
+		{"GenericID value", rm.GenericID{Value: "g1", Scheme: "local"}, "g1", true},
+		{"GenericID pointer", &rm.GenericID{Value: "g1", Scheme: "local"}, "g1", true},
+		{"GenericID nil pointer", (*rm.GenericID)(nil), "", false},
+
+		{"ArchetypeID value", rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.lab_result.v1"}, "openEHR-EHR-OBSERVATION.lab_result.v1", true},
+		{"ArchetypeID pointer", &rm.ArchetypeID{Value: "openEHR-EHR-OBSERVATION.lab_result.v1"}, "openEHR-EHR-OBSERVATION.lab_result.v1", true},
+		{"ArchetypeID nil pointer", (*rm.ArchetypeID)(nil), "", false},
+
+		{"TemplateID value", rm.TemplateID{Value: "tmpl.v1"}, "tmpl.v1", true},
+		{"TemplateID pointer", &rm.TemplateID{Value: "tmpl.v1"}, "tmpl.v1", true},
+		{"TemplateID nil pointer", (*rm.TemplateID)(nil), "", false},
+
+		{"TerminologyID value", rm.TerminologyID{Value: "SNOMED-CT"}, "SNOMED-CT", true},
+		{"TerminologyID pointer", &rm.TerminologyID{Value: "SNOMED-CT"}, "SNOMED-CT", true},
+		{"TerminologyID nil pointer", (*rm.TerminologyID)(nil), "", false},
+
+		// ObjectID has an unexported discriminator method. The default arm
+		// is reached by a nil interface value, or by an external type that
+		// embeds one of the concrete IDs (inheriting the promoted
+		// isObjectID() method, but as a distinct type it matches no case).
+		{"nil ObjectID (unrecognized)", nil, "", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := rm.ObjectIDValue(tc.id)
+			if got != tc.want || ok != tc.wantOK {
+				t.Errorf("ObjectIDValue(%#v) = (%q, %v), want (%q, %v)", tc.id, got, ok, tc.want, tc.wantOK)
+			}
+		})
+	}
+}
+
 func TestIdentifierAccessorsNoPanicOnGarbage(t *testing.T) {
 	// REQ-120 best-effort derivation methods must never panic, however
 	// malformed the input. (A panic here fails the test outright.)
