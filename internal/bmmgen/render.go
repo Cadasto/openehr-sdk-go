@@ -109,6 +109,14 @@ func RenderTypeRegFile(plan *Plan) ([]byte, error) {
 		fmt.Fprintf(&b, "\ttypereg.Default.Register(%q, func() any { return &%s{} })\n", pc.BMMName, goType)
 	}
 	b.WriteString("}\n")
+	// Reverse registry + nil predicate (ADR 0013) — RM target only:
+	// the identity consumers live against the RM model, and the AOM
+	// target has no equivalent surface.
+	if plan.Target.GoPackage == "rm" {
+		if err := emitReverseRegistry(&b, plan, concrete); err != nil {
+			return nil, err
+		}
+	}
 	formatted, err := format.Source(b.Bytes())
 	if err != nil {
 		return b.Bytes(), fmt.Errorf("gofmt typereg_gen.go: %w", err)
@@ -273,8 +281,20 @@ func renderAbstractClass(plan *Plan, pc *PlannedClass, _ *bmm.SimpleClass) (stri
 	writeDoc(&b, pc.GoName, pc.Class.Documentation())
 	fmt.Fprintf(&b, "type %s interface {\n", pc.GoName)
 	fmt.Fprintf(&b, "\tis%s()\n", pc.GoName)
+	// LOCATABLE identity surface (ADR 0013): the sealed interface is
+	// widened with the generated Get<Field> accessors.
+	if pc.BMMName == locatableClassName && !pc.External {
+		if err := emitLocatableGetterSignatures(&b, plan, pc); err != nil {
+			return "", err
+		}
+	}
 	b.WriteString("}\n")
 	emitMarkerMethods(&b, plan, pc)
+	if pc.BMMName == locatableClassName && !pc.External {
+		if err := emitLocatableIdentity(&b, plan, pc); err != nil {
+			return "", err
+		}
+	}
 	// Phase-3: methods declared on this abstract class are emitted as
 	// concrete stubs on each descendant that does not override them
 	// (the Go interface stays marker-only).
@@ -598,26 +618,12 @@ func renderField(plan *Plan, owner *bmm.SimpleClass, ownerName string, prop bmm.
 
 	switch p := prop.(type) {
 	case *bmm.SingleProperty:
-		typ, isClass, err := singleTypeRef(plan, owner, p.TypeName)
+		ref, err := singlePropTypeExpr(plan, owner, ownerName, p)
 		if err != nil {
 			return "", err
 		}
 		if p.IsMandatory {
-			// Cycle-break: when this owner/prop is in the mutual
-			// recursion graph, force a pointer so the Go compiler
-			// accepts the struct definition.
-			if plan.CyclicSingleProps[ownerName][name] {
-				return docLines + fmt.Sprintf("\t%s *%s %s\n", goName, typ, jsonTag), nil
-			}
-			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, typ, jsonTag), nil
-		}
-		// optional — pointer for nullability if it's a primitive or a
-		// non-interface class. Interface fields are nilable already.
-		ref := typ
-		if !isInterfaceTypeRef(plan, p.TypeName) && !isClass /* primitive */ {
-			ref = "*" + typ
-		} else if !isInterfaceTypeRef(plan, p.TypeName) {
-			ref = "*" + typ
+			return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, jsonTag), nil
 		}
 		return docLines + fmt.Sprintf("\t%s %s %s\n", goName, ref, jsonTagOpt), nil
 
@@ -802,6 +808,37 @@ func typeRef(plan *Plan, owner *bmm.SimpleClass, t bmm.Type) (string, error) {
 // generic ancestor), the function fills in the parameter list using
 // the class's declared generic parameter bounds (or `any` when the
 // bound is `Any` / empty / not resolvable to a Go interface).
+// singlePropTypeExpr resolves the Go type expression for a single
+// (non-container) property exactly as struct-field rendering does:
+// mandatory properties keep the bare type (cycle-broken to a pointer
+// when in the mutual-recursion graph); optional properties become
+// pointers unless the type resolves to an interface (interfaces are
+// nilable already). Shared by [renderField] and the LOCATABLE identity
+// emission (render_identity.go) so accessor types cannot drift from
+// field declarations.
+func singlePropTypeExpr(plan *Plan, owner *bmm.SimpleClass, ownerName string, p *bmm.SingleProperty) (string, error) {
+	typ, _, err := singleTypeRef(plan, owner, p.TypeName)
+	if err != nil {
+		return "", err
+	}
+	name := p.PropertyName()
+	if p.IsMandatory {
+		// Cycle-break: when this owner/prop is in the mutual
+		// recursion graph, force a pointer so the Go compiler
+		// accepts the struct definition.
+		if plan.CyclicSingleProps[ownerName][name] {
+			return "*" + typ, nil
+		}
+		return typ, nil
+	}
+	// optional — pointer for nullability unless the type is an
+	// interface (interface fields are nilable already).
+	if !isInterfaceTypeRef(plan, p.TypeName) {
+		return "*" + typ, nil
+	}
+	return typ, nil
+}
+
 func singleTypeRef(plan *Plan, owner *bmm.SimpleClass, name string) (string, bool, error) {
 	// Open generic parameter on the owning class wins first.
 	if owner != nil && owner.GenericParameterDefs != nil {
