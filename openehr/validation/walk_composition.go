@@ -506,7 +506,7 @@ func slotFitsArchetypeID(slot *tcimpl.CompiledNode, archetypeID string) bool {
 // locatableArchetypeNodeID extracts archetype_node_id from any RM
 // LOCATABLE value. Returns "" for non-LOCATABLE values (DataValue
 // subtypes, PartyProxy, EventContext). Thin wrapper over
-// [rmTypeInfo] — adding a new RM type means editing one switch.
+// [rmTypeInfo], which reads the generated identity surface (ADR 0013).
 func locatableArchetypeNodeID(v any) string {
 	_, id, _ := rmTypeInfo(v)
 	return id

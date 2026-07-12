@@ -115,18 +115,18 @@ func TestRMTypeName(t *testing.T) {
 		})
 	}
 
-	// Registry round-trip parity: for registered names, the constructor's
-	// product must reverse-map to the exact registration name.
-	for _, name := range []string{
-		"COMPOSITION", "SECTION", "OBSERVATION", "EVALUATION", "INSTRUCTION",
-		"ACTION", "CLUSTER", "ELEMENT", "HISTORY", "POINT_EVENT",
-		"INTERVAL_EVENT", "DV_INTERVAL", "DV_QUANTITY", "DV_CODED_TEXT",
-		"FOLDER", "EHR_STATUS", "PERSON", "ORGANISATION",
-	} {
-		ctor, ok := typereg.Default.Lookup(name)
-		if !ok {
-			t.Fatalf("registry has no %q", name)
-		}
+	// Registry round-trip parity over the FULL registry: every
+	// registered constructor's product must reverse-map to its exact
+	// registration name, so a missing reverse-registry arm fails here
+	// (REQ-040 reversibility). This test binary links only the rm
+	// registrations into typereg.Default — importing aom14 here would
+	// add names rm.RMTypeName deliberately does not cover.
+	names := typereg.Default.Names()
+	if len(names) < 100 {
+		t.Fatalf("registry holds %d names — rm registrations missing?", len(names))
+	}
+	for _, name := range names {
+		ctor, _ := typereg.Default.Lookup(name)
 		if got, ok := rm.RMTypeName(ctor()); !ok || got != name {
 			t.Errorf("round-trip %s: RMTypeName = (%q, %v)", name, got, ok)
 		}
