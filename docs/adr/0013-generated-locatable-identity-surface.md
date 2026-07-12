@@ -10,16 +10,18 @@
 
 ## Context
 
-Because [ADR 0002](0002-bmm-codegen-decisions.md) D4 flattens abstract ancestors, the ~54
-LOCATABLE concrete RM types carry `ArchetypeNodeID` / `Name` / `UID` / `ArchetypeDetails` as
-own fields, and `rm.Locatable` is a **sealed marker interface** (unexported `isLocatable()`,
+Because [ADR 0002](0002-bmm-codegen-decisions.md) D4 flattens abstract ancestors, the **31**
+LOCATABLE concrete RM types (the `isLocatable()` marker count in `openehr/rm/*_gen.go`)
+carry `ArchetypeNodeID string` / `Name DVTextLike` / `UID UIDBasedID` /
+`ArchetypeDetails *Archetyped` as own fields, and `rm.Locatable` is a **sealed marker interface** (unexported `isLocatable()`,
 value receivers). There is no polymorphic way to read or write a node's identity, so five
 files hand-maintain parallel reflection-free `case *rm.X` switches (~341 arms total):
 `openehr/validation/rmread/read.go` (116), `openehr/rm/rmpath/walk.go` (72 — `nodeIDOf` and
 `nameValueOf` are 36 byte-identical arms *each*), `internal/templateinstance/rmwrite/write.go`
-(59), `openehr/validation/composition.go` (58), `openehr/composition/typecheck.go` (36).
-(Counts as of `main` @ 15f02f1; plan Phase 4 — PR #70 — removes 13 *coercion* arms from
-`write.go`, disjoint from the identity/nil arms targeted here. Refresh counts on acceptance.)
+(59), `openehr/validation/composition.go` (58), `openehr/composition/typecheck.go` (36) —
+plus `openehr/instance/locatable.go`'s 18 identity arms (`applyLocatableIdentity`).
+(Counts as of pre-consolidation `main` @ 15f02f1; plan Phase 4 has since landed via PR #72,
+removing 13 *coercion* arms from `write.go` — disjoint from the identity/nil arms here.)
 Their own comments demand lock-step maintenance; every BMM bump grows each switch by hand.
 `internal/bmmgen` already emits the *forward* registry (`typereg_gen.go`: RM name →
 constructor) and per-type attribute metadata (`rminfo/lookup_gen.go`), but neither the
@@ -52,23 +54,33 @@ surface** in `*_gen.go` (ADR 0002 D6: the generator never touches non-`_gen.go` 
 
 1. **Read accessors, widening `rm.Locatable`** (value receivers, uniform `Get<Field>` rule
    per the `*Like`-interface precedent): `GetArchetypeNodeID() string` and
-   `GetName() DVText` — name = `Get` + field, return type = field type, mechanically
-   derivable by the generator. These are SDK-idiom additions, not BMM functions — they do
+   `GetName() DVTextLike` — name = `Get` + field, **return type = the field's actual
+   declared type**, mechanically derivable by the generator. `Name` is `DVTextLike` (not
+   `DVText`): returning the interface preserves `DV_CODED_TEXT` node names, and consumers
+   read the text via the Like surface's existing `GetValue()`. Accessors return the field
+   verbatim (a nil `Name`/`UID` on a partially-built node stays nil — nil handling remains
+   with consumers, as today). These are SDK-idiom additions, not BMM functions — they do
    not pass through the D6 panic-stub / D7 skip-set machinery.
 2. **Setters on a new sealed interface `rm.MutableLocatable`** (pointer receivers):
-   `SetArchetypeNodeID(string)`, `SetName(DVText)`, `SetUID(*UIDBasedID)`,
-   `SetArchetypeDetails(*Archetyped)` — satisfied by `*T` for every LOCATABLE `T`, sealed by
-   the same marker so it cannot be implemented outside `rm`.
+   `SetArchetypeNodeID(string)`, `SetName(DVTextLike)`, `SetUID(UIDBasedID)`,
+   `SetArchetypeDetails(*Archetyped)` — parameter type = the field's actual declared type
+   (`UID` is an interface-valued field, so the setter takes the `UIDBasedID` interface
+   directly; a pointer-to-interface would be a Go anti-pattern). Satisfied by `*T` for every
+   LOCATABLE `T`, sealed by the same marker so it cannot be implemented outside `rm`.
 3. **A generated reverse lookup** `rm.RMTypeName(any) (string, bool)` — the inverse of
    `typereg_gen.go`, one exhaustive generated type-switch with a per-type **typed-nil pointer
    guard** (a typed-nil `*T` reports `("", false)`, never a false positive).
 
-The five hand-maintained consumers then shrink to their essential dispatch: `rmpath`'s
-`nodeIDOf`/`nameValueOf` collapse to a single `Locatable` assertion, `instance`'s
-`applyLocatableIdentity` uses `MutableLocatable`, the two duplicated Go→RM-name maps unify
-onto `RMTypeName`, and the typed-nil guards delegate to the generated one. The
-value-dispatch routers in `rmread`/`rmwrite`/`childrenAt` **stay** — only identity/nil arms
-are removed; their lock-step comments are updated to the reduced set.
+The hand-maintained consumers then shrink to their essential dispatch: `rmpath`'s
+`nodeIDOf`/`nameValueOf` collapse to a single `Locatable` assertion (name text read via
+`GetName().GetValue()`), `instance`'s `applyLocatableIdentity` uses `MutableLocatable`, and
+the typed-nil guards delegate to the generated one. The two duplicated Go→RM-name maps
+converge on `RMTypeName` with one nuance: `typecheck`'s `goConcreteRMType` collapses fully,
+while `validation`'s `rmTypeInfo(v) (rmType, archetypeNodeID, ok)` does double duty and
+therefore **decomposes** into `RMTypeName(v)` plus a `Locatable` assertion for the node id
+rather than disappearing. The value-dispatch routers in `rmread`/`rmwrite`/`childrenAt`
+**stay** — only identity/nil arms are removed; their lock-step comments are updated to the
+reduced set.
 
 ## Consequences
 
@@ -80,9 +92,11 @@ are removed; their lock-step comments are updated to the reduced set.
   plus two sealed interfaces and one lookup function on the public `rm` surface — additive
   (the sealed markers mean no external implementer can be broken), but effectively
   irreversible under the SDK's API-stability policy.
-- **Generated-code growth:** ~54 types × 6 one-line methods (~350 generated LOC) versus the
-  ~200 removed hand-written lines — total LOC rises slightly; *hand-maintained* LOC drops
-  sharply. The trade is deliberate: machine-owned bulk over human-owned lock-step.
+- **Generated-code growth:** 31 LOCATABLE types × 6 one-line methods (~186 generated
+  methods) versus the ~200 removed hand-written lines — total LOC roughly nets out;
+  *hand-maintained* LOC drops sharply. The trade is deliberate: machine-owned bulk over
+  human-owned lock-step. (The `handles_test.go` **54**-type pin is the `rmread` closed
+  taxonomy — a superset including non-LOCATABLE types — and stays the regression gate.)
 - **Naming:** the `Get<Field>` prefix trades Effective Go's omit-`Get` guideline for
   collision-freedom, mechanical derivability, and consistency with the existing
   `*Like`-interface accessors — a deliberate, house-precedented choice.
@@ -90,13 +104,13 @@ are removed; their lock-step comments are updated to the reduced set.
   reverse direction, REQ-043 mapping rules) must be updated in the same PR as the generator
   change; `traceability.yaml` gains the ADR references on those REQ entries at implementation.
 - **Risk accepted:** if a future BMM class legitimately needs different identity semantics
-  (e.g. a name that is not a `DVText`), the generated surface must grow a per-type override
+  (e.g. a name outside the `DV_TEXT` family entirely), the generated surface must grow a per-type override
   mechanism (D7-style skip set) — deferred until a concrete case exists.
 
 ## Alternatives considered
 
 - **Hand-written accessors in `*_funcs.go`** (no generator change): keeps `bmmgen` frozen but
-  replaces 341 switch arms with ~324 hand-written methods — *more* human-owned lock-step, the
+  replaces the switch arms with ~186 hand-written methods — *more* human-owned lock-step, the
   opposite of the goal.
 - **Reflection-based identity access:** rejected outright (REQ-024).
 - **Embedded base struct carrying the fields** (make D4 emit a real `locatable` embed):
