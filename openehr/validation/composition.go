@@ -3,6 +3,7 @@ package validation
 import (
 	"fmt"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/internal/rmnames"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/validation/rmread"
@@ -96,22 +97,14 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 	if v == nil || rmread.IsTypedNilPointer(v) {
 		return "", "", false
 	}
-	switch v.(type) {
 	// Typed DV_INTERVAL instantiations keep their parameterised
 	// diagnostic names (bare "DV_INTERVAL" would lose the bound in
-	// rm_type_mismatch findings).
-	case *rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity]:
-		return "DV_INTERVAL<DV_QUANTITY>", "", true
-	case *rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount]:
-		return "DV_INTERVAL<DV_COUNT>", "", true
-	case *rm.DVInterval[rm.DVDateTime], rm.DVInterval[rm.DVDateTime]:
-		return "DV_INTERVAL<DV_DATE_TIME>", "", true
-	case *rm.DVInterval[rm.DVDate], rm.DVInterval[rm.DVDate]:
-		return "DV_INTERVAL<DV_DATE>", "", true
-	case *rm.DVInterval[rm.DVTime], rm.DVInterval[rm.DVTime]:
-		return "DV_INTERVAL<DV_TIME>", "", true
-	case *rm.DVInterval[rm.DVProportion], rm.DVInterval[rm.DVProportion]:
-		return "DV_INTERVAL<DV_PROPORTION>", "", true
+	// rm_type_mismatch findings). Single canonical closed set in
+	// rmnames — the previous local switch had drifted three
+	// instantiations (DV_DURATION/DV_ORDINAL/DV_SCALE) behind the
+	// DVOrdered closure.
+	if name, ok := rmnames.TypedIntervalName(v); ok {
+		return name, "", true
 	}
 	name, ok := rm.RMTypeName(v)
 	if !ok {

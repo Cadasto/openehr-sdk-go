@@ -14,8 +14,12 @@ import (
 // details branch is inert for them (the previous per-type switch
 // omitted it on the event arms — same observable behaviour).
 // Non-LOCATABLE RM types (DV*, EventContext) and value-form
-// (non-pointer) inputs silently no-op, exactly as the previous
-// pointer-only switch did — MutableLocatable is satisfied by *T only.
+// (non-pointer) inputs silently no-op — MutableLocatable is satisfied
+// by *T only. Deliberate widening vs the previous 18-arm switch:
+// every LOCATABLE concrete the template compiler can yield (FOLDER,
+// EHR_STATUS, the demographic PARTY family, …) now gets its identity
+// stamped rather than silently skipped; the uid policy below is
+// unchanged.
 func applyLocatableIdentity(rmValue any, nodeID, name string, archetypeDetails *rm.Archetyped, uidSource func() *rm.HierObjectID) {
 	m, ok := rmValue.(rm.MutableLocatable)
 	if !ok {
