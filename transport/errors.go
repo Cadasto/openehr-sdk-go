@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"strings"
@@ -104,7 +105,7 @@ func (e *WireError) Error() string {
 		b.WriteString("transport: wire error")
 	}
 	if e.Method != "" || e.Route != "" {
-		fmt.Fprintf(&b, " (%s %s)", e.Method, firstNonEmpty(e.Route, e.URL))
+		fmt.Fprintf(&b, " (%s %s)", e.Method, cmp.Or(e.Route, e.URL))
 	}
 	if e.StatusCode != 0 {
 		fmt.Fprintf(&b, " status=%d", e.StatusCode)
@@ -117,10 +118,3 @@ func (e *WireError) Error() string {
 
 // Unwrap exposes the sentinel for errors.Is.
 func (e *WireError) Unwrap() error { return e.Sentinel }
-
-func firstNonEmpty(a, b string) string {
-	if a != "" {
-		return a
-	}
-	return b
-}
