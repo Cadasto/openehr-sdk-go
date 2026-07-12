@@ -62,6 +62,32 @@ func TestUnmarshalUnknownXSITypeWrapsTypereg(t *testing.T) {
 	}
 }
 
+// TestUnmarshalRejectsPrefixedXSIType pins the REQ-056 boundary: a
+// namespace-prefixed xsi:type value (Better/Marand's
+// `xsi:type="ns2:DV_QUANTITY"` dialect, ns2 bound to the openEHR RM
+// namespace) is out of v1 scope. encoding/xml leaves the QName value
+// opaque, so the decoder MUST fail closed with typereg.ErrUnknownType
+// on the literal `ns2:PARTY_SELF` string rather than resolving the
+// prefix. A later prefix-normalisation change would break this test
+// on purpose.
+func TestUnmarshalRejectsPrefixedXSIType(t *testing.T) {
+	in := []byte(`<composition xmlns="http://schemas.openehr.org/v1" xmlns:ns2="http://schemas.openehr.org/v1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><name><value>x</value></name><archetype_node_id>x</archetype_node_id><language><terminology_id><value>ISO_639-1</value></terminology_id><code_string>en</code_string></language><territory><terminology_id><value>ISO_3166-1</value></terminology_id><code_string>GB</code_string></territory><category><value>event</value><defining_code><terminology_id><value>openehr</value></terminology_id><code_string>433</code_string></defining_code></category><composer xsi:type="ns2:PARTY_SELF"></composer></composition>`)
+	var c rm.Composition
+	err := canxml.Unmarshal(in, &c)
+	if err == nil {
+		t.Fatal("expected error for namespace-prefixed xsi:type value")
+	}
+	if !errors.Is(err, typereg.ErrUnknownType) {
+		t.Errorf("err = %v; want errors.Is(_, typereg.ErrUnknownType)", err)
+	}
+	// The unresolved, prefixed value MUST reach the registry verbatim —
+	// this is what pins the boundary against a silent prefix strip.
+	var de *canxml.DecodeError
+	if errors.As(err, &de) && de.Type != "ns2:PARTY_SELF" {
+		t.Errorf("DecodeError.Type = %q; want unresolved prefixed value %q", de.Type, "ns2:PARTY_SELF")
+	}
+}
+
 // TestUnmarshalMissingXSITypeStrictDefault — strict default: a
 // missing `xsi:type` at a polymorphic site is an error wrapping
 // typereg.ErrMissingType.
