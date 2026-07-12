@@ -79,132 +79,27 @@ func joinPath(parent, segment string) string {
 // rmTypeInfo is the single source of truth for "what RM class is
 // this Go value and (when LOCATABLE) what is its archetype_node_id".
 // All v2 walker code routes through this function — describeRMType
-// and locatableArchetypeNodeID are thin wrappers. Adding a new RM
-// type means editing one switch.
+// and locatableArchetypeNodeID are thin wrappers.
 //
-// Returns ("", "", false) for Go types outside the v2 closed set.
-// Pointer + value receivers both enumerated because JSON decoding
-// yields pointers while builders may yield values (REQ-024 — no
-// reflection).
+// Since ADR 0013 it decomposes onto the generated surface: the name
+// half delegates to rm.RMTypeName (every registered concrete — the
+// previous hand-written closed set was a subset, so recognition
+// widened to the full registry), the archetype_node_id half reads
+// polymorphically through rm.Locatable. Only the validation-facing
+// parameterised DV_INTERVAL diagnostic names stay hand-written: they
+// are display names for rm_type_mismatch findings, deliberately more
+// specific than the bare registry name.
+//
+// Returns ("", "", false) for nil, typed-nil, and non-RM Go values.
+// REQ-024 — no reflection.
 func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 	if v == nil || rmread.IsTypedNilPointer(v) {
 		return "", "", false
 	}
-	switch x := v.(type) {
-
-	// LOCATABLE concretes — carry archetype_node_id.
-	case *rm.Composition:
-		return "COMPOSITION", x.ArchetypeNodeID, true
-	case rm.Composition:
-		return "COMPOSITION", x.ArchetypeNodeID, true
-	case *rm.Observation:
-		return "OBSERVATION", x.ArchetypeNodeID, true
-	case rm.Observation:
-		return "OBSERVATION", x.ArchetypeNodeID, true
-	case *rm.Evaluation:
-		return "EVALUATION", x.ArchetypeNodeID, true
-	case rm.Evaluation:
-		return "EVALUATION", x.ArchetypeNodeID, true
-	case *rm.Instruction:
-		return "INSTRUCTION", x.ArchetypeNodeID, true
-	case rm.Instruction:
-		return "INSTRUCTION", x.ArchetypeNodeID, true
-	case *rm.Action:
-		return "ACTION", x.ArchetypeNodeID, true
-	case rm.Action:
-		return "ACTION", x.ArchetypeNodeID, true
-	case *rm.AdminEntry:
-		return "ADMIN_ENTRY", x.ArchetypeNodeID, true
-	case rm.AdminEntry:
-		return "ADMIN_ENTRY", x.ArchetypeNodeID, true
-	case *rm.GenericEntry:
-		return "GENERIC_ENTRY", x.ArchetypeNodeID, true
-	case rm.GenericEntry:
-		return "GENERIC_ENTRY", x.ArchetypeNodeID, true
-	case *rm.Section:
-		return "SECTION", x.ArchetypeNodeID, true
-	case rm.Section:
-		return "SECTION", x.ArchetypeNodeID, true
-	case *rm.Activity:
-		return "ACTIVITY", x.ArchetypeNodeID, true
-	case rm.Activity:
-		return "ACTIVITY", x.ArchetypeNodeID, true
-	case *rm.History[rm.ItemStructure]:
-		return "HISTORY", x.ArchetypeNodeID, true
-	case rm.History[rm.ItemStructure]:
-		return "HISTORY", x.ArchetypeNodeID, true
-	case *rm.PointEvent[rm.ItemStructure]:
-		return "POINT_EVENT", x.ArchetypeNodeID, true
-	case rm.PointEvent[rm.ItemStructure]:
-		return "POINT_EVENT", x.ArchetypeNodeID, true
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return "INTERVAL_EVENT", x.ArchetypeNodeID, true
-	case rm.IntervalEvent[rm.ItemStructure]:
-		return "INTERVAL_EVENT", x.ArchetypeNodeID, true
-	case *rm.ItemTree:
-		return "ITEM_TREE", x.ArchetypeNodeID, true
-	case rm.ItemTree:
-		return "ITEM_TREE", x.ArchetypeNodeID, true
-	case *rm.ItemList:
-		return "ITEM_LIST", x.ArchetypeNodeID, true
-	case rm.ItemList:
-		return "ITEM_LIST", x.ArchetypeNodeID, true
-	case *rm.ItemSingle:
-		return "ITEM_SINGLE", x.ArchetypeNodeID, true
-	case rm.ItemSingle:
-		return "ITEM_SINGLE", x.ArchetypeNodeID, true
-	case *rm.ItemTable:
-		return "ITEM_TABLE", x.ArchetypeNodeID, true
-	case rm.ItemTable:
-		return "ITEM_TABLE", x.ArchetypeNodeID, true
-	case *rm.Cluster:
-		return "CLUSTER", x.ArchetypeNodeID, true
-	case rm.Cluster:
-		return "CLUSTER", x.ArchetypeNodeID, true
-	case *rm.Element:
-		return "ELEMENT", x.ArchetypeNodeID, true
-	case rm.Element:
-		return "ELEMENT", x.ArchetypeNodeID, true
-
-	// EVENT_CONTEXT — has archetype-like nature but no archetype_node_id field.
-	case *rm.EventContext, rm.EventContext:
-		return "EVENT_CONTEXT", "", true
-
-	// DataValue subtypes — no archetype_node_id.
-	case *rm.DVCodedText, rm.DVCodedText:
-		return "DV_CODED_TEXT", "", true
-	case *rm.DVText, rm.DVText:
-		return "DV_TEXT", "", true
-	case *rm.CodePhrase, rm.CodePhrase:
-		return "CODE_PHRASE", "", true
-	case *rm.DVQuantity, rm.DVQuantity:
-		return "DV_QUANTITY", "", true
-	case *rm.DVCount, rm.DVCount:
-		return "DV_COUNT", "", true
-	case *rm.DVBoolean, rm.DVBoolean:
-		return "DV_BOOLEAN", "", true
-	case *rm.DVOrdinal, rm.DVOrdinal:
-		return "DV_ORDINAL", "", true
-	case *rm.DVDate, rm.DVDate:
-		return "DV_DATE", "", true
-	case *rm.DVTime, rm.DVTime:
-		return "DV_TIME", "", true
-	case *rm.DVDateTime, rm.DVDateTime:
-		return "DV_DATE_TIME", "", true
-	case *rm.DVDuration, rm.DVDuration:
-		return "DV_DURATION", "", true
-	case *rm.DVURI, rm.DVURI:
-		return "DV_URI", "", true
-	case *rm.DVEHRURI, rm.DVEHRURI:
-		return "DV_EHR_URI", "", true
-	case *rm.DVIdentifier, rm.DVIdentifier:
-		return "DV_IDENTIFIER", "", true
-	case *rm.DVMultimedia, rm.DVMultimedia:
-		return "DV_MULTIMEDIA", "", true
-	case *rm.DVParsable, rm.DVParsable:
-		return "DV_PARSABLE", "", true
-	case *rm.DVProportion, rm.DVProportion:
-		return "DV_PROPORTION", "", true
+	switch v.(type) {
+	// Typed DV_INTERVAL instantiations keep their parameterised
+	// diagnostic names (bare "DV_INTERVAL" would lose the bound in
+	// rm_type_mismatch findings).
 	case *rm.DVInterval[rm.DVQuantity], rm.DVInterval[rm.DVQuantity]:
 		return "DV_INTERVAL<DV_QUANTITY>", "", true
 	case *rm.DVInterval[rm.DVCount], rm.DVInterval[rm.DVCount]:
@@ -217,75 +112,16 @@ func rmTypeInfo(v any) (rmType string, archetypeNodeID string, ok bool) {
 		return "DV_INTERVAL<DV_TIME>", "", true
 	case *rm.DVInterval[rm.DVProportion], rm.DVInterval[rm.DVProportion]:
 		return "DV_INTERVAL<DV_PROPORTION>", "", true
-	case *rm.DVInterval[rm.DVOrdered], rm.DVInterval[rm.DVOrdered]:
-		return "DV_INTERVAL", "", true
-
-	// PartyProxy concretes.
-	case rm.PartySelf, *rm.PartySelf:
-		return "PARTY_SELF", "", true
-	case *rm.PartyIdentified, rm.PartyIdentified:
-		return "PARTY_IDENTIFIED", "", true
-	case *rm.PartyRelated, rm.PartyRelated:
-		return "PARTY_RELATED", "", true
-
-	// LOCATABLE demographic concretes — PARTY hierarchy + sub-components
-	// (REQ-110). All carry archetype_node_id.
-	case *rm.Person:
-		return "PERSON", x.ArchetypeNodeID, true
-	case rm.Person:
-		return "PERSON", x.ArchetypeNodeID, true
-	case *rm.Organisation:
-		return "ORGANISATION", x.ArchetypeNodeID, true
-	case rm.Organisation:
-		return "ORGANISATION", x.ArchetypeNodeID, true
-	case *rm.Group:
-		return "GROUP", x.ArchetypeNodeID, true
-	case rm.Group:
-		return "GROUP", x.ArchetypeNodeID, true
-	case *rm.Agent:
-		return "AGENT", x.ArchetypeNodeID, true
-	case rm.Agent:
-		return "AGENT", x.ArchetypeNodeID, true
-	case *rm.Role:
-		return "ROLE", x.ArchetypeNodeID, true
-	case rm.Role:
-		return "ROLE", x.ArchetypeNodeID, true
-	case *rm.Address:
-		return "ADDRESS", x.ArchetypeNodeID, true
-	case rm.Address:
-		return "ADDRESS", x.ArchetypeNodeID, true
-	case *rm.Contact:
-		return "CONTACT", x.ArchetypeNodeID, true
-	case rm.Contact:
-		return "CONTACT", x.ArchetypeNodeID, true
-	case *rm.PartyIdentity:
-		return "PARTY_IDENTITY", x.ArchetypeNodeID, true
-	case rm.PartyIdentity:
-		return "PARTY_IDENTITY", x.ArchetypeNodeID, true
-	case *rm.PartyRelationship:
-		return "PARTY_RELATIONSHIP", x.ArchetypeNodeID, true
-	case rm.PartyRelationship:
-		return "PARTY_RELATIONSHIP", x.ArchetypeNodeID, true
-	case *rm.Capability:
-		return "CAPABILITY", x.ArchetypeNodeID, true
-	case rm.Capability:
-		return "CAPABILITY", x.ArchetypeNodeID, true
-
-	// LOCATABLE EHR-IM roots (REQ-110).
-	case *rm.Folder:
-		return "FOLDER", x.ArchetypeNodeID, true
-	case rm.Folder:
-		return "FOLDER", x.ArchetypeNodeID, true
-	case *rm.EHRStatus:
-		return "EHR_STATUS", x.ArchetypeNodeID, true
-	case rm.EHRStatus:
-		return "EHR_STATUS", x.ArchetypeNodeID, true
-	case *rm.EHRAccess:
-		return "EHR_ACCESS", x.ArchetypeNodeID, true
-	case rm.EHRAccess:
-		return "EHR_ACCESS", x.ArchetypeNodeID, true
 	}
-	return "", "", false
+	name, ok := rm.RMTypeName(v)
+	if !ok {
+		return "", "", false
+	}
+	if l, isLocatable := v.(rm.Locatable); isLocatable {
+		// Guarded above: typed-nils never reach the getter.
+		return name, l.GetArchetypeNodeID(), true
+	}
+	return name, "", true
 }
 
 // describeRMType returns a string suitable for inclusion in Issue

@@ -357,215 +357,42 @@ func ifaceSlice[T any](s []T) []any {
 	return out
 }
 
-// isNilPointer reports whether v is a typed-nil pointer to one of the RM
-// types the walker dispatches on. A typed-nil boxed in an interface
-// (e.g. (*rm.Observation)(nil) stored as a ContentItem, or a typed-nil
-// root) is itself non-nil, so without this guard childrenAt / nodeIDOf /
-// nameValueOf would dereference it. Reflection-free (REQ-024): an
-// explicit type switch covering every pointer type those switches
-// dispatch on — keep it in lock-step with them.
+// isNilPointer reports whether v is a typed-nil pointer boxed in an
+// interface (e.g. (*rm.Observation)(nil) stored as a ContentItem, or a
+// typed-nil root) — itself non-nil, so without this guard childrenAt /
+// nodeIDOf / nameValueOf would dereference it. Delegates to the
+// generated rm.IsTypedNil (ADR 0013), which covers every registered RM
+// concrete; the walker's previous hand-written switch covered only the
+// 18 types it dispatches on, so this is a strict superset with
+// identical semantics on all reachable values. Reflection-free
+// (REQ-024).
 func isNilPointer(v any) bool {
-	switch p := v.(type) {
-	case *rm.Composition:
-		return p == nil
-	case *rm.Observation:
-		return p == nil
-	case *rm.Evaluation:
-		return p == nil
-	case *rm.Instruction:
-		return p == nil
-	case *rm.Action:
-		return p == nil
-	case *rm.AdminEntry:
-		return p == nil
-	case *rm.GenericEntry:
-		return p == nil
-	case *rm.Section:
-		return p == nil
-	case *rm.Activity:
-		return p == nil
-	case *rm.Cluster:
-		return p == nil
-	case *rm.Element:
-		return p == nil
-	case *rm.ItemTree:
-		return p == nil
-	case *rm.ItemList:
-		return p == nil
-	case *rm.ItemSingle:
-		return p == nil
-	case *rm.ItemTable:
-		return p == nil
-	case *rm.History[rm.ItemStructure]:
-		return p == nil
-	case *rm.PointEvent[rm.ItemStructure]:
-		return p == nil
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return p == nil
-	}
-	return false
+	return rm.IsTypedNil(v)
 }
 
 // nodeIDOf returns the archetype_node_id of a LOCATABLE child, or "".
+// Reads polymorphically through the generated rm.Locatable identity
+// surface (ADR 0013); the isNilPointer guard MUST stay ahead of the
+// assertion — a getter invoked on a typed-nil pointer panics.
 func nodeIDOf(o any) string {
 	if isNilPointer(o) {
 		return ""
 	}
-	switch v := o.(type) {
-	case *rm.Composition:
-		return v.ArchetypeNodeID
-	case rm.Composition:
-		return v.ArchetypeNodeID
-	case *rm.Section:
-		return v.ArchetypeNodeID
-	case rm.Section:
-		return v.ArchetypeNodeID
-	case *rm.Observation:
-		return v.ArchetypeNodeID
-	case rm.Observation:
-		return v.ArchetypeNodeID
-	case *rm.Evaluation:
-		return v.ArchetypeNodeID
-	case rm.Evaluation:
-		return v.ArchetypeNodeID
-	case *rm.Instruction:
-		return v.ArchetypeNodeID
-	case rm.Instruction:
-		return v.ArchetypeNodeID
-	case *rm.Action:
-		return v.ArchetypeNodeID
-	case rm.Action:
-		return v.ArchetypeNodeID
-	case *rm.AdminEntry:
-		return v.ArchetypeNodeID
-	case rm.AdminEntry:
-		return v.ArchetypeNodeID
-	case *rm.GenericEntry:
-		return v.ArchetypeNodeID
-	case rm.GenericEntry:
-		return v.ArchetypeNodeID
-	case *rm.Activity:
-		return v.ArchetypeNodeID
-	case rm.Activity:
-		return v.ArchetypeNodeID
-	case *rm.History[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case rm.History[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case *rm.PointEvent[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case rm.PointEvent[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case rm.IntervalEvent[rm.ItemStructure]:
-		return v.ArchetypeNodeID
-	case *rm.ItemTree:
-		return v.ArchetypeNodeID
-	case rm.ItemTree:
-		return v.ArchetypeNodeID
-	case *rm.ItemList:
-		return v.ArchetypeNodeID
-	case rm.ItemList:
-		return v.ArchetypeNodeID
-	case *rm.ItemSingle:
-		return v.ArchetypeNodeID
-	case rm.ItemSingle:
-		return v.ArchetypeNodeID
-	case *rm.ItemTable:
-		return v.ArchetypeNodeID
-	case rm.ItemTable:
-		return v.ArchetypeNodeID
-	case *rm.Cluster:
-		return v.ArchetypeNodeID
-	case rm.Cluster:
-		return v.ArchetypeNodeID
-	case *rm.Element:
-		return v.ArchetypeNodeID
-	case rm.Element:
-		return v.ArchetypeNodeID
+	if l, ok := o.(rm.Locatable); ok {
+		return l.GetArchetypeNodeID()
 	}
 	return ""
 }
 
 // nameValueOf returns the name/value string of a LOCATABLE child, or "".
+// Same guard-then-assert shape as nodeIDOf; rm.DVTextValueOf handles a
+// nil or typed-nil name (partially built nodes).
 func nameValueOf(o any) string {
 	if isNilPointer(o) {
 		return ""
 	}
-	switch v := o.(type) {
-	case *rm.Composition:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Composition:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Section:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Section:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Observation:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Observation:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Evaluation:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Evaluation:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Instruction:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Instruction:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Action:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Action:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.AdminEntry:
-		return rm.DVTextValueOf(v.Name)
-	case rm.AdminEntry:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.GenericEntry:
-		return rm.DVTextValueOf(v.Name)
-	case rm.GenericEntry:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Activity:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Activity:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.History[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case rm.History[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.PointEvent[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case rm.PointEvent[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case rm.IntervalEvent[rm.ItemStructure]:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.ItemTree:
-		return rm.DVTextValueOf(v.Name)
-	case rm.ItemTree:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.ItemList:
-		return rm.DVTextValueOf(v.Name)
-	case rm.ItemList:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.ItemSingle:
-		return rm.DVTextValueOf(v.Name)
-	case rm.ItemSingle:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.ItemTable:
-		return rm.DVTextValueOf(v.Name)
-	case rm.ItemTable:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Cluster:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Cluster:
-		return rm.DVTextValueOf(v.Name)
-	case *rm.Element:
-		return rm.DVTextValueOf(v.Name)
-	case rm.Element:
-		return rm.DVTextValueOf(v.Name)
+	if l, ok := o.(rm.Locatable); ok {
+		return rm.DVTextValueOf(l.GetName())
 	}
 	return ""
 }
