@@ -1,11 +1,11 @@
 # Plan — Modernize & simplify (2026-07 repo-wide assessment follow-ups)
 
 **Date:** 2026-07-10
-**Status:** Draft
+**Status:** Landed (PRs #72 + #71, 2026-07-12) — archived 2026-07-12. Phases 1–4 consolidated into PR #72 (the Phase-4 `generate.go` example-writer dedup was **dropped** by maintainer call: `DV_TEXT` free text vs `DV_DATE/TIME/DATE_TIME/DURATION` ISO value spaces is incidental, not essential, duplication); Phase 5 (ADR 0013 accepted + generated LOCATABLE identity surface) landed via PR #71.
 **Owner:** SDK maintainers
-**Covers:** — (behaviour-preserving modernization/simplification of landed code; no new REQ. Guardrails: [REQ-024](../specifications/idiom.md#generics-policy-req-024) generics-no-reflection, [REQ-013](../specifications/module-layout.md#req-013--building-block-independence) building-block independence. Phase 5 requires a **new ADR** before implementation and cross-references [STRAND-04](../specifications/research-strands.md).)
+**Covers:** — (behaviour-preserving modernization/simplification of landed code; no new REQ. Guardrails: [REQ-024](../../specifications/idiom.md#generics-policy-req-024) generics-no-reflection, [REQ-013](../../specifications/module-layout.md#req-013--building-block-independence) building-block independence. Phase 5 requires a **new ADR** before implementation and cross-references [STRAND-04](../../specifications/research-strands.md).)
 **Probes:** — (existing probes are the regression net: `testkit/probes/versioned/` for Phase 3, `testkit/probes/instance/` for Phases 4–5)
-**Implementation:** planned
+**Implementation:** landed — Phases 1–4 (deps currency, transport/rm micro-cleanups, shared versioned-write client plumbing, instance coercion dedup) via PR #72; Phase 5 (bmmgen identity accessors + `rm.MutableLocatable` + reverse registry `rm.RMTypeName`/`rm.IsTypedNil`, five consumer switch-families collapsed, −645 lines) via PR #71 under [ADR 0013](../../adr/0013-generated-locatable-identity-surface.md)
 **Depends on:** nothing landed-side; Phase 5 depends on its ADR being Accepted
 **Defers:** `encoding/json/v2` codec simplification (stays parked under STRAND-04); table-driven rewrite of `openehr/validation/composition_test.go` (pure churn); `iter.Seq` API migrations (no `Visit(callback)` surface worth a break); restructuring `sampleByConstraint` / `materialiseMultiple` (inherent spec/cardinality logic)
 
@@ -26,8 +26,8 @@ Close the structural-simplification findings from the 2026-07-10 repo-wide moder
 ## Definition of Done
 
 - Code and tests land with existing `// REQ-` citations preserved; no citation is orphaned by moved code.
-- [`traceability.yaml`](../specifications/traceability.yaml) untouched unless files move; Phase 5 updates it for the new generated artifacts and the ADR row in [REQ.md](../specifications/REQ.md) / [adr/README.md](../adr/README.md).
-- Phase 5 updates canonical spec prose ([rm-modeling.md](../specifications/rm-modeling.md)) for the widened `Locatable` contract in the same PR.
+- [`traceability.yaml`](../../specifications/traceability.yaml) untouched unless files move; Phase 5 updates it for the new generated artifacts and the ADR row in [REQ.md](../../specifications/REQ.md) / [adr/README.md](../../adr/README.md).
+- Phase 5 updates canonical spec prose ([rm-modeling.md](../../specifications/rm-modeling.md)) for the widened `Locatable` contract in the same PR.
 - `make spec-check` and `make ci` pass per phase; Phase 5 additionally `make codegen-verify` and `make test-race`.
 - Plan archived under [`docs/plans/archive/`](archive/).
 
@@ -90,25 +90,25 @@ The RM structs are flat (no embedded LOCATABLE base) and `rm.Locatable` is marke
 
 **Tasks:**
 
-- [ ] **Governance first:** author the ADR via the SDD flow (`/sdd-specify`) — generator structural change per [AGENTS.md § Do not touch](../../AGENTS.md) + [ADR 0002](../adr/0002-bmm-codegen-decisions.md); cross-reference STRAND-04 and [ADR 0011](../adr/0011-rm-behavioural-functions-surface.md); add the narrative note to [architecture.md](../architecture.md). Wire [adr/README.md](../adr/README.md), REQ.md, traceability per the ADR checklist. **Blocks the rest of the phase until Accepted.**
+- [ ] **Governance first:** author the ADR via the SDD flow (`/sdd-specify`) — generator structural change per [AGENTS.md § Do not touch](../../../AGENTS.md) + [ADR 0002](../../adr/0002-bmm-codegen-decisions.md); cross-reference STRAND-04 and [ADR 0011](../../adr/0011-rm-behavioural-functions-surface.md); add the narrative note to [architecture.md](../../architecture.md). Wire [adr/README.md](../../adr/README.md), REQ.md, traceability per the ADR checklist. **Blocks the rest of the phase until Accepted.**
 - [ ] Generator: emit `ArchetypeNodeID() string` / `NameValue() string` accessors and `SetArchetypeNodeID/SetName/SetUID/SetArchetypeDetails` setters on every LOCATABLE concrete type; widen the `rm.Locatable` interface accordingly (emission pattern: extend the `render_rminfo.go` style; ADR 0002 D6 — only `*_gen.go` files are written).
 - [ ] Generator: emit the reverse map Go-concrete → RM class name (inverse of `typereg_gen.go`), including a per-type typed-nil-pointer guard.
 - [ ] Consumer refactors (the payoff): `rmpath/walk.go` `nodeIDOf`/`nameValueOf` (34 byte-identical arms each) → single `rm.Locatable` assertion, `isNilPointer` → generated guard; `openehr/instance/locatable.go` `applyLocatableIdentity` (three repeated block-families) → generated setters; unify the duplicated Go→name maps (`validation/composition.go rmTypeInfo` + `composition/typecheck.go goConcreteRMType`) onto the generated reverse lookup; `rmread.isTypedNilPointer` delegates to the generated guard. The `rmread`/`rmwrite`/`childrenAt` value-dispatch routers **stay**; update their lock-step doc comments to the reduced set.
-- [ ] Update [rm-modeling.md](../specifications/rm-modeling.md) prose for the widened `Locatable` contract in the same PR.
+- [ ] Update [rm-modeling.md](../../specifications/rm-modeling.md) prose for the widened `Locatable` contract in the same PR.
 
 **Verification / DoD:** `make codegen` + `make codegen-verify`; `handles_test.go` 54-type taxonomy pin; full `make test-race`; `make spec-check` after ADR/traceability wiring; `go build ./...` (examples included).
 
 ## Mapping to specs
 
-- [docs/specifications/idiom.md § Generics policy (REQ-024)](../specifications/idiom.md#generics-policy-req-024) — Phases 4–5 stay reflection-free; generics used only to remove duplication hops
-- [docs/specifications/module-layout.md § REQ-013](../specifications/module-layout.md#req-013--building-block-independence) — no new imports of `transport/`/`auth/` into building-block packages
-- [docs/specifications/rm-functions.md § REQ-120](../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation) — Phase 2 `rm.ObjectIDValue` extends the canonical identifier-lexical home
-- [docs/specifications/research-strands.md STRAND-04](../specifications/research-strands.md) — RM polymorphism strand; Phase 5 ADR cross-references it, `encoding/json/v2` remains parked there
-- [docs/adr/0002-bmm-codegen-decisions.md](../adr/0002-bmm-codegen-decisions.md) — D6/D7 constrain the Phase 5 generator change; new ADR to be numbered at authoring time
+- [docs/specifications/idiom.md § Generics policy (REQ-024)](../../specifications/idiom.md#generics-policy-req-024) — Phases 4–5 stay reflection-free; generics used only to remove duplication hops
+- [docs/specifications/module-layout.md § REQ-013](../../specifications/module-layout.md#req-013--building-block-independence) — no new imports of `transport/`/`auth/` into building-block packages
+- [docs/specifications/rm-functions.md § REQ-120](../../specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation) — Phase 2 `rm.ObjectIDValue` extends the canonical identifier-lexical home
+- [docs/specifications/research-strands.md STRAND-04](../../specifications/research-strands.md) — RM polymorphism strand; Phase 5 ADR cross-references it, `encoding/json/v2` remains parked there
+- [docs/adr/0002-bmm-codegen-decisions.md](../../adr/0002-bmm-codegen-decisions.md) — D6/D7 constrain the Phase 5 generator change; new ADR to be numbered at authoring time
 
 ## Review notes (2026-07-11 verification against rebased main)
 
-Independent phase-by-phase fact-check of the claims above against the code at current `main` (post [ADR 0012](../adr/0012-retire-sdk-gap-identifier.md) SDK-GAP retirement). Verdict: **sound and accurately measured** — the five type-switch arm counts (rmread 116 / rmpath 72 / rmwrite 59 / validation 58 / typecheck 36), the Phase 4 coercion line numbers, and the Phase 5 generator-feasibility premise (the RM concrete LOCATABLE structs live in `*_gen.go`, so accessors can be emitted per ADR 0002 D6) all verified exactly. No structural, sequencing, or guardrail-compliance problems were found. Corrections to fold in **before executing each phase**, ranked:
+Independent phase-by-phase fact-check of the claims above against the code at current `main` (post [ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md) SDK-GAP retirement). Verdict: **sound and accurately measured** — the five type-switch arm counts (rmread 116 / rmpath 72 / rmwrite 59 / validation 58 / typecheck 36), the Phase 4 coercion line numbers, and the Phase 5 generator-feasibility premise (the RM concrete LOCATABLE structs live in `*_gen.go`, so accessors can be emitted per ADR 0002 D6) all verified exactly. No structural, sequencing, or guardrail-compliance problems were found. Corrections to fold in **before executing each phase**, ranked:
 
 1. **Phase 1 — dependency list is wrong.** Only `github.com/coreos/go-oidc/v3` (v3.19.0 → v3.20.0) and `golang.org/x/exp` (a 2024-era pseudo-version) were actually pinned in this repo. `golang.org/x/mod`, `golang.org/x/sync`, `golang.org/x/tools`, and `cloud.google.com/go/compute/metadata` do **not** appear in `go.mod`/`go.sum` — drop them from the task. OTel 1.44 / antlr 4.13.1 / the `go 1.26.0` floor are confirmed already current. **Since landed:** the `go-oidc` v3.20.0 bump merged to `main` via dependabot (PR #66), so Phase 1 now reduces to the single `golang.org/x/exp` refresh.
 2. **Phase 3 — path + error-string.** The demographic client is `openehr/client/demographic/party.go`, **not** nested under `ehr/`. The four Prefer state machines share a *pattern*, not a byte-identical error string — each uses a per-package prefix (`composition:` / `directory:` / `demographic:` / `ehrstatus.Put:`), so `writeResult[T]` needs a label/prefix parameter or it silently collapses four distinct messages into one. The `T = rm.Party` interface instantiation is type-safe (mirrors the existing `typereg.DecodeAs[T]`; no typed-nil footgun). `openehr/client/ehr` is not a REQ-013 building block, so no import-cycle/independence risk there.

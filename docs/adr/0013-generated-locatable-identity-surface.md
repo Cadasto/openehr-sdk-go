@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
 - **Introduces:** — (no new `REQ`). **Amends:** REQ-031, REQ-040, REQ-043. **Applies:** REQ-013, REQ-014, REQ-024, REQ-042, REQ-044.
-- **Plan:** [2026-07-10-modernize-simplify.md § Phase 5](../plans/2026-07-10-modernize-simplify.md).
+- **Plan:** [2026-07-10-modernize-simplify.md § Phase 5](../plans/archive/2026-07-10-modernize-simplify.md).
 - **Related:** [ADR 0011](0011-rm-behavioural-functions-surface.md) governs the hand-realised RM behavioural-function surface; the accessors here are SDK-idiom *generated* additions beside it (same `rm` method surface, different emission path) and reuse its sealed-interface and no-panic conventions. [ADR 0002](0002-bmm-codegen-decisions.md) D4/D6/D7 constrain the generator mechanics.
 
 ## Context
