@@ -11,7 +11,7 @@ import (
 // the OPT corpus reaches only transitively (so they were otherwise
 // 0%): the DV_COUNT/DV_QUANTITY scalar writers and the generic
 // DV_INTERVAL<T> bound writer across two distinct T's (DVCount value
-// → coerceBound `case T`; *DVDate → coerceBound `case *T`).
+// → coerceValueOrPtr `case T`; *DVDate → coerceValueOrPtr `case *T`).
 func TestEnsureSingleNumericAndInterval(t *testing.T) {
 	cases := []struct {
 		name   string
