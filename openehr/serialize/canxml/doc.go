@@ -35,7 +35,11 @@
 //     (unprefixed openEHR class name). The encoder emits it as the
 //     FIRST attribute on every concrete element at a polymorphic
 //     site. The decoder requires it at polymorphic sites unless
-//     [WithRelaxedTypeDispatch] is set.
+//     [WithRelaxedTypeDispatch] is set. Discriminator VALUES are
+//     matched unprefixed; namespace-prefixed values (the Better/Marand
+//     `xsi:type="ns2:DV_QUANTITY"` dialect) are out of scope and fail
+//     closed with [typereg.ErrUnknownType] — see
+//     docs/specifications/wire.md § REQ-056.
 //   - Element local names are **snake_case** BMM property/class names
 //     (identical to canjson JSON keys; e.g. `dv_quantity`,
 //     `magnitude_status`).
