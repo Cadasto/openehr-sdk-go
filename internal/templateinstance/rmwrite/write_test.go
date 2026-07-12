@@ -251,3 +251,68 @@ func TestAppendMultipleUnknownAttr(t *testing.T) {
 		t.Fatalf("want ErrUnknownAttribute, got %v", err)
 	}
 }
+
+// TestAssignVia pins assignVia's coercion + error contract directly,
+// now that writeIntervalSingle's lower/upper arms (interval_write.go)
+// delegate to it rather than hand-rolling coerceValueOrPtr+mismatch.
+// A typed-nil *T pointer failing here is the *T arm of
+// coerceValueOrPtr; it is distinct from a typed-nil pointer that
+// satisfies an interface T, which matches case T and succeeds (see
+// coerceValueOrPtr's doc comment).
+func TestAssignVia(t *testing.T) {
+	type result struct {
+		got rm.DVText
+		set bool
+	}
+	newSetter := func(r *result) func(rm.DVText) {
+		return func(v rm.DVText) {
+			r.got = v
+			r.set = true
+		}
+	}
+
+	t.Run("value coercion succeeds", func(t *testing.T) {
+		r := &result{}
+		if err := assignVia(rm.DVText{Value: "direct"}, newSetter(r), "value", "DV_TEXT"); err != nil {
+			t.Fatalf("assignVia: %v", err)
+		}
+		if !r.set || r.got.Value != "direct" {
+			t.Errorf("setter got %+v (set=%v), want Value=direct", r.got, r.set)
+		}
+	})
+
+	t.Run("pointer coercion dereferences", func(t *testing.T) {
+		r := &result{}
+		if err := assignVia(&rm.DVText{Value: "ptr"}, newSetter(r), "value", "DV_TEXT"); err != nil {
+			t.Fatalf("assignVia: %v", err)
+		}
+		if !r.set || r.got.Value != "ptr" {
+			t.Errorf("setter got %+v (set=%v), want Value=ptr", r.got, r.set)
+		}
+	})
+
+	t.Run("typed-nil pointer fails", func(t *testing.T) {
+		r := &result{}
+		var child *rm.DVText
+		err := assignVia(child, newSetter(r), "value", "DV_TEXT")
+		if r.set {
+			t.Fatalf("setter called despite coercion failure: %+v", r.got)
+		}
+		const want = `rmwrite: child type does not match attribute slot: attr "value" expects DV_TEXT, got *rm.DVText`
+		if err == nil || err.Error() != want {
+			t.Errorf("err = %v, want %s", err, want)
+		}
+	})
+
+	t.Run("wrong-type child fails", func(t *testing.T) {
+		r := &result{}
+		err := assignVia(42, newSetter(r), "value", "DV_TEXT")
+		if r.set {
+			t.Fatalf("setter called despite coercion failure: %+v", r.got)
+		}
+		const want = `rmwrite: child type does not match attribute slot: attr "value" expects DV_TEXT, got int`
+		if err == nil || err.Error() != want {
+			t.Errorf("err = %v, want %s", err, want)
+		}
+	})
+}
