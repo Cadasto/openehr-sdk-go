@@ -59,7 +59,7 @@ func MarshalAuditDetails(a *rm.AuditDetails) (string, error) {
 		return "", err
 	}
 	if ext != nil {
-		idVal, idOK := objectIDValue(ext.ID)
+		idVal, idOK := rm.ObjectIDValue(ext.ID)
 		if ext.ID != nil && !idOK {
 			return "", fmt.Errorf("%w: unsupported committer external_ref id type %T", transport.ErrInvalidConfig, ext.ID)
 		}
@@ -124,56 +124,4 @@ func derefString(s *string) string {
 		return ""
 	}
 	return *s
-}
-
-// objectIDValue returns the raw string value of any concrete ObjectID. ok
-// is false for an unrecognised id type (and for a nil id), so the caller can
-// avoid emitting a reference whose id it could not encode.
-func objectIDValue(id rm.ObjectID) (value string, ok bool) {
-	switch v := id.(type) {
-	case rm.HierObjectID:
-		return v.Value, true
-	case *rm.HierObjectID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	case rm.ObjectVersionID:
-		return v.Value, true
-	case *rm.ObjectVersionID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	case rm.GenericID:
-		return v.Value, true
-	case *rm.GenericID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	case rm.ArchetypeID:
-		return v.Value, true
-	case *rm.ArchetypeID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	case rm.TemplateID:
-		return v.Value, true
-	case *rm.TemplateID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	case rm.TerminologyID:
-		return v.Value, true
-	case *rm.TerminologyID:
-		if v == nil {
-			return "", false
-		}
-		return v.Value, true
-	default:
-		return "", false
-	}
 }
