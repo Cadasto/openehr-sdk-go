@@ -749,12 +749,7 @@ func (g *generator) applyPrimitiveExample(
 		v.Units = q.Units
 		return nil
 	case *rm.DVText:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_TEXT example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
+		return setStringExample(&v.Value, ex, "DV_TEXT")
 	case *rm.DVCodedText:
 		ref, ok := ex.(constraints.CodedTermRef)
 		if !ok {
@@ -796,37 +791,30 @@ func (g *generator) applyPrimitiveExample(
 		v.Value = rm.Integer(n)
 		return nil
 	case *rm.DVDate:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
+		return setStringExample(&v.Value, ex, "DV_DATE")
 	case *rm.DVTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
+		return setStringExample(&v.Value, ex, "DV_TIME")
 	case *rm.DVDateTime:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DATE_TIME example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
+		return setStringExample(&v.Value, ex, "DV_DATE_TIME")
 	case *rm.DVDuration:
-		s, ok := ex.(string)
-		if !ok {
-			return fmt.Errorf("DV_DURATION example value is %T, want string", ex)
-		}
-		v.Value = s
-		return nil
+		return setStringExample(&v.Value, ex, "DV_DURATION")
 	}
 	// Unknown RM target for this constraint — silently no-op so the
 	// generator stays sound on RM types REQ-103 does not yet have a
 	// typed primitive for.
+	return nil
+}
+
+// setStringExample dedups the five string-leaf arms of
+// applyPrimitiveExample (DV_TEXT, DV_DATE, DV_TIME, DV_DATE_TIME,
+// DV_DURATION): each carries its primitive as a bare string on dst,
+// and only the rmName in the mismatch message differs per RM type.
+func setStringExample(dst *string, ex any, rmName string) error {
+	s, ok := ex.(string)
+	if !ok {
+		return fmt.Errorf("%s example value is %T, want string", rmName, ex)
+	}
+	*dst = s
 	return nil
 }
 
