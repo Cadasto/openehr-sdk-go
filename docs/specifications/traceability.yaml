@@ -49,6 +49,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg]
     probes: [PROBE-031, PROBE-073]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-052
     title: Canonical JSON
@@ -1014,6 +1015,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-032
     title: Interfaces for abstract RM
@@ -1035,6 +1037,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [internal/bmmgen]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-044
     title: Hand-written extensions isolated

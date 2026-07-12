@@ -66,6 +66,15 @@ type Link struct {
 // Locatable Root class of all information model classes that can be archetyped. Most classes in the openEHR reference model inherit from the `LOCATABLE` class, which defines the idea of  locatability in an archetyped structure. `LOCATABLE` defines a runtime name and an `_archetype_node_id_`.
 type Locatable interface {
 	isLocatable()
+
+	// Generated identity accessors (ADR 0013): Get<Field> returns
+	// the flattened LOCATABLE field verbatim. Value receivers — both
+	// T and *T satisfy Locatable; calling a getter on a typed-nil *T
+	// panics, so guard with IsTypedNil first (see rm.IsTypedNil).
+	GetArchetypeNodeID() string
+	GetName() DVTextLike
+	GetUID() UIDBasedID
+	GetArchetypeDetails() *Archetyped
 }
 
 func (Action) isLocatable() {}
@@ -129,6 +138,514 @@ func (PointEvent[T]) isLocatable() {}
 func (Role) isLocatable() {}
 
 func (Section) isLocatable() {}
+
+// MutableLocatable is the write half of the generated LOCATABLE
+// identity surface (ADR 0013). Setters use pointer receivers, so the
+// interface is satisfied by *T only; it shares Locatable's unexported
+// marker and cannot be implemented outside this package.
+type MutableLocatable interface {
+	isLocatable()
+	SetArchetypeNodeID(string)
+	SetName(DVTextLike)
+	SetUID(UIDBasedID)
+	SetArchetypeDetails(*Archetyped)
+}
+
+func (x Action) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Action) GetName() DVTextLike { return x.Name }
+
+func (x Action) GetUID() UIDBasedID { return x.UID }
+
+func (x Action) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Action) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Action) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Action) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Action) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Activity) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Activity) GetName() DVTextLike { return x.Name }
+
+func (x Activity) GetUID() UIDBasedID { return x.UID }
+
+func (x Activity) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Activity) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Activity) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Activity) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Activity) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Address) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Address) GetName() DVTextLike { return x.Name }
+
+func (x Address) GetUID() UIDBasedID { return x.UID }
+
+func (x Address) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Address) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Address) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Address) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Address) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x AdminEntry) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x AdminEntry) GetName() DVTextLike { return x.Name }
+
+func (x AdminEntry) GetUID() UIDBasedID { return x.UID }
+
+func (x AdminEntry) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *AdminEntry) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *AdminEntry) SetName(v DVTextLike) { x.Name = v }
+
+func (x *AdminEntry) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *AdminEntry) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Agent) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Agent) GetName() DVTextLike { return x.Name }
+
+func (x Agent) GetUID() UIDBasedID { return x.UID }
+
+func (x Agent) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Agent) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Agent) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Agent) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Agent) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Capability) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Capability) GetName() DVTextLike { return x.Name }
+
+func (x Capability) GetUID() UIDBasedID { return x.UID }
+
+func (x Capability) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Capability) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Capability) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Capability) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Capability) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Cluster) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Cluster) GetName() DVTextLike { return x.Name }
+
+func (x Cluster) GetUID() UIDBasedID { return x.UID }
+
+func (x Cluster) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Cluster) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Cluster) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Cluster) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Cluster) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Composition) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Composition) GetName() DVTextLike { return x.Name }
+
+func (x Composition) GetUID() UIDBasedID { return x.UID }
+
+func (x Composition) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Composition) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Composition) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Composition) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Composition) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Contact) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Contact) GetName() DVTextLike { return x.Name }
+
+func (x Contact) GetUID() UIDBasedID { return x.UID }
+
+func (x Contact) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Contact) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Contact) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Contact) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Contact) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x EHRAccess) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x EHRAccess) GetName() DVTextLike { return x.Name }
+
+func (x EHRAccess) GetUID() UIDBasedID { return x.UID }
+
+func (x EHRAccess) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *EHRAccess) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *EHRAccess) SetName(v DVTextLike) { x.Name = v }
+
+func (x *EHRAccess) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *EHRAccess) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x EHRStatus) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x EHRStatus) GetName() DVTextLike { return x.Name }
+
+func (x EHRStatus) GetUID() UIDBasedID { return x.UID }
+
+func (x EHRStatus) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *EHRStatus) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *EHRStatus) SetName(v DVTextLike) { x.Name = v }
+
+func (x *EHRStatus) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *EHRStatus) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Element) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Element) GetName() DVTextLike { return x.Name }
+
+func (x Element) GetUID() UIDBasedID { return x.UID }
+
+func (x Element) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Element) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Element) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Element) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Element) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Evaluation) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Evaluation) GetName() DVTextLike { return x.Name }
+
+func (x Evaluation) GetUID() UIDBasedID { return x.UID }
+
+func (x Evaluation) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Evaluation) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Evaluation) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Evaluation) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Evaluation) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Folder) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Folder) GetName() DVTextLike { return x.Name }
+
+func (x Folder) GetUID() UIDBasedID { return x.UID }
+
+func (x Folder) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Folder) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Folder) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Folder) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Folder) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x GenericEntry) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x GenericEntry) GetName() DVTextLike { return x.Name }
+
+func (x GenericEntry) GetUID() UIDBasedID { return x.UID }
+
+func (x GenericEntry) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *GenericEntry) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *GenericEntry) SetName(v DVTextLike) { x.Name = v }
+
+func (x *GenericEntry) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *GenericEntry) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Group) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Group) GetName() DVTextLike { return x.Name }
+
+func (x Group) GetUID() UIDBasedID { return x.UID }
+
+func (x Group) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Group) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Group) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Group) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Group) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x History[T]) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x History[T]) GetName() DVTextLike { return x.Name }
+
+func (x History[T]) GetUID() UIDBasedID { return x.UID }
+
+func (x History[T]) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *History[T]) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *History[T]) SetName(v DVTextLike) { x.Name = v }
+
+func (x *History[T]) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *History[T]) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Instruction) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Instruction) GetName() DVTextLike { return x.Name }
+
+func (x Instruction) GetUID() UIDBasedID { return x.UID }
+
+func (x Instruction) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Instruction) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Instruction) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Instruction) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Instruction) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x IntervalEvent[T]) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x IntervalEvent[T]) GetName() DVTextLike { return x.Name }
+
+func (x IntervalEvent[T]) GetUID() UIDBasedID { return x.UID }
+
+func (x IntervalEvent[T]) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *IntervalEvent[T]) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *IntervalEvent[T]) SetName(v DVTextLike) { x.Name = v }
+
+func (x *IntervalEvent[T]) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *IntervalEvent[T]) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x ItemList) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x ItemList) GetName() DVTextLike { return x.Name }
+
+func (x ItemList) GetUID() UIDBasedID { return x.UID }
+
+func (x ItemList) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *ItemList) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *ItemList) SetName(v DVTextLike) { x.Name = v }
+
+func (x *ItemList) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *ItemList) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x ItemSingle) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x ItemSingle) GetName() DVTextLike { return x.Name }
+
+func (x ItemSingle) GetUID() UIDBasedID { return x.UID }
+
+func (x ItemSingle) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *ItemSingle) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *ItemSingle) SetName(v DVTextLike) { x.Name = v }
+
+func (x *ItemSingle) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *ItemSingle) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x ItemTable) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x ItemTable) GetName() DVTextLike { return x.Name }
+
+func (x ItemTable) GetUID() UIDBasedID { return x.UID }
+
+func (x ItemTable) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *ItemTable) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *ItemTable) SetName(v DVTextLike) { x.Name = v }
+
+func (x *ItemTable) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *ItemTable) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x ItemTree) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x ItemTree) GetName() DVTextLike { return x.Name }
+
+func (x ItemTree) GetUID() UIDBasedID { return x.UID }
+
+func (x ItemTree) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *ItemTree) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *ItemTree) SetName(v DVTextLike) { x.Name = v }
+
+func (x *ItemTree) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *ItemTree) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Observation) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Observation) GetName() DVTextLike { return x.Name }
+
+func (x Observation) GetUID() UIDBasedID { return x.UID }
+
+func (x Observation) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Observation) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Observation) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Observation) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Observation) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Organisation) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Organisation) GetName() DVTextLike { return x.Name }
+
+func (x Organisation) GetUID() UIDBasedID { return x.UID }
+
+func (x Organisation) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Organisation) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Organisation) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Organisation) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Organisation) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x PartyIdentity) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x PartyIdentity) GetName() DVTextLike { return x.Name }
+
+func (x PartyIdentity) GetUID() UIDBasedID { return x.UID }
+
+func (x PartyIdentity) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *PartyIdentity) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *PartyIdentity) SetName(v DVTextLike) { x.Name = v }
+
+func (x *PartyIdentity) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *PartyIdentity) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x PartyRelationship) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x PartyRelationship) GetName() DVTextLike { return x.Name }
+
+func (x PartyRelationship) GetUID() UIDBasedID { return x.UID }
+
+func (x PartyRelationship) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *PartyRelationship) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *PartyRelationship) SetName(v DVTextLike) { x.Name = v }
+
+func (x *PartyRelationship) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *PartyRelationship) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Person) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Person) GetName() DVTextLike { return x.Name }
+
+func (x Person) GetUID() UIDBasedID { return x.UID }
+
+func (x Person) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Person) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Person) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Person) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Person) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x PointEvent[T]) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x PointEvent[T]) GetName() DVTextLike { return x.Name }
+
+func (x PointEvent[T]) GetUID() UIDBasedID { return x.UID }
+
+func (x PointEvent[T]) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *PointEvent[T]) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *PointEvent[T]) SetName(v DVTextLike) { x.Name = v }
+
+func (x *PointEvent[T]) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *PointEvent[T]) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Role) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Role) GetName() DVTextLike { return x.Name }
+
+func (x Role) GetUID() UIDBasedID { return x.UID }
+
+func (x Role) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Role) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Role) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Role) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Role) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
+
+func (x Section) GetArchetypeNodeID() string { return x.ArchetypeNodeID }
+
+func (x Section) GetName() DVTextLike { return x.Name }
+
+func (x Section) GetUID() UIDBasedID { return x.UID }
+
+func (x Section) GetArchetypeDetails() *Archetyped { return x.ArchetypeDetails }
+
+func (x *Section) SetArchetypeNodeID(v string) { x.ArchetypeNodeID = v }
+
+func (x *Section) SetName(v DVTextLike) { x.Name = v }
+
+func (x *Section) SetUID(v UIDBasedID) { x.UID = v }
+
+func (x *Section) SetArchetypeDetails(v *Archetyped) { x.ArchetypeDetails = v }
 
 // Concept Clinical concept of the archetype as a whole (= derived from the archetype_node_id' of the root node)
 func (a *Action) Concept() DVTextLike {

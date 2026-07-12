@@ -176,7 +176,7 @@ flowchart LR
   Gen --> JSON
 ```
 
-Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). Normative conformance rules are in [`docs/specifications/bmm-conformance.md`](../docs/specifications/bmm-conformance.md).
+Load-bearing structural choices (flat packages, merge policy, typereg placement, abstract flattening, AOM→RM import, function stubs) are recorded in [ADR 0002 — BMM codegen decisions](adr/0002-bmm-codegen-decisions.md). The generator additionally emits the LOCATABLE identity surface — `Get*/Set*` accessors widening the sealed `rm.Locatable` plus `rm.MutableLocatable`, and the reverse registry `rm.RMTypeName` / `rm.IsTypedNil` — per [ADR 0013](adr/0013-generated-locatable-identity-surface.md), replacing the hand-maintained lock-step identity switches. Normative conformance rules are in [`docs/specifications/bmm-conformance.md`](../docs/specifications/bmm-conformance.md).
 
 ## Versioning
 
@@ -185,3 +185,4 @@ Standard Go module versioning; module path locked at `github.com/cadasto/openehr
 ## Open decisions
 
 Tracked in [`research-strands.md`](../docs/specifications/research-strands.md); resolutions become ADRs under [`adr/`](adr/). Don't settle a strand in code — surface it or draft an ADR first.
+

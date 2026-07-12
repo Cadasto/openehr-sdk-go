@@ -117,3 +117,1285 @@ func init() {
 	typereg.Default.Register("VERSIONED_PARTY", func() any { return &VersionedParty{} })
 	typereg.Default.Register("VERSION_TREE_ID", func() any { return &VersionTreeID{} })
 }
+
+// RMTypeName returns the RM class name for v's concrete Go type —
+// the reverse of the typereg registration above (ADR 0013). Generic
+// instantiations map to the bare class name (e.g. DVInterval[DVQuantity]
+// → "DV_INTERVAL"). A nil interface, a typed-nil pointer, or a non-RM
+// value reports ("", false). REQ-024: no reflection.
+func RMTypeName(v any) (string, bool) {
+	switch x := v.(type) {
+	case *AccessGroupRef:
+		if x == nil {
+			return "", false
+		}
+		return "ACCESS_GROUP_REF", true
+	case AccessGroupRef:
+		return "ACCESS_GROUP_REF", true
+	case *Action:
+		if x == nil {
+			return "", false
+		}
+		return "ACTION", true
+	case Action:
+		return "ACTION", true
+	case *Activity:
+		if x == nil {
+			return "", false
+		}
+		return "ACTIVITY", true
+	case Activity:
+		return "ACTIVITY", true
+	case *Address:
+		if x == nil {
+			return "", false
+		}
+		return "ADDRESS", true
+	case Address:
+		return "ADDRESS", true
+	case *AdminEntry:
+		if x == nil {
+			return "", false
+		}
+		return "ADMIN_ENTRY", true
+	case AdminEntry:
+		return "ADMIN_ENTRY", true
+	case *Agent:
+		if x == nil {
+			return "", false
+		}
+		return "AGENT", true
+	case Agent:
+		return "AGENT", true
+	case *Archetyped:
+		if x == nil {
+			return "", false
+		}
+		return "ARCHETYPED", true
+	case Archetyped:
+		return "ARCHETYPED", true
+	case *ArchetypeID:
+		if x == nil {
+			return "", false
+		}
+		return "ARCHETYPE_ID", true
+	case ArchetypeID:
+		return "ARCHETYPE_ID", true
+	case *Attestation:
+		if x == nil {
+			return "", false
+		}
+		return "ATTESTATION", true
+	case Attestation:
+		return "ATTESTATION", true
+	case *AuditDetails:
+		if x == nil {
+			return "", false
+		}
+		return "AUDIT_DETAILS", true
+	case AuditDetails:
+		return "AUDIT_DETAILS", true
+	case *BasicDefinitions:
+		if x == nil {
+			return "", false
+		}
+		return "BASIC_DEFINITIONS", true
+	case BasicDefinitions:
+		return "BASIC_DEFINITIONS", true
+	case *Capability:
+		if x == nil {
+			return "", false
+		}
+		return "CAPABILITY", true
+	case Capability:
+		return "CAPABILITY", true
+	case *Cluster:
+		if x == nil {
+			return "", false
+		}
+		return "CLUSTER", true
+	case Cluster:
+		return "CLUSTER", true
+	case *CodePhrase:
+		if x == nil {
+			return "", false
+		}
+		return "CODE_PHRASE", true
+	case CodePhrase:
+		return "CODE_PHRASE", true
+	case *Composition:
+		if x == nil {
+			return "", false
+		}
+		return "COMPOSITION", true
+	case Composition:
+		return "COMPOSITION", true
+	case *Contact:
+		if x == nil {
+			return "", false
+		}
+		return "CONTACT", true
+	case Contact:
+		return "CONTACT", true
+	case *Contribution:
+		if x == nil {
+			return "", false
+		}
+		return "CONTRIBUTION", true
+	case Contribution:
+		return "CONTRIBUTION", true
+	case *DVBoolean:
+		if x == nil {
+			return "", false
+		}
+		return "DV_BOOLEAN", true
+	case DVBoolean:
+		return "DV_BOOLEAN", true
+	case *DVCodedText:
+		if x == nil {
+			return "", false
+		}
+		return "DV_CODED_TEXT", true
+	case DVCodedText:
+		return "DV_CODED_TEXT", true
+	case *DVCount:
+		if x == nil {
+			return "", false
+		}
+		return "DV_COUNT", true
+	case DVCount:
+		return "DV_COUNT", true
+	case *DVDate:
+		if x == nil {
+			return "", false
+		}
+		return "DV_DATE", true
+	case DVDate:
+		return "DV_DATE", true
+	case *DVDateTime:
+		if x == nil {
+			return "", false
+		}
+		return "DV_DATE_TIME", true
+	case DVDateTime:
+		return "DV_DATE_TIME", true
+	case *DVDuration:
+		if x == nil {
+			return "", false
+		}
+		return "DV_DURATION", true
+	case DVDuration:
+		return "DV_DURATION", true
+	case *DVEHRURI:
+		if x == nil {
+			return "", false
+		}
+		return "DV_EHR_URI", true
+	case DVEHRURI:
+		return "DV_EHR_URI", true
+	case *DVGeneralTimeSpecification:
+		if x == nil {
+			return "", false
+		}
+		return "DV_GENERAL_TIME_SPECIFICATION", true
+	case DVGeneralTimeSpecification:
+		return "DV_GENERAL_TIME_SPECIFICATION", true
+	case *DVIdentifier:
+		if x == nil {
+			return "", false
+		}
+		return "DV_IDENTIFIER", true
+	case DVIdentifier:
+		return "DV_IDENTIFIER", true
+	case *DVInterval[DVOrdered]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVOrdered]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVCount]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVCount]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVDate]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVDate]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVDateTime]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVDateTime]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVDuration]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVDuration]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVOrdinal]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVOrdinal]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVProportion]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVProportion]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVQuantity]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVQuantity]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVScale]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVScale]:
+		return "DV_INTERVAL", true
+	case *DVInterval[DVTime]:
+		if x == nil {
+			return "", false
+		}
+		return "DV_INTERVAL", true
+	case DVInterval[DVTime]:
+		return "DV_INTERVAL", true
+	case *DVMultimedia:
+		if x == nil {
+			return "", false
+		}
+		return "DV_MULTIMEDIA", true
+	case DVMultimedia:
+		return "DV_MULTIMEDIA", true
+	case *DVOrdinal:
+		if x == nil {
+			return "", false
+		}
+		return "DV_ORDINAL", true
+	case DVOrdinal:
+		return "DV_ORDINAL", true
+	case *DVParagraph:
+		if x == nil {
+			return "", false
+		}
+		return "DV_PARAGRAPH", true
+	case DVParagraph:
+		return "DV_PARAGRAPH", true
+	case *DVParsable:
+		if x == nil {
+			return "", false
+		}
+		return "DV_PARSABLE", true
+	case DVParsable:
+		return "DV_PARSABLE", true
+	case *DVPeriodicTimeSpecification:
+		if x == nil {
+			return "", false
+		}
+		return "DV_PERIODIC_TIME_SPECIFICATION", true
+	case DVPeriodicTimeSpecification:
+		return "DV_PERIODIC_TIME_SPECIFICATION", true
+	case *DVProportion:
+		if x == nil {
+			return "", false
+		}
+		return "DV_PROPORTION", true
+	case DVProportion:
+		return "DV_PROPORTION", true
+	case *DVQuantity:
+		if x == nil {
+			return "", false
+		}
+		return "DV_QUANTITY", true
+	case DVQuantity:
+		return "DV_QUANTITY", true
+	case *DVScale:
+		if x == nil {
+			return "", false
+		}
+		return "DV_SCALE", true
+	case DVScale:
+		return "DV_SCALE", true
+	case *DVState:
+		if x == nil {
+			return "", false
+		}
+		return "DV_STATE", true
+	case DVState:
+		return "DV_STATE", true
+	case *DVText:
+		if x == nil {
+			return "", false
+		}
+		return "DV_TEXT", true
+	case DVText:
+		return "DV_TEXT", true
+	case *DVTime:
+		if x == nil {
+			return "", false
+		}
+		return "DV_TIME", true
+	case DVTime:
+		return "DV_TIME", true
+	case *DVURI:
+		if x == nil {
+			return "", false
+		}
+		return "DV_URI", true
+	case DVURI:
+		return "DV_URI", true
+	case *EHR:
+		if x == nil {
+			return "", false
+		}
+		return "EHR", true
+	case EHR:
+		return "EHR", true
+	case *EHRAccess:
+		if x == nil {
+			return "", false
+		}
+		return "EHR_ACCESS", true
+	case EHRAccess:
+		return "EHR_ACCESS", true
+	case *EHRStatus:
+		if x == nil {
+			return "", false
+		}
+		return "EHR_STATUS", true
+	case EHRStatus:
+		return "EHR_STATUS", true
+	case *Element:
+		if x == nil {
+			return "", false
+		}
+		return "ELEMENT", true
+	case Element:
+		return "ELEMENT", true
+	case *Evaluation:
+		if x == nil {
+			return "", false
+		}
+		return "EVALUATION", true
+	case Evaluation:
+		return "EVALUATION", true
+	case *EventContext:
+		if x == nil {
+			return "", false
+		}
+		return "EVENT_CONTEXT", true
+	case EventContext:
+		return "EVENT_CONTEXT", true
+	case *FeederAudit:
+		if x == nil {
+			return "", false
+		}
+		return "FEEDER_AUDIT", true
+	case FeederAudit:
+		return "FEEDER_AUDIT", true
+	case *FeederAuditDetails:
+		if x == nil {
+			return "", false
+		}
+		return "FEEDER_AUDIT_DETAILS", true
+	case FeederAuditDetails:
+		return "FEEDER_AUDIT_DETAILS", true
+	case *Folder:
+		if x == nil {
+			return "", false
+		}
+		return "FOLDER", true
+	case Folder:
+		return "FOLDER", true
+	case *GenericEntry:
+		if x == nil {
+			return "", false
+		}
+		return "GENERIC_ENTRY", true
+	case GenericEntry:
+		return "GENERIC_ENTRY", true
+	case *GenericID:
+		if x == nil {
+			return "", false
+		}
+		return "GENERIC_ID", true
+	case GenericID:
+		return "GENERIC_ID", true
+	case *Group:
+		if x == nil {
+			return "", false
+		}
+		return "GROUP", true
+	case Group:
+		return "GROUP", true
+	case *HierObjectID:
+		if x == nil {
+			return "", false
+		}
+		return "HIER_OBJECT_ID", true
+	case HierObjectID:
+		return "HIER_OBJECT_ID", true
+	case *History[ItemStructure]:
+		if x == nil {
+			return "", false
+		}
+		return "HISTORY", true
+	case History[ItemStructure]:
+		return "HISTORY", true
+	case *History[ItemList]:
+		if x == nil {
+			return "", false
+		}
+		return "HISTORY", true
+	case History[ItemList]:
+		return "HISTORY", true
+	case *History[ItemSingle]:
+		if x == nil {
+			return "", false
+		}
+		return "HISTORY", true
+	case History[ItemSingle]:
+		return "HISTORY", true
+	case *History[ItemTable]:
+		if x == nil {
+			return "", false
+		}
+		return "HISTORY", true
+	case History[ItemTable]:
+		return "HISTORY", true
+	case *History[ItemTree]:
+		if x == nil {
+			return "", false
+		}
+		return "HISTORY", true
+	case History[ItemTree]:
+		return "HISTORY", true
+	case *ImportedVersion[any]:
+		if x == nil {
+			return "", false
+		}
+		return "IMPORTED_VERSION", true
+	case ImportedVersion[any]:
+		return "IMPORTED_VERSION", true
+	case *Instruction:
+		if x == nil {
+			return "", false
+		}
+		return "INSTRUCTION", true
+	case Instruction:
+		return "INSTRUCTION", true
+	case *InstructionDetails:
+		if x == nil {
+			return "", false
+		}
+		return "INSTRUCTION_DETAILS", true
+	case InstructionDetails:
+		return "INSTRUCTION_DETAILS", true
+	case *InternetID:
+		if x == nil {
+			return "", false
+		}
+		return "INTERNET_ID", true
+	case InternetID:
+		return "INTERNET_ID", true
+	case *IntervalEvent[ItemStructure]:
+		if x == nil {
+			return "", false
+		}
+		return "INTERVAL_EVENT", true
+	case IntervalEvent[ItemStructure]:
+		return "INTERVAL_EVENT", true
+	case *IntervalEvent[ItemList]:
+		if x == nil {
+			return "", false
+		}
+		return "INTERVAL_EVENT", true
+	case IntervalEvent[ItemList]:
+		return "INTERVAL_EVENT", true
+	case *IntervalEvent[ItemSingle]:
+		if x == nil {
+			return "", false
+		}
+		return "INTERVAL_EVENT", true
+	case IntervalEvent[ItemSingle]:
+		return "INTERVAL_EVENT", true
+	case *IntervalEvent[ItemTable]:
+		if x == nil {
+			return "", false
+		}
+		return "INTERVAL_EVENT", true
+	case IntervalEvent[ItemTable]:
+		return "INTERVAL_EVENT", true
+	case *IntervalEvent[ItemTree]:
+		if x == nil {
+			return "", false
+		}
+		return "INTERVAL_EVENT", true
+	case IntervalEvent[ItemTree]:
+		return "INTERVAL_EVENT", true
+	case *IsmTransition:
+		if x == nil {
+			return "", false
+		}
+		return "ISM_TRANSITION", true
+	case IsmTransition:
+		return "ISM_TRANSITION", true
+	case *ISOOID:
+		if x == nil {
+			return "", false
+		}
+		return "ISO_OID", true
+	case ISOOID:
+		return "ISO_OID", true
+	case *ItemList:
+		if x == nil {
+			return "", false
+		}
+		return "ITEM_LIST", true
+	case ItemList:
+		return "ITEM_LIST", true
+	case *ItemSingle:
+		if x == nil {
+			return "", false
+		}
+		return "ITEM_SINGLE", true
+	case ItemSingle:
+		return "ITEM_SINGLE", true
+	case *ItemTable:
+		if x == nil {
+			return "", false
+		}
+		return "ITEM_TABLE", true
+	case ItemTable:
+		return "ITEM_TABLE", true
+	case *ItemTag:
+		if x == nil {
+			return "", false
+		}
+		return "ITEM_TAG", true
+	case ItemTag:
+		return "ITEM_TAG", true
+	case *ItemTree:
+		if x == nil {
+			return "", false
+		}
+		return "ITEM_TREE", true
+	case ItemTree:
+		return "ITEM_TREE", true
+	case *ISO8601Timezone:
+		if x == nil {
+			return "", false
+		}
+		return "Iso8601_timezone", true
+	case ISO8601Timezone:
+		return "Iso8601_timezone", true
+	case *Link:
+		if x == nil {
+			return "", false
+		}
+		return "LINK", true
+	case Link:
+		return "LINK", true
+	case *LocatableRef:
+		if x == nil {
+			return "", false
+		}
+		return "LOCATABLE_REF", true
+	case LocatableRef:
+		return "LOCATABLE_REF", true
+	case *MeasurementService:
+		if x == nil {
+			return "", false
+		}
+		return "MEASUREMENT_SERVICE", true
+	case MeasurementService:
+		return "MEASUREMENT_SERVICE", true
+	case *ObjectRef:
+		if x == nil {
+			return "", false
+		}
+		return "OBJECT_REF", true
+	case ObjectRef:
+		return "OBJECT_REF", true
+	case *ObjectVersionID:
+		if x == nil {
+			return "", false
+		}
+		return "OBJECT_VERSION_ID", true
+	case ObjectVersionID:
+		return "OBJECT_VERSION_ID", true
+	case *Observation:
+		if x == nil {
+			return "", false
+		}
+		return "OBSERVATION", true
+	case Observation:
+		return "OBSERVATION", true
+	case *OpenehrCodeSetIdentifiers:
+		if x == nil {
+			return "", false
+		}
+		return "OPENEHR_CODE_SET_IDENTIFIERS", true
+	case OpenehrCodeSetIdentifiers:
+		return "OPENEHR_CODE_SET_IDENTIFIERS", true
+	case *OpenehrDefinitions:
+		if x == nil {
+			return "", false
+		}
+		return "OPENEHR_DEFINITIONS", true
+	case OpenehrDefinitions:
+		return "OPENEHR_DEFINITIONS", true
+	case *OpenehrTerminologyGroupIdentifiers:
+		if x == nil {
+			return "", false
+		}
+		return "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", true
+	case OpenehrTerminologyGroupIdentifiers:
+		return "OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", true
+	case *Organisation:
+		if x == nil {
+			return "", false
+		}
+		return "ORGANISATION", true
+	case Organisation:
+		return "ORGANISATION", true
+	case *OriginalVersion[any]:
+		if x == nil {
+			return "", false
+		}
+		return "ORIGINAL_VERSION", true
+	case OriginalVersion[any]:
+		return "ORIGINAL_VERSION", true
+	case *Participation:
+		if x == nil {
+			return "", false
+		}
+		return "PARTICIPATION", true
+	case Participation:
+		return "PARTICIPATION", true
+	case *PartyIdentified:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_IDENTIFIED", true
+	case PartyIdentified:
+		return "PARTY_IDENTIFIED", true
+	case *PartyIdentity:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_IDENTITY", true
+	case PartyIdentity:
+		return "PARTY_IDENTITY", true
+	case *PartyRef:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_REF", true
+	case PartyRef:
+		return "PARTY_REF", true
+	case *PartyRelated:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_RELATED", true
+	case PartyRelated:
+		return "PARTY_RELATED", true
+	case *PartyRelationship:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_RELATIONSHIP", true
+	case PartyRelationship:
+		return "PARTY_RELATIONSHIP", true
+	case *PartySelf:
+		if x == nil {
+			return "", false
+		}
+		return "PARTY_SELF", true
+	case PartySelf:
+		return "PARTY_SELF", true
+	case *Person:
+		if x == nil {
+			return "", false
+		}
+		return "PERSON", true
+	case Person:
+		return "PERSON", true
+	case *PointEvent[ItemStructure]:
+		if x == nil {
+			return "", false
+		}
+		return "POINT_EVENT", true
+	case PointEvent[ItemStructure]:
+		return "POINT_EVENT", true
+	case *PointEvent[ItemList]:
+		if x == nil {
+			return "", false
+		}
+		return "POINT_EVENT", true
+	case PointEvent[ItemList]:
+		return "POINT_EVENT", true
+	case *PointEvent[ItemSingle]:
+		if x == nil {
+			return "", false
+		}
+		return "POINT_EVENT", true
+	case PointEvent[ItemSingle]:
+		return "POINT_EVENT", true
+	case *PointEvent[ItemTable]:
+		if x == nil {
+			return "", false
+		}
+		return "POINT_EVENT", true
+	case PointEvent[ItemTable]:
+		return "POINT_EVENT", true
+	case *PointEvent[ItemTree]:
+		if x == nil {
+			return "", false
+		}
+		return "POINT_EVENT", true
+	case PointEvent[ItemTree]:
+		return "POINT_EVENT", true
+	case *PointInterval[any]:
+		if x == nil {
+			return "", false
+		}
+		return "Point_interval", true
+	case PointInterval[any]:
+		return "Point_interval", true
+	case *ProperInterval[any]:
+		if x == nil {
+			return "", false
+		}
+		return "Proper_interval", true
+	case ProperInterval[any]:
+		return "Proper_interval", true
+	case *ReferenceRange[DVOrdered]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVOrdered]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVCount]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVCount]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVDate]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVDate]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVDateTime]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVDateTime]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVDuration]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVDuration]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVOrdinal]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVOrdinal]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVProportion]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVProportion]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVQuantity]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVQuantity]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVScale]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVScale]:
+		return "REFERENCE_RANGE", true
+	case *ReferenceRange[DVTime]:
+		if x == nil {
+			return "", false
+		}
+		return "REFERENCE_RANGE", true
+	case ReferenceRange[DVTime]:
+		return "REFERENCE_RANGE", true
+	case *ResourceAnnotations:
+		if x == nil {
+			return "", false
+		}
+		return "RESOURCE_ANNOTATIONS", true
+	case ResourceAnnotations:
+		return "RESOURCE_ANNOTATIONS", true
+	case *ResourceDescription:
+		if x == nil {
+			return "", false
+		}
+		return "RESOURCE_DESCRIPTION", true
+	case ResourceDescription:
+		return "RESOURCE_DESCRIPTION", true
+	case *ResourceDescriptionItem:
+		if x == nil {
+			return "", false
+		}
+		return "RESOURCE_DESCRIPTION_ITEM", true
+	case ResourceDescriptionItem:
+		return "RESOURCE_DESCRIPTION_ITEM", true
+	case *RevisionHistory:
+		if x == nil {
+			return "", false
+		}
+		return "REVISION_HISTORY", true
+	case RevisionHistory:
+		return "REVISION_HISTORY", true
+	case *RevisionHistoryItem:
+		if x == nil {
+			return "", false
+		}
+		return "REVISION_HISTORY_ITEM", true
+	case RevisionHistoryItem:
+		return "REVISION_HISTORY_ITEM", true
+	case *Role:
+		if x == nil {
+			return "", false
+		}
+		return "ROLE", true
+	case Role:
+		return "ROLE", true
+	case *Section:
+		if x == nil {
+			return "", false
+		}
+		return "SECTION", true
+	case Section:
+		return "SECTION", true
+	case *TemplateID:
+		if x == nil {
+			return "", false
+		}
+		return "TEMPLATE_ID", true
+	case TemplateID:
+		return "TEMPLATE_ID", true
+	case *TerminologyID:
+		if x == nil {
+			return "", false
+		}
+		return "TERMINOLOGY_ID", true
+	case TerminologyID:
+		return "TERMINOLOGY_ID", true
+	case *TerminologyService:
+		if x == nil {
+			return "", false
+		}
+		return "TERMINOLOGY_SERVICE", true
+	case TerminologyService:
+		return "TERMINOLOGY_SERVICE", true
+	case *TermMapping:
+		if x == nil {
+			return "", false
+		}
+		return "TERM_MAPPING", true
+	case TermMapping:
+		return "TERM_MAPPING", true
+	case *TranslationDetails:
+		if x == nil {
+			return "", false
+		}
+		return "TRANSLATION_DETAILS", true
+	case TranslationDetails:
+		return "TRANSLATION_DETAILS", true
+	case *TimeDefinitions:
+		if x == nil {
+			return "", false
+		}
+		return "Time_Definitions", true
+	case TimeDefinitions:
+		return "Time_Definitions", true
+	case *Uuid:
+		if x == nil {
+			return "", false
+		}
+		return "UUID", true
+	case Uuid:
+		return "UUID", true
+	case *VersionedComposition:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_COMPOSITION", true
+	case VersionedComposition:
+		return "VERSIONED_COMPOSITION", true
+	case *VersionedEHRAccess:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_EHR_ACCESS", true
+	case VersionedEHRAccess:
+		return "VERSIONED_EHR_ACCESS", true
+	case *VersionedEHRStatus:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_EHR_STATUS", true
+	case VersionedEHRStatus:
+		return "VERSIONED_EHR_STATUS", true
+	case *VersionedFolder:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_FOLDER", true
+	case VersionedFolder:
+		return "VERSIONED_FOLDER", true
+	case *VersionedObject[any]:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_OBJECT", true
+	case VersionedObject[any]:
+		return "VERSIONED_OBJECT", true
+	case *VersionedParty:
+		if x == nil {
+			return "", false
+		}
+		return "VERSIONED_PARTY", true
+	case VersionedParty:
+		return "VERSIONED_PARTY", true
+	case *VersionTreeID:
+		if x == nil {
+			return "", false
+		}
+		return "VERSION_TREE_ID", true
+	case VersionTreeID:
+		return "VERSION_TREE_ID", true
+	}
+	return "", false
+}
+
+// IsTypedNil reports whether v is an interface value carrying a
+// typed-nil pointer to a registered RM concrete (ADR 0013). Bare nil
+// interfaces and value-typed structs report false. Consumers use it
+// as the guard before calling Locatable getters (a getter on a
+// typed-nil *T panics). REQ-024: no reflection.
+func IsTypedNil(v any) bool {
+	switch x := v.(type) {
+	case *AccessGroupRef:
+		return x == nil
+	case *Action:
+		return x == nil
+	case *Activity:
+		return x == nil
+	case *Address:
+		return x == nil
+	case *AdminEntry:
+		return x == nil
+	case *Agent:
+		return x == nil
+	case *Archetyped:
+		return x == nil
+	case *ArchetypeID:
+		return x == nil
+	case *Attestation:
+		return x == nil
+	case *AuditDetails:
+		return x == nil
+	case *BasicDefinitions:
+		return x == nil
+	case *Capability:
+		return x == nil
+	case *Cluster:
+		return x == nil
+	case *CodePhrase:
+		return x == nil
+	case *Composition:
+		return x == nil
+	case *Contact:
+		return x == nil
+	case *Contribution:
+		return x == nil
+	case *DVBoolean:
+		return x == nil
+	case *DVCodedText:
+		return x == nil
+	case *DVCount:
+		return x == nil
+	case *DVDate:
+		return x == nil
+	case *DVDateTime:
+		return x == nil
+	case *DVDuration:
+		return x == nil
+	case *DVEHRURI:
+		return x == nil
+	case *DVGeneralTimeSpecification:
+		return x == nil
+	case *DVIdentifier:
+		return x == nil
+	case *DVInterval[DVOrdered]:
+		return x == nil
+	case *DVInterval[DVCount]:
+		return x == nil
+	case *DVInterval[DVDate]:
+		return x == nil
+	case *DVInterval[DVDateTime]:
+		return x == nil
+	case *DVInterval[DVDuration]:
+		return x == nil
+	case *DVInterval[DVOrdinal]:
+		return x == nil
+	case *DVInterval[DVProportion]:
+		return x == nil
+	case *DVInterval[DVQuantity]:
+		return x == nil
+	case *DVInterval[DVScale]:
+		return x == nil
+	case *DVInterval[DVTime]:
+		return x == nil
+	case *DVMultimedia:
+		return x == nil
+	case *DVOrdinal:
+		return x == nil
+	case *DVParagraph:
+		return x == nil
+	case *DVParsable:
+		return x == nil
+	case *DVPeriodicTimeSpecification:
+		return x == nil
+	case *DVProportion:
+		return x == nil
+	case *DVQuantity:
+		return x == nil
+	case *DVScale:
+		return x == nil
+	case *DVState:
+		return x == nil
+	case *DVText:
+		return x == nil
+	case *DVTime:
+		return x == nil
+	case *DVURI:
+		return x == nil
+	case *EHR:
+		return x == nil
+	case *EHRAccess:
+		return x == nil
+	case *EHRStatus:
+		return x == nil
+	case *Element:
+		return x == nil
+	case *Evaluation:
+		return x == nil
+	case *EventContext:
+		return x == nil
+	case *FeederAudit:
+		return x == nil
+	case *FeederAuditDetails:
+		return x == nil
+	case *Folder:
+		return x == nil
+	case *GenericEntry:
+		return x == nil
+	case *GenericID:
+		return x == nil
+	case *Group:
+		return x == nil
+	case *HierObjectID:
+		return x == nil
+	case *History[ItemStructure]:
+		return x == nil
+	case *History[ItemList]:
+		return x == nil
+	case *History[ItemSingle]:
+		return x == nil
+	case *History[ItemTable]:
+		return x == nil
+	case *History[ItemTree]:
+		return x == nil
+	case *ImportedVersion[any]:
+		return x == nil
+	case *Instruction:
+		return x == nil
+	case *InstructionDetails:
+		return x == nil
+	case *InternetID:
+		return x == nil
+	case *IntervalEvent[ItemStructure]:
+		return x == nil
+	case *IntervalEvent[ItemList]:
+		return x == nil
+	case *IntervalEvent[ItemSingle]:
+		return x == nil
+	case *IntervalEvent[ItemTable]:
+		return x == nil
+	case *IntervalEvent[ItemTree]:
+		return x == nil
+	case *IsmTransition:
+		return x == nil
+	case *ISOOID:
+		return x == nil
+	case *ItemList:
+		return x == nil
+	case *ItemSingle:
+		return x == nil
+	case *ItemTable:
+		return x == nil
+	case *ItemTag:
+		return x == nil
+	case *ItemTree:
+		return x == nil
+	case *ISO8601Timezone:
+		return x == nil
+	case *Link:
+		return x == nil
+	case *LocatableRef:
+		return x == nil
+	case *MeasurementService:
+		return x == nil
+	case *ObjectRef:
+		return x == nil
+	case *ObjectVersionID:
+		return x == nil
+	case *Observation:
+		return x == nil
+	case *OpenehrCodeSetIdentifiers:
+		return x == nil
+	case *OpenehrDefinitions:
+		return x == nil
+	case *OpenehrTerminologyGroupIdentifiers:
+		return x == nil
+	case *Organisation:
+		return x == nil
+	case *OriginalVersion[any]:
+		return x == nil
+	case *Participation:
+		return x == nil
+	case *PartyIdentified:
+		return x == nil
+	case *PartyIdentity:
+		return x == nil
+	case *PartyRef:
+		return x == nil
+	case *PartyRelated:
+		return x == nil
+	case *PartyRelationship:
+		return x == nil
+	case *PartySelf:
+		return x == nil
+	case *Person:
+		return x == nil
+	case *PointEvent[ItemStructure]:
+		return x == nil
+	case *PointEvent[ItemList]:
+		return x == nil
+	case *PointEvent[ItemSingle]:
+		return x == nil
+	case *PointEvent[ItemTable]:
+		return x == nil
+	case *PointEvent[ItemTree]:
+		return x == nil
+	case *PointInterval[any]:
+		return x == nil
+	case *ProperInterval[any]:
+		return x == nil
+	case *ReferenceRange[DVOrdered]:
+		return x == nil
+	case *ReferenceRange[DVCount]:
+		return x == nil
+	case *ReferenceRange[DVDate]:
+		return x == nil
+	case *ReferenceRange[DVDateTime]:
+		return x == nil
+	case *ReferenceRange[DVDuration]:
+		return x == nil
+	case *ReferenceRange[DVOrdinal]:
+		return x == nil
+	case *ReferenceRange[DVProportion]:
+		return x == nil
+	case *ReferenceRange[DVQuantity]:
+		return x == nil
+	case *ReferenceRange[DVScale]:
+		return x == nil
+	case *ReferenceRange[DVTime]:
+		return x == nil
+	case *ResourceAnnotations:
+		return x == nil
+	case *ResourceDescription:
+		return x == nil
+	case *ResourceDescriptionItem:
+		return x == nil
+	case *RevisionHistory:
+		return x == nil
+	case *RevisionHistoryItem:
+		return x == nil
+	case *Role:
+		return x == nil
+	case *Section:
+		return x == nil
+	case *TemplateID:
+		return x == nil
+	case *TerminologyID:
+		return x == nil
+	case *TerminologyService:
+		return x == nil
+	case *TermMapping:
+		return x == nil
+	case *TranslationDetails:
+		return x == nil
+	case *TimeDefinitions:
+		return x == nil
+	case *Uuid:
+		return x == nil
+	case *VersionedComposition:
+		return x == nil
+	case *VersionedEHRAccess:
+		return x == nil
+	case *VersionedEHRStatus:
+		return x == nil
+	case *VersionedFolder:
+		return x == nil
+	case *VersionedObject[any]:
+		return x == nil
+	case *VersionedParty:
+		return x == nil
+	case *VersionTreeID:
+		return x == nil
+	}
+	return false
+}

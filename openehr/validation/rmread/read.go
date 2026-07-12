@@ -1344,143 +1344,15 @@ func ifacePresent(v any) (any, bool) {
 // a typed-nil pointer (e.g. Element.Value = (*rm.DVQuantity)(nil)).
 // Bare nil interfaces and value-typed structs return false.
 //
-// Exported so openehr/validation's rmTypeInfo switch stays in lock-
-// step with ifacePresent without duplicating the closed type set.
-// REQ-024 compliant — no reflection.
+// Delegates to the generated rm.IsTypedNil (ADR 0013), which covers
+// every registered RM concrete. The previous hand-written switch was
+// deliberately narrow (only types pointer-stored behind an RM
+// interface); the generated predicate is a strict superset — the
+// additional types either never occur as typed-nils behind the
+// interfaces this package descends, or, where they can (e.g. a
+// typed-nil root handed to the validator), were latent panics that
+// now report correctly. Exported so openehr/validation's rmTypeInfo
+// shares the same guard. REQ-024 compliant — no reflection.
 func IsTypedNilPointer(v any) bool {
-	return isTypedNilPointer(v)
-}
-
-// isTypedNilPointer detects the "interface carrying a typed-nil
-// pointer" case for every RM concrete the validator descends into.
-// The set is intentionally narrow: RM types pointer-stored behind
-// an interface (DataValue, ItemStructure, Item, Event, ContentItem,
-// PartyProxy). Value-typed concretes never trigger the typed-nil
-// problem (a struct stored by value cannot be nil).
-//
-// Adding a new RM type may touch up to three switches, but they are
-// deliberately NOT the same set — membership depends on how the type is
-// stored:
-//   - this switch: only types pointer-stored behind an RM interface
-//     (so a typed-nil can arise); value-typed and root types are absent.
-//   - rmread.ReadSingle/ReadMultiple: only types with descendable
-//     attributes the walker reads.
-//   - the parent validator's rmTypeInfo: every type the walker routes
-//     (for RM-type name + archetype_node_id).
-//
-// Keep the relevant ones in step when adding a type; don't assume 1:1:1.
-func isTypedNilPointer(v any) bool {
-	switch p := v.(type) {
-	// DataValue concretes (Element.Value, etc.).
-	case *rm.DVQuantity:
-		return p == nil
-	case *rm.DVText:
-		return p == nil
-	case *rm.DVCodedText:
-		return p == nil
-	case *rm.DVBoolean:
-		return p == nil
-	case *rm.DVCount:
-		return p == nil
-	case *rm.DVOrdinal:
-		return p == nil
-	case *rm.DVDate:
-		return p == nil
-	case *rm.DVTime:
-		return p == nil
-	case *rm.DVDateTime:
-		return p == nil
-	case *rm.DVDuration:
-		return p == nil
-	case *rm.DVURI:
-		return p == nil
-	case *rm.DVEHRURI:
-		return p == nil
-	case *rm.DVIdentifier:
-		return p == nil
-	case *rm.DVMultimedia:
-		return p == nil
-	case *rm.DVParsable:
-		return p == nil
-	case *rm.DVProportion:
-		return p == nil
-
-	// ItemStructure concretes (Observation.Protocol, Activity.Description, …).
-	case *rm.ItemTree:
-		return p == nil
-	case *rm.ItemList:
-		return p == nil
-	case *rm.ItemSingle:
-		return p == nil
-	case *rm.ItemTable:
-		return p == nil
-
-	// Item concretes (Cluster.Items, Section items walked into Cluster/Element).
-	case *rm.Cluster:
-		return p == nil
-	case *rm.Element:
-		return p == nil
-
-	// Event concretes (History.Events).
-	case *rm.PointEvent[rm.ItemStructure]:
-		return p == nil
-	case *rm.IntervalEvent[rm.ItemStructure]:
-		return p == nil
-
-	// ContentItem concretes (Composition.Content, Section.Items).
-	case *rm.Observation:
-		return p == nil
-	case *rm.Evaluation:
-		return p == nil
-	case *rm.Instruction:
-		return p == nil
-	case *rm.Action:
-		return p == nil
-	case *rm.AdminEntry:
-		return p == nil
-	case *rm.GenericEntry:
-		return p == nil
-	case *rm.Section:
-		return p == nil
-
-	// PartyProxy concretes (Composition.Composer, Entry.Subject).
-	case *rm.PartySelf:
-		return p == nil
-	case *rm.PartyIdentified:
-		return p == nil
-	case *rm.PartyRelated:
-		return p == nil
-
-	// PARTY concretes (a typed-nil *rm.Person behind the rm.Party
-	// interface passed to ValidateDemographic / the generic Validate).
-	case *rm.Person:
-		return p == nil
-	case *rm.Organisation:
-		return p == nil
-	case *rm.Group:
-		return p == nil
-	case *rm.Agent:
-		return p == nil
-	case *rm.Role:
-		return p == nil
-
-	// PARTY sub-components (boxed as *rm.T by boxPtrs when walked).
-	case *rm.Address:
-		return p == nil
-	case *rm.Contact:
-		return p == nil
-	case *rm.PartyIdentity:
-		return p == nil
-	case *rm.PartyRelationship:
-		return p == nil
-	case *rm.Capability:
-		return p == nil
-
-	// EHR-IM roots (a typed-nil root passed to the generic Validate).
-	case *rm.Folder:
-		return p == nil
-	case *rm.EHRStatus:
-		return p == nil
-	}
-	return false
+	return rm.IsTypedNil(v)
 }

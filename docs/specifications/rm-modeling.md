@@ -75,6 +75,15 @@ Rules for embedded base structs:
 - Embedded fields **MUST NOT** be promoted into a "do-everything" base; if `EVENT` and `INSTRUCTION` share three fields by accident, define a third base struct rather than packing all six fields into `Entry`.
 - Embeds **MUST NOT** be used as interface implementations by composition trickery (e.g. embed a base struct that "implements" `DataValue` to make every descendant satisfy it) — interfaces are method sets (see § Abstract categories below); embeds carry data, not behaviour.
 
+### Generated LOCATABLE identity surface
+
+Because ADR 0002 D4 flattens the `LOCATABLE` fields into every concrete descendant, the generator **MUST** also emit a polymorphic identity surface over them ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
+
+- Every LOCATABLE concrete **MUST** carry four value-receiver read accessors — `GetArchetypeNodeID() string`, `GetName() DVTextLike`, `GetUID() UIDBasedID`, `GetArchetypeDetails() *Archetyped` — whose return types **MUST** equal the flattened field's declared type. The sealed `rm.Locatable` interface lists them; both `T` and `*T` satisfy it.
+- Every LOCATABLE concrete **MUST** carry the four matching pointer-receiver setters, collected behind the sealed `rm.MutableLocatable` interface (satisfied by `*T` only).
+- Accessors return the field verbatim: a getter invoked on a typed-nil `*T` panics, so callers **MUST** guard with `rm.IsTypedNil` (§ Type registry below) before asserting/calling.
+- The surface is machine-owned: accessor emission resolves types through the same rules as struct-field rendering, and `make codegen-verify` gates drift (REQ-042).
+
 ## Abstract categories (REQ-032)
 
 Abstract RM categories — types that no instance can be directly — **MUST** be expressed as Go interfaces:
@@ -141,6 +150,12 @@ Rules:
 - The `rm` package's `init()` **MUST** register every concrete RM type. Consumers do not register types unless they extend the RM (which the SDK does not actively support, but must not actively prevent).
 - The registry **MUST NOT** use reflection to instantiate types — the constructor closure is the only sanctioned mechanism.
 - A decoded value of static type `any` **MUST** be type-asserted at the call site. The SDK provides generic helpers (`typereg.DecodeAs[T DataValue](data)`) where useful.
+
+The registry is also **reversible** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)):
+
+- A generated `rm.RMTypeName(any) (string, bool)` **MUST** map every registered concrete Go type — including generic instantiations over the parameter bound's closed descendant set — back to its bare registration name (`DVInterval[DVQuantity]` → `"DV_INTERVAL"`). Nil interfaces, typed-nil pointers, and non-RM values report `("", false)`.
+- A generated `rm.IsTypedNil(any) bool` **MUST** report whether a value is an interface carrying a typed-nil pointer to a registered concrete; it is the sanctioned guard before calling `Locatable` accessors.
+- Both **MUST** be reflection-free and regenerated with the forward registrations, so forward and reverse mappings cannot drift.
 
 ## Generics for clients, validators, repositories (REQ-024)
 

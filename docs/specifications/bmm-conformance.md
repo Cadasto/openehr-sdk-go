@@ -124,6 +124,8 @@ How each P_BMM construct becomes Go code.
 
 Inheritance via `ancestors` is materialised by **embedding the ancestor struct(s)** in concrete classes, per REQ-031. Multiple inheritance flattens to multiple embedded structs (Go allows it; the BMM resolves conflicts at the model level).
 
+LOCATABLE concrete descendants additionally receive the **generated identity surface** ([ADR 0013](../adr/0013-generated-locatable-identity-surface.md)): four value-receiver `Get<Field>` accessors (listed on the sealed `Locatable` interface) and four pointer-receiver `Set<Field>` mutators (behind the sealed `MutableLocatable` interface), with types resolved by the same property-mapping rules as the struct fields. The RM target's `typereg_gen.go` also emits the reverse registry — `RMTypeName` (Go concrete → bare registration name, generic instantiations enumerated over the parameter bound's owned concrete descendants) and the `IsTypedNil` guard.
+
 ### Property → Go field
 
 | P_BMM property kind | Go field type |

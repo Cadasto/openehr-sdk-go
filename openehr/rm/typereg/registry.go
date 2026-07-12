@@ -14,6 +14,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sync"
 )
 
@@ -165,6 +167,16 @@ func (r *Registry) Lookup(typeName string) (func() any, bool) {
 	defer r.mu.RUnlock()
 	c, ok := r.ctors[typeName]
 	return c, ok
+}
+
+// Names returns a sorted snapshot of every registered type name — the
+// supported-type inventory. Enumeration exists so reversibility parity
+// (REQ-040: registration name ↔ [rm.RMTypeName]) can be verified over
+// the whole registry rather than a hand-picked sample.
+func (r *Registry) Names() []string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return slices.Sorted(maps.Keys(r.ctors))
 }
 
 // Decode peeks the JSON object's "_type" discriminator, looks up the
