@@ -85,10 +85,12 @@ func decode(ctx context.Context, c *transport.Client, req *transport.Request) (*
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// putConfig is the resolved option set for [Put] — a direct alias to the
-// shared [openehrclient.WriteConfig]; ehrstatus has no options beyond
-// Prefer / audit details / lifecycle state.
-type putConfig = openehrclient.WriteConfig
+// putConfig is the resolved option set for [Put]. It embeds the shared
+// [openehrclient.WriteConfig] (Prefer / audit details / lifecycle
+// state); ehrstatus has no options beyond that.
+type putConfig struct {
+	openehrclient.WriteConfig
+}
 
 // PutOption mutates [Put]'s request shape.
 type PutOption func(*putConfig)
@@ -138,7 +140,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if status == nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: nil status", transport.ErrInvalidConfig)
 	}
-	cfg := putConfig{Prefer: transport.PreferMinimal}
+	cfg := putConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -164,7 +166,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "ehrstatus.Put", decodeEHRStatus)
+	return openehrclient.WriteResult(ctx, c, req, "ehrstatus.Put", decodeEHRStatus)
 }
 
 // decodeEHRStatus decodes a Prefer=representation write response into

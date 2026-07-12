@@ -92,10 +92,12 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	return getParty(ctx, c, req)
 }
 
-// writeConfig is the resolved option set for Create / Update — a direct
-// alias to the shared [openehrclient.WriteConfig]; demographic has no
-// options beyond Prefer / audit details / lifecycle state.
-type writeConfig = openehrclient.WriteConfig
+// writeConfig is the resolved option set for Create / Update. It embeds
+// the shared [openehrclient.WriteConfig] (Prefer / audit details /
+// lifecycle state); demographic has no options beyond that.
+type writeConfig struct {
+	openehrclient.WriteConfig
+}
 
 // WriteOption mutates the request shape for [Create] and [Update].
 type WriteOption func(*writeConfig)
@@ -135,7 +137,7 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
 	}
-	cfg := writeConfig{Prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -160,7 +162,7 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "demographic", decodeParty)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
 }
 
 // Update modifies the PARTY family identified by voID, attaching `ifMatch` as
@@ -186,7 +188,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if party == nil {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{Prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -212,7 +214,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "demographic", decodeParty)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
 }
 
 // deleteConfig is the resolved option set for [Delete]. A logical delete is a

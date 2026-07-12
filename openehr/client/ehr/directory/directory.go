@@ -115,10 +115,12 @@ func decode(ctx context.Context, c *transport.Client, req *transport.Request) (*
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// writeConfig is the resolved option set for Save / Update — a direct
-// alias to the shared [openehrclient.WriteConfig]; directory has no
-// options beyond Prefer / audit details / lifecycle state.
-type writeConfig = openehrclient.WriteConfig
+// writeConfig is the resolved option set for Save / Update. It embeds
+// the shared [openehrclient.WriteConfig] (Prefer / audit details /
+// lifecycle state); directory has no options beyond that.
+type writeConfig struct {
+	openehrclient.WriteConfig
+}
 
 // WriteOption mutates the request shape for [Save] and [Update].
 type WriteOption func(*writeConfig)
@@ -173,7 +175,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Save: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{Prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -198,7 +200,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "directory", decodeFolder)
+	return openehrclient.WriteResult(ctx, c, req, "directory", decodeFolder)
 }
 
 // Update modifies the Directory under ehrID, requiring `ifMatch` per
@@ -217,7 +219,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Update: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{Prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -243,7 +245,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "directory", decodeFolder)
+	return openehrclient.WriteResult(ctx, c, req, "directory", decodeFolder)
 }
 
 // Delete logically deletes the Directory addressed by versionUID,
