@@ -1,6 +1,6 @@
 # ADR 0013 — Generated LOCATABLE identity surface and reverse type lookup
 
-- **Status:** Proposed, 2026-07-12. **An ADR MUST be Accepted before implementation begins** (plan DoR gate).
+- **Status:** Accepted, 2026-07-12 — maintainer acceptance after two review rounds (field-accurate types, corrected counts, completed getter quartet, typed-nil predicate); implementation lands in the same PR.
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** cross-references [STRAND-04](../specifications/research-strands.md#strand-04--rm-polymorphism-and-codec-performance) (RM polymorphism; does **not** resolve it — the codec question stays open).
@@ -146,8 +146,8 @@ reduced set.
 
 ## Acceptance gate
 
-Per the plan's Definition of Ready, implementation is **blocked until this ADR's status is
-Accepted** (maintainer decision). On acceptance: flip status, add the `architecture.md`
-narrative note and REQ/traceability wiring in the implementation PR, and proceed with
-Phase 5's generator + consumer-refactor tasks (`make codegen` + `codegen-verify` +
-`handles_test.go` 54-type taxonomy pin + full `make test-race` as the verification gate).
+Per the plan's Definition of Ready, implementation was blocked until this ADR reached
+**Accepted** (maintainer decision, 2026-07-12). The implementation PR carries the
+`architecture.md` narrative note, the REQ/traceability wiring, and Phase 5's generator +
+consumer-refactor tasks, verified by `make codegen` + `codegen-verify`, the
+`handles_test.go` 54-type taxonomy pin, and the full race-enabled test suite.
