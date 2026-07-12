@@ -13,6 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **`rm.ObjectIDValue` lexical helper (REQ-120).** Public `(string, bool)` accessor for any concrete `OBJECT_ID` (value or pointer), alongside the existing `UIDValue`; retires the private, behaviourally-identical switch in `openehr/client/ehr`.
+- **Shared versioned-write client plumbing (REQ-094).** `openehr/client/ehr` gains exported generic write-result, write-config, and delete-tail helpers consolidating the four leaf clients' duplicated Prefer-decode and write-option internals; leaf public APIs and error strings unchanged.
 
 ## [0.14.0] - 2026-07-02
 
