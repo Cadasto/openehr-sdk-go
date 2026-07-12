@@ -37,19 +37,9 @@ func writeDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string, 
 func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boundRM string) error {
 	switch attr {
 	case "lower":
-		v, ok := coerceBound[T](child)
-		if !ok {
-			return mismatch(attr, child, boundRM)
-		}
-		iv.Lower = v
-		return nil
+		return assignVia(child, func(v T) { iv.Lower = v }, attr, boundRM)
 	case "upper":
-		v, ok := coerceBound[T](child)
-		if !ok {
-			return mismatch(attr, child, boundRM)
-		}
-		iv.Upper = v
-		return nil
+		return assignVia(child, func(v T) { iv.Upper = v }, attr, boundRM)
 	case "lower_unbounded":
 		v, ok := child.(bool)
 		if !ok {
@@ -80,18 +70,4 @@ func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boun
 		return nil
 	}
 	return fmt.Errorf("%w: *rm.Interval[%s] has no single attr %q", ErrUnknownAttribute, boundRM, attr)
-}
-
-func coerceBound[T any](child any) (T, bool) {
-	var zero T
-	switch v := child.(type) {
-	case T:
-		return v, true
-	case *T:
-		if v == nil {
-			return zero, false
-		}
-		return *v, true
-	}
-	return zero, false
 }

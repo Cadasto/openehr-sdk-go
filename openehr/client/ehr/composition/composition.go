@@ -75,12 +75,13 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	return out, openehrclient.NewVersionMetadata(resp.Metadata), nil
 }
 
-// writeConfig is the resolved option set for Save / Update.
+// writeConfig is the resolved option set for Save / Update. It embeds
+// the shared [openehrclient.WriteConfig] (Prefer / audit details /
+// lifecycle state) and adds composition's own extra options — template
+// id and item tags — that the other versioned-write leaves lack.
 type writeConfig struct {
-	prefer          transport.Prefer
-	auditDetails    *rm.AuditDetails
+	openehrclient.WriteConfig
 	templateID      string
-	lifecycleState  openehrclient.LifecycleState
 	objectItemTags  []openehrclient.ItemTag
 	versionItemTags []openehrclient.ItemTag
 }
@@ -91,13 +92,13 @@ type WriteOption func(*writeConfig)
 // WithPrefer overrides the response-shape preference (REQ-094). The
 // default is [transport.PreferMinimal] per the spec.
 func WithPrefer(p transport.Prefer) WriteOption {
-	return func(c *writeConfig) { c.prefer = p }
+	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
 // `openehr-audit-details` header (REQ-059). Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
-	return func(c *writeConfig) { c.auditDetails = a }
+	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
 // WithTemplateID sets the `openehr-template-id` header (REQ-059) so
@@ -113,7 +114,7 @@ func WithTemplateID(id string) WriteOption {
 // the header (server default); an unrecognised code fails the write with
 // [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
-	return func(c *writeConfig) { c.lifecycleState = s }
+	return func(c *writeConfig) { c.LifecycleState = s }
 }
 
 // WithObjectItemTags sets the openehr-item-tag header (REQ-059).
@@ -175,7 +176,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	if comp == nil {
 		return nil, nil, fmt.Errorf("composition.Save: %w: nil Composition", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -183,31 +184,31 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("composition.Save")
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Save: %w", err)
+		return nil, nil, err
 	}
 	objectTags, versionTags, err := marshalItemTagHeaders(cfg.objectItemTags, cfg.versionItemTags)
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Save: %w", err)
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("composition.Save")
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Save: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition",
 		Route:              "/ehr/{ehr_id}/composition",
 		Body:               body,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 		TemplateID:         cfg.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
 }
 
 // Update modifies the Composition family identified by voID, attaching
@@ -236,7 +237,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if comp == nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w: nil Composition", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -244,17 +245,17 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("composition.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Update: %w", err)
+		return nil, nil, err
 	}
 	objectTags, versionTags, err := marshalItemTagHeaders(cfg.objectItemTags, cfg.versionItemTags)
 	if err != nil {
 		return nil, nil, fmt.Errorf("composition.Update: %w", err)
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("composition.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("composition.Update: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
@@ -262,14 +263,14 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Route:              "/ehr/{ehr_id}/composition/{versioned_object_id}",
 		Body:               body,
 		IfMatch:            ifMatch,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 		TemplateID:         cfg.templateID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
 }
 
 // Delete logically deletes the Composition version addressed by
@@ -303,61 +304,22 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,
 	}
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, err
-	}
-	return openehrclient.NewVersionMetadata(resp.Metadata), nil
+	return openehrclient.DoDelete(ctx, c, req)
 }
 
-// doWrite executes a Save / Update request and decodes the response
-// body per the Prefer mode (REQ-094): Prefer=representation decodes the
-// bare Composition (and returns [transport.ErrInvalidShape] on an empty
-// body); Prefer=identifier resolves the ITS-REST Identifier body into
-// the version metadata; for minimal / default the body is empty and the
-// returned Composition pointer is nil.
-//
+// decodeComposition decodes a Prefer=representation write response.
 // Per ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated`
 // (REQ-094), the response body is a bare `Composition` — not an
 // `ORIGINAL_VERSION<COMPOSITION>` envelope. The full audit / lifecycle
 // version envelope lives at `GET /versioned_composition/{vo_uid}/
 // version/{version_uid}` (`UVersionOfComposition`) which the
 // consumer can fetch when needed.
-func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.Composition, *openehrclient.VersionMetadata, error) {
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+func decodeComposition(body []byte) (*rm.Composition, error) {
+	var comp rm.Composition
+	if err := canjson.Unmarshal(body, &comp); err != nil {
+		return nil, fmt.Errorf("composition: decode Composition: %w", err)
 	}
-	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	switch prefer {
-	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
-			// REQ-094: representation MUST NOT silently downgrade to an
-			// empty body — surface it rather than returning a nil resource.
-			return nil, meta, fmt.Errorf("composition: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
-		}
-		var comp rm.Composition
-		if err := canjson.Unmarshal(resp.Body, &comp); err != nil {
-			return nil, meta, fmt.Errorf("composition: decode Composition: %w", err)
-		}
-		return &comp, meta, nil
-	case transport.PreferIdentifier:
-		// REQ-094: populate the identifier slot (meta.VersionUID) from the
-		// ITS-REST Identifier body when present; never silently discard it.
-		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
-			return nil, meta, fmt.Errorf("composition: %w", err)
-		}
-		return nil, meta, nil
-	default:
-		// minimal / default: empty body expected; id is in Location/ETag.
-		return nil, meta, nil
-	}
+	return &comp, nil
 }
 
 func marshalItemTagHeaders(object, version []openehrclient.ItemTag) (objectHdr, versionHdr string, err error) {

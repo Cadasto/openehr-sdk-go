@@ -194,7 +194,8 @@ func TestPutMinimal(t *testing.T) {
 }
 
 // TestPutRepresentationEmptyBodyErrors pins REQ-094 on the ehr_status
-// leaf (same shared doWrite pattern as composition/directory): an empty
+// leaf (same shared openehrclient.WriteResult pattern as
+// composition/directory): an empty
 // body under Prefer=return=representation MUST surface
 // transport.ErrInvalidShape, not a silent nil EHR_STATUS.
 func TestPutRepresentationEmptyBodyErrors(t *testing.T) {

@@ -82,20 +82,14 @@ func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.
 
 func decode(ctx context.Context, c *transport.Client, req *transport.Request) (*rm.EHRStatus, *openehrclient.VersionMetadata, error) {
 	out, meta, err := transport.Decode[rm.EHRStatus](ctx, c, req)
-	return out, newVersionMetadata(meta), err
+	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// newVersionMetadata is a thin wrapper around the ehr package helper
-// so this file can call it without re-exporting it.
-func newVersionMetadata(m *transport.Metadata) *openehrclient.VersionMetadata {
-	return openehrclient.NewVersionMetadata(m)
-}
-
-// putConfig is the resolved option set for [Put].
+// putConfig is the resolved option set for [Put]. It embeds the shared
+// [openehrclient.WriteConfig] (Prefer / audit details / lifecycle
+// state); ehrstatus has no options beyond that.
 type putConfig struct {
-	prefer         transport.Prefer
-	auditDetails   *rm.AuditDetails
-	lifecycleState openehrclient.LifecycleState
+	openehrclient.WriteConfig
 }
 
 // PutOption mutates [Put]'s request shape.
@@ -104,21 +98,21 @@ type PutOption func(*putConfig)
 // WithPrefer overrides the response-shape preference (REQ-094). The
 // default is [transport.PreferMinimal] per the spec's write-path rule.
 func WithPrefer(p transport.Prefer) PutOption {
-	return func(c *putConfig) { c.prefer = p }
+	return func(c *putConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope as the
 // `openehr-audit-details` header (REQ-059). The struct is canjson-
 // encoded; nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) PutOption {
-	return func(c *putConfig) { c.auditDetails = a }
+	return func(c *putConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
 // `openehr-version` header (REQ-059). Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
-	return func(c *putConfig) { c.lifecycleState = s }
+	return func(c *putConfig) { c.LifecycleState = s }
 }
 
 // Put updates the EHR_STATUS under ehrID. `ifMatch` is the
@@ -146,7 +140,7 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if status == nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: %w: nil status", transport.ErrInvalidConfig)
 	}
-	cfg := putConfig{prefer: transport.PreferMinimal}
+	cfg := putConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -154,13 +148,13 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	if err != nil {
 		return nil, nil, fmt.Errorf("ehrstatus.Put: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("ehrstatus.Put")
 	if err != nil {
-		return nil, nil, fmt.Errorf("ehrstatus.Put: %w", err)
+		return nil, nil, err
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("ehrstatus.Put")
 	if err != nil {
-		return nil, nil, fmt.Errorf("ehrstatus.Put: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
@@ -168,41 +162,21 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 		Route:              routeTemplate,
 		Body:               body,
 		IfMatch:            ifMatch,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return nil, newVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+	return openehrclient.WriteResult(ctx, c, req, "ehrstatus.Put", decodeEHRStatus)
+}
+
+// decodeEHRStatus decodes a Prefer=representation write response into
+// the full updated EHR_STATUS (REQ-094).
+func decodeEHRStatus(body []byte) (*rm.EHRStatus, error) {
+	var out rm.EHRStatus
+	if err := canjson.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("ehrstatus.Put: decode response: %w", err)
 	}
-	meta := newVersionMetadata(resp.Metadata)
-	switch cfg.prefer {
-	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
-			// REQ-094: representation MUST NOT silently downgrade to an
-			// empty body — surface it rather than returning a nil resource.
-			return nil, meta, fmt.Errorf("ehrstatus.Put: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
-		}
-		var out rm.EHRStatus
-		if err := canjson.Unmarshal(resp.Body, &out); err != nil {
-			return nil, meta, fmt.Errorf("ehrstatus.Put: decode response: %w", err)
-		}
-		return &out, meta, nil
-	case transport.PreferIdentifier:
-		// REQ-094: populate the identifier slot (meta.VersionUID) from the
-		// ITS-REST Identifier body when present; never silently discard it.
-		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
-			return nil, meta, fmt.Errorf("ehrstatus.Put: %w", err)
-		}
-		return nil, meta, nil
-	default:
-		// minimal / default: empty body expected; id is in Location/ETag.
-		return nil, meta, nil
-	}
+	return &out, nil
 }
 
 // Repository mirrors the package functions for DI seams.

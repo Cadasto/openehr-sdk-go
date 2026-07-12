@@ -10,6 +10,11 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **`rm.ObjectIDValue` lexical helper (REQ-120).** Public `(string, bool)` accessor for any concrete `OBJECT_ID` (value or pointer), alongside the existing `UIDValue`; retires the private, behaviourally-identical switch in `openehr/client/ehr`.
+- **Shared versioned-write client plumbing (REQ-094).** `openehr/client/ehr` gains exported generic write-result, write-config, and delete-tail helpers consolidating the four leaf clients' duplicated Prefer-decode and write-option internals; leaf public APIs and error strings unchanged.
+
 ## [0.14.0] - 2026-07-02
 
 Fourteenth `v0.x` minor — two consumer-driven gaps closed on the RM-floor and AQL-parse surfaces: presence-aware EHR_STATUS validation (REQ-112) and structured access to AQL standing-predicate + WHERE paths (REQ-113). Additive new public API; one minor source break — `parse.IdentifiedPath` now embeds the relocated `aql.IdentifiedPath`, so field reads are unchanged but composite-literal construction must wrap the embedded struct.

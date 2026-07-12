@@ -92,11 +92,11 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	return getParty(ctx, c, req)
 }
 
-// writeConfig is the resolved option set for Create / Update.
+// writeConfig is the resolved option set for Create / Update. It embeds
+// the shared [openehrclient.WriteConfig] (Prefer / audit details /
+// lifecycle state); demographic has no options beyond that.
 type writeConfig struct {
-	prefer         transport.Prefer
-	auditDetails   *rm.AuditDetails
-	lifecycleState openehrclient.LifecycleState
+	openehrclient.WriteConfig
 }
 
 // WriteOption mutates the request shape for [Create] and [Update].
@@ -105,20 +105,20 @@ type WriteOption func(*writeConfig)
 // WithPrefer overrides the response-shape preference (REQ-094). The default
 // is [transport.PreferMinimal] per the spec's write-path rule.
 func WithPrefer(p transport.Prefer) WriteOption {
-	return func(c *writeConfig) { c.prefer = p }
+	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
 // `openehr-audit-details` header (REQ-059). Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
-	return func(c *writeConfig) { c.auditDetails = a }
+	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
 // `openehr-version` header (REQ-059). Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
-	return func(c *writeConfig) { c.lifecycleState = s }
+	return func(c *writeConfig) { c.LifecycleState = s }
 }
 
 // Create commits a new PARTY. The resource path is derived from party's
@@ -137,7 +137,7 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -145,24 +145,24 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Create: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("demographic.Create")
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
+		return nil, nil, err
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("demographic.Create")
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Create: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               basePath(t),
 		Route:              basePath(t),
 		Body:               body,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
 }
 
 // Update modifies the PARTY family identified by voID, attaching `ifMatch` as
@@ -188,7 +188,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if party == nil {
 		return nil, nil, fmt.Errorf("demographic.Update: %w: nil Party", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -196,13 +196,13 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	if err != nil {
 		return nil, nil, fmt.Errorf("demographic.Update: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("demographic.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
+		return nil, nil, err
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("demographic.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("demographic.Update: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
@@ -210,11 +210,11 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 		Route:              basePath(t) + "/{uid_based_id}",
 		Body:               body,
 		IfMatch:            ifMatch,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, "demographic", decodeParty)
 }
 
 // deleteConfig is the resolved option set for [Delete]. A logical delete is a
@@ -265,14 +265,7 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,
 	}
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, err
-	}
-	return openehrclient.NewVersionMetadata(resp.Metadata), nil
+	return openehrclient.DoDelete(ctx, c, req)
 }
 
 // getParty issues a read request and decodes the bare PARTY body
@@ -308,38 +301,14 @@ func getParty(ctx context.Context, c *transport.Client, req *transport.Request) 
 	return party, meta, nil
 }
 
-// doWrite executes a Create / Update request and decodes the response per the
-// Prefer mode (REQ-094): representation decodes the bare PARTY (and returns
-// [transport.ErrInvalidShape] on an empty body); identifier resolves the
-// ITS-REST Identifier body into the version metadata; minimal / default
-// leaves the returned Party nil (the id is in Location / ETag).
-func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (rm.Party, *openehrclient.VersionMetadata, error) {
-	resp, err := c.Do(ctx, req)
+// decodeParty decodes a Prefer=representation write response
+// polymorphically via the type registry (REQ-040).
+func decodeParty(body []byte) (rm.Party, error) {
+	party, err := typereg.DecodeAs[rm.Party](body)
 	if err != nil {
-		if resp != nil {
-			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+		return nil, fmt.Errorf("demographic: decode PARTY body: %w", err)
 	}
-	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	switch prefer {
-	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
-			return nil, meta, fmt.Errorf("demographic: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
-		}
-		party, err := typereg.DecodeAs[rm.Party](resp.Body)
-		if err != nil {
-			return nil, meta, fmt.Errorf("demographic: decode PARTY body: %w", err)
-		}
-		return party, meta, nil
-	case transport.PreferIdentifier:
-		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
-			return nil, meta, fmt.Errorf("demographic: %w", err)
-		}
-		return nil, meta, nil
-	default:
-		return nil, meta, nil
-	}
+	return party, nil
 }
 
 // Repository mirrors the package-level functions for DI seams (REQ-023).
