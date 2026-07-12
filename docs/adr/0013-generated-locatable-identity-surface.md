@@ -30,7 +30,10 @@ identity accessors nor the *reverse* mapping (Go concrete type → RM class name
 Two Go constraints shape any fix:
 
 1. **Field/method name collision.** A struct cannot have a method named after a field, so
-   accessors cannot be called `ArchetypeNodeID()` / `Name()`. Non-colliding names are required.
+   accessors cannot be called `ArchetypeNodeID()` / `Name()`. The repo already solves this
+   exact problem on the `*Like` interfaces (REQ-052/040): `openehr/rm/like_interfaces.go`
+   emits `Get<Field>()` accessors (`DVText.GetValue()`, `GetDefiningCode()`) — the
+   established convention for method-over-field access on RM types.
 2. **Receiver split.** `Locatable`'s marker uses value receivers, so both `T` and `*T`
    satisfy it today; widening it with value-receiver *getters* preserves that. *Setters*
    require pointer receivers — putting them on `Locatable` would silently evict all value
@@ -47,10 +50,11 @@ irreversible fork this ADR records.
 Extend `internal/bmmgen` to emit, for every LOCATABLE concrete type, a **generated identity
 surface** in `*_gen.go` (ADR 0002 D6: the generator never touches non-`_gen.go` files):
 
-1. **Read accessors, widening `rm.Locatable`** (value receivers, non-colliding names):
-   `NodeID() string` (returns the `ArchetypeNodeID` field) and `NameValue() string` (returns
-   the name's text value). These are SDK-idiom additions, not BMM functions — they do not
-   pass through the D6 panic-stub / D7 skip-set machinery.
+1. **Read accessors, widening `rm.Locatable`** (value receivers, uniform `Get<Field>` rule
+   per the `*Like`-interface precedent): `GetArchetypeNodeID() string` and
+   `GetName() DVText` — name = `Get` + field, return type = field type, mechanically
+   derivable by the generator. These are SDK-idiom additions, not BMM functions — they do
+   not pass through the D6 panic-stub / D7 skip-set machinery.
 2. **Setters on a new sealed interface `rm.MutableLocatable`** (pointer receivers):
    `SetArchetypeNodeID(string)`, `SetName(DVText)`, `SetUID(*UIDBasedID)`,
    `SetArchetypeDetails(*Archetyped)` — satisfied by `*T` for every LOCATABLE `T`, sealed by
@@ -79,8 +83,9 @@ are removed; their lock-step comments are updated to the reduced set.
 - **Generated-code growth:** ~54 types × 6 one-line methods (~350 generated LOC) versus the
   ~200 removed hand-written lines — total LOC rises slightly; *hand-maintained* LOC drops
   sharply. The trade is deliberate: machine-owned bulk over human-owned lock-step.
-- **Naming asymmetry:** `NodeID()`/`NameValue()` cannot mirror their field names (collision
-  constraint above); godoc on each accessor must state which field it reads.
+- **Naming:** the `Get<Field>` prefix trades Effective Go's omit-`Get` guideline for
+  collision-freedom, mechanical derivability, and consistency with the existing
+  `*Like`-interface accessors — a deliberate, house-precedented choice.
 - **Spec impact:** `rm-modeling.md` prose (REQ-031 layering, REQ-040 registry — which gains a
   reverse direction, REQ-043 mapping rules) must be updated in the same PR as the generator
   change; `traceability.yaml` gains the ADR references on those REQ entries at implementation.
