@@ -901,10 +901,13 @@ func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
 // --- coercion helpers ---------------------------------------------------
 
 // coerceValueOrPtr accepts child as either T or *T, dereferencing the
-// pointer form and treating a nil pointer as a coercion failure. It
-// is the single value-or-pointer coercion primitive behind assignVia
-// and the coerce<RMType> wrappers below; writeIntervalSingle
-// (interval_write.go) also uses it directly for DV_INTERVAL<T>
+// pointer form and treating a nil pointer as a coercion failure — a
+// nil *T fails; a typed-nil pointer satisfying an interface T (e.g.
+// the rm.DVOrdered instantiation via writeIntervalSingle) still
+// matches case T and coerces with ok=true. It is the single
+// value-or-pointer coercion primitive behind assignVia and the
+// coerce<RMType> wrappers below; writeIntervalSingle
+// (interval_write.go) reaches it via assignVia for the DV_INTERVAL<T>
 // bounds.
 func coerceValueOrPtr[T any](child any) (T, bool) {
 	var zero T

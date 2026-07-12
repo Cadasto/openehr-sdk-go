@@ -37,19 +37,9 @@ func writeDVIntervalOrderedSingle(iv *rm.DVInterval[rm.DVOrdered], attr string, 
 func writeIntervalSingle[T any](iv *rm.Interval[T], attr string, child any, boundRM string) error {
 	switch attr {
 	case "lower":
-		v, ok := coerceValueOrPtr[T](child)
-		if !ok {
-			return mismatch(attr, child, boundRM)
-		}
-		iv.Lower = v
-		return nil
+		return assignVia(child, func(v T) { iv.Lower = v }, attr, boundRM)
 	case "upper":
-		v, ok := coerceValueOrPtr[T](child)
-		if !ok {
-			return mismatch(attr, child, boundRM)
-		}
-		iv.Upper = v
-		return nil
+		return assignVia(child, func(v T) { iv.Upper = v }, attr, boundRM)
 	case "lower_unbounded":
 		v, ok := child.(bool)
 		if !ok {
