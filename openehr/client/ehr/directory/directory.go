@@ -115,12 +115,10 @@ func decode(ctx context.Context, c *transport.Client, req *transport.Request) (*
 	return out, openehrclient.NewVersionMetadata(meta), err
 }
 
-// writeConfig is the resolved option set for Save / Update.
-type writeConfig struct {
-	prefer         transport.Prefer
-	auditDetails   *rm.AuditDetails
-	lifecycleState openehrclient.LifecycleState
-}
+// writeConfig is the resolved option set for Save / Update — a direct
+// alias to the shared [openehrclient.WriteConfig]; directory has no
+// options beyond Prefer / audit details / lifecycle state.
+type writeConfig = openehrclient.WriteConfig
 
 // WriteOption mutates the request shape for [Save] and [Update].
 type WriteOption func(*writeConfig)
@@ -128,20 +126,20 @@ type WriteOption func(*writeConfig)
 // WithPrefer overrides the response-shape preference (REQ-094).
 // Default [transport.PreferMinimal] per the spec.
 func WithPrefer(p transport.Prefer) WriteOption {
-	return func(c *writeConfig) { c.prefer = p }
+	return func(c *writeConfig) { c.Prefer = p }
 }
 
 // WithAuditDetails attaches the commit-time audit envelope via the
 // `openehr-audit-details` header (REQ-059). Nil omits the header.
 func WithAuditDetails(a *rm.AuditDetails) WriteOption {
-	return func(c *writeConfig) { c.auditDetails = a }
+	return func(c *writeConfig) { c.AuditDetails = a }
 }
 
 // WithLifecycleState sets the committed VERSION's lifecycle_state via the
 // `openehr-version` header (REQ-059). Empty omits the header; an
 // unrecognised code fails the write with [transport.ErrInvalidConfig].
 func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
-	return func(c *writeConfig) { c.lifecycleState = s }
+	return func(c *writeConfig) { c.LifecycleState = s }
 }
 
 // deleteConfig is the resolved option set for [Delete].
@@ -175,7 +173,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Save: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -183,24 +181,24 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, f
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Save: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("directory.Save")
 	if err != nil {
-		return nil, nil, fmt.Errorf("directory.Save: %w", err)
+		return nil, nil, err
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("directory.Save")
 	if err != nil {
-		return nil, nil, fmt.Errorf("directory.Save: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
 		Path:               basePath(ehrID),
 		Route:              routeTemplate,
 		Body:               body,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "directory", decodeFolder)
 }
 
 // Update modifies the Directory under ehrID, requiring `ifMatch` per
@@ -219,7 +217,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if folder == nil {
 		return nil, nil, fmt.Errorf("directory.Update: %w: nil Folder", transport.ErrInvalidConfig)
 	}
-	cfg := writeConfig{prefer: transport.PreferMinimal}
+	cfg := writeConfig{Prefer: transport.PreferMinimal}
 	for _, o := range opts {
 		o(&cfg)
 	}
@@ -227,13 +225,13 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	if err != nil {
 		return nil, nil, fmt.Errorf("directory.Update: marshal body: %w", err)
 	}
-	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
+	auditHeader, err := cfg.ResolveAuditHeader("directory.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("directory.Update: %w", err)
+		return nil, nil, err
 	}
-	verHeader, err := openehrclient.FormatLifecycleStateHeader(cfg.lifecycleState)
+	verHeader, err := cfg.ResolveLifecycleHeader("directory.Update")
 	if err != nil {
-		return nil, nil, fmt.Errorf("directory.Update: %w", err)
+		return nil, nil, err
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
@@ -241,11 +239,11 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		Route:              routeTemplate,
 		Body:               body,
 		IfMatch:            ifMatch,
-		Prefer:             cfg.prefer,
+		Prefer:             cfg.Prefer,
 		AuditDetailsHeader: auditHeader,
 		RMVersion:          verHeader,
 	}
-	return doWrite(ctx, c, req, cfg.prefer)
+	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "directory", decodeFolder)
 }
 
 // Delete logically deletes the Directory addressed by versionUID,
@@ -278,55 +276,19 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,
 	}
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, err
-	}
-	return openehrclient.NewVersionMetadata(resp.Metadata), nil
+	return openehrclient.DoDelete(ctx, c, req)
 }
 
-// doWrite executes a Save / Update request and decodes the response
-// body per the Prefer mode (REQ-094). Per ITS-REST OpenAPI `201_directory`
-// / `200_FOLDER_retrieved` (REQ-094), Prefer=representation decodes a
-// bare `Folder` — not an `ORIGINAL_VERSION<Folder>` envelope — and returns
-// [transport.ErrInvalidShape] on an empty body; Prefer=identifier resolves
-// the ITS-REST Identifier body into the version metadata; for minimal /
-// default the body is empty and the returned Folder pointer is nil.
-func doWrite(ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer) (*rm.Folder, *openehrclient.VersionMetadata, error) {
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		if resp != nil {
-			return nil, openehrclient.NewVersionMetadata(resp.Metadata), err
-		}
-		return nil, nil, err
+// decodeFolder decodes a Prefer=representation write response per
+// ITS-REST OpenAPI `201_directory` / `200_FOLDER_retrieved` (REQ-094):
+// the body is a bare `Folder` — not an `ORIGINAL_VERSION<Folder>`
+// envelope.
+func decodeFolder(body []byte) (*rm.Folder, error) {
+	var folder rm.Folder
+	if err := canjson.Unmarshal(body, &folder); err != nil {
+		return nil, fmt.Errorf("directory: decode Folder: %w", err)
 	}
-	meta := openehrclient.NewVersionMetadata(resp.Metadata)
-	switch prefer {
-	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
-			// REQ-094: representation MUST NOT silently downgrade to an
-			// empty body — surface it rather than returning a nil resource.
-			return nil, meta, fmt.Errorf("directory: %w: Prefer=return=representation but response body is empty", transport.ErrInvalidShape)
-		}
-		var folder rm.Folder
-		if err := canjson.Unmarshal(resp.Body, &folder); err != nil {
-			return nil, meta, fmt.Errorf("directory: decode Folder: %w", err)
-		}
-		return &folder, meta, nil
-	case transport.PreferIdentifier:
-		// REQ-094: populate the identifier slot (meta.VersionUID) from the
-		// ITS-REST Identifier body when present; never silently discard it.
-		if err := meta.ResolveIdentifierBody(resp.Body); err != nil {
-			return nil, meta, fmt.Errorf("directory: %w", err)
-		}
-		return nil, meta, nil
-	default:
-		// minimal / default: empty body expected; id is in Location/ETag.
-		return nil, meta, nil
-	}
+	return &folder, nil
 }
 
 // Repository mirrors the package-level Directory functions.
