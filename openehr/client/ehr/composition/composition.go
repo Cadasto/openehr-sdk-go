@@ -208,7 +208,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "composition", decodeComposition)
+	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
 }
 
 // Update modifies the Composition family identified by voID, attaching
@@ -270,7 +270,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 		ItemTag:            objectTags,
 		VersionItemTag:     versionTags,
 	}
-	return openehrclient.WriteResult(ctx, c, req, cfg.Prefer, "composition", decodeComposition)
+	return openehrclient.WriteResult(ctx, c, req, "composition", decodeComposition)
 }
 
 // Delete logically deletes the Composition version addressed by

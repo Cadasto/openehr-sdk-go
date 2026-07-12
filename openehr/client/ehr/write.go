@@ -14,13 +14,17 @@ import (
 // commit-time audit envelope (REQ-059), and the committed VERSION's
 // lifecycle_state (REQ-059).
 //
-// Leaf packages define their own unexported writeConfig either as a
-// type alias to WriteConfig (directory, demographic, ehrstatus — no
-// extra options) or embedding it in a resource-specific struct
-// (composition, which adds template id and item tags). Either way the
-// leaf's own WriteOption / PutOption type and With* constructors are
-// unaffected (idiom.md public-API stability); only their bodies now
-// set fields on the shared struct.
+// Leaf packages define their own unexported writeConfig struct that
+// embeds WriteConfig — either with no extra fields (directory,
+// demographic, ehrstatus) or adding resource-specific options
+// (composition, which adds template id and item tags). Embedding
+// (rather than a type alias) keeps each leaf's writeConfig a distinct,
+// unexported type, so its WriteOption / PutOption function type stays
+// opaque to external callers even though the underlying option struct
+// is structurally identical across leaves. The leaf's own WriteOption /
+// PutOption type and With* constructors are unaffected (idiom.md
+// public-API stability); only their bodies now set fields on the
+// embedded struct.
 type WriteConfig struct {
 	Prefer         transport.Prefer
 	AuditDetails   *rm.AuditDetails
@@ -54,7 +58,9 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 // WriteResult executes a Save / Update / Create / Put request and
 // decodes the response body per the Prefer state machine (REQ-094),
 // shared by the four versioned-write leaf clients (composition,
-// directory, demographic, ehrstatus):
+// directory, demographic, ehrstatus). The Prefer value that drives the
+// decode switch is read from req.Prefer — the single source of truth,
+// since it is also what was sent on the wire:
 //
 //   - PreferRepresentation decodes the bare resource body via decode.
 //     REQ-094: representation MUST NOT silently downgrade to an empty
@@ -75,7 +81,7 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 // T instantiates as an interface for demographic ([rm.Party]) — safe
 // because the zero value of an interface type is a true nil, the same
 // pattern typereg.DecodeAs[T] already relies on (REQ-024: no reflection).
-func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport.Request, prefer transport.Prefer, label string, decode func([]byte) (T, error)) (T, *VersionMetadata, error) {
+func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport.Request, label string, decode func([]byte) (T, error)) (T, *VersionMetadata, error) {
 	var zero T
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -85,7 +91,7 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 		return zero, nil, err
 	}
 	meta := NewVersionMetadata(resp.Metadata)
-	switch prefer {
+	switch req.Prefer {
 	case transport.PreferRepresentation:
 		if len(resp.Body) == 0 {
 			return zero, meta, fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape)
