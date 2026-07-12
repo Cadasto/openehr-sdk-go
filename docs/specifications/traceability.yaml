@@ -81,6 +81,7 @@ requirements:
     tests:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/serialize/canxml/decode_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
 
