@@ -10,6 +10,15 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-13
+
+Sixteenth `v0.x` minor — closes two consumer-filed gaps: REST path parameters are now percent-encoded exactly once (fixing a real 404 for ids containing a space, e.g. a spaced template id) and a class standing predicate exposes its relative path as structured segments. Additive API — the only integrator-visible change is the corrected single-encoded wire URL for an id carrying a percent-encodable character; safe to upgrade.
+
+### Added
+
+- **Single-encoded REST path parameters (REQ-095).** Every `openehr/client` leaf client now interpolates the raw id and lets the transport — the single canonical path encoder — escape it once, fixing a double-encode that 404'd template ids containing a space; guarded tree-wide against re-introduction.
+- **Structured class-predicate path (REQ-113).** A class standing predicate's `Comparison.ParsedPath` is now populated with an empty alias and structured segments, mirroring the WHERE side, so a consumer reads the relative path's segments without re-splitting the raw `Path`.
+
 ## [0.15.0] - 2026-07-12
 
 Fifteenth `v0.x` minor — internal consolidation onto generated and shared surfaces: a generated LOCATABLE identity surface + reverse type registry (ADR 0013; REQ-031/040), the `rm.ObjectIDValue` lexical helper (REQ-120), and shared versioned-write client plumbing (REQ-094). Additive only — no integrator-visible behaviour or API break from v0.14.0; safe to upgrade.
