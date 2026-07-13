@@ -171,8 +171,8 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 	// Tolerate absolute and relative forms. Strip scheme+host if present,
 	// then take the last two non-empty path segments — `{name}` and
-	// `{version}`. PathEscape on the way in is reversed by PathUnescape on
-	// the way out so the returned values match the caller's input forms.
+	// `{version}` — decoding each below (the server MAY percent-encode the
+	// Location; the client itself now sends the raw id — REQ-095).
 	p := loc
 	if u, err := url.Parse(loc); err == nil && u.Path != "" {
 		p = u.Path
@@ -199,8 +199,9 @@ func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 	if qi < 0 || qi+2 != len(clean)-1 {
 		return "", "", false
 	}
-	// PathEscape on the way in is reversed by PathUnescape on the way out so
-	// the returned values match the caller's input forms.
+	// Decode each segment defensively: a server MAY percent-encode the
+	// Location even though the client sends the raw id (REQ-095); PathUnescape
+	// is a no-op for an already-decoded segment.
 	n, err := url.PathUnescape(clean[qi+1])
 	if err != nil {
 		n = clean[qi+1]

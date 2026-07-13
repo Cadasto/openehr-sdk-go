@@ -1,7 +1,7 @@
 # Plan — path-parameter encoding fix + class-predicate ParsedPath
 
 **Date:** 2026-07-13
-**Status:** In progress
+**Status:** In review (PR #74)
 **Owner:** SDK maintainers
 **Covers:**
 - **REQ-095** (OpenAPI authoritative source — [wire.md](../specifications/wire.md#req-095)): a defect fix. The SDK's request path MUST conform to the OAS path template, which requires each path parameter to be percent-encoded **exactly once**. Today several leaf clients pre-escape with `url.PathEscape` into `transport.Request.Path`, which the transport re-encodes — a double-encode that 404s any id with an encodable character (e.g. a space in a template id).
@@ -49,7 +49,7 @@ Two gaps filed by the consuming CDR project against SDK v0.14.0:
 
 ## Definition of Done
 
-- [ ] All new tests pass; `make ci` green (includes `spec-check`, codegen/aqlgen drift, race).
-- [ ] `traceability.yaml` updated; `make spec-check` clean.
-- [ ] No `url.PathEscape` into `Request.Path` in the definition/query clients; guard test enforces it.
-- [ ] Round-trip: upload a spaced-id template → `GetTemplate` by that id → 200 with body (was 404).
+- [x] All new tests pass; `make ci` green (includes `spec-check`, codegen/aqlgen drift, race).
+- [x] `traceability.yaml` updated; `make spec-check` clean.
+- [x] No `url.PathEscape` into `Request.Path` in any `openehr/client` leaf client; `TestNoPathEscapeInClientPathParams` enforces it tree-wide.
+- [x] Round-trip: upload a spaced-id template → `GetTemplate` by that id → 200 with body (was 404).
