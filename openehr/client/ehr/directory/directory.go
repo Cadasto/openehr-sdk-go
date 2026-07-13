@@ -19,7 +19,7 @@ const (
 )
 
 func basePath(ehrID openehrclient.EHRID) string {
-	return "/ehr/" + url.PathEscape(string(ehrID)) + "/directory"
+	return "/ehr/" + string(ehrID) + "/directory"
 }
 
 // getConfig is the resolved option set for the directory GET operations.
@@ -103,7 +103,7 @@ func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   basePath(ehrID) + "/" + url.PathEscape(string(versionUID)),
+		Path:   basePath(ehrID) + "/" + string(versionUID),
 		Route:  routeVersioned,
 	}
 	applyPath(req, opts)

@@ -31,6 +31,8 @@ Pinned source: `https://github.com/openEHR/specifications-ITS-REST/tree/master/c
 
 When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the prose is updated, not the wire behaviour.
 
+**Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. openEHR ids (template ids, archetype ids, qualified query names) contain no `/`, so a decoded path round-trips through `String()` correctly; an id that could itself contain a path separator would require the caller to set `url.URL.RawPath` (the encoded hint), which the transport does not do today. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
+
 ## REST version pin
 
 ### REQ-050

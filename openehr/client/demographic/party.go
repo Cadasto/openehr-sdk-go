@@ -83,7 +83,7 @@ func Get(ctx context.Context, c *transport.Client, t Type, ref openehrclient.Ref
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   basePath(t) + "/" + url.PathEscape(seg),
+		Path:   basePath(t) + "/" + seg,
 		Route:  basePath(t) + "/{uid_based_id}",
 	}
 	if qk, qv := ref.Query(); qk != "" {
@@ -206,7 +206,7 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
-		Path:               basePath(t) + "/" + url.PathEscape(string(voID)),
+		Path:               basePath(t) + "/" + string(voID),
 		Route:              basePath(t) + "/{uid_based_id}",
 		Body:               body,
 		IfMatch:            ifMatch,
@@ -260,7 +260,7 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 	}
 	req := &transport.Request{
 		Method:             http.MethodDelete,
-		Path:               basePath(t) + "/" + url.PathEscape(string(versionUID)),
+		Path:               basePath(t) + "/" + string(versionUID),
 		Route:              basePath(t) + "/{version_uid}",
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,

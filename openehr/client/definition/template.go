@@ -239,7 +239,7 @@ func GetTemplate(ctx context.Context, c *transport.Client, templateID string, fo
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID),
+		Path:   "/definition/template/" + format.PathSegment() + "/" + templateID,
 		Route:  "/definition/template/{format}/{template_id}",
 		Accept: "application/xml",
 	}
@@ -302,7 +302,7 @@ func DeleteTemplate(ctx context.Context, c *transport.Client, templateID string,
 	}
 	req := &transport.Request{
 		Method: http.MethodDelete,
-		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID),
+		Path:   "/definition/template/" + format.PathSegment() + "/" + templateID,
 		Route:  "/definition/template/{format}/{template_id}",
 	}
 	resp, err := c.Do(ctx, req)
@@ -414,7 +414,7 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/template/" + format.PathSegment() + "/" + url.PathEscape(templateID) + "/example",
+		Path:   "/definition/template/" + format.PathSegment() + "/" + templateID + "/example",
 		Route:  "/definition/template/{format}/{template_id}/example",
 		Accept: "application/json",
 	}

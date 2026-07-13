@@ -24,6 +24,15 @@ type Request struct {
 	// Path is the path segment appended to the resolved service
 	// base URL. MUST begin with "/". Path parameters are caller-
 	// substituted; the transport does not perform path templating.
+	//
+	// Path is a DECODED path (net/url [url.URL.Path] semantics): the
+	// transport is the single canonical path encoder and percent-encodes
+	// it exactly once via [url.URL.String]. Callers MUST interpolate raw,
+	// decoded path parameters (e.g. a template id `Referral Request.v1`)
+	// and MUST NOT pre-escape them with [url.PathEscape] — doing so
+	// double-encodes (` ` → `%20` → `%2520`) and 404s. openEHR ids
+	// (template ids, archetype ids, qualified query names) contain no `/`,
+	// so a decoded path round-trips correctly.
 	Path string
 	// Route is the optional path template used for OTel span naming
 	// and error attribution (e.g. "/ehr/{ehr_id}/composition"). When
