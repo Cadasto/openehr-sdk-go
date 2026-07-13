@@ -87,6 +87,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) | landed |
 | REQ-104 | Slot assertion grammar | [clinical-modeling.md § REQ-104](clinical-modeling.md#req-104--slot-assertion-grammar) | landed |
 | REQ-105 | Terminology bindings | [clinical-modeling.md § REQ-105](clinical-modeling.md#req-105--terminology-bindings) | landed |
+| REQ-106 | WebTemplate JSON export | [clinical-modeling.md § REQ-106](clinical-modeling.md#req-106--webtemplate-json-export) | planned |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | landed |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) | landed |
 | REQ-109 | AQL static lint | [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) | landed |

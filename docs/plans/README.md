@@ -11,7 +11,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 | Plan | Scope | Covers REQs / probes |
 |---|---|---|
 | [2026-06-23-simplified-formats.md](2026-06-23-simplified-formats.md) | Umbrella — shared simplified-template model → WebTemplate JSON export + FLAT/STRUCTURED codecs | REQ-053, proposed REQ-106; PROBE-075/076 |
-| [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md) | WebTemplate JSON export — umbrella Phase 2 (deferred) | proposed REQ-106; PROBE-075 |
+| [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md) | WebTemplate JSON export — **active (direct slice)**; shared-model extraction deferred to REQ-053 | REQ-106; PROBE-075; ADR-0014 |
 
 The Phase 2 clinical-building-blocks umbrella **landed and was archived** ([archive/2026-05-21-phase-2-clinical-building-blocks.md](archive/2026-05-21-phase-2-clinical-building-blocks.md)); its remaining deferred scope (simplified formats) is now sequenced by the umbrella above. The two AQL plans also landed and moved to `archive/` — AQL builders ([REQ-055](archive/2026-05-21-aql-builders.md)) and AQL parse + lint ([REQ-109](archive/2026-06-15-aql-lint.md)).
 

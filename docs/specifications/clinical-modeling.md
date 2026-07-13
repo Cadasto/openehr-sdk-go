@@ -681,6 +681,56 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
 - **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 
+## REQ-106 — WebTemplate JSON export
+
+**WebTemplate** is a consumer-facing, UI-oriented projection of an operational template: a lossy, flattened JSON view listing each node's stable `id`, cardinality, AQL path, and the leaf **inputs** a form must render. It is a **vendor de-facto** serialisation (Better → EHRbase), **not** a normative openEHR artefact — only the downstream FLAT/STRUCTURED *serialization* it enables is standardised (ITS-REST Simplified Formats). The SDK treats it as a public contract it MUST keep stable for consumers, mirrored from a single locked reference implementation ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+
+The SDK **MUST** provide a WebTemplate JSON export that projects a compiled operational template — the public `*templatecompile.Compiled` (REQ-111) — into the **EHRbase `openEHR_SDK` v2.3** WebTemplate shape. The export **MUST** consume only the compiled form (never `.oet` / `.opt` / `.t.json` authoring artefacts) and **MUST NOT** mutate it.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate
+
+// Build projects a compiled OPT into the typed WebTemplate tree.
+func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error)
+
+// Marshal is Build followed by deterministic JSON encoding.
+func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
+
+type Option func(*config) // e.g. default-language / languages / version overrides
+```
+
+`Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path. A nil or empty compiled input, or an unresolvable default language, **MUST** return an error (never panic).
+
+### Output shape
+
+The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `defaultLanguage`, `languages`, and a `tree` of nodes. Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`. JSON field names are camelCase. Encoding **MUST** be deterministic: the same compiled template **MUST** produce byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
+
+The exported tree **MUST** retain the structural Reference Model nodes (e.g. `HISTORY` / `EVENT` / `ITEM_TREE`) — it is a structural mirror of the compiled OPT. "Level removal" (collapsing structural nodes into FLAT path keys) is a property of the FLAT/STRUCTURED path grammar (REQ-053), **not** of the WebTemplate tree.
+
+### `id` generation (ADR 0014)
+
+The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name, with the reference's sibling-disambiguation rule when two siblings would collide. The exact normalisation and disambiguation are **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling.
+
+### `inputs` (core clinical subset)
+
+Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map to `inputs[]` for the core clinical datatypes: `DV_TEXT` (one `TEXT` input), `DV_CODED_TEXT` (a `code` CODED_TEXT input with `list` / `listOpen` / `terminology`), `DV_QUANTITY` (`magnitude` DECIMAL + `unit` CODED_TEXT with validation), `DV_COUNT` (INTEGER/COUNT), `DV_ORDINAL` (an ordinal `list`), `DV_DATE_TIME` / `DV_DATE` / `DV_TIME` (temporal with pattern validation), `DV_BOOLEAN` (BOOLEAN), and `DV_PROPORTION` (`numerator` + `denominator`). Datatypes outside this subset (e.g. `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_INTERVAL`) **MUST** emit the node **without** `inputs` and **MUST NOT** error — the omission is a documented gap, recorded so consumers can distinguish "no inputs" from "unsupported".
+
+### Conformance and deviations
+
+Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type`, against a **documented-deviations list**. Field ordering, absent optional fields, localized-string packaging, and known id edge cases are recorded deviations, not failures; any structural difference **not** on the list is a failure.
+
+The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md)).
+
+### Building-block independence (REQ-013)
+
+`openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template` (OPT metadata), `openehr/rm/rminfo`, and the standard library only.
+
+- **Lives in:** `openehr/template/webtemplate/` (planned).
+- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `corona_anamnese` fixture (or its recorded deferral if the fixture fetch is blocked). Catalogued in [`conformance.md`](conformance.md).
+- **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/2026-05-22-webtemplate-export.md).
+
 ## REQ-112 — Template-less Reference Model validation floor
 
 The validators introduced by REQ-102 and generalised by REQ-110 are **template-driven** — every entry point accepts a `*templatecompile.Compiled` as the authoritative driver. A consumer persisting RM roots that bind to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) has no SDK call to assert RM conformance. The strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision<0`.
