@@ -1,13 +1,186 @@
 package webtemplate
 
-import "github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+import (
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+)
 
-// inputsFor maps a compiled value node's primitive constraint to the
-// WebTemplate inputs for the core clinical datatype subset (REQ-106).
-//
-// TODO(Task 7): implement the per-datatype mapping. Returns nil for now so
-// the tree structure can be validated independently of inputs.
+// inputsFor maps a compiled value node to the WebTemplate inputs for the
+// core clinical datatype subset (REQ-106). Input suffix and type mirror the
+// EHRbase v2.3 reference exactly; list values, terminology and numeric-range
+// validation are populated where the constraint carries them. Deeper input
+// contents (date patterns, default values, duration/precision ranges,
+// per-unit validation, term bindings) are documented deviations — see
+// deviations.md.
 func inputsFor(v *templatecompile.CompiledNode) []Input {
-	_ = v
+	switch v.RMTypeName() {
+	case "DV_TEXT":
+		return []Input{{Type: "TEXT"}}
+	case "DV_CODED_TEXT":
+		return codedTextInputs(v)
+	case "DV_QUANTITY":
+		return quantityInputs(v)
+	case "DV_COUNT":
+		return []Input{{Type: "INTEGER", Validation: rangeValidation(childConstraint[constraints.CInteger](v, "magnitude").Range)}}
+	case "DV_ORDINAL":
+		return ordinalInputs(v)
+	case "DV_DATE_TIME":
+		return []Input{{Type: "DATETIME"}}
+	case "DV_DATE":
+		return []Input{{Type: "DATE"}}
+	case "DV_TIME":
+		return []Input{{Type: "TIME"}}
+	case "DV_BOOLEAN":
+		return []Input{{Type: "BOOLEAN"}}
+	case "DV_DURATION":
+		return durationInputs()
+	case "DV_PROPORTION":
+		return proportionInputs(v)
+	case "PARTY_PROXY":
+		return partyProxyInputs()
+	}
 	return nil
+}
+
+// codedTextInputs emits the single "code" input for DV_CODED_TEXT. The
+// C_CODE_PHRASE constraint lives on the value node's defining_code child.
+func codedTextInputs(v *templatecompile.CompiledNode) []Input {
+	in := Input{Suffix: "code", Type: "CODED_TEXT"}
+	dc := childNode(v, "defining_code")
+	if dc == nil {
+		in.ListOpen = true
+		return []Input{in}
+	}
+	cp, ok := dc.PrimitiveConstraint().(constraints.CodePhrase)
+	if !ok {
+		in.ListOpen = true
+		return []Input{in}
+	}
+	in.Terminology = cp.Terminology
+	if len(cp.CodeList) == 0 {
+		in.ListOpen = true
+		return []Input{in}
+	}
+	for _, code := range cp.CodeList {
+		in.List = append(in.List, listItem(v, code))
+	}
+	return []Input{in}
+}
+
+// quantityInputs emits the magnitude (DECIMAL) + unit (CODED_TEXT) pair.
+func quantityInputs(v *templatecompile.CompiledNode) []Input {
+	mag := Input{Suffix: "magnitude", Type: "DECIMAL"}
+	unit := Input{Suffix: "unit", Type: "CODED_TEXT"}
+	if dq, ok := v.PrimitiveConstraint().(constraints.DvQuantity); ok {
+		for _, u := range dq.Units {
+			unit.List = append(unit.List, InputListItem{Value: u.Units, Label: u.Units})
+		}
+		if len(dq.Units) == 1 {
+			mag.Validation = rangeValidation(dq.Units[0].Magnitude)
+		}
+	}
+	return []Input{mag, unit}
+}
+
+// ordinalInputs emits the single CODED_TEXT input carrying the ordinal list.
+func ordinalInputs(v *templatecompile.CompiledNode) []Input {
+	in := Input{Type: "CODED_TEXT"}
+	if ord, ok := v.PrimitiveConstraint().(constraints.CDvOrdinal); ok {
+		for _, sym := range ord.Values {
+			item := listItem(v, sym.Symbol.CodeString)
+			ordinal := sym.Value
+			item.Ordinal = &ordinal
+			in.List = append(in.List, item)
+		}
+	}
+	return []Input{in}
+}
+
+// durationInputs emits the seven fixed INTEGER duration fields.
+func durationInputs() []Input {
+	fields := []string{"year", "month", "day", "week", "hour", "minute", "second"}
+	out := make([]Input, 0, len(fields))
+	for _, f := range fields {
+		out = append(out, Input{Suffix: f, Type: "INTEGER"})
+	}
+	return out
+}
+
+// proportionInputs emits the numerator + denominator DECIMAL pair.
+func proportionInputs(v *templatecompile.CompiledNode) []Input {
+	num := Input{Suffix: "numerator", Type: "DECIMAL", Validation: rangeValidation(childConstraint[constraints.CReal](v, "numerator").Range)}
+	den := Input{Suffix: "denominator", Type: "DECIMAL", Validation: rangeValidation(childConstraint[constraints.CReal](v, "denominator").Range)}
+	return []Input{num, den}
+}
+
+// partyProxyInputs emits the four fixed TEXT identity inputs.
+func partyProxyInputs() []Input {
+	return []Input{
+		{Suffix: "id", Type: "TEXT"},
+		{Suffix: "id_scheme", Type: "TEXT"},
+		{Suffix: "id_namespace", Type: "TEXT"},
+		{Suffix: "name", Type: "TEXT"},
+	}
+}
+
+// listItem builds a coded list entry, resolving the code's label and
+// localized text from the archetype terms attached to the value node.
+func listItem(v *templatecompile.CompiledNode, code string) InputListItem {
+	item := InputListItem{Value: code}
+	if t, ok := v.Term(code, ""); ok {
+		item.Label = t.Items["text"]
+	}
+	return item
+}
+
+// childNode returns the first child of v reached through attribute attr.
+func childNode(v *templatecompile.CompiledNode, attr string) *templatecompile.CompiledNode {
+	a := v.Attribute(attr)
+	if a == nil {
+		return nil
+	}
+	if cs := a.Children(); len(cs) > 0 {
+		return cs[0]
+	}
+	return nil
+}
+
+// childConstraint returns the typed primitive constraint on v's child reached
+// through attribute attr, or the zero value when absent.
+func childConstraint[T any](v *templatecompile.CompiledNode, attr string) T {
+	var zero T
+	c := childNode(v, attr)
+	if c == nil {
+		return zero
+	}
+	if pc, ok := c.PrimitiveConstraint().(T); ok {
+		return pc
+	}
+	return zero
+}
+
+// rangeValidation converts a numeric range constraint into input validation,
+// or nil when the range is unbounded on both sides.
+func rangeValidation(nr constraints.NumericRange) *Validation {
+	if nr.LowerUnbounded && nr.UpperUnbounded {
+		return nil
+	}
+	r := &Range{}
+	if !nr.LowerUnbounded {
+		lo := nr.Lower
+		r.Min = &lo
+		r.MinOp = ">"
+		if nr.LowerInclusive {
+			r.MinOp = ">="
+		}
+	}
+	if !nr.UpperUnbounded {
+		hi := nr.Upper
+		r.Max = &hi
+		r.MaxOp = "<"
+		if nr.UpperInclusive {
+			r.MaxOp = "<="
+		}
+	}
+	return &Validation{Range: r}
 }
