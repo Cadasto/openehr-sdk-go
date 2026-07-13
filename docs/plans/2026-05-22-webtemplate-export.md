@@ -355,6 +355,8 @@ git commit -m "test(webtemplate): vendor EHRbase constrain_test parity fixture (
 
 #### Task 3: Build the tree (rmType / nodeId / aqlPath / min / max)
 
+> **Corrected transform model (empirically derived from the `constrain_test` reference).** EHRbase's WebTemplate tree is **not** a structural mirror. `build.go` MUST implement, per [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) "Output shape": (a) **keep** COMPOSITION / ENTRY types / EVENT / INTERVAL_EVENT / EVENT_CONTEXT / CLUSTER; (b) **collapse** each ELEMENT into a value leaf (`rmType`=value type, `nodeId`=element at-code, `aqlPath`=element path + `/value`); (c) **drop** HISTORY / ITEM_TREE / ITEM_LIST / ITEM_STRUCTURE as nodes, **folding their `attr[predicate]` into the descendants' `aqlPath`**; (d) emit data-bearing RM attributes (context `start_time`/`setting`, event `time`, entry `language`/`encoding`/`subject`, interval_event `math_function`/`width`) as leaves with `id`=attribute name. The reference `aqlPath` carries every archetype-id/at-code predicate and **differs from our compiled `AQLPath()`** — reconstruct it during the walk. The naive `buildNode` snippet below is superseded by this model; drive the implementation against the vendored reference (parity test) rather than the illustrative code.
+
 **Files:**
 - Create: `openehr/template/webtemplate/build.go`
 - Test: `openehr/template/webtemplate/build_test.go`
