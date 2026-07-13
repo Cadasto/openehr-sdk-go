@@ -82,6 +82,41 @@ func TestWhereComparisonStructuredPath(t *testing.T) {
 	}
 }
 
+// TestStandingPredicateParsedPath is the REQ-113 completeness case: a class
+// standing predicate's relative left-hand path is exposed as structured
+// segments with an empty Alias (a relative predicate path binds no FROM
+// alias), so a consumer reads the segments without re-splitting the raw
+// Comparison.Path string — the WHERE-side symmetry for the class-predicate LHS.
+func TestStandingPredicateParsedPath(t *testing.T) {
+	q, err := parse.ParseQuery(standingPredicateQuery)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	pc := q.From.Root.PredicateComparison
+	if pc == nil {
+		t.Fatalf("EHR standing predicate not structured; Predicate=%q", q.From.Root.Predicate)
+	}
+	if pc.ParsedPath == nil {
+		t.Fatalf("class-predicate ParsedPath nil; Path=%q", pc.Path)
+	}
+	pp := pc.ParsedPath
+	if pp.Alias != "" {
+		t.Errorf("ParsedPath.Alias = %q, want empty (a relative predicate path binds no alias)", pp.Alias)
+	}
+	if len(pp.Segments) != 2 {
+		t.Fatalf("ParsedPath.Segments len = %d, want 2 (%+v)", len(pp.Segments), pp.Segments)
+	}
+	if got := pp.Segments[0]; got.Name != "ehr_id" || got.Predicate != "" {
+		t.Errorf("Segments[0] = %+v, want {ehr_id}", got)
+	}
+	if got := pp.Segments[1]; got.Name != "value" || got.Predicate != "" {
+		t.Errorf("Segments[1] = %+v, want {value}", got)
+	}
+	if pc.Path != pp.Raw {
+		t.Errorf("Comparison.Path %q != ParsedPath.Raw %q (must agree)", pc.Path, pp.Raw)
+	}
+}
+
 // TestClassArchetypePredicateNotComparison confirms a non-comparison class
 // predicate (an archetype HRID) is distinguishable: PredicateComparison is
 // nil and the HRID lives on Archetype.
@@ -145,5 +180,9 @@ func TestStandingPredicateLiteralValue(t *testing.T) {
 	sv, ok := pc.Val.(aql.StringValue)
 	if !ok || sv.S != "Vital signs" {
 		t.Errorf("PredicateComparison.Val = %#v, want StringValue{Vital signs}", pc.Val)
+	}
+	if pc.ParsedPath == nil || len(pc.ParsedPath.Segments) != 2 ||
+		pc.ParsedPath.Segments[0].Name != "name" || pc.ParsedPath.Segments[1].Name != "value" {
+		t.Errorf("PredicateComparison.ParsedPath = %+v, want segments [name value]", pc.ParsedPath)
 	}
 }

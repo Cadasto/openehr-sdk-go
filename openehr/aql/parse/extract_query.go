@@ -561,18 +561,32 @@ func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) Identifi
 		ip.Predicate = trimBrackets(pp.GetText())
 	}
 	if op := c.ObjectPath(); op != nil {
-		for _, part := range op.AllPathPart() {
-			seg := PathSegment{}
-			if id := part.IDENTIFIER(); id != nil {
-				seg.Name = id.GetText()
-			}
-			if pp := part.PathPredicate(); pp != nil {
-				seg.Predicate = trimBrackets(pp.GetText())
-			}
-			ip.Segments = append(ip.Segments, seg)
-		}
+		ip.Segments = segmentsFromObjectPath(op)
 	}
 	return ip
+}
+
+// segmentsFromObjectPath decomposes a relative objectPath (the path steps after
+// any alias root) into the shared path-segment vocabulary — the loop shared by
+// extractIdentifiedPath (alias-qualified SELECT/WHERE/ORDER BY paths) and
+// standingComparison (a class-predicate relative path). Returns nil for a nil
+// objectPath.
+func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
+	if op == nil {
+		return nil
+	}
+	var segs []aql.PathSegment
+	for _, part := range op.AllPathPart() {
+		seg := aql.PathSegment{}
+		if id := part.IDENTIFIER(); id != nil {
+			seg.Name = id.GetText()
+		}
+		if pp := part.PathPredicate(); pp != nil {
+			seg.Predicate = trimBrackets(pp.GetText())
+		}
+		segs = append(segs, seg)
+	}
+	return segs
 }
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
@@ -583,9 +597,10 @@ func pathRaw(c gen.IIdentifiedPathContext) string {
 // (`objectPath <op> operand`) into an [*aql.Comparison] for REQ-113, or
 // nil when the predicate is absent or its RHS operand is not a scalar value
 // (an objectPath / node-code operand). Path is the relative object path as
-// written; ParsedPath is left nil (a class predicate path has no alias to
-// structure). The verbatim [ClassExpr.Predicate] text remains the round-trip
-// source regardless.
+// written; ParsedPath carries its decomposed Segments with an empty Alias —
+// the class-predicate path binds no FROM alias, but its steps are structured
+// so a consumer need not re-split Path (the WHERE-side symmetry). The verbatim
+// [ClassExpr.Predicate] text remains the round-trip source regardless.
 func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if sp == nil {
 		return nil
@@ -598,7 +613,9 @@ func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if v == nil {
 		return nil
 	}
-	return &aql.Comparison{Path: op.GetText(), Op: aql.Operator(cmp.GetText()), Val: v}
+	raw := op.GetText()
+	parsed := aql.IdentifiedPath{Segments: segmentsFromObjectPath(op), Raw: raw}
+	return &aql.Comparison{Path: raw, Op: aql.Operator(cmp.GetText()), Val: v, ParsedPath: &parsed}
 }
 
 // pathPredicateOperandValue lifts a standing-predicate RHS operand into an

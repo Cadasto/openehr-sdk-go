@@ -81,8 +81,10 @@ type ClassExpr struct {
 	// nil for an archetype HRID (see [Archetype]), a version predicate, or
 	// a non-scalar / complex standing predicate — the verbatim [Predicate]
 	// text stays authoritative there. The comparison's Path is the relative
-	// object path as written; its ParsedPath is not populated (a class
-	// predicate path is relative, with no alias to structure).
+	// object path as written, and its ParsedPath carries the same path's
+	// structured Segments with an empty Alias (a relative predicate path
+	// binds no FROM alias) — the WHERE-side symmetry for the class-predicate
+	// left-hand side.
 	PredicateComparison *aql.Comparison
 	// Pos is the source position of the class expression.
 	Pos Position
