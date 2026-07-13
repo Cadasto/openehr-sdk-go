@@ -12,10 +12,6 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -163,36 +159,4 @@ func TestStoredQueryPathSingleEncoded(t *testing.T) {
 			t.Errorf("wire path = %q, want %q (single-encoded)", escaped, wantGetEscaped)
 		}
 	})
-}
-
-// TestNoPathEscapeInPathParams is the REQ-095 guard: no non-test source in the
-// definition or query clients may pre-escape a path parameter with
-// url.PathEscape — the transport is the single canonical path encoder.
-// (url.PathUnescape, used to decode a server Location header, is allowed.)
-func TestNoPathEscapeInPathParams(t *testing.T) {
-	_, self, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
-	}
-	clientDir := filepath.Dir(filepath.Dir(self)) // .../openehr/client
-	for _, pkg := range []string{"definition", "query"} {
-		dir := filepath.Join(clientDir, pkg)
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			t.Fatalf("read %s: %v", dir, err)
-		}
-		for _, e := range entries {
-			name := e.Name()
-			if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-				continue
-			}
-			b, err := os.ReadFile(filepath.Join(dir, name))
-			if err != nil {
-				t.Fatal(err)
-			}
-			if bytes.Contains(b, []byte("url.PathEscape(")) {
-				t.Errorf("%s/%s calls url.PathEscape into a request path; interpolate the raw id and let the transport encode once (REQ-095)", pkg, name)
-			}
-		}
-	}
 }

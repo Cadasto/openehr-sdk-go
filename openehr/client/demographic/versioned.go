@@ -19,7 +19,7 @@ import (
 // container keyed by the versioned-object uid, with revision-history and
 // per-version sub-paths. All four endpoints are GET-only.
 func versionedBase(voUID openehrclient.VersionedObjectID) string {
-	return "/demographic/versioned_party/" + url.PathEscape(string(voUID))
+	return "/demographic/versioned_party/" + string(voUID)
 }
 
 const (
@@ -144,7 +144,7 @@ func GetVersionByID(ctx context.Context, c *transport.Client, voUID openehrclien
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   versionedBase(voUID) + "/version/" + url.PathEscape(string(versionUID)),
+		Path:   versionedBase(voUID) + "/version/" + string(versionUID),
 		Route:  routeVersionByID,
 	}
 	return getVersion(ctx, c, req)

@@ -16,7 +16,7 @@ import (
 // basePath returns the per-EHR EHR_STATUS base path. Kept local so the
 // route template emitted on OTel spans is stable.
 func basePath(ehrID openehrclient.EHRID) string {
-	return "/ehr/" + url.PathEscape(string(ehrID)) + "/ehr_status"
+	return "/ehr/" + string(ehrID) + "/ehr_status"
 }
 
 const (
@@ -74,7 +74,7 @@ func GetVersioned(ctx context.Context, c *transport.Client, ehrID openehrclient.
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   basePath(ehrID) + "/" + url.PathEscape(string(versionUID)),
+		Path:   basePath(ehrID) + "/" + string(versionUID),
 		Route:  routeVersioned,
 	}
 	return decode(ctx, c, req)

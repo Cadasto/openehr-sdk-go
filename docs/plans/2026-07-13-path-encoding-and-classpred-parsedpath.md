@@ -12,7 +12,7 @@
 **Depends on:** REQ-113 landed (PR #58); REQ-055/057 stored-query + definition clients landed.
 
 **Defers / out of scope:**
-- The `ehr` / `composition` / `admin` / `demographic` / `directory` clients share the same `url.PathEscape`-into-`Request.Path` pattern, but their ids are UUIDs / `::`-delimited OBJECT_VERSION_IDs carrying no encodable character, so the double-encode is **latent** there (same status as the stored-query names before this fix). They are not in REQ-095's documented scope for this change; a follow-up may retire the pattern repo-wide once the decoded-`Request.Path` contract is settled.
+- ~~The `ehr` / `composition` / `admin` / `demographic` / `directory` clients share the same `url.PathEscape`-into-`Request.Path` pattern~~ — **done in the follow-up** (commit 3): the pre-escape pattern is now retired across *every* `openehr/client` leaf client (UUID / `::`-delimited `OBJECT_VERSION_ID` ids carry no `/`, so the decoded path round-trips). Enforced tree-wide by `TestNoPathEscapeInClientPathParams`.
 - Ids that legitimately contain a literal `/` (would need `RawPath`) — openEHR ids (template ids, archetype ids, qualified query names) do not contain `/`, so the minimal decoded-path contract round-trips correctly.
 - Alias resolution / binding the relative class-predicate path to a concrete RM type — the consumer's job.
 

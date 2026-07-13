@@ -332,7 +332,7 @@ requirements:
     canonical: docs/specifications/wire.md#req-095
     status: draft
     implementation: partial
-    packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution, transport, openehr/client/definition, openehr/client/query]
+    packages: [testkit/cassettes/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
     probes: [PROBE-072]
     plans:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
@@ -340,17 +340,21 @@ requirements:
     notes: >
       Path-parameter encoding: the transport is the single canonical path
       encoder (Request.Path is a decoded url.URL.Path); leaf clients interpolate
-      the raw id and MUST NOT pre-escape with url.PathEscape. Fixed the
-      definition (template + stored_query) and query clients that double-encoded
-      an id with an encodable character (a space → %2520 → 404); guarded by
-      TestNoPathEscapeInPathParams.
+      the raw id and MUST NOT pre-escape with url.PathEscape (which double-encodes
+      an id carrying an encodable character: a space → %2520 → 404). Retired the
+      pre-escape pattern across every openehr/client leaf client; enforced
+      tree-wide by TestNoPathEscapeInClientPathParams (openehr/client) and pinned
+      behaviourally by per-client single-encode tests.
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
       - transport/path_encoding_test.go
+      - openehr/client/pathencoding_guard_test.go
       - openehr/client/definition/path_encoding_test.go
       - openehr/client/query/path_encoding_test.go
+      - openehr/client/ehr/path_encoding_test.go
+      - openehr/client/ehr/composition/path_encoding_test.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"

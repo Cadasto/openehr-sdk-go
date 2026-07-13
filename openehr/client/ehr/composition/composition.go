@@ -46,7 +46,7 @@ func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, re
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(seg),
+		Path:   "/ehr/" + string(ehrID) + "/composition/" + seg,
 		Route:  routeTemplate,
 	}
 	if qk, qv := ref.Query(); qk != "" {
@@ -198,7 +198,7 @@ func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, c
 	}
 	req := &transport.Request{
 		Method:             http.MethodPost,
-		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition",
+		Path:               "/ehr/" + string(ehrID) + "/composition",
 		Route:              "/ehr/{ehr_id}/composition",
 		Body:               body,
 		Prefer:             cfg.Prefer,
@@ -259,7 +259,7 @@ func Update(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	}
 	req := &transport.Request{
 		Method:             http.MethodPut,
-		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(voID)),
+		Path:               "/ehr/" + string(ehrID) + "/composition/" + string(voID),
 		Route:              "/ehr/{ehr_id}/composition/{versioned_object_id}",
 		Body:               body,
 		IfMatch:            ifMatch,
@@ -299,7 +299,7 @@ func Delete(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	}
 	req := &transport.Request{
 		Method:             http.MethodDelete,
-		Path:               "/ehr/" + url.PathEscape(string(ehrID)) + "/composition/" + url.PathEscape(string(versionUID)),
+		Path:               "/ehr/" + string(ehrID) + "/composition/" + string(versionUID),
 		Route:              "/ehr/{ehr_id}/composition/{version_uid}",
 		IfMatch:            ifMatch,
 		AuditDetailsHeader: auditHeader,

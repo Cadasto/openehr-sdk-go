@@ -21,7 +21,7 @@ func DeleteEHR(ctx context.Context, c *transport.Client, id ehr.EHRID) error {
 	}
 	_, err := c.Do(ctx, &transport.Request{
 		Method: http.MethodDelete,
-		Path:   "/admin/ehr/" + url.PathEscape(string(id)),
+		Path:   "/admin/ehr/" + string(id),
 		Route:  "/admin/ehr/{ehr_id}",
 	})
 	return err

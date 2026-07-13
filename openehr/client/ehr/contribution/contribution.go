@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -65,7 +64,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	}
 	req := &transport.Request{
 		Method: http.MethodPost,
-		Path:   "/ehr/" + url.PathEscape(string(ehrID)) + "/contribution",
+		Path:   "/ehr/" + string(ehrID) + "/contribution",
 		Route:  routeTemplate,
 		Body:   body,
 		Prefer: cfg.prefer,
