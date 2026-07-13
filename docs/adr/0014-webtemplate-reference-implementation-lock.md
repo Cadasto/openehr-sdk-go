@@ -1,6 +1,6 @@
 # ADR 0014 — WebTemplate reference implementation and id-generation lock
 
-- **Status:** Proposed, 2026-07-13 — the reference + version were chosen during brainstorming (superseding the placeholder plan's shared-model-first sketch); this ADR reaches **Accepted** on maintainer sign-off of the REQ-106 specification, before any implementation code depends on it (see Acceptance gate).
+- **Status:** Accepted, 2026-07-14 — maintainer sign-off on the REQ-106 specification (the reference + version were chosen during brainstorming, superseding the placeholder plan's shared-model-first sketch); implementation lands under [2026-05-22-webtemplate-export.md](../plans/2026-05-22-webtemplate-export.md).
 - **Supersedes:** —
 - **Superseded by:** —
 - **Strand:** —
