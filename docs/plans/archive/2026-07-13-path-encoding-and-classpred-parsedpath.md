@@ -1,11 +1,11 @@
 # Plan — path-parameter encoding fix + class-predicate ParsedPath
 
 **Date:** 2026-07-13
-**Status:** In review (PR #74)
+**Status:** Landed (PR #74, 2026-07-13)
 **Owner:** SDK maintainers
 **Covers:**
-- **REQ-095** (OpenAPI authoritative source — [wire.md](../specifications/wire.md#req-095)): a defect fix. The SDK's request path MUST conform to the OAS path template, which requires each path parameter to be percent-encoded **exactly once**. Today several leaf clients pre-escape with `url.PathEscape` into `transport.Request.Path`, which the transport re-encodes — a double-encode that 404s any id with an encodable character (e.g. a space in a template id).
-- **REQ-113** (execution-oriented parsed AQL AST — [clinical-modeling.md](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)): an implementation-aligned completeness change. Populate `aql.Comparison.ParsedPath` for a **class standing predicate** (`EHR e[ehr_id/value = $x]`) with an empty `Alias` and structured `Segments`, so a consumer need not re-split the relative path text — the last raw-text re-tokenization the WHERE side already eliminated.
+- **REQ-095** (OpenAPI authoritative source — [wire.md](../../specifications/wire.md#req-095)): a defect fix. The SDK's request path MUST conform to the OAS path template, which requires each path parameter to be percent-encoded **exactly once**. Today several leaf clients pre-escape with `url.PathEscape` into `transport.Request.Path`, which the transport re-encodes — a double-encode that 404s any id with an encodable character (e.g. a space in a template id).
+- **REQ-113** (execution-oriented parsed AQL AST — [clinical-modeling.md](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)): an implementation-aligned completeness change. Populate `aql.Comparison.ParsedPath` for a **class standing predicate** (`EHR e[ehr_id/value = $x]`) with an empty `Alias` and structured `Segments`, so a consumer need not re-split the relative path text — the last raw-text re-tokenization the WHERE side already eliminated.
 
 **Probes:** PROBE-082 (already pins structured standing-predicate access in `openehr/aql/parse/structured_test.go`) is extended to assert the class-predicate `ParsedPath`. No new PROBE for the encoding fix — it is a wire-URL correctness defect covered by unit + round-trip tests in the leaf clients and transport.
 

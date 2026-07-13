@@ -336,7 +336,7 @@ requirements:
     probes: [PROBE-072]
     plans:
       - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
-      - docs/plans/2026-07-13-path-encoding-and-classpred-parsedpath.md
+      - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
     notes: >
       Path-parameter encoding: the transport is the single canonical path
       encoder (Request.Path is a decoded url.URL.Path); leaf clients interpolate
@@ -856,7 +856,7 @@ requirements:
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md
-      - docs/plans/2026-07-13-path-encoding-and-classpred-parsedpath.md
+      - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation
