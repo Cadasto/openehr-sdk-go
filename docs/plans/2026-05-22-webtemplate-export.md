@@ -10,7 +10,7 @@
 **Decisions:** [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md) — reference implementation & id-generation lock
 **Implementation:** planned
 **Depends on:** landed compiled-template foundation — `openehr/template/` (REQ-100) + public bridge `openehr/templatecompile/` (REQ-111) + REQ-103 primitive constraints.
-**Defers:** the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](2026-06-23-simplified-formats.md)); FLAT/STRUCTURED codecs (REQ-053); WebTemplate→OPT round-trip; REST serving / content negotiation; exotic datatype inputs; the Better camelCase `id` variant.
+**Defers:** the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](2026-06-23-simplified-formats.md)); FLAT/STRUCTURED codecs (REQ-053); WebTemplate→OPT round-trip; REST serving / content negotiation; exotic datatype inputs; the Better camelCase `id` variant; **archetype-reuse-under-slot templates** (duplicate compiled AQL paths — e.g. `corona_anamnese` — which `templatecompile` rejects; relaxing the compiler is a possible REQ-100/111 follow-up per ADR-0014).
 
 ## Goal
 
@@ -69,7 +69,7 @@ Every task's requirements implicitly include these:
 - `openehr/template/webtemplate/inputs.go` — per-RM-datatype `inputs[]` mapping.
 - `openehr/template/webtemplate/*_test.go` — unit + golden + parity tests.
 - `openehr/template/webtemplate/testdata/webtemplate/*.json` — SDK-generated round-trip goldens.
-- `testkit/cassettes/webtemplate/corona_anamnese.{opt,webtemplate.json}` — vendored EHRbase reference (Apache-2.0; provenance in `testkit/cassettes/THIRD_PARTY_LICENSES.md`).
+- `testkit/cassettes/webtemplate/constrain_test.{opt,webtemplate.json}` — vendored EHRbase reference (Apache-2.0; provenance in `testkit/cassettes/THIRD_PARTY_LICENSES.md`).
 
 ## Phases
 
@@ -268,8 +268,8 @@ git commit -m "feat(webtemplate): scaffold package + WebTemplate/Node/Input shap
 Parity-anchored (ADR-0014): the reference is the oracle. **If the fetch is blocked, record the deferral (Step 4b) and continue — later parity assertions fall back to SDK goldens.**
 
 **Files:**
-- Create: `testkit/cassettes/webtemplate/corona_anamnese.opt`
-- Create: `testkit/cassettes/webtemplate/corona_anamnese.webtemplate.json`
+- Create: `testkit/cassettes/webtemplate/constrain_test.opt`
+- Create: `testkit/cassettes/webtemplate/constrain_test.webtemplate.json`
 - Modify: `testkit/cassettes/THIRD_PARTY_LICENSES.md`
 - Test: `openehr/template/webtemplate/parity_test.go` (loader only in this task)
 
@@ -277,17 +277,17 @@ Parity-anchored (ADR-0014): the reference is the oracle. **If the fetch is block
 
 ```bash
 BASE=https://raw.githubusercontent.com/ehrbase/openEHR_SDK/22b01e0c99b53669394e56da29c2410838b5cf7e/test-data/src/main/resources
-curl -fsSL "$BASE/operationaltemplate/corona_anamnese.opt" -o testkit/cassettes/webtemplate/corona_anamnese.opt
-curl -fsSL "$BASE/webtemplate/corona_anamnese.json"        -o testkit/cassettes/webtemplate/corona_anamnese.webtemplate.json
+curl -fsSL "$BASE/operationaltemplate/constrain_test.opt" -o testkit/cassettes/webtemplate/constrain_test.opt
+curl -fsSL "$BASE/webtemplate/constrain_test.json"        -o testkit/cassettes/webtemplate/constrain_test.webtemplate.json
 ```
 
 - [ ] **Step 2: Record provenance + license.** Append to `testkit/cassettes/THIRD_PARTY_LICENSES.md`:
 
 ```markdown
-## webtemplate/corona_anamnese.{opt,webtemplate.json}
+## webtemplate/constrain_test.{opt,webtemplate.json}
 
 Source: ehrbase/openEHR_SDK @ 22b01e0c99b53669394e56da29c2410838b5cf7e
-  test-data/src/main/resources/{operationaltemplate,webtemplate}/corona_anamnese
+  test-data/src/main/resources/{operationaltemplate,webtemplate}/constrain_test
 License: Apache-2.0 (© EHRbase authors). Vendored unmodified as the REQ-106 / PROBE-075
 WebTemplate structural-parity oracle. Not distributed as part of the SDK's runtime.
 ```
@@ -310,7 +310,7 @@ const referenceDir = "../../../testkit/cassettes/webtemplate"
 
 func loadReference(t *testing.T) map[string]any {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(referenceDir, "corona_anamnese.webtemplate.json"))
+	b, err := os.ReadFile(filepath.Join(referenceDir, "constrain_test.webtemplate.json"))
 	if err != nil {
 		t.Skipf("reference fixture absent (PROBE-075 deferred, ADR-0014): %v", err)
 	}
@@ -348,7 +348,7 @@ Expected: PASS.
 
 ```bash
 git add testkit/cassettes/webtemplate/ testkit/cassettes/THIRD_PARTY_LICENSES.md openehr/template/webtemplate/parity_test.go
-git commit -m "test(webtemplate): vendor EHRbase corona_anamnese parity fixture (PROBE-075)"
+git commit -m "test(webtemplate): vendor EHRbase constrain_test parity fixture (PROBE-075)"
 ```
 
 ### Phase 3 — Structural transform
@@ -695,7 +695,7 @@ git commit -m "feat(webtemplate): lower-snake web-id sanitisation (REQ-106, ADR-
 func TestIDParityAgainstReference(t *testing.T) {
 	ref := loadReference(t) // t.Skip if fixture absent
 	refByPath := indexByAQLPath(ref) // map[aqlPath]id — walk ref["tree"]
-	c := compileFixture(t, referenceDir+"/corona_anamnese.opt")
+	c := compileFixture(t, referenceDir+"/constrain_test.opt")
 	wt, err := webtemplate.Build(c)
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -743,7 +743,7 @@ git commit -m "feat(webtemplate): sibling id disambiguation matching EHRbase ref
 - Consumes: `CompiledNode.PrimitiveConstraint() constraints.PrimitiveConstraint` (REQ-103 sealed interface) + the node's RM type.
 - Produces: `func inputsFor(n *templatecompile.CompiledNode) []Input`.
 
-- [ ] **Step 1: Write the inputs table test (RED)** covering each core datatype from [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export): DV_TEXT, DV_CODED_TEXT, DV_QUANTITY, DV_COUNT, DV_ORDINAL, DV_DATE_TIME/DATE/TIME, DV_BOOLEAN, DV_PROPORTION — asserting `suffix`/`type` (and `list`/`listOpen` where relevant). Use OPT fixtures that exercise each type, or build minimal `CompiledNode`s via `templatecompile.Compile` on a fixture that contains them (prefer the corona fixture, which has coded text + quantity). Assert the exotic case (e.g. DV_MULTIMEDIA if present) yields a node with `len(Inputs)==0` and no error.
+- [ ] **Step 1: Write the inputs table test (RED)** covering each core datatype from [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export): DV_TEXT, DV_CODED_TEXT, DV_QUANTITY, DV_COUNT, DV_ORDINAL, DV_DATE_TIME/DATE/TIME, DV_BOOLEAN, DV_PROPORTION — asserting `suffix`/`type` (and `list`/`listOpen` where relevant). Use OPT fixtures that exercise each type, or build minimal `CompiledNode`s via `templatecompile.Compile` on a fixture that contains them (prefer the vendored `constrain_test` fixture, which covers DV_TEXT / CODED_TEXT / QUANTITY / COUNT / ORDINAL / DATE_TIME / DURATION / PROPORTION). Assert the exotic case (e.g. DV_MULTIMEDIA if present) yields a node with `len(Inputs)==0` and no error.
 
 - [ ] **Step 2: Run it — expect FAIL (`inputsFor` undefined).**
 

@@ -723,12 +723,14 @@ Conformance against the reference is **structural, not byte-exact**: PROBE-075 c
 
 The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md)).
 
+Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) produce duplicate compiled AQL paths that `openehr/templatecompile` currently rejects (`ErrInvalidInput`); such templates — including the canonical EHRbase `corona_anamnese` — cannot be exported by this slice and are **deferred**. Relaxing the compiler to a first-wins path index (the compiled tree already retains every instance) is a possible follow-up against REQ-100/REQ-111 ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+
 ### Building-block independence (REQ-013)
 
 `openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template` (OPT metadata), `openehr/rm/rminfo`, and the standard library only.
 
 - **Lives in:** `openehr/template/webtemplate/` (planned).
-- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `corona_anamnese` fixture (or its recorded deferral if the fixture fetch is blocked). Catalogued in [`conformance.md`](conformance.md).
+- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture (or its recorded deferral if the fixture fetch is blocked). Catalogued in [`conformance.md`](conformance.md).
 - **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/2026-05-22-webtemplate-export.md).
 
 ## REQ-112 — Template-less Reference Model validation floor
