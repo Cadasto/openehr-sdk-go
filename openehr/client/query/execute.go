@@ -80,10 +80,10 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	for _, o := range opts {
 		o(&cfg)
 	}
-	path := "/query/" + url.PathEscape(name)
+	path := "/query/" + name
 	route := "/query/{qualified_query_name}"
 	if version != "" {
-		path += "/" + url.PathEscape(version)
+		path += "/" + version
 		route += "/{version}"
 	}
 	req := &transport.Request{

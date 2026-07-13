@@ -84,7 +84,7 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 		return nil, nil, fmt.Errorf("definition.PutStoredQuery: %w: empty qualified query name", transport.ErrInvalidConfig)
 	}
 	return putStoredQuery(ctx, c,
-		"/definition/query/"+url.PathEscape(name),
+		"/definition/query/"+name,
 		"/definition/query/{qualified_query_name}",
 		"definition.PutStoredQuery", name, "", aqlText, opts...)
 }
@@ -102,7 +102,7 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 		return nil, nil, fmt.Errorf("definition.PutStoredQueryVersion: %w: name and version are required", transport.ErrInvalidConfig)
 	}
 	return putStoredQuery(ctx, c,
-		"/definition/query/"+url.PathEscape(name)+"/"+url.PathEscape(ver),
+		"/definition/query/"+name+"/"+ver,
 		"/definition/query/{qualified_query_name}/{version}",
 		"definition.PutStoredQueryVersion", name, ver, aqlText, opts...)
 }
@@ -226,7 +226,7 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(ver),
+		Path:   "/definition/query/" + name + "/" + ver,
 		Route:  "/definition/query/{qualified_query_name}/{version}",
 		Accept: "application/json",
 	}
@@ -255,7 +255,7 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 	path := "/definition/query"
 	route := "/definition/query"
 	if strings.TrimSpace(namePattern) != "" {
-		path += "/" + url.PathEscape(strings.TrimSpace(namePattern))
+		path += "/" + strings.TrimSpace(namePattern)
 		route += "/{qualified_query_name}"
 	}
 	req := &transport.Request{
@@ -292,7 +292,7 @@ func DeleteStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, 
 	}
 	req := &transport.Request{
 		Method: http.MethodDelete,
-		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(version),
+		Path:   "/definition/query/" + name + "/" + version,
 		Route:  "/definition/query/{qualified_query_name}/{version}",
 	}
 	resp, err := c.Do(ctx, req)
