@@ -25,5 +25,6 @@
 //   - cmd/examples/lint-aql             — AQL static lint + ValidateAQL (REQ-109)
 //   - cmd/examples/compile-build-validate — public compile→build→validate, public-only imports (REQ-111)
 //   - cmd/examples/template-explore     — introspect a compiled OPT: structure + leaf paths (REQ-111)
+//   - cmd/examples/webtemplate-export   — compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106)
 //   - cmd/examples/smart-launch         — standalone SMART PKCE launch, state+verifier persistence (REQ-061)
 package examples

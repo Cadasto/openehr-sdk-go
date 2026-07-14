@@ -29,6 +29,7 @@ make build
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
+| [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
@@ -326,6 +327,41 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 ```
 
 **What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker; `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, `node.Term(code, "")` gives the label, `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+
+---
+
+### webtemplate-export
+
+**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON** (REQ-106, ADR 0014) — the lossy, UI-oriented projection form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
+
+```bash
+go run ./cmd/examples/webtemplate-export
+go run ./cmd/examples/webtemplate-export path/to/template.opt
+go run ./cmd/examples/webtemplate-export -json path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate` — **no `internal/` import.**
+
+**Sample output (abridged):**
+
+```text
+template : vital_signs (vital_signs.opt)
+version  : 2.3   defaultLanguage: en
+document : 9839 bytes deterministic JSON (application/openehr.wt+json)
+
+form tree (id [rmType] occurrences — inputs):
+encounter [COMPOSITION] 1..1
+  category [DV_CODED_TEXT] 1..1 — code:CODED_TEXT(1 codes)
+  blood_pressure [OBSERVATION] 0..*
+    any_event [EVENT] 0..*
+      systolic [DV_QUANTITY] 0..1 — magnitude:DECIMAL, unit:CODED_TEXT(1 codes)
+      time [DV_DATE_TIME] 0..1 — DATETIME
+    language [CODE_PHRASE] 0..1
+    subject [PARTY_PROXY] 0..1 — id:TEXT, id_scheme:TEXT, id_namespace:TEXT, name:TEXT
+  ...
+```
+
+**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first — each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix`/`type`/`list`/`validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) rather than emit ambiguous output; accepted reference deltas are documented in the package's `deviations.md`.
 
 ---
 

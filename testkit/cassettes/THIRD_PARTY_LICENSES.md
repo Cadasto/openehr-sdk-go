@@ -28,7 +28,9 @@ limitations under the License.
 
 **Template triplets (`templates/` + `compositions/`):** `cluster-slot.ehrbase.org.v0`, `nested.en.v1`, `IDCR Problem List.v1`, `IDCR - Laboratory Test Report.v0`, `IDCR -  Adverse Reaction List.v1` — OPT from `operationaltemplate/` (or equivalent) and matching canonical JSON/XML from `composition/` in the same upstream tree.
 
-**Modifications:** Filename stems match operational `template_id` values; no clinical content edits.
+**WebTemplate parity reference (`webtemplate/`):** `constrain_test.opt` (from `operationaltemplate/constrain_test.opt`) + `constrain_test.webtemplate.json` (from `webtemplate/constrain_test.json`), pinned at commit `22b01e0c99b53669394e56da29c2410838b5cf7e`. Vendored unmodified as the REQ-106 / PROBE-075 WebTemplate structural-parity oracle (ADR-0014); chosen because it compiles under the SDK's `templatecompile` (unique AQL paths) and exercises the core datatype set (DV_TEXT / CODED_TEXT / QUANTITY / COUNT / ORDINAL / DATE_TIME / DURATION / PROPORTION). Not part of the SDK runtime.
+
+**Modifications:** Filename stems match operational `template_id` values; the WebTemplate JSON stem is suffixed `.webtemplate` to disambiguate it from canonical-composition JSON; no clinical content edits.
 
 ## ehrbase (integration-tests Robot)
 

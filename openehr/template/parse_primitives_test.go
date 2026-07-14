@@ -518,6 +518,48 @@ func TestParse_CDvOrdinal(t *testing.T) {
 	}
 }
 
+// REQ-103 — the AOM 1.4 XSD form: the ordinal symbol is a DV_CODED_TEXT,
+// so its code sits under symbol/defining_code (as EHRbase and template
+// designers emit it), not directly under symbol.
+func TestParse_CDvOrdinal_DefiningCode(t *testing.T) {
+	tmpl := parseOPTWithChild(t, `<children xsi:type="C_DV_ORDINAL">
+		<rm_type_name>DV_ORDINAL</rm_type_name>
+		<node_id />
+		<list>
+			<value>0</value>
+			<symbol>
+				<defining_code>
+					<terminology_id><value>local</value></terminology_id>
+					<code_string>at0010</code_string>
+				</defining_code>
+			</symbol>
+		</list>
+		<list>
+			<value>1</value>
+			<symbol>
+				<defining_code>
+					<terminology_id><value>local</value></terminology_id>
+					<code_string>at0011</code_string>
+				</defining_code>
+			</symbol>
+		</list>
+	</children>`)
+	p := firstChildPrimitive(t, tmpl)
+	c, ok := p.(constraints.CDvOrdinal)
+	if !ok {
+		t.Fatalf("want CDvOrdinal, got %T", p)
+	}
+	if len(c.Values) != 2 {
+		t.Fatalf("Values = %+v, want 2 entries", c.Values)
+	}
+	if c.Values[0].Symbol.CodeString != "at0010" || c.Values[0].Symbol.Terminology != "local" {
+		t.Errorf("Values[0].Symbol = %+v, want local::at0010", c.Values[0].Symbol)
+	}
+	if c.Values[1].Symbol.CodeString != "at0011" {
+		t.Errorf("Values[1].Symbol = %+v, want at0011", c.Values[1].Symbol)
+	}
+}
+
 // REQ-103 — non-primitive xsi:type values (here ARCHETYPE_SLOT) do
 // NOT carry a primitive constraint. Guards against the dispatch
 // over-attaching.
