@@ -43,27 +43,16 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 }
 
 // codedTextInputs emits the single "code" input for DV_CODED_TEXT. The
-// C_CODE_PHRASE constraint lives on the value node's defining_code child.
+// C_CODE_PHRASE constraint lives on the value node's defining_code child;
+// an absent or code-less constraint leaves the list open.
 func codedTextInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Suffix: "code", Type: "CODED_TEXT"}
-	dc := childNode(v, "defining_code")
-	if dc == nil {
-		in.ListOpen = true
-		return []Input{in}
-	}
-	cp, ok := dc.PrimitiveConstraint().(constraints.CodePhrase)
-	if !ok {
-		in.ListOpen = true
-		return []Input{in}
-	}
+	cp := childConstraint[constraints.CodePhrase](v, "defining_code")
 	in.Terminology = cp.Terminology
-	if len(cp.CodeList) == 0 {
-		in.ListOpen = true
-		return []Input{in}
-	}
 	for _, code := range cp.CodeList {
 		in.List = append(in.List, listItem(v, code))
 	}
+	in.ListOpen = len(in.List) == 0
 	return []Input{in}
 }
 
@@ -198,9 +187,12 @@ func childConstraint[T any](v *templatecompile.CompiledNode, attr string) T {
 }
 
 // rangeValidation converts a numeric range constraint into input validation,
-// or nil when the range is unbounded on both sides.
+// or nil when the range constrains nothing — unbounded on both sides, or
+// the zero NumericRange that childConstraint yields when the constraint is
+// absent (IsBounded covers both; a zero range must not become the
+// impossible interval 0<x<0).
 func rangeValidation(nr constraints.NumericRange) *Validation {
-	if nr.LowerUnbounded && nr.UpperUnbounded {
+	if !nr.IsBounded() {
 		return nil
 	}
 	r := &Range{}

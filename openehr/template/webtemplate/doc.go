@@ -9,6 +9,11 @@
 //
 // The package is a building block (REQ-013): it takes a
 // *templatecompile.Compiled in and returns bytes out, importing only
-// openehr/templatecompile, openehr/template, openehr/rm/rminfo, and the
-// standard library — never the transport, auth, client, or serialize layers.
+// openehr/templatecompile, openehr/template/constraints, and the standard
+// library — never the transport, auth, client, or serialize layers.
+//
+// Scope limits (see deviations.md): templates whose sibling nodes sanitise
+// to the same id return ErrIDCollision (the reference's disambiguation
+// rule is not yet implemented), and archetype-reuse-under-slot templates
+// are rejected upstream by templatecompile.
 package webtemplate

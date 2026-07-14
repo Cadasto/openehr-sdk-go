@@ -1,14 +1,15 @@
 package webtemplate_test
 
 // PROBE-075 — the vendored EHRbase openEHR_SDK v2.3 reference is the
-// WebTemplate structural-parity oracle (REQ-106, ADR-0014). When the
-// fixture is absent (fetch was blocked), the parity tests skip and the
-// SDK-generated goldens (golden_test.go) remain the regression anchor.
+// WebTemplate structural-parity oracle (REQ-106, ADR-0014). The fixture is
+// vendored in-repo; a missing file is repo corruption and fails the run.
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -21,13 +22,12 @@ const referenceDir = "../../../testkit/cassettes/webtemplate"
 // templatecompile — see the archetype-reuse-under-slot gap in REQ-106.
 const referenceStem = "constrain_test"
 
-// loadReference decodes the reference WebTemplate JSON, skipping the test
-// if the fixture is absent.
+// loadReference decodes the vendored reference WebTemplate JSON.
 func loadReference(t *testing.T) map[string]any {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(referenceDir, referenceStem+".webtemplate.json"))
 	if err != nil {
-		t.Skipf("reference fixture absent — PROBE-075 deferred (ADR-0014): %v", err)
+		t.Fatalf("vendored reference fixture unreadable (PROBE-075): %v", err)
 	}
 	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
@@ -42,14 +42,6 @@ func TestReferenceFixtureLoads(t *testing.T) {
 		t.Errorf("reference version = %v, want 2.3", ref["version"])
 	}
 	if _, ok := ref["tree"].(map[string]any); !ok {
-		t.Fatalf("reference has no object tree; keys=%v", mapKeys(ref))
+		t.Fatalf("reference has no object tree; keys=%v", slices.Sorted(maps.Keys(ref)))
 	}
-}
-
-func mapKeys(m map[string]any) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }

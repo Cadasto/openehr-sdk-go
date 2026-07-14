@@ -71,30 +71,29 @@ type Range struct {
 }
 
 type config struct {
-	version         string
 	defaultLanguage string
 	languages       []string
 }
 
-// Option customises Build and Marshal.
+// Option customises Build and Marshal. No options are defined in the
+// current slice — the compiled template is single-language, so language
+// overrides would relabel text without retranslating it, and the version
+// is fixed to the schema this package implements. The type is kept so
+// future overrides land without a signature break.
 type Option func(*config)
-
-// WithVersion overrides the emitted schema version (default "2.3").
-func WithVersion(v string) Option { return func(c *config) { c.version = v } }
-
-// WithDefaultLanguage overrides the default language code (otherwise taken
-// from the compiled template).
-func WithDefaultLanguage(code string) Option {
-	return func(c *config) { c.defaultLanguage = code }
-}
-
-// WithLanguages overrides the language set emitted for localized text.
-func WithLanguages(codes ...string) Option {
-	return func(c *config) { c.languages = codes }
-}
 
 // ErrEmptyTemplate is returned when the compiled template has no root.
 var ErrEmptyTemplate = errors.New("webtemplate: compiled template has no root")
+
+// ErrNoDefaultLanguage is returned when the compiled template carries no
+// resolvable default language (REQ-106: never emit "defaultLanguage": "").
+var ErrNoDefaultLanguage = errors.New("webtemplate: compiled template has no default language")
+
+// ErrIDCollision is returned when two sibling nodes sanitise to the same
+// id. The reference's sibling-disambiguation rule is not yet implemented
+// (see deviations.md); failing loudly protects FLAT-path uniqueness, the
+// id's load-bearing property (ADR 0014).
+var ErrIDCollision = errors.New("webtemplate: duplicate sibling id")
 
 // Marshal builds and JSON-encodes the WebTemplate (REQ-106).
 func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error) {

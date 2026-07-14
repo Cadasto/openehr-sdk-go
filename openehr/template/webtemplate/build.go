@@ -1,6 +1,8 @@
 package webtemplate
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -10,17 +12,20 @@ import (
 //
 // The transform follows the EHRbase v2.3 node model (ADR-0014): it keeps
 // COMPOSITION / ENTRY / EVENT / EVENT_CONTEXT / CLUSTER, collapses each
-// ELEMENT into a value leaf, drops the pure structural wrappers (HISTORY /
-// ITEM_TREE / ITEM_LIST / ITEM_STRUCTURE) while folding their node
-// predicates into descendant aqlPaths, and emits data-bearing RM
-// attributes as leaves.
+// ELEMENT into a value leaf, drops the pure structural wrappers (HISTORY
+// and the ITEM_STRUCTURE family — ITEM_TREE / ITEM_LIST / ITEM_SINGLE /
+// ITEM_TABLE) while folding their node predicates into descendant
+// aqlPaths, and emits data-bearing RM attributes as leaves.
 func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	if c == nil || c.Root() == nil {
 		return nil, ErrEmptyTemplate
 	}
-	cfg := &config{version: defaultVersion, defaultLanguage: c.Language()}
+	cfg := &config{defaultLanguage: c.Language()}
 	for _, o := range opts {
 		o(cfg)
+	}
+	if cfg.defaultLanguage == "" {
+		return nil, ErrNoDefaultLanguage
 	}
 	if len(cfg.languages) == 0 {
 		cfg.languages = []string{cfg.defaultLanguage}
@@ -36,14 +41,35 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	setOccurrences(tree, root)
 	setNames(tree, root, cfg)
 	tree.Children = childrenOf(root, "", cfg)
+	if err := checkIDCollisions(tree); err != nil {
+		return nil, err
+	}
 
 	return &WebTemplate{
 		TemplateID:      c.TemplateID(),
-		Version:         cfg.version,
+		Version:         defaultVersion,
 		DefaultLanguage: cfg.defaultLanguage,
 		Languages:       cfg.languages,
 		Tree:            tree,
 	}, nil
+}
+
+// checkIDCollisions rejects trees where two sibling nodes share an id. The
+// reference disambiguates such siblings; until that rule is implemented
+// (deviations.md) the export fails loudly rather than emit ambiguous
+// FLAT paths.
+func checkIDCollisions(n *Node) error {
+	seen := map[string]bool{}
+	for _, ch := range n.Children {
+		if seen[ch.ID] {
+			return fmt.Errorf("%w: %q under %q (sibling disambiguation not implemented — see deviations.md)", ErrIDCollision, ch.ID, n.AQLPath)
+		}
+		seen[ch.ID] = true
+		if err := checkIDCollisions(ch); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // childrenOf walks a kept container's attributes and returns the emitted
@@ -53,81 +79,68 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 // language, encoding, territory, time, …) when the template did not already
 // supply them.
 func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
-	var out []*Node
+	out := emitAll(n, parentPath, cfg)
 	seen := map[string]bool{}
-	for _, attr := range n.Attributes() {
-		for _, child := range attr.Children() {
-			for _, nd := range emit(child, attr, parentPath, cfg) {
-				out = append(out, nd)
-				seen[nd.AQLPath] = true
-			}
-		}
+	for _, nd := range out {
+		seen[nd.AQLPath] = true
 	}
-	for _, ic := range inContextLeaves(n.RMTypeName()) {
-		p := parentPath + "/" + ic.attr
-		if seen[p] {
+	for _, proto := range inContextByRM[n.RMTypeName()] {
+		ic := proto // per-leaf copy; the table entries stay pristine
+		ic.AQLPath = parentPath + "/" + ic.ID
+		if seen[ic.AQLPath] {
 			continue
 		}
-		out = append(out, &Node{
-			RMType:  ic.rmType,
-			AQLPath: p,
-			ID:      ic.attr,
-			Min:     ic.min,
-			Max:     ic.max,
-			Inputs:  ic.inputs,
-		})
+		ic.Inputs = slices.Clone(ic.Inputs) // never alias the table's slices into returned trees
+		out = append(out, &ic)
 	}
 	return out
 }
 
-// inContextLeaf is a fixed RM-attribute leaf EHRbase emits for a container.
-type inContextLeaf struct {
-	attr     string
-	rmType   string
-	min, max int
-	inputs   []Input
+// emitAll emits the WebTemplate nodes contributed by all of n's attribute
+// children, with parentPath the accumulated aqlPath prefix.
+func emitAll(n *templatecompile.CompiledNode, parentPath string, cfg *config) []*Node {
+	var out []*Node
+	for _, attr := range n.Attributes() {
+		for _, child := range attr.Children() {
+			out = append(out, emit(child, attr, parentPath, cfg)...)
+		}
+	}
+	return out
 }
 
 var (
-	partyProxyIC = []Input{
-		{Suffix: "id", Type: "TEXT"},
-		{Suffix: "id_scheme", Type: "TEXT"},
-		{Suffix: "id_namespace", Type: "TEXT"},
-		{Suffix: "name", Type: "TEXT"},
-	}
-	dateTimeIC = []Input{{Type: "DATETIME"}}
-	settingIC  = []Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}}
-)
+	partyProxyIC = partyProxyInputs()
+	dateTimeIC   = []Input{{Type: "DATETIME"}}
+	settingIC    = []Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}}
 
-// inContextLeaves returns the RM-attribute leaves EHRbase emits for a
-// container RM type independent of the template (WebTemplate "inContext"
-// nodes), derived from the reference fixture.
-func inContextLeaves(containerRM string) []inContextLeaf {
-	switch containerRM {
-	case "COMPOSITION":
-		return []inContextLeaf{
-			{attr: "language", rmType: "CODE_PHRASE", min: 0, max: 1},
-			{attr: "territory", rmType: "CODE_PHRASE", min: 0, max: 1},
-			{attr: "composer", rmType: "PARTY_PROXY", min: 0, max: 1, inputs: partyProxyIC},
-		}
-	case "EVENT_CONTEXT":
-		return []inContextLeaf{
-			{attr: "start_time", rmType: "DV_DATE_TIME", min: 0, max: 1, inputs: dateTimeIC},
-			{attr: "setting", rmType: "DV_CODED_TEXT", min: 0, max: 1, inputs: settingIC},
-		}
-	case "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY":
-		return []inContextLeaf{
-			{attr: "language", rmType: "CODE_PHRASE", min: 0, max: 1},
-			{attr: "encoding", rmType: "CODE_PHRASE", min: 0, max: 1},
-			{attr: "subject", rmType: "PARTY_PROXY", min: 0, max: 1, inputs: partyProxyIC},
-		}
-	case "EVENT", "POINT_EVENT", "INTERVAL_EVENT":
-		return []inContextLeaf{
-			{attr: "time", rmType: "DV_DATE_TIME", min: 0, max: 1, inputs: dateTimeIC},
-		}
+	entryIC = []Node{
+		{ID: "language", Name: "Language", RMType: "CODE_PHRASE", Max: 1},
+		{ID: "encoding", Name: "Encoding", RMType: "CODE_PHRASE", Max: 1},
+		{ID: "subject", Name: "Subject", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
 	}
-	return nil
-}
+	eventIC = []Node{
+		{ID: "time", Name: "Time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
+	}
+
+	// inContextByRM lists the fixed RM-attribute leaves EHRbase emits per
+	// container RM type independent of the template (WebTemplate
+	// "inContext" nodes), derived from the reference fixture. The ID
+	// doubles as the RM attribute name; AQLPath is stamped at emission.
+	inContextByRM = map[string][]Node{
+		"COMPOSITION": {
+			{ID: "language", Name: "Language", RMType: "CODE_PHRASE", Max: 1},
+			{ID: "territory", Name: "Territory", RMType: "CODE_PHRASE", Max: 1},
+			{ID: "composer", Name: "Composer", RMType: "PARTY_PROXY", Max: 1, Inputs: partyProxyIC},
+		},
+		"EVENT_CONTEXT": {
+			{ID: "start_time", Name: "Start_time", RMType: "DV_DATE_TIME", Max: 1, Inputs: dateTimeIC},
+			{ID: "setting", Name: "Setting", RMType: "DV_CODED_TEXT", Max: 1, Inputs: settingIC},
+		},
+		"OBSERVATION": entryIC, "EVALUATION": entryIC, "INSTRUCTION": entryIC,
+		"ACTION": entryIC, "ADMIN_ENTRY": entryIC,
+		"EVENT": eventIC, "POINT_EVENT": eventIC, "INTERVAL_EVENT": eventIC,
+	}
+)
 
 // emit returns the WebTemplate node(s) contributed by compiled child c,
 // reached from its parent through attribute attr whose parent sits at
@@ -140,13 +153,7 @@ func emit(c *templatecompile.CompiledNode, attr *templatecompile.CompiledAttribu
 
 	switch {
 	case isDroppedContainer(c.RMTypeName()):
-		var out []*Node
-		for _, a := range c.Attributes() {
-			for _, gc := range a.Children() {
-				out = append(out, emit(gc, a, childPath, cfg)...)
-			}
-		}
-		return out
+		return emitAll(c, childPath, cfg)
 
 	case c.RMTypeName() == "ELEMENT":
 		if leaf := collapseElement(c, childPath, attr, cfg); leaf != nil {
@@ -230,10 +237,8 @@ func setOccurrences(node *Node, c *templatecompile.CompiledNode) {
 }
 
 func setNames(node *Node, c *templatecompile.CompiledNode, cfg *config) {
-	if t, ok := c.Term(c.NodeID(), cfg.defaultLanguage); ok {
-		node.Name = t.Items["text"]
-		node.LocalizedName = node.Name
-	}
+	node.Name = termText(c, cfg.defaultLanguage)
+	node.LocalizedName = node.Name
 	for _, lang := range cfg.languages {
 		t, ok := c.Term(c.NodeID(), lang)
 		if !ok {
@@ -265,16 +270,22 @@ func predicate(c *templatecompile.CompiledNode) string {
 }
 
 // nodeIDOf returns the WebTemplate nodeId: archetype id when present, else
-// the at-code, else empty (the archetype root's internal at0000 is not a
-// nodeId — the archetype id is used instead).
+// the at-code, else empty (the archetype root's internal at0000 — or a
+// specialized at0000.1 — is not a nodeId; the archetype id is used instead).
 func nodeIDOf(c *templatecompile.CompiledNode) string {
 	if a := c.ArchetypeID(); a != "" {
 		return a
 	}
-	if id := c.NodeID(); id != "" && id != "at0000" {
+	if id := c.NodeID(); id != "" && !isArchetypeRootCode(id) {
 		return id
 	}
 	return ""
+}
+
+// isArchetypeRootCode reports whether an at-code is the archetype root
+// concept (at0000, or a specialized at0000.N…).
+func isArchetypeRootCode(id string) bool {
+	return id == "at0000" || strings.HasPrefix(id, "at0000.")
 }
 
 // isDroppedContainer reports whether an RM type is a pure structural

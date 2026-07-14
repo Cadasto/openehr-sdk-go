@@ -37,29 +37,11 @@ func refInputSig(m map[string]any) string {
 	return strings.Join(parts, ",")
 }
 
-func walkOursInputs(n *webtemplate.Node, out map[string]string) {
-	out[n.AQLPath] = inputSig(n.Inputs)
-	for _, ch := range n.Children {
-		walkOursInputs(ch, out)
-	}
-}
-
-func walkRefInputs(m map[string]any, out map[string]string) {
-	path, _ := m["aqlPath"].(string)
-	out[path] = refInputSig(m)
-	if ch, ok := m["children"].([]any); ok {
-		for _, c := range ch {
-			if cm, ok := c.(map[string]any); ok {
-				walkRefInputs(cm, out)
-			}
-		}
-	}
-}
-
 func TestInputParity(t *testing.T) {
-	ref := loadReference(t)
 	refInputs := map[string]string{}
-	walkRefInputs(ref["tree"].(map[string]any), refInputs)
+	walkRefTree(refTree(t, loadReference(t)), func(m map[string]any) {
+		refInputs[refStr(m, "aqlPath")] = refInputSig(m)
+	})
 
 	c := compileFixture(t, referenceDir+"/"+referenceStem+".opt")
 	wt, err := webtemplate.Build(c)
@@ -67,7 +49,9 @@ func TestInputParity(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 	ourInputs := map[string]string{}
-	walkOursInputs(wt.Tree, ourInputs)
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		ourInputs[n.AQLPath] = inputSig(n.Inputs)
+	})
 
 	var mismatch []string
 	matched := 0

@@ -4,6 +4,7 @@ package webtemplate_test
 // vendored EHRbase reference (id / rmType / nodeId / aqlPath / min / max).
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"testing"
@@ -24,6 +25,16 @@ func compileFixture(t *testing.T, path string) *templatecompile.Compiled {
 		t.Fatalf("compile %s: %v", path, err)
 	}
 	return c
+}
+
+// A nil compiled template must surface the sentinel, never panic (REQ-106).
+func TestBuildNil(t *testing.T) {
+	if _, err := webtemplate.Build(nil); !errors.Is(err, webtemplate.ErrEmptyTemplate) {
+		t.Errorf("Build(nil) err = %v, want ErrEmptyTemplate", err)
+	}
+	if _, err := webtemplate.Marshal(nil); !errors.Is(err, webtemplate.ErrEmptyTemplate) {
+		t.Errorf("Marshal(nil) err = %v, want ErrEmptyTemplate", err)
+	}
 }
 
 func TestBuildRootShape(t *testing.T) {
@@ -56,42 +67,57 @@ func (f nodeFacts) String() string {
 	return fmt.Sprintf("rmType=%s nodeId=%s id=%s min=%d max=%d", f.rmType, f.nodeID, f.id, f.min, f.max)
 }
 
-// walkOurs indexes our tree by aqlPath.
-func walkOurs(n *webtemplate.Node, out map[string]nodeFacts) {
-	out[n.AQLPath] = nodeFacts{n.RMType, n.NodeID, n.ID, n.Min, n.Max}
+// walkOurTree visits every node of our tree depth-first.
+func walkOurTree(n *webtemplate.Node, visit func(*webtemplate.Node)) {
+	visit(n)
 	for _, ch := range n.Children {
-		walkOurs(ch, out)
+		walkOurTree(ch, visit)
 	}
 }
 
-// walkRef indexes the reference JSON tree by aqlPath.
-func walkRef(m map[string]any, out map[string]nodeFacts) {
-	str := func(k string) string {
-		if v, ok := m[k].(string); ok {
-			return v
-		}
-		return ""
-	}
-	num := func(k string) int {
-		if v, ok := m[k].(float64); ok {
-			return int(v)
-		}
-		return 0
-	}
-	out[str("aqlPath")] = nodeFacts{str("rmType"), str("nodeId"), str("id"), num("min"), num("max")}
+// walkRefTree visits every node of the reference JSON tree depth-first.
+func walkRefTree(m map[string]any, visit func(map[string]any)) {
+	visit(m)
 	if ch, ok := m["children"].([]any); ok {
 		for _, c := range ch {
 			if cm, ok := c.(map[string]any); ok {
-				walkRef(cm, out)
+				walkRefTree(cm, visit)
 			}
 		}
 	}
 }
 
+func refStr(m map[string]any, k string) string {
+	v, _ := m[k].(string)
+	return v
+}
+
+// refTree fails the test when the reference document carries no tree.
+func refTree(t *testing.T, ref map[string]any) map[string]any {
+	t.Helper()
+	tree, ok := ref["tree"].(map[string]any)
+	if !ok {
+		t.Fatal("reference has no object tree")
+	}
+	return tree
+}
+
+// Both parity tests index nodes by aqlPath; siblings sharing a path (one
+// at-code cloned under a Multiple attribute) would silently collapse into
+// one entry. constrain_test has no such duplicate; templates that do are
+// the deferred archetype-reuse-under-slot class the compiler rejects.
+
 func TestStructuralParity(t *testing.T) {
-	ref := loadReference(t) // skips if fixture absent
 	refByPath := map[string]nodeFacts{}
-	walkRef(ref["tree"].(map[string]any), refByPath)
+	walkRefTree(refTree(t, loadReference(t)), func(m map[string]any) {
+		num := func(k string) int {
+			if v, ok := m[k].(float64); ok {
+				return int(v)
+			}
+			return 0
+		}
+		refByPath[refStr(m, "aqlPath")] = nodeFacts{refStr(m, "rmType"), refStr(m, "nodeId"), refStr(m, "id"), num("min"), num("max")}
+	})
 
 	c := compileFixture(t, referenceDir+"/"+referenceStem+".opt")
 	wt, err := webtemplate.Build(c)
@@ -99,7 +125,9 @@ func TestStructuralParity(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 	ourByPath := map[string]nodeFacts{}
-	walkOurs(wt.Tree, ourByPath)
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		ourByPath[n.AQLPath] = nodeFacts{n.RMType, n.NodeID, n.ID, n.Min, n.Max}
+	})
 
 	var missing, extra, mismatch []string
 	for p, rf := range refByPath {

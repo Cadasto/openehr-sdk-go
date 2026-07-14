@@ -288,6 +288,7 @@
           },
           {
             "id": "start_time",
+            "name": "Start_time",
             "rmType": "DV_DATE_TIME",
             "min": 0,
             "max": 1,
@@ -300,6 +301,7 @@
           },
           {
             "id": "setting",
+            "name": "Setting",
             "rmType": "DV_CODED_TEXT",
             "min": 0,
             "max": 1,
@@ -671,6 +673,7 @@
               },
               {
                 "id": "time",
+                "name": "Time",
                 "rmType": "DV_DATE_TIME",
                 "min": 0,
                 "max": 1,
@@ -685,6 +688,7 @@
           },
           {
             "id": "language",
+            "name": "Language",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -692,6 +696,7 @@
           },
           {
             "id": "encoding",
+            "name": "Encoding",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -699,6 +704,7 @@
           },
           {
             "id": "subject",
+            "name": "Subject",
             "rmType": "PARTY_PROXY",
             "min": 0,
             "max": 1,
@@ -1099,6 +1105,7 @@
               },
               {
                 "id": "time",
+                "name": "Time",
                 "rmType": "DV_DATE_TIME",
                 "min": 0,
                 "max": 1,
@@ -1526,6 +1533,7 @@
               },
               {
                 "id": "time",
+                "name": "Time",
                 "rmType": "DV_DATE_TIME",
                 "min": 0,
                 "max": 1,
@@ -1807,6 +1815,7 @@
           },
           {
             "id": "language",
+            "name": "Language",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -1814,6 +1823,7 @@
           },
           {
             "id": "encoding",
+            "name": "Encoding",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -1821,6 +1831,7 @@
           },
           {
             "id": "subject",
+            "name": "Subject",
             "rmType": "PARTY_PROXY",
             "min": 0,
             "max": 1,
@@ -2123,6 +2134,7 @@
           },
           {
             "id": "language",
+            "name": "Language",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -2130,6 +2142,7 @@
           },
           {
             "id": "encoding",
+            "name": "Encoding",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -2137,6 +2150,7 @@
           },
           {
             "id": "subject",
+            "name": "Subject",
             "rmType": "PARTY_PROXY",
             "min": 0,
             "max": 1,
@@ -2266,15 +2280,7 @@
                   },
                   {
                     "suffix": "denominator",
-                    "type": "DECIMAL",
-                    "validation": {
-                      "range": {
-                        "min": 0,
-                        "minOp": "\u003e",
-                        "max": 0,
-                        "maxOp": "\u003c"
-                      }
-                    }
+                    "type": "DECIMAL"
                   }
                 ]
               },
@@ -2345,15 +2351,7 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL",
-                        "validation": {
-                          "range": {
-                            "min": 0,
-                            "minOp": "\u003e",
-                            "max": 0,
-                            "maxOp": "\u003c"
-                          }
-                        }
+                        "type": "DECIMAL"
                       }
                     ]
                   },
@@ -2387,15 +2385,7 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL",
-                        "validation": {
-                          "range": {
-                            "min": 0,
-                            "minOp": "\u003e",
-                            "max": 0,
-                            "maxOp": "\u003c"
-                          }
-                        }
+                        "type": "DECIMAL"
                       }
                     ]
                   },
@@ -2466,15 +2456,7 @@
                           },
                           {
                             "suffix": "denominator",
-                            "type": "DECIMAL",
-                            "validation": {
-                              "range": {
-                                "min": 0,
-                                "minOp": "\u003e",
-                                "max": 0,
-                                "maxOp": "\u003c"
-                              }
-                            }
+                            "type": "DECIMAL"
                           }
                         ]
                       }
@@ -2549,15 +2531,7 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL",
-                        "validation": {
-                          "range": {
-                            "min": 0,
-                            "minOp": "\u003e",
-                            "max": 0,
-                            "maxOp": "\u003c"
-                          }
-                        }
+                        "type": "DECIMAL"
                       }
                     ]
                   }
@@ -2586,6 +2560,7 @@
               },
               {
                 "id": "time",
+                "name": "Time",
                 "rmType": "DV_DATE_TIME",
                 "min": 0,
                 "max": 1,
@@ -2600,6 +2575,7 @@
           },
           {
             "id": "language",
+            "name": "Language",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -2607,6 +2583,7 @@
           },
           {
             "id": "encoding",
+            "name": "Encoding",
             "rmType": "CODE_PHRASE",
             "min": 0,
             "max": 1,
@@ -2614,6 +2591,7 @@
           },
           {
             "id": "subject",
+            "name": "Subject",
             "rmType": "PARTY_PROXY",
             "min": 0,
             "max": 1,
@@ -2641,6 +2619,7 @@
       },
       {
         "id": "language",
+        "name": "Language",
         "rmType": "CODE_PHRASE",
         "min": 0,
         "max": 1,
@@ -2648,6 +2627,7 @@
       },
       {
         "id": "territory",
+        "name": "Territory",
         "rmType": "CODE_PHRASE",
         "min": 0,
         "max": 1,
@@ -2655,6 +2635,7 @@
       },
       {
         "id": "composer",
+        "name": "Composer",
         "rmType": "PARTY_PROXY",
         "min": 0,
         "max": 1,

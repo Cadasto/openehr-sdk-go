@@ -1,6 +1,9 @@
 package webtemplate
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 // REQ-106, ADR-0014 — lock the reverse-engineered EHRbase id sanitisation
 // rules (diacritics kept, non-alphanumerics collapse to '_', trailing '.'
@@ -41,16 +44,8 @@ func TestDurationFields(t *testing.T) {
 		{"", []string{"year", "month", "day", "week", "hour", "minute", "second"}},
 	}
 	for _, tc := range cases {
-		got := durationFields(tc.pattern)
-		if len(got) != len(tc.want) {
+		if got := durationFields(tc.pattern); !slices.Equal(got, tc.want) {
 			t.Errorf("durationFields(%q) = %v, want %v", tc.pattern, got, tc.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				t.Errorf("durationFields(%q) = %v, want %v", tc.pattern, got, tc.want)
-				break
-			}
 		}
 	}
 }

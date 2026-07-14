@@ -24,6 +24,10 @@ func goldenFixtures() map[string]string {
 		"minimal_observation": tmpl + "minimal_observation.en.v1.opt",
 		"minimal_instruction": tmpl + "minimal_instruction.en.v1.opt",
 		"constrain_test":      referenceDir + "/constrain_test.opt",
+		// Unconstrained numerics must emit no validation range — pins the
+		// rangeValidation zero-value regression (REQ-106).
+		"dv_count_open_constraint":      tmpl + "Test_dv_count_open_constraint.v0.opt",
+		"dv_proportion_open_constraint": tmpl + "Test_dv_proportion_open_constraint.v0.opt",
 	}
 }
 

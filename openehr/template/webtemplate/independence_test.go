@@ -8,9 +8,9 @@ import (
 
 // REQ-013 § Building-block independence — openehr/template/webtemplate MUST
 // stay a pure clinical building block: a compiled OPT in, WebTemplate JSON
-// out. It depends only on openehr/templatecompile, openehr/template,
-// openehr/rm/rminfo, and the standard library — never on the wire /
-// transport / auth / client / serialize layers. Mirrors
+// out. It depends only on openehr/templatecompile,
+// openehr/template/constraints, and the standard library — never on the
+// wire / transport / auth / client / serialize layers. Mirrors
 // TestTemplatecompileForbiddenImports and locks the contract documented in
 // doc.go (REQ-106).
 func TestWebtemplateForbiddenImports(t *testing.T) {

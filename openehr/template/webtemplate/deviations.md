@@ -13,24 +13,34 @@ a *structural* field diverge is a test failure, not a deviation.
 
 - **`termBindings`, `annotations`, `inContext`** — not emitted. The reference tags
   RM-attribute leaves with `inContext: true` and carries per-node term bindings and
-  UI annotations; this slice omits them.
-- **`localizedName` / localized maps** — emitted from the archetype terms, but only
-  for languages the OPT actually defines; the reference's exact language packaging may
-  differ.
+  UI annotations; this slice omits them (the leaves themselves, including their
+  capitalized `name`, are emitted).
+- **inContext coverage** — the fixed RM-attribute leaf table covers the container
+  types the fixture exercises (COMPOSITION, EVENT_CONTEXT, the ENTRY types, EVENT
+  variants). The reference also synthesizes ACTIVITY `timing` /
+  `action_archetype_id` and ACTION `ism_transition` leaves; those are not emitted
+  yet. *(Deferred: extend parity with a fixture exercising INSTRUCTION/ACTION.)*
+- **`localizedName` / localized maps** — emitted for the compiled template's single
+  document language only. The compiled bridge resolves every language to the
+  document-language term, so no per-language override options are offered — they
+  would relabel text without retranslating it; the reference's exact language
+  packaging may differ.
 - **Sibling `id` disambiguation** — not implemented. When two sibling nodes sanitise
   to the same `id`, EHRbase appends a disambiguating suffix; `constrain_test` contains
-  no such collision, so the exact rule is unverified. Templates with colliding sibling
-  names will currently emit duplicate `id`s. *(Deferred: derive the suffix rule from a
-  fixture that exercises it.)*
+  no such collision, so the exact rule is unverified. Rather than emit ambiguous
+  duplicate `id`s, `Build` returns `ErrIDCollision` for such templates. *(Deferred:
+  derive the suffix rule from a fixture that exercises it.)*
 
 ## Input-level (contents beyond suffix/type)
 
 - **`defaultValue`** — never emitted (the reference carries assumed values on several
   inputs).
 - **`validation` ranges** — emitted for DV_COUNT (INTEGER) and DV_PROPORTION
-  (numerator/denominator) and single-unit DV_QUANTITY magnitude; **not** emitted for
-  DV_DURATION per-field ranges, DV_QUANTITY `precision`, per-unit list validation, or
-  multi-unit magnitude.
+  (numerator/denominator) and single-unit DV_QUANTITY magnitude, only when the
+  constraint actually bounds a side (an unconstrained numeric emits no validation);
+  **not** emitted for DV_DURATION per-field ranges, DV_QUANTITY `precision`, per-unit
+  list validation, multi-unit magnitude, or the proportion-kind–derived denominator
+  bounds the reference computes (e.g. `>=100 <=100` for percent-kind DV_PROPORTION).
 - **Date/time `validation.pattern`** — not emitted (reference carries e.g.
   `yyyy-mm-ddTHH:MM:SS`).
 - **Coded/ordinal list labels** — `value` and `ordinal` match; `label` is resolved from
