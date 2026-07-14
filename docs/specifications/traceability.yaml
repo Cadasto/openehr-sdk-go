@@ -655,20 +655,28 @@ requirements:
     title: WebTemplate JSON export
     canonical: docs/specifications/clinical-modeling.md#req-106--webtemplate-json-export
     status: draft
-    # Planned. Projects the public compiled OPT (*templatecompile.Compiled,
-    # REQ-111) into the EHRbase openEHR_SDK v2.3 WebTemplate JSON shape:
-    # deterministic camelCase output, reference-locked lower-snake id
-    # generation (ADR 0014), core-datatype inputs from REQ-103 primitive
-    # constraints, structural (not byte) parity via PROBE-075 against a
-    # vendored EHRbase corona_anamnese fixture. Direct-slice: the shared
-    # simplified-template model (umbrella Phase 1 / REQ-053) is deferred
-    # until a second consumer exists.
-    implementation: planned
+    # Projects the public compiled OPT (*templatecompile.Compiled, REQ-111)
+    # into the EHRbase openEHR_SDK v2.3 WebTemplate JSON shape: deterministic
+    # camelCase output, reference-locked lower-snake id generation (ADR 0014),
+    # core-datatype inputs from REQ-103 primitive constraints, structural (not
+    # byte) parity via PROBE-075 against the vendored EHRbase constrain_test
+    # fixture (104/104 node + input-suffix/type parity; documented deviations
+    # in the package's deviations.md). Direct-slice: the shared
+    # simplified-template model (umbrella Phase 1 / REQ-053) is deferred until
+    # a second consumer exists; archetype-reuse-under-slot templates (duplicate
+    # compiled AQL paths) are deferred — see ADR 0014.
+    implementation: landed
     packages:
       - openehr/template/webtemplate
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
     probes: [PROBE-075]
-    tests: []
+    tests:
+      - openehr/template/webtemplate/build_test.go
+      - openehr/template/webtemplate/inputs_test.go
+      - openehr/template/webtemplate/golden_test.go
+      - openehr/template/webtemplate/parity_test.go
+      - openehr/template/webtemplate/id_internal_test.go
+      - openehr/template/webtemplate/independence_test.go
     plans:
       - docs/plans/2026-05-22-webtemplate-export.md
 

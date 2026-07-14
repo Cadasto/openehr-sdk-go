@@ -86,10 +86,7 @@ func TestInputParity(t *testing.T) {
 
 	t.Logf("INPUT PARITY: compared=%d matched=%d mismatch=%d", len(refInputs), matched, len(mismatch))
 	if len(mismatch) > 0 {
-		n := len(mismatch)
-		if n > 20 {
-			n = 20
-		}
+		n := min(len(mismatch), 20)
 		for _, m := range mismatch[:n] {
 			t.Logf("  %s", m)
 		}
