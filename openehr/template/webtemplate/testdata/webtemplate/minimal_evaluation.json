@@ -1,0 +1,181 @@
+{
+  "templateId": "minimal_evaluation.en.v1",
+  "version": "2.3",
+  "defaultLanguage": "en",
+  "languages": [
+    "en"
+  ],
+  "tree": {
+    "id": "minimal",
+    "name": "Minimal",
+    "localizedName": "Minimal",
+    "rmType": "COMPOSITION",
+    "nodeId": "openEHR-EHR-COMPOSITION.minimal.v1",
+    "min": 1,
+    "max": 1,
+    "localizedNames": {
+      "en": "Minimal"
+    },
+    "localizedDescriptions": {
+      "en": "unknown"
+    },
+    "aqlPath": "",
+    "children": [
+      {
+        "id": "category",
+        "rmType": "DV_CODED_TEXT",
+        "min": 1,
+        "max": 1,
+        "aqlPath": "/category",
+        "inputs": [
+          {
+            "suffix": "code",
+            "type": "CODED_TEXT",
+            "list": [
+              {
+                "value": "433"
+              }
+            ],
+            "terminology": "openehr"
+          }
+        ]
+      },
+      {
+        "id": "minimal",
+        "name": "Minimal",
+        "localizedName": "Minimal",
+        "rmType": "EVALUATION",
+        "nodeId": "openEHR-EHR-EVALUATION.minimal.v1",
+        "min": 0,
+        "max": -1,
+        "localizedNames": {
+          "en": "Minimal"
+        },
+        "localizedDescriptions": {
+          "en": "unknown"
+        },
+        "aqlPath": "/content[openEHR-EHR-EVALUATION.minimal.v1]",
+        "children": [
+          {
+            "id": "quantity",
+            "name": "quantity",
+            "localizedName": "quantity",
+            "rmType": "DV_QUANTITY",
+            "nodeId": "at0002",
+            "min": 0,
+            "max": 1,
+            "localizedNames": {
+              "en": "quantity"
+            },
+            "localizedDescriptions": {
+              "en": "*"
+            },
+            "aqlPath": "/content[openEHR-EHR-EVALUATION.minimal.v1]/data[at0001]/items[at0002]/value",
+            "inputs": [
+              {
+                "suffix": "magnitude",
+                "type": "DECIMAL"
+              },
+              {
+                "suffix": "unit",
+                "type": "CODED_TEXT",
+                "list": [
+                  {
+                    "value": "kg",
+                    "label": "kg"
+                  },
+                  {
+                    "value": "mg",
+                    "label": "mg"
+                  },
+                  {
+                    "value": "gm",
+                    "label": "gm"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "language",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-EVALUATION.minimal.v1]/language"
+          },
+          {
+            "id": "encoding",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-EVALUATION.minimal.v1]/encoding"
+          },
+          {
+            "id": "subject",
+            "rmType": "PARTY_PROXY",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-EVALUATION.minimal.v1]/subject",
+            "inputs": [
+              {
+                "suffix": "id",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_scheme",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_namespace",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "name",
+                "type": "TEXT"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "language",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/language"
+      },
+      {
+        "id": "territory",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/territory"
+      },
+      {
+        "id": "composer",
+        "rmType": "PARTY_PROXY",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/composer",
+        "inputs": [
+          {
+            "suffix": "id",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_scheme",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_namespace",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "name",
+            "type": "TEXT"
+          }
+        ]
+      }
+    ]
+  }
+}

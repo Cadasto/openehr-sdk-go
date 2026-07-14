@@ -1,0 +1,181 @@
+{
+  "templateId": "minimal_instruction.en.v1",
+  "version": "2.3",
+  "defaultLanguage": "en",
+  "languages": [
+    "en"
+  ],
+  "tree": {
+    "id": "minimal",
+    "name": "Minimal",
+    "localizedName": "Minimal",
+    "rmType": "COMPOSITION",
+    "nodeId": "openEHR-EHR-COMPOSITION.minimal.v1",
+    "min": 1,
+    "max": 1,
+    "localizedNames": {
+      "en": "Minimal"
+    },
+    "localizedDescriptions": {
+      "en": "unknown"
+    },
+    "aqlPath": "",
+    "children": [
+      {
+        "id": "category",
+        "rmType": "DV_CODED_TEXT",
+        "min": 1,
+        "max": 1,
+        "aqlPath": "/category",
+        "inputs": [
+          {
+            "suffix": "code",
+            "type": "CODED_TEXT",
+            "list": [
+              {
+                "value": "433"
+              }
+            ],
+            "terminology": "openehr"
+          }
+        ]
+      },
+      {
+        "id": "minimal",
+        "name": "Minimal",
+        "localizedName": "Minimal",
+        "rmType": "INSTRUCTION",
+        "nodeId": "openEHR-EHR-INSTRUCTION.minimal.v1",
+        "min": 0,
+        "max": -1,
+        "localizedNames": {
+          "en": "Minimal"
+        },
+        "localizedDescriptions": {
+          "en": "unknown"
+        },
+        "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]",
+        "children": [
+          {
+            "id": "current_activity",
+            "name": "Current Activity",
+            "localizedName": "Current Activity",
+            "rmType": "ACTIVITY",
+            "nodeId": "at0001",
+            "min": 0,
+            "max": 1,
+            "localizedNames": {
+              "en": "Current Activity"
+            },
+            "localizedDescriptions": {
+              "en": "Current Activity"
+            },
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/activities[at0001]",
+            "children": [
+              {
+                "id": "duration",
+                "name": "duration",
+                "localizedName": "duration",
+                "rmType": "DV_DURATION",
+                "nodeId": "at0003",
+                "min": 0,
+                "max": 1,
+                "localizedNames": {
+                  "en": "duration"
+                },
+                "localizedDescriptions": {
+                  "en": "*"
+                },
+                "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/activities[at0001]/description[at0002]/items[at0003]/value",
+                "inputs": [
+                  {
+                    "suffix": "minute",
+                    "type": "INTEGER"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "language",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/language"
+          },
+          {
+            "id": "encoding",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/encoding"
+          },
+          {
+            "id": "subject",
+            "rmType": "PARTY_PROXY",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/subject",
+            "inputs": [
+              {
+                "suffix": "id",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_scheme",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_namespace",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "name",
+                "type": "TEXT"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "language",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/language"
+      },
+      {
+        "id": "territory",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/territory"
+      },
+      {
+        "id": "composer",
+        "rmType": "PARTY_PROXY",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/composer",
+        "inputs": [
+          {
+            "suffix": "id",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_scheme",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_namespace",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "name",
+            "type": "TEXT"
+          }
+        ]
+      }
+    ]
+  }
+}
