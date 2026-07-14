@@ -1,15 +1,20 @@
-# WebTemplate export — documented deviations (REQ-106, PROBE-075)
+# WebTemplate export — deviations catalogue (REQ-106, PROBE-075)
 
-Conformance against the EHRbase `openEHR_SDK` v2.3 reference is **structural, not
-byte-exact** ([ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md)).
-PROBE-075 (`TestStructuralParity` + `TestInputParity` in this package) pins the
-load-bearing surface — every node's `id`, `rmType`, `nodeId`, `aqlPath`,
-`min`/`max`, and each input's `suffix`/`type` extended with coded/ordinal list
-values and ordinals, temporal validation patterns, and numeric validation
-ranges — at **104/104** parity against the vendored `constrain_test` reference.
-The deltas below are the parts of the reference this slice deliberately does
-**not** reproduce. Any change that makes a *structural* field diverge is a test
-failure, not a deviation.
+**Informative.** The normative conformance contract — which categories of
+divergence from the EHRbase `openEHR_SDK` v2.3 reference are permitted — lives in
+the canonical spec, [REQ-106 § Conformance and deviations](../../../docs/specifications/clinical-modeling.md#req-106--webtemplate-json-export)
+([ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md)).
+This file is the per-field elaboration of that contract, kept beside the parity
+tests that pin it.
+
+Conformance is **structural, not byte-exact**. PROBE-075 (`TestStructuralParity`
++ `TestInputParity` in this package) pins the load-bearing surface — every node's
+`id`, `rmType`, `nodeId`, `aqlPath`, `min`/`max`, and each input's `suffix`/`type`
+extended with coded/ordinal list values and ordinals, `listOpen`, `terminology`,
+temporal validation patterns, and numeric validation ranges — at **104/104**
+parity against the vendored `constrain_test` reference. The deltas below are the
+parts of the reference this slice deliberately does **not** reproduce. Any change
+that makes a *pinned* field diverge is a test failure, not a deviation.
 
 ## Node-level
 
@@ -50,6 +55,12 @@ failure, not a deviation.
   archetype at-code terms where present, but is **empty for external-terminology codes**
   (e.g. `openehr::433`), and `localizedLabels` / `localizedDescriptions` / per-item
   `termBindings` are not emitted.
+- **`terminology`** — emitted for external bindings only (e.g. `openehr`). The
+  archetype-internal `local` value is omitted, mirroring the reference (pinned by
+  `TestInputParity`).
+- **`listOpen`** — emitted (`true`) for an open coded list: an empty constraint list, or
+  a DV_CODED_TEXT with a DV_TEXT alternative (the free-text `other` input admits values
+  beyond the enumerated codes), mirroring the reference (pinned by `TestInputParity`).
 
 ## Scope
 

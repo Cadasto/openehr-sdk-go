@@ -719,7 +719,15 @@ Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map
 
 ### Conformance and deviations
 
-Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` extended with coded/ordinal list values, temporal validation patterns, and numeric validation ranges — against a **documented-deviations list**. That list lives at [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md), beside the parity tests that pin it, and is the normative exception catalogue for this section. Field ordering, absent optional fields, localized-string packaging, and known id edge cases are recorded deviations, not failures; any structural difference **not** on the list is a failure.
+Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` extended with coded/ordinal list values, `listOpen`, `terminology`, temporal validation patterns, and numeric validation ranges. Any structural difference on that pinned surface is a failure; the following categories of divergence are **permitted deviations** and **MUST NOT** be treated as conformance failures:
+
+1. **Field-level presentation** — JSON field ordering, absent optional fields, and localized-string packaging (`localizedName` / localized maps emitted for the compiled template's single document language only).
+2. **Reference-only node metadata** — `termBindings`, `annotations`, and the `inContext` flag on synthesized RM-attribute leaves.
+3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
+4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
+5. **Deferred id edge cases** — sibling-`id` disambiguation is not implemented; a would-be collision fails with a typed error rather than emitting duplicates (see the `id` generation section).
+
+The exact per-field enumeration behind these categories — the informative catalogue pinned by the parity tests — is maintained in [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md) beside those tests. This section is the normative contract; that file elaborates it.
 
 The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md)).
 
