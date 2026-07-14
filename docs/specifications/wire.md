@@ -151,16 +151,30 @@ Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassette
 
 ### REQ-053
 
-The SDK **MUST** provide codecs for the openEHR **FLAT** and **STRUCTURED** simplified formats in `openehr/serialize`:
+The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** (simSDT) and **STRUCTURED** (structSDT) *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0). This section pins to that document for the wire grammar; it does not re-define it.
 
-- **FLAT** — path-keyed, value-flat. Keys are openEHR paths (`/content[openEHR-EHR-OBSERVATION.foo.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude`); values are leaf scalars.
-- **STRUCTURED** — nested JSON that preserves RM structure but omits `_type` where the path is unambiguous (because the template constrains the type).
+Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
 
-Both codecs **MUST**:
+- Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
+- Repeating nodes carry a zero-based instance index `:0` / `:1`.
+- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` collapses into its value (no trailing `/value`).
+- Structural levels are removed relative to the canonical path: container attributes (`content`, `data`, `events`, `items`, …) are elided, and the `ITEM_STRUCTURE` family, `HISTORY`, and single unnamed `EVENT`s are collapsed.
+- Composition-level metadata is carried under the `ctx/` prefix (mandatory `language`, `territory`; optional `composer`, `time`, `setting`, participations, …).
+- Optional RM attributes the template does not constrain use an underscore prefix (`_uid`, `_link`, `_normal_range`, …); the `|raw` suffix embeds a pre-serialized canonical RM fragment, which **MUST** carry `_type`.
 
-- Be usable independently of the HTTP client (REQ-013) — feeding a FLAT JSON file to a FLAT-to-canonical converter is a valid standalone use case.
-- Round-trip cleanly when the source artifact is OPT-aware (FLAT/STRUCTURED ↔ canonical conversion requires the OPT to resolve ambiguous paths and missing `_type`s).
-- Report missing OPT context as a typed error when conversion cannot proceed without it.
+**FLAT** is a single-level map of `path → primitive | object`. **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
+
+The identifier-generation algorithm is **normative** in the *Simplified Formats* spec (§Node ID Generation Rules); the SDK **MUST** generate segment identifiers by that algorithm, reusing the Web Template projection (REQ-106, [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md)) as the single source of ids.
+
+The codecs **MUST**:
+
+- Be usable independently of the HTTP client and of `auth`/`transport` (REQ-013) — converting a FLAT or STRUCTURED document to or from canonical RM is a valid standalone use case.
+- Require the composition's **operational template** (via its Web Template) to resolve identifiers, RM types, level-removal, and `:index` — conversion is template-specific and cannot proceed from the payload alone.
+- **Round-trip** FLAT / STRUCTURED ↔ canonical `COMPOSITION` given the OPT: bidirectional and **semantics-preserving** (all archetype- and template-constrained clinical semantics are retained). The simplified forms are *not self-standing* — they depend on the template — which is distinct from being lossy; reconstructing the OPT itself from a data instance is out of scope.
+- Interconvert FLAT ↔ STRUCTURED **without** an OPT (the two are mechanical restructurings of one identifier grammar).
+- Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
+
+The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them.
 
 ## ITS-REST envelopes
 
