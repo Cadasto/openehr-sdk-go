@@ -25,15 +25,12 @@ var (
 	// ErrMissingContext is returned when mandatory context (language,
 	// territory) is absent and cannot be defaulted.
 	ErrMissingContext = errors.New("simplified: missing mandatory context")
+	// ErrNilComposition is returned when a nil composition is passed to an
+	// encode.
+	ErrNilComposition = errors.New("simplified: nil composition")
 )
 
-// MarshalFlat encodes comp as FLAT JSON using wt (REQ-053).
-//
-// Implemented in flat_encode.go; this stub keeps the public surface stable
-// until that lands.
-func MarshalFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
-	return nil, ErrNoTemplate
-}
+// MarshalFlat is implemented in flat_encode.go.
 
 // UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION
 // using wt (REQ-053). Implemented in flat_decode.go.
