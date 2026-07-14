@@ -38,27 +38,5 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, e
 	return nil, ErrNoTemplate
 }
 
-// MarshalStructured encodes comp as STRUCTURED JSON using wt (REQ-053).
-// Implemented in structured.go.
-func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
-	return nil, ErrNoTemplate
-}
-
-// UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
-// using wt (REQ-053). Implemented in structured.go.
-func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
-	return nil, ErrNoTemplate
-}
-
-// FlatToStructured restructures FLAT JSON into STRUCTURED JSON. The two
-// variants share one identifier grammar, so this needs no Web Template
-// (REQ-053). Implemented in structured.go.
-func FlatToStructured(data []byte) ([]byte, error) {
-	return nil, ErrUnknownPath
-}
-
-// StructuredToFlat restructures STRUCTURED JSON into FLAT JSON. Needs no Web
-// Template (REQ-053). Implemented in structured.go.
-func StructuredToFlat(data []byte) ([]byte, error) {
-	return nil, ErrUnknownPath
-}
+// MarshalStructured / UnmarshalStructured / FlatToStructured / StructuredToFlat
+// are implemented in structured.go.
