@@ -19,6 +19,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -51,24 +52,23 @@ func main() {
 		log.Fatalf("Compile: %v", err)
 	}
 
-	// Build returns the typed tree for callers that post-process before
-	// encoding; Marshal is Build + deterministic JSON in one call.
+	// Build once for the typed tree; encode with the same json.Marshal path
+	// webtemplate.Marshal uses (deterministic struct field order).
 	wt, err := webtemplate.Build(c)
 	if err != nil {
 		log.Fatalf("Build: %v", err)
 	}
-	data, err := webtemplate.Marshal(c)
+	data, err := json.Marshal(wt)
 	if err != nil {
 		log.Fatalf("Marshal: %v", err)
 	}
 
 	if *dumpJSON {
-		var pretty strings.Builder
-		enc := json.NewEncoder(&pretty)
-		enc.SetIndent("", "  ")
-		if err := enc.Encode(wt); err != nil {
-			log.Fatalf("encode: %v", err)
+		var pretty bytes.Buffer
+		if err := json.Indent(&pretty, data, "", "  "); err != nil {
+			log.Fatalf("indent: %v", err)
 		}
+		pretty.WriteByte('\n')
 		fmt.Print(pretty.String())
 		return
 	}
