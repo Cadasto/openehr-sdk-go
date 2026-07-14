@@ -2,15 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Date:** 2026-05-22 (activated 2026-07-13 — direct-slice decision)
-**Status:** Active (ready — DoR met)
+**Date:** 2026-05-22 (activated 2026-07-13 — direct-slice decision; landed 2026-07-14)
+**Status:** Done
 **Owner:** SDK maintainers
-**Covers:** [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (registry row in [REQ.md](../specifications/REQ.md))
-**Probes:** [PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity)
-**Decisions:** [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md) — reference implementation & id-generation lock
-**Implementation:** planned
+**Covers:** [REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (registry row in [REQ.md](../../specifications/REQ.md))
+**Probes:** [PROBE-075](../../specifications/conformance.md#probe-075--webtemplate-structural-parity)
+**Decisions:** [ADR-0014](../../adr/0014-webtemplate-reference-implementation-lock.md) — reference implementation & id-generation lock
+**Implementation:** landed
 **Depends on:** landed compiled-template foundation — `openehr/template/` (REQ-100) + public bridge `openehr/templatecompile/` (REQ-111) + REQ-103 primitive constraints.
-**Defers:** the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](2026-06-23-simplified-formats.md)); FLAT/STRUCTURED codecs (REQ-053); WebTemplate→OPT round-trip; REST serving / content negotiation; exotic datatype inputs; the Better camelCase `id` variant; **archetype-reuse-under-slot templates** (duplicate compiled AQL paths — e.g. `corona_anamnese` — which `templatecompile` rejects; relaxing the compiler is a possible REQ-100/111 follow-up per ADR-0014).
+**Defers:** the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../2026-06-23-simplified-formats.md)); FLAT/STRUCTURED codecs (REQ-053); WebTemplate→OPT round-trip; REST serving / content negotiation; exotic datatype inputs; the Better camelCase `id` variant; **archetype-reuse-under-slot templates** (duplicate compiled AQL paths — e.g. `corona_anamnese` — which `templatecompile` rejects; relaxing the compiler is a possible REQ-100/111 follow-up per ADR-0014).
 
 ## Goal
 
@@ -19,8 +19,8 @@ Ship `openehr/template/webtemplate` — a public package that projects a compile
 ## Definition of Ready
 
 - [x] `**Covers:**` lists the REQ (REQ-106).
-- [x] Canonical normative prose exists — [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) + REQ.md registry row.
-- [x] The irreversible fork (reference-impl + id-generation lock) has an ADR — [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md). **Flip its Status to `Accepted` at Task 1 start** (maintainer sign-off on the REQ-106 spec is the acceptance moment).
+- [x] Canonical normative prose exists — [clinical-modeling.md § REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) + REQ.md registry row.
+- [x] The irreversible fork (reference-impl + id-generation lock) has an ADR — [ADR-0014](../../adr/0014-webtemplate-reference-implementation-lock.md). **Flip its Status to `Accepted` at Task 1 start** (maintainer sign-off on the REQ-106 spec is the acceptance moment).
 - [x] Phases list concrete tasks and name the verification command (`go test`, `make spec-check`, `make ci`).
 
 ## Global Constraints
@@ -37,26 +37,26 @@ Every task's requirements implicitly include these:
 
 ## Definition of Done
 
-- [ ] Code + tests land with `// REQ-106` / `// PROBE-075` citations; `openehr/template/webtemplate` exports `Build` / `Marshal` / the typed shapes.
-- [ ] [`traceability.yaml`](../specifications/traceability.yaml) REQ-106 `tests:`/`packages:` populated; `implementation: planned` → `landed`; REQ.md **Impl.** column `planned` → `landed`; ADR-0014 Status `Accepted`.
-- [ ] PROBE-075 implemented (or its deferral recorded per ADR-0014 if the fixture fetch is blocked).
-- [ ] `make spec-check` and `make ci` pass.
-- [ ] Plan archived under [`docs/plans/archive/`](archive/) (or **Status:** set to complete) + plans/README + roadmap updated.
+- [x] Code + tests land with `// REQ-106` / `// PROBE-075` citations; `openehr/template/webtemplate` exports `Build` / `Marshal` / the typed shapes.
+- [x] [`traceability.yaml`](../../specifications/traceability.yaml) REQ-106 `tests:`/`packages:` populated; `implementation: planned` → `landed`; REQ.md **Impl.** column `planned` → `landed`; ADR-0014 Status `Accepted`.
+- [x] PROBE-075 implemented — 104/104 structural + input-suffix/type parity; deviations recorded in the package's `deviations.md`.
+- [x] `make spec-check` and `make ci` pass.
+- [x] Plan archived under [`docs/plans/archive/`](./) + plans/README + roadmap updated.
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| ADR-0014 flipped to Accepted | |
-| Package + typed shapes (`webtemplate.go`, `doc.go`) | |
-| Reference fixture vendored (or deferral recorded) | |
-| Structural transform (`build.go`) | |
-| id generation (`id.go`) | |
-| inputs mapping (`inputs.go`) | |
-| Deterministic `Marshal` + round-trip goldens | |
-| PROBE-075 structural parity + deviations list | |
-| traceability / REQ.md / ADR status updated | |
-| `make spec-check` + `make ci` | |
+| ADR-0014 flipped to Accepted | ✅ |
+| Package + typed shapes (`webtemplate.go`, `doc.go`) | ✅ |
+| Reference fixture vendored (or deferral recorded) | ✅ constrain_test |
+| Structural transform (`build.go`) | ✅ 104/104 |
+| id generation (`id.go`) | ✅ |
+| inputs mapping (`inputs.go`) | ✅ 104/104 |
+| Deterministic `Marshal` + round-trip goldens | ✅ |
+| PROBE-075 structural parity + deviations list | ✅ |
+| traceability / REQ.md / ADR status updated | ✅ |
+| `make spec-check` + `make ci` | ✅ |
 
 ---
 
@@ -355,7 +355,7 @@ git commit -m "test(webtemplate): vendor EHRbase constrain_test parity fixture (
 
 #### Task 3: Build the tree (rmType / nodeId / aqlPath / min / max)
 
-> **Corrected transform model (empirically derived from the `constrain_test` reference).** EHRbase's WebTemplate tree is **not** a structural mirror. `build.go` MUST implement, per [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) "Output shape": (a) **keep** COMPOSITION / ENTRY types / EVENT / INTERVAL_EVENT / EVENT_CONTEXT / CLUSTER; (b) **collapse** each ELEMENT into a value leaf (`rmType`=value type, `nodeId`=element at-code, `aqlPath`=element path + `/value`); (c) **drop** HISTORY / ITEM_TREE / ITEM_LIST / ITEM_STRUCTURE as nodes, **folding their `attr[predicate]` into the descendants' `aqlPath`**; (d) emit data-bearing RM attributes (context `start_time`/`setting`, event `time`, entry `language`/`encoding`/`subject`, interval_event `math_function`/`width`) as leaves with `id`=attribute name. The reference `aqlPath` carries every archetype-id/at-code predicate and **differs from our compiled `AQLPath()`** — reconstruct it during the walk. The naive `buildNode` snippet below is superseded by this model; drive the implementation against the vendored reference (parity test) rather than the illustrative code.
+> **Corrected transform model (empirically derived from the `constrain_test` reference).** EHRbase's WebTemplate tree is **not** a structural mirror. `build.go` MUST implement, per [clinical-modeling.md § REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) "Output shape": (a) **keep** COMPOSITION / ENTRY types / EVENT / INTERVAL_EVENT / EVENT_CONTEXT / CLUSTER; (b) **collapse** each ELEMENT into a value leaf (`rmType`=value type, `nodeId`=element at-code, `aqlPath`=element path + `/value`); (c) **drop** HISTORY / ITEM_TREE / ITEM_LIST / ITEM_STRUCTURE as nodes, **folding their `attr[predicate]` into the descendants' `aqlPath`**; (d) emit data-bearing RM attributes (context `start_time`/`setting`, event `time`, entry `language`/`encoding`/`subject`, interval_event `math_function`/`width`) as leaves with `id`=attribute name. The reference `aqlPath` carries every archetype-id/at-code predicate and **differs from our compiled `AQLPath()`** — reconstruct it during the walk. The naive `buildNode` snippet below is superseded by this model; drive the implementation against the vendored reference (parity test) rather than the illustrative code.
 
 **Files:**
 - Create: `openehr/template/webtemplate/build.go`
@@ -745,7 +745,7 @@ git commit -m "feat(webtemplate): sibling id disambiguation matching EHRbase ref
 - Consumes: `CompiledNode.PrimitiveConstraint() constraints.PrimitiveConstraint` (REQ-103 sealed interface) + the node's RM type.
 - Produces: `func inputsFor(n *templatecompile.CompiledNode) []Input`.
 
-- [ ] **Step 1: Write the inputs table test (RED)** covering each core datatype from [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export): DV_TEXT, DV_CODED_TEXT, DV_QUANTITY, DV_COUNT, DV_ORDINAL, DV_DATE_TIME/DATE/TIME, DV_BOOLEAN, DV_PROPORTION — asserting `suffix`/`type` (and `list`/`listOpen` where relevant). Use OPT fixtures that exercise each type, or build minimal `CompiledNode`s via `templatecompile.Compile` on a fixture that contains them (prefer the vendored `constrain_test` fixture, which covers DV_TEXT / CODED_TEXT / QUANTITY / COUNT / ORDINAL / DATE_TIME / DURATION / PROPORTION). Assert the exotic case (e.g. DV_MULTIMEDIA if present) yields a node with `len(Inputs)==0` and no error.
+- [ ] **Step 1: Write the inputs table test (RED)** covering each core datatype from [clinical-modeling.md § REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export): DV_TEXT, DV_CODED_TEXT, DV_QUANTITY, DV_COUNT, DV_ORDINAL, DV_DATE_TIME/DATE/TIME, DV_BOOLEAN, DV_PROPORTION — asserting `suffix`/`type` (and `list`/`listOpen` where relevant). Use OPT fixtures that exercise each type, or build minimal `CompiledNode`s via `templatecompile.Compile` on a fixture that contains them (prefer the vendored `constrain_test` fixture, which covers DV_TEXT / CODED_TEXT / QUANTITY / COUNT / ORDINAL / DATE_TIME / DURATION / PROPORTION). Assert the exotic case (e.g. DV_MULTIMEDIA if present) yields a node with `len(Inputs)==0` and no error.
 
 - [ ] **Step 2: Run it — expect FAIL (`inputsFor` undefined).**
 
@@ -874,8 +874,8 @@ git commit -m "docs(webtemplate): land REQ-106/PROBE-075 traceability + statuses
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — normative contract.
-- [REQ.md](../specifications/REQ.md) — registry row.
-- [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md) — reference-impl & id-generation lock.
-- [conformance.md § PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) — structural-parity probe.
-- [simplified-formats umbrella](2026-06-23-simplified-formats.md) — where the shared model is extracted later (REQ-053).
+- [clinical-modeling.md § REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — normative contract.
+- [REQ.md](../../specifications/REQ.md) — registry row.
+- [ADR-0014](../../adr/0014-webtemplate-reference-implementation-lock.md) — reference-impl & id-generation lock.
+- [conformance.md § PROBE-075](../../specifications/conformance.md#probe-075--webtemplate-structural-parity) — structural-parity probe.
+- [simplified-formats umbrella](../2026-06-23-simplified-formats.md) — where the shared model is extracted later (REQ-053).

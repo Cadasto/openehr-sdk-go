@@ -6,7 +6,7 @@
 **Covers:** REQ-100 (hardening); PROBE-022 (breadth); foundation for REQ-101 (composition builder), REQ-102 (validation), REQ-103 (primitive constraints), REQ-104 (slot assertions), REQ-105 (terminology bindings)
 **Implementation:** landed — Phases 1–6 + 4-bis (parser hardening through REQ-103 primitives); Phases 7–8 tracked in the deferred follow-up plan
 **Depends on:** [2026-05-21-template-parser.md](2026-05-21-template-parser.md) (PR #10 landing — done)
-**Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](../2026-05-22-webtemplate-export.md)); REQ-104 / REQ-105 — see deferred follow-up plan
+**Defers:** AOM 2 / ADL 2; OET parse; remote slot-fill repository; JSON-format simplified template export (separate plan — [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md)); REQ-104 / REQ-105 — see deferred follow-up plan
 
 ## Goal
 
@@ -169,7 +169,7 @@ type CompiledNode struct {
 ### Open questions
 
 - Should `Compiled` be the **primary** public API (with `OperationalTemplate` as wire-only), or sit alongside it? Decision deferred to first REQ-101 implementation PR (when call-site preferences emerge).
-- The compiled tree is internal infrastructure — distinct from any JSON-format simplified template representation used for UI / form-generation consumption. The latter is a serialisation concern with its own integration plan: [2026-05-22-webtemplate-export.md](../2026-05-22-webtemplate-export.md).
+- The compiled tree is internal infrastructure — distinct from any JSON-format simplified template representation used for UI / form-generation consumption. The latter is a serialisation concern with its own integration plan: [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md).
 
 ## Phase 4-bis — RM info lookup (foundation for Phase 4)
 
@@ -394,7 +394,7 @@ Phase 4 is the **load-bearing foundation**: it depends on Phase 4-bis (RMInfoLoo
 - **OET parse**, **ADL 2 OPT**, **remote slot-fill repository** — REQ-100 v1 bounds unchanged.
 - **Lowering ADL 1.4 into AOM 2** — we keep AOM 1.4 first-class because the OPT XSD emits AOM-1.4-shaped elements (`C_DV_QUANTITY`, `C_DV_ORDINAL`, etc.) and re-synthesising them on serialisation would be wasted work.
 - **Importing `openehr/aom/aom14/` into the parser** — the compiled template + REQ-103 primitive constraints supersede the original "reuse aom14 types" idea from the REQ-100 plan. The compile step produces its own typed surface; `aom14` remains a separate consumer-facing API for direct AOM XML decode if needed.
-- **JSON-format simplified template export** — a separate concern; see [2026-05-22-webtemplate-export.md](../2026-05-22-webtemplate-export.md). The compiled tree here is internal infrastructure consumed by builder + validator; the JSON-format export targets UI-rendering consumers and has its own design constraints.
+- **JSON-format simplified template export** — a separate concern; see [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md). The compiled tree here is internal infrastructure consumed by builder + validator; the JSON-format export targets UI-rendering consumers and has its own design constraints.
 
 ## Implementation checklist
 
@@ -424,4 +424,4 @@ Plan informed by analysis of two reference implementations and the openEHR speci
 - **openEHR AM specifications** — [`specifications.openehr.org/releases/AM/latest`](https://specifications.openehr.org/releases/AM/latest). Class invariants and AOM 1.4 / ADL 1.4 normative semantics.
 - **ehrbase openEHR_SDK** — [`github.com/ehrbase/openEHR_SDK`](https://github.com/ehrbase/openEHR_SDK). Java reference. Sourced design patterns: two-layer model (raw OPT → `WebTemplate` compiled), `Walker<T>` with `Context<T>` of three parallel stacks, RM-type-prefix slot fallback, `WebTemplateSkeletonBuilder` for default-composition build. Deepwiki summary: [`deepwiki.com/ehrbase/openEHR_SDK/3.2-template-structure`](https://deepwiki.com/ehrbase/openEHR_SDK/3.2-template-structure).
 - **openEHR/archie** — [`github.com/openEHR/archie`](https://github.com/openEHR/archie). Java reference (AOM 2 internally, with ADL 1.4 ingest via conversion). Sourced design patterns: single `CAttribute` with `multiple bool` + `Cardinality`, three-layer path system (`APathQuery` parser → `AOMPathQuery` walks template → `RMPathQuery` walks RM instance), first-class primitive constraint types in `aom/primitives/`, `RMObjectValidator` composition-vs-template walker.
-- **WebTemplate format (deferred plan)** — JSON-format simplified template representation widely used for UI / form-generation consumption. Originating reference: [`github.com/better-care/web-template`](https://github.com/better-care/web-template). Not in scope here; see [2026-05-22-webtemplate-export.md](../2026-05-22-webtemplate-export.md).
+- **WebTemplate format (deferred plan)** — JSON-format simplified template representation widely used for UI / form-generation consumption. Originating reference: [`github.com/better-care/web-template`](https://github.com/better-care/web-template). Not in scope here; see [2026-05-22-webtemplate-export.md](2026-05-22-webtemplate-export.md).

@@ -731,7 +731,7 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 - **Lives in:** `openehr/template/webtemplate/` (planned).
 - **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture (or its recorded deferral if the fixture fetch is blocked). Catalogued in [`conformance.md`](conformance.md).
-- **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/2026-05-22-webtemplate-export.md).
+- **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/archive/2026-05-22-webtemplate-export.md).
 
 ## REQ-112 — Template-less Reference Model validation floor
 
