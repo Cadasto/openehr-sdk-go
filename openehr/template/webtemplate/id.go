@@ -54,14 +54,20 @@ func termText(n *templatecompile.CompiledNode, lang string) string {
 }
 
 // idOf resolves a node's web id: its display name if any, else the RM
-// attribute name that reached it, else the RM type — all sanitised.
+// attribute name that reached it, else the RM type — all sanitised. The
+// fallback applies after sanitisation, so a punctuation-only display
+// name (which sanitises to "") still yields a usable FLAT-path segment.
 func idOf(n *templatecompile.CompiledNode, attrName string, cfg *config) string {
-	base := termText(n, cfg.defaultLanguage)
-	if strings.TrimSpace(base) == "" {
-		base = attrName
+	return firstNonEmptyID(termText(n, cfg.defaultLanguage), attrName, n.RMTypeName())
+}
+
+// firstNonEmptyID returns the first candidate whose sanitised form is
+// non-empty, or "".
+func firstNonEmptyID(candidates ...string) string {
+	for _, c := range candidates {
+		if id := sanitizeID(c); id != "" {
+			return id
+		}
 	}
-	if strings.TrimSpace(base) == "" {
-		base = n.RMTypeName()
-	}
-	return sanitizeID(base)
+	return ""
 }

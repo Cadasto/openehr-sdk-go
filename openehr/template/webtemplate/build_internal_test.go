@@ -25,6 +25,25 @@ func TestRangeValidationUnconstrained(t *testing.T) {
 	}
 }
 
+// The reference normalises exclusive INTEGER bounds to inclusive
+// (>10 → >=11, <15 → <=14) for DV_COUNT ranges (REQ-106).
+func TestIntRangeValidationNormalisesExclusiveBounds(t *testing.T) {
+	v := intRangeValidation(constraints.NumericRange{Lower: 10, Upper: 15, UpperInclusive: true})
+	if v == nil || v.Range.Min == nil || *v.Range.Min != 11 || v.Range.MinOp != ">=" {
+		t.Errorf("min = %+v, want >=11", v)
+	}
+	if v.Range.Max == nil || *v.Range.Max != 15 || v.Range.MaxOp != "<=" {
+		t.Errorf("max = %+v, want <=15", v)
+	}
+	v = intRangeValidation(constraints.NumericRange{Lower: 0, LowerInclusive: true, Upper: 5})
+	if v == nil || v.Range.Max == nil || *v.Range.Max != 4 || v.Range.MaxOp != "<=" {
+		t.Errorf("max = %+v, want <=4", v)
+	}
+	if v := intRangeValidation(constraints.NumericRange{}); v != nil {
+		t.Errorf("intRangeValidation(zero) = %+v, want nil", v)
+	}
+}
+
 // The archetype root's internal at0000 — including specialized forms like
 // at0000.1 — is not a nodeId; the archetype id takes its place (REQ-106).
 func TestNodeIDOfExcludesSpecializedRoot(t *testing.T) {
@@ -36,6 +55,27 @@ func TestNodeIDOfExcludesSpecializedRoot(t *testing.T) {
 	for _, id := range []string{"at0001", "at00001", "at0000x"} {
 		if isArchetypeRootCode(id) {
 			t.Errorf("isArchetypeRootCode(%q) = true, want false", id)
+		}
+	}
+}
+
+// A punctuation-only display name sanitises to "" and must fall through
+// to the attribute-name / RM-type fallbacks instead of emitting an empty
+// FLAT-path id (REQ-106).
+func TestFirstNonEmptyID(t *testing.T) {
+	cases := []struct {
+		candidates []string
+		want       string
+	}{
+		{[]string{"Blood pressure", "value", "DV_TEXT"}, "blood_pressure"},
+		{[]string{"!!!", "value", "DV_TEXT"}, "value"},         // name sanitises to ""
+		{[]string{"", "???", "DV_TEXT"}, "dv_text"},            // attr sanitises to "" too
+		{[]string{"  ", "", "DV_CODED_TEXT"}, "dv_coded_text"}, // blanks skipped
+		{[]string{"!!!", "  ", ""}, ""},                        // nothing usable
+	}
+	for _, tc := range cases {
+		if got := firstNonEmptyID(tc.candidates...); got != tc.want {
+			t.Errorf("firstNonEmptyID(%q) = %q, want %q", tc.candidates, got, tc.want)
 		}
 	}
 }

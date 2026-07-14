@@ -4,9 +4,12 @@ package webtemplate_test
 // vendored EHRbase reference (id / rmType / nodeId / aqlPath / min / max).
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
@@ -34,6 +37,68 @@ func TestBuildNil(t *testing.T) {
 	}
 	if _, err := webtemplate.Marshal(nil); !errors.Is(err, webtemplate.ErrEmptyTemplate) {
 		t.Errorf("Marshal(nil) err = %v, want ErrEmptyTemplate", err)
+	}
+}
+
+// An OPT without a resolvable default language must error, never emit
+// "defaultLanguage": "" (spec § REQ-106 Surface MUST).
+func TestBuildNoDefaultLanguage(t *testing.T) {
+	raw, err := os.ReadFile(referenceDir + "/" + referenceStem + ".opt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Strip the OPT-level <language> block; the lenient parser accepts
+	// the document, leaving Compiled.Language() empty.
+	before, rest, foundOpen := bytes.Cut(raw, []byte("<language>"))
+	_, after, foundClose := bytes.Cut(rest, []byte("</language>"))
+	if !foundOpen || !foundClose {
+		t.Fatal("fixture has no <language> block to strip")
+	}
+	stripped := append(append([]byte{}, before...), after...)
+
+	opt, err := template.ParseOPT(bytes.NewReader(stripped))
+	if err != nil {
+		t.Fatalf("ParseOPT (language stripped): %v", err)
+	}
+	c, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	if _, err := webtemplate.Build(c); !errors.Is(err, webtemplate.ErrNoDefaultLanguage) {
+		t.Errorf("Build err = %v, want ErrNoDefaultLanguage", err)
+	}
+}
+
+// Datatypes outside the core subset must emit their node without inputs
+// and without error (spec § REQ-106 inputs MUST NOT error).
+func TestExoticDatatypesEmitNoInputs(t *testing.T) {
+	cases := map[string]string{ // fixture → expected input-less leaf rmType
+		"Test_dv_multimedia_open_constraint.v0.opt":        "DV_MULTIMEDIA",
+		"Test_dv_parsable_open_constraint.v0.opt":          "DV_PARSABLE",
+		"Test_dv_uri_open_constraint.v0.opt":               "DV_URI",
+		"Test_dv_ehr_uri_open_constraint.v0.opt":           "DV_EHR_URI",
+		"Test_dv_interval_dv_count_open_constraint.v0.opt": "DV_INTERVAL",
+	}
+	for fixture, rmType := range cases {
+		t.Run(rmType, func(t *testing.T) {
+			c := compileFixture(t, "../../../testkit/cassettes/templates/"+fixture)
+			wt, err := webtemplate.Build(c)
+			if err != nil {
+				t.Fatalf("build: %v", err)
+			}
+			found := false
+			walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+				if strings.HasPrefix(n.RMType, rmType) {
+					found = true
+					if len(n.Inputs) != 0 {
+						t.Errorf("%s node carries inputs %+v, want none", n.RMType, n.Inputs)
+					}
+				}
+			})
+			if !found {
+				t.Errorf("no %s node emitted", rmType)
+			}
+		})
 	}
 }
 

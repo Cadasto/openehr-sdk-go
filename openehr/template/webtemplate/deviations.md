@@ -4,10 +4,12 @@ Conformance against the EHRbase `openEHR_SDK` v2.3 reference is **structural, no
 byte-exact** ([ADR 0014](../../../docs/adr/0014-webtemplate-reference-implementation-lock.md)).
 PROBE-075 (`TestStructuralParity` + `TestInputParity` in this package) pins the
 load-bearing surface — every node's `id`, `rmType`, `nodeId`, `aqlPath`,
-`min`/`max`, and each input's `suffix`/`type` — at **104/104** parity against the
-vendored `constrain_test` reference. The deltas below are the parts of the
-reference this slice deliberately does **not** reproduce. Any change that makes
-a *structural* field diverge is a test failure, not a deviation.
+`min`/`max`, and each input's `suffix`/`type` extended with coded/ordinal list
+values and ordinals, temporal validation patterns, and numeric validation
+ranges — at **104/104** parity against the vendored `constrain_test` reference.
+The deltas below are the parts of the reference this slice deliberately does
+**not** reproduce. Any change that makes a *structural* field diverge is a test
+failure, not a deviation.
 
 ## Node-level
 
@@ -35,14 +37,15 @@ a *structural* field diverge is a test failure, not a deviation.
 
 - **`defaultValue`** — never emitted (the reference carries assumed values on several
   inputs).
-- **`validation` ranges** — emitted for DV_COUNT (INTEGER) and DV_PROPORTION
-  (numerator/denominator) and single-unit DV_QUANTITY magnitude, only when the
+- **`validation` ranges** — emitted for DV_COUNT (INTEGER, exclusive bounds
+  normalised to inclusive as the reference does), DV_PROPORTION
+  numerator/denominator (including the percent-kind–derived `>=100 <=100`
+  denominator bound), and single-unit DV_QUANTITY magnitude, only when the
   constraint actually bounds a side (an unconstrained numeric emits no validation);
-  **not** emitted for DV_DURATION per-field ranges, DV_QUANTITY `precision`, per-unit
-  list validation, multi-unit magnitude, or the proportion-kind–derived denominator
-  bounds the reference computes (e.g. `>=100 <=100` for percent-kind DV_PROPORTION).
-- **Date/time `validation.pattern`** — not emitted (reference carries e.g.
-  `yyyy-mm-ddTHH:MM:SS`).
+  **not** emitted for DV_DURATION per-field ranges (including the reference's
+  `>=0` defaults), DV_QUANTITY `precision`, per-unit list validation, or
+  multi-unit magnitude. Proportion kinds other than percent (e.g. unitary) derive
+  no denominator bound — the fixture does not pin them.
 - **Coded/ordinal list labels** — `value` and `ordinal` match; `label` is resolved from
   archetype at-code terms where present, but is **empty for external-terminology codes**
   (e.g. `openehr::433`), and `localizedLabels` / `localizedDescriptions` / per-item

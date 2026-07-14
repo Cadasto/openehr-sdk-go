@@ -21,15 +21,15 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 	case "DV_QUANTITY":
 		return quantityInputs(v)
 	case "DV_COUNT":
-		return []Input{{Type: "INTEGER", Validation: rangeValidation(childConstraint[constraints.CInteger](v, "magnitude").Range)}}
+		return []Input{{Type: "INTEGER", Validation: intRangeValidation(childConstraint[constraints.CInteger](v, "magnitude").Range)}}
 	case "DV_ORDINAL":
 		return ordinalInputs(v)
 	case "DV_DATE_TIME":
-		return []Input{{Type: "DATETIME"}}
+		return []Input{{Type: "DATETIME", Validation: patternValidation(childConstraint[constraints.CDateTime](v, "value").Pattern)}}
 	case "DV_DATE":
-		return []Input{{Type: "DATE"}}
+		return []Input{{Type: "DATE", Validation: patternValidation(childConstraint[constraints.CDate](v, "value").Pattern)}}
 	case "DV_TIME":
-		return []Input{{Type: "TIME"}}
+		return []Input{{Type: "TIME", Validation: patternValidation(childConstraint[constraints.CTime](v, "value").Pattern)}}
 	case "DV_BOOLEAN":
 		return []Input{{Type: "BOOLEAN"}}
 	case "DV_DURATION":
@@ -133,11 +133,62 @@ func durationFields(pattern string) []string {
 	return out
 }
 
-// proportionInputs emits the numerator + denominator DECIMAL pair.
+// proportionInputs emits the numerator + denominator DECIMAL pair. When
+// the OPT fixes the proportion kind to percent (type C_INTEGER list [2])
+// and carries no explicit denominator constraint, the reference derives
+// the denominator bound `>=100 <=100` from the kind — mirrored here.
 func proportionInputs(v *templatecompile.CompiledNode) []Input {
 	num := Input{Suffix: "numerator", Type: "DECIMAL", Validation: rangeValidation(childConstraint[constraints.CReal](v, "numerator").Range)}
 	den := Input{Suffix: "denominator", Type: "DECIMAL", Validation: rangeValidation(childConstraint[constraints.CReal](v, "denominator").Range)}
+	if den.Validation == nil {
+		den.Validation = kindDenominatorValidation(childConstraint[constraints.CInteger](v, "type").List)
+	}
 	return []Input{num, den}
+}
+
+// proportionKindPercent is the openEHR PROPORTION_KIND pk_percent value:
+// the denominator is fixed at 100.
+const proportionKindPercent = 100
+
+// kindDenominatorValidation derives the fixed denominator bound implied
+// by a single-valued proportion-kind constraint, or nil. Only the percent
+// kind (2) is mirrored — the only kind the reference fixture pins
+// (deviations.md lists the rest).
+func kindDenominatorValidation(kinds []int64) *Validation {
+	if len(kinds) != 1 || kinds[0] != 2 {
+		return nil
+	}
+	fixed := float64(proportionKindPercent)
+	return &Validation{Range: &Range{Min: &fixed, MinOp: ">=", Max: &fixed, MaxOp: "<="}}
+}
+
+// intRangeValidation is rangeValidation for INTEGER inputs: the
+// reference normalises exclusive integer bounds to inclusive
+// (>10 → >=11, <15 → <=14), mirrored here.
+func intRangeValidation(nr constraints.NumericRange) *Validation {
+	v := rangeValidation(nr)
+	if v == nil {
+		return nil
+	}
+	if v.Range.Min != nil && v.Range.MinOp == ">" {
+		*v.Range.Min++
+		v.Range.MinOp = ">="
+	}
+	if v.Range.Max != nil && v.Range.MaxOp == "<" {
+		*v.Range.Max--
+		v.Range.MaxOp = "<="
+	}
+	return v
+}
+
+// patternValidation wraps a temporal constraint pattern (e.g.
+// "yyyy-mm-ddTHH:MM:SS") as input validation, or nil when unconstrained.
+// The reference copies the OPT pattern verbatim.
+func patternValidation(pattern string) *Validation {
+	if pattern == "" {
+		return nil
+	}
+	return &Validation{Pattern: pattern}
 }
 
 // partyProxyInputs emits the four fixed TEXT identity inputs.

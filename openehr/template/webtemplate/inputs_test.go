@@ -12,14 +12,40 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
-// inputSig is the comparable signature of a node's inputs: the ordered
-// "suffix:type" list. PROBE-075 pins suffix and type, not deeper contents.
+// inputSig is the comparable signature of a node's inputs: per input the
+// "suffix:type" pair extended with the deep contents PROBE-075 pins —
+// ordinal/coded list entries (value@ordinal), temporal validation
+// patterns, and numeric validation ranges. List labels and the remaining
+// validation payloads (duration fields, quantity precision, per-unit
+// ranges) stay outside the signature as documented deviations.
 func inputSig(inputs []webtemplate.Input) string {
 	parts := make([]string, 0, len(inputs))
 	for _, in := range inputs {
-		parts = append(parts, in.Suffix+":"+in.Type)
+		var p strings.Builder
+		p.WriteString(in.Suffix + ":" + in.Type)
+		for _, it := range in.List {
+			p.WriteString("|" + it.Value)
+			if it.Ordinal != nil {
+				fmt.Fprintf(&p, "@%d", *it.Ordinal)
+			}
+		}
+		if v := in.Validation; v != nil && !isDurationField(in.Suffix) {
+			p.WriteString(patternSig(v.Pattern) + rangeSig(v.Range))
+		}
+		parts = append(parts, p.String())
 	}
 	return strings.Join(parts, ",")
+}
+
+// isDurationField reports whether an input suffix is a DV_DURATION
+// component — their per-field ranges are a documented deviation
+// (deviations.md) and stay outside the parity signature.
+func isDurationField(suffix string) bool {
+	switch suffix {
+	case "year", "month", "week", "day", "hour", "minute", "second":
+		return true
+	}
+	return false
 }
 
 func refInputSig(m map[string]any) string {
@@ -28,13 +54,62 @@ func refInputSig(m map[string]any) string {
 		return ""
 	}
 	parts := make([]string, 0, len(raw))
-	for _, r := range raw {
-		im, _ := r.(map[string]any)
+	for _, entry := range raw {
+		im, _ := entry.(map[string]any)
 		suffix, _ := im["suffix"].(string)
 		typ, _ := im["type"].(string)
-		parts = append(parts, suffix+":"+typ)
+		var p strings.Builder
+		p.WriteString(suffix + ":" + typ)
+		if list, ok := im["list"].([]any); ok {
+			for _, e := range list {
+				em, _ := e.(map[string]any)
+				val, _ := em["value"].(string)
+				p.WriteString("|" + val)
+				if ord, ok := em["ordinal"].(float64); ok {
+					fmt.Fprintf(&p, "@%d", int(ord))
+				}
+			}
+		}
+		if v, ok := im["validation"].(map[string]any); ok && !isDurationField(suffix) {
+			pat, _ := v["pattern"].(string)
+			p.WriteString(patternSig(pat))
+			if rng, ok := v["range"].(map[string]any); ok {
+				r := &webtemplate.Range{}
+				if f, ok := rng["min"].(float64); ok {
+					r.Min = &f
+				}
+				if f, ok := rng["max"].(float64); ok {
+					r.Max = &f
+				}
+				r.MinOp, _ = rng["minOp"].(string)
+				r.MaxOp, _ = rng["maxOp"].(string)
+				p.WriteString(rangeSig(r))
+			}
+		}
+		parts = append(parts, p.String())
 	}
 	return strings.Join(parts, ",")
+}
+
+func patternSig(pattern string) string {
+	if pattern == "" {
+		return ""
+	}
+	return "~" + pattern
+}
+
+func rangeSig(r *webtemplate.Range) string {
+	if r == nil {
+		return ""
+	}
+	sig := "#"
+	if r.Min != nil {
+		sig += fmt.Sprintf("%s%g", r.MinOp, *r.Min)
+	}
+	if r.Max != nil {
+		sig += fmt.Sprintf("%s%g", r.MaxOp, *r.Max)
+	}
+	return sig
 }
 
 func TestInputParity(t *testing.T) {

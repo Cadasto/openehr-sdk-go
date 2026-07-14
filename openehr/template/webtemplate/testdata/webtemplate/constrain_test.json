@@ -255,7 +255,10 @@
                         "aqlPath": "/context/other_context[at0001]/items[openEHR-EHR-CLUSTER.address.v0]/items[at0001]/items[at0015]/items[at0007]/value",
                         "inputs": [
                           {
-                            "type": "DATETIME"
+                            "type": "DATETIME",
+                            "validation": {
+                              "pattern": "yyyy-mm-ddTHH:MM:SS"
+                            }
                           }
                         ]
                       },
@@ -276,7 +279,10 @@
                         "aqlPath": "/context/other_context[at0001]/items[openEHR-EHR-CLUSTER.address.v0]/items[at0001]/items[at0015]/items[at0008]/value",
                         "inputs": [
                           {
-                            "type": "DATETIME"
+                            "type": "DATETIME",
+                            "validation": {
+                              "pattern": "yyyy-mm-ddTHH:??:??"
+                            }
                           }
                         ]
                       }
@@ -368,19 +374,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -404,19 +414,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -440,19 +454,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -476,19 +494,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -512,19 +534,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -548,19 +574,23 @@
                     "type": "CODED_TEXT",
                     "list": [
                       {
-                        "value": "",
+                        "value": "at0010",
+                        "label": "Absent",
                         "ordinal": 0
                       },
                       {
-                        "value": "",
+                        "value": "at0011",
+                        "label": "Mild",
                         "ordinal": 1
                       },
                       {
-                        "value": "",
+                        "value": "at0012",
+                        "label": "Moderate",
                         "ordinal": 2
                       },
                       {
-                        "value": "",
+                        "value": "at0013",
+                        "label": "Severe",
                         "ordinal": 3
                       }
                     ]
@@ -587,8 +617,8 @@
                     "type": "INTEGER",
                     "validation": {
                       "range": {
-                        "min": 10,
-                        "minOp": "\u003e",
+                        "min": 11,
+                        "minOp": "\u003e=",
                         "max": 15,
                         "maxOp": "\u003c="
                       }
@@ -2280,7 +2310,15 @@
                   },
                   {
                     "suffix": "denominator",
-                    "type": "DECIMAL"
+                    "type": "DECIMAL",
+                    "validation": {
+                      "range": {
+                        "min": 100,
+                        "minOp": "\u003e=",
+                        "max": 100,
+                        "maxOp": "\u003c="
+                      }
+                    }
                   }
                 ]
               },
@@ -2351,7 +2389,15 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL"
+                        "type": "DECIMAL",
+                        "validation": {
+                          "range": {
+                            "min": 100,
+                            "minOp": "\u003e=",
+                            "max": 100,
+                            "maxOp": "\u003c="
+                          }
+                        }
                       }
                     ]
                   },
@@ -2385,7 +2431,15 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL"
+                        "type": "DECIMAL",
+                        "validation": {
+                          "range": {
+                            "min": 100,
+                            "minOp": "\u003e=",
+                            "max": 100,
+                            "maxOp": "\u003c="
+                          }
+                        }
                       }
                     ]
                   },
@@ -2456,7 +2510,15 @@
                           },
                           {
                             "suffix": "denominator",
-                            "type": "DECIMAL"
+                            "type": "DECIMAL",
+                            "validation": {
+                              "range": {
+                                "min": 100,
+                                "minOp": "\u003e=",
+                                "max": 100,
+                                "maxOp": "\u003c="
+                              }
+                            }
                           }
                         ]
                       }
@@ -2531,7 +2593,15 @@
                       },
                       {
                         "suffix": "denominator",
-                        "type": "DECIMAL"
+                        "type": "DECIMAL",
+                        "validation": {
+                          "range": {
+                            "min": 100,
+                            "minOp": "\u003e=",
+                            "max": 100,
+                            "maxOp": "\u003c="
+                          }
+                        }
                       }
                     ]
                   }
