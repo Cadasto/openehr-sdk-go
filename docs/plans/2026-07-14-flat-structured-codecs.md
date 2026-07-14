@@ -15,12 +15,12 @@
 
 ## Goal
 
-Ship `openehr/serialize/simplified` — codecs that convert an `*rm.Composition` to and from the openEHR **FLAT** (simSDT) and **STRUCTURED** (structSDT) *Simplified Formats*, driven by the composition's **Web Template** (REQ-106). Bidirectional and **semantics-preserving** given the OPT (REQ-053); building-block-independent (REQ-013); structural conformance against a vendored upstream trio (PROBE-076), parity documented-not-byte-exact.
+Ship `openehr/serialize/simplified` — codecs that convert an `*rm.Composition` to and from the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* (the two variants named by the STABLE spec; the legacy simSDT/structSDT/SDT naming is superseded and stays out of the public surface), driven by the composition's **Web Template** (REQ-106). Bidirectional and **semantics-preserving** given the OPT (REQ-053); building-block-independent (REQ-013); structural conformance against a vendored upstream trio (PROBE-076), parity documented-not-byte-exact.
 
 ## Definition of Ready
 
 - [x] `**Covers:**` lists the REQ (REQ-053).
-- [x] Canonical normative prose exists and is correct — [wire.md § REQ-053](../specifications/wire.md#req-053) (rewritten 2026-07-14 to the real simSDT/structSDT grammar) + REQ.md registry row.
+- [x] Canonical normative prose exists and is correct — [wire.md § REQ-053](../specifications/wire.md#req-053) (rewritten 2026-07-14 to the real Flat/Structured grammar) + REQ.md registry row.
 - [x] Reference implementation + id-generation locked by [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md); the output-form deviation is recorded here rather than re-litigated.
 - [x] Phases list concrete tasks and name the verification command (`go test`, `make spec-check`, `make ci`, `make probe-status`).
 
@@ -127,7 +127,7 @@ func TestBuildingBlockIndependence(t *testing.T) {
 ```go
 // openehr/serialize/simplified/doc.go
 // Package simplified converts an openEHR COMPOSITION to and from the FLAT
-// (simSDT) and STRUCTURED (structSDT) Simplified Formats (REQ-053).
+// and STRUCTURED Simplified Formats (REQ-053).
 //
 // These are serializations of a data instance, not a template: conversion
 // to/from canonical RM is template-specific and requires the composition's

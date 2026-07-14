@@ -11,7 +11,7 @@
 
 ## Goal
 
-Build the SDK's **simplified-formats** stack on a single shared internal model derived from the compiled OPT, then expose it two ways: (1) **WebTemplate JSON** (REQ-106 — a UI/form-generation schema) and (2) **FLAT (simSDT) + STRUCTURED (structSDT) composition codecs** (REQ-053 — simplified data-entry/ingestion payloads). Consumers: form renderers, AQL-builder UIs, FHIR-mapping tools, and any integration that commits composition data against a known template without hand-building canonical RM.
+Build the SDK's **simplified-formats** stack on a single shared internal model derived from the compiled OPT, then expose it two ways: (1) **WebTemplate JSON** (REQ-106 — a UI/form-generation schema) and (2) **FLAT + STRUCTURED composition codecs** (REQ-053 — simplified data-entry/ingestion payloads). Consumers: form renderers, AQL-builder UIs, FHIR-mapping tools, and any integration that commits composition data against a known template without hand-building canonical RM.
 
 ## Why one umbrella (the key architectural insight)
 
@@ -24,7 +24,7 @@ WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed
 SIMPLIFIED TEMPLATE MODEL   ← shared: id-tree + aqlPath + inputs/suffixes + :index rules
         │                                   │
         ▼ serialize                         ▼ drive path<->value mapping
-WebTemplate JSON (REQ-106)          FLAT (simSDT) / STRUCTURED (structSDT) (REQ-053)
+WebTemplate JSON (REQ-106)          FLAT / STRUCTURED (REQ-053)
 application/openehr.wt+json         application/openehr.wt.flat+json / …wt.structured+json
 ```
 
@@ -59,7 +59,7 @@ Matched **OPT → WebTemplate → FLAT/STRUCTURED** fixture sets exist upstream 
 
 ## Out of scope (entire umbrella)
 
-- **Reconstructing an OPT from a simplified artefact.** Only **WebTemplate JSON → OPT** is a real (template→template) reconstruction, and it is excluded because the Web Template is a deliberately lossy, flattened projection of the OPT (also under **Defers**). **FLAT/STRUCTURED → OPT is not a meaningful operation at all** — FLAT (simSDT) / STRUCTURED (structSDT) are *composition data instances*, not templates, so there is no template to recover. Their round-trip is `FLAT/STRUCTURED ↔ canonical composition`, which **is in scope** (Phase 3 / PROBE-076): bidirectional and semantics-preserving *given the OPT* — the simplified forms are *template-dependent (not self-standing)*, which is distinct from being "lossy" (ITS-REST *Simplified Formats* Requirements 3 & 5).
+- **Reconstructing an OPT from a simplified artefact.** Only **WebTemplate JSON → OPT** is a real (template→template) reconstruction, and it is excluded because the Web Template is a deliberately lossy, flattened projection of the OPT (also under **Defers**). **FLAT/STRUCTURED → OPT is not a meaningful operation at all** — FLAT / STRUCTURED are *composition data instances*, not templates, so there is no template to recover. Their round-trip is `FLAT/STRUCTURED ↔ canonical composition`, which **is in scope** (Phase 3 / PROBE-076): bidirectional and semantics-preserving *given the OPT* — the simplified forms are *template-dependent (not self-standing)*, which is distinct from being "lossy" (ITS-REST *Simplified Formats* Requirements 3 & 5).
 - Parsing `.oet` / `.t.json` *authoring* templates or ADL2 `.opt2` — the SDK consumes the flattened ADL 1.4 `.opt` ([roadmap](../roadmap.md): AOM 2.4 deferred).
 - UI rendering (consumer's job — these plans emit/consume data only).
 - Terminology expansion of `inputs[].list` against an external TERM service.

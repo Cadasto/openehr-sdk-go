@@ -27,7 +27,7 @@ var (
 	ErrMissingContext = errors.New("simplified: missing mandatory context")
 )
 
-// MarshalFlat encodes comp as FLAT (simSDT) JSON using wt (REQ-053).
+// MarshalFlat encodes comp as FLAT JSON using wt (REQ-053).
 //
 // Implemented in flat_encode.go; this stub keeps the public surface stable
 // until that lands.
@@ -35,20 +35,20 @@ func MarshalFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, err
 	return nil, ErrNoTemplate
 }
 
-// UnmarshalFlat decodes FLAT (simSDT) JSON into a canonical COMPOSITION
+// UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION
 // using wt (REQ-053). Implemented in flat_decode.go.
 func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
 	return nil, ErrNoTemplate
 }
 
-// MarshalStructured encodes comp as STRUCTURED (structSDT) JSON using wt
-// (REQ-053). Implemented in structured.go.
+// MarshalStructured encodes comp as STRUCTURED JSON using wt (REQ-053).
+// Implemented in structured.go.
 func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byte, error) {
 	return nil, ErrNoTemplate
 }
 
-// UnmarshalStructured decodes STRUCTURED (structSDT) JSON into a canonical
-// COMPOSITION using wt (REQ-053). Implemented in structured.go.
+// UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
+// using wt (REQ-053). Implemented in structured.go.
 func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
 	return nil, ErrNoTemplate
 }

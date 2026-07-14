@@ -151,7 +151,7 @@ Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassette
 
 ### REQ-053
 
-The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** (simSDT) and **STRUCTURED** (structSDT) *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0). This section pins to that document for the wire grammar; it does not re-define it.
+The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0). The spec names exactly these two variants — *Flat* and *Structured*; the earlier "Simplified Data Template (SDT)" naming (and EHRbase's `simSDT`/`structSDT` labels) is superseded and **MUST NOT** appear in the SDK's public surface. This section pins to that document for the wire grammar; it does not re-define it.
 
 Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
 

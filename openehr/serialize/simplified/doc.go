@@ -1,5 +1,7 @@
 // Package simplified converts an openEHR COMPOSITION to and from the FLAT
-// (simSDT) and STRUCTURED (structSDT) Simplified Formats (REQ-053).
+// and STRUCTURED Simplified Formats (REQ-053). These are the two variants
+// named by the STABLE ITS-REST Simplified Formats spec; the older
+// "Simplified Data Template" / simSDT / structSDT naming is superseded.
 //
 // These are serializations of a data instance, not a template. Field
 // identifiers are the human-readable Web Template ids (REQ-106) — not

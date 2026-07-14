@@ -11,7 +11,7 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 | Plan | Scope | Covers REQs / probes |
 |---|---|---|
 | [2026-06-23-simplified-formats.md](2026-06-23-simplified-formats.md) | Umbrella — FLAT/STRUCTURED codecs (WebTemplate export Phase 2 **landed** as a direct slice) | REQ-053; PROBE-076 |
-| [2026-07-14-flat-structured-codecs.md](2026-07-14-flat-structured-codecs.md) | Phase 3 — FLAT (simSDT) / STRUCTURED (structSDT) composition codecs in `openehr/serialize/simplified` | REQ-053; PROBE-076 |
+| [2026-07-14-flat-structured-codecs.md](2026-07-14-flat-structured-codecs.md) | Phase 3 — FLAT / STRUCTURED composition codecs in `openehr/serialize/simplified` | REQ-053; PROBE-076 |
 
 WebTemplate JSON export (**REQ-106**) landed as a direct slice and was archived ([archive/2026-05-22-webtemplate-export.md](archive/2026-05-22-webtemplate-export.md)); the umbrella's shared simplified-template model is deferred until REQ-053 (FLAT/STRUCTURED) gives it a second consumer.
 
