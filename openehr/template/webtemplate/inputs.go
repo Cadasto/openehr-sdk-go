@@ -44,17 +44,26 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 
 // codedTextInputs emits the single "code" input for DV_CODED_TEXT. The
 // C_CODE_PHRASE constraint lives on the value node's defining_code child;
-// an absent or code-less constraint leaves the list open.
+// an absent or code-less constraint leaves the list open. Local
+// (archetype-internal) terminology is implied and omitted, mirroring the
+// reference, which carries `terminology` only for external bindings.
 func codedTextInputs(v *templatecompile.CompiledNode) []Input {
 	in := Input{Suffix: "code", Type: "CODED_TEXT"}
 	cp := childConstraint[constraints.CodePhrase](v, "defining_code")
-	in.Terminology = cp.Terminology
+	if cp.Terminology != localTerminology {
+		in.Terminology = cp.Terminology
+	}
 	for _, code := range cp.CodeList {
 		in.List = append(in.List, listItem(v, code))
 	}
 	in.ListOpen = len(in.List) == 0
 	return []Input{in}
 }
+
+// localTerminology is the archetype-internal terminology id; the
+// reference omits `terminology` for it (only external bindings such as
+// "openehr" are surfaced).
+const localTerminology = "local"
 
 // quantityInputs emits the magnitude (DECIMAL) + unit (CODED_TEXT) pair.
 func quantityInputs(v *templatecompile.CompiledNode) []Input {
@@ -153,13 +162,15 @@ const proportionKindPercent = 100
 // kindDenominatorValidation derives the fixed denominator bound implied
 // by a single-valued proportion-kind constraint, or nil. Only the percent
 // kind (2) is mirrored — the only kind the reference fixture pins
-// (deviations.md lists the rest).
+// (deviations.md lists the rest). Min and Max are distinct allocations:
+// Build returns a mutable tree for post-processing, so the bounds must
+// not alias.
 func kindDenominatorValidation(kinds []int64) *Validation {
 	if len(kinds) != 1 || kinds[0] != 2 {
 		return nil
 	}
-	fixed := float64(proportionKindPercent)
-	return &Validation{Range: &Range{Min: &fixed, MinOp: ">=", Max: &fixed, MaxOp: "<="}}
+	lo, hi := float64(proportionKindPercent), float64(proportionKindPercent)
+	return &Validation{Range: &Range{Min: &lo, MinOp: ">=", Max: &hi, MaxOp: "<="}}
 }
 
 // intRangeValidation is rangeValidation for INTEGER inputs: the

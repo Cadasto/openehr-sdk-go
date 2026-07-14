@@ -22,7 +22,9 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	}
 	cfg := &config{defaultLanguage: c.Language()}
 	for _, o := range opts {
-		o(cfg)
+		if o != nil {
+			o(cfg)
+		}
 	}
 	if cfg.defaultLanguage == "" {
 		return nil, ErrNoDefaultLanguage
@@ -191,8 +193,12 @@ func collapseElement(el *templatecompile.CompiledNode, elPath string, attr *temp
 	leaf.AQLPath = elPath + "/value"
 	leaf.Inputs = inputsFor(v)
 	// A DV_CODED_TEXT with a DV_TEXT alternative renders an extra free-text
-	// "other" input, mirroring EHRbase.
+	// "other" input, and the coded list becomes open (the free text admits
+	// values beyond the enumerated codes), mirroring EHRbase.
 	if v.RMTypeName() == "DV_CODED_TEXT" && hasTextAlternative(alts[1:]) {
+		if len(leaf.Inputs) > 0 {
+			leaf.Inputs[0].ListOpen = true // the "code" input
+		}
 		leaf.Inputs = append(leaf.Inputs, Input{Suffix: "other", Type: "TEXT"})
 	}
 	return leaf

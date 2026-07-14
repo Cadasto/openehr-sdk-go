@@ -25,6 +25,27 @@ func TestRangeValidationUnconstrained(t *testing.T) {
 	}
 }
 
+// Build returns a mutable tree for post-processing, so the percent
+// denominator's Min and Max must be independent allocations — mutating
+// one bound must not move the other (REQ-106).
+func TestKindDenominatorValidationBoundsNotAliased(t *testing.T) {
+	v := kindDenominatorValidation([]int64{2})
+	if v == nil || v.Range.Min == nil || v.Range.Max == nil {
+		t.Fatalf("kindDenominatorValidation([2]) = %+v, want a bounded range", v)
+	}
+	if *v.Range.Min != 100 || *v.Range.Max != 100 {
+		t.Fatalf("bounds = [%v,%v], want [100,100]", *v.Range.Min, *v.Range.Max)
+	}
+	*v.Range.Min = 0
+	if *v.Range.Max != 100 {
+		t.Errorf("mutating Min changed Max to %v — bounds alias the same pointer", *v.Range.Max)
+	}
+	// Non-percent kinds derive no bound.
+	if got := kindDenominatorValidation([]int64{0}); got != nil {
+		t.Errorf("kindDenominatorValidation([0]) = %+v, want nil", got)
+	}
+}
+
 // The reference normalises exclusive INTEGER bounds to inclusive
 // (>10 → >=11, <15 → <=14) for DV_COUNT ranges (REQ-106).
 func TestIntRangeValidationNormalisesExclusiveBounds(t *testing.T) {

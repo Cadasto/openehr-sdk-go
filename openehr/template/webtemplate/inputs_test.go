@@ -14,10 +14,11 @@ import (
 
 // inputSig is the comparable signature of a node's inputs: per input the
 // "suffix:type" pair extended with the deep contents PROBE-075 pins —
-// ordinal/coded list entries (value@ordinal), temporal validation
-// patterns, and numeric validation ranges. List labels and the remaining
-// validation payloads (duration fields, quantity precision, per-unit
-// ranges) stay outside the signature as documented deviations.
+// ordinal/coded list entries (value@ordinal), listOpen, terminology,
+// temporal validation patterns, and numeric validation ranges. List
+// labels and the remaining validation payloads (duration fields, quantity
+// precision, per-unit ranges) stay outside the signature as documented
+// deviations.
 func inputSig(inputs []webtemplate.Input) string {
 	parts := make([]string, 0, len(inputs))
 	for _, in := range inputs {
@@ -29,6 +30,7 @@ func inputSig(inputs []webtemplate.Input) string {
 				fmt.Fprintf(&p, "@%d", *it.Ordinal)
 			}
 		}
+		p.WriteString(openSig(in.ListOpen) + termSig(in.Terminology))
 		if v := in.Validation; v != nil && !isDurationField(in.Suffix) {
 			p.WriteString(patternSig(v.Pattern) + rangeSig(v.Range))
 		}
@@ -70,6 +72,9 @@ func refInputSig(m map[string]any) string {
 				}
 			}
 		}
+		open, _ := im["listOpen"].(bool)
+		term, _ := im["terminology"].(string)
+		p.WriteString(openSig(open) + termSig(term))
 		if v, ok := im["validation"].(map[string]any); ok && !isDurationField(suffix) {
 			pat, _ := v["pattern"].(string)
 			p.WriteString(patternSig(pat))
@@ -89,6 +94,20 @@ func refInputSig(m map[string]any) string {
 		parts = append(parts, p.String())
 	}
 	return strings.Join(parts, ",")
+}
+
+func openSig(open bool) string {
+	if open {
+		return "!open"
+	}
+	return ""
+}
+
+func termSig(terminology string) string {
+	if terminology == "" {
+		return ""
+	}
+	return "%" + terminology
 }
 
 func patternSig(pattern string) string {

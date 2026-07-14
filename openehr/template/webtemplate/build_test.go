@@ -40,6 +40,19 @@ func TestBuildNil(t *testing.T) {
 	}
 }
 
+// A nil option must be skipped, not invoked (the variadic is a reserved
+// extension point; Build(c, nil) must not panic) (REQ-106).
+func TestBuildNilOption(t *testing.T) {
+	c := compileFixture(t, referenceDir+"/"+referenceStem+".opt")
+	wt, err := webtemplate.Build(c, nil)
+	if err != nil {
+		t.Fatalf("Build(c, nil): %v", err)
+	}
+	if wt.Tree == nil {
+		t.Fatal("Build(c, nil) returned no tree")
+	}
+}
+
 // An OPT without a resolvable default language must error, never emit
 // "defaultLanguage": "" (spec § REQ-106 Surface MUST).
 func TestBuildNoDefaultLanguage(t *testing.T) {

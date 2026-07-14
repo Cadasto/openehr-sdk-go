@@ -115,8 +115,7 @@
                             "value": "at0014",
                             "label": "Temporary"
                           }
-                        ],
-                        "terminology": "local"
+                        ]
                       }
                     ]
                   },
@@ -662,8 +661,7 @@
                         "value": "at0019",
                         "label": "Severe pain"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -696,8 +694,7 @@
                         "value": "at0023",
                         "label": "Acute on chronic"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -1034,8 +1031,7 @@
                         "value": "at1014",
                         "label": "Lying with tilt to left"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -1088,8 +1084,7 @@
                         "value": "at1045",
                         "label": "Sleeping"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -1462,8 +1457,7 @@
                         "value": "at1014",
                         "label": "Lying with tilt to left"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -1516,8 +1510,7 @@
                         "value": "at1045",
                         "label": "Sleeping"
                       }
-                    ],
-                    "terminology": "local"
+                    ]
                   }
                 ]
               },
@@ -1624,8 +1617,7 @@
                     "value": "at1019",
                     "label": "Neonatal"
                   }
-                ],
-                "terminology": "local"
+                ]
               }
             ]
           },
@@ -1698,7 +1690,7 @@
                     "label": "Intra-arterial"
                   }
                 ],
-                "terminology": "local"
+                "listOpen": true
               },
               {
                 "suffix": "other",
@@ -1742,8 +1734,7 @@
                     "value": "at1040",
                     "label": "Invasive"
                   }
-                ],
-                "terminology": "local"
+                ]
               }
             ]
           },
@@ -1838,8 +1829,7 @@
                     "value": "at1012",
                     "label": "Phase V"
                   }
-                ],
-                "terminology": "local"
+                ]
               }
             ]
           },
@@ -1973,7 +1963,7 @@
                         "label": "Mixed"
                       }
                     ],
-                    "terminology": "local"
+                    "listOpen": true
                   },
                   {
                     "suffix": "other",
