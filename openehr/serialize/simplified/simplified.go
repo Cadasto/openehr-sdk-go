@@ -1,11 +1,6 @@
 package simplified
 
-import (
-	"errors"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
-)
+import "errors"
 
 // Media types for the Simplified Formats (REQ-053). Emit these; accept
 // EHRbase's non-conformant `.schema`-suffixed variants on input only.
@@ -31,12 +26,6 @@ var (
 )
 
 // MarshalFlat is implemented in flat_encode.go.
-
-// UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION
-// using wt (REQ-053). Implemented in flat_decode.go.
-func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
-	return nil, ErrNoTemplate
-}
-
+// UnmarshalFlat is implemented in flat_decode.go.
 // MarshalStructured / UnmarshalStructured / FlatToStructured / StructuredToFlat
 // are implemented in structured.go.
