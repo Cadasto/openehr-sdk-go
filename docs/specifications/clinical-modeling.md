@@ -698,7 +698,7 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error)
 // Marshal is Build followed by deterministic JSON encoding.
 func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
 
-type Option func(*config) // e.g. default-language / languages / version overrides
+type Option func(*config) // reserved — no options in the current slice (single-language compiled input; fixed schema version)
 ```
 
 `Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path. A nil or empty compiled input, or an unresolvable default language, **MUST** return an error (never panic).
@@ -707,11 +707,11 @@ type Option func(*config) // e.g. default-language / languages / version overrid
 
 The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `defaultLanguage`, `languages`, and a `tree` of nodes. Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`. JSON field names are camelCase. Encoding **MUST** be deterministic: the same compiled template **MUST** produce byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
 
-The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the reference implementation's node model. The transform **MUST**: keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT` / `INTERVAL_EVENT`, `EVENT_CONTEXT`, and `CLUSTER` as nodes; **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`; **drop** the pure structural wrappers (`HISTORY`, `ITEM_TREE` / `ITEM_LIST` / `ITEM_STRUCTURE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose; and emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name. The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
+The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the reference implementation's node model. The transform **MUST**: keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT` / `INTERVAL_EVENT`, `EVENT_CONTEXT`, and `CLUSTER` as nodes; **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`; **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose; and emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name. The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
 
 ### `id` generation (ADR 0014)
 
-The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name, with the reference's sibling-disambiguation rule when two siblings would collide. The exact normalisation and disambiguation are **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling.
+The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name, with the reference's sibling-disambiguation rule when two siblings would collide. The exact normalisation and disambiguation are **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling. Until the disambiguation rule is derived from a fixture that exercises it, a would-be sibling collision **MUST** fail with a typed error — the export **MUST NOT** emit duplicate sibling `id`s.
 
 ### `inputs` (core clinical subset)
 
@@ -727,10 +727,10 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 
 ### Building-block independence (REQ-013)
 
-`openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template` (OPT metadata), `openehr/rm/rminfo`, and the standard library only.
+`openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), and the standard library only.
 
-- **Lives in:** `openehr/template/webtemplate/` (planned).
-- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture (or its recorded deferral if the fixture fetch is blocked). Catalogued in [`conformance.md`](conformance.md).
+- **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
+- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture. Catalogued in [`conformance.md`](conformance.md).
 - **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/archive/2026-05-22-webtemplate-export.md).
 
 ## REQ-112 — Template-less Reference Model validation floor
