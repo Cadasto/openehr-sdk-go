@@ -33,7 +33,7 @@ func inputsFor(v *templatecompile.CompiledNode) []Input {
 	case "DV_BOOLEAN":
 		return []Input{{Type: "BOOLEAN"}}
 	case "DV_DURATION":
-		return durationInputs()
+		return durationInputs(v)
 	case "DV_PROPORTION":
 		return proportionInputs(v)
 	case "PARTY_PROXY":
@@ -96,12 +96,50 @@ func ordinalInputs(v *templatecompile.CompiledNode) []Input {
 	return []Input{in}
 }
 
-// durationInputs emits the seven fixed INTEGER duration fields.
-func durationInputs() []Input {
-	fields := []string{"year", "month", "day", "week", "hour", "minute", "second"}
+// durationInputs emits the INTEGER duration fields. When the C_DURATION
+// pattern (on the value child) constrains which components are allowed, only
+// those fields are emitted, in the pattern's letter order (e.g. "PYMWD" →
+// year, month, week, day). An empty pattern emits all seven fields.
+func durationInputs(v *templatecompile.CompiledNode) []Input {
+	fields := durationFields(childConstraint[constraints.CDuration](v, "value").Pattern)
 	out := make([]Input, 0, len(fields))
 	for _, f := range fields {
 		out = append(out, Input{Suffix: f, Type: "INTEGER"})
+	}
+	return out
+}
+
+// durationFields returns the allowed duration component names in order. An
+// ISO-8601-style pattern (e.g. "PYMWD", "PYMDTHMS") maps each letter to a
+// field; "M" is month before the "T" separator and minute after it. An empty
+// pattern yields all seven fields in EHRbase's default order.
+func durationFields(pattern string) []string {
+	if pattern == "" {
+		return []string{"year", "month", "day", "week", "hour", "minute", "second"}
+	}
+	var out []string
+	afterT := false
+	for _, r := range pattern {
+		switch r {
+		case 'T':
+			afterT = true
+		case 'Y':
+			out = append(out, "year")
+		case 'M':
+			if afterT {
+				out = append(out, "minute")
+			} else {
+				out = append(out, "month")
+			}
+		case 'W':
+			out = append(out, "week")
+		case 'D':
+			out = append(out, "day")
+		case 'H':
+			out = append(out, "hour")
+		case 'S':
+			out = append(out, "second")
+		}
 	}
 	return out
 }

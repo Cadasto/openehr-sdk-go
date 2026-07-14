@@ -74,6 +74,7 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 			ID:      ic.attr,
 			Min:     ic.min,
 			Max:     ic.max,
+			Inputs:  ic.inputs,
 		})
 	}
 	return out
@@ -84,7 +85,19 @@ type inContextLeaf struct {
 	attr     string
 	rmType   string
 	min, max int
+	inputs   []Input
 }
+
+var (
+	partyProxyIC = []Input{
+		{Suffix: "id", Type: "TEXT"},
+		{Suffix: "id_scheme", Type: "TEXT"},
+		{Suffix: "id_namespace", Type: "TEXT"},
+		{Suffix: "name", Type: "TEXT"},
+	}
+	dateTimeIC = []Input{{Type: "DATETIME"}}
+	settingIC  = []Input{{Suffix: "code", Type: "TEXT"}, {Suffix: "value", Type: "TEXT"}}
+)
 
 // inContextLeaves returns the RM-attribute leaves EHRbase emits for a
 // container RM type independent of the template (WebTemplate "inContext"
@@ -93,24 +106,24 @@ func inContextLeaves(containerRM string) []inContextLeaf {
 	switch containerRM {
 	case "COMPOSITION":
 		return []inContextLeaf{
-			{"language", "CODE_PHRASE", 0, 1},
-			{"territory", "CODE_PHRASE", 0, 1},
-			{"composer", "PARTY_PROXY", 0, 1},
+			{attr: "language", rmType: "CODE_PHRASE", min: 0, max: 1},
+			{attr: "territory", rmType: "CODE_PHRASE", min: 0, max: 1},
+			{attr: "composer", rmType: "PARTY_PROXY", min: 0, max: 1, inputs: partyProxyIC},
 		}
 	case "EVENT_CONTEXT":
 		return []inContextLeaf{
-			{"start_time", "DV_DATE_TIME", 0, 1},
-			{"setting", "DV_CODED_TEXT", 0, 1},
+			{attr: "start_time", rmType: "DV_DATE_TIME", min: 0, max: 1, inputs: dateTimeIC},
+			{attr: "setting", rmType: "DV_CODED_TEXT", min: 0, max: 1, inputs: settingIC},
 		}
 	case "OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY":
 		return []inContextLeaf{
-			{"language", "CODE_PHRASE", 0, 1},
-			{"encoding", "CODE_PHRASE", 0, 1},
-			{"subject", "PARTY_PROXY", 0, 1},
+			{attr: "language", rmType: "CODE_PHRASE", min: 0, max: 1},
+			{attr: "encoding", rmType: "CODE_PHRASE", min: 0, max: 1},
+			{attr: "subject", rmType: "PARTY_PROXY", min: 0, max: 1, inputs: partyProxyIC},
 		}
 	case "EVENT", "POINT_EVENT", "INTERVAL_EVENT":
 		return []inContextLeaf{
-			{"time", "DV_DATE_TIME", 0, 1},
+			{attr: "time", rmType: "DV_DATE_TIME", min: 0, max: 1, inputs: dateTimeIC},
 		}
 	}
 	return nil
@@ -164,12 +177,29 @@ func collapseElement(el *templatecompile.CompiledNode, elPath string, attr *temp
 	if va == nil || len(va.Children()) == 0 {
 		return nil // no constrained value — EHRbase omits the ELEMENT
 	}
-	v := va.Children()[0] // first value alternative; multiples are a documented deviation
+	alts := va.Children()
+	v := alts[0] // primary value alternative
 	leaf := newNode(el, elPath, attr, cfg)
 	leaf.RMType = v.RMTypeName()
 	leaf.AQLPath = elPath + "/value"
 	leaf.Inputs = inputsFor(v)
+	// A DV_CODED_TEXT with a DV_TEXT alternative renders an extra free-text
+	// "other" input, mirroring EHRbase.
+	if v.RMTypeName() == "DV_CODED_TEXT" && hasTextAlternative(alts[1:]) {
+		leaf.Inputs = append(leaf.Inputs, Input{Suffix: "other", Type: "TEXT"})
+	}
 	return leaf
+}
+
+// hasTextAlternative reports whether any of the value alternatives is a
+// plain DV_TEXT (the "other, please specify" free-text option).
+func hasTextAlternative(alts []*templatecompile.CompiledNode) bool {
+	for _, a := range alts {
+		if a.RMTypeName() == "DV_TEXT" {
+			return true
+		}
+	}
+	return false
 }
 
 // newNode builds the common fields of a WebTemplate node from a compiled node.
