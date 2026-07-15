@@ -8,6 +8,7 @@ package simplified
 
 import (
 	"encoding/json"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -68,7 +69,17 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 		}
 		groups[base][suffix] = val
 	}
-	for base, sfx := range groups {
+	// Process leaf groups in a stable (sorted) order so the reconstructed tree
+	// is deterministic: distinct-node-id siblings with no explicit :index
+	// (e.g. multiple content items, or elements under one ITEM_TREE) are
+	// appended in this order, which must not depend on Go map iteration.
+	bases := make([]string, 0, len(groups))
+	for base := range groups {
+		bases = append(bases, base)
+	}
+	sort.Strings(bases)
+	for _, base := range bases {
+		sfx := groups[base]
 		pk := parseFlatKey(base)
 		leaf, predIndex, predType, ok := resolveLeaf(wt, pk.segs)
 		if !ok {
@@ -123,7 +134,11 @@ type aqlSeg struct {
 	pred string
 }
 
-// parseAQL splits a canonical aqlPath into attribute+predicate segments.
+// parseAQL splits a canonical aqlPath into attribute+predicate segments. The
+// predicate is taken as a bare node id (archetype id or at-code); compound
+// predicates (e.g. [at0001 and name/value='x']) are not split — no supported
+// Web Template emits them in aqlPath (mirror rmpath.parsePredicate if that
+// changes).
 func parseAQL(p string) []aqlSeg {
 	var out []aqlSeg
 	for part := range strings.SplitSeq(strings.TrimPrefix(p, "/"), "/") {
@@ -144,6 +159,11 @@ func parseAQL(p string) []aqlSeg {
 // nodes (concrete type via rminfo + the Web Template, archetype_node_id from
 // the predicate, list position from predIndex), and sets the terminal
 // attribute to the leaf DataValue.
+//
+// Reconstructed intermediate and leaf nodes carry _type + archetype_node_id
+// only; populating the mandatory LOCATABLE.name from the Web Template node is
+// deferred (rmpath re-resolves by archetype_node_id, so round-trip does not
+// depend on it — full name population lands with the ctx/name completion).
 func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any) {
 	segs := parseAQL(aqlPath)
 	cur := compJSON

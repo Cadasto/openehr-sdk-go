@@ -8,6 +8,8 @@ package simplified
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -37,7 +39,9 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 	out := make(map[string]any)
 	root := wt.Tree
 	for _, ch := range root.Children {
-		emitNode(out, ch, root.ID, comp, root.AQLPath)
+		if err := emitNode(out, ch, root.ID, comp, root.AQLPath); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -47,42 +51,58 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 // enumerates its instances and stamps a zero-based :index; a container
 // recurses into its children; a value leaf maps its datatype to suffix keys.
 // Absent optional nodes resolve to nothing and are silently skipped.
-func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string) {
+func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string) error {
 	isContainer := len(node.Children) > 0
 	isLeaf := !isContainer && len(node.Inputs) > 0
 	if !isContainer && !isLeaf {
-		return // structural node carrying neither children nor value inputs
+		return nil // structural node carrying neither children nor value inputs
 	}
 	relPath := strings.TrimPrefix(node.AQLPath, resolveRootAql)
 
 	if node.Max != 1 {
 		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)
 		if err != nil {
-			return
+			return skipNotFound(err, relPath)
 		}
 		for i, v := range vals {
-			emitValue(out, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(i), v, isContainer)
+			if err := emitValue(out, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(i), v, isContainer); err != nil {
+				return err
+			}
 		}
-		return
+		return nil
 	}
 	v, err := rmpath.ItemAtPath(resolveRoot, relPath)
 	if err != nil {
-		return
+		return skipNotFound(err, relPath)
 	}
-	emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer)
+	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer)
+}
+
+// skipNotFound treats an absent optional node (ErrPathNotFound) as a no-op,
+// but surfaces real faults — a malformed path (ErrPathSyntax) or a Max==1
+// node that resolves to multiple items (ErrPathAmbiguous) — rather than
+// silently dropping data.
+func skipNotFound(err error, relPath string) error {
+	if errors.Is(err, rmpath.ErrPathNotFound) {
+		return nil
+	}
+	return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
 }
 
 // emitValue recurses into a container instance or maps a leaf value.
-func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool) {
+func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool) error {
 	if isContainer {
 		loc, ok := v.(rm.Locatable)
 		if !ok {
-			return
+			return nil
 		}
 		for _, ch := range node.Children {
-			emitNode(out, ch, flatPath, loc, node.AQLPath)
+			if err := emitNode(out, ch, flatPath, loc, node.AQLPath); err != nil {
+				return err
+			}
 		}
-		return
+		return nil
 	}
 	leafToFlat(out, flatPath, v)
+	return nil
 }
