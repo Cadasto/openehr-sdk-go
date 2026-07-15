@@ -63,10 +63,17 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 		"archetype_node_id": root.NodeID,
 		"name":              textJSON(orDefault(root.Name, wt.TemplateID)),
 	}
+	// Separate composition-level context (ctx/) from clinical content; context
+	// is rebuilt from RM attributes, not from a Web Template leaf path.
+	ctx := make(map[string]any)
 	// Group FLAT keys by leaf instance (key minus the |suffix); each group's
 	// suffix->value pairs build one DataValue.
 	groups := make(map[string]map[string]any)
 	for key, val := range flat {
+		if strings.HasPrefix(key, "ctx/") {
+			ctx[key] = val
+			continue
+		}
 		base := key
 		suffix := ""
 		if i := strings.LastIndex(key, "|"); i >= 0 {
@@ -104,7 +111,71 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
+	// Apply context after content, so an unresolvable content key surfaces as
+	// ErrUnknownPath before the mandatory-context check.
+	if err := applyContext(compJSON, ctx); err != nil {
+		return nil, err
+	}
 	return compJSON, nil
+}
+
+// applyContext sets the composition-level metadata from the ctx/ entries and
+// enforces that language and territory (mandatory per the Simplified Formats
+// spec) are present. Only the core context fields are supported; any other
+// ctx/ field is ErrUnknownPath (see deviations.md).
+func applyContext(compJSON map[string]any, ctx map[string]any) error {
+	var lang, terr, composerName string
+	var haveLang, haveTerr, haveComposerName, composerSelf bool
+	var timeVal any
+	var haveTime bool
+	for key, val := range ctx {
+		switch strings.TrimPrefix(key, "ctx/") {
+		case "language":
+			lang, _ = val.(string)
+			haveLang = true
+		case "territory":
+			terr, _ = val.(string)
+			haveTerr = true
+		case "composer_name":
+			composerName, _ = val.(string)
+			haveComposerName = true
+		case "composer_self":
+			b, _ := val.(bool)
+			composerSelf = b
+		case "time":
+			timeVal = val
+			haveTime = true
+		default:
+			return fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+		}
+	}
+	if !haveLang || lang == "" || !haveTerr || terr == "" {
+		return fmt.Errorf("%w: ctx/language and ctx/territory are required", ErrMissingContext)
+	}
+	compJSON["language"] = codePhraseJSON(lang, "ISO_639-1")
+	compJSON["territory"] = codePhraseJSON(terr, "ISO_3166-1")
+	switch {
+	case composerSelf:
+		compJSON["composer"] = map[string]any{"_type": "PARTY_SELF"}
+	case haveComposerName:
+		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": composerName}
+	}
+	if haveTime {
+		compJSON["context"] = map[string]any{
+			"_type":      "EVENT_CONTEXT",
+			"start_time": map[string]any{"_type": "DV_DATE_TIME", "value": timeVal},
+		}
+	}
+	return nil
+}
+
+// codePhraseJSON is a canonical CODE_PHRASE object.
+func codePhraseJSON(code, terminology string) map[string]any {
+	return map[string]any{
+		"_type":          "CODE_PHRASE",
+		"code_string":    code,
+		"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": terminology},
+	}
 }
 
 // unmarshalObject decodes a JSON object into a map, preserving integer

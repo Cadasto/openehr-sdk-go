@@ -29,7 +29,8 @@ not partially/silently accepted.
 
 | Feature | Current behaviour | Lands in |
 |---|---|---|
-| `ctx/` context (`ctx/language`, `ctx/territory`, composer, …) | Not emitted on encode; `ctx/*` keys are rejected on decode (`ErrUnknownPath`). `ErrMissingContext` is reserved for this. | Phase 6 (Task 6) |
+| `ctx/` context — **core supported**: `ctx/language`, `ctx/territory` (both mandatory on decode → `ErrMissingContext`), `ctx/composer_name` / `ctx/composer_self`, `ctx/time` (context `start_time`). | Emitted on encode; rebuilt on decode. | landed (Task 6) |
+| `ctx/` context — **rest deferred**: `setting`, `category`, participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted; any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). Setting/category are platform defaults or need terminology resolution. | Phase 6 |
 | `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`) | Not emitted; rejected on decode. | Phase 6 |
 | `\|raw` escape hatch (canonical fragment for exotic datatypes) | Not implemented — exotic `DV_*` error on encode instead. | Phase 6 |
 | `\|other` open-value-set free text for `DV_CODED_TEXT` | Not implemented. | Phase 6 |

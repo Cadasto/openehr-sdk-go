@@ -32,9 +32,10 @@ func TestDecodeRejectsHugeIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
 	}
-	// Mutate the first repeatable :index (encode only stamps :index on
-	// repeatables) to an out-of-range value.
-	mutated := strings.Replace(string(f1), ":0", ":100000001", 1)
+	// Mutate the first repeatable content :index to an out-of-range value. A
+	// content index is always followed by "/" (a deeper segment), which avoids
+	// matching a ":0" inside a ctx/time timestamp value.
+	mutated := strings.Replace(string(f1), ":0/", ":100000001/", 1)
 	if mutated == string(f1) {
 		t.Skip("no repeatable :index in fixture to mutate")
 	}

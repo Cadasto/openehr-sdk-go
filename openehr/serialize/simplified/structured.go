@@ -71,7 +71,18 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 // single object; every deeper segment is an array indexed by its :index.
 func flatToStructured(flat map[string]any) (map[string]any, error) {
 	root := make(map[string]any)
+	var ctxObj map[string]any
 	for key, val := range flat {
+		// Context is grouped under a ctx object with direct (non-arrayified)
+		// values, unlike clinical data (spec §Structured format).
+		if rest, ok := strings.CutPrefix(key, "ctx/"); ok {
+			if ctxObj == nil {
+				ctxObj = make(map[string]any)
+				root["ctx"] = ctxObj
+			}
+			ctxObj[rest] = val
+			continue
+		}
 		pk := parseFlatKey(key)
 		if len(pk.segs) == 0 {
 			continue
@@ -134,9 +145,19 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 func structuredToFlat(s map[string]any) map[string]any {
 	out := make(map[string]any)
 	for rootID, v := range s {
-		if obj, ok := v.(map[string]any); ok {
-			structWalk(out, rootID, obj)
+		obj, ok := v.(map[string]any)
+		if !ok {
+			continue
 		}
+		// The ctx object holds direct values (no arrays / :index), inverse of
+		// the ctx grouping in flatToStructured.
+		if rootID == "ctx" {
+			for k, cv := range obj {
+				out["ctx/"+k] = cv
+			}
+			continue
+		}
+		structWalk(out, rootID, obj)
 	}
 	return out
 }

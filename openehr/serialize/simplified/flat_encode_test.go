@@ -75,8 +75,12 @@ func TestMarshalFlatDVTextLeaf(t *testing.T) {
 	if len(m) == 0 {
 		t.Fatal("empty flat map")
 	}
-	// Every key is rooted at the template's tree id.
+	// Every clinical key is rooted at the template's tree id; ctx/ context keys
+	// are the documented exception (composition-level metadata).
 	for k := range m {
+		if strings.HasPrefix(k, "ctx/") {
+			continue
+		}
 		if !strings.HasPrefix(k, wt.Tree.ID+"/") {
 			t.Errorf("key %q not rooted at %q", k, wt.Tree.ID)
 		}

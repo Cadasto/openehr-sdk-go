@@ -37,6 +37,7 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 		return nil, ErrNilComposition
 	}
 	out := make(map[string]any)
+	emitContext(out, comp)
 	root := wt.Tree
 	for _, ch := range root.Children {
 		if err := emitNode(out, ch, root.ID, comp, root.AQLPath); err != nil {
@@ -44,6 +45,37 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 		}
 	}
 	return out, nil
+}
+
+// emitContext writes composition-level metadata under the ctx/ prefix (REQ-053):
+// the mandatory language and territory code strings, the composer, and the
+// context start time. Setting, category, participations, health-care facility,
+// workflow ids, and the composer external reference are deferred (they are
+// platform defaults or need terminology resolution) — see deviations.md.
+func emitContext(out map[string]any, comp *rm.Composition) {
+	if comp.Language.CodeString != "" {
+		out["ctx/language"] = comp.Language.CodeString
+	}
+	if comp.Territory.CodeString != "" {
+		out["ctx/territory"] = comp.Territory.CodeString
+	}
+	switch c := comp.Composer.(type) {
+	case *rm.PartySelf:
+		out["ctx/composer_self"] = true
+	case rm.PartySelf:
+		out["ctx/composer_self"] = true
+	case *rm.PartyIdentified:
+		if c.Name != nil && *c.Name != "" {
+			out["ctx/composer_name"] = *c.Name
+		}
+	case rm.PartyIdentified:
+		if c.Name != nil && *c.Name != "" {
+			out["ctx/composer_name"] = *c.Name
+		}
+	}
+	if comp.Context != nil && comp.Context.StartTime.Value != "" {
+		out["ctx/time"] = comp.Context.StartTime.Value
+	}
 }
 
 // emitNode resolves node against resolveRoot (whose canonical path is
