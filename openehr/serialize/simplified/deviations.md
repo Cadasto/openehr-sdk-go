@@ -67,6 +67,14 @@ not partially/silently accepted.
   decode/interconversion so a hostile key (`node:1000000000`) cannot force an unbounded
   allocation; an out-of-range index is `ErrUnknownPath`.
 
+- **OPT-free `FlatToStructured` → `StructuredToFlat` normalises `:index`** — STRUCTURED is
+  arrays-always (spec), and interconversion has no OPT, so the back-conversion cannot tell
+  a single-cardinality leaf (no `:index` in FLAT) from a one-element repeatable (`:0`); it
+  emits `:0` on both. The result is valid-but-verbose FLAT that decodes to the same
+  composition (the redundant `:0` on a max=1 node is ignored on decode), so interconversion
+  is **semantics-preserving, not byte-identical**. PROBE-076 asserts the semantic form
+  (decode + re-encode equals the original FLAT).
+
 ## Conformance
 
 Structural conformance against a vendored upstream trio (**PROBE-076**) is **deferred**

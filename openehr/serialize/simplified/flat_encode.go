@@ -97,7 +97,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 			return skipNotFound(err, relPath)
 		}
 		for i, v := range vals {
-			if err := emitValue(out, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(i), v, isContainer); err != nil {
+			if err := emitValue(out, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(i), v, isContainer, resolveRoot, resolveRootAql); err != nil {
 				return err
 			}
 		}
@@ -107,7 +107,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	if err != nil {
 		return skipNotFound(err, relPath)
 	}
-	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer)
+	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql)
 }
 
 // skipNotFound treats an absent optional node (ErrPathNotFound) as a no-op,
@@ -122,17 +122,20 @@ func skipNotFound(err error, relPath string) error {
 }
 
 // emitValue recurses into a container instance or maps a leaf value.
-func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool) error {
+// ancestorRoot/ancestorAql are the enclosing Locatable resolution root against
+// which node was resolved; they carry through when a container is not itself
+// Locatable (e.g. EVENT_CONTEXT), so its children resolve from that ancestor by
+// their full relative paths rather than being dropped.
+func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string) error {
 	if isContainer {
-		loc, ok := v.(rm.Locatable)
-		if !ok {
-			// A container node must resolve to a Locatable RM object; anything
-			// else is an internal inconsistency between the Web Template and the
-			// composition, not an absent optional — surface it (REQ-053).
-			return fmt.Errorf("simplified: container node %q resolved to non-Locatable %T", node.ID, v)
+		root, rootAql := ancestorRoot, ancestorAql
+		if loc, ok := v.(rm.Locatable); ok {
+			// A Locatable container becomes the new resolution root for its
+			// children (each repeatable instance is resolved independently).
+			root, rootAql = loc, node.AQLPath
 		}
 		for _, ch := range node.Children {
-			if err := emitNode(out, ch, flatPath, loc, node.AQLPath); err != nil {
+			if err := emitNode(out, ch, flatPath, root, rootAql); err != nil {
 				return err
 			}
 		}

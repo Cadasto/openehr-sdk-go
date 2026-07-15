@@ -53,7 +53,7 @@ func TestDvFromSuffixes(t *testing.T) {
 // TestDvFromSuffixesErrors covers the strict-decode guarantees: an unmapped
 // datatype and a missing required suffix are errors, not silent zero values.
 func TestDvFromSuffixesErrors(t *testing.T) {
-	if _, err := dvFromSuffixes("DV_DURATION", map[string]any{"": "P1D"}); !errors.Is(err, ErrUnsupportedDatatype) {
+	if _, err := dvFromSuffixes("DV_MULTIMEDIA", map[string]any{"": "x"}); !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Errorf("unmapped datatype err = %v, want ErrUnsupportedDatatype", err)
 	}
 	if _, err := dvFromSuffixes("DV_COUNT", map[string]any{}); err == nil {

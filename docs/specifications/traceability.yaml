@@ -412,10 +412,13 @@ requirements:
     implementation: partial
     packages:
       - openehr/serialize/simplified
+    probes:
+      - PROBE-076
     plans:
       - docs/plans/2026-07-14-flat-structured-codecs.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
+      - testkit/probes/serialize/probe_076_simplified_round_trip.go
       - openehr/serialize/simplified/independence_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go

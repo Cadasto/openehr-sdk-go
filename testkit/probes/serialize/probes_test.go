@@ -1,8 +1,10 @@
 package serializeprobes_test
 
 import (
+	"os"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	serializeprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/serialize"
 )
 
@@ -120,5 +122,48 @@ func TestProbe034(t *testing.T) {
 	}
 	if r.Status != "pass" {
 		t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+	}
+}
+
+// TestProbe076 runs PROBE-076 across the vendored (OPT + canonical composition)
+// pairs — the EHRbase Test_dv_* datatype corpus and the other constraint
+// templates. Every template that the Web Template builder can model MUST
+// round-trip (Status "pass"); a template it cannot yet model is "skip" (never
+// "fail"). A pass floor guards against the corpus silently emptying.
+func TestProbe076(t *testing.T) {
+	ids, err := fixtures.ConstraintTemplateIDs()
+	if err != nil {
+		t.Fatalf("ConstraintTemplateIDs: %v", err)
+	}
+	if len(ids) == 0 {
+		t.Fatal("no constraint template ids discovered")
+	}
+	var passes int
+	for _, id := range ids {
+		t.Run(id, func(t *testing.T) {
+			optBody, err := os.ReadFile(fixtures.TemplateOpt(id))
+			if err != nil {
+				t.Skipf("no OPT: %v", err)
+			}
+			compBody, err := os.ReadFile(fixtures.CompositionJSON(id))
+			if err != nil {
+				t.Skipf("no composition: %v", err)
+			}
+			r, err := serializeprobes.Probe076SimplifiedRoundTrip(optBody, compBody)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			switch r.Status {
+			case "pass":
+				passes++
+			case "skip":
+				t.Skipf("skip: %s", r.Detail)
+			default:
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+	if passes == 0 {
+		t.Error("PROBE-076 produced no passes — check cassette discovery / codec regressions")
 	}
 }
