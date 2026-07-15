@@ -382,6 +382,18 @@ func concreteType(parentType, attr, pred string, predType map[string]string, nex
 // mappings). A required suffix that is absent is an error rather than a coerced
 // zero value; an unmapped datatype is ErrUnsupportedDatatype.
 func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
+	// |raw bypass: the value is a pre-serialised canonical fragment (carrying
+	// its own _type); use it directly, regardless of the leaf's rmType.
+	if raw, ok := sfx["raw"]; ok {
+		frag, ok := raw.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("%w: |raw value is not a canonical object", ErrUnsupportedDatatype)
+		}
+		if _, ok := frag["_type"]; !ok {
+			return nil, fmt.Errorf("%w: |raw fragment missing _type", ErrUnsupportedDatatype)
+		}
+		return frag, nil
+	}
 	switch rmType {
 	case "DV_TEXT":
 		v, err := requireSuffix(rmType, sfx, "")

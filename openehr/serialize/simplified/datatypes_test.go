@@ -2,7 +2,6 @@ package simplified
 
 // REQ-053 — leaf datatype -> FLAT suffix mapping.
 import (
-	"errors"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -81,15 +80,19 @@ func TestLeafToFlat(t *testing.T) {
 	}
 }
 
-// TestLeafToFlatUnsupported checks that an unmapped clinical datatype (DV_*)
-// is an error rather than a silent no-op, so no value is dropped (REQ-053).
-func TestLeafToFlatUnsupported(t *testing.T) {
+// TestLeafToFlatRawFallback checks that a clinical datatype outside the core
+// set is embedded as a |raw canonical fragment rather than dropped (REQ-053) —
+// the codec stays lossless.
+func TestLeafToFlatRawFallback(t *testing.T) {
 	out := map[string]any{}
-	err := leafToFlat(out, "p/x", rm.DVProportion{Numerator: 1, Denominator: 2}, "DV_PROPORTION")
-	if !errors.Is(err, ErrUnsupportedDatatype) {
-		t.Fatalf("leafToFlat(DV_PROPORTION) err = %v, want ErrUnsupportedDatatype", err)
+	if err := leafToFlat(out, "p/x", rm.DVProportion{Numerator: 1, Denominator: 2, Type: 0}, "DV_PROPORTION"); err != nil {
+		t.Fatalf("leafToFlat(DV_PROPORTION): %v", err)
 	}
-	if len(out) != 0 {
-		t.Errorf("unsupported datatype wrote %d entries, want 0", len(out))
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected p/x|raw canonical fragment, got %#v", out)
+	}
+	if raw["_type"] != "DV_PROPORTION" {
+		t.Errorf("|raw _type = %v, want DV_PROPORTION", raw["_type"])
 	}
 }

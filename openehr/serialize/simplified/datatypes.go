@@ -7,10 +7,11 @@ package simplified
 // may hold either (see openehr/rm on substitution slots).
 
 import (
-	"fmt"
+	"encoding/json"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
 // leafToFlat writes the FLAT entries for a single leaf value at flatPath.
@@ -58,11 +59,42 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string) error
 	case *rm.DVBoolean:
 		out[flatPath] = dv.Value
 	default:
+		// |raw fallback: a clinical datatype the core switch does not map is
+		// embedded as its canonical-JSON fragment (which carries its own _type)
+		// rather than dropped — the codec stays lossless (REQ-053). Non-DV_
+		// leaves (party/context/other RM attributes) remain deferred; see
+		// deviations.md.
 		if strings.HasPrefix(rmType, "DV_") {
-			return fmt.Errorf("%w: %s at %q", ErrUnsupportedDatatype, rmType, flatPath)
+			raw, err := rawFragment(v, rmType)
+			if err != nil {
+				return err
+			}
+			out[flatPath+"|raw"] = raw
 		}
 	}
 	return nil
+}
+
+// rawFragment serialises v to its openEHR canonical JSON (via canjson) and
+// re-parses it as a generic value, so it nests inside the FLAT/STRUCTURED map
+// under a |raw key. canjson emits _type only for pointer/polymorphic forms, so
+// the fragment is stamped with rmType (the Web Template leaf type) when the
+// value form omits it — decode requires _type on a |raw fragment.
+func rawFragment(v any, rmType string) (any, error) {
+	b, err := canjson.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var frag any
+	if err := json.Unmarshal(b, &frag); err != nil {
+		return nil, err
+	}
+	if m, ok := frag.(map[string]any); ok {
+		if _, has := m["_type"]; !has {
+			m["_type"] = rmType
+		}
+	}
+	return frag, nil
 }
 
 // codedToFlat emits the |code, |value and (external only) |terminology suffix
