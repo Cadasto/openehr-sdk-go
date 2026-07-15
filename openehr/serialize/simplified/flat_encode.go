@@ -87,7 +87,11 @@ func emitContext(out map[string]any, comp *rm.Composition) {
 // Absent optional nodes resolve to nothing and are silently skipped.
 func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string) error {
 	isContainer := len(node.Children) > 0
-	isLeaf := !isContainer && len(node.Inputs) > 0
+	// A value leaf normally carries input descriptors, but the Web Template emits
+	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, …); any childless
+	// DV_* node is still a value leaf and must be emitted (bare/suffixed or |raw),
+	// not dropped.
+	isLeaf := !isContainer && (len(node.Inputs) > 0 || strings.HasPrefix(node.RMType, "DV_"))
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
 	}

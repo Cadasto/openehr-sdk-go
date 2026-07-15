@@ -11,14 +11,14 @@ package serializeprobes
 //     to the same FLAT;
 //   - interconversion:       FlatToStructured -> StructuredToFlat is the identity.
 //
-// Scope: this is a round-trip **idempotence** probe, not an upstream-conformance
-// probe. It does not compare the emitted FLAT/STRUCTURED to vendored simplified
-// output, nor the decoded composition to the vendored canonical — so a symmetric
-// omission on both encode and decode would pass. The guarantee is that the codec
-// is self-consistent and lossless across its own pipeline on real upstream
-// compositions. A true upstream-conformance probe is a documented follow-up
-// (needs vendored simplified fixtures) — see
-// openehr/serialize/simplified/deviations.md § Conformance.
+// Scope: round-trip idempotence PLUS an OPT-conformance check — when the source
+// composition is itself OPT-valid, a WithTemplate decode (names + RM-mandatory
+// completion) must also validate against the OPT. That conformance leg catches
+// dropped or mistyped leaves that pure FLAT idempotence (a symmetric omission on
+// both encode and decode) would miss. It does not compare the emitted
+// FLAT/STRUCTURED byte-for-byte against vendored upstream simplified output — a
+// documented follow-up needing those fixtures (see
+// openehr/serialize/simplified/deviations.md § Conformance).
 
 import (
 	"bytes"
@@ -32,6 +32,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
@@ -135,9 +136,31 @@ func Probe076SimplifiedRoundTrip(optBody, compBody []byte) (Result, error) {
 		r.Status, r.Detail = "fail", "FLAT<->STRUCTURED interconversion loses data"
 		return r, nil
 	}
+	// Conformance: when the source composition is itself OPT-valid, a WithTemplate
+	// decode (names + RM-mandatory completion) must also validate — this catches
+	// dropped/mistyped leaves that FLAT idempotence alone (a symmetric omission)
+	// would miss.
+	if validation.Validate(&comp, compiled).OK {
+		named, err := simplified.UnmarshalFlat(f1, wt, simplified.WithTemplate(compiled))
+		if err != nil {
+			r.Status, r.Detail = "fail", "UnmarshalFlat (WithTemplate): "+err.Error()
+			return r, nil
+		}
+		if vr := validation.Validate(named, compiled); !vr.OK {
+			r.Status, r.Detail = "fail", "WithTemplate decode of a valid composition does not validate: "+firstIssue(vr)
+			return r, nil
+		}
+	}
 	r.Status = "pass"
 	r.Detail = fmt.Sprintf("%d FLAT keys round-tripped", flatKeyCount(f1))
 	return r, nil
+}
+
+func firstIssue(r validation.Result) string {
+	if len(r.Issues) == 0 {
+		return ""
+	}
+	return r.Issues[0].Code + " " + r.Issues[0].Path
 }
 
 func flatMapsEqual(a, b []byte) bool {

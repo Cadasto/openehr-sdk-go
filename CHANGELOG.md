@@ -14,7 +14,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 - **WebTemplate JSON export (REQ-106, ADR 0014).** New building block `openehr/template/webtemplate` projects a compiled OPT into EHRbase `openEHR_SDK` v2.3 WebTemplate JSON, pinned by structural parity (PROBE-075) against a vendored reference fixture.
 
-- **FLAT / STRUCTURED simplified-format codecs (REQ-053, partial).** New building block `openehr/serialize/simplified` converts a COMPOSITION to and from the openEHR Flat and Structured formats (bidirectional, Web-Template-driven) with OPT-free interconversion; core datatypes landed, conformance (PROBE-076) and edge cases deferred.
+- **FLAT / STRUCTURED simplified-format codecs (REQ-053).** New building block `openehr/serialize/simplified` converts a COMPOSITION to and from the openEHR Flat and Structured formats (bidirectional, Web-Template-driven) with OPT-free interconversion: the full DV_* datatype set (first-class + `|raw` for decorated/exotic), `ctx/` context, `|other` open value-sets, and strict fail-loud decode. `Unmarshal*(…, simplified.WithTemplate(compiled))` repopulates `LOCATABLE.name` and completes the RM-mandatory attributes the formats omit, so a decoded composition validates against the OPT. Conformance is exercised by PROBE-076 over the vendored EHRbase `Test_dv_*` corpus. Residual deferrals (exotic `ctx/` fields on encode, `.schema` media types, upstream byte-conformance) are listed in the package `deviations.md`.
 
 ## [0.16.0] - 2026-07-13
 

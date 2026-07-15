@@ -406,15 +406,19 @@ requirements:
     # unresolvable paths, unsupported datatypes, missing required suffixes, missing
     # mandatory context, and out-of-bound :index are errors, not silent data loss
     # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
-    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip) — idempotence,
-    # not upstream byte-conformance. LOCATABLE.name is repopulated on decode via
-    # WithTemplate(compiled) (names from the archetype terminology; never leak into
-    # FLAT). Deferred (documented, deviations.md): the remaining RM-mandatory
-    # attributes FLAT does not carry (HISTORY.origin, EVENT.time, ENTRY language/
-    # encoding/subject, EVENT_CONTEXT.setting) so decode is not yet fully
-    # OPT-validatable; first-class _-attr suffix decomposition (covered losslessly
-    # via |raw); .schema media types; and an upstream-conformance probe.
-    implementation: partial
+    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip): idempotence
+    # PLUS OPT-conformance — a WithTemplate(compiled) decode of a valid source
+    # validates against the OPT. WithTemplate repopulates LOCATABLE.name (from the
+    # archetype terminology) and completes the RM-mandatory attributes FLAT does
+    # not carry (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
+    # EVENT_CONTEXT.setting, COMPOSITION category/composer) from ctx + RM defaults;
+    # names/defaults never leak into FLAT. Deferred (documented, deviations.md):
+    # exotic ctx/ fields not emitted on encode (participations/facility/workflow/
+    # composer external_ref — optional, no validity impact; non-default source
+    # values for the defaulted attributes are not round-tripped); first-class
+    # _-attr suffix decomposition (covered losslessly via |raw); .schema media
+    # types on input; and an upstream byte-conformance probe.
+    implementation: landed
     packages:
       - openehr/serialize/simplified
     probes:

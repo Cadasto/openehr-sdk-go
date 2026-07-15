@@ -68,13 +68,15 @@ func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
 		t.Error("bare decode: expected missing-name issues (the gap WithTemplate closes), got none")
 	}
 
-	// WithTemplate: every LOCATABLE.name is repopulated -> no missing-name issues.
+	// WithTemplate: names repopulated AND the RM-mandatory attributes the formats
+	// omit are completed from ctx defaults -> the decoded composition validates
+	// against the OPT.
 	named, err := simplified.UnmarshalFlat(flat, wt, simplified.WithTemplate(compiled))
 	if err != nil {
 		t.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
 	}
-	if got := nameRequiredIssues(validation.Validate(named, compiled)); len(got) != 0 {
-		t.Errorf("WithTemplate decode still missing names at: %v", got)
+	if r := validation.Validate(named, compiled); !r.OK {
+		t.Errorf("WithTemplate decode does not validate against the OPT; issues=%v", r.Issues)
 	}
 
 	// Names must not leak into FLAT — the round-trip stays idempotent.

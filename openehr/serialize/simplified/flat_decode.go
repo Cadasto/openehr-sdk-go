@@ -139,56 +139,77 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
-	// Apply context after content, so an unresolvable content key surfaces as
-	// ErrUnknownPath before the mandatory-context check.
-	if err := applyContext(compJSON, ctx); err != nil {
+	// Context: parse once, then apply (with the mandatory-field check) after
+	// content, so an unresolvable content key surfaces as ErrUnknownPath first.
+	ci, err := parseCtx(ctx)
+	if err != nil {
 		return nil, err
+	}
+	if err := applyContext(compJSON, ci); err != nil {
+		return nil, err
+	}
+	// Conformant mode (a template was supplied, so names is non-nil): fill the
+	// RM-mandatory attributes the formats do not carry, from ctx defaults + RM
+	// conventions, so the decoded composition is OPT-validatable.
+	if names != nil {
+		completeRequired(compJSON, ci)
 	}
 	return compJSON, nil
 }
 
-// applyContext sets the composition-level metadata from the ctx/ entries and
-// enforces that language and territory (mandatory per the Simplified Formats
-// spec) are present. Only the core context fields are supported; any other
-// ctx/ field is ErrUnknownPath (see deviations.md).
-func applyContext(compJSON map[string]any, ctx map[string]any) error {
-	var lang, terr, composerName string
-	var haveLang, haveTerr, haveComposerName, composerSelf bool
-	var timeVal any
-	var haveTime bool
+// ctxInfo is the parsed ctx/ context — the shared source for applyContext and
+// the RM-mandatory completion pass.
+type ctxInfo struct {
+	language, territory string
+	composerName        string
+	composerSelf        bool
+	haveComposerName    bool
+	time                any
+	haveTime            bool
+}
+
+// parseCtx decodes the ctx/ entries. Only the core context fields are supported;
+// any other ctx/ field is ErrUnknownPath (see deviations.md).
+func parseCtx(ctx map[string]any) (ctxInfo, error) {
+	var ci ctxInfo
 	for key, val := range ctx {
 		switch strings.TrimPrefix(key, "ctx/") {
 		case "language":
-			lang, _ = val.(string)
-			haveLang = true
+			ci.language, _ = val.(string)
 		case "territory":
-			terr, _ = val.(string)
-			haveTerr = true
+			ci.territory, _ = val.(string)
 		case "composer_name":
-			composerName, _ = val.(string)
-			haveComposerName = true
+			ci.composerName, _ = val.(string)
+			ci.haveComposerName = true
 		case "composer_self":
 			b, _ := val.(bool)
-			composerSelf = b
+			ci.composerSelf = b
 		case "time":
-			timeVal = val
-			haveTime = true
+			ci.time = val
+			ci.haveTime = true
 		default:
-			return fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+			return ci, fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
 		}
 	}
-	if !haveLang || lang == "" || !haveTerr || terr == "" {
+	return ci, nil
+}
+
+// applyContext sets the composition-level metadata from the parsed context and
+// enforces that language and territory (mandatory per the Simplified Formats
+// spec) are present.
+func applyContext(compJSON map[string]any, ci ctxInfo) error {
+	if ci.language == "" || ci.territory == "" {
 		return fmt.Errorf("%w: ctx/language and ctx/territory are required", ErrMissingContext)
 	}
-	compJSON["language"] = codePhraseJSON(lang, "ISO_639-1")
-	compJSON["territory"] = codePhraseJSON(terr, "ISO_3166-1")
+	compJSON["language"] = codePhraseJSON(ci.language, "ISO_639-1")
+	compJSON["territory"] = codePhraseJSON(ci.territory, "ISO_3166-1")
 	switch {
-	case composerSelf:
+	case ci.composerSelf:
 		compJSON["composer"] = map[string]any{"_type": "PARTY_SELF"}
-	case haveComposerName:
-		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": composerName}
+	case ci.haveComposerName:
+		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": ci.composerName}
 	}
-	if haveTime {
+	if ci.haveTime {
 		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
 		// (setting, other_context, health_care_facility, …) rather than replacing
 		// it — otherwise that data would be lost.
@@ -197,7 +218,69 @@ func applyContext(compJSON map[string]any, ctx map[string]any) error {
 			ctxObj = map[string]any{"_type": "EVENT_CONTEXT"}
 			compJSON["context"] = ctxObj
 		}
-		ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": timeVal}
+		ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+	}
+	return nil
+}
+
+// completeRequired fills the RM-mandatory attributes the FLAT/STRUCTURED formats
+// do not carry — ENTRY language/encoding/subject, HISTORY.origin, EVENT.time,
+// EVENT_CONTEXT.setting, and any others rminfo reports — with ctx defaults + RM
+// conventions, so a WithTemplate decode yields an OPT-validatable composition.
+// It only runs in conformant (WithTemplate) mode. The values it synthesises
+// (event times, subject, setting) are defaults, not recovered data — the formats
+// never carried them; see deviations.md.
+func completeRequired(node map[string]any, ci ctxInfo) {
+	if t, _ := node["_type"].(string); t != "" {
+		for _, attr := range rminfo.Default.RequiredAttributes(t) {
+			if _, has := node[attr]; has {
+				continue
+			}
+			if dv := defaultAttr(attr, ci); dv != nil {
+				node[attr] = dv
+			}
+		}
+	}
+	for _, v := range node {
+		switch val := v.(type) {
+		case map[string]any:
+			completeRequired(val, ci)
+		case []any:
+			for _, e := range val {
+				if m, ok := e.(map[string]any); ok {
+					completeRequired(m, ci)
+				}
+			}
+		}
+	}
+}
+
+// defaultAttr synthesises a default value for an RM-mandatory attribute the
+// formats omit. LOCATABLE.name and archetype_node_id are handled elsewhere
+// (WithTemplate names / the aqlPath predicate); container attributes (data,
+// items, item) are reconstructed from content. Returns nil for attributes with
+// no sensible default.
+func defaultAttr(attr string, ci ctxInfo) map[string]any {
+	switch attr {
+	case "language":
+		return codePhraseJSON(orDefault(ci.language, "en"), "ISO_639-1")
+	case "encoding":
+		return codePhraseJSON("UTF-8", "IANA_character-sets")
+	case "subject", "composer":
+		return map[string]any{"_type": "PARTY_SELF"}
+	case "origin", "time":
+		if ci.time == nil {
+			return nil
+		}
+		return map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+	case "setting":
+		return map[string]any{"_type": "DV_CODED_TEXT", "value": "other care", "defining_code": codePhraseJSON("238", "openehr")}
+	case "category":
+		return map[string]any{"_type": "DV_CODED_TEXT", "value": "event", "defining_code": codePhraseJSON("433", "openehr")}
+	case "math_function":
+		return map[string]any{"_type": "DV_CODED_TEXT", "value": "actual", "defining_code": codePhraseJSON("146", "openehr")}
+	case "width":
+		return map[string]any{"_type": "DV_DURATION", "value": "PT0S"}
 	}
 	return nil
 }

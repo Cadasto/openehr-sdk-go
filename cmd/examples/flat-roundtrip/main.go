@@ -19,14 +19,15 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
 const templateID = "Test_dv_quantity_open_constraint.v0"
 
 func main() {
-	// 1. Build the Web Template from the OPT (the schema both codecs need).
-	wt := buildWebTemplate()
+	// 1. Build the Web Template + keep the compiled template (both come from the OPT).
+	compiled, wt := buildTemplate()
 
 	// 2. Decode a canonical COMPOSITION.
 	comp := decodeComposition()
@@ -59,9 +60,22 @@ func main() {
 		log.Fatal("round-trip mismatch")
 	}
 	fmt.Println("\nOK: FLAT -> COMPOSITION -> FLAT round-trips for", templateID)
+
+	// 6. Conformant decode: WithTemplate repopulates LOCATABLE.name and completes
+	// the RM-mandatory attributes the format does not carry, so the result
+	// validates against the OPT.
+	conformant, err := simplified.UnmarshalFlat(flat, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		log.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
+	}
+	if r := validation.Validate(conformant, compiled); r.OK {
+		fmt.Println("OK: WithTemplate decode validates against the OPT")
+	} else {
+		fmt.Printf("decoded composition has %d validation issue(s)\n", len(r.Issues))
+	}
 }
 
-func buildWebTemplate() *webtemplate.WebTemplate {
+func buildTemplate() (*templatecompile.Compiled, *webtemplate.WebTemplate) {
 	optBody, err := os.ReadFile(fixtures.TemplateOpt(templateID))
 	if err != nil {
 		log.Fatalf("read OPT: %v", err)
@@ -78,7 +92,7 @@ func buildWebTemplate() *webtemplate.WebTemplate {
 	if err != nil {
 		log.Fatalf("build web template: %v", err)
 	}
-	return wt
+	return compiled, wt
 }
 
 func decodeComposition() *rm.Composition {

@@ -18,8 +18,10 @@ semantics-preserving). Concretely:
   when that form fully captures the value; a **decorated** value (carrying `normal_range`,
   `magnitude_status`, `accuracy`, `mappings`, … — anything outside the datatype's captured
   keys) and any datatype outside the core set are embedded as a lossless `|raw` canonical
-  fragment rather than partially/silently dropped. A non-`DV_` leaf (party / context /
-  other RM attribute) is a documented skip. A container node that resolves to a
+  fragment rather than partially/silently dropped. A `DV_*` leaf the Web Template gives no
+  input descriptors for (e.g. `DV_URI`, `DV_MULTIMEDIA`, `DV_PARSABLE`) is still emitted (as
+  bare/suffixed or `|raw`), not skipped. A non-`DV_` leaf (party / context / other RM
+  attribute) is a documented skip. A container node that resolves to a
   non-`Locatable` RM object (e.g. `EVENT_CONTEXT`) is recursed via the enclosing Locatable
   ancestor, not dropped. A typed-nil RM pointer is treated as an absent leaf (skipped).
 - **Decode** — a key that does not resolve to a Web Template node returns
@@ -37,13 +39,13 @@ not partially/silently accepted.
 | Feature | Current behaviour | Lands in |
 |---|---|---|
 | `ctx/` context — **core supported**: `ctx/language`, `ctx/territory` (both mandatory on decode → `ErrMissingContext`), `ctx/composer_name` / `ctx/composer_self`, `ctx/time` (context `start_time`). | Emitted on encode; rebuilt on decode. | landed (Task 6) |
-| `ctx/` context — **rest deferred**: `setting`, `category`, participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted; any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). Setting/category are platform defaults or need terminology resolution. | Phase 6 |
+| `ctx/` context — **rest deferred**: participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted on encode (source values dropped); any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). These are optional, so their absence does not break OPT-validity. `setting`, `category`, `composer` are RM-mandatory and **defaulted** on `WithTemplate` decode (see the RM-mandatory-completion deviation) — valid, but a non-default source value is not round-tripped. | Phase 6 |
 | Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, or a decorated instance of the above, rides `\|raw`. | Both directions. | landed (Task 6) |
 | `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Phase 6 |
 | `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix. `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
 | `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf whose Web Template input is `listOpen` encodes to `\|other`; decode maps `\|other` back to `DV_TEXT`, requiring `listOpen` and rejecting `\|other`+`\|code`. | landed (Task 6) |
 | `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Phase 6 |
-| Non-`DV_` leaves (party/`subject`, other RM leaves) on encode | Skipped (not an error), pending the `ctx/`/`_`-attr work. | Phase 6 |
+| Non-`DV_` leaves (party/`subject`, `language`, `encoding`, other RM leaves) on encode | Skipped on encode (source value dropped). The RM-mandatory ones (`subject`, `language`, `encoding`) are **defaulted** on `WithTemplate` decode (PARTY_SELF / ctx language / UTF-8) so the result validates; a non-default source value is not round-tripped. | Phase 6 |
 
 ## Deviations
 
@@ -54,15 +56,17 @@ not partially/silently accepted.
   compiled aqlPath); without it, nodes are unnamed and the round-trip is merely
   **format-idempotent**. Names never leak into FLAT, so idempotence is preserved either way.
 
-- **Other RM-mandatory attributes not carried by FLAT (full OPT-conformance gap)** — even
-  with `WithTemplate`, a decoded composition is not yet fully OPT-validatable: the
-  FLAT/STRUCTURED formats omit several RM-mandatory attributes that are neither clinical-data
-  leaves nor names — `HISTORY.origin`, `EVENT.time`, `ENTRY.language` / `.encoding` /
-  `.subject`, and `EVENT_CONTEXT.setting`. Decode does not yet synthesise defaults for these,
-  so `validation.Validate` still reports `required` at those paths. Reconstructing them (from
-  `ctx/` defaults + RM conventions) is the remaining step to move REQ-053 from `partial` to a
-  fully-conformant decode; it is deferred pending a decision on defaulting policy (synthesising
-  event times / subject is a semantic choice).
+- **RM-mandatory attributes not carried by FLAT — completed on `WithTemplate` decode.** The
+  formats omit several RM-mandatory attributes that are neither clinical-data leaves nor names
+  (`HISTORY.origin`, `EVENT.time`, `ENTRY.language`/`.encoding`/`.subject`,
+  `EVENT_CONTEXT.setting`, `COMPOSITION.category`/`.composer`, `INTERVAL_EVENT.math_function`/
+  `.width`). With `WithTemplate`, decode now completes them from `ctx/` defaults + RM
+  conventions (`rminfo.RequiredAttributes` drives the walk), so the decoded composition
+  **validates against the OPT** (verified over the vendored corpus by PROBE-076's conformance
+  leg and `names_test.go`). These are **synthesised defaults**, not recovered data — the
+  formats never carried them, so e.g. every `EVENT.time`/`HISTORY.origin` takes the context
+  `start_time` and `subject` becomes `PARTY_SELF`. Without `WithTemplate`, decode omits them
+  (format-idempotent only).
 
 - **`ITEM_TREE` vs `ITEM_LIST` on decode** — the Web Template collapses `ITEM_STRUCTURE`
   nodes, so the concrete subtype is inferred from the child aqlPath attribute:
@@ -91,11 +95,9 @@ not partially/silently accepted.
 ## Conformance
 
 **PROBE-076** (landed) exercises the codec over the vendored EHRbase `Test_dv_*` corpus
-(OPT + canonical composition) — 24 pass, 1 skip. Its guarantee is **round-trip
-idempotence** (FLAT/STRUCTURED/interconversion), **not** byte-conformance against upstream
-simplified output, and it does **not** compare the decoded composition against the vendored
-canonical (a symmetric omission would pass). A true upstream-conformance probe — comparing
-emitted FLAT/STRUCTURED to vendored simplified fixtures, or the decoded canonical to the
-vendored canonical with an explicit exclusion list (LOCATABLE.name, deferred ctx fields,
-RM metadata FLAT does not carry) — is a documented follow-up; it needs upstream simplified
-fixtures that are not yet vendored.
+(OPT + canonical composition) — 24 pass, 1 skip. It asserts **round-trip idempotence**
+(FLAT/STRUCTURED/interconversion) **and OPT-conformance**: when the source composition is
+itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
+leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
+It does **not** yet compare emitted FLAT/STRUCTURED byte-for-byte against vendored upstream
+simplified output — a documented follow-up needing those fixtures.
