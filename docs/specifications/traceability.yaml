@@ -399,7 +399,7 @@ requirements:
     # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
     # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
     # composition/observation spine + DV_TEXT/DATE_TIME/DATE/TIME/QUANTITY/
-    # CODED_TEXT. Deferred (see the Phase 3 plan): ctx/ context + _-attrs +
+    # CODED_TEXT/COUNT/BOOLEAN. Deferred (see the Phase 3 plan): ctx/ context + _-attrs +
     # |raw + |other, the remaining datatypes, and PROBE-076 structural
     # conformance vs a vendored upstream trio.
     implementation: partial

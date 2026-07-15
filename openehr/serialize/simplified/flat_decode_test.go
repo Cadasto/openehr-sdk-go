@@ -7,6 +7,43 @@ import (
 	"testing"
 )
 
+func TestDvFromSuffixes(t *testing.T) {
+	tests := []struct {
+		rmType string
+		sfx    map[string]any
+		want   map[string]any
+	}{
+		{
+			rmType: "DV_TEXT",
+			sfx:    map[string]any{"": "hello"},
+			want:   map[string]any{"_type": "DV_TEXT", "value": "hello"},
+		},
+		{
+			rmType: "DV_QUANTITY",
+			sfx:    map[string]any{"magnitude": float64(120), "unit": "mm[Hg]"},
+			want:   map[string]any{"_type": "DV_QUANTITY", "magnitude": float64(120), "units": "mm[Hg]"},
+		},
+		{
+			rmType: "DV_COUNT",
+			sfx:    map[string]any{"magnitude": float64(5)},
+			want:   map[string]any{"_type": "DV_COUNT", "magnitude": float64(5)},
+		},
+		{
+			rmType: "DV_BOOLEAN",
+			sfx:    map[string]any{"value": true},
+			want:   map[string]any{"_type": "DV_BOOLEAN", "value": true},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.rmType, func(t *testing.T) {
+			got := dvFromSuffixes(tc.rmType, tc.sfx)
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("dvFromSuffixes(%s) = %#v, want %#v", tc.rmType, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestParseFlatKey(t *testing.T) {
 	tests := []struct {
 		key        string

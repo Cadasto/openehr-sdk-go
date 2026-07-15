@@ -41,6 +41,16 @@ func TestLeafToFlat(t *testing.T) {
 			},
 			want: map[string]any{"p/x|code": "433", "p/x|value": "event", "p/x|terminology": "openehr"},
 		},
+		{
+			name: "DV_COUNT is a magnitude suffix",
+			v:    rm.DVCount{Magnitude: 5},
+			want: map[string]any{"p/x|magnitude": int64(5)},
+		},
+		{
+			name: "DV_BOOLEAN is a value suffix",
+			v:    rm.DVBoolean{Value: true},
+			want: map[string]any{"p/x|value": true},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

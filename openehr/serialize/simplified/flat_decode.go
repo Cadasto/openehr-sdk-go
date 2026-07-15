@@ -246,6 +246,10 @@ func dvFromSuffixes(rmType string, sfx map[string]any) map[string]any {
 		return map[string]any{"_type": "DV_TIME", "value": sfx[""]}
 	case "DV_QUANTITY":
 		return map[string]any{"_type": "DV_QUANTITY", "magnitude": sfx["magnitude"], "units": sfx["unit"]}
+	case "DV_COUNT":
+		return map[string]any{"_type": "DV_COUNT", "magnitude": sfx["magnitude"]}
+	case "DV_BOOLEAN":
+		return map[string]any{"_type": "DV_BOOLEAN", "value": sfx["value"]}
 	case "DV_CODED_TEXT":
 		dc := map[string]any{"_type": "CODE_PHRASE", "code_string": sfx["code"]}
 		if t, ok := sfx["terminology"]; ok {

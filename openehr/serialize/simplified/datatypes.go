@@ -36,6 +36,14 @@ func leafToFlat(out map[string]any, flatPath string, v any) {
 		quantityToFlat(out, flatPath, dv)
 	case *rm.DVQuantity:
 		quantityToFlat(out, flatPath, *dv)
+	case rm.DVCount:
+		out[flatPath+"|magnitude"] = dv.Magnitude
+	case *rm.DVCount:
+		out[flatPath+"|magnitude"] = dv.Magnitude
+	case rm.DVBoolean:
+		out[flatPath+"|value"] = dv.Value
+	case *rm.DVBoolean:
+		out[flatPath+"|value"] = dv.Value
 	}
 }
 
