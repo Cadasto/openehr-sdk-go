@@ -9,6 +9,7 @@ package simplified
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -20,11 +21,30 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
-// maxRepeatIndex bounds a FLAT :index during decode/interconversion. A FLAT key
-// such as "node:1000000000" would otherwise grow a slice to that length before
-// any real data is placed; clinical repeats are small, so a generous cap turns
-// a hostile or corrupt key into an error instead of an allocation blow-up.
-const maxRepeatIndex = 100_000
+// maxRepeatIndex bounds a single FLAT :index during decode/interconversion, and
+// maxTotalNodes bounds the cumulative slots allocated across one decode. A FLAT
+// key such as "node:1000000000" would grow a slice to that length; a handful of
+// deeply-indexed keys ("a:9999/b:9999/…") would amplify further. Clinical
+// repeats are small, so these caps turn a hostile or corrupt payload into an
+// error instead of an allocation blow-up.
+const (
+	maxRepeatIndex = 10_000
+	maxTotalNodes  = 1_000_000
+)
+
+// allocBudget caps the total array slots materialised across one decode or
+// interconversion, bounding allocation amplification from indexed keys.
+type allocBudget struct {
+	n, limit int
+}
+
+func (b *allocBudget) add(k int) error {
+	b.n += k
+	if b.n > b.limit {
+		return fmt.Errorf("%w: decoded-node budget %d exceeded", ErrUnknownPath, b.limit)
+	}
+	return nil
+}
 
 // UnmarshalFlat decodes FLAT JSON into a canonical COMPOSITION using wt
 // (REQ-053). It rebuilds a canonical-JSON tree from the FLAT entries — node
@@ -93,6 +113,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 		bases = append(bases, base)
 	}
 	sort.Strings(bases)
+	budget := &allocBudget{limit: maxTotalNodes}
 	for _, base := range bases {
 		sfx := groups[base]
 		pk := parseFlatKey(base)
@@ -103,11 +124,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 			// Fail loudly rather than drop it silently (REQ-053).
 			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, base)
 		}
-		dv, err := dvFromSuffixes(leaf.RMType, sfx)
+		dv, err := dvFromSuffixes(leaf.RMType, leafListOpen(leaf), sfx)
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv); err != nil {
+		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
@@ -161,10 +182,15 @@ func applyContext(compJSON map[string]any, ctx map[string]any) error {
 		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": composerName}
 	}
 	if haveTime {
-		compJSON["context"] = map[string]any{
-			"_type":      "EVENT_CONTEXT",
-			"start_time": map[string]any{"_type": "DV_DATE_TIME", "value": timeVal},
+		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
+		// (setting, other_context, health_care_facility, …) rather than replacing
+		// it — otherwise that data would be lost.
+		ctxObj, _ := compJSON["context"].(map[string]any)
+		if ctxObj == nil {
+			ctxObj = map[string]any{"_type": "EVENT_CONTEXT"}
+			compJSON["context"] = ctxObj
 		}
+		ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": timeVal}
 	}
 	return nil
 }
@@ -188,6 +214,11 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 	var m map[string]any
 	if err := dec.Decode(&m); err != nil {
 		return nil, err
+	}
+	// Reject trailing content after the first JSON value — a second document (or
+	// garbage) must not be silently ignored.
+	if dec.More() {
+		return nil, errors.New("simplified: unexpected trailing content after JSON object")
 	}
 	return m, nil
 }
@@ -262,7 +293,7 @@ func parseAQL(p string) []aqlSeg {
 // only; populating the mandatory LOCATABLE.name from the Web Template node is
 // deferred (rmpath re-resolves by archetype_node_id, so round-trip does not
 // depend on it — full name population lands with the ctx/name completion).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any) error {
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget) error {
 	segs := parseAQL(aqlPath)
 	cur := compJSON
 	curType := "COMPOSITION"
@@ -278,7 +309,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
 		if container {
-			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[seg.pred])
+			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[seg.pred], budget)
 			if err != nil {
 				return err
 			}
@@ -303,7 +334,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 // cur[attr]'s list, at the idx-th position among same-pred siblings (idx is
 // the flat :index for a repeatable node; 0 otherwise). Distinct sibling node
 // ids get distinct elements even without an explicit index.
-func selectElem(cur map[string]any, attr, elemType, pred string, idx int) (map[string]any, error) {
+func selectElem(cur map[string]any, attr, elemType, pred string, idx int, budget *allocBudget) (map[string]any, error) {
 	want := max(idx, 0)
 	if want > maxRepeatIndex {
 		return nil, fmt.Errorf("%w: :index %d exceeds bound %d", ErrUnknownPath, want, maxRepeatIndex)
@@ -313,6 +344,11 @@ func selectElem(cur map[string]any, attr, elemType, pred string, idx int) (map[s
 	for i, e := range arr {
 		if m, ok := e.(map[string]any); ok && m["archetype_node_id"] == pred {
 			matches = append(matches, i)
+		}
+	}
+	if need := want + 1 - len(matches); need > 0 {
+		if err := budget.add(need); err != nil {
+			return nil, err
 		}
 	}
 	for len(matches) <= want {
@@ -381,18 +417,25 @@ func concreteType(parentType, attr, pred string, predType map[string]string, nex
 // suffix (DV_COUNT -> magnitude, DV_BOOLEAN -> value, per the STABLE RM
 // mappings). A required suffix that is absent is an error rather than a coerced
 // zero value; an unmapped datatype is ErrUnsupportedDatatype.
-func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
-	// |raw bypass: the value is a pre-serialised canonical fragment (carrying
-	// its own _type); use it directly, regardless of the leaf's rmType.
+func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[string]any, error) {
+	// |raw bypass: a pre-serialised canonical fragment (carrying its own string
+	// _type); used directly, regardless of the leaf rmType. Mutually exclusive
+	// with every other suffix.
 	if raw, ok := sfx["raw"]; ok {
+		if len(sfx) > 1 {
+			return nil, fmt.Errorf("%w: |raw is mutually exclusive with other suffixes", ErrUnsupportedDatatype)
+		}
 		frag, ok := raw.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("%w: |raw value is not a canonical object", ErrUnsupportedDatatype)
 		}
-		if _, ok := frag["_type"]; !ok {
-			return nil, fmt.Errorf("%w: |raw fragment missing _type", ErrUnsupportedDatatype)
+		if t, ok := frag["_type"].(string); !ok || t == "" {
+			return nil, fmt.Errorf("%w: |raw fragment missing string _type", ErrUnsupportedDatatype)
 		}
 		return frag, nil
+	}
+	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
+		return nil, err
 	}
 	switch rmType {
 	case "DV_TEXT":
@@ -445,6 +488,9 @@ func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
 		// |other is the open-value-set free-text fallback: the leaf is persisted
 		// as a DV_TEXT, not a DV_CODED_TEXT (spec §Open Value-Sets and |other).
 		if other, ok := sfx["other"]; ok {
+			if !listOpen {
+				return nil, fmt.Errorf("%w: |other requires an open value-set (listOpen)", ErrUnsupportedDatatype)
+			}
 			if _, hasCode := sfx["code"]; hasCode {
 				return nil, fmt.Errorf("%w: |other is mutually exclusive with |code", ErrUnsupportedDatatype)
 			}
@@ -531,6 +577,62 @@ func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
 		return out, nil
 	}
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
+}
+
+// allowedSuffixes lists, per datatype, the pipe suffixes (and "" for a bare
+// value) the decoder maps. A key outside this set (a typo like |unitt, or a
+// decorated attribute like |accuracy that only rides |raw) is rejected rather
+// than silently dropped. |other and |raw are handled before this check.
+var allowedSuffixes = map[string]map[string]bool{
+	"DV_TEXT":       {"": true},
+	"DV_CODED_TEXT": {"code": true, "value": true, "terminology": true},
+	"DV_DATE_TIME":  {"": true},
+	"DV_DATE":       {"": true},
+	"DV_TIME":       {"": true},
+	"DV_DURATION":   {"": true},
+	"DV_URI":        {"": true},
+	"DV_EHR_URI":    {"": true},
+	"DV_QUANTITY":   {"magnitude": true, "unit": true},
+	"DV_COUNT":      {"": true},
+	"DV_BOOLEAN":    {"": true},
+	"DV_ORDINAL":    {"code": true, "value": true, "ordinal": true},
+	"DV_PROPORTION": {"numerator": true, "denominator": true, "type": true},
+	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+}
+
+// checkSuffixAllowlist rejects any suffix a datatype does not map. An unmapped
+// rmType is left to the switch (ErrUnsupportedDatatype). |other is allowed only
+// for DV_CODED_TEXT (the case then enforces listOpen).
+func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
+	allowed, known := allowedSuffixes[rmType]
+	if !known {
+		return nil
+	}
+	for k := range sfx {
+		if k == "other" && rmType == "DV_CODED_TEXT" {
+			continue
+		}
+		if allowed[k] {
+			continue
+		}
+		label := "|" + k
+		if k == "" {
+			label = "bare value"
+		}
+		return fmt.Errorf("%w: unexpected %s for %s", ErrUnsupportedDatatype, label, rmType)
+	}
+	return nil
+}
+
+// leafListOpen reports whether a Web Template leaf constrains an open value-set
+// (any input with listOpen) — the precondition for the |other free-text form.
+func leafListOpen(node *webtemplate.Node) bool {
+	for _, in := range node.Inputs {
+		if in.ListOpen {
+			return true
+		}
+	}
+	return false
 }
 
 // requireSuffix returns sfx[name], or an error if it is absent — a missing

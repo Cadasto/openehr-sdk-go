@@ -39,7 +39,7 @@ func TestDvFromSuffixes(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.rmType, func(t *testing.T) {
-			got, err := dvFromSuffixes(tc.rmType, tc.sfx)
+			got, err := dvFromSuffixes(tc.rmType, false, tc.sfx)
 			if err != nil {
 				t.Fatalf("dvFromSuffixes(%s): %v", tc.rmType, err)
 			}
@@ -53,14 +53,37 @@ func TestDvFromSuffixes(t *testing.T) {
 // TestDvFromSuffixesErrors covers the strict-decode guarantees: an unmapped
 // datatype and a missing required suffix are errors, not silent zero values.
 func TestDvFromSuffixesErrors(t *testing.T) {
-	if _, err := dvFromSuffixes("DV_MULTIMEDIA", map[string]any{"": "x"}); !errors.Is(err, ErrUnsupportedDatatype) {
+	if _, err := dvFromSuffixes("DV_MULTIMEDIA", false, map[string]any{"": "x"}); !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Errorf("unmapped datatype err = %v, want ErrUnsupportedDatatype", err)
 	}
-	if _, err := dvFromSuffixes("DV_COUNT", map[string]any{}); err == nil {
+	if _, err := dvFromSuffixes("DV_COUNT", false, map[string]any{}); err == nil {
 		t.Error("DV_COUNT with no bare value = nil error, want missing-suffix error")
 	}
-	if _, err := dvFromSuffixes("DV_QUANTITY", map[string]any{"magnitude": float64(1)}); err == nil {
+	if _, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": float64(1)}); err == nil {
 		t.Error("DV_QUANTITY without |unit = nil error, want missing-suffix error")
+	}
+}
+
+// TestDvFromSuffixesStrict covers the suffix allowlist, |raw strictness, and the
+// |other listOpen precondition.
+func TestDvFromSuffixesStrict(t *testing.T) {
+	// D4 — unknown suffix (typo) is rejected, not silently dropped.
+	if _, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": float64(1), "unit": "mm", "unitt": "x"}); !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Error("unknown |unitt suffix should be rejected")
+	}
+	// D3 — |raw is mutually exclusive with other suffixes and needs a string _type.
+	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"raw": map[string]any{"_type": "DV_TEXT", "value": "x"}, "": "y"}); err == nil {
+		t.Error("|raw combined with another suffix should be rejected")
+	}
+	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"raw": map[string]any{"value": "x"}}); err == nil {
+		t.Error("|raw fragment without string _type should be rejected")
+	}
+	// D5 — |other requires an open value-set.
+	if _, err := dvFromSuffixes("DV_CODED_TEXT", false, map[string]any{"other": "free"}); !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Error("|other on a closed list should be rejected")
+	}
+	if _, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free"}); err != nil {
+		t.Errorf("|other on an open list should be accepted: %v", err)
 	}
 }
 

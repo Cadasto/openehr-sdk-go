@@ -428,7 +428,6 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/raw_test.go
-      - openehr/serialize/simplified/hardening_test.go
 
   - id: REQ-055
     title: AQL wire boundary

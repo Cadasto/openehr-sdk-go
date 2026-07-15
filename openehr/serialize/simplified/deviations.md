@@ -19,12 +19,15 @@ semantics-preserving). Concretely:
   `magnitude_status`, `accuracy`, `mappings`, … — anything outside the datatype's captured
   keys) and any datatype outside the core set are embedded as a lossless `|raw` canonical
   fragment rather than partially/silently dropped. A non-`DV_` leaf (party / context /
-  other RM attribute) is a documented skip. A container node that does not resolve to a
-  `Locatable` is an error, not a skip.
-- **Decode** — a FLAT/STRUCTURED key that does not resolve to a Web Template node
-  returns [`ErrUnknownPath`](simplified.go); an unmapped datatype returns
-  `ErrUnsupportedDatatype`; a missing **required** suffix is an error, never a coerced
-  zero value.
+  other RM attribute) is a documented skip. A container node that resolves to a
+  non-`Locatable` RM object (e.g. `EVENT_CONTEXT`) is recursed via the enclosing Locatable
+  ancestor, not dropped. A typed-nil RM pointer is treated as an absent leaf (skipped).
+- **Decode** — a key that does not resolve to a Web Template node returns
+  [`ErrUnknownPath`](simplified.go); an unmapped datatype, a suffix outside the datatype's
+  allowlist (e.g. a `\|unitt` typo), a misused `\|raw`/`\|other`, or a `\|other` on a closed
+  value-set return `ErrUnsupportedDatatype`; a missing **required** suffix is an error, not
+  a coerced zero value; trailing JSON after the object and an out-of-bound/over-budget
+  `:index` are rejected.
 
 Consequence: a payload that uses a not-yet-supported feature (below) is **rejected**,
 not partially/silently accepted.
@@ -37,8 +40,8 @@ not partially/silently accepted.
 | `ctx/` context — **rest deferred**: `setting`, `category`, participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted; any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). Setting/category are platform defaults or need terminology resolution. | Phase 6 |
 | Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, or a decorated instance of the above, rides `\|raw`. | Both directions. | landed (Task 6) |
 | `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Phase 6 |
-| `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts any `\|raw` fragment (must carry `_type`). | landed (Task 6) |
-| `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf encodes to `\|other`; decode maps `\|other` back to `DV_TEXT` (mutually exclusive with `\|code`). | landed (Task 6) |
+| `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix. `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
+| `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf whose Web Template input is `listOpen` encodes to `\|other`; decode maps `\|other` back to `DV_TEXT`, requiring `listOpen` and rejecting `\|other`+`\|code`. | landed (Task 6) |
 | `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Phase 6 |
 | Non-`DV_` leaves (party/`subject`, other RM leaves) on encode | Skipped (not an error), pending the `ctx/`/`_`-attr work. | Phase 6 |
 
@@ -77,6 +80,12 @@ not partially/silently accepted.
 
 ## Conformance
 
-Structural conformance against a vendored upstream trio (**PROBE-076**) is **deferred**
-to Phase 7; when it lands, any residual byte-level differences (id sanitisation,
-`version`, field ordering) are recorded here.
+**PROBE-076** (landed) exercises the codec over the vendored EHRbase `Test_dv_*` corpus
+(OPT + canonical composition) — 24 pass, 1 skip. Its guarantee is **round-trip
+idempotence** (FLAT/STRUCTURED/interconversion), **not** byte-conformance against upstream
+simplified output, and it does **not** compare the decoded composition against the vendored
+canonical (a symmetric omission would pass). A true upstream-conformance probe — comparing
+emitted FLAT/STRUCTURED to vendored simplified fixtures, or the decoded canonical to the
+vendored canonical with an explicit exclusion list (LOCATABLE.name, deferred ctx fields,
+RM metadata FLAT does not carry) — is a documented follow-up; it needs upstream simplified
+fixtures that are not yet vendored.

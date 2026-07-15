@@ -38,7 +38,11 @@ func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composit
 	if err != nil {
 		return nil, err
 	}
-	flat, err := json.Marshal(structuredToFlat(s))
+	flatMap, err := structuredToFlat(s)
+	if err != nil {
+		return nil, err
+	}
+	flat, err := json.Marshal(flatMap)
 	if err != nil {
 		return nil, err
 	}
@@ -64,13 +68,18 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(structuredToFlat(s))
+	flatMap, err := structuredToFlat(s)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(flatMap)
 }
 
 // flatToStructured nests a FLAT map. The first path segment (template id) is a
 // single object; every deeper segment is an array indexed by its :index.
 func flatToStructured(flat map[string]any) (map[string]any, error) {
 	root := make(map[string]any)
+	budget := &allocBudget{limit: maxTotalNodes}
 	var ctxObj map[string]any
 	for key, val := range flat {
 		// Context is grouped under a ctx object with direct (non-arrayified)
@@ -100,7 +109,7 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			}
 			continue
 		}
-		if err := insertStructured(obj, rest, pk.suffix, val); err != nil {
+		if err := insertStructured(obj, rest, pk.suffix, val, budget); err != nil {
 			return nil, err
 		}
 	}
@@ -111,13 +120,18 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 // :index. A bare leaf sets the array element to the scalar value; a suffixed
 // leaf sets a |suffix key on the element object. The :index is bounded so a
 // hostile key cannot force an unbounded allocation.
-func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any) error {
+func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any, budget *allocBudget) error {
 	seg := segs[0]
 	idx := max(seg.idx, 0)
 	if idx > maxRepeatIndex {
 		return fmt.Errorf("%w: :index %d on %q exceeds bound %d", ErrUnknownPath, idx, seg.id, maxRepeatIndex)
 	}
 	arr, _ := obj[seg.id].([]any)
+	if need := idx + 1 - len(arr); need > 0 {
+		if err := budget.add(need); err != nil {
+			return err
+		}
+	}
 	for len(arr) <= idx {
 		arr = append(arr, nil)
 	}
@@ -137,17 +151,19 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 		el["|"+suffix] = val
 		return nil
 	}
-	return insertStructured(el, segs[1:], suffix, val)
+	return insertStructured(el, segs[1:], suffix, val, budget)
 }
 
 // structuredToFlat flattens a STRUCTURED map into a FLAT map. Each array
-// element takes a :index; |-prefixed keys become the FLAT |suffix.
-func structuredToFlat(s map[string]any) map[string]any {
+// element takes a :index; |-prefixed keys become the FLAT |suffix. A malformed
+// shape (non-object root, non-array clinical child, null array hole) is an error
+// rather than a silent drop (REQ-053).
+func structuredToFlat(s map[string]any) (map[string]any, error) {
 	out := make(map[string]any)
 	for rootID, v := range s {
 		obj, ok := v.(map[string]any)
 		if !ok {
-			continue
+			return nil, fmt.Errorf("simplified: structured: root %q is not an object (%T)", rootID, v)
 		}
 		// The ctx object holds direct values (no arrays / :index), inverse of
 		// the ctx grouping in flatToStructured.
@@ -157,14 +173,16 @@ func structuredToFlat(s map[string]any) map[string]any {
 			}
 			continue
 		}
-		structWalk(out, rootID, obj)
+		if err := structWalk(out, rootID, obj); err != nil {
+			return nil, err
+		}
 	}
-	return out
+	return out, nil
 }
 
 // structWalk descends an object whose keys are either child ids (mapping to
 // arrays) or |-prefixed leaf suffixes, accumulating FLAT entries under path.
-func structWalk(out map[string]any, path string, obj map[string]any) {
+func structWalk(out map[string]any, path string, obj map[string]any) error {
 	for k, v := range obj {
 		if strings.HasPrefix(k, "|") {
 			out[path+k] = v
@@ -172,15 +190,21 @@ func structWalk(out map[string]any, path string, obj map[string]any) {
 		}
 		arr, ok := v.([]any)
 		if !ok {
-			continue
+			return fmt.Errorf("simplified: structured: expected an array at %q, got %T", path+"/"+k, v)
 		}
 		for i, el := range arr {
 			seg := path + "/" + k + ":" + strconv.Itoa(i)
-			if child, ok := el.(map[string]any); ok {
-				structWalk(out, seg, child)
-			} else {
+			switch child := el.(type) {
+			case map[string]any:
+				if err := structWalk(out, seg, child); err != nil {
+					return err
+				}
+			case nil:
+				return fmt.Errorf("simplified: structured: null element at %q", seg)
+			default:
 				out[seg] = el
 			}
 		}
 	}
+	return nil
 }

@@ -2,6 +2,7 @@ package simplified
 
 // REQ-053 — leaf datatype -> FLAT suffix mapping.
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -77,10 +78,10 @@ func TestNewDatatypesEncodeDecode(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.rmType, func(t *testing.T) {
 			out := map[string]any{}
-			if err := leafToFlat(out, "p/x", tc.v, tc.rmType); err != nil {
+			if err := leafToFlat(out, "p/x", tc.v, tc.rmType, false); err != nil {
 				t.Fatalf("leafToFlat: %v", err)
 			}
-			dv, err := dvFromSuffixes(tc.rmType, suffixesOf(out, "p/x"))
+			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"))
 			if err != nil {
 				t.Fatalf("dvFromSuffixes: %v", err)
 			}
@@ -150,7 +151,7 @@ func TestLeafToFlat(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			out := map[string]any{}
-			if err := leafToFlat(out, "p/x", tc.v, tc.rmType); err != nil {
+			if err := leafToFlat(out, "p/x", tc.v, tc.rmType, false); err != nil {
 				t.Fatalf("leafToFlat: %v", err)
 			}
 			if len(out) != len(tc.want) {
@@ -169,20 +170,20 @@ func TestLeafToFlat(t *testing.T) {
 // a DV_CODED_TEXT leaf encodes to |other and decodes back to a DV_TEXT.
 func TestOtherOpenValueSet(t *testing.T) {
 	out := map[string]any{}
-	if err := leafToFlat(out, "p/x", rm.DVText{Value: "free text"}, "DV_CODED_TEXT"); err != nil {
+	if err := leafToFlat(out, "p/x", rm.DVText{Value: "free text"}, "DV_CODED_TEXT", true); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
 	if out["p/x|other"] != "free text" {
 		t.Fatalf("expected p/x|other, got %#v", out)
 	}
-	dv, err := dvFromSuffixes("DV_CODED_TEXT", map[string]any{"other": "free text"})
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"})
 	if err != nil {
 		t.Fatalf("dvFromSuffixes(|other): %v", err)
 	}
 	if dv["_type"] != "DV_TEXT" || dv["value"] != "free text" {
 		t.Errorf("|other decode = %#v, want DV_TEXT", dv)
 	}
-	if _, err := dvFromSuffixes("DV_CODED_TEXT", map[string]any{"other": "x", "code": "c", "value": "v"}); err == nil {
+	if _, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x", "code": "c", "value": "v"}); err == nil {
 		t.Error("|other + |code = nil error, want rejection")
 	}
 }
@@ -193,7 +194,7 @@ func TestOtherOpenValueSet(t *testing.T) {
 func TestQuantityDecoratedRaw(t *testing.T) {
 	status := "~"
 	out := map[string]any{}
-	if err := leafToFlat(out, "p/x", rm.DVQuantity{Magnitude: 1, Units: "mm", MagnitudeStatus: &status}, "DV_QUANTITY"); err != nil {
+	if err := leafToFlat(out, "p/x", rm.DVQuantity{Magnitude: 1, Units: "mm", MagnitudeStatus: &status}, "DV_QUANTITY", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
 	if _, ok := out["p/x|raw"]; !ok {
@@ -204,13 +205,45 @@ func TestQuantityDecoratedRaw(t *testing.T) {
 	}
 }
 
+// TestRawFragmentPreservesLargeInteger checks a decorated DV_COUNT above 2^53
+// keeps its magnitude exactly through the |raw path (json.Number, not float64).
+func TestRawFragmentPreservesLargeInteger(t *testing.T) {
+	status := "~"
+	out := map[string]any{}
+	// A decorated DV_COUNT (magnitude_status) rides |raw.
+	if err := leafToFlat(out, "p/x", rm.DVCount{Magnitude: 9007199254740993, MagnitudeStatus: &status}, "DV_COUNT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected |raw, got %#v", out)
+	}
+	num, ok := raw["magnitude"].(json.Number)
+	if !ok || num.String() != "9007199254740993" {
+		t.Errorf("|raw magnitude = %#v, want json.Number 9007199254740993", raw["magnitude"])
+	}
+}
+
+// TestLeafToFlatTypedNil checks a typed-nil RM pointer is skipped, not
+// dereferenced (which would panic).
+func TestLeafToFlatTypedNil(t *testing.T) {
+	out := map[string]any{}
+	var p *rm.DVText
+	if err := leafToFlat(out, "p/x", p, "DV_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat(typed-nil): %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("typed-nil wrote %d entries, want 0", len(out))
+	}
+}
+
 // TestLeafToFlatRawFallback checks that a clinical datatype outside the core
 // set is embedded as a |raw canonical fragment rather than dropped (REQ-053) —
 // the codec stays lossless.
 func TestLeafToFlatRawFallback(t *testing.T) {
 	out := map[string]any{}
 	// DV_PARAGRAPH is outside the first-class set, so it must fall back to |raw.
-	if err := leafToFlat(out, "p/x", rm.DVParagraph{}, "DV_PARAGRAPH"); err != nil {
+	if err := leafToFlat(out, "p/x", rm.DVParagraph{}, "DV_PARAGRAPH", false); err != nil {
 		t.Fatalf("leafToFlat(DV_PARAGRAPH): %v", err)
 	}
 	raw, ok := out["p/x|raw"].(map[string]any)

@@ -11,12 +11,14 @@ package serializeprobes
 //     to the same FLAT;
 //   - interconversion:       FlatToStructured -> StructuredToFlat is the identity.
 //
-// Parity is structural, not byte-exact against the upstream simplified output
-// (ids, ordering, and the documented deviations differ) — see
-// openehr/serialize/simplified/deviations.md. Canonical equality against the
-// upstream composition is not asserted: LOCATABLE.name repopulation on decode is
-// deferred (deviations.md), so the guarantee is format idempotence, not
-// canonical identity.
+// Scope: this is a round-trip **idempotence** probe, not an upstream-conformance
+// probe. It does not compare the emitted FLAT/STRUCTURED to vendored simplified
+// output, nor the decoded composition to the vendored canonical — so a symmetric
+// omission on both encode and decode would pass. The guarantee is that the codec
+// is self-consistent and lossless across its own pipeline on real upstream
+// compositions. A true upstream-conformance probe is a documented follow-up
+// (needs vendored simplified fixtures) — see
+// openehr/serialize/simplified/deviations.md § Conformance.
 
 import (
 	"bytes"

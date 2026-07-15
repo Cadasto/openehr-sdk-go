@@ -47,6 +47,32 @@ func TestDecodeRejectsHugeIndex(t *testing.T) {
 	}
 }
 
+// TestDecodeRejectsTrailingJSON: content after the first JSON object is an error,
+// not silently ignored.
+func TestDecodeRejectsTrailingJSON(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	if _, err := simplified.UnmarshalFlat([]byte(`{"ctx/language":"en"} {"extra":1}`), wt); err == nil {
+		t.Error("UnmarshalFlat with trailing JSON = nil error, want rejection")
+	}
+	if _, err := simplified.FlatToStructured([]byte(`{} 99`)); err == nil {
+		t.Error("FlatToStructured with trailing JSON = nil error, want rejection")
+	}
+}
+
+// TestStructuredToFlatRejectsMalformed: a non-array clinical child and a null
+// array hole are errors, not silent drops.
+func TestStructuredToFlatRejectsMalformed(t *testing.T) {
+	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"leaf":"not-an-array"}}`)); err == nil {
+		t.Error("non-array clinical child = nil error, want rejection")
+	}
+	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"leaf":[null]}}`)); err == nil {
+		t.Error("null array hole = nil error, want rejection")
+	}
+	if _, err := simplified.StructuredToFlat([]byte(`{"t":"not-an-object"}`)); err == nil {
+		t.Error("non-object root = nil error, want rejection")
+	}
+}
+
 // TestInterconvPreservesLargeInteger: a bare integer above 2^53 survives
 // FLAT<->STRUCTURED interconversion exactly (json.Number, not float64).
 func TestInterconvPreservesLargeInteger(t *testing.T) {

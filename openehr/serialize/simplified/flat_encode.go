@@ -61,11 +61,13 @@ func emitContext(out map[string]any, comp *rm.Composition) {
 	}
 	switch c := comp.Composer.(type) {
 	case *rm.PartySelf:
-		out["ctx/composer_self"] = true
+		if c != nil {
+			out["ctx/composer_self"] = true
+		}
 	case rm.PartySelf:
 		out["ctx/composer_self"] = true
 	case *rm.PartyIdentified:
-		if c.Name != nil && *c.Name != "" {
+		if c != nil && c.Name != nil && *c.Name != "" {
 			out["ctx/composer_name"] = *c.Name
 		}
 	case rm.PartyIdentified:
@@ -141,5 +143,5 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 		}
 		return nil
 	}
-	return leafToFlat(out, flatPath, v, node.RMType)
+	return leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node))
 }

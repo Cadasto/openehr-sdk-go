@@ -7,6 +7,7 @@ package simplified
 // may hold either (see openehr/rm on substitution slots).
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -47,14 +48,19 @@ var capturedKeys = map[string]map[string]bool{
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
 // mappings.
-func leafToFlat(out map[string]any, flatPath string, v any, rmType string) error {
+func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listOpen bool) error {
+	// A typed-nil RM pointer carries no value; skip it rather than dereferencing
+	// it in the value switch (which would panic). Equivalent to an absent leaf.
+	if v == nil || nilRMPointer(v) {
+		return nil
+	}
 	if captured, known := capturedKeys[rmType]; known {
 		extra, err := hasUncapturedKeys(v, captured)
 		if err != nil {
 			return err
 		}
 		if !extra {
-			emitCoreLeaf(out, flatPath, v, rmType)
+			emitCoreLeaf(out, flatPath, v, rmType, listOpen)
 			return nil
 		}
 	}
@@ -91,12 +97,12 @@ func hasUncapturedKeys(v any, captured map[string]bool) (bool, error) {
 
 // emitCoreLeaf writes the suffix form for a fully-captured leaf value. It is
 // only reached for values whose canonical keys are within capturedKeys[rmType].
-func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string) {
+func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, listOpen bool) {
 	switch dv := v.(type) {
 	case rm.DVText:
-		emitText(out, flatPath, dv.Value, rmType)
+		emitText(out, flatPath, dv.Value, rmType, listOpen)
 	case *rm.DVText:
-		emitText(out, flatPath, dv.Value, rmType)
+		emitText(out, flatPath, dv.Value, rmType, listOpen)
 	case rm.DVCodedText:
 		codedToFlat(out, flatPath, dv)
 	case *rm.DVCodedText:
@@ -153,10 +159,11 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string) {
 }
 
 // emitText writes a DV_TEXT value: a bare leaf normally, but under the |other
-// suffix when the leaf's Web Template type is DV_CODED_TEXT — an open-value-set
-// free-text entry stored as DV_TEXT (spec §Open Value-Sets and |other).
-func emitText(out map[string]any, flatPath, value, rmType string) {
-	if rmType == "DV_CODED_TEXT" {
+// suffix when the leaf's Web Template type is DV_CODED_TEXT constraining an open
+// value-set — a free-text entry stored as DV_TEXT (spec §Open Value-Sets and
+// |other). |other is only valid for an open list, so it is gated on listOpen.
+func emitText(out map[string]any, flatPath, value, rmType string, listOpen bool) {
+	if rmType == "DV_CODED_TEXT" && listOpen {
 		out[flatPath+"|other"] = value
 		return
 	}
@@ -165,16 +172,20 @@ func emitText(out map[string]any, flatPath, value, rmType string) {
 
 // rawFragment serialises v to its openEHR canonical JSON (via canjson) and
 // re-parses it as a generic value, so it nests inside the FLAT/STRUCTURED map
-// under a |raw key. canjson emits _type only for pointer/polymorphic forms, so
-// the fragment is stamped with rmType (the Web Template leaf type) when the
-// value form omits it — decode requires _type on a |raw fragment.
+// under a |raw key. Numbers are re-parsed with json.Number so a large integer
+// (e.g. a decorated DV_COUNT magnitude above 2^53) is preserved rather than
+// rounded through float64. canjson emits _type only for pointer/polymorphic
+// forms, so the fragment is stamped with rmType (the Web Template leaf type)
+// when the value form omits it — decode requires _type on a |raw fragment.
 func rawFragment(v any, rmType string) (any, error) {
 	b, err := canjson.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
 	var frag any
-	if err := json.Unmarshal(b, &frag); err != nil {
+	if err := dec.Decode(&frag); err != nil {
 		return nil, err
 	}
 	if m, ok := frag.(map[string]any); ok {
@@ -183,6 +194,43 @@ func rawFragment(v any, rmType string) (any, error) {
 		}
 	}
 	return frag, nil
+}
+
+// nilRMPointer reports whether v is a typed-nil pointer to a first-class RM
+// datatype — a value that would panic on dereference in emitCoreLeaf. Explicit
+// type switch, no reflection (REQ-024).
+func nilRMPointer(v any) bool {
+	switch p := v.(type) {
+	case *rm.DVText:
+		return p == nil
+	case *rm.DVCodedText:
+		return p == nil
+	case *rm.DVDateTime:
+		return p == nil
+	case *rm.DVDate:
+		return p == nil
+	case *rm.DVTime:
+		return p == nil
+	case *rm.DVQuantity:
+		return p == nil
+	case *rm.DVCount:
+		return p == nil
+	case *rm.DVBoolean:
+		return p == nil
+	case *rm.DVDuration:
+		return p == nil
+	case *rm.DVURI:
+		return p == nil
+	case *rm.DVEHRURI:
+		return p == nil
+	case *rm.DVOrdinal:
+		return p == nil
+	case *rm.DVProportion:
+		return p == nil
+	case *rm.DVIdentifier:
+		return p == nil
+	}
+	return false
 }
 
 // codedToFlat emits the |code, |value and (external only) |terminology suffix
