@@ -47,12 +47,22 @@ not partially/silently accepted.
 
 ## Deviations
 
-- **`LOCATABLE.name` on decode** — reconstructed intermediate/leaf nodes carry `_type`
-  and `archetype_node_id` only; the mandatory `name` is not repopulated from the Web
-  Template. Round-trip does not depend on it (`rmpath` re-resolves by
-  `archetype_node_id`). Full `name` population lands with the `ctx/`/name completion
-  (Phase 6). Until then, decoded compositions are **format-idempotent**, not guaranteed
-  canonically equal to an upstream canonical instance.
+- **`LOCATABLE.name` on decode** — the FLAT/STRUCTURED formats do not carry names, and the
+  Web Template collapses the HISTORY / ITEM_STRUCTURE wrappers, so decode cannot name every
+  node from the WT alone. Passing [`WithTemplate(compiled)`](simplified.go) repopulates the
+  mandatory `name` on every reconstructed node from the archetype terminology (keyed by the
+  compiled aqlPath); without it, nodes are unnamed and the round-trip is merely
+  **format-idempotent**. Names never leak into FLAT, so idempotence is preserved either way.
+
+- **Other RM-mandatory attributes not carried by FLAT (full OPT-conformance gap)** — even
+  with `WithTemplate`, a decoded composition is not yet fully OPT-validatable: the
+  FLAT/STRUCTURED formats omit several RM-mandatory attributes that are neither clinical-data
+  leaves nor names — `HISTORY.origin`, `EVENT.time`, `ENTRY.language` / `.encoding` /
+  `.subject`, and `EVENT_CONTEXT.setting`. Decode does not yet synthesise defaults for these,
+  so `validation.Validate` still reports `required` at those paths. Reconstructing them (from
+  `ctx/` defaults + RM conventions) is the remaining step to move REQ-053 from `partial` to a
+  fully-conformant decode; it is deferred pending a decision on defaulting policy (synthesising
+  event times / subject is a semantic choice).
 
 - **`ITEM_TREE` vs `ITEM_LIST` on decode** — the Web Template collapses `ITEM_STRUCTURE`
   nodes, so the concrete subtype is inferred from the child aqlPath attribute:

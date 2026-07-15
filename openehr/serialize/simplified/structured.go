@@ -33,7 +33,7 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 
 // UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
 // using wt (REQ-053). It restructures to FLAT and delegates to UnmarshalFlat.
-func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
+func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	s, err := unmarshalObject(data)
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composit
 	if err != nil {
 		return nil, err
 	}
-	return UnmarshalFlat(flat, wt)
+	return UnmarshalFlat(flat, wt, opts...)
 }
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).

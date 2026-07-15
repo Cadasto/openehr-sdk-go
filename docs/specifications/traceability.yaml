@@ -407,10 +407,13 @@ requirements:
     # mandatory context, and out-of-bound :index are errors, not silent data loss
     # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
     # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip) — idempotence,
-    # not upstream byte-conformance. Deferred (documented, deviations.md): LOCATABLE
-    # .name on decode (so decode is format-idempotent, not canonically complete),
-    # first-class _-attr suffix decomposition (covered losslessly via |raw), the
-    # remaining ctx/ fields, .schema media types, and an upstream-conformance probe.
+    # not upstream byte-conformance. LOCATABLE.name is repopulated on decode via
+    # WithTemplate(compiled) (names from the archetype terminology; never leak into
+    # FLAT). Deferred (documented, deviations.md): the remaining RM-mandatory
+    # attributes FLAT does not carry (HISTORY.origin, EVENT.time, ENTRY language/
+    # encoding/subject, EVENT_CONTEXT.setting) so decode is not yet fully
+    # OPT-validatable; first-class _-attr suffix decomposition (covered losslessly
+    # via |raw); .schema media types; and an upstream-conformance probe.
     implementation: partial
     packages:
       - openehr/serialize/simplified
@@ -430,6 +433,7 @@ requirements:
       - openehr/serialize/simplified/hardening_test.go
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/raw_test.go
+      - openehr/serialize/simplified/names_test.go
 
   - id: REQ-055
     title: AQL wire boundary

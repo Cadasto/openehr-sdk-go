@@ -19,6 +19,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // maxRepeatIndex bounds a single FLAT :index during decode/interconversion, and
@@ -51,7 +52,7 @@ func (b *allocBudget) add(k int) error {
 // types and the elided HISTORY/ITEM_TREE wrappers come from the Web Template
 // and rminfo, values from the FLAT suffixes — then decodes it through canjson
 // (typereg instantiates the polymorphic RM types).
-func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
+func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate, opts ...Option) (*rm.Composition, error) {
 	if wt == nil || wt.Tree == nil {
 		return nil, ErrNoTemplate
 	}
@@ -59,7 +60,12 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, e
 	if err != nil {
 		return nil, err
 	}
-	compJSON, err := decodeFlat(flat, wt)
+	cfg := newDecodeConfig(opts)
+	var names map[string]string
+	if cfg.template != nil {
+		names = buildNameIndex(cfg.template)
+	}
+	compJSON, err := decodeFlat(flat, wt, names)
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +81,9 @@ func UnmarshalFlat(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, e
 }
 
 // decodeFlat builds the canonical-JSON object for the COMPOSITION from the
-// FLAT map, driven by the Web Template.
-func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]any, error) {
+// FLAT map, driven by the Web Template. names (optional; nil unless a template
+// was supplied) maps a node's compiled aqlPath to its LOCATABLE.name.
+func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[string]string) (map[string]any, error) {
 	root := wt.Tree
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
@@ -128,7 +135,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate) (map[string]an
 		if err != nil {
 			return nil, fmt.Errorf("simplified: decode %q: %w", base, err)
 		}
-		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget); err != nil {
+		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
@@ -289,14 +296,19 @@ func parseAQL(p string) []aqlSeg {
 // the predicate, list position from predIndex), and sets the terminal
 // attribute to the leaf DataValue.
 //
-// Reconstructed intermediate and leaf nodes carry _type + archetype_node_id
-// only; populating the mandatory LOCATABLE.name from the Web Template node is
-// deferred (rmpath re-resolves by archetype_node_id, so round-trip does not
-// depend on it — full name population lands with the ctx/name completion).
-func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget) error {
+// Reconstructed intermediate and leaf nodes carry _type + archetype_node_id;
+// when names is non-nil (a template was supplied via WithTemplate) the mandatory
+// LOCATABLE.name is set from it, keyed by the node's compiled aqlPath — which
+// the walk reconstructs by keeping a predicate only on container attributes
+// (matching templatecompile's path convention). Without names, nodes are left
+// unnamed (rmpath re-resolves by archetype_node_id, so the round-trip does not
+// depend on it — but the result is then format-idempotent, not canonically
+// complete; see deviations.md).
+func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget, names map[string]string) error {
 	segs := parseAQL(aqlPath)
 	cur := compJSON
 	curType := "COMPOSITION"
+	var prefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
 			cur[seg.attr] = dv
@@ -308,6 +320,14 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 			return fmt.Errorf("cannot resolve RM type for %q on %s (aqlPath %q)", seg.attr, curType, aqlPath)
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
+		// Compiled-path key: predicate kept only on container attributes.
+		prefix.WriteString("/")
+		prefix.WriteString(seg.attr)
+		if container && seg.pred != "" {
+			prefix.WriteString("[")
+			prefix.WriteString(seg.pred)
+			prefix.WriteString("]")
+		}
 		if container {
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[seg.pred], budget)
 			if err != nil {
@@ -325,9 +345,41 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 			}
 			cur = obj
 		}
+		if nm := names[prefix.String()]; nm != "" {
+			if _, has := cur["name"]; !has {
+				cur["name"] = textJSON(nm)
+			}
+		}
 		curType = childType
 	}
 	return nil
+}
+
+// buildNameIndex walks the compiled template and maps each archetype node's
+// canonical aqlPath to its LOCATABLE name (the node-id term rubric, default
+// language). Used by decode to repopulate LOCATABLE.name (see WithTemplate).
+func buildNameIndex(c *templatecompile.Compiled) map[string]string {
+	names := make(map[string]string)
+	lang := c.Language()
+	var walk func(n *templatecompile.CompiledNode)
+	walk = func(n *templatecompile.CompiledNode) {
+		if id := n.NodeID(); id != "" {
+			if t, ok := n.Term(id, lang); ok {
+				if txt := t.Items["text"]; txt != "" {
+					names[n.AQLPath()] = txt
+				}
+			}
+		}
+		for _, a := range n.Attributes() {
+			for _, ch := range a.Children() {
+				walk(ch)
+			}
+		}
+	}
+	if root := c.Root(); root != nil {
+		walk(root)
+	}
+	return names
 }
 
 // selectElem finds (or creates) the element with archetype_node_id==pred in
