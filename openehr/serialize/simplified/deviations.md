@@ -14,10 +14,13 @@ implemented, scheduled for a later phase of the
 The codec never succeeds while silently losing or altering data (REQ-053 is
 semantics-preserving). Concretely:
 
-- **Encode** — a **clinical** datatype (`DV_*`) outside the core set is embedded as a
-  `|raw` canonical fragment (lossless) rather than dropped; a non-`DV_` leaf (party /
-  context / other RM attribute) is a documented skip. A container node that does not
-  resolve to a `Locatable` is an error, not a skip.
+- **Encode** — a **clinical** datatype (`DV_*`) is emitted as its FLAT suffix form only
+  when that form fully captures the value; a **decorated** value (carrying `normal_range`,
+  `magnitude_status`, `accuracy`, `mappings`, … — anything outside the datatype's captured
+  keys) and any datatype outside the core set are embedded as a lossless `|raw` canonical
+  fragment rather than partially/silently dropped. A non-`DV_` leaf (party / context /
+  other RM attribute) is a documented skip. A container node that does not resolve to a
+  `Locatable` is an error, not a skip.
 - **Decode** — a FLAT/STRUCTURED key that does not resolve to a Web Template node
   returns [`ErrUnknownPath`](simplified.go); an unmapped datatype returns
   `ErrUnsupportedDatatype`; a missing **required** suffix is an error, never a coerced
@@ -32,9 +35,10 @@ not partially/silently accepted.
 |---|---|---|
 | `ctx/` context — **core supported**: `ctx/language`, `ctx/territory` (both mandatory on decode → `ErrMissingContext`), `ctx/composer_name` / `ctx/composer_self`, `ctx/time` (context `start_time`). | Emitted on encode; rebuilt on decode. | landed (Task 6) |
 | `ctx/` context — **rest deferred**: `setting`, `category`, participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted; any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). Setting/category are platform defaults or need terminology resolution. | Phase 6 |
-| `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`) | Not emitted; rejected on decode. | Phase 6 |
-| `\|raw` escape hatch (canonical fragment for exotic datatypes) | Supported both directions: encode emits `\|raw` for non-core `DV_*`; decode accepts any `\|raw` fragment (must carry `_type`). | landed (Task 6) |
-| `\|other` open-value-set free text for `DV_CODED_TEXT` | Not implemented. | Phase 6 |
+| Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, or a decorated instance of the above, rides `\|raw`. | Both directions. | landed (Task 6) |
+| `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Phase 6 |
+| `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts any `\|raw` fragment (must carry `_type`). | landed (Task 6) |
+| `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf encodes to `\|other`; decode maps `\|other` back to `DV_TEXT` (mutually exclusive with `\|code`). | landed (Task 6) |
 | `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Phase 6 |
 | Non-`DV_` leaves (party/`subject`, other RM leaves) on encode | Skipped (not an error), pending the `ctx/`/`_`-attr work. | Phase 6 |
 

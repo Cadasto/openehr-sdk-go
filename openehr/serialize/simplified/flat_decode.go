@@ -442,6 +442,14 @@ func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
 		}
 		return map[string]any{"_type": "DV_BOOLEAN", "value": v}, nil
 	case "DV_CODED_TEXT":
+		// |other is the open-value-set free-text fallback: the leaf is persisted
+		// as a DV_TEXT, not a DV_CODED_TEXT (spec §Open Value-Sets and |other).
+		if other, ok := sfx["other"]; ok {
+			if _, hasCode := sfx["code"]; hasCode {
+				return nil, fmt.Errorf("%w: |other is mutually exclusive with |code", ErrUnsupportedDatatype)
+			}
+			return map[string]any{"_type": "DV_TEXT", "value": other}, nil
+		}
 		code, err := requireSuffix(rmType, sfx, "code")
 		if err != nil {
 			return nil, err
@@ -455,6 +463,72 @@ func dvFromSuffixes(rmType string, sfx map[string]any) (map[string]any, error) {
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
 		return map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}, nil
+	case "DV_DURATION":
+		v, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_DURATION", "value": v}, nil
+	case "DV_URI":
+		v, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_URI", "value": v}, nil
+	case "DV_EHR_URI":
+		v, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_EHR_URI", "value": v}, nil
+	case "DV_ORDINAL":
+		code, err := requireSuffix(rmType, sfx, "code")
+		if err != nil {
+			return nil, err
+		}
+		val, err := requireSuffix(rmType, sfx, "value")
+		if err != nil {
+			return nil, err
+		}
+		ordinal, err := requireSuffix(rmType, sfx, "ordinal")
+		if err != nil {
+			return nil, err
+		}
+		// Ordinal symbols are archetype-local (at-codes) -> "local" terminology.
+		symbol := map[string]any{
+			"_type": "DV_CODED_TEXT", "value": val,
+			"defining_code": map[string]any{
+				"_type": "CODE_PHRASE", "code_string": code,
+				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+			},
+		}
+		return map[string]any{"_type": "DV_ORDINAL", "value": ordinal, "symbol": symbol}, nil
+	case "DV_PROPORTION":
+		num, err := requireSuffix(rmType, sfx, "numerator")
+		if err != nil {
+			return nil, err
+		}
+		den, err := requireSuffix(rmType, sfx, "denominator")
+		if err != nil {
+			return nil, err
+		}
+		typ, err := requireSuffix(rmType, sfx, "type")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_PROPORTION", "numerator": num, "denominator": den, "type": typ}, nil
+	case "DV_IDENTIFIER":
+		id, err := requireSuffix(rmType, sfx, "id")
+		if err != nil {
+			return nil, err
+		}
+		out := map[string]any{"_type": "DV_IDENTIFIER", "id": id}
+		for _, s := range []string{"issuer", "assigner", "type"} {
+			if v, ok := sfx[s]; ok {
+				out[s] = v
+			}
+		}
+		return out, nil
 	}
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
 }
