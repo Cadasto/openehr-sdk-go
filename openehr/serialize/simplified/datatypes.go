@@ -6,11 +6,24 @@ package simplified
 // The switch handles both value and pointer forms because a DataValue slot
 // may hold either (see openehr/rm on substitution slots).
 
-import "github.com/cadasto/openehr-sdk-go/openehr/rm"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+)
 
 // leafToFlat writes the FLAT entries for a single leaf value at flatPath.
-// Unhandled datatypes are left for later cycles (|raw fallback, Task 6).
-func leafToFlat(out map[string]any, flatPath string, v any) {
+// rmType is the Web Template leaf type, used only to classify the fallthrough:
+// an unmapped clinical DataValue (DV_*) is an error (silently dropping it would
+// break the REQ-053 semantics-preserving contract — the |raw fallback is Phase
+// 6), whereas an unmapped non-DV leaf (party/context/other RM attribute) is a
+// documented deferral and is skipped (see deviations.md).
+//
+// DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
+// magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
+// mappings.
+func leafToFlat(out map[string]any, flatPath string, v any, rmType string) error {
 	switch dv := v.(type) {
 	case rm.DVText:
 		out[flatPath] = dv.Value
@@ -37,14 +50,19 @@ func leafToFlat(out map[string]any, flatPath string, v any) {
 	case *rm.DVQuantity:
 		quantityToFlat(out, flatPath, *dv)
 	case rm.DVCount:
-		out[flatPath+"|magnitude"] = dv.Magnitude
+		out[flatPath] = dv.Magnitude
 	case *rm.DVCount:
-		out[flatPath+"|magnitude"] = dv.Magnitude
+		out[flatPath] = dv.Magnitude
 	case rm.DVBoolean:
-		out[flatPath+"|value"] = dv.Value
+		out[flatPath] = dv.Value
 	case *rm.DVBoolean:
-		out[flatPath+"|value"] = dv.Value
+		out[flatPath] = dv.Value
+	default:
+		if strings.HasPrefix(rmType, "DV_") {
+			return fmt.Errorf("%w: %s at %q", ErrUnsupportedDatatype, rmType, flatPath)
+		}
 	}
+	return nil
 }
 
 // codedToFlat emits the |code, |value and (external only) |terminology suffix

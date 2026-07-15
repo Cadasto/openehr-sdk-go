@@ -3,6 +3,7 @@ package simplified
 // REQ-053 — FLAT decode: parsing the FLAT key grammar (inverse of the path
 // build). Segment ids, zero-based :index, and the trailing |suffix.
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -24,23 +25,42 @@ func TestDvFromSuffixes(t *testing.T) {
 			want:   map[string]any{"_type": "DV_QUANTITY", "magnitude": float64(120), "units": "mm[Hg]"},
 		},
 		{
+			// STABLE RM mappings: DV_COUNT magnitude is the bare value.
 			rmType: "DV_COUNT",
-			sfx:    map[string]any{"magnitude": float64(5)},
+			sfx:    map[string]any{"": float64(5)},
 			want:   map[string]any{"_type": "DV_COUNT", "magnitude": float64(5)},
 		},
 		{
+			// STABLE RM mappings: DV_BOOLEAN value is the bare value.
 			rmType: "DV_BOOLEAN",
-			sfx:    map[string]any{"value": true},
+			sfx:    map[string]any{"": true},
 			want:   map[string]any{"_type": "DV_BOOLEAN", "value": true},
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.rmType, func(t *testing.T) {
-			got := dvFromSuffixes(tc.rmType, tc.sfx)
+			got, err := dvFromSuffixes(tc.rmType, tc.sfx)
+			if err != nil {
+				t.Fatalf("dvFromSuffixes(%s): %v", tc.rmType, err)
+			}
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Errorf("dvFromSuffixes(%s) = %#v, want %#v", tc.rmType, got, tc.want)
 			}
 		})
+	}
+}
+
+// TestDvFromSuffixesErrors covers the strict-decode guarantees: an unmapped
+// datatype and a missing required suffix are errors, not silent zero values.
+func TestDvFromSuffixesErrors(t *testing.T) {
+	if _, err := dvFromSuffixes("DV_DURATION", map[string]any{"": "P1D"}); !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("unmapped datatype err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if _, err := dvFromSuffixes("DV_COUNT", map[string]any{}); err == nil {
+		t.Error("DV_COUNT with no bare value = nil error, want missing-suffix error")
+	}
+	if _, err := dvFromSuffixes("DV_QUANTITY", map[string]any{"magnitude": float64(1)}); err == nil {
+		t.Error("DV_QUANTITY without |unit = nil error, want missing-suffix error")
 	}
 }
 

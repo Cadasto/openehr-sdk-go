@@ -10,6 +10,7 @@ package simplified
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -23,14 +24,18 @@ func MarshalStructured(comp *rm.Composition, wt *webtemplate.WebTemplate) ([]byt
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(flatToStructured(flat))
+	s, err := flatToStructured(flat)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(s)
 }
 
 // UnmarshalStructured decodes STRUCTURED JSON into a canonical COMPOSITION
 // using wt (REQ-053). It restructures to FLAT and delegates to UnmarshalFlat.
 func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composition, error) {
-	var s map[string]any
-	if err := json.Unmarshal(data, &s); err != nil {
+	s, err := unmarshalObject(data)
+	if err != nil {
 		return nil, err
 	}
 	flat, err := json.Marshal(structuredToFlat(s))
@@ -42,17 +47,21 @@ func UnmarshalStructured(data []byte, wt *webtemplate.WebTemplate) (*rm.Composit
 
 // FlatToStructured restructures FLAT JSON into STRUCTURED JSON (no OPT needed).
 func FlatToStructured(data []byte) ([]byte, error) {
-	var flat map[string]any
-	if err := json.Unmarshal(data, &flat); err != nil {
+	flat, err := unmarshalObject(data)
+	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(flatToStructured(flat))
+	s, err := flatToStructured(flat)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(s)
 }
 
 // StructuredToFlat restructures STRUCTURED JSON into FLAT JSON (no OPT needed).
 func StructuredToFlat(data []byte) ([]byte, error) {
-	var s map[string]any
-	if err := json.Unmarshal(data, &s); err != nil {
+	s, err := unmarshalObject(data)
+	if err != nil {
 		return nil, err
 	}
 	return json.Marshal(structuredToFlat(s))
@@ -60,7 +69,7 @@ func StructuredToFlat(data []byte) ([]byte, error) {
 
 // flatToStructured nests a FLAT map. The first path segment (template id) is a
 // single object; every deeper segment is an array indexed by its :index.
-func flatToStructured(flat map[string]any) map[string]any {
+func flatToStructured(flat map[string]any) (map[string]any, error) {
 	root := make(map[string]any)
 	for key, val := range flat {
 		pk := parseFlatKey(key)
@@ -80,17 +89,23 @@ func flatToStructured(flat map[string]any) map[string]any {
 			}
 			continue
 		}
-		insertStructured(obj, rest, pk.suffix, val)
+		if err := insertStructured(obj, rest, pk.suffix, val); err != nil {
+			return nil, err
+		}
 	}
-	return root
+	return root, nil
 }
 
 // insertStructured places val at segs (relative to obj), growing arrays by
 // :index. A bare leaf sets the array element to the scalar value; a suffixed
-// leaf sets a |suffix key on the element object.
-func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any) {
+// leaf sets a |suffix key on the element object. The :index is bounded so a
+// hostile key cannot force an unbounded allocation.
+func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any) error {
 	seg := segs[0]
 	idx := max(seg.idx, 0)
+	if idx > maxRepeatIndex {
+		return fmt.Errorf("%w: :index %d on %q exceeds bound %d", ErrUnknownPath, idx, seg.id, maxRepeatIndex)
+	}
 	arr, _ := obj[seg.id].([]any)
 	for len(arr) <= idx {
 		arr = append(arr, nil)
@@ -100,7 +115,7 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 	isLeaf := len(segs) == 1
 	if isLeaf && suffix == "" {
 		arr[idx] = val
-		return
+		return nil
 	}
 	el, ok := arr[idx].(map[string]any)
 	if !ok {
@@ -109,9 +124,9 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 	}
 	if isLeaf {
 		el["|"+suffix] = val
-		return
+		return nil
 	}
-	insertStructured(el, segs[1:], suffix, val)
+	return insertStructured(el, segs[1:], suffix, val)
 }
 
 // structuredToFlat flattens a STRUCTURED map into a FLAT map. Each array

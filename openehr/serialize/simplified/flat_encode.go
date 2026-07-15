@@ -94,7 +94,10 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 	if isContainer {
 		loc, ok := v.(rm.Locatable)
 		if !ok {
-			return nil
+			// A container node must resolve to a Locatable RM object; anything
+			// else is an internal inconsistency between the Web Template and the
+			// composition, not an absent optional — surface it (REQ-053).
+			return fmt.Errorf("simplified: container node %q resolved to non-Locatable %T", node.ID, v)
 		}
 		for _, ch := range node.Children {
 			if err := emitNode(out, ch, flatPath, loc, node.AQLPath); err != nil {
@@ -103,6 +106,5 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 		}
 		return nil
 	}
-	leafToFlat(out, flatPath, v)
-	return nil
+	return leafToFlat(out, flatPath, v, node.RMType)
 }

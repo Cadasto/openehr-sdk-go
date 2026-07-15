@@ -398,10 +398,13 @@ requirements:
     # driven by the REQ-106 Web Template: encode (rm.Composition -> FLAT /
     # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
     # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
-    # composition/observation spine + DV_TEXT/DATE_TIME/DATE/TIME/QUANTITY/
-    # CODED_TEXT/COUNT/BOOLEAN. Deferred (see the Phase 3 plan): ctx/ context + _-attrs +
-    # |raw + |other, the remaining datatypes, and PROBE-076 structural
-    # conformance vs a vendored upstream trio.
+    # composition/observation spine (incl. ITEM_SINGLE/ITEM_LIST) + DV_TEXT/
+    # DATE_TIME/DATE/TIME/QUANTITY/CODED_TEXT/COUNT/BOOLEAN. Strict, fail-loud
+    # posture: unresolvable paths, unsupported datatypes, missing required
+    # suffixes, and out-of-bound :index are errors, not silent data loss (see
+    # openehr/serialize/simplified/deviations.md). Deferred (see the Phase 3
+    # plan): ctx/ context + _-attrs + |raw + |other, the remaining datatypes,
+    # and PROBE-076 structural conformance vs a vendored upstream trio.
     implementation: partial
     packages:
       - openehr/serialize/simplified
@@ -410,12 +413,12 @@ requirements:
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - openehr/serialize/simplified/independence_test.go
-      - openehr/serialize/simplified/index_test.go
       - openehr/serialize/simplified/datatypes_test.go
       - openehr/serialize/simplified/flat_encode_test.go
       - openehr/serialize/simplified/flat_decode_test.go
       - openehr/serialize/simplified/structured_test.go
       - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/hardening_test.go
 
   - id: REQ-055
     title: AQL wire boundary
