@@ -3,13 +3,13 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-07-14
-**Status:** Active (approved for implementation)
+**Status:** Landed (partial) — all tasks executed; REQ-053 tracked `partial` (see DoD). Archive on PR #76 merge.
 **Owner:** SDK maintainers
 **Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT / STRUCTURED codecs — registry row in [REQ.md](../specifications/REQ.md))
 **Probes:** PROBE-076 (FLAT/STRUCTURED composition round-trip) — **to register** in [conformance.md](../specifications/conformance.md) at Task in Phase 7.
 **Umbrella:** [simplified-formats umbrella](2026-06-23-simplified-formats.md) — this is **Phase 3**; Phase 1 (shared model) is realised by the shipped `openehr/template/webtemplate`, Phase 2 (REQ-106 WebTemplate export) landed.
 **Decisions:** reference implementation & id-generation are locked by [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md) (reused, not re-decided). The **output-form fork** (spec `ctx/` short-form vs EHRbase full-path context) is a documented deviation, not a new ADR (see Global Constraints); escalate to an ADR only if a consumer needs the EHRbase form emitted by default.
-**Implementation:** planned
+**Implementation:** partial (core codec + ctx/ + `|raw`/`|other` + full datatype set + PROBE-076 landed; `LOCATABLE.name` on decode, exotic `ctx/` fields, first-class `_`-attr suffixes, `.schema` media types, and an upstream-conformance probe deferred — see `openehr/serialize/simplified/deviations.md`)
 **Depends on:** landed `openehr/template/webtemplate` (REQ-106) — the shared WT node model; `openehr/templatecompile` (REQ-111); `openehr/rm` + `openehr/rm/rmpath` (path resolution) + `openehr/rm/rminfo` (RM-attribute/type oracle); `openehr/serialize/canjson` (canonical fragments for `|raw`). All shipped.
 **Defers:** WebTemplate/OPT reconstruction from a data instance (category error / lossy — out of scope, see REQ-053 + umbrella); REST content-negotiation wiring (client-layer follow-up); exotic datatypes not in the conformance corpus (emit/accept `|raw`, list in `deviations.md`); the Better camelCase id variant; multi-composition FLAT batches.
 
@@ -39,26 +39,26 @@ Every task's requirements implicitly include these:
 
 ## Definition of Done
 
-- [ ] Code + tests land with `// REQ-053` / `// PROBE-076` citations; `openehr/serialize/simplified` exports `MarshalFlat`/`UnmarshalFlat`/`MarshalStructured`/`UnmarshalStructured`/`FlatToStructured`/`StructuredToFlat` + the media-type constants + typed errors.
-- [ ] Round-trip holds: `Unmarshal*(Marshal*(comp, wt), wt)` is canonically equal to `comp` for the covered corpus; `FlatToStructured`/`StructuredToFlat` invert each other.
-- [ ] PROBE-076 registered in `conformance.md` and implemented against a vendored upstream trio (OPT + FLAT + STRUCTURED + canonical); deviations recorded in the package's `deviations.md`.
-- [ ] [`traceability.yaml`](../specifications/traceability.yaml) REQ-053 `packages:`/`tests:`/`probes:`/`plans:` populated; `implementation: planned` → `landed` (or `partial` with the covered-types note); REQ.md **Impl.** column updated; wire.md mapping-table row names the package.
-- [ ] `make spec-check` and `make ci` pass.
-- [ ] Plan **Status: Done** and archived via `sdd-archive`; plans/README + roadmap updated.
+- [x] Code + tests land with `// REQ-053` / `// PROBE-076` citations; `openehr/serialize/simplified` exports `MarshalFlat`/`UnmarshalFlat`/`MarshalStructured`/`UnmarshalStructured`/`FlatToStructured`/`StructuredToFlat` + the media-type constants + typed errors.
+- [x] Round-trip holds: `Unmarshal*(Marshal*(comp, wt), wt)` reproduces the FLAT/STRUCTURED for the covered corpus; `FlatToStructured`/`StructuredToFlat` invert each other (semantically — `:index` normalisation, see deviations.md). **Format-idempotent**, not canonically equal: `LOCATABLE.name` repopulation on decode is deferred (deviations.md), so REQ-053 lands `partial`.
+- [x] PROBE-076 registered in `conformance.md` and implemented against the vendored EHRbase `Test_dv_*` corpus (OPT + canonical); deviations recorded in `deviations.md`. Scope: round-trip idempotence, not upstream byte-conformance (documented follow-up).
+- [x] [`traceability.yaml`](../specifications/traceability.yaml) REQ-053 `packages:`/`tests:`/`probes:`/`plans:` populated; `implementation: partial` with the covered-types note; REQ.md **Impl.** column `partial`; wire.md mapping-table row names the package.
+- [x] `make spec-check` and `make ci` pass.
+- [~] Plan **Status: Done** and archived via `sdd-archive`; plans/README + roadmap updated. — roadmap/README updated; archive on PR #76 merge (the one remaining in-scope deferral, `LOCATABLE.name`, is tracked by the umbrella + deviations.md).
 
 ## Implementation checklist
 
 | Step | Status |
 |---|---|
-| Package + public API + media types + independence guard | ☐ |
-| WT index engine (id-path ↔ node, repeatables, ctx) | ☐ |
-| FLAT encode — core datatypes | ☐ |
-| FLAT decode — core datatypes (canonical RM rebuild) | ☐ |
-| STRUCTURED encode/decode + FLAT↔STRUCTURED | ☐ |
-| ctx / `_`-attrs / `|raw` / `|other` | ☐ |
-| PROBE-076 conformance trio vendored + registered | ☐ |
-| traceability / REQ.md / wire.md row / deviations | ☐ |
-| `make spec-check` + `make ci` | ☐ |
+| Package + public API + media types + independence guard | ☑ |
+| WT index engine (id-path ↔ node, repeatables, ctx) | ☑ (folded into encode/decode; standalone index removed as unused) |
+| FLAT encode — core datatypes | ☑ |
+| FLAT decode — core datatypes (canonical RM rebuild) | ☑ |
+| STRUCTURED encode/decode + FLAT↔STRUCTURED | ☑ |
+| ctx / `_`-attrs / `\|raw` / `\|other` | ☑ (`_`-attrs carried losslessly via `\|raw`; first-class suffix decomposition deferred) |
+| PROBE-076 conformance corpus vendored + registered | ☑ (EHRbase `Test_dv_*`; idempotence) |
+| traceability / REQ.md / wire.md row / deviations | ☑ |
+| `make spec-check` + `make ci` | ☑ |
 
 ---
 

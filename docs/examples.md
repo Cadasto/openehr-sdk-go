@@ -30,6 +30,7 @@ make build
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
 | [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats (REQ-053) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
@@ -362,6 +363,36 @@ encounter [COMPOSITION] 1..1
 ```
 
 **What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first — each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix`/`type`/`list`/`validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) rather than emit ambiguous output; accepted reference deltas are documented in the package's `deviations.md`.
+
+---
+
+### flat-roundtrip
+
+**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back (REQ-053), driven by the composition's Web Template (REQ-106). Shows the three public entry points — `MarshalFlat`/`UnmarshalFlat`, the OPT-free `FlatToStructured`, and the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip — with no transport or auth.
+
+```bash
+go run ./cmd/examples/flat-roundtrip
+```
+
+**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson` — **no `internal/` import.**
+
+**Sample output (abridged):**
+
+```text
+FLAT (application/openehr.wt.flat+json):
+  ctx/language = en
+  ctx/territory = DE
+  ctx/composer_name = Max Mustermann
+  test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|magnitude = 130
+  test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|unit = mmHg
+  ...
+
+STRUCTURED (application/openehr.wt.structured+json): 412 bytes
+
+OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint.v0
+```
+
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode (unknown paths/suffixes, missing context, and malformed input error rather than drop data) — see the package's `deviations.md`.
 
 ---
 

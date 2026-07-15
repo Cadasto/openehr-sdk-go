@@ -405,10 +405,12 @@ requirements:
     # bypass makes decorated/exotic datatypes lossless. Strict, fail-loud posture:
     # unresolvable paths, unsupported datatypes, missing required suffixes, missing
     # mandatory context, and out-of-bound :index are errors, not silent data loss
-    # (see openehr/serialize/simplified/deviations.md). Deferred (Phase 3 plan):
+    # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
+    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip) — idempotence,
+    # not upstream byte-conformance. Deferred (documented, deviations.md): LOCATABLE
+    # .name on decode (so decode is format-idempotent, not canonically complete),
     # first-class _-attr suffix decomposition (covered losslessly via |raw), the
-    # remaining ctx/ fields, LOCATABLE.name on decode, and PROBE-076 structural
-    # conformance vs a vendored upstream trio.
+    # remaining ctx/ fields, .schema media types, and an upstream-conformance probe.
     implementation: partial
     packages:
       - openehr/serialize/simplified
