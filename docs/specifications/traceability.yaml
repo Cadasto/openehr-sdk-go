@@ -394,7 +394,28 @@ requirements:
     title: FLAT and STRUCTURED
     canonical: docs/specifications/wire.md#req-053
     status: draft
-    implementation: planned
+    # Bidirectional FLAT + STRUCTURED codecs in openehr/serialize/simplified,
+    # driven by the REQ-106 Web Template: encode (rm.Composition -> FLAT /
+    # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
+    # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
+    # composition/observation spine + DV_TEXT/DATE_TIME/DATE/TIME/QUANTITY/
+    # CODED_TEXT. Deferred (see the Phase 3 plan): ctx/ context + _-attrs +
+    # |raw + |other, the remaining datatypes, and PROBE-076 structural
+    # conformance vs a vendored upstream trio.
+    implementation: partial
+    packages:
+      - openehr/serialize/simplified
+    plans:
+      - docs/plans/2026-07-14-flat-structured-codecs.md
+    tests:
+      - openehr/serialize/simplified/simplified_test.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/serialize/simplified/index_test.go
+      - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/roundtrip_test.go
 
   - id: REQ-055
     title: AQL wire boundary

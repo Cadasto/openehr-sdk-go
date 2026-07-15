@@ -46,7 +46,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-050 | REST 1.1.0-development pin | [wire.md § REQ-050](wire.md#req-050) | landed |
 | REQ-051 | Cadasto spec-version header | [wire.md § REQ-051](wire.md#req-051) | landed |
 | REQ-052 | Canonical JSON | [wire.md § REQ-052](wire.md#req-052) | landed |
-| REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | planned |
+| REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | partial |
 | REQ-054 | Optimistic concurrency | [wire.md § REQ-054](wire.md#req-054) | landed |
 | REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055--wire-boundary) | landed |
 | REQ-056 | Canonical XML | [wire.md § REQ-056](wire.md#req-056) | landed |

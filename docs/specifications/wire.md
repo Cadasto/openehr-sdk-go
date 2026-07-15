@@ -285,7 +285,7 @@ Out of v1 scope:
 | Cadasto spec-version header | REQ-051 | `transport/` |
 | Canonical JSON | REQ-052 | `openehr/serialize/canjson/` |
 | Canonical XML | REQ-056 | `openehr/serialize/canxml/` |
-| FLAT / STRUCTURED | REQ-053 | `openehr/serialize/` (deferred sub-packages) |
+| FLAT / STRUCTURED | REQ-053 | `openehr/serialize/simplified/` |
 | Optimistic concurrency | REQ-054 | `transport/` (error mapping), `openehr/client/*` (header plumbing) |
 | AQL wire | REQ-055 | `openehr/aql/`, `openehr/client/query/` |
 | Stored AQL | REQ-057 | `openehr/client/definition/`, `openehr/client/query/` |
