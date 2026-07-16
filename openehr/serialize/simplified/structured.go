@@ -184,7 +184,7 @@ func structuredToFlat(s map[string]any) (map[string]any, error) {
 	for rootID, v := range s {
 		obj, ok := v.(map[string]any)
 		if !ok {
-			return nil, fmt.Errorf("simplified: structured: root %q is not an object (%T)", rootID, v)
+			return nil, fmt.Errorf("%w: structured root %q is not an object (%T)", ErrUnknownPath, rootID, v)
 		}
 		// The ctx object holds direct values (no arrays / :index), inverse of
 		// the ctx grouping in flatToStructured.
@@ -214,7 +214,7 @@ func structWalk(out map[string]any, path string, obj map[string]any) error {
 		}
 		arr, ok := v.([]any)
 		if !ok {
-			return fmt.Errorf("simplified: structured: expected an array at %q, got %T", path+"/"+k, v)
+			return fmt.Errorf("%w: structured: expected an array at %q, got %T", ErrUnknownPath, path+"/"+k, v)
 		}
 		for i, el := range arr {
 			seg := path + "/" + k + ":" + strconv.Itoa(i)
@@ -225,10 +225,10 @@ func structWalk(out map[string]any, path string, obj map[string]any) error {
 					return err
 				}
 				if len(out) == before {
-					return fmt.Errorf("simplified: structured: element at %q carries no entries", seg)
+					return fmt.Errorf("%w: structured: element at %q carries no entries", ErrUnknownPath, seg)
 				}
 			case nil:
-				return fmt.Errorf("simplified: structured: null element at %q", seg)
+				return fmt.Errorf("%w: structured: null element at %q", ErrUnknownPath, seg)
 			default:
 				out[seg] = el
 			}

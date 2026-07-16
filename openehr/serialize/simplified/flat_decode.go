@@ -8,10 +8,12 @@ package simplified
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -88,7 +90,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	compJSON := map[string]any{
 		"_type":             "COMPOSITION",
 		"archetype_node_id": root.NodeID,
-		"name":              textJSON(orDefault(root.Name, wt.TemplateID)),
+		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
 	// Separate composition-level context (ctx/) from clinical content; context
 	// is rebuilt from RM attributes, not from a Web Template leaf path.
@@ -101,11 +103,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 			ctx[key] = val
 			continue
 		}
-		base := key
-		suffix := ""
-		if i := strings.LastIndex(key, "|"); i >= 0 {
-			base, suffix = key[:i], key[i+1:]
-		}
+		base, suffix := splitSuffix(key)
 		if groups[base] == nil {
 			groups[base] = make(map[string]any)
 		}
@@ -115,13 +113,8 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// is deterministic: distinct-node-id siblings with no explicit :index
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
-	bases := make([]string, 0, len(groups))
-	for base := range groups {
-		bases = append(bases, base)
-	}
-	sort.Strings(bases)
 	budget := &allocBudget{limit: maxTotalNodes}
-	for _, base := range bases {
+	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		sfx := groups[base]
 		pk, err := parseFlatKey(base)
 		if err != nil {
@@ -292,7 +285,7 @@ func completeRequired(node map[string]any, ci ctxInfo) {
 func defaultAttr(attr string, ci ctxInfo) map[string]any {
 	switch attr {
 	case "language":
-		return codePhraseJSON(orDefault(ci.language, "en"), "ISO_639-1")
+		return codePhraseJSON(cmp.Or(ci.language, "en"), "ISO_639-1")
 	case "encoding":
 		return codePhraseJSON("UTF-8", "IANA_character-sets")
 	case "subject", "composer":
@@ -450,7 +443,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		nextAttr := segs[i+1].attr
 		childType := concreteType(curType, seg.attr, wtType, nextAttr)
 		if childType == "" {
-			return fmt.Errorf("cannot resolve RM type for %q on %s (aqlPath %q)", seg.attr, curType, aqlPath)
+			return fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
 		namePrefix.WriteString("/")
@@ -642,6 +635,21 @@ func concreteType(parentType, attr, wtType, nextAttr string) string {
 	}
 }
 
+// bareLeafAttr maps each bare-leaf datatype to the canonical attribute its ""
+// suffix value rebuilds (DV_COUNT -> magnitude, DV_BOOLEAN -> value, … — per
+// the STABLE RM mappings).
+var bareLeafAttr = map[string]string{
+	"DV_TEXT":      "value",
+	"DV_DATE_TIME": "value",
+	"DV_DATE":      "value",
+	"DV_TIME":      "value",
+	"DV_DURATION":  "value",
+	"DV_URI":       "value",
+	"DV_EHR_URI":   "value",
+	"DV_COUNT":     "magnitude",
+	"DV_BOOLEAN":   "value",
+}
+
 // dvFromSuffixes builds the canonical-JSON DataValue for a leaf from its FLAT
 // suffix->value map (the inverse of leafToFlat). Bare values live under the ""
 // suffix (DV_COUNT -> magnitude, DV_BOOLEAN -> value, per the STABLE RM
@@ -667,31 +675,16 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
 		return nil, err
 	}
+	// The bare-leaf datatypes all rebuild as {_type, <attr>: value} from the ""
+	// suffix; the table replaces nine identical switch cases.
+	if attr, ok := bareLeafAttr[rmType]; ok {
+		v, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": rmType, attr: v}, nil
+	}
 	switch rmType {
-	case "DV_TEXT":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_TEXT", "value": v}, nil
-	case "DV_DATE_TIME":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_DATE_TIME", "value": v}, nil
-	case "DV_DATE":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_DATE", "value": v}, nil
-	case "DV_TIME":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_TIME", "value": v}, nil
 	case "DV_QUANTITY":
 		mag, err := requireSuffix(rmType, sfx, "magnitude")
 		if err != nil {
@@ -702,18 +695,6 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			return nil, err
 		}
 		return map[string]any{"_type": "DV_QUANTITY", "magnitude": mag, "units": unit}, nil
-	case "DV_COUNT":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_COUNT", "magnitude": v}, nil
-	case "DV_BOOLEAN":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_BOOLEAN", "value": v}, nil
 	case "DV_CODED_TEXT":
 		// |other is the open-value-set free-text fallback: the leaf is persisted
 		// as a DV_TEXT, not a DV_CODED_TEXT (spec §Open Value-Sets and |other).
@@ -739,24 +720,6 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
 		return map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}, nil
-	case "DV_DURATION":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_DURATION", "value": v}, nil
-	case "DV_URI":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_URI", "value": v}, nil
-	case "DV_EHR_URI":
-		v, err := requireSuffix(rmType, sfx, "")
-		if err != nil {
-			return nil, err
-		}
-		return map[string]any{"_type": "DV_EHR_URI", "value": v}, nil
 	case "DV_ORDINAL":
 		code, err := requireSuffix(rmType, sfx, "code")
 		if err != nil {
@@ -874,7 +837,7 @@ func requireSuffix(rmType string, sfx map[string]any, name string) (any, error) 
 		if name == "" {
 			label = "bare value"
 		}
-		return nil, fmt.Errorf("%s: missing required %s", rmType, label)
+		return nil, fmt.Errorf("%w: %s missing required %s", ErrUnsupportedDatatype, rmType, label)
 	}
 	return v, nil
 }
@@ -884,12 +847,14 @@ func textJSON(value string) map[string]any {
 	return map[string]any{"_type": "DV_TEXT", "value": value}
 }
 
-// orDefault returns s if non-empty, else def.
-func orDefault(s, def string) string {
-	if s != "" {
-		return s
+// splitSuffix splits a FLAT key at its trailing pipe attribute — the one place
+// that owns the |suffix grammar, shared by grouping and full key parsing so the
+// two cannot drift.
+func splitSuffix(key string) (base, suffix string) {
+	if i := strings.LastIndex(key, "|"); i >= 0 {
+		return key[:i], key[i+1:]
 	}
-	return def
+	return key, ""
 }
 
 // flatSeg is one "/"-separated FLAT path segment: a Web Template id with an
@@ -915,11 +880,7 @@ type parsedKey struct {
 // make distinct JSON keys resolve to the same slot, silently overwriting one
 // value with another — both are rejected.
 func parseFlatKey(key string) (parsedKey, error) {
-	var suffix string
-	if i := strings.LastIndex(key, "|"); i >= 0 {
-		suffix = key[i+1:]
-		key = key[:i]
-	}
+	key, suffix := splitSuffix(key)
 	parts := strings.Split(key, "/")
 	segs := make([]flatSeg, 0, len(parts))
 	for _, p := range parts {
