@@ -159,8 +159,8 @@ func TestDecodeRejectsTrailingJSON(t *testing.T) {
 	}
 }
 
-// TestStructuredToFlatRejectsMalformed: a non-array clinical child and a null
-// array hole are errors, not silent drops.
+// TestStructuredToFlatRejectsMalformed: a non-array clinical child, a null
+// array hole, and an element carrying no entries are errors, not silent drops.
 func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"leaf":"not-an-array"}}`)); err == nil {
 		t.Error("non-array clinical child = nil error, want rejection")
@@ -170,6 +170,26 @@ func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 	}
 	if _, err := simplified.StructuredToFlat([]byte(`{"t":"not-an-object"}`)); err == nil {
 		t.Error("non-object root = nil error, want rejection")
+	}
+	if _, err := simplified.StructuredToFlat([]byte(`{"t":{"a":[{}]}}`)); err == nil {
+		t.Error("empty-object element = nil error, want rejection (it would vanish)")
+	}
+}
+
+// TestFlatToStructuredRejectsConflicts: two FLAT keys claiming the same
+// STRUCTURED slot with incompatible shapes (bare scalar vs |suffix object, or
+// a bare root value) must error deterministically — last-write-wins would make
+// the output depend on Go map iteration order.
+func TestFlatToStructuredRejectsConflicts(t *testing.T) {
+	cases := []string{
+		`{"t/leaf:0": "bare", "t/leaf:0|code": "c"}`,
+		`{"t/a:0": "x", "t/a:0/b:0": "y"}`,
+		`{"t": 5}`,
+	}
+	for _, in := range cases {
+		if _, err := simplified.FlatToStructured([]byte(in)); err == nil {
+			t.Errorf("FlatToStructured(%s) = nil error, want conflict rejection", in)
+		}
 	}
 }
 

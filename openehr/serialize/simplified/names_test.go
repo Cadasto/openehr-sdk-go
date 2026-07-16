@@ -79,6 +79,21 @@ func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
 		t.Errorf("WithTemplate decode does not validate against the OPT; issues=%v", r.Issues)
 	}
 
+	// The option must pass through the STRUCTURED entry point too — deleting
+	// the opts... delegation would regress STRUCTURED conformance with every
+	// FLAT-only assertion still green.
+	s, err := simplified.MarshalStructured(&comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalStructured: %v", err)
+	}
+	namedS, err := simplified.UnmarshalStructured(s, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (WithTemplate): %v", err)
+	}
+	if r := validation.Validate(namedS, compiled); !r.OK {
+		t.Errorf("WithTemplate STRUCTURED decode does not validate; issues=%v", r.Issues)
+	}
+
 	// Names must not leak into FLAT — the round-trip stays idempotent.
 	flat2, err := simplified.MarshalFlat(named, wt)
 	if err != nil {

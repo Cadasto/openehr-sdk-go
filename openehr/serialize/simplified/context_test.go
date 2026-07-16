@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 )
 
@@ -56,6 +57,49 @@ func TestContextEncodeAndRoundTrip(t *testing.T) {
 		if m1[k] != m2[k] {
 			t.Errorf("ctx round-trip %s: %#v -> %#v", k, m1[k], m2[k])
 		}
+	}
+}
+
+// TestComposerSelfRoundTrip pins the PARTY_SELF composer branch end-to-end:
+// encode emits ctx/composer_self, decode rebuilds PARTY_SELF, and the FLAT
+// survives a second round-trip. (The generated fixtures always use
+// PARTY_IDENTIFIED, so without this test the branch has zero coverage and the
+// WithTemplate default would mask its loss.)
+func TestComposerSelfRoundTrip(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	comp.Composer = &rm.PartySelf{}
+
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f1, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["ctx/composer_self"] != true {
+		t.Fatalf("ctx/composer_self = %#v, want true (keys: %v)", m["ctx/composer_self"], m)
+	}
+	if _, ok := m["ctx/composer_name"]; ok {
+		t.Error("ctx/composer_name emitted alongside composer_self")
+	}
+	comp2, err := simplified.UnmarshalFlat(f1, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	if _, ok := comp2.Composer.(*rm.PartySelf); !ok {
+		t.Errorf("decoded composer = %T, want *rm.PartySelf", comp2.Composer)
+	}
+	f2, err := simplified.MarshalFlat(comp2, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat #2: %v", err)
+	}
+	var m2 map[string]any
+	if err := json.Unmarshal(f2, &m2); err != nil {
+		t.Fatal(err)
+	}
+	if m2["ctx/composer_self"] != true {
+		t.Errorf("composer_self lost on round-trip: %#v", m2["ctx/composer_self"])
 	}
 }
 

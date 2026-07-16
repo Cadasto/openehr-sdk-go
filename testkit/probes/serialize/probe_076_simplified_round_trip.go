@@ -163,21 +163,36 @@ func firstIssue(r validation.Result) string {
 	return r.Issues[0].Code + " " + r.Issues[0].Path
 }
 
+// flatMapsEqual compares two FLAT payloads for exact semantic equality. Both
+// sides are decoded with json.Number — comparing through float64 would round
+// integers above 2^53 on both sides and mask a regression of exactly the
+// precision guarantee the codec documents (json.Number values compare as
+// strings under DeepEqual, i.e. exactly).
 func flatMapsEqual(a, b []byte) bool {
-	var ma, mb map[string]any
-	if err := json.Unmarshal(a, &ma); err != nil {
+	ma, err := decodeNumberMap(a)
+	if err != nil {
 		return false
 	}
-	if err := json.Unmarshal(b, &mb); err != nil {
+	mb, err := decodeNumberMap(b)
+	if err != nil {
 		return false
 	}
 	return reflect.DeepEqual(ma, mb)
 }
 
-func flatKeyCount(b []byte) int {
+func decodeNumberMap(b []byte) (map[string]any, error) {
 	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.UseNumber()
 	var m map[string]any
 	if err := dec.Decode(&m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func flatKeyCount(b []byte) int {
+	m, err := decodeNumberMap(b)
+	if err != nil {
 		return 0
 	}
 	return len(m)
