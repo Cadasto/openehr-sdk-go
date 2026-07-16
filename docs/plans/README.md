@@ -6,6 +6,17 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Ecosystem fit-gap delivery (2026-07-16)
+
+Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opens a new "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
+
+| Plan | Scope | Covers (proposed) | Probe |
+|---|---|---|---|
+| [2026-07-16-flat-author-linter.md](2026-07-16-flat-author-linter.md) | Pre-submit FLAT path linter + CLI | REQ-115 (builds on REQ-053/106/111) | PROBE-083 |
+| [2026-07-16-opt-author-validator.md](2026-07-16-opt-author-validator.md) | OPT author validator + CLI | REQ-114 (builds on REQ-100/104/106/108) | PROBE-085 |
+| [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
+| [2026-07-16-web-template-tests-conformance.md](2026-07-16-web-template-tests-conformance.md) | Vendored web-template-tests adapter in CI | REQ-080 (verifies REQ-053/106) | PROBE-086 |
+
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
 | Plan | Scope | Covers REQs / probes |
