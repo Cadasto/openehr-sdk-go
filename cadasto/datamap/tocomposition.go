@@ -86,6 +86,47 @@ func encodeComposer(v any) map[string]any {
 	return out
 }
 
+// encodeOtherParticipations builds an ENTRY.other_participations list from a
+// datamap `other_participations` array. Each entry is:
+//
+//	{"function": "requestor",
+//	 "performer": {"name": "...", "id": "...", "id_scheme": "AGB",
+//	               "id_namespace": "lab24", "id_type": "PERSON"}}
+//
+// The performer reuses encodeComposer so the party is a PARTY_IDENTIFIED whose
+// id* keys land on external_ref (PARTY_REF/GENERIC_ID) — AQL-queryable on
+// `.../other_participations/performer/external_ref/id/value`, the same seam the
+// composer uses. Entries without a function or performer are skipped; a
+// resulting empty list returns nil so the attribute is omitted rather than
+// emitted empty.
+func encodeOtherParticipations(payload map[string]any) []any {
+	raw, ok := payload["other_participations"].([]any)
+	if !ok || len(raw) == 0 {
+		return nil
+	}
+	out := make([]any, 0, len(raw))
+	for _, r := range raw {
+		m, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		fn := stringOrDefault(m["function"], "")
+		perf, ok := m["performer"].(map[string]any)
+		if fn == "" || !ok {
+			continue
+		}
+		out = append(out, map[string]any{
+			"_type":     "PARTICIPATION",
+			"function":  dvText(fn),
+			"performer": encodeComposer(perf),
+		})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (map[string]any, error) {
 	if IsPartyTemplate(opt) {
 		return nil, errors.New("datamap.ToComposition: template roots a demographic PARTY type; use ToParty")
@@ -295,6 +336,13 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 		"language":          codePhrase("ISO_639-1", language),
 		"encoding":          codePhrase("IANA_character-sets", "UTF-8"),
 		"subject":           map[string]any{"_type": "PARTY_SELF"},
+	}
+
+	// ENTRY.other_participations (e.g. requesting clinician / organisation with
+	// an AGB in external_ref) — applies to every ENTRY subtype, so attach before
+	// the INSTRUCTION/ACTION branches. Omitted when the datamap carries none.
+	if parts := encodeOtherParticipations(payload); len(parts) > 0 {
+		out["other_participations"] = parts
 	}
 
 	// INSTRUCTION has activities[] (not data) — encode separately.
