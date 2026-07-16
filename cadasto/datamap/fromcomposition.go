@@ -309,7 +309,85 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 		return "", nil, fmt.Errorf("RM entry type %q not supported", rmType)
 	}
 
+	// ENTRY.other_participations (e.g. requesting clinician / organisation with
+	// an AGB on performer/external_ref) — OPTIONAL: decoded back into the
+	// datamap ONLY when the composition actually carries them, mirroring
+	// encodeOtherParticipations (tocomposition.go). Absent → the key is omitted
+	// entirely, so a composition without participations round-trips unchanged.
+	if parts := decodeOtherParticipations(node); parts != nil {
+		payload["other_participations"] = parts
+	}
+
 	return key, payload, nil
+}
+
+// decodeOtherParticipations reads ENTRY.other_participations back into the
+// datamap shape encodeOtherParticipations consumes:
+//
+//	[{"function": "requestor",
+//	  "performer": {"name": "...", "id": "...", "id_scheme": "AGB",
+//	                "id_namespace": "lab24", "id_type": "PERSON"}}]
+//
+// so a read → merge → write round-trip preserves them. Returns nil when the
+// entry has no participations (the attribute is then omitted, not emitted
+// empty).
+func decodeOtherParticipations(node map[string]any) []any {
+	raw, _ := node["other_participations"].([]any)
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]any, 0, len(raw))
+	for _, r := range raw {
+		p, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		entry := map[string]any{}
+		if fn, ok := readDVValue(p["function"]).(string); ok && fn != "" {
+			entry["function"] = fn
+		}
+		if perf := decodePerformer(p["performer"]); len(perf) > 0 {
+			entry["performer"] = perf
+		}
+		if len(entry) > 0 {
+			out = append(out, entry)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// decodePerformer reads a PARTY_IDENTIFIED performer back into the datamap
+// composer/performer shape (name + external_ref id* keys), mirroring
+// encodeComposer. Returns an empty map when nothing usable is present.
+func decodePerformer(v any) map[string]any {
+	perf, ok := v.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := map[string]any{}
+	if name, _ := perf["name"].(string); name != "" {
+		out["name"] = name
+	}
+	if ext, ok := perf["external_ref"].(map[string]any); ok {
+		if ns, _ := ext["namespace"].(string); ns != "" {
+			out["id_namespace"] = ns
+		}
+		if ty, _ := ext["type"].(string); ty != "" {
+			out["id_type"] = ty
+		}
+		if id, ok := ext["id"].(map[string]any); ok {
+			if val, _ := id["value"].(string); val != "" {
+				out["id"] = val
+			}
+			if sch, _ := id["scheme"].(string); sch != "" {
+				out["id_scheme"] = sch
+			}
+		}
+	}
+	return out
 }
 
 // decodeActivity decodes one ACTIVITY: its description ITEM_TREE items plus an

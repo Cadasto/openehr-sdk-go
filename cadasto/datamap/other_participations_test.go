@@ -74,3 +74,49 @@ func TestEncodeOtherParticipations(t *testing.T) {
 		}
 	})
 }
+
+// PROBE-0798 proves REQ-058 — decodeOtherParticipations round-trips the encoded
+// ENTRY.other_participations back into the datamap shape encodeOtherParticipations
+// consumes (function + performer name + external_ref id/scheme/namespace/type),
+// and is OPTIONAL: an entry without participations decodes to nil (attribute
+// omitted, not emitted empty).
+func TestDecodeOtherParticipations(t *testing.T) {
+	t.Run("nil when absent", func(t *testing.T) {
+		if got := decodeOtherParticipations(map[string]any{}); got != nil {
+			t.Fatalf("want nil, got %v", got)
+		}
+	})
+
+	t.Run("round-trip encode -> decode", func(t *testing.T) {
+		in := map[string]any{
+			"other_participations": []any{
+				map[string]any{
+					"function": "requestor",
+					"performer": map[string]any{
+						"name": "de Vries, Peter", "id": "03012345",
+						"id_scheme": "AGB", "id_namespace": "lab24", "id_type": "PERSON",
+					},
+				},
+			},
+		}
+		// encode into an ENTRY node, then decode back.
+		node := map[string]any{"other_participations": encodeOtherParticipations(in)}
+		got := decodeOtherParticipations(node)
+		if len(got) != 1 {
+			t.Fatalf("want 1 participation, got %d (%v)", len(got), got)
+		}
+		p := got[0].(map[string]any)
+		if p["function"] != "requestor" {
+			t.Errorf("function = %v, want requestor", p["function"])
+		}
+		perf := p["performer"].(map[string]any)
+		for k, want := range map[string]string{
+			"name": "de Vries, Peter", "id": "03012345",
+			"id_scheme": "AGB", "id_namespace": "lab24", "id_type": "PERSON",
+		} {
+			if perf[k] != want {
+				t.Errorf("performer[%q] = %v, want %v", k, perf[k], want)
+			}
+		}
+	})
+}
