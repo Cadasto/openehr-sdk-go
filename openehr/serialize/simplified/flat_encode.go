@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -37,7 +38,9 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 		return nil, ErrNilComposition
 	}
 	out := make(map[string]any)
-	emitContext(out, comp)
+	if err := emitContext(out, comp); err != nil {
+		return nil, err
+	}
 	root := wt.Tree
 	for _, ch := range root.Children {
 		if err := emitNode(out, ch, root.ID, comp, root.AQLPath); err != nil {
@@ -53,7 +56,12 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 // health-care facility, workflow ids, and the composer external reference are
 // deferred — see deviations.md. (category is not a ctx/ field at all: it is a
 // template-constrained leaf and rides its own Web Template path.)
-func emitContext(out map[string]any, comp *rm.Composition) {
+//
+// A composer the ctx/ short forms cannot carry (PARTY_RELATED, or a
+// PARTY_IDENTIFIED without a name) is an error, not an omission: a decode of
+// the composer-less output under WithTemplate would default the composer to
+// PARTY_SELF — a silent type substitution (see deviations.md).
+func emitContext(out map[string]any, comp *rm.Composition) error {
 	if comp.Language.CodeString != "" {
 		out["ctx/language"] = comp.Language.CodeString
 	}
@@ -61,6 +69,8 @@ func emitContext(out map[string]any, comp *rm.Composition) {
 		out["ctx/territory"] = comp.Territory.CodeString
 	}
 	switch c := comp.Composer.(type) {
+	case nil:
+		// Absent composer: nothing to represent, nothing substituted.
 	case *rm.PartySelf:
 		if c != nil {
 			out["ctx/composer_self"] = true
@@ -68,17 +78,24 @@ func emitContext(out map[string]any, comp *rm.Composition) {
 	case rm.PartySelf:
 		out["ctx/composer_self"] = true
 	case *rm.PartyIdentified:
-		if c != nil && c.Name != nil && *c.Name != "" {
+		if c != nil {
+			if c.Name == nil || *c.Name == "" {
+				return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+			}
 			out["ctx/composer_name"] = *c.Name
 		}
 	case rm.PartyIdentified:
-		if c.Name != nil && *c.Name != "" {
-			out["ctx/composer_name"] = *c.Name
+		if c.Name == nil || *c.Name == "" {
+			return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
 		}
+		out["ctx/composer_name"] = *c.Name
+	default:
+		return fmt.Errorf("%w: composer %T is not representable in the ctx/ short forms", ErrUnsupportedDatatype, comp.Composer)
 	}
 	if comp.Context != nil && comp.Context.StartTime.Value != "" {
 		out["ctx/time"] = comp.Context.StartTime.Value
 	}
+	return nil
 }
 
 // emitNode resolves node against resolveRoot (whose canonical path is
@@ -103,10 +120,22 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		if err != nil {
 			return skipNotFound(err, relPath)
 		}
-		for i, v := range vals {
-			if err := emitValue(out, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(i), v, isContainer, resolveRoot, resolveRootAql); err != nil {
+		// The :index counts emitted instances, not RM list positions: an
+		// instance whose subtree contributes no FLAT keys is omitted without
+		// consuming an index. Stamping by list position would leave a sparse
+		// sequence (":0",":2") that the decoder rejects as phantom gap-fill,
+		// breaking the round-trip on valid compositions (see deviations.md).
+		idx := 0
+		for _, v := range vals {
+			sub := make(map[string]any)
+			if err := emitValue(sub, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(idx), v, isContainer, resolveRoot, resolveRootAql); err != nil {
 				return err
 			}
+			if len(sub) == 0 {
+				continue
+			}
+			maps.Copy(out, sub)
+			idx++
 		}
 		return nil
 	}

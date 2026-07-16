@@ -26,6 +26,10 @@ semantics-preserving). Concretely:
   attribute) is a documented skip. A container node that resolves to a
   non-`Locatable` RM object (e.g. `EVENT_CONTEXT`) is recursed via the enclosing Locatable
   ancestor, not dropped. A typed-nil RM pointer is treated as an absent leaf (skipped).
+  A **composer** the `ctx/` short forms cannot carry — `PARTY_RELATED`, or a
+  `PARTY_IDENTIFIED` without a `name` — is `ErrUnsupportedDatatype`, not an omission
+  (omitting it would let a `WithTemplate` decode default the composer to `PARTY_SELF`,
+  a silent type substitution).
 - **Decode** — a key that does not resolve to a Web Template node returns
   [`ErrUnknownPath`](simplified.go); an unmapped datatype, a suffix outside the datatype's
   allowlist (e.g. a `\|unitt` typo), a misused `\|raw`/`\|other`, or a `\|other` on a closed
@@ -72,6 +76,15 @@ not partially/silently accepted.
   decodes successfully but does not validate when the template carries HISTORY/EVENT nodes
   (pinned by `names_test.go`). Without `WithTemplate`, decode omits names and defaults
   entirely (format-idempotent only).
+
+- **Empty repeat instances are not representable in FLAT** — an instance of a repeatable
+  node whose subtree contributes no FLAT keys (all leaves below it absent) is omitted on
+  encode and does **not** consume an `:index`; later instances close ranks. Stamping the
+  index by RM list position instead would emit a sparse sequence (`:0`,`:2`) that the
+  decoder rejects as phantom gap-fill, breaking `MarshalFlat → UnmarshalFlat` on a valid
+  composition. Consequence: a composition with such an empty instance round-trips
+  **minus that instance** — the one place encode narrows the composition rather than
+  erroring, because the format simply has no spelling for "an instance with no values".
 
 - **`ITEM_TREE` vs `ITEM_LIST` on decode** — the Web Template collapses `ITEM_STRUCTURE`
   nodes, so the concrete subtype is inferred from the child aqlPath attribute:
