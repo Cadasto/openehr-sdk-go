@@ -123,7 +123,10 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	budget := &allocBudget{limit: maxTotalNodes}
 	for _, base := range bases {
 		sfx := groups[base]
-		pk := parseFlatKey(base)
+		pk, err := parseFlatKey(base)
+		if err != nil {
+			return nil, err
+		}
 		leaf, predIndex, predType, ok := resolveLeaf(wt, pk.segs)
 		if !ok {
 			// A key that does not resolve to a WT node is a wrong template, a
@@ -138,6 +141,12 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
+	}
+	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
+	// empty phantom instance in selectElem; reject it before context/completion
+	// can decorate fabricated data into something OPT-valid.
+	if err := checkNoPhantoms(compJSON); err != nil {
+		return nil, err
 	}
 	// Context: parse once, then apply (with the mandatory-field check) after
 	// content, so an unresolvable content key surfaces as ErrUnknownPath first.
@@ -315,8 +324,11 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 
 // resolveLeaf walks the Web Template by FLAT segment ids to the leaf node,
 // collecting, for each ancestor that carries an archetype node id, its flat
-// :index (predIndex) and Web Template rmType (predType), both keyed by that
-// node id. Returns ok=false when a segment id is not found.
+// :index (predIndex) and Web Template rmType (predType) — both keyed by the
+// ancestor's canonical AQLPath, which is unique per chain position. Keying by
+// bare node id would collide when the same at-code (or a self-nested archetype
+// id) appears twice along one path, silently applying one segment's index or
+// type to another. Returns ok=false when a segment id is not found.
 func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg) (*webtemplate.Node, map[string]int, map[string]string, bool) {
 	predIndex := make(map[string]int)
 	predType := make(map[string]string)
@@ -336,9 +348,9 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg) (*webtemplate.Node
 			return nil, nil, nil, false
 		}
 		if next.NodeID != "" {
-			predType[next.NodeID] = next.RMType
+			predType[next.AQLPath] = next.RMType
 			if seg.idx >= 0 {
-				predIndex[next.NodeID] = seg.idx
+				predIndex[next.AQLPath] = seg.idx
 			}
 		}
 		node = next
@@ -391,28 +403,45 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 	segs := parseAQL(aqlPath)
 	cur := compJSON
 	curType := "COMPOSITION"
-	var prefix strings.Builder
+	// Two path keys are rebuilt in lockstep: aqlPrefix reproduces the WT
+	// aqlPath prefix exactly (predicate on every predicated segment) — the
+	// positional key predIndex/predType are stored under; namePrefix keeps a
+	// predicate only on container attributes (templatecompile's convention),
+	// the key of the WithTemplate name index.
+	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
+			if _, exists := cur[seg.attr]; exists {
+				// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
+				// "a:0" on a repeatable) — overwriting would silently drop one.
+				return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
+			}
 			cur[seg.attr] = dv
 			return nil
 		}
+		aqlPrefix.WriteString("/")
+		aqlPrefix.WriteString(seg.attr)
+		if seg.pred != "" {
+			aqlPrefix.WriteString("[")
+			aqlPrefix.WriteString(seg.pred)
+			aqlPrefix.WriteString("]")
+		}
+		wtType := predType[aqlPrefix.String()]
 		nextAttr := segs[i+1].attr
-		childType := concreteType(curType, seg.attr, seg.pred, predType, nextAttr)
+		childType := concreteType(curType, seg.attr, wtType, nextAttr)
 		if childType == "" {
 			return fmt.Errorf("cannot resolve RM type for %q on %s (aqlPath %q)", seg.attr, curType, aqlPath)
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
-		// Compiled-path key: predicate kept only on container attributes.
-		prefix.WriteString("/")
-		prefix.WriteString(seg.attr)
+		namePrefix.WriteString("/")
+		namePrefix.WriteString(seg.attr)
 		if container && seg.pred != "" {
-			prefix.WriteString("[")
-			prefix.WriteString(seg.pred)
-			prefix.WriteString("]")
+			namePrefix.WriteString("[")
+			namePrefix.WriteString(seg.pred)
+			namePrefix.WriteString("]")
 		}
 		if container {
-			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[seg.pred], budget)
+			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[aqlPrefix.String()], budget)
 			if err != nil {
 				return err
 			}
@@ -428,7 +457,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 			}
 			cur = obj
 		}
-		if nm := names[prefix.String()]; nm != "" {
+		if nm := names[namePrefix.String()]; nm != "" {
 			if _, has := cur["name"]; !has {
 				cur["name"] = textJSON(nm)
 			}
@@ -463,6 +492,50 @@ func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 		walk(root)
 	}
 	return names
+}
+
+// checkNoPhantoms walks the rebuilt tree and rejects any container element that
+// selectElem gap-filled but no leaf ever reached: an instance carrying nothing
+// beyond _type and archetype_node_id. Such phantoms arise only from a sparse
+// :index sequence (":0" and ":2" with no ":1"); accepting them would fabricate
+// empty — and, after RM-mandatory completion, seemingly valid — clinical
+// instances out of a malformed payload.
+func checkNoPhantoms(node map[string]any) error {
+	for _, v := range node {
+		arr, ok := v.([]any)
+		if !ok {
+			if m, ok := v.(map[string]any); ok {
+				if err := checkNoPhantoms(m); err != nil {
+					return err
+				}
+			}
+			continue
+		}
+		for _, e := range arr {
+			m, ok := e.(map[string]any)
+			if !ok {
+				continue
+			}
+			if phantomKeysOnly(m) {
+				return fmt.Errorf("%w: sparse :index left an empty %v instance (missing occurrence in sequence)", ErrUnknownPath, m["_type"])
+			}
+			if err := checkNoPhantoms(m); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// phantomKeysOnly reports whether m carries nothing beyond the identity keys a
+// gap-filled element is created with.
+func phantomKeysOnly(m map[string]any) bool {
+	for k := range m {
+		if k != "_type" && k != "archetype_node_id" {
+			return false
+		}
+	}
+	return true
 }
 
 // selectElem finds (or creates) the element with archetype_node_id==pred in
@@ -502,22 +575,24 @@ func selectElem(cur map[string]any, attr, elemType, pred string, idx int, budget
 
 // concreteType resolves the RM type to instantiate for attr on parentType,
 // mapping the abstract RM slots to concrete types the way the Web Template /
-// canonical form require. nextAttr is the following aqlPath attribute, used to
+// canonical form require. wtType is the Web Template rmType positionally
+// resolved for this segment ("" when the segment has no WT node — e.g. the
+// collapsed wrappers); nextAttr is the following aqlPath attribute, used to
 // disambiguate the abstract ITEM_STRUCTURE slot whose concrete subtype the Web
 // Template does not carry (it collapses those nodes).
-func concreteType(parentType, attr, pred string, predType map[string]string, nextAttr string) string {
+func concreteType(parentType, attr, wtType, nextAttr string) string {
 	t, ok := rminfo.Default.AttributeRMType(parentType, attr)
 	if !ok {
 		return ""
 	}
 	switch t {
 	case "CONTENT_ITEM":
-		if wt := predType[pred]; wt != "" {
-			return wt // OBSERVATION / EVALUATION / …
+		if wtType != "" {
+			return wtType // OBSERVATION / EVALUATION / …
 		}
 		return "OBSERVATION"
 	case "EVENT":
-		if predType[pred] == "INTERVAL_EVENT" {
+		if wtType == "INTERVAL_EVENT" {
 			return "INTERVAL_EVENT"
 		}
 		return "POINT_EVENT"
@@ -538,7 +613,7 @@ func concreteType(parentType, attr, pred string, predType map[string]string, nex
 			return "ITEM_TREE"
 		}
 	case "ITEM":
-		if predType[pred] == "CLUSTER" {
+		if wtType == "CLUSTER" {
 			return "CLUSTER"
 		}
 		return "ELEMENT"
@@ -814,8 +889,12 @@ type parsedKey struct {
 
 // parseFlatKey splits a FLAT key into path segments and the trailing |suffix.
 // Each "/"-separated segment may carry a ":<index>" suffix; a trailing
-// "|<attr>" is the leaf attribute suffix.
-func parseFlatKey(key string) parsedKey {
+// "|<attr>" is the leaf attribute suffix. A numeric index must be spelled
+// canonically ("0", "1", …): a negative index would collide with the internal
+// "no index" sentinel, and non-canonical spellings ("-1", "+0", "00") would
+// make distinct JSON keys resolve to the same slot, silently overwriting one
+// value with another — both are rejected.
+func parseFlatKey(key string) (parsedKey, error) {
 	var suffix string
 	if i := strings.LastIndex(key, "|"); i >= 0 {
 		suffix = key[i+1:]
@@ -827,11 +906,14 @@ func parseFlatKey(key string) parsedKey {
 		seg := flatSeg{id: p, idx: -1}
 		if j := strings.LastIndex(p, ":"); j >= 0 {
 			if n, err := strconv.Atoi(p[j+1:]); err == nil {
+				if n < 0 || p[j+1:] != strconv.Itoa(n) {
+					return parsedKey{}, fmt.Errorf("%w: invalid :index %q in %q", ErrUnknownPath, p[j+1:], key)
+				}
 				seg.id = p[:j]
 				seg.idx = n
 			}
 		}
 		segs = append(segs, seg)
 	}
-	return parsedKey{segs: segs, suffix: suffix}
+	return parsedKey{segs: segs, suffix: suffix}, nil
 }

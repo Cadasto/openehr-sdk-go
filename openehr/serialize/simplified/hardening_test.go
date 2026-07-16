@@ -47,6 +47,75 @@ func TestDecodeRejectsHugeIndex(t *testing.T) {
 	}
 }
 
+// TestDecodeRejectsNegativeIndex: ":-1" collides with the internal "no index"
+// sentinel and would silently drop one of two values resolving to the same
+// slot; it must be rejected on decode and on OPT-free interconversion.
+func TestDecodeRejectsNegativeIndex(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	mutated := strings.Replace(string(f1), ":0/", ":-1/", 1)
+	if mutated == string(f1) {
+		t.Skip("no repeatable :index in fixture to mutate")
+	}
+	if _, err := simplified.UnmarshalFlat([]byte(mutated), wt); !errors.Is(err, simplified.ErrUnknownPath) {
+		t.Errorf("UnmarshalFlat(:-1) err = %v, want ErrUnknownPath", err)
+	}
+	if _, err := simplified.FlatToStructured([]byte(mutated)); !errors.Is(err, simplified.ErrUnknownPath) {
+		t.Errorf("FlatToStructured(:-1) err = %v, want ErrUnknownPath", err)
+	}
+}
+
+// TestDecodeRejectsSparseIndex: ":2" with no ":0"/":1" would gap-fill phantom
+// empty instances (which RM-mandatory completion could then decorate into
+// seemingly valid data) — rejected instead.
+func TestDecodeRejectsSparseIndex(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	mutated := strings.Replace(string(f1), ":0/", ":2/", 1)
+	if mutated == string(f1) {
+		t.Skip("no repeatable :index in fixture to mutate")
+	}
+	if _, err := simplified.UnmarshalFlat([]byte(mutated), wt); !errors.Is(err, simplified.ErrUnknownPath) {
+		t.Errorf("UnmarshalFlat(sparse :2) err = %v, want ErrUnknownPath", err)
+	}
+}
+
+// TestDecodeRejectsIndexCollision: "a" (no index) and "a:0" are distinct JSON
+// keys resolving to the same instance slot; last-write-wins would silently
+// drop one value, so the collision is an error.
+func TestDecodeRejectsIndexCollision(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f1, &m); err != nil {
+		t.Fatal(err)
+	}
+	added := false
+	for k, v := range m {
+		if strings.Contains(k, ":0/") {
+			m[strings.Replace(k, ":0/", "/", 1)] = v
+			added = true
+			break
+		}
+	}
+	if !added {
+		t.Skip("no repeatable :index in fixture to duplicate")
+	}
+	dup, _ := json.Marshal(m)
+	if _, err := simplified.UnmarshalFlat(dup, wt); !errors.Is(err, simplified.ErrUnknownPath) {
+		t.Errorf("UnmarshalFlat(index collision) err = %v, want ErrUnknownPath", err)
+	}
+}
+
 // TestDecodeRejectsTrailingJSON: content after the first JSON object is an error,
 // not silently ignored.
 func TestDecodeRejectsTrailingJSON(t *testing.T) {

@@ -6,6 +6,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
 func TestDvFromSuffixes(t *testing.T) {
@@ -110,7 +112,10 @@ func TestParseFlatKey(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.key, func(t *testing.T) {
-			got := parseFlatKey(tc.key)
+			got, err := parseFlatKey(tc.key)
+			if err != nil {
+				t.Fatalf("parseFlatKey: %v", err)
+			}
 			if !reflect.DeepEqual(got.segs, tc.wantSegs) {
 				t.Errorf("segs = %+v, want %+v", got.segs, tc.wantSegs)
 			}
@@ -118,5 +123,68 @@ func TestParseFlatKey(t *testing.T) {
 				t.Errorf("suffix = %q, want %q", got.suffix, tc.wantSuffix)
 			}
 		})
+	}
+}
+
+// TestResolveLeafPositionalPredicates pins that predIndex/predType are keyed by
+// the ancestor's unique AQLPath, not its bare node id: the same at-code
+// appearing twice along one chain (two archetypes reusing an id, or a
+// self-nested archetype) must keep separate :index and rmType entries —
+// otherwise one segment's index is silently applied at another depth and
+// values land in the wrong repeat instance.
+func TestResolveLeafPositionalPredicates(t *testing.T) {
+	leaf := &webtemplate.Node{
+		ID: "val", RMType: "DV_TEXT",
+		AQLPath: "/content[at0001]/data[at0002]/events[at0001]/data[at0003]/items[at0004]/value",
+	}
+	// Both the OBSERVATION and the EVENT deliberately carry NodeID "at0001".
+	ev := &webtemplate.Node{
+		ID: "ev", NodeID: "at0001", RMType: "POINT_EVENT",
+		AQLPath:  "/content[at0001]/data[at0002]/events[at0001]",
+		Children: []*webtemplate.Node{leaf},
+	}
+	obs := &webtemplate.Node{
+		ID: "obs", NodeID: "at0001", RMType: "OBSERVATION",
+		AQLPath:  "/content[at0001]",
+		Children: []*webtemplate.Node{ev},
+	}
+	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{ID: "root", Children: []*webtemplate.Node{obs}}}
+
+	segs := []flatSeg{{"root", -1}, {"obs", 2}, {"ev", 5}, {"val", -1}}
+	node, predIndex, predType, ok := resolveLeaf(wt, segs)
+	if !ok || node != leaf {
+		t.Fatalf("resolveLeaf: ok=%v node=%v", ok, node)
+	}
+	if got := predIndex["/content[at0001]"]; got != 2 {
+		t.Errorf("obs index = %d, want 2 (keyed by its own AQLPath)", got)
+	}
+	if got := predIndex["/content[at0001]/data[at0002]/events[at0001]"]; got != 5 {
+		t.Errorf("event index = %d, want 5 (must not be conflated with the obs entry)", got)
+	}
+	if got := predType["/content[at0001]"]; got != "OBSERVATION" {
+		t.Errorf("obs type = %q, want OBSERVATION", got)
+	}
+	if got := predType["/content[at0001]/data[at0002]/events[at0001]"]; got != "POINT_EVENT" {
+		t.Errorf("event type = %q, want POINT_EVENT", got)
+	}
+}
+
+// TestParseFlatKeyRejectsBadIndex pins the strict :index spelling: a negative
+// index collides with the "no index" sentinel and non-canonical spellings make
+// distinct keys resolve to the same slot — both must error, not coerce.
+func TestParseFlatKeyRejectsBadIndex(t *testing.T) {
+	for _, key := range []string{"a/b:-1/c", "a/b:+0/c", "a/b:00/c", "a/b:01/c"} {
+		if _, err := parseFlatKey(key); !errors.Is(err, ErrUnknownPath) {
+			t.Errorf("parseFlatKey(%q) err = %v, want ErrUnknownPath", key, err)
+		}
+	}
+	// A non-numeric tail after ":" is not an index — it stays part of the id
+	// (and later fails Web Template resolution, loudly).
+	pk, err := parseFlatKey("a/b:notanumber/c")
+	if err != nil {
+		t.Fatalf("parseFlatKey(non-numeric): %v", err)
+	}
+	if pk.segs[1].id != "b:notanumber" || pk.segs[1].idx != -1 {
+		t.Errorf("non-numeric segment parsed as %+v, want id kept verbatim", pk.segs[1])
 	}
 }

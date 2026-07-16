@@ -92,7 +92,10 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 			ctxObj[rest] = val
 			continue
 		}
-		pk := parseFlatKey(key)
+		pk, err := parseFlatKey(key)
+		if err != nil {
+			return nil, err
+		}
 		if len(pk.segs) == 0 {
 			continue
 		}
