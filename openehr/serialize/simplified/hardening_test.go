@@ -116,6 +116,37 @@ func TestDecodeRejectsIndexCollision(t *testing.T) {
 	}
 }
 
+// TestDecodeRejectsWrongTypedCtx: a ctx/ value of the wrong JSON type must be
+// rejected, not coerced — a numeric composer_name would otherwise become an
+// empty PARTY_IDENTIFIED name (silent authorship corruption).
+func TestDecodeRejectsWrongTypedCtx(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	for _, bad := range []struct {
+		key string
+		val any
+	}{
+		{"ctx/composer_name", 42},
+		{"ctx/language", 42},
+		{"ctx/territory", true},
+		{"ctx/time", 42},
+		{"ctx/composer_self", "true"},
+	} {
+		var m map[string]any
+		if err := json.Unmarshal(f1, &m); err != nil {
+			t.Fatal(err)
+		}
+		m[bad.key] = bad.val
+		mutated, _ := json.Marshal(m)
+		if _, err := simplified.UnmarshalFlat(mutated, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+			t.Errorf("UnmarshalFlat(%s = %v) err = %v, want ErrUnsupportedDatatype", bad.key, bad.val, err)
+		}
+	}
+}
+
 // TestDecodeRejectsTrailingJSON: content after the first JSON object is an error,
 // not silently ignored.
 func TestDecodeRejectsTrailingJSON(t *testing.T) {

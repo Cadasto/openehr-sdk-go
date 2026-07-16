@@ -173,34 +173,53 @@ type ctxInfo struct {
 	composerName        string
 	composerSelf        bool
 	haveComposerName    bool
-	time                any
+	time                string
 	haveTime            bool
 }
 
 // parseCtx decodes the ctx/ entries. Only the core context fields are supported;
-// any other ctx/ field is ErrUnknownPath (see deviations.md).
+// any other ctx/ field is ErrUnknownPath (see deviations.md). Values of the
+// wrong JSON type are rejected — coercing them would silently corrupt
+// composition metadata (e.g. a numeric composer_name becoming an empty
+// PARTY_IDENTIFIED name).
 func parseCtx(ctx map[string]any) (ctxInfo, error) {
 	var ci ctxInfo
+	var err error
 	for key, val := range ctx {
 		switch strings.TrimPrefix(key, "ctx/") {
 		case "language":
-			ci.language, _ = val.(string)
+			ci.language, err = ctxString(key, val)
 		case "territory":
-			ci.territory, _ = val.(string)
+			ci.territory, err = ctxString(key, val)
 		case "composer_name":
-			ci.composerName, _ = val.(string)
+			ci.composerName, err = ctxString(key, val)
 			ci.haveComposerName = true
 		case "composer_self":
-			b, _ := val.(bool)
+			b, ok := val.(bool)
+			if !ok {
+				err = fmt.Errorf("%w: %s must be a boolean, got %T", ErrUnsupportedDatatype, key, val)
+			}
 			ci.composerSelf = b
 		case "time":
-			ci.time = val
+			ci.time, err = ctxString(key, val)
 			ci.haveTime = true
 		default:
-			return ci, fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+			err = fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
+		}
+		if err != nil {
+			return ci, err
 		}
 	}
 	return ci, nil
+}
+
+// ctxString asserts a ctx/ value is a JSON string, failing loudly otherwise.
+func ctxString(key string, val any) (string, error) {
+	s, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("%w: %s must be a string, got %T", ErrUnsupportedDatatype, key, val)
+	}
+	return s, nil
 }
 
 // applyContext sets the composition-level metadata from the parsed context and
@@ -278,7 +297,7 @@ func defaultAttr(attr string, ci ctxInfo) map[string]any {
 	case "subject", "composer":
 		return map[string]any{"_type": "PARTY_SELF"}
 	case "origin", "time":
-		if ci.time == nil {
+		if !ci.haveTime {
 			return nil
 		}
 		return map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}

@@ -3,6 +3,7 @@ package simplified
 // REQ-053 — leaf datatype -> FLAT suffix mapping.
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -185,6 +186,110 @@ func TestOtherOpenValueSet(t *testing.T) {
 	}
 	if _, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x", "code": "c", "value": "v"}); err == nil {
 		t.Error("|other + |code = nil error, want rejection")
+	}
+}
+
+// TestSubstitutedSubtypeRidesRaw: a legal RM subtype substitution (DV_EHR_URI
+// stored at a DV_URI leaf) must not take the suffix form — decode would rebuild
+// it as the leaf type, silently demoting DV_EHR_URI to DV_URI. It rides |raw
+// stamped with its dynamic type.
+func TestSubstitutedSubtypeRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	v := rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://ehr/1"}}
+	if err := leafToFlat(out, "p/x", v, "DV_URI", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected |raw for substituted subtype, got %#v", out)
+	}
+	if raw["_type"] != "DV_EHR_URI" {
+		t.Errorf("|raw _type = %v, want DV_EHR_URI (dynamic type, not the leaf type)", raw["_type"])
+	}
+}
+
+// TestNonLocalOrdinalRidesRaw: the ordinal suffix set has no |terminology
+// channel and decode rebuilds the symbol as archetype-local, so a symbol coded
+// in an external terminology must ride |raw rather than being rewritten.
+func TestNonLocalOrdinalRidesRaw(t *testing.T) {
+	mk := func(term string) rm.DVOrdinal {
+		return rm.DVOrdinal{
+			Symbol: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "mild"},
+				DefiningCode: rm.CodePhrase{CodeString: "c1", TerminologyID: rm.TerminologyID{Value: term}},
+			},
+			Value: 1,
+		}
+	}
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", mk("SNOMED-CT"), "DV_ORDINAL", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|raw"]; !ok {
+		t.Errorf("SNOMED-coded ordinal should ride |raw, got %#v", out)
+	}
+	out = map[string]any{}
+	if err := leafToFlat(out, "p/x", mk("local"), "DV_ORDINAL", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|ordinal"]; !ok {
+		t.Errorf("local-coded ordinal should keep the suffix form, got %#v", out)
+	}
+}
+
+// TestPreferredTermRidesRaw: CODE_PHRASE.preferred_term has no suffix channel;
+// a coded text carrying it must ride |raw, not silently drop it.
+func TestPreferredTermRidesRaw(t *testing.T) {
+	pt := "Preferred rubric"
+	v := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "v"},
+		DefiningCode: rm.CodePhrase{CodeString: "c", TerminologyID: rm.TerminologyID{Value: "openehr"}, PreferredTerm: &pt},
+	}
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected |raw for preferred_term-decorated coded text, got %#v", out)
+	}
+	dc, _ := raw["defining_code"].(map[string]any)
+	if dc["preferred_term"] != pt {
+		t.Errorf("|raw fragment lost preferred_term: %#v", dc)
+	}
+}
+
+// TestClosedCodedTextEncodeErrors: a DV_TEXT at a closed DV_CODED_TEXT leaf has
+// no decodable FLAT form (|other needs an open list; a bare value is rejected by
+// the decode allowlist) — encode must fail loudly, not emit undecodable output.
+func TestClosedCodedTextEncodeErrors(t *testing.T) {
+	out := map[string]any{}
+	err := leafToFlat(out, "p/x", rm.DVText{Value: "free"}, "DV_CODED_TEXT", false)
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("leafToFlat(DVText at closed coded leaf) err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("errored encode wrote %d entries, want 0", len(out))
+	}
+}
+
+// TestDecoratedTextAtCodedLeafStampsDynamicType: a decorated DV_TEXT at an open
+// DV_CODED_TEXT leaf rides |raw stamped DV_TEXT (its dynamic type) — stamping
+// the leaf type would make decode reconstruct a DV_CODED_TEXT with the text's
+// fields silently dropped.
+func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
+	fm := "markdown"
+	v := rm.DVText{Value: "x", Formatting: &fm}
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected |raw for decorated text, got %#v", out)
+	}
+	if raw["_type"] != "DV_TEXT" {
+		t.Errorf("|raw _type = %v, want DV_TEXT (dynamic type)", raw["_type"])
 	}
 }
 
