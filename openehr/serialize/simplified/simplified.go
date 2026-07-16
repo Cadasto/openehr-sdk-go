@@ -14,18 +14,20 @@ type decodeConfig struct {
 	template *templatecompile.Compiled
 }
 
-// WithTemplate supplies the compiled template (REQ-111) so decode repopulates
-// the mandatory LOCATABLE.name on every reconstructed node from the archetype
-// terminology. The FLAT/STRUCTURED formats do not carry names, and the Web
-// Template collapses the HISTORY / ITEM_STRUCTURE wrappers, so the compiled
-// template (which the Web Template is built from) is the authoritative name
-// source. Without this option decode omits names (the round-trip stays
-// format-idempotent).
+// WithTemplate supplies the compiled template (REQ-111), switching decode into
+// conformant mode: the mandatory LOCATABLE.name is repopulated on every
+// reconstructed node from the archetype terminology (the formats do not carry
+// names, and the Web Template collapses the HISTORY / ITEM_STRUCTURE wrappers,
+// so the compiled template is the authoritative source), and the RM-mandatory
+// attributes the formats omit (HISTORY.origin, EVENT.time, ENTRY
+// language/encoding/subject, EVENT_CONTEXT.setting, …) are completed from ctx
+// defaults + RM conventions — synthesised defaults, not recovered data. The
+// decoded composition then validates against the OPT, provided ctx/time is
+// present when the template carries HISTORY/EVENT nodes (their mandatory
+// origin/time have no other source; see deviations.md).
 //
-// This closes the LOCATABLE.name gap only. Other RM-mandatory attributes the
-// FLAT/STRUCTURED formats do not carry (HISTORY.origin, EVENT.time, ENTRY
-// language/encoding/subject, EVENT_CONTEXT.setting) are still not reconstructed,
-// so the decoded composition is not yet fully OPT-validatable — see deviations.md.
+// Without this option decode omits names and defaults — the round-trip stays
+// format-idempotent but the result is not canonically complete.
 func WithTemplate(c *templatecompile.Compiled) Option {
 	return func(cfg *decodeConfig) { cfg.template = c }
 }
@@ -40,8 +42,10 @@ func newDecodeConfig(opts []Option) decodeConfig {
 	return cfg
 }
 
-// Media types for the Simplified Formats (REQ-053). Emit these; accept
-// EHRbase's non-conformant `.schema`-suffixed variants on input only.
+// Media types for the Simplified Formats (REQ-053). Emit these canonical
+// types. REQ-053 says input handling SHOULD also tolerate EHRbase's
+// non-conformant `.schema`-suffixed variants; this package does not yet
+// provide that (see deviations.md) — the codecs take bytes, not media types.
 const (
 	MediaTypeFlat       = "application/openehr.wt.flat+json"
 	MediaTypeStructured = "application/openehr.wt.structured+json"
@@ -53,14 +57,16 @@ var (
 	// removal.
 	ErrNoTemplate = errors.New("simplified: nil web template")
 	// ErrUnknownPath is returned when a FLAT/STRUCTURED key does not resolve to
-	// a Web Template node (a typo, a wrong template, an unsupported ctx/ field,
-	// or an out-of-bound :index). The codec fails loudly rather than dropping
-	// the entry (REQ-053 semantics-preserving).
+	// a Web Template node (a typo, a wrong template, an unsupported ctx/ field)
+	// or cannot be placed faithfully (an invalid / out-of-bound / sparse
+	// :index, a slot conflict between two keys, or the decoded-node budget).
+	// The codec fails loudly rather than dropping the entry (REQ-053
+	// semantics-preserving).
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
-	// to/from a FLAT suffix set and cannot ride |raw, when a suffix is not valid
-	// for the datatype, or when a |raw / |other suffix is misused. Failing beats
-	// silently omitting or mistyping a value (REQ-053).
+	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
+	// value is not valid for its slot, or when a |raw / |other suffix is
+	// misused. Failing beats silently omitting or mistyping a value (REQ-053).
 	ErrUnsupportedDatatype = errors.New("simplified: unsupported datatype")
 	// ErrMissingContext is returned when mandatory context (ctx/language,
 	// ctx/territory) is absent on decode.

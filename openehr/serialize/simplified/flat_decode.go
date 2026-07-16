@@ -130,8 +130,9 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		leaf, predIndex, predType, ok := resolveLeaf(wt, pk.segs)
 		if !ok {
 			// A key that does not resolve to a WT node is a wrong template, a
-			// typo, or an unsupported feature (ctx/, _-attrs, |raw — Phase 6).
-			// Fail loudly rather than drop it silently (REQ-053).
+			// typo, or an unsupported _-prefixed RM attribute (see deviations.md
+			// — ctx/ is siphoned off above and |raw is a suffix, so neither
+			// reaches this branch). Fail loudly, never drop silently (REQ-053).
 			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, base)
 		}
 		dv, err := dvFromSuffixes(leaf.RMType, leafListOpen(leaf), sfx)

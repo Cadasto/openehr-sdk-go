@@ -94,6 +94,24 @@ func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
 		t.Errorf("WithTemplate STRUCTURED decode does not validate; issues=%v", r.Issues)
 	}
 
+	// Documented boundary (deviations.md): without ctx/time the mandatory
+	// EVENT.time / HISTORY.origin have no source — the WithTemplate decode
+	// still succeeds but must NOT claim OPT-validity. Pin it so a change in
+	// either direction (erroring, or synthesising a timestamp) is deliberate.
+	var noTime map[string]any
+	if err := json.Unmarshal(flat, &noTime); err != nil {
+		t.Fatal(err)
+	}
+	delete(noTime, "ctx/time")
+	noTimeFlat, _ := json.Marshal(noTime)
+	partial, err := simplified.UnmarshalFlat(noTimeFlat, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate, no ctx/time): %v", err)
+	}
+	if r := validation.Validate(partial, compiled); r.OK {
+		t.Error("WithTemplate decode without ctx/time validated — the documented boundary moved; update deviations.md")
+	}
+
 	// Names must not leak into FLAT — the round-trip stays idempotent.
 	flat2, err := simplified.MarshalFlat(named, wt)
 	if err != nil {

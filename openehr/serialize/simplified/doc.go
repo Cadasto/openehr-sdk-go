@@ -14,9 +14,10 @@
 //
 // The codecs are a building block (REQ-013): they take an *rm.Composition
 // and a *webtemplate.WebTemplate and return bytes (or vice versa), importing
-// only openehr/rm (+ rmpath / rminfo / typereg), openehr/template/webtemplate,
-// openehr/serialize/canjson, and the standard library — never the transport,
-// auth, or client layers.
+// only openehr/rm (+ rmpath / rminfo), openehr/template/webtemplate,
+// openehr/templatecompile (the WithTemplate name/default source),
+// openehr/serialize/canjson (typereg via canjson), and the standard library —
+// never the transport, auth, or client layers.
 //
 // Context output-form and exotic-datatype fallbacks are documented in
 // deviations.md beside the package tests.

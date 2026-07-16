@@ -49,9 +49,10 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 
 // emitContext writes composition-level metadata under the ctx/ prefix (REQ-053):
 // the mandatory language and territory code strings, the composer, and the
-// context start time. Setting, category, participations, health-care facility,
-// workflow ids, and the composer external reference are deferred (they are
-// platform defaults or need terminology resolution) — see deviations.md.
+// context start time. The ctx/ short forms for setting, participations,
+// health-care facility, workflow ids, and the composer external reference are
+// deferred — see deviations.md. (category is not a ctx/ field at all: it is a
+// template-constrained leaf and rides its own Web Template path.)
 func emitContext(out map[string]any, comp *rm.Composition) {
 	if comp.Language.CodeString != "" {
 		out["ctx/language"] = comp.Language.CodeString

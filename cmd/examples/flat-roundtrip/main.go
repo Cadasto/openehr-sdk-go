@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"sort"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -47,7 +48,8 @@ func main() {
 	}
 	fmt.Printf("\nSTRUCTURED (%s): %d bytes\n", simplified.MediaTypeStructured, len(structured))
 
-	// 5. FLAT -> COMPOSITION -> FLAT: the round-trip reproduces the FLAT.
+	// 5. FLAT -> COMPOSITION -> FLAT: the round-trip reproduces the FLAT
+	// (keys and values).
 	comp2, err := simplified.UnmarshalFlat(flat, wt)
 	if err != nil {
 		log.Fatalf("UnmarshalFlat: %v", err)
@@ -56,7 +58,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("MarshalFlat (round-trip): %v", err)
 	}
-	if !sameKeys(flat, flat2) {
+	if !sameFlat(flat, flat2) {
 		log.Fatal("round-trip mismatch")
 	}
 	fmt.Println("\nOK: FLAT -> COMPOSITION -> FLAT round-trips for", templateID)
@@ -122,18 +124,10 @@ func printFlat(flat []byte) {
 	}
 }
 
-func sameKeys(a, b []byte) bool {
+func sameFlat(a, b []byte) bool {
 	var ma, mb map[string]any
 	if json.Unmarshal(a, &ma) != nil || json.Unmarshal(b, &mb) != nil {
 		return false
 	}
-	if len(ma) != len(mb) {
-		return false
-	}
-	for k := range ma {
-		if _, ok := mb[k]; !ok {
-			return false
-		}
-	}
-	return true
+	return reflect.DeepEqual(ma, mb)
 }

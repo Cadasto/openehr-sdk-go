@@ -6,8 +6,10 @@ deviates from, or has not yet implemented, part of the spec. Each entry says wha
 current behaviour is and where the full behaviour lands.
 
 Status legend: **Deviation** = deliberate, permanent-ish choice; **Deferred** = not yet
-implemented, scheduled for a later phase of the
-[Phase 3 plan](../../../docs/plans/2026-07-14-flat-structured-codecs.md).
+implemented — residual scope tracked by the
+[simplified-formats umbrella plan](../../../docs/plans/2026-06-23-simplified-formats.md)
+(the [Phase 3 plan](../../../docs/plans/archive/2026-07-14-flat-structured-codecs.md) that
+built this package is done and archived).
 
 ## Strict, fail-loud posture
 
@@ -34,18 +36,18 @@ semantics-preserving). Concretely:
 Consequence: a payload that uses a not-yet-supported feature (below) is **rejected**,
 not partially/silently accepted.
 
-## Deferred features (Phase 6)
+## Deferred features
 
 | Feature | Current behaviour | Lands in |
 |---|---|---|
 | `ctx/` context — **core supported**: `ctx/language`, `ctx/territory` (both mandatory on decode → `ErrMissingContext`), `ctx/composer_name` / `ctx/composer_self`, `ctx/time` (context `start_time`). | Emitted on encode; rebuilt on decode. | landed (Task 6) |
-| `ctx/` context — **rest deferred**: participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, `other_context`. | Not emitted on encode (source values dropped); any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). These are optional, so their absence does not break OPT-validity. `setting`, `category`, `composer` are RM-mandatory and **defaulted** on `WithTemplate` decode (see the RM-mandatory-completion deviation) — valid, but a non-default source value is not round-tripped. | Phase 6 |
-| Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, or a decorated instance of the above, rides `\|raw`. | Both directions. | landed (Task 6) |
-| `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Phase 6 |
-| `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix. `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
+| `ctx/` context — **rest deferred**: the `ctx/` short forms for participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, and `setting`. | Not emitted on encode (those source values are dropped); any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). All are optional except `setting`, which is **defaulted** on `WithTemplate` decode (`238 other care`) — valid, but a non-default source setting is not round-tripped. Note the fields that do NOT belong here: `category` is a template-constrained Web Template leaf and round-trips via its own path; a composer **name** round-trips via `ctx/composer_name` (only the external ref is lost); template-constrained `other_context` content rides its Web Template paths. | Deferred |
+| Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, a decorated instance of the above, or a **substituted subtype** (the value's dynamic type differs from the leaf type, e.g. `DV_EHR_URI` at a `DV_URI` leaf), rides `\|raw`. | Both directions. | landed (Task 6) |
+| `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Deferred |
+| `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix; encode stamps the fragment with the value's **dynamic** type when it can classify it. On decode, `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
 | `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf whose Web Template input is `listOpen` encodes to `\|other`; decode maps `\|other` back to `DV_TEXT`, requiring `listOpen` and rejecting `\|other`+`\|code`. | landed (Task 6) |
-| `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Phase 6 |
-| Non-`DV_` leaves (party/`subject`, `language`, `encoding`, other RM leaves) on encode | Skipped on encode (source value dropped). The RM-mandatory ones (`subject`, `language`, `encoding`) are **defaulted** on `WithTemplate` decode (PARTY_SELF / ctx language / UTF-8) so the result validates; a non-default source value is not round-tripped. | Phase 6 |
+| `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Deferred |
+| Non-`DV_` leaves (party/`subject`, `language`, `encoding`, other RM leaves) on encode | Skipped on encode (source value dropped). The RM-mandatory ones (`subject`, `language`, `encoding`) are **defaulted** on `WithTemplate` decode (PARTY_SELF / ctx language / UTF-8) so the result validates; a non-default source value is not round-tripped. | Deferred |
 
 ## Deviations
 
@@ -65,8 +67,11 @@ not partially/silently accepted.
   **validates against the OPT** (verified over the vendored corpus by PROBE-076's conformance
   leg and `names_test.go`). These are **synthesised defaults**, not recovered data — the
   formats never carried them, so e.g. every `EVENT.time`/`HISTORY.origin` takes the context
-  `start_time` and `subject` becomes `PARTY_SELF`. Without `WithTemplate`, decode omits them
-  (format-idempotent only).
+  `start_time` and `subject` becomes `PARTY_SELF`. **Qualifier:** `EVENT.time` and
+  `HISTORY.origin` have no source other than `ctx/time` — a payload without `ctx/time`
+  decodes successfully but does not validate when the template carries HISTORY/EVENT nodes
+  (pinned by `names_test.go`). Without `WithTemplate`, decode omits names and defaults
+  entirely (format-idempotent only).
 
 - **`ITEM_TREE` vs `ITEM_LIST` on decode** — the Web Template collapses `ITEM_STRUCTURE`
   nodes, so the concrete subtype is inferred from the child aqlPath attribute:
@@ -80,9 +85,11 @@ not partially/silently accepted.
 - **Integer precision** — FLAT/STRUCTURED JSON is decoded with `json.Number`
   (`UseNumber`), so a `DV_COUNT` magnitude above 2^53 is preserved exactly through
   decode and through OPT-free interconversion rather than being rounded via `float64`.
-- **`:index` bound** — a FLAT `:index` is capped at `maxRepeatIndex` (100 000) on
-  decode/interconversion so a hostile key (`node:1000000000`) cannot force an unbounded
-  allocation; an out-of-range index is `ErrUnknownPath`.
+- **`:index` strictness** — a FLAT `:index` must be canonically spelled (`0`, `1`, …;
+  negative, `+`, or zero-padded spellings are rejected — they would collide with other
+  keys), must not be sparse (a gap would fabricate a phantom empty instance), and is capped
+  at `maxRepeatIndex` (see `flat_decode.go`) with a total decoded-node budget on top, so a
+  hostile key cannot force an unbounded allocation. Violations are `ErrUnknownPath`.
 
 - **OPT-free `FlatToStructured` → `StructuredToFlat` normalises `:index`** — STRUCTURED is
   arrays-always (spec), and interconversion has no OPT, so the back-conversion cannot tell

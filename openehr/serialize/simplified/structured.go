@@ -1,6 +1,6 @@
 package simplified
 
-// REQ-053 — STRUCTURED (structSDT) format and the FLAT<->STRUCTURED
+// REQ-053 — the STRUCTURED format and the FLAT<->STRUCTURED
 // interconversion. STRUCTURED is FLAT re-nested: every non-root segment
 // becomes an array (arrays throughout, even at single cardinality), leaf
 // attribute suffixes become |-prefixed keys inside the array element, and the

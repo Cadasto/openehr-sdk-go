@@ -30,7 +30,7 @@ make build
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
 | [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
-| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats (REQ-053) |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + conformant `WithTemplate` decode (REQ-053) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
@@ -368,21 +368,23 @@ encounter [COMPOSITION] 1..1
 
 ### flat-roundtrip
 
-**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back (REQ-053), driven by the composition's Web Template (REQ-106). Shows the three public entry points — `MarshalFlat`/`UnmarshalFlat`, the OPT-free `FlatToStructured`, and the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip — with no transport or auth.
+**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back (REQ-053), driven by the composition's Web Template (REQ-106). Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT — with no transport or auth.
 
 ```bash
 go run ./cmd/examples/flat-roundtrip
 ```
 
-**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson` — **no `internal/` import.**
+**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation` — **no `internal/` import.**
 
-**Sample output (abridged):**
+**Sample output (abridged, keys sorted):**
 
 ```text
 FLAT (application/openehr.wt.flat+json):
+  ctx/composer_name = Max Mustermann
   ctx/language = en
   ctx/territory = DE
-  ctx/composer_name = Max Mustermann
+  ctx/time = 2022-02-03T04:05:06.000
+  test_dv_quantity_open_constraint.v0/category|code = 433
   test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|magnitude = 130
   test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|unit = mmHg
   ...
@@ -390,9 +392,10 @@ FLAT (application/openehr.wt.flat+json):
 STRUCTURED (application/openehr.wt.structured+json): 412 bytes
 
 OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint.v0
+OK: WithTemplate decode validates against the OPT
 ```
 
-**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode (unknown paths/suffixes, missing context, and malformed input error rather than drop data) — see the package's `deviations.md`.
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names + RM-mandatory attributes repopulated) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode (unknown paths/suffixes, wrong-typed ctx values, index games, and malformed input error rather than drop data) — see the package's `deviations.md`.
 
 ---
 
