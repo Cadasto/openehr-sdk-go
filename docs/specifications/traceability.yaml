@@ -394,7 +394,50 @@ requirements:
     title: FLAT and STRUCTURED
     canonical: docs/specifications/wire.md#req-053
     status: draft
-    implementation: planned
+    # Bidirectional FLAT + STRUCTURED codecs in openehr/serialize/simplified,
+    # driven by the REQ-106 Web Template: encode (rm.Composition -> FLAT /
+    # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
+    # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
+    # composition/observation spine (incl. ITEM_SINGLE/ITEM_LIST). First-class
+    # datatypes: DV_TEXT/CODED_TEXT/DATE_TIME/DATE/TIME/QUANTITY/COUNT/BOOLEAN/
+    # DURATION/URI/EHR_URI/ORDINAL/PROPORTION/IDENTIFIER; ctx/ context (language,
+    # territory, composer, time); |other open value-sets; |raw canonical-fragment
+    # bypass makes decorated/exotic datatypes lossless. Strict, fail-loud posture:
+    # unresolvable paths, unsupported datatypes, missing required suffixes, missing
+    # mandatory context, and out-of-bound :index are errors, not silent data loss
+    # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
+    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip): idempotence
+    # PLUS OPT-conformance — a WithTemplate(compiled) decode of a valid source
+    # validates against the OPT. WithTemplate repopulates LOCATABLE.name (from the
+    # archetype terminology) and completes the RM-mandatory attributes FLAT does
+    # not carry (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
+    # EVENT_CONTEXT.setting, COMPOSITION category/composer) from ctx + RM defaults;
+    # names/defaults never leak into FLAT. Deferred (documented, deviations.md):
+    # exotic ctx/ fields not emitted on encode (participations/facility/workflow/
+    # composer external_ref — optional, no validity impact; non-default source
+    # values for the defaulted attributes are not round-tripped); first-class
+    # _-attr suffix decomposition (covered losslessly via |raw); .schema media
+    # types on input; and an upstream byte-conformance probe.
+    implementation: landed
+    packages:
+      - openehr/serialize/simplified
+    probes:
+      - PROBE-076
+    plans:
+      - docs/plans/archive/2026-07-14-flat-structured-codecs.md
+    tests:
+      - openehr/serialize/simplified/simplified_test.go
+      - testkit/probes/serialize/probe_076_simplified_round_trip.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/raw_test.go
+      - openehr/serialize/simplified/names_test.go
 
   - id: REQ-055
     title: AQL wire boundary

@@ -1,0 +1,126 @@
+package simplified_test
+
+// REQ-053 — LOCATABLE.name repopulation on decode via WithTemplate: the decoded
+// composition must be RM/OPT-conformant (every mandatory name present), not just
+// format-idempotent.
+import (
+	"encoding/json"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
+	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/validation"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
+)
+
+func nameRequiredIssues(r validation.Result) []string {
+	var out []string
+	for _, is := range r.Issues {
+		if is.Code == "required" && strings.HasSuffix(is.Path, "/name") {
+			out = append(out, is.Path)
+		}
+	}
+	return out
+}
+
+func TestDecodeWithTemplateNamesAreConformant(t *testing.T) {
+	const id = "Test_dv_quantity_open_constraint.v0"
+	optB, err := os.ReadFile(fixtures.TemplateOpt(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt, err := fixtures.ParseOPTBytes(optB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compiled, err := templatecompile.Compile(opt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := webtemplate.Build(compiled)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compB, err := os.ReadFile(fixtures.CompositionJSON(id))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comp rm.Composition
+	if err := canjson.Unmarshal(compB, &comp); err != nil {
+		t.Fatal(err)
+	}
+	flat, err := simplified.MarshalFlat(&comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+
+	// Bare decode: names are absent -> the RM-mandatory name surfaces as required.
+	bare, err := simplified.UnmarshalFlat(flat, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (bare): %v", err)
+	}
+	if got := nameRequiredIssues(validation.Validate(bare, compiled)); len(got) == 0 {
+		t.Error("bare decode: expected missing-name issues (the gap WithTemplate closes), got none")
+	}
+
+	// WithTemplate: names repopulated AND the RM-mandatory attributes the formats
+	// omit are completed from ctx defaults -> the decoded composition validates
+	// against the OPT.
+	named, err := simplified.UnmarshalFlat(flat, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
+	}
+	if r := validation.Validate(named, compiled); !r.OK {
+		t.Errorf("WithTemplate decode does not validate against the OPT; issues=%v", r.Issues)
+	}
+
+	// The option must pass through the STRUCTURED entry point too — deleting
+	// the opts... delegation would regress STRUCTURED conformance with every
+	// FLAT-only assertion still green.
+	s, err := simplified.MarshalStructured(&comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalStructured: %v", err)
+	}
+	namedS, err := simplified.UnmarshalStructured(s, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalStructured (WithTemplate): %v", err)
+	}
+	if r := validation.Validate(namedS, compiled); !r.OK {
+		t.Errorf("WithTemplate STRUCTURED decode does not validate; issues=%v", r.Issues)
+	}
+
+	// Documented boundary (deviations.md): without ctx/time the mandatory
+	// EVENT.time / HISTORY.origin have no source — the WithTemplate decode
+	// still succeeds but must NOT claim OPT-validity. Pin it so a change in
+	// either direction (erroring, or synthesising a timestamp) is deliberate.
+	var noTime map[string]any
+	if err := json.Unmarshal(flat, &noTime); err != nil {
+		t.Fatal(err)
+	}
+	delete(noTime, "ctx/time")
+	noTimeFlat, _ := json.Marshal(noTime)
+	partial, err := simplified.UnmarshalFlat(noTimeFlat, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate, no ctx/time): %v", err)
+	}
+	if r := validation.Validate(partial, compiled); r.OK {
+		t.Error("WithTemplate decode without ctx/time validated — the documented boundary moved; update deviations.md")
+	}
+
+	// Names must not leak into FLAT — the round-trip stays idempotent.
+	flat2, err := simplified.MarshalFlat(named, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat #2: %v", err)
+	}
+	var m1, m2 map[string]any
+	_ = json.Unmarshal(flat, &m1)
+	_ = json.Unmarshal(flat2, &m2)
+	if len(m1) != len(m2) {
+		t.Errorf("naming changed the FLAT key set: %d -> %d", len(m1), len(m2))
+	}
+}

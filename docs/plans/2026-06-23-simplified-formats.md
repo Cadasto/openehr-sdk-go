@@ -11,11 +11,11 @@
 
 ## Goal
 
-Build the SDK's **simplified-formats** stack on a single shared internal model derived from the compiled OPT, then expose it two ways: (1) **WebTemplate JSON** (REQ-106 — a UI/form-generation schema) and (2) **FLAT (simSDT) + STRUCTURED (structSDT) composition codecs** (REQ-053 — simplified data-entry/ingestion payloads). Consumers: form renderers, AQL-builder UIs, FHIR-mapping tools, and any integration that commits composition data against a known template without hand-building canonical RM.
+Build the SDK's **simplified-formats** stack on a single shared internal model derived from the compiled OPT, then expose it two ways: (1) **WebTemplate JSON** (REQ-106 — a UI/form-generation schema) and (2) **FLAT + STRUCTURED composition codecs** (REQ-053 — simplified data-entry/ingestion payloads). Consumers: form renderers, AQL-builder UIs, FHIR-mapping tools, and any integration that commits composition data against a known template without hand-building canonical RM.
 
 ## Why one umbrella (the key architectural insight)
 
-WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed as unrelated tracks. They are not: per the format research (the sibling private repo **`openehr-kb`**, `reference/notes/openehr-template-and-composition-formats.md`; primary sources also in §References), the **Web Template node tree IS the machinery FLAT/STRUCTURED needs**. Both reference implementations (EHRbase `openEHR_SDK`, Better `web-template`) generate flat paths from exactly this model:
+WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed as unrelated tracks. They are not: per the format research (the sibling private repo **`openehr-kb`**, `reference/notes/openehr-template-formats.md` (renamed 2026-07-10 from `…-and-composition-formats.md`; composition/canonical deep-dive now in `openehr-canonical-format.md`); primary sources also in §References), the **Web Template node tree IS the machinery FLAT/STRUCTURED needs**. Both reference implementations (EHRbase `openEHR_SDK`, Better `web-template`) generate flat paths from exactly this model:
 
 ```
 *template.Compiled (OPT, flattened)
@@ -24,7 +24,7 @@ WebTemplate export (REQ-106) and FLAT/STRUCTURED (REQ-053) were previously filed
 SIMPLIFIED TEMPLATE MODEL   ← shared: id-tree + aqlPath + inputs/suffixes + :index rules
         │                                   │
         ▼ serialize                         ▼ drive path<->value mapping
-WebTemplate JSON (REQ-106)          FLAT (simSDT) / STRUCTURED (structSDT) (REQ-053)
+WebTemplate JSON (REQ-106)          FLAT / STRUCTURED (REQ-053)
 application/openehr.wt+json         application/openehr.wt.flat+json / …wt.structured+json
 ```
 
@@ -44,9 +44,9 @@ Phases 2 and 3 are independent once Phase 1 exists; either can ship first by con
 
 - **Reference implementation:** target **EHRbase `openEHR_SDK`** (Java, actively maintained, `version "2.3"`) over Better `web-template` (Kotlin; frozen 2021, build-rot reports). Record as an [ADR](../adr/) if it forks behaviour.
 - **Pin the WebTemplate `version`** we emit (EHRbase emits `"2.3"`).
-- **`id`-generation algorithm** is the load-bearing decision (consumers' FLAT paths depend on it): document the exact sanitisation + sibling-disambiguation rules mirroring the reference; ADR if it diverges.
+- **`id`-generation algorithm** is load-bearing (consumers' FLAT paths depend on it). It is now **normatively specified** in the STABLE *Simplified Formats* spec (§Node ID Generation Rules: character-normalisation → underscore-consolidation → lowercase → trim → empty→`id` → digit-prefix→`a` → sibling-uniqueness suffix), so **target the spec algorithm**; use EHRbase `openEHR_SDK` as the conforming reference implementation and record an ADR only where it deviates.
 - **Author the specs:** REQ-106 has **no registry row yet** — add canonical prose to `docs/specifications/clinical-modeling.md` + a `REQ.md` row; flesh `REQ-053` in `wire.md`. Do **not** implement against an unregistered REQ.
-- **Media types:** emit the canonical openEHR *Simplified Formats* strings `application/openehr.wt.flat+json` / `application/openehr.wt.structured+json` and `application/openehr.wt+json`; treat EHRbase's `.schema`-suffixed strings as a known upstream bug (be liberal on input only).
+- **Media types:** the *Simplified Formats* spec standardises exactly **two** strings — the FLAT/STRUCTURED **composition** types `application/openehr.wt.flat+json` / `application/openehr.wt.structured+json`. The WebTemplate resource type `application/openehr.wt+json` is **not** a Simplified-Formats media type — "Web Template as a resource" is explicitly out of that spec's scope; it belongs to the ITS-REST DEFINITION API / EHRbase de-facto usage. Emit all three canonical strings; treat EHRbase's `.schema`-suffixed variants as a known upstream deviation (be liberal on input only).
 
 ## Conformance corpus (for PROBE-075/076)
 
@@ -59,7 +59,7 @@ Matched **OPT → WebTemplate → FLAT/STRUCTURED** fixture sets exist upstream 
 
 ## Out of scope (entire umbrella)
 
-- Round-trip from WebTemplate/FLAT/STRUCTURED back to an OPT (the simplified forms are lossy by design).
+- **Reconstructing an OPT from a simplified artefact.** Only **WebTemplate JSON → OPT** is a real (template→template) reconstruction, and it is excluded because the Web Template is a deliberately lossy, flattened projection of the OPT (also under **Defers**). **FLAT/STRUCTURED → OPT is not a meaningful operation at all** — FLAT / STRUCTURED are *composition data instances*, not templates, so there is no template to recover. Their round-trip is `FLAT/STRUCTURED ↔ canonical composition`, which **is in scope** (Phase 3 / PROBE-076): bidirectional and semantics-preserving *given the OPT* — the simplified forms are *template-dependent (not self-standing)*, which is distinct from being "lossy" (ITS-REST *Simplified Formats* Requirements 3 & 5).
 - Parsing `.oet` / `.t.json` *authoring* templates or ADL2 `.opt2` — the SDK consumes the flattened ADL 1.4 `.opt` ([roadmap](../roadmap.md): AOM 2.4 deferred).
 - UI rendering (consumer's job — these plans emit/consume data only).
 - Terminology expansion of `inputs[].list` against an external TERM service.
@@ -86,7 +86,7 @@ Matched **OPT → WebTemplate → FLAT/STRUCTURED** fixture sets exist upstream 
 
 ## References (informational)
 
-- **openehr-kb note** — `openehr-kb/reference/notes/openehr-template-and-composition-formats.md` (sibling repo): the layered format map, WebTemplate de-facto schema, FLAT/STRUCTURED path grammar, media-type table, and commit-pinned sources. Primary design grounding.
+- **openehr-kb note** — `openehr-kb/reference/notes/openehr-template-formats.md` (sibling repo; renamed 2026-07-10 from `…-and-composition-formats.md`): the layered template/composition format map, WebTemplate de-facto schema, media-type table, and commit-pinned sources. Companion `openehr-canonical-format.md` covers the canonical + FLAT/STRUCTURED deep dive. Primary design grounding.
 - **EHRbase `openEHR_SDK`** — [`github.com/ehrbase/openEHR_SDK`](https://github.com/ehrbase/openEHR_SDK), `web-template/` module (`WebTemplateNode`, `OPTParser`, `FlatPathDto`/`FlatPathParser`, `InputHandler`). The recommended living reference.
 - **Better `web-template`** — [`github.com/better-care/web-template`](https://github.com/better-care/web-template) (Kotlin; older, frozen test suite).
 - **openEHR ITS-REST Simplified Formats** (current, STABLE → 1.1.0) — <https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.md>. Canonical media types; supersedes "Simplified Data Template".

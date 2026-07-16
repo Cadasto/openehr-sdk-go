@@ -391,6 +391,15 @@ client scenarios to SDK coverage:
 - **Status:** Implemented (inline) — `TestStructuralParity` + `TestInputParity` in [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/) hold 104/104 parity on node structure (id/rmType/nodeId/aqlPath/min/max) and input suffix/type against the vendored `constrain_test` reference; documented deltas in [`deviations.md`](../../openehr/template/webtemplate/deviations.md).
 - **Satisfies:** REQ-106.
 
+#### PROBE-076 — FLAT / STRUCTURED composition round-trip
+
+- **Title:** For a vendored upstream (OPT + canonical COMPOSITION) pair, the simplified codecs round-trip the composition without losing the data the formats carry — FLAT is idempotent (`MarshalFlat → UnmarshalFlat → MarshalFlat`), STRUCTURED re-encodes to the same FLAT, OPT-free interconversion preserves it — **and**, when the source composition is itself OPT-valid, a `WithTemplate` decode of the emitted FLAT validates against the OPT (the conformance leg).
+- **Preconditions:** Vendored EHRbase (Apache-2.0) `Test_dv_*` datatype OPTs + matching canonical composition JSON under [`testkit/cassettes/`](../../testkit/cassettes/) (provenance in [`THIRD_PARTY_LICENSES.md`](../../testkit/cassettes/THIRD_PARTY_LICENSES.md)); the WebTemplate is built via `templatecompile.Compile` + `webtemplate.Build` (REQ-106).
+- **Wire assertion:** Not backend-facing — an in-repo property across the datatype corpus (DV_TEXT/CODED_TEXT/DATE_TIME/QUANTITY/COUNT/BOOLEAN/ORDINAL/PROPORTION/DURATION/IDENTIFIER/URI + the `|raw`-carried MULTIMEDIA/PARSABLE/INTERVAL): round-trip idempotence plus the OPT-validation leg, which catches dropped or mistyped leaves that a symmetric omission would hide from idempotence alone. **Scope limit:** symmetric omission of *optional* data can still pass, and the probe does **not** compare emitted FLAT/STRUCTURED byte-for-byte against vendored upstream simplified output — that upstream-conformance probe is a documented follow-up needing those fixtures; see [`deviations.md`](../../openehr/serialize/simplified/deviations.md) § Conformance. A template the WebTemplate builder cannot yet model is a documented skip, never a fail.
+- **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
+- **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_076_simplified_round_trip.go`](../../testkit/probes/serialize/probe_076_simplified_round_trip.go), run by `TestProbe076` over the vendored constraint-template corpus (24 pass, 1 skip).
+- **Satisfies:** REQ-053.
+
 #### PROBE-077 — RM-floor invariant matrix
 
 - **Title:** A vendored-cassette matrix exercises `ValidateRM` (+ typed sugars) across the REQ-112 per-RM-type invariant catalogue and the RM-mandatory required-set walk, the same way PROBE-025/026 exercise the template-driven floor.

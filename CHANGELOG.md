@@ -14,6 +14,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 - **WebTemplate JSON export (REQ-106, ADR 0014).** New building block `openehr/template/webtemplate` projects a compiled OPT into EHRbase `openEHR_SDK` v2.3 WebTemplate JSON, pinned by structural parity (PROBE-075) against a vendored reference fixture.
 
+- **FLAT / STRUCTURED simplified-format codecs (REQ-053, PROBE-076).** New building block `openehr/serialize/simplified` — bidirectional, Web-Template-driven Flat/Structured codecs with OPT-free interconversion, strict fail-loud decode, and an OPT-validatable `WithTemplate` decode mode.
+
 ## [0.16.0] - 2026-07-13
 
 Sixteenth `v0.x` minor — closes two consumer-filed gaps: REST path parameters are now percent-encoded exactly once (fixing a real 404 for ids containing a space, e.g. a spaced template id) and a class standing predicate exposes its relative path as structured segments. Additive API — the only integrator-visible change is the corrected single-encoded wire URL for an id carrying a percent-encodable character; safe to upgrade.
