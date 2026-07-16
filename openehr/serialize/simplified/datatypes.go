@@ -63,7 +63,8 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listO
 	// rides |raw, stamped with its dynamic type. The one spec-sanctioned
 	// substitution is DV_TEXT at a DV_CODED_TEXT leaf (the |other form).
 	dyn := dvTypeName(v)
-	if dyn != "" && dyn != rmType && !(dyn == "DV_TEXT" && rmType == "DV_CODED_TEXT") {
+	textAtCodedLeaf := dyn == "DV_TEXT" && rmType == "DV_CODED_TEXT"
+	if dyn != "" && dyn != rmType && !textAtCodedLeaf {
 		return emitRaw(out, flatPath, v, dyn)
 	}
 	if captured, known := capturedKeys[rmType]; known {
