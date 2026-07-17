@@ -264,10 +264,16 @@ func feederAudit(raw any) map[string]any {
 	// RM verplicht; zonder geldige system_id emitten we de details niet.
 	if osa, ok := m["originating_system_audit"].(map[string]any); ok {
 		if sysID := stringOrDefault(osa["system_id"], ""); sysID != "" {
-			out["originating_system_audit"] = map[string]any{
+			osaOut := map[string]any{
 				"_type":     "FEEDER_AUDIT_DETAILS",
 				"system_id": sysID,
 			}
+			// time (DV_DATE_TIME) — bron-verzendmoment (HL7 MSH-7). Optioneel op
+			// FEEDER_AUDIT_DETAILS; alleen emitten wanneer aanwezig.
+			if t := stringOrDefault(osa["time"], ""); t != "" {
+				osaOut["time"] = dvDateTime(t)
+			}
+			out["originating_system_audit"] = osaOut
 		}
 	}
 

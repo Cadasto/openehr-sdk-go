@@ -453,3 +453,25 @@ func categoryCodeOf(comp map[string]any) string {
 	s, _ := dc["code_string"].(string)
 	return s
 }
+
+// PROBE-0542 proves REQ-0037 — feederAudit() behoudt originating_system_audit.time
+// (HL7 MSH-7) als DV_DATE_TIME i.p.v. 'm te droppen.
+func TestFeederAudit_ForwardsTime(t *testing.T) {
+	out := feederAudit(map[string]any{
+		"originating_system_audit": map[string]any{
+			"system_id": "GLIMS",
+			"time":      "2026-07-16T08:10:00",
+		},
+	})
+	osa, ok := out["originating_system_audit"].(map[string]any)
+	if !ok {
+		t.Fatalf("originating_system_audit missing: %v", out)
+	}
+	tv, ok := osa["time"].(map[string]any)
+	if !ok {
+		t.Fatalf("time missing/not DV_DATE_TIME: %v", osa["time"])
+	}
+	if tv["value"] != "2026-07-16T08:10:00" || tv["_type"] != "DV_DATE_TIME" {
+		t.Errorf("time = %v, want DV_DATE_TIME 2026-07-16T08:10:00", tv)
+	}
+}
