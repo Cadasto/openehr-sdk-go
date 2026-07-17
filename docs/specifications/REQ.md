@@ -46,7 +46,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-050 | REST 1.1.0-development pin | [wire.md § REQ-050](wire.md#req-050) | landed |
 | REQ-051 | Cadasto spec-version header | [wire.md § REQ-051](wire.md#req-051) | landed |
 | REQ-052 | Canonical JSON | [wire.md § REQ-052](wire.md#req-052) | landed |
-| REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | planned |
+| REQ-053 | FLAT and STRUCTURED | [wire.md § REQ-053](wire.md#req-053) | landed |
 | REQ-054 | Optimistic concurrency | [wire.md § REQ-054](wire.md#req-054) | landed |
 | REQ-055 | AQL wire boundary | [wire.md § REQ-055](wire.md#req-055--wire-boundary) | landed |
 | REQ-056 | Canonical XML | [wire.md § REQ-056](wire.md#req-056) | landed |
@@ -70,7 +70,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
 | REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
 | REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#req-082--runnability) | partial |
-| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | planned |
+| REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | partial |
 | REQ-090 | OpenTelemetry hooks | [transport.md § REQ-090](transport.md#req-090--opentelemetry-hooks) | landed |
 | REQ-091 | Retry policy | [transport.md § REQ-091](transport.md#req-091--retry-policy) | landed |
 | REQ-092 | TLS posture | [transport.md § REQ-092](transport.md#req-092--tls-posture) | landed |
@@ -87,6 +87,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-103 | Primitive constraint introspection | [clinical-modeling.md § REQ-103](clinical-modeling.md#req-103--primitive-constraint-introspection) | landed |
 | REQ-104 | Slot assertion grammar | [clinical-modeling.md § REQ-104](clinical-modeling.md#req-104--slot-assertion-grammar) | landed |
 | REQ-105 | Terminology bindings | [clinical-modeling.md § REQ-105](clinical-modeling.md#req-105--terminology-bindings) | landed |
+| REQ-106 | WebTemplate JSON export | [clinical-modeling.md § REQ-106](clinical-modeling.md#req-106--webtemplate-json-export) | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | landed |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) | landed |
 | REQ-109 | AQL static lint | [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) | landed |

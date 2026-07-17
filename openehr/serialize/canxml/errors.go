@@ -15,12 +15,16 @@ import (
 // against this sentinel.
 var ErrInvalidShape = errors.New("canxml: invalid XML shape")
 
-// ErrNamespace is the canxml-local sentinel for foreign-namespace
-// errors: an element decoded outside the openEHR canonical default
-// namespace at a position the spec pins to it. The decoder tolerates
-// redundant `xmlns` declarations on inner elements and the XSI
-// namespace for `xsi:type`, but rejects unknown namespaces with this
-// error.
+// ErrNamespace is the canxml-local sentinel reserved for foreign-
+// namespace rejection: an element decoded outside the openEHR
+// canonical default namespace at a position the spec pins to it.
+//
+// NOTE: the decoder does not currently return it — the generated
+// UnmarshalXML methods match children by local name and skip
+// unrecognised elements, so foreign namespaces are tolerated rather
+// than rejected. The sentinel is retained as a released public symbol
+// (shipped since v0.1.0) for source compatibility and for a future
+// strict-namespace decode path.
 var ErrNamespace = errors.New("canxml: foreign XML namespace")
 
 // DecodeError is the unified error returned by the decoder at

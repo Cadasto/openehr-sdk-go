@@ -78,7 +78,7 @@ func mustCompileInline(t *testing.T, body string) *templatecompile.Compiled {
 // while the template pins >= 1 (the validator correctly catching a real
 // violation).
 //
-// SDK-GAP-13 sub-gap B regression guard: the fixture's DV_INTERVAL<DV_DATE>
+// REQ-052 sub-gap B regression guard: the fixture's DV_INTERVAL<DV_DATE>
 // bounds previously surfaced a spurious rm_type_mismatch — a round-tripped
 // DV_INTERVAL re-decodes as the bare DVInterval[DVOrdered], which the
 // walker could not type-match against DV_INTERVAL<DV_DATE>. The validator
@@ -93,7 +93,7 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 
 	// The fixture validates clean except the genuine /relationships
 	// cardinality finding (instance has none; template pins >= 1). After
-	// SDK-GAP-13 sub-gap B no spurious DV_INTERVAL rm_type_mismatch remains.
+	// REQ-052 sub-gap B no spurious DV_INTERVAL rm_type_mismatch remains.
 	sawCardinality := false
 	for _, iss := range r.Issues {
 		switch iss.Code {
@@ -110,7 +110,7 @@ func TestValidateDemographic_PersonFixture(t *testing.T) {
 	// Positive descent guard: the clean fixture leaves no residual deep
 	// issues, so corrupt one DV_DATE interval bound under contacts and one
 	// under details, then confirm the walker reaches both deep paths. This
-	// also exercises SDK-GAP-13 sub-gap B end-to-end — a round-tripped
+	// also exercises REQ-052 sub-gap B end-to-end — a round-tripped
 	// DV_INTERVAL now type-matches DV_INTERVAL<DV_DATE>, so the walker
 	// descends into and validates its bounds.
 	raw, err := os.ReadFile(fixtures.CompositionJSON("TestPerson.v2"))

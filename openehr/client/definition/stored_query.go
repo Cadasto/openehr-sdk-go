@@ -84,7 +84,7 @@ func PutStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, aql
 		return nil, nil, fmt.Errorf("definition.PutStoredQuery: %w: empty qualified query name", transport.ErrInvalidConfig)
 	}
 	return putStoredQuery(ctx, c,
-		"/definition/query/"+url.PathEscape(name),
+		"/definition/query/"+name,
 		"/definition/query/{qualified_query_name}",
 		"definition.PutStoredQuery", name, "", aqlText, opts...)
 }
@@ -102,7 +102,7 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 		return nil, nil, fmt.Errorf("definition.PutStoredQueryVersion: %w: name and version are required", transport.ErrInvalidConfig)
 	}
 	return putStoredQuery(ctx, c,
-		"/definition/query/"+url.PathEscape(name)+"/"+url.PathEscape(ver),
+		"/definition/query/"+name+"/"+ver,
 		"/definition/query/{qualified_query_name}/{version}",
 		"definition.PutStoredQueryVersion", name, ver, aqlText, opts...)
 }
@@ -110,7 +110,7 @@ func PutStoredQueryVersion(ctx context.Context, c *transport.Client, qualifiedNa
 // putStoredQuery is the shared PUT implementation for the versioned and
 // unversioned stored-query endpoints.
 //
-// SDK-GAP-16 finding B: the canonical OAS `200_StoredQuery_stored` response
+// REQ-057 finding B: the canonical OAS `200_StoredQuery_stored` response
 // defines a `Location` header and no body — the server-assigned version is
 // conveyed via `Location: …/definition/query/{name}/{version}`. EHRbase
 // returns the same `Location`-only shape when the request is
@@ -164,15 +164,15 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 
 // parseStoredQueryLocation recovers the assigned {name, version} from a
 // `Location: …/definition/query/{name}/{version}` response header
-// (SDK-GAP-16 finding B). Returns ok=false on a malformed value so the
+// (REQ-057 finding B). Returns ok=false on a malformed value so the
 // caller can fall through to body / synthesised metadata; no error is
 // surfaced for a malformed Location — a deficient server should not break
 // the call.
 func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 	// Tolerate absolute and relative forms. Strip scheme+host if present,
 	// then take the last two non-empty path segments — `{name}` and
-	// `{version}`. PathEscape on the way in is reversed by PathUnescape on
-	// the way out so the returned values match the caller's input forms.
+	// `{version}` — decoding each below (the server MAY percent-encode the
+	// Location; the client itself now sends the raw id — REQ-095).
 	p := loc
 	if u, err := url.Parse(loc); err == nil && u.Path != "" {
 		p = u.Path
@@ -199,8 +199,9 @@ func parseStoredQueryLocation(loc string) (name, version string, ok bool) {
 	if qi < 0 || qi+2 != len(clean)-1 {
 		return "", "", false
 	}
-	// PathEscape on the way in is reversed by PathUnescape on the way out so
-	// the returned values match the caller's input forms.
+	// Decode each segment defensively: a server MAY percent-encode the
+	// Location even though the client sends the raw id (REQ-095); PathUnescape
+	// is a no-op for an already-decoded segment.
 	n, err := url.PathUnescape(clean[qi+1])
 	if err != nil {
 		n = clean[qi+1]
@@ -226,7 +227,7 @@ func GetStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, ver
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(ver),
+		Path:   "/definition/query/" + name + "/" + ver,
 		Route:  "/definition/query/{qualified_query_name}/{version}",
 		Accept: "application/json",
 	}
@@ -255,7 +256,7 @@ func ListStoredQueries(ctx context.Context, c *transport.Client, namePattern str
 	path := "/definition/query"
 	route := "/definition/query"
 	if strings.TrimSpace(namePattern) != "" {
-		path += "/" + url.PathEscape(strings.TrimSpace(namePattern))
+		path += "/" + strings.TrimSpace(namePattern)
 		route += "/{qualified_query_name}"
 	}
 	req := &transport.Request{
@@ -292,7 +293,7 @@ func DeleteStoredQuery(ctx context.Context, c *transport.Client, qualifiedName, 
 	}
 	req := &transport.Request{
 		Method: http.MethodDelete,
-		Path:   "/definition/query/" + url.PathEscape(name) + "/" + url.PathEscape(version),
+		Path:   "/definition/query/" + name + "/" + version,
 		Route:  "/definition/query/{qualified_query_name}/{version}",
 	}
 	resp, err := c.Do(ctx, req)

@@ -64,7 +64,7 @@ func (s sampler) float64() float64 {
 // intersection, a single-value range, a collapsed exclusive-integer
 // window, and the exclusive-lower real edge (a [lo,hi) draw can land on
 // the excluded bound). Output stays valid, but RandomFill can equal
-// ExampleFill for such a leaf. SDK-GAP-14.
+// ExampleFill for such a leaf. REQ-107.
 func sampleValue(pc constraints.PrimitiveConstraint, s sampler) any {
 	v := sampleByConstraint(pc, s)
 	if v == nil || len(pc.Validate(v)) != 0 {

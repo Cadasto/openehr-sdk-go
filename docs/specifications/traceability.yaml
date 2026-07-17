@@ -49,6 +49,7 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg]
     probes: [PROBE-031, PROBE-073]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-052
     title: Canonical JSON
@@ -80,6 +81,7 @@ requirements:
     tests:
       - openehr/serialize/canxml/crossformat_test.go
       - openehr/serialize/canxml/roundtrip_test.go
+      - openehr/serialize/canxml/decode_test.go
       - testkit/probes/serialize/probe_033_canxml_round_trip.go
       - testkit/probes/serialize/probe_034_typereg_xsi_unknown.go
 
@@ -319,7 +321,7 @@ requirements:
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
     notes: >-
       All three write-path modes landed: return=representation bare-body decode
-      (SDK-GAP-09, PROBE-061/071); return=identifier populates the VersionMetadata
+      (PROBE-061/071); return=identifier populates the VersionMetadata
       identifier slot from the ITS-REST Identifier body (ehr.ResolveIdentifierBody);
       representation + empty body returns transport.ErrInvalidShape (no silent
       downgrade) across composition / directory / ehr_status doWrite. Deferred:
@@ -330,13 +332,29 @@ requirements:
     canonical: docs/specifications/wire.md#req-095
     status: draft
     implementation: partial
-    packages: [testkit/cassettes/its_rest, openehr/client/ehr/contribution]
+    packages: [testkit/cassettes/its_rest, transport, openehr/client, openehr/client/definition, openehr/client/query, openehr/client/admin, openehr/client/demographic, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/contribution, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
     probes: [PROBE-072]
-    plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
+    plans:
+      - docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md
+      - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
+    notes: >
+      Path-parameter encoding: the transport is the single canonical path
+      encoder (Request.Path is a decoded url.URL.Path); leaf clients interpolate
+      the raw id and MUST NOT pre-escape with url.PathEscape (which double-encodes
+      an id carrying an encodable character: a space → %2520 → 404). Retired the
+      pre-escape pattern across every openehr/client leaf client; enforced
+      tree-wide by TestNoPathEscapeInClientPathParams (openehr/client) and pinned
+      behaviourally by per-client single-encode tests.
     tests:
       - openehr/client/ehr/contribution/update_audit_test.go
       - openehr/client/ehr/contribution/version_test.go
       - testkit/probes/versioned/probe_072_contribution_submission_shape.go
+      - transport/path_encoding_test.go
+      - openehr/client/pathencoding_guard_test.go
+      - openehr/client/definition/path_encoding_test.go
+      - openehr/client/query/path_encoding_test.go
+      - openehr/client/ehr/path_encoding_test.go
+      - openehr/client/ehr/composition/path_encoding_test.go
 
   - id: REQ-096
     title: Unambiguous "disable retry"
@@ -376,7 +394,50 @@ requirements:
     title: FLAT and STRUCTURED
     canonical: docs/specifications/wire.md#req-053
     status: draft
-    implementation: planned
+    # Bidirectional FLAT + STRUCTURED codecs in openehr/serialize/simplified,
+    # driven by the REQ-106 Web Template: encode (rm.Composition -> FLAT /
+    # STRUCTURED via rmpath), decode (canonical RM rebuild via rminfo + canjson),
+    # and OPT-free FLAT<->STRUCTURED interconversion. Round-trip verified for the
+    # composition/observation spine (incl. ITEM_SINGLE/ITEM_LIST). First-class
+    # datatypes: DV_TEXT/CODED_TEXT/DATE_TIME/DATE/TIME/QUANTITY/COUNT/BOOLEAN/
+    # DURATION/URI/EHR_URI/ORDINAL/PROPORTION/IDENTIFIER; ctx/ context (language,
+    # territory, composer, time); |other open value-sets; |raw canonical-fragment
+    # bypass makes decorated/exotic datatypes lossless. Strict, fail-loud posture:
+    # unresolvable paths, unsupported datatypes, missing required suffixes, missing
+    # mandatory context, and out-of-bound :index are errors, not silent data loss
+    # (see openehr/serialize/simplified/deviations.md). PROBE-076 (landed) round-
+    # trips the vendored EHRbase Test_dv_* corpus (24 pass, 1 skip): idempotence
+    # PLUS OPT-conformance — a WithTemplate(compiled) decode of a valid source
+    # validates against the OPT. WithTemplate repopulates LOCATABLE.name (from the
+    # archetype terminology) and completes the RM-mandatory attributes FLAT does
+    # not carry (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
+    # EVENT_CONTEXT.setting, COMPOSITION category/composer) from ctx + RM defaults;
+    # names/defaults never leak into FLAT. Deferred (documented, deviations.md):
+    # exotic ctx/ fields not emitted on encode (participations/facility/workflow/
+    # composer external_ref — optional, no validity impact; non-default source
+    # values for the defaulted attributes are not round-tripped); first-class
+    # _-attr suffix decomposition (covered losslessly via |raw); .schema media
+    # types on input; and an upstream byte-conformance probe.
+    implementation: landed
+    packages:
+      - openehr/serialize/simplified
+    probes:
+      - PROBE-076
+    plans:
+      - docs/plans/archive/2026-07-14-flat-structured-codecs.md
+    tests:
+      - openehr/serialize/simplified/simplified_test.go
+      - testkit/probes/serialize/probe_076_simplified_round_trip.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/flat_encode_test.go
+      - openehr/serialize/simplified/flat_decode_test.go
+      - openehr/serialize/simplified/structured_test.go
+      - openehr/serialize/simplified/roundtrip_test.go
+      - openehr/serialize/simplified/hardening_test.go
+      - openehr/serialize/simplified/context_test.go
+      - openehr/serialize/simplified/raw_test.go
+      - openehr/serialize/simplified/names_test.go
 
   - id: REQ-055
     title: AQL wire boundary
@@ -388,6 +449,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-05-21-aql-builders.md
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
       - openehr/aql/builder_test.go
@@ -401,6 +463,7 @@ requirements:
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
     plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
+    notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/client/query/query_test.go
       - openehr/client/definition/stored_query_test.go
@@ -631,6 +694,36 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-12-template-req104-req105-deferred.md
 
+  - id: REQ-106
+    title: WebTemplate JSON export
+    canonical: docs/specifications/clinical-modeling.md#req-106--webtemplate-json-export
+    status: draft
+    # Projects the public compiled OPT (*templatecompile.Compiled, REQ-111)
+    # into the EHRbase openEHR_SDK v2.3 WebTemplate JSON shape: deterministic
+    # camelCase output, reference-locked lower-snake id generation (ADR 0014),
+    # core-datatype inputs from REQ-103 primitive constraints, structural (not
+    # byte) parity via PROBE-075 against the vendored EHRbase constrain_test
+    # fixture (104/104 node + input-suffix/type parity; documented deviations
+    # in the package's deviations.md). Direct-slice: the shared
+    # simplified-template model (umbrella Phase 1 / REQ-053) is deferred until
+    # a second consumer exists; archetype-reuse-under-slot templates (duplicate
+    # compiled AQL paths) are deferred — see ADR 0014.
+    implementation: landed
+    packages:
+      - openehr/template/webtemplate
+    adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
+    probes: [PROBE-075]
+    tests:
+      - openehr/template/webtemplate/build_test.go
+      - openehr/template/webtemplate/build_internal_test.go
+      - openehr/template/webtemplate/inputs_test.go
+      - openehr/template/webtemplate/golden_test.go
+      - openehr/template/webtemplate/parity_test.go
+      - openehr/template/webtemplate/id_internal_test.go
+      - openehr/template/webtemplate/independence_test.go
+    plans:
+      - docs/plans/archive/2026-05-22-webtemplate-export.md
+
   - id: REQ-107
     title: Template-driven RM instance example generator
     canonical: docs/specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator
@@ -648,14 +741,14 @@ requirements:
       - openehr/template/constraints/example_test.go
       - openehr/validation/constraint_cassettes_test.go
       - openehr/instance/instance_test.go
-      - openehr/instance/gap12_test.go
-      - openehr/instance/gap13_test.go
-      - openehr/instance/gap14_test.go
+      - openehr/instance/realworld_opt_synthesis_test.go
+      - openehr/instance/polymorphic_roundtrip_test.go
+      - openehr/instance/valuefill_test.go
       - openehr/instance/sample_test.go
       - openehr/instance/rmtype_test.go
       - openehr/instance/imports_test.go
       - internal/templateinstance/rmwrite/write_test.go
-      - internal/templateinstance/rmwrite/write_gap12_test.go
+      - internal/templateinstance/rmwrite/write_datavalue_test.go
       - openehr/rm/coerce_test.go
       - openehr/rm/rminfo/nonstorable_test.go
       - testkit/probes/instance/probe_027_generated_validates.go
@@ -663,7 +756,8 @@ requirements:
       - cmd/examples/generate-example/main.go
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
-      - docs/plans/archive/2026-06-19-sdk-gap-12-newskeleton.md
+      - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
+    notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
     title: Generic OPT-driven composition builder
@@ -725,7 +819,7 @@ requirements:
     tests:
       - openehr/validation/noncomposition_test.go
       - openehr/validation/rmread/read_demographic_test.go
-      - openehr/validation/rmread/read_gap12_test.go
+      - openehr/validation/rmread/read_datavalues_test.go
       - openehr/validation/constraint_cassettes_test.go
       - openehr/validation/primitive_input_test.go
       - testkit/probes/validation/probe_074_test.go
@@ -771,7 +865,7 @@ requirements:
     # per-RM-type invariant catalogue (CODE_PHRASE, DV_QUANTITY,
     # DV_INTERVAL bounds for numeric-comparable bounds, OBJECT_REF
     # type/namespace). Driver is a second walker alongside REQ-102/110;
-    # closed-RM-set helpers (rmTypeInfo / rmread) are shared. SDK-GAP-15.
+    # closed-RM-set helpers (rmTypeInfo / rmread) are shared across REQ-102/110/112.
     implementation: landed
     packages:
       - openehr/validation
@@ -779,7 +873,7 @@ requirements:
     # PROBE-077 (RM-floor invariant matrix) is deferred to a follow-up
     # cycle; the unit-test cassette matrix in rmfloor_test.go covers the
     # first-cycle catalogue (required-set absence + the four named
-    # leaf invariants). PROBE-081 (SDK-GAP-18) covers value-typed
+    # leaf invariants). PROBE-081 (REQ-112) covers value-typed
     # mandatory presence — EHR_STATUS.subject — decided from JSON-key
     # presence by ValidateRMEHRStatusBytes (rmfloor_bytes.go), carried
     # inline by rmfloor_bytes_test.go.
@@ -788,7 +882,7 @@ requirements:
       - openehr/validation/rmfloor_test.go
       - openehr/validation/rmfloor_bytes_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md
+      - docs/plans/archive/2026-06-29-rm-floor-validation.md
 
   - id: REQ-113
     title: Execution-oriented parsed AQL AST
@@ -811,12 +905,15 @@ requirements:
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
-    # contract; marked // Deprecated:). SDK-GAP-17.
-    # SDK-GAP-19: the standing class predicate (ClassExpr.PredicateComparison)
+    # contract; marked // Deprecated:) ahead of the REQ-113 Tier-2 AST.
+    # The standing class predicate (ClassExpr.PredicateComparison)
     # and the WHERE comparison path (aql.Comparison.ParsedPath) are exposed
     # as parsed structure; the shared path vocabulary (aql.IdentifiedPath /
     # PathSegment) moved into openehr/aql (openehr/aql/path.go) with parse
-    # aliases. PROBE-082 pins it inline in structured_test.go.
+    # aliases. PROBE-082 pins it inline in structured_test.go. The
+    # class-predicate ParsedPath is now populated too (Segments with an empty
+    # Alias, mirroring the WHERE side) so a consumer need not re-split the
+    # relative predicate path.
     implementation: landed
     packages:
       - openehr/aql
@@ -831,7 +928,8 @@ requirements:
       - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
-      - docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md
+      - docs/plans/archive/2026-06-29-aql-execution-ast.md
+      - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation
@@ -1011,6 +1109,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-032
     title: Interfaces for abstract RM
@@ -1032,6 +1131,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [internal/bmmgen]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
 
   - id: REQ-044
     title: Hand-written extensions isolated
@@ -1079,5 +1179,8 @@ requirements:
     title: Cadasto platform API conformance
     canonical: docs/specifications/conformance.md#req-083--cadasto-platform-api-conformance
     status: draft
-    implementation: planned
-    packages: [cadasto]
+    implementation: partial
+    packages: [cadasto, cadasto/admin]
+    notes: "Health probes (Live/Ready) landed: default paths, WithLivePath/WithReadyPath, origin-derived URL, public/no-auth, status→sentinel map. Platform-API fixtures Phase 4."
+    tests:
+      - cadasto/admin/probes_test.go

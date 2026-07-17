@@ -21,7 +21,7 @@ import (
 // types parameterised over an abstract bound (e.g.
 // DV_INTERVAL[T: DV_ORDERED]).
 //
-// Pins SDK-GAP-11. For the given `body` and target `factory`, the
+// Pins REQ-052. For the given `body` and target `factory`, the
 // probe asserts:
 //
 //  1. canjson.Unmarshal succeeds.

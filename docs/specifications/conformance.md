@@ -51,6 +51,18 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 **Status: planned.** The `cadasto/*` surfaces are Phase 4; the conformance fixtures land with them.
 
+#### Health probes (`cadasto/admin`)
+
+`cadasto/admin` exposes deployment liveness/readiness probes (`Live`, `Ready`) with a wire contract independent of the (planned) Cadasto platform API surface:
+
+- **Default paths** `DefaultLivePath = "/health/live"`, `DefaultReadyPath = "/health/ready"`, each overridable per call via `WithLivePath` / `WithReadyPath` (e.g. `/healthz`).
+- **URL derivation.** The probe URL derives from the **origin (scheme + host) of the openEHR REST service entry** — the openEHR REST API path prefix is **NOT** inherited.
+- **Public / no auth.** Health endpoints are public: the SDK **MUST NOT** send an `Authorization` header on a probe.
+- **Status mapping** (`errors.Is`-compatible): `2xx → nil`; `401 → transport.ErrUnauthorized`; `403 → transport.ErrForbidden`; `404 → transport.ErrNotFound`; `5xx → transport.ErrServerError`. Other non-2xx codes (400, 405, 408, 429, …) surface as a plain formatted error with no sentinel.
+- Probes borrow `transport`'s sentinel taxonomy (REQ-093) but **bypass** `transport.Client.Do` — no openEHR error-envelope decoding, no OTel spans, no retries. Use `openehr/client/admin` when those concerns matter.
+
+**Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
+
 ### Vendored cassettes (`testkit/cassettes/`)
 
 Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
@@ -301,7 +313,7 @@ client scenarios to SDK coverage:
 
 #### PROBE-082 — AQL structured path access (standing predicate + WHERE path)
 
-- **Title:** A class standing predicate is readable as a structured `{path, operator, value}` (`ClassExpr.PredicateComparison`) and a WHERE comparison's alias-qualified path as alias + segments (`aql.Comparison.ParsedPath`), without importing `parse/gen` or re-tokenizing raw text (SDK-GAP-19).
+- **Title:** A class standing predicate is readable as a structured `{path, operator, value}` (`ClassExpr.PredicateComparison`) and a WHERE comparison's alias-qualified path as alias + segments (`aql.Comparison.ParsedPath`), without importing `parse/gen` or re-tokenizing raw text (REQ-113).
 - **Preconditions:** A parsed query carrying a standing class predicate (`EHR e[ehr_id/value=$ehr]`) and a WHERE comparison over an alias path (`o/data[at0001]/events[at0006]/value/magnitude > $threshold`).
 - **Wire assertion:** In-repo property — `ParseQuery`'s `From.Root.PredicateComparison` MUST expose `{ehr_id/value, =, $ehr}` for the standing comparison and be nil for an archetype-HRID (non-comparison) predicate; the WHERE `aql.Comparison.ParsedPath` MUST expose alias `o` + the ordered segments, with `ParsedPath.Raw == Comparison.Path`. Emission is unaffected — the standing predicate and path survive a parse→emit→parse round-trip, and Emit is idempotent.
 - **Modes:** In-repo (unit-level property; no backend).
@@ -370,6 +382,33 @@ client scenarios to SDK coverage:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/validation/probe_074_noncomposition_validate.go`](../../testkit/probes/validation/probe_074_noncomposition_validate.go).
 - **Satisfies:** REQ-110, REQ-102, REQ-103.
 
+#### PROBE-075 — WebTemplate structural parity
+
+- **Title:** `webtemplate.Marshal(templatecompile.Compile(opt))` structurally matches a vendored EHRbase `openEHR_SDK` v2.3 reference WebTemplate JSON for the same OPT — the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` — against a documented-deviations list.
+- **Preconditions:** A commit-pinned EHRbase `openEHR_SDK` `constrain_test` OPT + reference WebTemplate JSON, vendored under [`testkit/cassettes/`](../../testkit/cassettes/) with provenance + Apache-2.0 attribution. (`constrain_test` is used rather than `corona_anamnese`: the latter reuses an archetype under a slot and does not compile under `templatecompile` — a deferred REQ-106 gap, [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md).)
+- **Wire assertion:** Not backend-facing — an in-repo parity property: `template.ParseOPT` + `templatecompile.Compile` + `webtemplate.Build`/`Marshal` MUST reproduce the reference node structure (id / rmType / aqlPath / min / max + input suffix/type per node); every accepted difference (field ordering, absent optional fields, localized-string packaging, known id edge cases) MUST appear on the documented-deviations list, and any difference not listed is a failure.
+- **Modes:** In-repo (parity property against a vendored fixture; no backend).
+- **Status:** Implemented (inline) — `TestStructuralParity` + `TestInputParity` in [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/) hold 104/104 parity on node structure (id/rmType/nodeId/aqlPath/min/max) and input suffix/type against the vendored `constrain_test` reference; documented deltas in [`deviations.md`](../../openehr/template/webtemplate/deviations.md).
+- **Satisfies:** REQ-106.
+
+#### PROBE-076 — FLAT / STRUCTURED composition round-trip
+
+- **Title:** For a vendored upstream (OPT + canonical COMPOSITION) pair, the simplified codecs round-trip the composition without losing the data the formats carry — FLAT is idempotent (`MarshalFlat → UnmarshalFlat → MarshalFlat`), STRUCTURED re-encodes to the same FLAT, OPT-free interconversion preserves it — **and**, when the source composition is itself OPT-valid, a `WithTemplate` decode of the emitted FLAT validates against the OPT (the conformance leg).
+- **Preconditions:** Vendored EHRbase (Apache-2.0) `Test_dv_*` datatype OPTs + matching canonical composition JSON under [`testkit/cassettes/`](../../testkit/cassettes/) (provenance in [`THIRD_PARTY_LICENSES.md`](../../testkit/cassettes/THIRD_PARTY_LICENSES.md)); the WebTemplate is built via `templatecompile.Compile` + `webtemplate.Build` (REQ-106).
+- **Wire assertion:** Not backend-facing — an in-repo property across the datatype corpus (DV_TEXT/CODED_TEXT/DATE_TIME/QUANTITY/COUNT/BOOLEAN/ORDINAL/PROPORTION/DURATION/IDENTIFIER/URI + the `|raw`-carried MULTIMEDIA/PARSABLE/INTERVAL): round-trip idempotence plus the OPT-validation leg, which catches dropped or mistyped leaves that a symmetric omission would hide from idempotence alone. **Scope limit:** symmetric omission of *optional* data can still pass, and the probe does **not** compare emitted FLAT/STRUCTURED byte-for-byte against vendored upstream simplified output — that upstream-conformance probe is a documented follow-up needing those fixtures; see [`deviations.md`](../../openehr/serialize/simplified/deviations.md) § Conformance. A template the WebTemplate builder cannot yet model is a documented skip, never a fail.
+- **Modes:** In-repo (round-trip property against vendored fixtures; no backend).
+- **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_076_simplified_round_trip.go`](../../testkit/probes/serialize/probe_076_simplified_round_trip.go), run by `TestProbe076` over the vendored constraint-template corpus (24 pass, 1 skip).
+- **Satisfies:** REQ-053.
+
+#### PROBE-077 — RM-floor invariant matrix
+
+- **Title:** A vendored-cassette matrix exercises `ValidateRM` (+ typed sugars) across the REQ-112 per-RM-type invariant catalogue and the RM-mandatory required-set walk, the same way PROBE-025/026 exercise the template-driven floor.
+- **Preconditions:** Vendored RM cassettes covering the required-set breaches and the four named leaf invariants (CODE_PHRASE, DV_QUANTITY, DV_INTERVAL, OBJECT_REF-family) documented in [clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor).
+- **Wire assertion:** Not yet defined at cassette granularity — the unit-test cassette matrix in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) carries first-cycle coverage (required-set absences, the four named invariants, the unbounded-skip negative, and the nil-guard contract) inline, ahead of a dedicated vendored-cassette probe.
+- **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
+- **Status:** Deferred — REQ-112 is landed and unit-covered; the dedicated PROBE-077 vendored-cassette matrix is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
+- **Satisfies:** REQ-112.
+
 #### PROBE-081 — EHR_STATUS value-typed mandatory presence (subject)
 
 - **Title:** `validation.ValidateRMEHRStatusBytes(data)` flags an omitted RM-mandatory `subject` (typed `rm.PartySelf`, a value struct) from JSON-key presence, without false-positiving on a valid bare `PARTY_SELF`.
@@ -399,14 +438,14 @@ client scenarios to SDK coverage:
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_031_typereg_unknown_type.go`](../../testkit/probes/serialize/probe_031_typereg_unknown_type.go).
 - **Satisfies:** REQ-040, REQ-052
 
-#### PROBE-038 — RM polymorphic decode coverage (SDK-GAP-11)
+#### PROBE-038 — RM polymorphic decode coverage
 
 - **Title:** `canjson.Unmarshal[Composition]` decodes every BMM-admissible `_type` discriminator at every substitutable slot — including (a) substitutable subtypes in concrete-typed slots (e.g. `LOCATABLE.name` carrying `DV_CODED_TEXT`) per openEHR RM Liskov substitution, and (b) generic types with abstract type parameters (e.g. `DV_INTERVAL[T: DV_ORDERED]`).
 - **Preconditions:** Vendored RM cassettes under `testkit/cassettes/rm/polymorphic/` covering both failure modes.
 - **Wire assertion:** Decode succeeds; the recovered tree preserves every original `_type` discriminator (no silent narrowing on substitutable slots); re-marshalling produces wire-equivalent JSON for the same logical content (canonical JSON ordering wins ties).
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go) exercises decode → re-marshal → `_type`-preservation on canjson across [`testkit/cassettes/rm/polymorphic/`](../../testkit/cassettes/rm/polymorphic/). The probe's scope is canjson; the underlying narrow-interface generator emission (`<Parent>Like` per BMM ancestors graph) lifts both canjson and canxml dispatch in the same change, but only canjson is asserted here. Plan: [`docs/plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md`](../plans/archive/2026-05-26-rm-polymorphic-decode-coverage.md).
-- **Satisfies:** SDK-GAP-11, REQ-040, REQ-052
+- **Satisfies:** REQ-040, REQ-052
 
 #### PROBE-033 — Canonical-XML round trip
 
@@ -468,11 +507,11 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 #### PROBE-061 — Composition versioned write with `Prefer: return=representation`
 
-- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` returns a bare `COMPOSITION` body plus a new `ETag` (SDK-GAP-09).
+- **Title:** `POST /ehr/{ehr_id}/composition` with `Prefer: return=representation` returns a bare `COMPOSITION` body plus a new `ETag` (REQ-094).
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
 - **Wire assertion:** Request carries `Prefer: return=representation`; response body decodes as bare `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` schema (oneOf: `Composition` | `Identifier`) — **not** an `ORIGINAL_VERSION<COMPOSITION>` envelope, which lives at `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). The response `ETag` is captured into `VersionMetadata`.
 - **Modes:** Sandbox, Cassette, Live.
-- **Status:** Implemented (Sandbox) via PROBE-071 — the bare-body wire assertion (and the symmetric PUT path) is exercised by [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) and the strict-against-spec unit pins `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../../openehr/client/ehr/composition/composition_test.go). PROBE-061 stays as the named "Composition versioned write with `Prefer: return=representation`" probe in the REST-binding range; PROBE-071 is the SDK-GAP-09-anchored superset covering both POST and PUT with the strict-rejection assertion.
+- **Status:** Implemented (Sandbox) via PROBE-071 — the bare-body wire assertion (and the symmetric PUT path) is exercised by [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) and the strict-against-spec unit pins `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../../openehr/client/ehr/composition/composition_test.go). PROBE-061 stays as the named "Composition versioned write with `Prefer: return=representation`" probe in the REST-binding range; PROBE-071 is the REQ-094-anchored superset covering both POST and PUT with the strict-rejection assertion.
 - **Satisfies:** REQ-094 (`return=representation` arm only). The `Prefer=identifier` slot and empty-body strictness are now landed (leaf unit tests) — see the archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md).
 
 #### PROBE-062 — `openehr-audit-details` header round-trip
@@ -549,23 +588,23 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — happy-path delete + missing-EHR variants covered by [`openehr/client/admin/admin_test.go`](../../openehr/client/admin/admin_test.go). A standalone probe file (`testkit/probes/admin/`) is deferred.
 - **Satisfies:** REQ-099
 
-#### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION (SDK-GAP-09)
+#### PROBE-071 — Composition POST/PUT response body is bare COMPOSITION
 
 - **Title:** `POST /ehr/{ehr_id}/composition` and `PUT /ehr/{ehr_id}/composition/{vo_uid}` with `Prefer: return=representation` return a bare `COMPOSITION` body — not an `ORIGINAL_VERSION<COMPOSITION>` envelope.
 - **Preconditions:** Existing EHR; a valid Composition body conforming to a deployed template.
-- **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per SDK-GAP-09). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
+- **Wire assertion:** Response body decodes cleanly as `*rm.Composition` per the ITS-REST OpenAPI `201_COMPOSITION` / `200_COMPOSITION_updated` schemas. A server that returns `{"_type":"ORIGINAL_VERSION", ...}` on these paths is non-conformant; the SDK surfaces that as a decode error (strict-against-spec posture per REQ-094). The full version envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`).
 - **Modes:** Sandbox, Cassette, Live.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) which exercises both POST and PUT arms in a single invocation when `voID` and `ifMatch` are supplied; otherwise the PUT arm is skipped and the probe still passes on POST alone. Unit-level pins covering both verbs and both halves of the strict-against-spec contract: `TestSaveRepresentationDecodesBareComposition`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareComposition`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/composition/composition_test.go`](../../openehr/client/ehr/composition/composition_test.go). The same shape applies to `directory.Save` / `directory.Update` per `201_directory` / `200_FOLDER_retrieved`; covered by `TestSaveRepresentationDecodesBareFolder`, `TestSaveRepresentationRejectsOriginalVersionShape`, `TestUpdateRepresentationDecodesBareFolder`, and `TestUpdateRepresentationRejectsOriginalVersionShape` in [`openehr/client/ehr/directory/directory_test.go`](../../openehr/client/ehr/directory/directory_test.go).
-- **Satisfies:** SDK-GAP-09, REQ-094 (`return=representation` arm only).
+- **Satisfies:** REQ-094 (`return=representation` arm only).
 
-#### PROBE-072 — Contribution submission body matches `Contribution_create` (SDK-GAP-10)
+#### PROBE-072 — Contribution submission body matches `Contribution_create`
 
 - **Title:** `POST /ehr/{ehr_id}/contribution` request body is the ITS-REST `Contribution_create` shape — `{audit, versions: [ORIGINAL_VERSION<T>|IMPORTED_VERSION<T> with inline data]}` — not the persisted `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`.
 - **Preconditions:** Existing EHR; at least one resource payload (`Composition` / `EHRStatus` / `Folder` / `EHRAccess`) to commit.
 - **Wire assertion:** Captured request body has `versions[i]._type ∈ {"ORIGINAL_VERSION","IMPORTED_VERSION"}` and carries the resource payload inline under `data`. A request body whose `versions[]` contains `{"_type":"OBJECT_REF", ...}` is non-conformant per the ITS-REST OpenAPI `Contribution_create` schema (the persisted `OBJECT_REF` shape returns at read time only). **Commit-audit shape (SPECITS-95 / ITS-REST PR 131):** the batch `audit` and each `versions[i].commit_audit` MUST omit the server-assigned `time_committed` and carry a `DV_CODED_TEXT`-shaped `change_type` (nested `defining_code`), not the erroneous flat `TERMINOLOGY_CODE`. The SDK emits `_type:"AUDIT_DETAILS"` by default (conformant servers accept it); the `UPDATE_AUDIT` form is available as a caller-selected fallback.
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — `contribution.Submission` lands in [`openehr/client/ehr/contribution/submission.go`](../../openehr/client/ehr/contribution/submission.go) and `contribution.Commit` now takes `*Submission`; the probe is at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go). The commit-audit DTO (`contribution.UpdateAudit` + write-version wrappers `OriginalVersion`/`ImportedVersion`) drops the server-assigned `time_committed`; the probe asserts both the version shape and the audit shape. Unit-level pins `TestCommitSubmissionShape` and the `update_audit` / `version` tests cover the SDK leaf. Plans: [`docs/plans/archive/2026-05-26-contribution-submission-shape.md`](../plans/archive/2026-05-26-contribution-submission-shape.md) (SDK-GAP-10) and the UPDATE_AUDIT/DvCodedText follow-up (SPECITS-95).
-- **Satisfies:** SDK-GAP-10, REQ-050, REQ-095.
+- **Status:** Implemented (Sandbox) — `contribution.Submission` lands in [`openehr/client/ehr/contribution/submission.go`](../../openehr/client/ehr/contribution/submission.go) and `contribution.Commit` now takes `*Submission`; the probe is at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go). The commit-audit DTO (`contribution.UpdateAudit` + write-version wrappers `OriginalVersion`/`ImportedVersion`) drops the server-assigned `time_committed`; the probe asserts both the version shape and the audit shape. Unit-level pins `TestCommitSubmissionShape` and the `update_audit` / `version` tests cover the SDK leaf. Plans: [`docs/plans/archive/2026-05-26-contribution-submission-shape.md`](../plans/archive/2026-05-26-contribution-submission-shape.md) (REQ-050/095) and the UPDATE_AUDIT/DvCodedText follow-up (SPECITS-95).
+- **Satisfies:** REQ-050, REQ-095.
 
 #### PROBE-073 — Demographic PARTY polymorphic round-trip
 
@@ -575,6 +614,24 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); the leaf is covered by the `openehr/client/demographic` unit tests. Demographic API maturity is Draft (upstream ITS-REST `x-status: DEVELOPMENT`).
 - **Satisfies:** REQ-040, REQ-050.
+
+#### PROBE-078 — `POST /query/aql` scopes via `openehr-ehr-id` header
+
+- **Title:** An EHR-scoped ad-hoc AQL execution via `POST /query/aql` carries the scope on the `openehr-ehr-id` request header, per the verb-aware scoping rule in [wire.md § AQL executor](wire.md#aql-executor); `GET /query/aql/{qualified_query_name}` continues to carry the `ehr_id` query parameter.
+- **Preconditions:** A stored or ad-hoc query executed with an EHR scope, against a backend that honours the ITS-REST OAS distinction between the two verbs (no `ehr_id` query parameter or body field on the POST operations).
+- **Wire assertion:** Captured POST request carries `openehr-ehr-id: <ehr_id>` and no `ehr_id` query parameter or request-body field; the same scope on a GET request carries `ehr_id` as a query parameter and no header. A backend that only honours the header would run a query lacking it population-wide — the assertion catches an SDK regression that scopes POST via the query parameter instead.
+- **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
+- **Status:** Deferred — REQ-055 verb-aware scoping is landed and unit-covered ([`openehr/client/query/query_test.go`](../../openehr/client/query/query_test.go)); the dedicated wire-level PROBE-078 is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
+- **Satisfies:** REQ-055.
+
+#### PROBE-079 — `PutStoredQuery` recovers `{name, version}` from `Location`
+
+- **Title:** A body-less `PUT /definition/query/{qualified_query_name}[/{version}]` store reply recovers the server-assigned `{name, version}` from the `Location` response header, per [wire.md § Stored AQL](wire.md#req-057).
+- **Preconditions:** A store operation whose response is the canonical `200_StoredQuery_stored` shape — empty body, `Location` header carrying the qualified name and version.
+- **Wire assertion:** `definition.PutStoredQuery` MUST recover `{name, version}` by parsing `Location` first; a JSON body, when present, is a lenient fallback; the caller's input `{name, version}` is the last-resort fallback. A malformed `Location` MUST NOT fail the call.
+- **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
+- **Status:** Deferred — REQ-057 recovery order is landed and unit-covered ([`openehr/client/definition/stored_query_test.go`](../../openehr/client/definition/stored_query_test.go)); the dedicated wire-level PROBE-079 is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
+- **Satisfies:** REQ-057.
 
 ### Observability
 
@@ -621,9 +678,9 @@ Renumbering is prohibited — once a `PROBE-NNN` is published, it stays.
 |---|---|---|
 | Auth + discovery | PROBE-001 … 009 | **all implemented (Sandbox)** — [`testkit/probes/auth/`](../../testkit/probes/auth/). PROBE-001/002/003 drive the real `discovery.Resolver`; PROBE-004 (PKCE + G-7 parity) / PROBE-005 (scope) drive a full `auth/smart` authorization-code launch; PROBE-006 (JWKS rotation), PROBE-007 (transport + proactive refresh halves), PROBE-008 (principal claims), PROBE-009 (caller attribution). Launch-mode coverage (standalone / embedded / backend, REQ-068) lives alongside in [`launch_modes.go`](../../testkit/probes/auth/launch_modes.go). |
 | Versioned writes | PROBE-010 … 013 | [`testkit/probes/versioned/`](../../testkit/probes/versioned) — all implemented (Sandbox) |
-| AQL | PROBE-020 … 021, PROBE-028, PROBE-080, PROBE-082 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go); PROBE-080 (REQ-113 parse/emit round-trip) + PROBE-082 (REQ-113 / SDK-GAP-19 structured predicate + WHERE path) implemented inline — [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go), [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go) |
-| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074, PROBE-081 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots; PROBE-081 (REQ-112 / SDK-GAP-18) pins EHR_STATUS value-typed `subject` presence, implemented inline — [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go). |
-| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (SDK-GAP-11 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
+| AQL | PROBE-020 … 021, PROBE-028, PROBE-080, PROBE-082 | PROBE-020 implemented (Sandbox) — [`testkit/probes/aql/`](../../testkit/probes/aql/); PROBE-021 structural guarantee + `aql.ErrPathResolution` mapping tested under [`openehr/client/query/`](../../openehr/client/query/), Cassette/Live pending; PROBE-028 (REQ-109 AQL lint stability) implemented (Sandbox) — [`testkit/probes/aql/probe_028_aql_lint.go`](../../testkit/probes/aql/probe_028_aql_lint.go); PROBE-080 (REQ-113 parse/emit round-trip) + PROBE-082 (REQ-113 structured predicate + WHERE path) implemented inline — [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go), [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go) |
+| Clinical modeling | PROBE-022, PROBE-023, PROBE-024, PROBE-025, PROBE-026, PROBE-027, PROBE-074, PROBE-075, PROBE-077, PROBE-081 | [`testkit/probes/template/`](../../testkit/probes/template/) — PROBE-022 / PROBE-024 implemented (Sandbox); PROBE-023 implemented (Sandbox) under [`testkit/probes/composition/`](../../testkit/probes/composition/); PROBE-025 / PROBE-026 / PROBE-074 under [`testkit/probes/validation/`](../../testkit/probes/validation/); PROBE-027 implemented (Sandbox) under [`testkit/probes/instance/`](../../testkit/probes/instance/) — REQ-107 Phases 1–3 landed; PROBE-074 (REQ-110) extends validation to demographic + EHR-IM roots; PROBE-075 (REQ-106 WebTemplate structural parity) implemented inline — 104/104 node + input-suffix/type parity against the vendored `constrain_test` reference in [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/); PROBE-077 (REQ-112 RM-floor invariant matrix) deferred — unit-cassette matrix carries first-cycle coverage in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go); PROBE-081 (REQ-112) pins EHR_STATUS value-typed `subject` presence, implemented inline — [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go). |
+| Canonical JSON / formats | PROBE-030 … 034, PROBE-038 | [`testkit/probes/serialize/`](../../testkit/probes/serialize) — 030–031, 033–034, 038 implemented; 032 not yet. PROBE-038 (REQ-052/040 polymorphic decode coverage) at [`testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go`](../../testkit/probes/serialize/probe_038_canjson_rm_polymorphic_decode.go). |
 | Service discovery | PROBE-040 … 041 | [`testkit/probes/discovery/`](../../testkit/probes/discovery) — both implemented (Sandbox) |
 | Observability | PROBE-050 … 051 | partial — PROBE-051 in [`transport/client_test.go`](../../transport/client_test.go); *planned* — `testkit/probes/observability/` |
-| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072, PROBE-073 | partial — PROBE-061/071 (`Prefer: return=representation`, SDK-GAP-09) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (SDK-GAP-10 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); PROBE-073 (Demographic PARTY polymorphic round-trip) implemented (Sandbox) at [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip) still deferred |
+| REST binding | PROBE-060 … 068, PROBE-071, PROBE-072, PROBE-073, PROBE-078, PROBE-079 | partial — PROBE-061/071 (`Prefer: return=representation`, REQ-094) implemented (Sandbox) at [`testkit/probes/versioned/probe_071_composition_write_response_shape.go`](../../testkit/probes/versioned/probe_071_composition_write_response_shape.go) + leaf unit tests; PROBE-072 (REQ-050/095 contribution submission shape) implemented (Sandbox) at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go); PROBE-073 (Demographic PARTY polymorphic round-trip) implemented (Sandbox) at [`testkit/probes/demographic/probe_073_demographic_round_trip.go`](../../testkit/probes/demographic/probe_073_demographic_round_trip.go); REQ-094 `identifier` / empty-body follow-ups landed (leaf unit tests, archived [`2026-05-25-req094-prefer-followups.md`](../plans/archive/2026-05-25-req094-prefer-followups.md)); PROBE-065 (`minimal`→GET round-trip), PROBE-078 (REQ-055 `openehr-ehr-id` POST scoping), and PROBE-079 (REQ-057 `PutStoredQuery` `Location` recovery) still deferred |

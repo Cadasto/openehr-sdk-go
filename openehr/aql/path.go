@@ -2,7 +2,7 @@ package aql
 
 // path.go: the structured identified-path vocabulary shared by the read
 // AST (openehr/aql/parse) and the WHERE comparison it decorates
-// (SDK-GAP-19 / REQ-113). It lives in openehr/aql — the shared AQL
+// (REQ-113). It lives in openehr/aql — the shared AQL
 // vocabulary — so a WHERE [Comparison] can carry its parsed path without
 // openehr/aql importing openehr/aql/parse (which would cycle, since parse
 // imports aql). The parse package re-exports these as `parse.PathSegment`

@@ -135,7 +135,7 @@ PR 131 fixes the source schemas:
 
 - [REQ-050](../../specifications/wire.md#req-050) — REST wire surface; contribution create payload
 - [REQ-095](../../specifications/wire.md#req-095) — OpenAPI is authoritative; track ITS-REST amendment 5.9
-- [PROBE-072](../../specifications/conformance.md#probe-072--contribution-submission-body-matches-contribution_create-sdk-gap-10) — submission shape (extend)
+- [PROBE-072](../../specifications/conformance.md#probe-072--contribution-submission-body-matches-contribution_create) — submission shape (extend)
 - Archived: [2026-05-26-contribution-submission-shape.md](2026-05-26-contribution-submission-shape.md) — landed `Submission` vs `rm.Contribution`
 - Upstream: [specifications-ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131), [Discourse thread](https://discourse.openehr.org/t/contribution-update-audit-change-type-in-rest-api-vs-vendor-implementations/16928)
 

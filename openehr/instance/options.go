@@ -32,7 +32,7 @@ func (p Policy) String() string {
 }
 
 // ValueFill controls how primitive leaves are valued, orthogonally to
-// [Policy] (which controls *which* nodes are materialised). SDK-GAP-14.
+// [Policy] (which controls *which* nodes are materialised). REQ-107.
 type ValueFill int
 
 const (
@@ -101,7 +101,7 @@ type Options struct {
 
 	// ValueFill selects how primitive leaves are valued. Zero value =
 	// ExampleFill (the REQ-103 representative value). RandomFill draws
-	// in-constraint values that vary between calls. SDK-GAP-14.
+	// in-constraint values that vary between calls. REQ-107.
 	ValueFill ValueFill
 
 	// ValueSource seeds the in-constraint sampler used when ValueFill is

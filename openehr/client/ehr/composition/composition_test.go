@@ -263,7 +263,7 @@ func TestSaveMinimal(t *testing.T) {
 	}
 }
 
-// TestSaveRepresentationDecodesBareComposition pins SDK-GAP-09:
+// TestSaveRepresentationDecodesBareComposition pins REQ-094:
 // `Prefer: return=representation` on POST returns a bare COMPOSITION
 // (not an ORIGINAL_VERSION<COMPOSITION>) per the ITS-REST OpenAPI
 // `201_COMPOSITION` schema (oneOf: Composition | Identifier).
@@ -320,7 +320,8 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 
 // TestSaveRepresentationEmptyBodyErrors pins REQ-094: when the caller
 // asks for Prefer=return=representation but the server returns an empty
-// body, doWrite MUST surface transport.ErrInvalidShape rather than
+// body, the shared openehrclient.WriteResult MUST surface
+// transport.ErrInvalidShape rather than
 // silently returning a nil Composition ("MUST NOT silently downgrade").
 func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -477,10 +478,11 @@ func TestUpdateRoundTrip(t *testing.T) {
 	}
 }
 
-// TestUpdateRepresentationDecodesBareComposition pins SDK-GAP-09 on
+// TestUpdateRepresentationDecodesBareComposition pins REQ-094 on
 // the PUT path: `Prefer: return=representation` on PUT returns a bare
 // COMPOSITION per the ITS-REST OpenAPI `200_COMPOSITION_updated`
-// schema. Save and Update share `doWrite` but the catalog title for
+// schema. Save and Update share `openehrclient.WriteResult` but the
+// catalog title for
 // PROBE-071 cites both POST and PUT, so the PUT arm is exercised
 // explicitly here.
 func TestUpdateRepresentationDecodesBareComposition(t *testing.T) {

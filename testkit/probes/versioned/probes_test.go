@@ -282,7 +282,7 @@ func TestProbe072ContributionSubmissionShapeRejectsObjectRef(t *testing.T) {
 	// plants the regression-shape — a persisted rm.Contribution with
 	// versions[] of OBJECT_REF — into the captured slot. The probe
 	// inspects *capturedBody, so it sees the planted body and MUST
-	// flag the SDK-GAP-10 regression.
+	// flag the REQ-050/095 regression.
 	planted := []byte(`{"_type":"CONTRIBUTION","audit":{"_type":"AUDIT_DETAILS","system_id":"x"},"versions":[{"_type":"OBJECT_REF","id":{"_type":"OBJECT_VERSION_ID","value":"1::x::1"}}]}`)
 	var captured []byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

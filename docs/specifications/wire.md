@@ -31,6 +31,8 @@ Pinned source: `https://github.com/openEHR/specifications-ITS-REST/tree/master/c
 
 When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the prose is updated, not the wire behaviour.
 
+**Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. openEHR ids (template ids, archetype ids, qualified query names) contain no `/`, so a decoded path round-trips through `String()` correctly; an id that could itself contain a path separator would require the caller to set `url.URL.RawPath` (the encoded hint), which the transport does not do today. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
+
 ## REST version pin
 
 ### REQ-050
@@ -111,7 +113,7 @@ Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` m
 
 Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
-### Polymorphic substitution (SDK-GAP-11)
+### Polymorphic substitution
 
 The openEHR RM permits Liskov substitution at every property slot: a slot whose declared type is `T` admits any concrete subtype of `T` as a runtime instance, by AOM `valid_value` semantics. Two cases the canonical-JSON codec **MUST** handle losslessly:
 
@@ -120,7 +122,7 @@ The openEHR RM permits Liskov substitution at every property slot: a slot whose 
 
 **Missing-`_type` tolerance:** canonical JSON SHOULD carry `_type` everywhere, but real-world cassettes elide it on concrete-typed slots where the static field fixes the subtype (e.g. `"name": {"value": "Tree"}` on an `ITEM_TREE`). The decoder falls back to the **declared parent's concrete type** when the wire omits `_type` on a narrow-interface slot; this preserves backward compatibility with permissive producers without compromising the strict-abstract-slot rule (`DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY` still require `_type`).
 
-The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage-sdk-gap-11) (decode + re-marshal preserves every input `_type` discriminator). On BMM bumps that introduce new subtypes ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) step 10), `make codegen` auto-extends the relevant `<Parent>Like` interface (marker methods on the new concrete class); the closed type-switches in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) still need an explicit `case *NewSubtype:` arm per new descendant, plus a round-trip case in [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go), so PROBE-038's substitution guarantee covers it.
+The full substitution semantics are pinned by [PROBE-038](conformance.md#probe-038--rm-polymorphic-decode-coverage) (decode + re-marshal preserves every input `_type` discriminator). On BMM bumps that introduce new subtypes ([ADR 0001](../adr/0001-bmm-version-bump-runbook.md) step 10), `make codegen` auto-extends the relevant `<Parent>Like` interface (marker methods on the new concrete class); the closed type-switches in [`openehr/rm/like_accessors.go`](../../openehr/rm/like_accessors.go) still need an explicit `case *NewSubtype:` arm per new descendant, plus a round-trip case in [`openehr/serialize/canjson/polymorphic_decode_test.go`](../../openehr/serialize/canjson/polymorphic_decode_test.go), so PROBE-038's substitution guarantee covers it.
 
 ## Canonical XML
 
@@ -139,6 +141,7 @@ Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/ar
 - Numeric magnitudes use IEEE 754 double-precision (same posture as canonical JSON); decode also accepts quoted decimal strings per [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md).
 - Compact XML (no insignificant inter-element whitespace) is the byte-equality target for round-trip tests.
 - `xmi:type` is **rejected** on decode with `ErrInvalidShape` and an explicit message — only `xsi:type` is recognised.
+- `xsi:type` discriminator **values** **MUST** be matched as **unprefixed** RM class names; a leading `xsd:` on a foundation-primitive value (`xsd:string`) is stripped to the BMM primitive name. A **namespace-prefixed** discriminator value — the Better/Marand `xsi:type="ns2:DV_QUANTITY"` form, where the RM namespace is bound to a prefix rather than being the default — is **out of v1 scope**: the decoder **MUST NOT** resolve it and **MUST** fail closed with `ErrUnknownType` (never silently mis-resolved). The `xsi:type` attribute itself is recognised only when the `xsi` prefix is bound to the XSI namespace; an `xsi:type` written with no in-scope `xmlns:xsi` declaration is treated as a **missing** discriminator (`encoding/xml` yields the unresolved prefix, not a match). Supporting the prefixed form later means resolving the value's prefix against its in-scope `xmlns` binding (not a blind strip) plus a focused decode fixture — the boundary is pinned by `TestUnmarshalRejectsPrefixedXSIType`.
 
 XML is a second-class format on the wire today (REST 1.1.0-development is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 
@@ -148,16 +151,30 @@ Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassette
 
 ### REQ-053
 
-The SDK **MUST** provide codecs for the openEHR **FLAT** and **STRUCTURED** simplified formats in `openehr/serialize`:
+The SDK **MUST** provide codecs in `openehr/serialize` for the openEHR **FLAT** and **STRUCTURED** *Simplified Formats* — the JSON serializations of a composition **data instance** standardised by the openEHR ITS-REST [*Simplified Formats*](https://specifications.openehr.org/releases/ITS-REST/development/simplified_formats.html) specification (STABLE, targeting 1.1.0). The spec names exactly these two variants — *Flat* and *Structured*; the earlier "Simplified Data Template (SDT)" naming (and EHRbase's `simSDT`/`structSDT` labels) is superseded and **MUST NOT** appear in the SDK's public surface. This section pins to that document for the wire grammar; it does not re-define it.
 
-- **FLAT** — path-keyed, value-flat. Keys are openEHR paths (`/content[openEHR-EHR-OBSERVATION.foo.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value/magnitude`); values are leaf scalars.
-- **STRUCTURED** — nested JSON that preserves RM structure but omits `_type` where the path is unambiguous (because the template constrains the type).
+Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-specific**, human-readable field identifiers taken from the template's *Web Template* projection (REQ-106) — **not** canonical AQL/AOM paths:
 
-Both codecs **MUST**:
+- Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
+- Repeating nodes carry a zero-based instance index `:0` / `:1`.
+- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` collapses into its value (no trailing `/value`).
+- Structural levels are removed relative to the canonical path: container attributes (`content`, `data`, `events`, `items`, …) are elided, and the `ITEM_STRUCTURE` family, `HISTORY`, and single unnamed `EVENT`s are collapsed.
+- Composition-level metadata is carried under the `ctx/` prefix (mandatory `language`, `territory`; optional `composer`, `time`, `setting`, participations, …).
+- Optional RM attributes the template does not constrain use an underscore prefix (`_uid`, `_link`, `_normal_range`, …); the `|raw` suffix embeds a pre-serialized canonical RM fragment, which **MUST** carry `_type`.
 
-- Be usable independently of the HTTP client (REQ-013) — feeding a FLAT JSON file to a FLAT-to-canonical converter is a valid standalone use case.
-- Round-trip cleanly when the source artifact is OPT-aware (FLAT/STRUCTURED ↔ canonical conversion requires the OPT to resolve ambiguous paths and missing `_type`s).
-- Report missing OPT context as a typed error when conversion cannot proceed without it.
+**FLAT** is a single-level map of `path → primitive | object`. **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
+
+The identifier-generation algorithm is **normative** in the *Simplified Formats* spec (§Node ID Generation Rules); the SDK **MUST** generate segment identifiers by that algorithm, reusing the Web Template projection (REQ-106, [ADR-0014](../adr/0014-webtemplate-reference-implementation-lock.md)) as the single source of ids.
+
+The codecs **MUST**:
+
+- Be usable independently of the HTTP client and of `auth`/`transport` (REQ-013) — converting a FLAT or STRUCTURED document to or from canonical RM is a valid standalone use case.
+- Require the composition's **operational template** (via its Web Template) to resolve identifiers, RM types, level-removal, and `:index` — conversion is template-specific and cannot proceed from the payload alone.
+- **Round-trip** FLAT / STRUCTURED ↔ canonical `COMPOSITION` given the OPT: bidirectional and **semantics-preserving** (all archetype- and template-constrained clinical semantics are retained). The simplified forms are *not self-standing* — they depend on the template — which is distinct from being lossy; reconstructing the OPT itself from a data instance is out of scope.
+- Interconvert FLAT ↔ STRUCTURED **without** an OPT (the two are mechanical restructurings of one identifier grammar).
+- Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
+
+The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. (The `.schema` acceptance is a SHOULD the implementation currently defers — see the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
 
 ## ITS-REST envelopes
 
@@ -173,8 +190,8 @@ The exact envelope shapes are openEHR REST 1.1.0-development; this spec does not
 
 Two endpoints carry **distinct request and response shapes** that are easy to conflate because the RM ships only the persisted (response) form:
 
-- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** (SDK-GAP-09, [PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition-sdk-gap-09)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
-- **`POST /ehr/{ehr_id}/contribution`** (SDK-GAP-10, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create-sdk-gap-10)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
+- **`POST /ehr/{ehr_id}/composition`** and **`PUT /ehr/{ehr_id}/composition/{vo_uid}`** ([PROBE-071](conformance.md#probe-071--composition-postput-response-body-is-bare-composition)). Request body: a bare `COMPOSITION` payload. Response body under `Prefer: return=representation`: a bare `COMPOSITION` per ITS-REST `201_COMPOSITION` / `200_COMPOSITION_updated`, **not** the persisted `ORIGINAL_VERSION<COMPOSITION>` envelope. The persisted envelope is reached via `GET /versioned_composition/{vo_uid}/version/{version_uid}` (`UVersionOfComposition`). Same shape applies to `directory.Save` / `Update`.
+- **`POST /ehr/{ehr_id}/contribution`** ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
   - **Commit-audit DTO asymmetry (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).** The request-side commit audit (the batch `audit` and each version's `commit_audit`) is the `UPDATE_AUDIT` DTO, **not** the persisted `AUDIT_DETAILS`: it MUST omit the server-assigned `time_committed`, treats `system_id` as optional, and types `change_type` (and `UpdateVersion.lifecycle_state`) as `DV_CODED_TEXT` — never the withdrawn flat `TERMINOLOGY_CODE`. A client SHOULD send `_type:"UPDATE_AUDIT"`; servers SHOULD accept `AUDIT_DETAILS` or an omitted `_type`. The Go SDK emits `AUDIT_DETAILS` by default (`contribution.UpdateAudit`) and exposes `AuditType` to fall back to `UPDATE_AUDIT` for non-conformant servers.
 
 Implementations **MUST NOT** serialise the persisted shape on either submission path. The Go SDK enforces this via [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) (distinct from `rm.Contribution`) and the composition / directory write surfaces that take bare RM types.
@@ -217,6 +234,8 @@ The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/t
 
 **AQL injection.** `ExecuteString` (raw AQL escape hatch) **MUST** be documented as unsafe for interpolating caller-supplied values into the query text — bind parameters via the typed `params` map (named placeholders the CDR binds server-side). String-built AQL from untrusted input is injectable.
 
+**EHR scoping (verb-aware).** When execution is scoped to a single EHR, the SDK **MUST** apply the scope by the verb-appropriate mechanism the ITS-REST OAS declares: `GET /query/aql/{qualified_query_name}` carries the `ehr_id` **query parameter**; `POST /query/aql` carries the **`openehr-ehr-id` request header** — the POST operations declare no `ehr_id` query parameter and the request body carries no `ehr_id` field, so the header is the only channel. The SDK **MUST NOT** scope POST via the query parameter: a strict-spec server that honours only the header would otherwise run the query population-wide.
+
 ### Stored AQL
 
 ### REQ-057
@@ -227,6 +246,8 @@ The platform supports **stored AQL queries** — queries registered ahead of tim
 - **`openehr/client/query/`** — execute a stored query by ID (`GET /query/{qualified_query_name}`) in addition to the ad-hoc execution path.
 
 A stored query is identified by a qualified name (typically reverse-DNS, e.g. `org.example.queries.recent-observations`); the SDK passes it through verbatim. Stored queries are expected to be faster than ad-hoc AQL on the same backend (materialised read models, known output schemas), but the SDK does not pre-validate the qualified name — that's the backend's responsibility.
+
+**Store-response version recovery.** The Definition store operation (`PUT /definition/query/{qualified_query_name}[/{version}]`) returns the server-assigned `{name, version}` in a **`Location` response header** with an empty body — the canonical `200_StoredQuery_stored` OAS shape, and what a `text/plain` store returns. The SDK **MUST** recover the assigned identifier in order: (1) parse the `Location` header (canonical); (2) decode a JSON body if present (lenient — some deployments return one); (3) fall back to the caller's input `{name, version}` (graceful degradation). A malformed `Location` **MUST NOT** fail the call — it falls through to (2)/(3).
 
 ## Optimistic concurrency
 
@@ -264,7 +285,7 @@ Out of v1 scope:
 | Cadasto spec-version header | REQ-051 | `transport/` |
 | Canonical JSON | REQ-052 | `openehr/serialize/canjson/` |
 | Canonical XML | REQ-056 | `openehr/serialize/canxml/` |
-| FLAT / STRUCTURED | REQ-053 | `openehr/serialize/` (deferred sub-packages) |
+| FLAT / STRUCTURED | REQ-053 | `openehr/serialize/simplified/` |
 | Optimistic concurrency | REQ-054 | `transport/` (error mapping), `openehr/client/*` (header plumbing) |
 | AQL wire | REQ-055 | `openehr/aql/`, `openehr/client/query/` |
 | Stored AQL | REQ-057 | `openehr/client/definition/`, `openehr/client/query/` |

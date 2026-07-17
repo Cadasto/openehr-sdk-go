@@ -82,7 +82,7 @@ func TestExecuteAdhoc(t *testing.T) {
 	}
 }
 
-// TestExecuteWithEHRID pins SDK-GAP-16 finding A on the POST path: EHR
+// TestExecuteWithEHRID pins REQ-055 (verb-aware EHR scoping) on the POST path: EHR
 // scoping is emitted via the `openehr-ehr-id` request header (the spec's
 // POST mechanism), NOT the `ehr_id` query parameter (the GET mechanism;
 // not declared on the canonical POST operations).
@@ -110,12 +110,12 @@ func TestExecuteWithEHRID(t *testing.T) {
 		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
 	}
 	if got := captured.URL.Query().Get("ehr_id"); got != "" {
-		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (REQ-055 — verb-aware EHR scoping)", got)
 	}
 }
 
 // TestRunStoredWithEHRID mirrors TestExecuteWithEHRID for the stored-query
-// POST path (SDK-GAP-16 finding A).
+// POST path (REQ-055 — verb-aware EHR scoping).
 func TestRunStoredWithEHRID(t *testing.T) {
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -140,11 +140,11 @@ func TestRunStoredWithEHRID(t *testing.T) {
 		t.Errorf("openehr-ehr-id header = %q, want %q", got, ehrID)
 	}
 	if got := captured.URL.Query().Get("ehr_id"); got != "" {
-		t.Errorf("ehr_id query param leaked on POST = %q, want empty (SDK-GAP-16 finding A)", got)
+		t.Errorf("ehr_id query param leaked on POST = %q, want empty (REQ-055 — verb-aware EHR scoping)", got)
 	}
 }
 
-// TestExecuteGETWithEHRID pins SDK-GAP-16 finding A on the GET path: EHR
+// TestExecuteGETWithEHRID pins REQ-055 (verb-aware EHR scoping) on the GET path: EHR
 // scoping uses the `ehr_id` query parameter (declared on the canonical
 // GET operations) and MUST NOT send the `openehr-ehr-id` header.
 func TestExecuteGETWithEHRID(t *testing.T) {
@@ -170,7 +170,7 @@ func TestExecuteGETWithEHRID(t *testing.T) {
 		t.Errorf("ehr_id query param = %q, want %q (GET keeps query-param scoping)", got, ehrID)
 	}
 	if got := captured.Header.Get("openehr-ehr-id"); got != "" {
-		t.Errorf("openehr-ehr-id header leaked on GET = %q, want empty (SDK-GAP-16 finding A)", got)
+		t.Errorf("openehr-ehr-id header leaked on GET = %q, want empty (REQ-055 — verb-aware EHR scoping)", got)
 	}
 }
 

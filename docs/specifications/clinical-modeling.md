@@ -425,12 +425,14 @@ const (
 )
 
 type Options struct {
-    Policy    Policy
-    Language  string                       // ISO 639-1; defaults from Compiled.Language()
-    Territory string                       // for COMPOSITION roots
-    Composer  rm.PartyProxy                // required when root is COMPOSITION
-    Now       time.Time                    // clock for EVENT / context times
-    UIDSource func() *rm.HierObjectID      // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    Policy      Policy
+    Language    string                  // ISO 639-1; defaults from Compiled.Language()
+    Territory   string                  // for COMPOSITION roots
+    Composer    rm.PartyProxy           // required when root is COMPOSITION
+    Now         time.Time               // clock for EVENT / context times
+    UIDSource   func() *rm.HierObjectID // optional determinism hook for LOCATABLE.uid (nil = crypto/rand)
+    ValueFill   ValueFill               // ExampleFill (default) or RandomFill
+    ValueSource mrand.Source            // seeds RandomFill; nil = auto-seeded global
 }
 
 func Generate(ctx context.Context, c *templatecompile.Compiled, opts Options) (any, error)
@@ -439,9 +441,17 @@ func AsObservation(v any) (*rm.Observation, error)
 // … closed set matching validation ContentItem + standalone archetype roots
 ```
 
-`Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. Multi-valued attributes are sized to `max(existence.lower, 1)` subject to AOM `cardinality.upper` when bounded; under `Minimal`, when optional archetype-root siblings share a `node_id`, the synthesiser emits only the first colliding sibling so validator node-id binding stays unambiguous (SDK-GAP-12). OPT-declared BMM generic RM types (e.g. `DV_INTERVAL<DV_QUANTITY>`) MUST resolve to the concrete Go typereg constructor before `rmwrite` attachment. `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics).
+`Generate` **MUST** return a root RM value satisfying the OPT's structural rules and REQ-103 primitive constraints. Specifically, `Minimal` materialises only attributes with existence lower ≥ 1 (plus BMM-mandatory implicit attrs); `Example` additionally populates every primitive leaf via `PrimitiveConstraint.ExampleValue()`. Multi-valued attributes are sized to `max(existence.lower, 1)` subject to AOM `cardinality.upper` when bounded; under `Minimal`, when optional archetype-root siblings share a `node_id`, the synthesiser emits only the first colliding sibling so validator node-id binding stays unambiguous (REQ-107). OPT-declared BMM generic RM types (e.g. `DV_INTERVAL<DV_QUANTITY>`) MUST resolve to the concrete Go typereg constructor before `rmwrite` attachment. `C_SINGLE_ATTRIBUTE` alternatives resolve first-child-wins (matching validation v2's first-alternative semantics).
 
 Slot handling (v1): pinned archetype-root children under a slot are synthesised; pure `ARCHETYPE_SLOT` assertions resolve via the parsed REQ-104 include grammar when a safe example id can be derived, or via the RM-type-prefix fallback only when no include assertions were parsed — same compromise as validation slot-fit.
+
+### Primitive-leaf value fill
+
+`Policy` selects *which* nodes are materialised; an orthogonal **`ValueFill`** selects *how* primitive leaves are valued. The SDK **MUST** offer two fills: `ExampleFill` (default) populates each leaf with its REQ-103 `PrimitiveConstraint.ExampleValue` — a single representative value, byte-identical across calls for one OPT; `RandomFill` draws each leaf from within its constraint (in-range magnitudes, value-set-member codes, enumeration entries), valid by construction and varying between calls. A `ValueFill` other than `RandomFill` **MUST** degrade to `ExampleFill` rather than error.
+
+`RandomFill` reproducibility is caller-controlled via **`Options.ValueSource`** (a `math/rand/v2.Source`): a fixed source makes leaf values byte-reproducible; `nil` draws from the auto-seeded package global so successive calls differ — mirroring the `UIDSource` determinism seam. A `Source` is not safe for concurrent use: each concurrent `Generate` **MUST** own its source (or leave it `nil` for the concurrency-safe global). The composition builder surfaces the seam as `composition.WithValueFill` / `composition.WithValueSource`.
+
+**Deferred.** A third `medium` / `detail_level` structural level — a representative optional-subset fill between `Minimal` and full population — is planned but not delivered; it is **not** part of the v1 `ValueFill` contract. Tracked in the roadmap.
 
 ### Trust model
 
@@ -451,7 +461,7 @@ The generator is **sound** (every output is valid against the OPT), not **comple
 
 ### Trust model — phasing
 
-Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + SDK-GAP-12 corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
+Phases 0–3 landed: `ExampleValue()` on every `PrimitiveConstraint`; `internal/templateinstance/rmwrite/` inverse-of-rmread RM construction table; `openehr/instance/` synthesiser with `Generate` / `Policy` / `UIDSource` test-determinism seam / typed accessors for the closed root set; PROBE-027 implemented (Sandbox) covering `vital_signs.opt` + `clinical_note.opt` + the REQ-107 real-world corpus (`Referral Request.v1`, `Demonstration.v1`, `social`); `cmd/examples/generate-example/` worked example. The C_PRIMITIVE_OBJECT inner-`<item>` wire-parser fix + canjson-polymorphic `Composition.uid` emission landed via the [wire-parser plan](../plans/archive/2026-05-26-c-primitive-object-wire-parser.md) (archived); PROBE-023 now exercises the full marshal → unmarshal → re-marshal round-trip. Phase 4 (REQ-101 composition-builder integration delegating to `instance.Generate`) tracked in [`docs/plans/archive/2026-05-24-template-instance-example-generator.md`](../plans/archive/2026-05-24-template-instance-example-generator.md) (archived). REQ-104 slot-fill archetype-id stamping is landed for parsed include patterns that can be synthesized safely; when no includes were parsed the synthesiser uses `openEHR-EHR-<RMType>.example.v1` to satisfy the validator's RM-type-prefix heuristic.
 
 ### Out of scope
 
@@ -671,6 +681,66 @@ It therefore lives in the sibling package `openehr/templatecompile`. This supers
 - **Verification:** unit tests in [`openehr/templatecompile/compile_test.go`](../../openehr/templatecompile/compile_test.go); the public-only acceptance proof (external-shape build → canjson round-trip → validate, plus `ValidateEHRStatus` reachability) in [`openehr/templatecompile/external_test.go`](../../openehr/templatecompile/external_test.go); and the runnable [`cmd/examples/compile-build-validate`](../../cmd/examples/compile-build-validate/) whose direct imports are public-only. No new PROBE — this is an API-reachability requirement, not a wire-conformance assertion (the builder round-trip itself is PROBE-023).
 - **Plan:** [`docs/plans/archive/2026-06-17-public-compiled-template-bridge.md`](../plans/archive/2026-06-17-public-compiled-template-bridge.md)
 
+## REQ-106 — WebTemplate JSON export
+
+**WebTemplate** is a consumer-facing, UI-oriented projection of an operational template: a lossy, flattened JSON view listing each node's stable `id`, cardinality, AQL path, and the leaf **inputs** a form must render. It is a **vendor de-facto** serialisation (Better → EHRbase), **not** a normative openEHR artefact — only the downstream FLAT/STRUCTURED *serialization* it enables is standardised (ITS-REST Simplified Formats). The SDK treats it as a public contract it MUST keep stable for consumers, mirrored from a single locked reference implementation ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+
+The SDK **MUST** provide a WebTemplate JSON export that projects a compiled operational template — the public `*templatecompile.Compiled` (REQ-111) — into the **EHRbase `openEHR_SDK` v2.3** WebTemplate shape. The export **MUST** consume only the compiled form (never `.oet` / `.opt` / `.t.json` authoring artefacts) and **MUST NOT** mutate it.
+
+### Surface
+
+```go
+// Package github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate
+
+// Build projects a compiled OPT into the typed WebTemplate tree.
+func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error)
+
+// Marshal is Build followed by deterministic JSON encoding.
+func Marshal(c *templatecompile.Compiled, opts ...Option) ([]byte, error)
+
+type Option func(*config) // reserved — no options in the current slice (single-language compiled input; fixed schema version)
+```
+
+`Build` returns the typed tree for callers that post-process before encoding; `Marshal` is the common path. A nil or empty compiled input, or an unresolvable default language, **MUST** return an error (never panic).
+
+### Output shape
+
+The exported root **MUST** carry `templateId`, `version` (the string `"2.3"`), `defaultLanguage`, `languages`, and a `tree` of nodes. Each node **MUST** carry `id`, `rmType`, `min`, `max` (with `-1` denoting unbounded), and `aqlPath`; and where the compiled template supplies them, `name` / localized names, `nodeId`, `inputs`, and `children`. JSON field names are camelCase. Encoding **MUST** be deterministic: the same compiled template **MUST** produce byte-identical output across runs and SDK patch releases (fixed field order; map keys sorted).
+
+The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the reference implementation's node model. The transform **MUST**: keep `COMPOSITION`, the ENTRY types (`OBSERVATION` / `EVALUATION` / `INSTRUCTION` / `ACTION` / `ADMIN_ENTRY`), `EVENT` / `INTERVAL_EVENT`, `EVENT_CONTEXT`, and `CLUSTER` as nodes; **collapse** each `ELEMENT` into a single leaf carrying the constrained value type as `rmType`, the ELEMENT's node id as `nodeId`, and the ELEMENT path extended by `/value` as `aqlPath`; **drop** the pure structural wrappers (`HISTORY` and the `ITEM_STRUCTURE` family — `ITEM_TREE` / `ITEM_LIST` / `ITEM_SINGLE` / `ITEM_TABLE`) as nodes while **folding their node predicates into the `aqlPath`** of the descendants they enclose; and emit RM-attribute values that carry data directly (e.g. `EVENT_CONTEXT.start_time` / `setting`, `EVENT.time`, the ENTRY `language` / `encoding` / `subject`, `INTERVAL_EVENT.math_function` / `width`) as leaves whose `id` is the attribute name. The `aqlPath` therefore carries every archetype-id and at-code node predicate along the retained path.
+
+### `id` generation (ADR 0014)
+
+The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name, with the reference's sibling-disambiguation rule when two siblings would collide. The exact normalisation and disambiguation are **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling. Until the disambiguation rule is derived from a fixture that exercises it, a would-be sibling collision **MUST** fail with a typed error — the export **MUST NOT** emit duplicate sibling `id`s.
+
+### `inputs` (core clinical subset)
+
+Each `ELEMENT` value constraint (via REQ-103 primitive constraints) **MUST** map to `inputs[]` for the core clinical datatypes: `DV_TEXT` (one `TEXT` input), `DV_CODED_TEXT` (a `code` CODED_TEXT input with `list` / `listOpen` / `terminology`), `DV_QUANTITY` (`magnitude` DECIMAL + `unit` CODED_TEXT with validation), `DV_COUNT` (INTEGER/COUNT), `DV_ORDINAL` (an ordinal `list`), `DV_DATE_TIME` / `DV_DATE` / `DV_TIME` (temporal with pattern validation), `DV_BOOLEAN` (BOOLEAN), `DV_DURATION` (pattern-ordered INTEGER component fields), and `DV_PROPORTION` (`numerator` + `denominator`, with the percent-kind–derived denominator bound). Datatypes outside this subset (e.g. `DV_MULTIMEDIA`, `DV_PARSABLE`, `DV_IDENTIFIER`, `DV_INTERVAL`) **MUST** emit the node **without** `inputs` and **MUST NOT** error — the omission is a documented gap, recorded so consumers can distinguish "no inputs" from "unsupported".
+
+### Conformance and deviations
+
+Conformance against the reference is **structural, not byte-exact**: PROBE-075 compares the SDK output to the vendored EHRbase fixture on the `id` set, `rmType`, `aqlPath`, `min`/`max`, and per-node input `suffix`/`type` extended with coded/ordinal list values, `listOpen`, `terminology`, temporal validation patterns, and numeric validation ranges. Any structural difference on that pinned surface is a failure; the following categories of divergence are **permitted deviations** and **MUST NOT** be treated as conformance failures:
+
+1. **Field-level presentation** — JSON field ordering, absent optional fields, and localized-string packaging (`localizedName` / localized maps emitted for the compiled template's single document language only).
+2. **Reference-only node metadata** — `termBindings`, `annotations`, and the `inContext` flag on synthesized RM-attribute leaves.
+3. **Input-content omissions** — `defaultValue`; DV_DURATION per-field ranges; DV_QUANTITY `precision`; per-unit and multi-unit magnitude validation; list `label` for external-terminology codes; `localizedLabels` and per-item `termBindings`.
+4. **Local terminology** — `terminology` is emitted only for external bindings (e.g. `openehr`); the archetype-internal `local` value is omitted, mirroring the reference.
+5. **Deferred id edge cases** — sibling-`id` disambiguation is not implemented; a would-be collision fails with a typed error rather than emitting duplicates (see the `id` generation section).
+
+The exact per-field enumeration behind these categories — the informative catalogue pinned by the parity tests — is maintained in [`openehr/template/webtemplate/deviations.md`](../../openehr/template/webtemplate/deviations.md) beside those tests. This section is the normative contract; that file elaborates it.
+
+The media type for the format is `application/openehr.wt+json` (documented for consumers). Emitting the export over a REST endpoint / content negotiation is **out of scope** for this REQ — the package produces the bytes only. Also out of scope: the WebTemplate → OPT round-trip (the format is lossy by design); the Better camelCase `id` variant; multi-version output; and the shared simplified-template model abstraction (extracted with REQ-053 when a second consumer exists — [simplified-formats umbrella](../plans/2026-06-23-simplified-formats.md)).
+
+Templates that **reuse one archetype under a multi-valued slot** (name-distinguished instances) produce duplicate compiled AQL paths that `openehr/templatecompile` currently rejects (`ErrInvalidInput`); such templates — including the canonical EHRbase `corona_anamnese` — cannot be exported by this slice and are **deferred**. Relaxing the compiler to a first-wins path index (the compiled tree already retains every instance) is a possible follow-up against REQ-100/REQ-111 ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)).
+
+### Building-block independence (REQ-013)
+
+`openehr/template/webtemplate/` **MUST** be importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/`. It imports `openehr/templatecompile` (the compiled input, REQ-111), `openehr/template/constraints` (primitive constraints, REQ-103), and the standard library only.
+
+- **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
+- **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture. Catalogued in [`conformance.md`](conformance.md).
+- **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/archive/2026-05-22-webtemplate-export.md).
+
 ## REQ-112 — Template-less Reference Model validation floor
 
 The validators introduced by REQ-102 and generalised by REQ-110 are **template-driven** — every entry point accepts a `*templatecompile.Compiled` as the authoritative driver. A consumer persisting RM roots that bind to no operational template (FOLDER, EHR_STATUS, EHR_ACCESS, and untemplated demographic PARTY on a write path) has no SDK call to assert RM conformance. The strongest substitute today is a strict `canjson` typed decode, which proves JSON↔type correctness but **not** RM invariants — mandatory-attribute omissions decode cleanly, as do `DV_INTERVAL` lower>upper, empty `CODE_PHRASE.code_string`, and `DV_QUANTITY.precision<0`.
@@ -689,7 +759,7 @@ func ValidateRMEHRStatus(status *rm.EHRStatus) Result
 func ValidateRMEHRAccess(access *rm.EHRAccess) Result
 func ValidateRMDemographic(party rm.Party) Result   // PERSON / ORGANISATION / GROUP / AGENT / ROLE
 
-// Presence-aware EHR_STATUS entry (SDK-GAP-18) — decides value-typed
+// Presence-aware EHR_STATUS entry (REQ-112) — decides value-typed
 // mandatory presence from JSON keys; see § Value-typed mandatory presence.
 func ValidateRMEHRStatusBytes(data []byte) Result
 ```
@@ -725,7 +795,7 @@ The floor is the structural RM-only layer. It does **not** evaluate:
 
 These exclusions are by design: a CDR may layer template-driven validation on top of the floor, or run the floor alone for resources where no template applies.
 
-### Value-typed mandatory presence (SDK-GAP-18)
+### Value-typed mandatory presence
 
 The required-set walk reads presence from the decoded Go value, which cannot detect an omitted **value-typed** mandatory attribute — a Go zero value is indistinguishable from an absent one. `EHR_STATUS.subject` is the case: typed `rm.PartySelf`, a value struct whose only field (`external_ref`) is optional, so an omitted subject and a valid bare `{"_type":"PARTY_SELF"}` decode to the identical zero value. Interface- / pointer- / slice-typed mandatories (e.g. `name`, typed `rm.DVTextLike`) are unaffected — nil is a reliable absence signal — as are the value-level invariants, which inspect fields rather than presence.
 
@@ -743,7 +813,7 @@ func ValidateRMEHRStatusBytes(data []byte) Result
 
 - **Lives in:** [`openehr/validation/rmfloor.go`](../../openehr/validation/rmfloor.go) + [`openehr/validation/rmfloor_adapters.go`](../../openehr/validation/rmfloor_adapters.go) + [`openehr/validation/rmfloor_bytes.go`](../../openehr/validation/rmfloor_bytes.go) (the presence-aware EHR_STATUS entry); the closed-RM-set helpers (`rmTypeInfo` / `describeRMType`) and the rmread layer are shared with REQ-102 / REQ-110.
 - **Verification:** unit pins in [`openehr/validation/rmfloor_test.go`](../../openehr/validation/rmfloor_test.go) — required-set absences (FOLDER.name missing), the four named per-type invariants, the unbounded-skip negative, and the nil-guard contract on every typed wrapper. The unit-test cassette matrix is the first-cycle verification; a dedicated PROBE-077 against vendored cassettes is deferred to a follow-up cycle. Value-typed mandatory presence (EHR_STATUS.subject) is pinned by **PROBE-081** in [`openehr/validation/rmfloor_bytes_test.go`](../../openehr/validation/rmfloor_bytes_test.go).
-- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md`](../plans/archive/2026-06-29-sdk-gap-15-rm-floor-validation.md) — SDK-GAP-15 (archived after PR #57).
+- **Plan:** [`docs/plans/archive/2026-06-29-rm-floor-validation.md`](../plans/archive/2026-06-29-rm-floor-validation.md) — REQ-112 (archived after PR #57).
 
 ---
 
@@ -805,12 +875,12 @@ Tier 1 — the cheap interim — exposes the validated ANTLR tree via [`(*Docume
 
 The WhereExpr vocabulary on the construction side gains [`aql.NotExpr`](../../openehr/aql/where.go) / [`aql.ExistsExpr`](../../openehr/aql/where.go) / [`aql.MatchesExpr`](../../openehr/aql/where.go) / [`aql.LikeExpr`](../../openehr/aql/where.go) (and their `Not` / `Exists` / `Matches` / `Like` constructors) so the parser populates the same shapes the Builder constructs. [`aql.FormatWhere`](../../openehr/aql/where.go) is the public read-side mirror of the internal `.expr()` emitter — used by `(*Query).Emit()` to render the structured AST back to canonical AQL.
 
-### Structured path access (SDK-GAP-19)
+### Structured path access
 
 Two path-bearing sub-structures are exposed as parsed structure, not only raw text, so an execution consumer reads them without re-tokenizing AQL grammar the SDK already parsed once:
 
-- **`ClassExpr.PredicateComparison`** — a class *standing* predicate (e.g. `EHR e[ehr_id/value = $x]`) is exposed as an optional `*aql.Comparison` (`{path, operator, value}`, reusing the shared vocabulary) when it is a simple comparison; it is nil for an archetype-HRID predicate (on `ClassExpr.Archetype`), a version predicate, or a non-scalar / complex standing predicate — so a comparison is distinguishable from a non-comparison. The verbatim `ClassExpr.Predicate` text is retained.
-- **`aql.Comparison.ParsedPath`** — a WHERE comparison carries the structured alias-qualified path (`*aql.IdentifiedPath`: alias + segments) alongside the raw `Path` string, populated by the parser (nil on the write side, and for a path shape the parser does not structure).
+- **`ClassExpr.PredicateComparison`** — a class *standing* predicate (e.g. `EHR e[ehr_id/value = $x]`) is exposed as an optional `*aql.Comparison` (`{path, operator, value}`, reusing the shared vocabulary) when it is a simple comparison; it is nil for an archetype-HRID predicate (on `ClassExpr.Archetype`), a version predicate, or a non-scalar / complex standing predicate — so a comparison is distinguishable from a non-comparison. The comparison's `ParsedPath` carries the relative left-hand path's structured `Segments` with an **empty `Alias`** (a class-predicate path binds no FROM alias); the verbatim `ClassExpr.Predicate` text is retained.
+- **`aql.Comparison.ParsedPath`** — a comparison carries the structured path (`*aql.IdentifiedPath`: alias + segments) alongside the raw `Path` string, populated by the parser. A WHERE comparison sets the alias root; a class standing predicate sets `Alias == ""` (relative path). It is nil on the write side and for a path shape the parser does not structure. `ParsedPath.Raw` equals `Path`.
 
 To carry the structured path on `aql.Comparison` without a package cycle (`aql` cannot import `openehr/aql/parse`), the shared path vocabulary — [`aql.IdentifiedPath`](../../openehr/aql/path.go) and `aql.PathSegment` — lives in `openehr/aql`. `parse.IdentifiedPath` embeds `aql.IdentifiedPath` and adds the parse-only `Clause` / source `Position` (promoted fields keep existing access unchanged); `parse.PathSegment` re-exports `aql.PathSegment`. Emission uses `Comparison.Path` and the verbatim class `Predicate`, so the round-trip property below is unaffected by the structured fields.
 
@@ -851,6 +921,6 @@ Each gap is a forward-compatible extension. The buildable grammar (everything `a
 `openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
-- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (34 idempotence cases + 11 canonical-input preservation cases across the v1 catalogue, plus a 10-case incomplete-AST suite that asserts ParseQuery and Emit both surface `aql.ErrIncompleteAST`). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (SDK-GAP-19) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
-- **Plan:** [`docs/plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md`](../plans/archive/2026-06-29-sdk-gap-17-aql-execution-ast.md) — SDK-GAP-17 (archived after PR #58).
+- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (34 idempotence cases + 11 canonical-input preservation cases across the v1 catalogue, plus a 10-case incomplete-AST suite that asserts ParseQuery and Emit both surface `aql.ErrIncompleteAST`). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Plan:** [`docs/plans/archive/2026-06-29-aql-execution-ast.md`](../plans/archive/2026-06-29-aql-execution-ast.md) — REQ-113 (archived after PR #58).
 

@@ -17,11 +17,11 @@ import (
 // At submission time the OBJECT_REFs in the persisted shape would point
 // at versions that do not yet exist, so a spec-conformant CDR rejects
 // the persisted shape on the write path. This shape is symmetric to the
-// SDK-GAP-09 fix on `composition.Save / Update` (response-side bare
+// REQ-094 fix on `composition.Save / Update` (response-side bare
 // COMPOSITION) — see [docs/specifications/conformance.md] PROBE-071 /
 // PROBE-072.
 //
-// SDK-GAP-10. Plan: docs/plans/archive/2026-05-26-contribution-submission-shape.md.
+// REQ-050/095. Plan: docs/plans/archive/2026-05-26-contribution-submission-shape.md.
 type Submission struct {
 	// Audit is the write-side commit-audit applied to the whole batch
 	// (REQ-059 / SPECITS-95 / ITS-REST PR 131). Carried inside the body

@@ -222,18 +222,7 @@ func writeObservationSingle(o *rm.Observation, attr string, child any) error {
 		return nil
 	case "data":
 		// Observation.Data is value-typed HISTORY; accept *History or History.
-		switch h := child.(type) {
-		case *rm.History[rm.ItemStructure]:
-			if h == nil {
-				return mismatch(attr, child, "HISTORY")
-			}
-			o.Data = *h
-			return nil
-		case rm.History[rm.ItemStructure]:
-			o.Data = h
-			return nil
-		}
-		return mismatch(attr, child, "HISTORY")
+		return assignVia(child, func(v rm.History[rm.ItemStructure]) { o.Data = v }, attr, "HISTORY")
 	case "state":
 		v, ok := child.(*rm.History[rm.ItemStructure])
 		if !ok {
@@ -369,18 +358,7 @@ func writeInstructionSingle(i *rm.Instruction, attr string, child any) error {
 func writeInstructionMultiple(i *rm.Instruction, attr string, child any) error {
 	switch attr {
 	case "activities":
-		switch v := child.(type) {
-		case *rm.Activity:
-			if v == nil {
-				return mismatch(attr, child, "ACTIVITY")
-			}
-			i.Activities = append(i.Activities, *v)
-			return nil
-		case rm.Activity:
-			i.Activities = append(i.Activities, v)
-			return nil
-		}
-		return mismatch(attr, child, "ACTIVITY")
+		return assignVia(child, func(v rm.Activity) { i.Activities = append(i.Activities, v) }, attr, "ACTIVITY")
 	}
 	return fmt.Errorf("%w: *rm.Instruction has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -581,18 +559,7 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 		c.Setting = v
 		return nil
 	case "start_time":
-		switch v := child.(type) {
-		case *rm.DVDateTime:
-			if v == nil {
-				return mismatch(attr, child, "DV_DATE_TIME")
-			}
-			c.StartTime = *v
-			return nil
-		case rm.DVDateTime:
-			c.StartTime = v
-			return nil
-		}
-		return mismatch(attr, child, "DV_DATE_TIME")
+		return assignVia(child, func(v rm.DVDateTime) { c.StartTime = v }, attr, "DV_DATE_TIME")
 	}
 	return fmt.Errorf("%w: *rm.EventContext has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -602,18 +569,7 @@ func writeEventContextSingle(c *rm.EventContext, attr string, child any) error {
 func writeHistorySingle(h *rm.History[rm.ItemStructure], attr string, child any) error {
 	switch attr {
 	case "origin":
-		switch v := child.(type) {
-		case *rm.DVDateTime:
-			if v == nil {
-				return mismatch(attr, child, "DV_DATE_TIME")
-			}
-			h.Origin = *v
-			return nil
-		case rm.DVDateTime:
-			h.Origin = v
-			return nil
-		}
-		return mismatch(attr, child, "DV_DATE_TIME")
+		return assignVia(child, func(v rm.DVDateTime) { h.Origin = v }, attr, "DV_DATE_TIME")
 	case "period":
 		v, ok := child.(*rm.DVDuration)
 		if !ok {
@@ -657,18 +613,7 @@ func writeHistoryMultiple(h *rm.History[rm.ItemStructure], attr string, child an
 func writePointEventSingle(e *rm.PointEvent[rm.ItemStructure], attr string, child any) error {
 	switch attr {
 	case "time":
-		switch v := child.(type) {
-		case *rm.DVDateTime:
-			if v == nil {
-				return mismatch(attr, child, "DV_DATE_TIME")
-			}
-			e.Time = *v
-			return nil
-		case rm.DVDateTime:
-			e.Time = v
-			return nil
-		}
-		return mismatch(attr, child, "DV_DATE_TIME")
+		return assignVia(child, func(v rm.DVDateTime) { e.Time = v }, attr, "DV_DATE_TIME")
 	case "data":
 		v, ok := child.(rm.ItemStructure)
 		if !ok {
@@ -690,31 +635,9 @@ func writePointEventSingle(e *rm.PointEvent[rm.ItemStructure], attr string, chil
 func writeIntervalEventSingle(e *rm.IntervalEvent[rm.ItemStructure], attr string, child any) error {
 	switch attr {
 	case "time":
-		switch v := child.(type) {
-		case *rm.DVDateTime:
-			if v == nil {
-				return mismatch(attr, child, "DV_DATE_TIME")
-			}
-			e.Time = *v
-			return nil
-		case rm.DVDateTime:
-			e.Time = v
-			return nil
-		}
-		return mismatch(attr, child, "DV_DATE_TIME")
+		return assignVia(child, func(v rm.DVDateTime) { e.Time = v }, attr, "DV_DATE_TIME")
 	case "width":
-		switch v := child.(type) {
-		case *rm.DVDuration:
-			if v == nil {
-				return mismatch(attr, child, "DV_DURATION")
-			}
-			e.Width = *v
-			return nil
-		case rm.DVDuration:
-			e.Width = v
-			return nil
-		}
-		return mismatch(attr, child, "DV_DURATION")
+		return assignVia(child, func(v rm.DVDuration) { e.Width = v }, attr, "DV_DURATION")
 	case "math_function":
 		v, ok := coerceDVCodedText(child)
 		if !ok {
@@ -773,18 +696,7 @@ func writeItemListSingle(_ *rm.ItemList, attr string, _ any) error {
 func writeItemListMultiple(l *rm.ItemList, attr string, child any) error {
 	switch attr {
 	case "items":
-		switch v := child.(type) {
-		case *rm.Element:
-			if v == nil {
-				return mismatch(attr, child, "ELEMENT")
-			}
-			l.Items = append(l.Items, *v)
-			return nil
-		case rm.Element:
-			l.Items = append(l.Items, v)
-			return nil
-		}
-		return mismatch(attr, child, "ELEMENT")
+		return assignVia(child, func(v rm.Element) { l.Items = append(l.Items, v) }, attr, "ELEMENT")
 	}
 	return fmt.Errorf("%w: *rm.ItemList has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -792,18 +704,7 @@ func writeItemListMultiple(l *rm.ItemList, attr string, child any) error {
 func writeItemSingleSingle(s *rm.ItemSingle, attr string, child any) error {
 	switch attr {
 	case "item":
-		switch v := child.(type) {
-		case *rm.Element:
-			if v == nil {
-				return mismatch(attr, child, "ELEMENT")
-			}
-			s.Item = *v
-			return nil
-		case rm.Element:
-			s.Item = v
-			return nil
-		}
-		return mismatch(attr, child, "ELEMENT")
+		return assignVia(child, func(v rm.Element) { s.Item = v }, attr, "ELEMENT")
 	}
 	return fmt.Errorf("%w: *rm.ItemSingle has no single attr %q", ErrUnknownAttribute, attr)
 }
@@ -815,18 +716,7 @@ func writeItemTableSingle(_ *rm.ItemTable, attr string, _ any) error {
 func writeItemTableMultiple(t *rm.ItemTable, attr string, child any) error {
 	switch attr {
 	case "rows":
-		switch v := child.(type) {
-		case *rm.Cluster:
-			if v == nil {
-				return mismatch(attr, child, "CLUSTER")
-			}
-			t.Rows = append(t.Rows, *v)
-			return nil
-		case rm.Cluster:
-			t.Rows = append(t.Rows, v)
-			return nil
-		}
-		return mismatch(attr, child, "CLUSTER")
+		return assignVia(child, func(v rm.Cluster) { t.Rows = append(t.Rows, v) }, attr, "CLUSTER")
 	}
 	return fmt.Errorf("%w: *rm.ItemTable has no multiple attr %q", ErrUnknownAttribute, attr)
 }
@@ -1010,46 +900,59 @@ func writeCodePhraseSingle(c *rm.CodePhrase, attr string, child any) error {
 
 // --- coercion helpers ---------------------------------------------------
 
+// coerceValueOrPtr accepts child as either T or *T, dereferencing the
+// pointer form and treating a nil pointer as a coercion failure — a
+// nil *T fails; a typed-nil pointer satisfying an interface T (e.g.
+// the rm.DVOrdered instantiation via writeIntervalSingle) still
+// matches case T and coerces with ok=true. It is the single
+// value-or-pointer coercion primitive behind assignVia and the
+// coerce<RMType> wrappers below; writeIntervalSingle
+// (interval_write.go) reaches it via assignVia for the DV_INTERVAL<T>
+// bounds.
+func coerceValueOrPtr[T any](child any) (T, bool) {
+	var zero T
+	switch v := child.(type) {
+	case T:
+		return v, true
+	case *T:
+		if v == nil {
+			return zero, false
+		}
+		return *v, true
+	}
+	return zero, false
+}
+
+// assignVia coerces child to T via coerceValueOrPtr and hands the
+// result to set — a caller-supplied closure that either assigns a
+// scalar field or appends to a slice, so one helper covers both
+// shapes uniformly. Mirrors the writeDVTemporalValueSingle closure
+// idiom, generalised beyond the string primitive. On coercion
+// failure it returns the same mismatch(attr, child, rmName) every
+// inline coercion switch in this file used to build directly, so
+// error output is unchanged.
+func assignVia[T any](child any, set func(T), attr, rmName string) error {
+	v, ok := coerceValueOrPtr[T](child)
+	if !ok {
+		return mismatch(attr, child, rmName)
+	}
+	set(v)
+	return nil
+}
+
 // coerceDVText accepts both value- and pointer-receiver shapes; the
 // typereg ctor yields *DVText but rmread / hand-built code may pass
 // value-typed equivalents.
 func coerceDVText(child any) (rm.DVText, bool) {
-	switch v := child.(type) {
-	case *rm.DVText:
-		if v == nil {
-			return rm.DVText{}, false
-		}
-		return *v, true
-	case rm.DVText:
-		return v, true
-	}
-	return rm.DVText{}, false
+	return coerceValueOrPtr[rm.DVText](child)
 }
 
 func coerceDVCodedText(child any) (rm.DVCodedText, bool) {
-	switch v := child.(type) {
-	case *rm.DVCodedText:
-		if v == nil {
-			return rm.DVCodedText{}, false
-		}
-		return *v, true
-	case rm.DVCodedText:
-		return v, true
-	}
-	return rm.DVCodedText{}, false
+	return coerceValueOrPtr[rm.DVCodedText](child)
 }
 
 func coerceCodePhrase(child any) (rm.CodePhrase, bool) {
-	switch v := child.(type) {
-	case *rm.CodePhrase:
-		if v == nil {
-			return rm.CodePhrase{}, false
-		}
-		return *v, true
-	case rm.CodePhrase:
-		return v, true
-	}
-	return rm.CodePhrase{}, false
+	return coerceValueOrPtr[rm.CodePhrase](child)
 }
 
 // mismatch builds a wrapped ErrTypeMismatch with diagnostic context.

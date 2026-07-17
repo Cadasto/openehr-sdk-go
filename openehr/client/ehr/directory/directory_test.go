@@ -258,7 +258,7 @@ func TestSaveSendsDottedAuditHeader(t *testing.T) {
 	}
 }
 
-// TestSaveRepresentationDecodesBareFolder pins SDK-GAP-09 for the
+// TestSaveRepresentationDecodesBareFolder pins REQ-094 for the
 // directory leaf: `Prefer: return=representation` on POST returns a
 // bare FOLDER (not an ORIGINAL_VERSION<FOLDER>) per the ITS-REST
 // OpenAPI `201_directory` schema.
@@ -298,7 +298,7 @@ func TestSaveRepresentationDecodesBareFolder(t *testing.T) {
 // composition strict-against-spec test on the directory leaf: a
 // non-conformant server returning ORIGINAL_VERSION on `201_directory`
 // must surface as a decode error, preventing directory-only
-// regressions of the SDK-GAP-09 contract.
+// regressions of the REQ-094 contract.
 func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
@@ -400,7 +400,7 @@ func TestSaveIdentifierMalformedBodyErrors(t *testing.T) {
 	}
 }
 
-// TestUpdateRepresentationDecodesBareFolder pins SDK-GAP-09 on the directory
+// TestUpdateRepresentationDecodesBareFolder pins REQ-094 on the directory
 // PUT path: `Prefer: return=representation` on PUT returns a bare FOLDER per
 // the ITS-REST OpenAPI `200_FOLDER_retrieved` schema.
 func TestUpdateRepresentationDecodesBareFolder(t *testing.T) {

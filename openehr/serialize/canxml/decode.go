@@ -32,7 +32,7 @@ type decoderConfig struct {
 // descendant). Scope: abstract slots only — slot types like
 // `DATA_VALUE`, `DV_ORDERED`, `ITEM_STRUCTURE`, `PARTY_PROXY`.
 //
-// SDK-GAP-11 narrow-interface slots (`<Parent>Like` — DVTextLike,
+// REQ-052 narrow-interface slots (`<Parent>Like` — DVTextLike,
 // PartyIdentifiedLike, …) have an independent, always-on fallback:
 // a missing `xsi:type` defaults to the declared parent's concrete
 // type, served by [DecodeAsOrDefault] from the generator emission.
@@ -96,14 +96,23 @@ func Unmarshal(data []byte, v any) error {
 }
 
 // XSITypeOf scans a start element's attribute list and returns the
-// value of the `xsi:type` discriminator. Accepts both the
-// namespace-resolved form (`Space == NSXSI, Local == "type"`) and
-// the unprefixed-literal form (`Local == "xsi:type"`) that some
-// encoders emit when no `xmlns:xsi` is in scope.
+// value of the `xsi:type` discriminator. It accepts the
+// namespace-resolved form (`Space == NSXSI, Local == "type"`) — what
+// encoding/xml produces when `xmlns:xsi` is in scope — and the
+// literal form (`Local == "xsi:type"`) produced by directly
+// constructed tokens, e.g. the encoder's own [XSITypeAttrName].
+// Note an `xsi:type` written with NO in-scope `xmlns:xsi` does not
+// take the literal branch: encoding/xml yields `Space == "xsi",
+// Local == "type"`, which matches neither branch and is reported as a
+// missing discriminator (below).
 //
 // The returned discriminator is normalised: a leading `xsd:` (XML
 // Schema datatype) prefix is stripped so foundation primitives like
-// `xsd:string` decode against the BMM primitive name `String`.
+// `xsd:string` decode against the BMM primitive name `String`. A
+// namespace-prefixed RM value (e.g. Better's `ns2:DV_QUANTITY`) is
+// NOT stripped and so fails registry lookup as an unknown type —
+// namespace-prefixed discriminators are out of scope per
+// docs/specifications/wire.md § REQ-056.
 //
 // Returns [ErrInvalidShape] when an `xmi:type` attribute is
 // encountered — ITS-XML pins `xsi:type` and the SDK rejects XMI
@@ -209,7 +218,7 @@ func DecodeAs[T any](dec *xml.Decoder, start xml.StartElement) (T, error) {
 	}
 }
 
-// DecodeAsOrDefault is the polySingleNarrow (SDK-GAP-11) XML
+// DecodeAsOrDefault is the polySingleNarrow (REQ-052) XML
 // counterpart of [DecodeAs]. When the element carries an `xsi:type`,
 // dispatch goes through [typereg.Default] exactly like DecodeAs.
 // When `xsi:type` is absent, the supplied defaultCtor instantiates

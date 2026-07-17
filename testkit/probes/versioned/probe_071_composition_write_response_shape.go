@@ -21,7 +21,7 @@ import (
 // `GET /versioned_composition/{vo_uid}/version/{version_uid}`
 // (`UVersionOfComposition`).
 //
-// Pins [SDK-GAP-09]. A deployment that returns ORIGINAL_VERSION on
+// Pins REQ-094. A deployment that returns ORIGINAL_VERSION on
 // these paths is non-conformant; the SDK surfaces the mismatch as a
 // decode error (strict-against-spec). The probe exercises both halves:
 // POST then PUT, each with a fresh round-trip. When `voID` or `ifMatch`
@@ -35,7 +35,8 @@ func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Cli
 		return r, errors.New("PROBE-071: missing required inputs (client/ehr/comp)")
 	}
 	// POST arm — Save with Prefer=representation must decode bare.
-	postOut, postMeta, err := composition.Save(ctx, c, ehrID, comp,
+	postOut, postMeta, err := composition.Save(
+		ctx, c, ehrID, comp,
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
 	if msg := assertBareCompositionResult(postOut, postMeta, err, "POST"); msg != "" {
@@ -46,7 +47,8 @@ func Probe071CompositionWriteResponseShape(ctx context.Context, c *transport.Cli
 	// PUT arm — Update with Prefer=representation, optional based on
 	// caller-provided preconditions.
 	if voID != "" && ifMatch != "" {
-		putOut, putMeta, err := composition.Update(ctx, c, ehrID, voID, ifMatch, comp,
+		putOut, putMeta, err := composition.Update(
+			ctx, c, ehrID, voID, ifMatch, comp,
 			composition.WithPrefer(transport.PreferRepresentation),
 		)
 		if msg := assertBareCompositionResult(putOut, putMeta, err, "PUT"); msg != "" {

@@ -7,7 +7,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
 
-// TestDVTextLikeGetValue pins the SDK-GAP-11 Phase 1 ergonomic method:
+// TestDVTextLikeGetValue pins the REQ-052 Phase 1 ergonomic method:
 // `.GetValue()` on a DVTextLike returns the rendered text of the
 // underlying concrete type — DVText OR DVCodedText. Equivalence with
 // the legacy compat helper `rm.DVTextValueOf` is the migration

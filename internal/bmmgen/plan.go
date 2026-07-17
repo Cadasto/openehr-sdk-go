@@ -86,7 +86,7 @@ type Plan struct {
 	AbstractDescendants map[string][]string
 	// ConcreteSubtypes maps each NON-abstract BMM class that has at
 	// least one descendant to the sorted list of its descendant BMM
-	// names. Drives the SDK-GAP-11 narrow-interface emission
+	// names. Drives the REQ-052 narrow-interface emission
 	// (`<GoName>Like`): the openEHR RM permits Liskov substitution at
 	// every concrete-typed slot, so a property declared as DV_TEXT may
 	// admit DV_CODED_TEXT etc. The narrow Go interface lifts those
@@ -565,7 +565,7 @@ func computeAbstractDescendants(p *Plan) {
 // that appear as the declared type of at least one property anywhere
 // in the plan. Includes both single-property type names and the
 // element types of container / generic properties (each level of
-// nesting unwrapped). Drives the SDK-GAP-11 narrow-interface filter.
+// nesting unwrapped). Drives the REQ-052 narrow-interface filter.
 func collectReferencedPropertyTypes(p *Plan) map[string]bool {
 	out := map[string]bool{}
 	addContainer := func(td *bmm.ContainerType) {
@@ -604,7 +604,7 @@ func collectReferencedPropertyTypes(p *Plan) map[string]bool {
 // computeAbstractDescendants but keyed on NON-abstract SimpleClasses
 // that (a) have at least one concrete descendant AND (b) are actually
 // referenced as a property type somewhere in the schema — the
-// SDK-GAP-11 narrow-interface driver. Each entry maps the parent's
+// REQ-052 narrow-interface driver. Each entry maps the parent's
 // BMM name to the sorted list of all transitive concrete SimpleClass
 // descendants.
 //

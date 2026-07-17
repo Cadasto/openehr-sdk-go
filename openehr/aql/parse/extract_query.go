@@ -1,8 +1,8 @@
 package parse
 
-// extract_query.go: SDK-GAP-17 Tier 2 — translate a validated ANTLR
+// extract_query.go: REQ-113 Tier 2 — translate a validated ANTLR
 // parse tree (gen.ISelectQueryContext) into the readable, generated-
-// type-free [Query] AST (REQ-113). Pure recursive descent — no
+// type-free [Query] AST. Pure recursive descent — no
 // listeners, no shared mutable state between calls.
 //
 // Catalogue: the v1 supported shapes are the buildable grammar plus the
@@ -353,7 +353,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
 				// verbatim so the emitter round-trips it, and expose a
 				// structured {path, op, value} when it is a simple
-				// comparison (SDK-GAP-19).
+				// comparison (REQ-113).
 				ce.Predicate = trimBrackets(pp.GetText())
 				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
@@ -478,7 +478,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return nil
 				}
 				if v != nil {
-					// SDK-GAP-19: carry the structured path (alias +
+					// REQ-113: carry the structured path (alias +
 					// segments) alongside the raw string so a consumer
 					// reads it without re-splitting.
 					parsed := extractIdentifiedPath(ip, ClauseWhere)
@@ -561,18 +561,32 @@ func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) Identifi
 		ip.Predicate = trimBrackets(pp.GetText())
 	}
 	if op := c.ObjectPath(); op != nil {
-		for _, part := range op.AllPathPart() {
-			seg := PathSegment{}
-			if id := part.IDENTIFIER(); id != nil {
-				seg.Name = id.GetText()
-			}
-			if pp := part.PathPredicate(); pp != nil {
-				seg.Predicate = trimBrackets(pp.GetText())
-			}
-			ip.Segments = append(ip.Segments, seg)
-		}
+		ip.Segments = segmentsFromObjectPath(op)
 	}
 	return ip
+}
+
+// segmentsFromObjectPath decomposes a relative objectPath (the path steps after
+// any alias root) into the shared path-segment vocabulary — the loop shared by
+// extractIdentifiedPath (alias-qualified SELECT/WHERE/ORDER BY paths) and
+// standingComparison (a class-predicate relative path). Returns nil for a nil
+// objectPath.
+func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
+	if op == nil {
+		return nil
+	}
+	var segs []aql.PathSegment
+	for _, part := range op.AllPathPart() {
+		seg := aql.PathSegment{}
+		if id := part.IDENTIFIER(); id != nil {
+			seg.Name = id.GetText()
+		}
+		if pp := part.PathPredicate(); pp != nil {
+			seg.Predicate = trimBrackets(pp.GetText())
+		}
+		segs = append(segs, seg)
+	}
+	return segs
 }
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
@@ -580,12 +594,13 @@ func pathRaw(c gen.IIdentifiedPathContext) string {
 }
 
 // standingComparison lifts a class standing predicate's standardPredicate
-// (`objectPath <op> operand`) into an [*aql.Comparison] for SDK-GAP-19, or
+// (`objectPath <op> operand`) into an [*aql.Comparison] for REQ-113, or
 // nil when the predicate is absent or its RHS operand is not a scalar value
 // (an objectPath / node-code operand). Path is the relative object path as
-// written; ParsedPath is left nil (a class predicate path has no alias to
-// structure). The verbatim [ClassExpr.Predicate] text remains the round-trip
-// source regardless.
+// written; ParsedPath carries its decomposed Segments with an empty Alias —
+// the class-predicate path binds no FROM alias, but its steps are structured
+// so a consumer need not re-split Path (the WHERE-side symmetry). The verbatim
+// [ClassExpr.Predicate] text remains the round-trip source regardless.
 func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if sp == nil {
 		return nil
@@ -598,7 +613,9 @@ func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if v == nil {
 		return nil
 	}
-	return &aql.Comparison{Path: op.GetText(), Op: aql.Operator(cmp.GetText()), Val: v}
+	raw := op.GetText()
+	parsed := aql.IdentifiedPath{Segments: segmentsFromObjectPath(op), Raw: raw}
+	return &aql.Comparison{Path: raw, Op: aql.Operator(cmp.GetText()), Val: v, ParsedPath: &parsed}
 }
 
 // pathPredicateOperandValue lifts a standing-predicate RHS operand into an

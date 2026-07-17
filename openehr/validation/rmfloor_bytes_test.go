@@ -1,6 +1,6 @@
 package validation_test
 
-// rmfloor_bytes_test.go: PROBE-081 — REQ-112 / SDK-GAP-18. The
+// rmfloor_bytes_test.go: PROBE-081 — REQ-112. The
 // presence-aware EHR_STATUS floor entry must flag an omitted (value-typed)
 // mandatory `subject` from JSON-key presence, without false-positiving on
 // a valid bare PARTY_SELF and without regressing the interface-typed
@@ -25,7 +25,7 @@ const ehrStatusBareSubject = `{
 	"is_queryable": true
 }`
 
-// TestValidateRMEHRStatusBytes_MissingSubject is the SDK-GAP-18 case: a
+// TestValidateRMEHRStatusBytes_MissingSubject is the PROBE-081 case: a
 // decodable EHR_STATUS that omits the RM-mandatory `subject` key must
 // surface `required` at /subject (the value-based floor cannot see it).
 func TestValidateRMEHRStatusBytes_MissingSubject(t *testing.T) {

@@ -45,7 +45,25 @@ type xmlPrimitiveListItem struct {
 
 	// C_DV_ORDINAL children
 	Value  *xmlIntValue      `xml:"value"`
-	Symbol *xmlCodePhraseRef `xml:"symbol"`
+	Symbol *xmlOrdinalSymbol `xml:"symbol"`
+}
+
+// xmlOrdinalSymbol is the <symbol> of a C_DV_ORDINAL list entry. Per the
+// AOM 1.4 XSD the symbol is a DV_CODED_TEXT whose code sits under
+// <defining_code> (the form EHRbase and template designers emit); the
+// inline code_string/terminology_id form is accepted leniently.
+type xmlOrdinalSymbol struct {
+	DefiningCode *xmlCodePhraseRef `xml:"defining_code"`
+	xmlCodePhraseRef
+}
+
+// ref resolves the symbol's code phrase, preferring the XSD-conformant
+// defining_code child over the inline lenient form.
+func (s *xmlOrdinalSymbol) ref() *xmlCodePhraseRef {
+	if s.DefiningCode != nil {
+		return s.DefiningCode
+	}
+	return &s.xmlCodePhraseRef
 }
 
 // xmlIntValue wraps the simple <value>N</value> integer payload used
@@ -244,9 +262,10 @@ func buildDvOrdinal(o *xmlCObject) constraints.CDvOrdinal {
 		if item.Value == nil || item.Symbol == nil {
 			continue
 		}
-		ref := constraints.CodedTermRef{CodeString: strings.TrimSpace(item.Symbol.CodeString)}
-		if item.Symbol.TerminologyID != nil {
-			ref.Terminology = strings.TrimSpace(item.Symbol.TerminologyID.Value)
+		sym := item.Symbol.ref()
+		ref := constraints.CodedTermRef{CodeString: strings.TrimSpace(sym.CodeString)}
+		if sym.TerminologyID != nil {
+			ref.Terminology = strings.TrimSpace(sym.TerminologyID.Value)
 		}
 		c.Values = append(c.Values, constraints.OrdinalSymbol{
 			Value:  item.Value.Value,

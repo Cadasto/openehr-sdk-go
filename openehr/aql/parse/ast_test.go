@@ -122,7 +122,7 @@ func TestExtractVersionClass(t *testing.T) {
 // Archetype carries the source placeholder verbatim (with the leading `$`)
 // so emission can round-trip the exact placeholder name; ParamArchetype
 // stays as the typed signal — aligned with the structured extractor
-// (SDK-GAP-17 review).
+// (REQ-113 review).
 func TestExtractParamArchetype(t *testing.T) {
 	doc, err := parse.Parse("SELECT c FROM COMPOSITION c[$arch]")
 	if err != nil {

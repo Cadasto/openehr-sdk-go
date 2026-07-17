@@ -1,6 +1,6 @@
 package parse_test
 
-// structured_test.go: PROBE-082 — REQ-113 / SDK-GAP-19. The parser must
+// structured_test.go: PROBE-082 — REQ-113. The parser must
 // expose the two path-bearing sub-structures as parsed structure, not only
 // raw text: a class standing predicate as a {path, op, value} comparison,
 // and a WHERE comparison's alias-qualified path as alias + segments — so a
@@ -14,19 +14,19 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
-// gap19Query exercises both asks in one parse: a standing class predicate on
+// standingPredicateQuery exercises both asks in one parse: a standing class predicate on
 // the EHR root (`ehr_id/value=$ehr`) and a WHERE comparison over an
 // alias-qualified path (`o/data[at0001]/events[at0006]/value/magnitude`).
-const gap19Query = "SELECT o/data[at0001]/events[at0006]/value/magnitude " +
+const standingPredicateQuery = "SELECT o/data[at0001]/events[at0006]/value/magnitude " +
 	"FROM EHR e[ehr_id/value=$ehr] " +
 	"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
 	"WHERE o/data[at0001]/events[at0006]/value/magnitude > $threshold"
 
-// TestStandingPredicateStructured is the SDK-GAP-19 Ask #1 case: a class
+// TestStandingPredicateStructured is the PROBE-082 Ask #1 case: a class
 // standing predicate is readable as a structured comparison, with the
 // verbatim text retained for round-trip.
 func TestStandingPredicateStructured(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestStandingPredicateStructured(t *testing.T) {
 // TestWhereComparisonStructuredPath is the Ask #2 case: a WHERE comparison
 // carries the structured alias + segments alongside the raw path string.
 func TestWhereComparisonStructuredPath(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}
@@ -82,6 +82,41 @@ func TestWhereComparisonStructuredPath(t *testing.T) {
 	}
 }
 
+// TestStandingPredicateParsedPath is the REQ-113 completeness case: a class
+// standing predicate's relative left-hand path is exposed as structured
+// segments with an empty Alias (a relative predicate path binds no FROM
+// alias), so a consumer reads the segments without re-splitting the raw
+// Comparison.Path string — the WHERE-side symmetry for the class-predicate LHS.
+func TestStandingPredicateParsedPath(t *testing.T) {
+	q, err := parse.ParseQuery(standingPredicateQuery)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	pc := q.From.Root.PredicateComparison
+	if pc == nil {
+		t.Fatalf("EHR standing predicate not structured; Predicate=%q", q.From.Root.Predicate)
+	}
+	if pc.ParsedPath == nil {
+		t.Fatalf("class-predicate ParsedPath nil; Path=%q", pc.Path)
+	}
+	pp := pc.ParsedPath
+	if pp.Alias != "" {
+		t.Errorf("ParsedPath.Alias = %q, want empty (a relative predicate path binds no alias)", pp.Alias)
+	}
+	if len(pp.Segments) != 2 {
+		t.Fatalf("ParsedPath.Segments len = %d, want 2 (%+v)", len(pp.Segments), pp.Segments)
+	}
+	if got := pp.Segments[0]; got.Name != "ehr_id" || got.Predicate != "" {
+		t.Errorf("Segments[0] = %+v, want {ehr_id}", got)
+	}
+	if got := pp.Segments[1]; got.Name != "value" || got.Predicate != "" {
+		t.Errorf("Segments[1] = %+v, want {value}", got)
+	}
+	if pc.Path != pp.Raw {
+		t.Errorf("Comparison.Path %q != ParsedPath.Raw %q (must agree)", pc.Path, pp.Raw)
+	}
+}
+
 // TestClassArchetypePredicateNotComparison confirms a non-comparison class
 // predicate (an archetype HRID) is distinguishable: PredicateComparison is
 // nil and the HRID lives on Archetype.
@@ -103,7 +138,7 @@ func TestClassArchetypePredicateNotComparison(t *testing.T) {
 // round-trips, the standing predicate survives a parse→emit→parse cycle, and
 // emission is idempotent.
 func TestStandingPredicateRoundTrip(t *testing.T) {
-	q, err := parse.ParseQuery(gap19Query)
+	q, err := parse.ParseQuery(standingPredicateQuery)
 	if err != nil {
 		t.Fatalf("ParseQuery: %v", err)
 	}
@@ -145,5 +180,9 @@ func TestStandingPredicateLiteralValue(t *testing.T) {
 	sv, ok := pc.Val.(aql.StringValue)
 	if !ok || sv.S != "Vital signs" {
 		t.Errorf("PredicateComparison.Val = %#v, want StringValue{Vital signs}", pc.Val)
+	}
+	if pc.ParsedPath == nil || len(pc.ParsedPath.Segments) != 2 ||
+		pc.ParsedPath.Segments[0].Name != "name" || pc.ParsedPath.Segments[1].Name != "value" {
+		t.Errorf("PredicateComparison.ParsedPath = %+v, want segments [name value]", pc.ParsedPath)
 	}
 }

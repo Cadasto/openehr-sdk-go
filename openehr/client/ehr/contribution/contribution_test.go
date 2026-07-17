@@ -130,12 +130,12 @@ func TestCommitRejectsInputs(t *testing.T) {
 	}
 }
 
-// TestCommitSubmissionShape pins SDK-GAP-10 / PROBE-072 — the wire body
+// TestCommitSubmissionShape pins REQ-050/095 / PROBE-072 — the wire body
 // of POST /ehr/{id}/contribution must be the ITS-REST Contribution_create
 // shape (versions[i] is ORIGINAL_VERSION<T> with inline data), NOT the
 // persisted CONTRIBUTION shape (versions[] of OBJECT_REF). The
 // regression we are guarding against is exactly the second shape: the
-// pre-SDK-GAP-10 Commit took *rm.Contribution and emitted
+// pre-REQ-050/095 Commit took *rm.Contribution and emitted
 // versions[]: [{"_type":"OBJECT_REF",...}].
 func TestCommitSubmissionShape(t *testing.T) {
 	var capturedBody []byte
@@ -179,7 +179,7 @@ func TestCommitSubmissionShape(t *testing.T) {
 	switch t0 := v0["_type"]; t0 {
 	case "ORIGINAL_VERSION", "IMPORTED_VERSION":
 	case "OBJECT_REF":
-		t.Errorf("versions[0] is OBJECT_REF — pre-SDK-GAP-10 persisted shape leaked into the submission body")
+		t.Errorf("versions[0] is OBJECT_REF — pre-REQ-050/095 persisted shape leaked into the submission body")
 	default:
 		t.Errorf("versions[0]._type = %v (want ORIGINAL_VERSION or IMPORTED_VERSION)", t0)
 	}

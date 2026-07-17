@@ -174,7 +174,7 @@ func TestLintValidPathNoWarning(t *testing.T) {
 }
 
 // A path with a wrong structural attribute (eventz) must warn, localised to
-// the offending segment and path (GAP-5: payload assertion).
+// the offending segment and path.
 func TestLintBadPathWarns(t *testing.T) {
 	const rawPath = "o/data[at0001]/eventz/value"
 	c := mustCompile(t, "vital_signs")
@@ -223,7 +223,7 @@ func TestLintWrongAtCodeLenientFallback(t *testing.T) {
 
 // --- Review-driven coverage additions ---------------------------------------
 
-// GAP-2: a referenced $param that IS bound produces no aql_unbound_param (the
+// A referenced $param that IS bound produces no aql_unbound_param (the
 // negative of TestLintUnboundParam — guards against an inverted condition).
 func TestLintBoundParamClean(t *testing.T) {
 	q := aql.NewQuery(
@@ -240,7 +240,7 @@ func TestLintBoundParamClean(t *testing.T) {
 	}
 }
 
-// GAP-3: each hasIdentifiableScope disjunct (param-archetype, VERSION) on its
+// Each hasIdentifiableScope disjunct (param-archetype, VERSION) on its
 // own suppresses aql_from_archetype — guards the OR-chain against losing a
 // disjunct. (Literal archetype and EHR are already covered elsewhere.)
 func TestLintIdentifiableScopeSuppressesWarning(t *testing.T) {
@@ -255,7 +255,7 @@ func TestLintIdentifiableScopeSuppressesWarning(t *testing.T) {
 	}
 }
 
-// GAP-4: with multiple unused params, the aql_unused_param issues appear in
+// With multiple unused params, the aql_unused_param issues appear in
 // deterministic sorted-key order (the sort is a no-op with a single param).
 func TestLintUnusedParamsSorted(t *testing.T) {
 	q := aql.NewQuery("SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]")
@@ -277,7 +277,7 @@ func TestLintUnusedParamsSorted(t *testing.T) {
 	}
 }
 
-// GAP-6: Lint is collect-all — one query tripping Layer-2 alias, Layer-2
+// Lint is collect-all — one query tripping Layer-2 alias, Layer-2
 // param, and Layer-3 archetype checks returns all three in a single pass.
 func TestLintCollectAll(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
@@ -295,7 +295,7 @@ func TestLintCollectAll(t *testing.T) {
 	}
 }
 
-// GAP-7: a nil *Document is guarded (no panic) and yields aql_syntax.
+// A nil *Document is guarded (no panic) and yields aql_syntax.
 func TestLintNilDocument(t *testing.T) {
 	r := lint.Lint(nil, nil)
 	if r.OK() || !has(r, "aql_syntax") {

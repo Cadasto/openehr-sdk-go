@@ -29,6 +29,8 @@ make build
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
+| [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
+| [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + conformant `WithTemplate` decode (REQ-053) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
@@ -205,7 +207,7 @@ byte-identical : true
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (SDK-GAP-17 Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -326,6 +328,74 @@ addressable primitive-leaf paths (6) — Builder.Set targets:
 ```
 
 **What to copy into your app:** hold `*templatecompile.CompiledNode` / `*templatecompile.CompiledAttribute` in your own walker; `node.RMTypeName()` + `attr.Cardinality()`/`Required()` drive widget choice and required-markers, `node.Term(code, "")` gives the label, `node.PrimitiveConstraint()` marks the editable leaves, and `node.AQLPath()` yields the `Builder.Set` path.
+
+---
+
+### webtemplate-export
+
+**Purpose:** Export a compiled OPT as EHRbase `openEHR_SDK` v2.3 **WebTemplate JSON** (REQ-106, ADR 0014) — the lossy, UI-oriented projection form renderers and FLAT-path mappers consume. Prints the form-oriented tree (FLAT-path `id`, RM type, occurrences, input widgets), then the deterministic document; `-json` dumps the full indented WebTemplate instead.
+
+```bash
+go run ./cmd/examples/webtemplate-export
+go run ./cmd/examples/webtemplate-export path/to/template.opt
+go run ./cmd/examples/webtemplate-export -json path/to/template.opt
+```
+
+**Packages:** `openehr/template`, `openehr/templatecompile`, `openehr/template/webtemplate` — **no `internal/` import.**
+
+**Sample output (abridged):**
+
+```text
+template : vital_signs (vital_signs.opt)
+version  : 2.3   defaultLanguage: en
+document : 9839 bytes deterministic JSON (application/openehr.wt+json)
+
+form tree (id [rmType] occurrences — inputs):
+encounter [COMPOSITION] 1..1
+  category [DV_CODED_TEXT] 1..1 — code:CODED_TEXT(1 codes)
+  blood_pressure [OBSERVATION] 0..*
+    any_event [EVENT] 0..*
+      systolic [DV_QUANTITY] 0..1 — magnitude:DECIMAL, unit:CODED_TEXT(1 codes)
+      time [DV_DATE_TIME] 0..1 — DATETIME
+    language [CODE_PHRASE] 0..1
+    subject [PARTY_PROXY] 0..1 — id:TEXT, id_scheme:TEXT, id_namespace:TEXT, name:TEXT
+  ...
+```
+
+**What to copy into your app:** `webtemplate.Marshal(compiled)` for the bytes (`application/openehr.wt+json`), or `webtemplate.Build(compiled)` when you post-process the typed tree first — each `Node.ID` is the FLAT-path segment consumers bind to, and each leaf's `Inputs` (`suffix`/`type`/`list`/`validation`) drives the widget. Both fail loudly (`ErrEmptyTemplate` / `ErrNoDefaultLanguage` / `ErrIDCollision`) rather than emit ambiguous output; accepted reference deltas are documented in the package's `deviations.md`.
+
+---
+
+### flat-roundtrip
+
+**Purpose:** Convert a canonical `COMPOSITION` to the **FLAT** and **STRUCTURED** Simplified Formats and back (REQ-053), driven by the composition's Web Template (REQ-106). Shows the encode/decode entry points, the OPT-free `FlatToStructured`, the `COMPOSITION → FLAT → COMPOSITION → FLAT` round-trip, and the **conformant decode** (`WithTemplate`) whose result validates against the OPT — with no transport or auth.
+
+```bash
+go run ./cmd/examples/flat-roundtrip
+```
+
+**Packages:** `openehr/serialize/simplified`, `openehr/template/webtemplate`, `openehr/templatecompile`, `openehr/serialize/canjson`, `openehr/validation` — **no `internal/` import.**
+
+**Sample output (abridged, keys sorted):**
+
+```text
+FLAT (application/openehr.wt.flat+json):
+  ctx/composer_name = Max Mustermann
+  ctx/language = en
+  ctx/territory = DE
+  ctx/time = 2022-02-03T04:05:06.000
+  test_dv_quantity_open_constraint.v0/category|code = 433
+  test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|magnitude = 130
+  test_dv_quantity_open_constraint.v0/test123/any_event:0/my_dv_quantity|unit = mmHg
+  ...
+
+STRUCTURED (application/openehr.wt.structured+json): 412 bytes
+
+OK: FLAT -> COMPOSITION -> FLAT round-trips for Test_dv_quantity_open_constraint.v0
+OK: WithTemplate decode validates against the OPT
+```
+
+**What to copy into your app:** build the Web Template once (`templatecompile.Compile` + `webtemplate.Build`), then `simplified.MarshalFlat(comp, wt)` / `UnmarshalFlat(data, wt)` (and the `…Structured` pair) for OPT-driven conversion, or `FlatToStructured` / `StructuredToFlat` for OPT-free interconversion. Pass `simplified.WithTemplate(compiled)` to `Unmarshal*` when you need an OPT-validatable composition (names + RM-mandatory attributes repopulated) rather than a format-idempotent one. Composition-level metadata rides `ctx/`; decorated or exotic datatypes ride `|raw`. The codec is strict on decode (unknown paths/suffixes, wrong-typed ctx values, index games, and malformed input error rather than drop data) — see the package's `deviations.md`.
 
 ---
 

@@ -11,7 +11,7 @@
 
 ## Goal
 
-Close **SDK-GAP-11**: `canjson.Unmarshal[Composition]` MUST accept any structurally-valid openEHR RM JSON payload the BMM admits — not just payloads whose concrete `_type` discriminator exactly matches the declared Go field type. The gap surfaces when a consumer routes wire bytes through the typed leaf client (`composition.Save` etc.) — the same path SDK-GAP-09 / SDK-GAP-10 already standardised. Closing it makes the typed client the right choice for **every** spec-conformant fixture, not just the subset whose authoring tool emits the most-narrow concrete type.
+Close the **REQ-052/040** decode-side polymorphism gap: `canjson.Unmarshal[Composition]` MUST accept any structurally-valid openEHR RM JSON payload the BMM admits — not just payloads whose concrete `_type` discriminator exactly matches the declared Go field type. The gap surfaces when a consumer routes wire bytes through the typed leaf client (`composition.Save` etc.) — the same path the REQ-094 bare-decode contract and the REQ-050/095 `contribution.Commit` shape fix already standardised. Closing it makes the typed client the right choice for **every** spec-conformant fixture, not just the subset whose authoring tool emits the most-narrow concrete type.
 
 ## Investigation summary
 
@@ -28,7 +28,7 @@ canjson: COMPOSITION: decode /other_context: ... decode /items/0: typereg.Decode
 
 The error trace points at the **`name`** field of an `ELEMENT` / `CLUSTER`, not its `value`. Per the BMM ([`openehr_rm_1.2.0.bmm.json`](../../../resources/bmm/)), `LOCATABLE.name: DV_TEXT`. Per the openEHR RM spec, `DV_TEXT` admits Liskov substitution by any subtype; today the only direct subtype is `DV_CODED_TEXT` (concrete).
 
-`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the SDK-GAP-11 draft's surface read was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
+`ELEMENT.value` itself is already correctly typed as `DataValue` (abstract) and routed through `typereg.DecodeAs[DataValue]` in [`openehr/rm/data_structures_representation_jsonunmar_gen.go:129`](../../../openehr/rm/data_structures_representation_jsonunmar_gen.go#L129) — the inbound gap report's surface read was off; the actual gap is on every `LOCATABLE`-descended class's `name` (and on any other concrete-typed slot that admits substitution per BMM ancestry).
 
 The root cause is the **strict class-equality check** every generated `UnmarshalJSON` emits today (e.g. [`data_types_text_jsonunmar_gen.go:159`](../../../openehr/rm/data_types_text_jsonunmar_gen.go#L159)):
 
@@ -140,9 +140,9 @@ A narrow interface (e.g. `DVTextLike` = `DV_TEXT | DV_CODED_TEXT`) constrains th
 
 ## Cross-references
 
-- **SDK-GAP-11** — consumer gap report (private; concept only — naming and source consumer kept anonymous in this plan).
-- **SDK-GAP-09** — response-side bare-decode contract (closed in PR #17).
-- **SDK-GAP-10** — request-side `contribution.Commit` shape (closed in PR #22).
+- **REQ-052/040 / PROBE-038** — this decode-side polymorphism gap; consumer report kept private (concept only — naming and source consumer kept anonymous in this plan).
+- **REQ-094 (+052) / PROBE-061/071** — response-side bare-decode contract (closed in PR #17).
+- **REQ-050/095 / PROBE-072** — request-side `contribution.Commit` shape (closed in PR #22).
 - [`internal/bmmgen/render_jsonunmar.go`](../../../internal/bmmgen/render_jsonunmar.go) — current generator for JSON unmarshallers; `polymorphicProperty` is the entry point.
 - [`openehr/rm/typereg/registry.go`](../../../openehr/rm/typereg/registry.go) — type registry and `DecodeAs[T]` dispatch.
 - [openEHR RM Latest — DV_TEXT inheritance](https://specifications.openehr.org/releases/RM/latest/data_types.html#_dv_text_class) and [DV_INTERVAL](https://specifications.openehr.org/releases/RM/latest/data_types.html#_dv_interval_class).

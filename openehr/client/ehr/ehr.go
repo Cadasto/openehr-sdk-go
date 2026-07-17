@@ -23,7 +23,7 @@ func Get(ctx context.Context, c *transport.Client, id EHRID) (*rm.EHR, *VersionM
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
-		Path:   "/ehr/" + url.PathEscape(string(id)),
+		Path:   "/ehr/" + string(id),
 		Route:  "/ehr/{ehr_id}",
 	}
 	out, meta, err := transport.Decode[rm.EHR](ctx, c, req)
@@ -42,7 +42,7 @@ func Exists(ctx context.Context, c *transport.Client, id EHRID) (bool, error) {
 	}
 	resp, err := c.Do(ctx, &transport.Request{
 		Method: http.MethodHead,
-		Path:   "/ehr/" + url.PathEscape(string(id)),
+		Path:   "/ehr/" + string(id),
 		Route:  "/ehr/{ehr_id}",
 	})
 	if err != nil {
@@ -143,7 +143,7 @@ func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm
 	}
 	if cfg.ehrID != "" {
 		req.Method = http.MethodPut
-		req.Path = "/ehr/" + url.PathEscape(string(cfg.ehrID))
+		req.Path = "/ehr/" + string(cfg.ehrID)
 		req.Route = "/ehr/{ehr_id}"
 	} else {
 		req.Method = http.MethodPost

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -38,7 +37,7 @@ func WithPrefer(p transport.Prefer) CommitOption {
 // Wire: POST /ehr/{ehr_id}/contribution. Request body is the
 // ITS-REST `Contribution_create` schema — `{audit, versions[]}` with
 // each `versions[i]` an inline `ORIGINAL_VERSION<T>` or
-// `IMPORTED_VERSION<T>` (SDK-GAP-10 / PROBE-072), NOT the persisted
+// `IMPORTED_VERSION<T>` (REQ-050/095 / PROBE-072), NOT the persisted
 // `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`. The
 // response decodes as `*rm.Contribution` (persisted shape, returned
 // under `Prefer: return=representation`).
@@ -65,7 +64,7 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	}
 	req := &transport.Request{
 		Method: http.MethodPost,
-		Path:   "/ehr/" + url.PathEscape(string(ehrID)) + "/contribution",
+		Path:   "/ehr/" + string(ehrID) + "/contribution",
 		Route:  routeTemplate,
 		Body:   body,
 		Prefer: cfg.prefer,

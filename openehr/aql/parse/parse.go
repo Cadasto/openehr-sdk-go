@@ -47,8 +47,8 @@ type Document struct {
 
 	// query / queryErr are the structured AST and any catalogue-gap
 	// error from extraction, populated lazily on the first call to
-	// [Document.Query] / [Document.QueryErr] / [ParseQuery] (SDK-GAP-17
-	// Tier 2, REQ-113). Extraction cost is only paid when a consumer
+	// [Document.Query] / [Document.QueryErr] / [ParseQuery] (REQ-113
+	// Tier 2). Extraction cost is only paid when a consumer
 	// asks for the structured shape; lint-only callers stay on the
 	// existing flat view. queryOnce guards the lazy build.
 	queryOnce sync.Once
@@ -105,7 +105,7 @@ func Parse(q string) (*Document, error) {
 // Parsed reports whether d is the result of a successful [Parse] call.
 func (d *Document) Parsed() bool { return d != nil && d.tree != nil }
 
-// ParseQuery is the SDK-GAP-17 Tier-2 entry (REQ-113): it validates q
+// ParseQuery is the REQ-113 Tier-2 entry: it validates q
 // against the SDK grammar profile (the same grammar [Parse] uses) and
 // returns the structured [Query] AST directly — the read-side mirror
 // of the [aql.Builder] construction model.
@@ -138,7 +138,7 @@ func ParseQuery(q string) (*Query, error) {
 // Deprecated: Tree exposes the generated parser context
 // ([gen.ISelectQueryContext]) and may change shape on any grammar
 // regeneration. Use [Document.Query] / [ParseQuery] for the stable
-// structured AST; Tree remains as the SDK-GAP-17 Tier-1 escape hatch
+// structured AST; Tree remains as the REQ-113 Tier-1 escape hatch
 // for consumers that need raw-tree access during the transition.
 //
 // Returns nil for a zero-value document — call only after a successful
@@ -150,8 +150,8 @@ func (d *Document) Tree() gen.ISelectQueryContext {
 	return d.tree
 }
 
-// Query returns the structured AQL AST for this document (SDK-GAP-17
-// Tier 2, REQ-113). Lazily extracted on the first call and cached
+// Query returns the structured AQL AST for this document (REQ-113
+// Tier 2). Lazily extracted on the first call and cached
 // behind a [sync.Once] so concurrent callers see a single, stable
 // pointer; repeated calls return the same pointer. Returns nil for a
 // zero-value document.
@@ -178,7 +178,7 @@ func (d *Document) Query() *Query {
 }
 
 // QueryErr reports any catalogue-gap diagnostic captured during
-// extraction of the structured [Query] (SDK-GAP-17 Tier 2). Returns
+// extraction of the structured [Query] (REQ-113 Tier 2). Returns
 // nil when the source falls fully inside the v1 catalogue, otherwise
 // an error wrapping [aql.ErrIncompleteAST] naming the dropped shapes.
 //

@@ -24,7 +24,7 @@ func distinct(vals []any) int {
 	return len(set)
 }
 
-// TestSampleValue_validReproducibleVaried covers the three SDK-GAP-14
+// TestSampleValue_validReproducibleVaried covers the three REQ-107
 // guarantees for the in-constraint sampler: every draw is valid against
 // the constraint, a fixed seed is reproducible, and the values vary.
 func TestSampleValue_validReproducibleVaried(t *testing.T) {
@@ -232,12 +232,12 @@ func TestSampleValue_boolean(t *testing.T) {
 	}
 }
 
-// TestSampleValue_enumerableDoesNotCollapse is the SDK-GAP-14 regression
+// TestSampleValue_enumerableDoesNotCollapse is the REQ-107 regression
 // guard for the silent ExampleFill collapse: a multi-member enumerable
 // constraint must actually draw values other than ExampleValue. A future
 // filter/bounds bug that made the sampler always fall back would otherwise
 // be invisible (output stays valid, just non-varying) — the end-to-end
-// gap14 test would still pass on variation from a different leaf.
+// value-fill test would still pass on variation from a different leaf.
 func TestSampleValue_enumerableDoesNotCollapse(t *testing.T) {
 	c := constraints.CInteger{
 		List:  []int64{10, 20, 30},
@@ -261,7 +261,7 @@ func TestSampleValue_enumerableDoesNotCollapse(t *testing.T) {
 }
 
 // TestSampleValue_quantityMagnitudeVaries pins the DvQuantity magnitude
-// draw specifically (the gap14 end-to-end test only proves *some* leaf
+// draw specifically (the value-fill end-to-end test only proves *some* leaf
 // varies): across draws the in-range magnitude must take ≥2 distinct
 // values, so a regression to a fixed example magnitude is caught here.
 func TestSampleValue_quantityMagnitudeVaries(t *testing.T) {

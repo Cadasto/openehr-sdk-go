@@ -1,0 +1,199 @@
+{
+  "templateId": "minimal_observation.en.v1",
+  "version": "2.3",
+  "defaultLanguage": "en",
+  "languages": [
+    "en"
+  ],
+  "tree": {
+    "id": "minimal",
+    "name": "Minimal",
+    "localizedName": "Minimal",
+    "rmType": "COMPOSITION",
+    "nodeId": "openEHR-EHR-COMPOSITION.minimal.v1",
+    "min": 1,
+    "max": 1,
+    "localizedNames": {
+      "en": "Minimal"
+    },
+    "localizedDescriptions": {
+      "en": "unknown"
+    },
+    "aqlPath": "",
+    "children": [
+      {
+        "id": "category",
+        "rmType": "DV_CODED_TEXT",
+        "min": 1,
+        "max": 1,
+        "aqlPath": "/category",
+        "inputs": [
+          {
+            "suffix": "code",
+            "type": "CODED_TEXT",
+            "list": [
+              {
+                "value": "433"
+              }
+            ],
+            "terminology": "openehr"
+          }
+        ]
+      },
+      {
+        "id": "minimal",
+        "name": "Minimal",
+        "localizedName": "Minimal",
+        "rmType": "OBSERVATION",
+        "nodeId": "openEHR-EHR-OBSERVATION.minimal.v1",
+        "min": 0,
+        "max": -1,
+        "localizedNames": {
+          "en": "Minimal"
+        },
+        "localizedDescriptions": {
+          "en": "unknown"
+        },
+        "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]",
+        "children": [
+          {
+            "id": "cualquier_evento",
+            "name": "Cualquier evento",
+            "localizedName": "Cualquier evento",
+            "rmType": "EVENT",
+            "nodeId": "at0002",
+            "min": 0,
+            "max": 1,
+            "localizedNames": {
+              "en": "Cualquier evento"
+            },
+            "localizedDescriptions": {
+              "en": "*"
+            },
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]",
+            "children": [
+              {
+                "id": "text",
+                "name": "text",
+                "localizedName": "text",
+                "rmType": "DV_TEXT",
+                "nodeId": "at0004",
+                "min": 0,
+                "max": 1,
+                "localizedNames": {
+                  "en": "text"
+                },
+                "localizedDescriptions": {
+                  "en": "*"
+                },
+                "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value",
+                "inputs": [
+                  {
+                    "type": "TEXT"
+                  }
+                ]
+              },
+              {
+                "id": "time",
+                "name": "Time",
+                "rmType": "DV_DATE_TIME",
+                "min": 0,
+                "max": 1,
+                "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/time",
+                "inputs": [
+                  {
+                    "type": "DATETIME"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "language",
+            "name": "Language",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/language"
+          },
+          {
+            "id": "encoding",
+            "name": "Encoding",
+            "rmType": "CODE_PHRASE",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/encoding"
+          },
+          {
+            "id": "subject",
+            "name": "Subject",
+            "rmType": "PARTY_PROXY",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/subject",
+            "inputs": [
+              {
+                "suffix": "id",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_scheme",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "id_namespace",
+                "type": "TEXT"
+              },
+              {
+                "suffix": "name",
+                "type": "TEXT"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "language",
+        "name": "Language",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/language"
+      },
+      {
+        "id": "territory",
+        "name": "Territory",
+        "rmType": "CODE_PHRASE",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/territory"
+      },
+      {
+        "id": "composer",
+        "name": "Composer",
+        "rmType": "PARTY_PROXY",
+        "min": 0,
+        "max": 1,
+        "aqlPath": "/composer",
+        "inputs": [
+          {
+            "suffix": "id",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_scheme",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "id_namespace",
+            "type": "TEXT"
+          },
+          {
+            "suffix": "name",
+            "type": "TEXT"
+          }
+        ]
+      }
+    ]
+  }
+}

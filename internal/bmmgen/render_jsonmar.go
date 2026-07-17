@@ -14,7 +14,7 @@ import (
 
 // jsonpolyImportPath is the leaf helper package used to marshal
 // interface-typed (polymorphic) fields so a concrete value sitting in
-// an interface slot still emits its `_type` discriminator (SDK-GAP-13
+// an interface slot still emits its `_type` discriminator (REQ-052
 // sub-gap A). It depends only on reflect + encoding/json, so the
 // generated marshaller packages can import it without an import cycle.
 const jsonpolyImportPath = "github.com/cadasto/openehr-sdk-go/openehr/internal/jsonpoly"
@@ -303,7 +303,7 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 			// Polymorphic field: pre-marshalled to RawMessage by the
 			// method body via the jsonpoly helper, which injects the
 			// mandatory `_type` even when a concrete value (not pointer)
-			// sits in the interface slot (SDK-GAP-13 sub-gap A).
+			// sits in the interface slot (REQ-052 sub-gap A).
 			line, err = polyWireField(ef.Prop)
 		}
 		if err != nil {
@@ -366,7 +366,7 @@ func renderMarshalJSON(plan *Plan, pc *PlannedClass) (string, error) {
 // pointer in the DVInterval[DVOrdered] that typereg rebuilds on decode it
 // emits `_type` directly. So `_type` survives the round-trip in both
 // shapes. The DV_INTERVAL<T> collapse to DVInterval[DVOrdered] is handled
-// validator-side (SDK-GAP-13 sub-gap B), not here. (A non-pointer value
+// validator-side (REQ-052 sub-gap B), not here. (A non-pointer value
 // placed directly in a DVInterval[DVOrdered] bound would drop `_type`;
 // that hand-built case is out of scope for this routing.)
 func marshalPolyKind(plan *Plan, owner, emitting *bmm.SimpleClass, prop bmm.Property) polyKind {

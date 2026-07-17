@@ -93,7 +93,7 @@ type generator struct {
 	opts     Options
 	// valueSampler draws in-constraint leaf values when opts.ValueFill
 	// is RandomFill; the zero value (used under ExampleFill) is never
-	// consulted. SDK-GAP-14.
+	// consulted. REQ-107.
 	valueSampler sampler
 }
 
@@ -736,7 +736,7 @@ func (g *generator) applyPrimitiveExample(
 	ex := pc.ExampleValue()
 	if g.opts.ValueFill == RandomFill {
 		// In-constraint sampled value (valid by construction); same Go
-		// shape as ExampleValue so the switch below is unchanged. SDK-GAP-14.
+		// shape as ExampleValue so the switch below is unchanged. REQ-107.
 		ex = sampleValue(pc, g.valueSampler)
 	}
 	switch v := rmValue.(type) {
