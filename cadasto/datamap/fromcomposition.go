@@ -165,8 +165,24 @@ func decodeFeederAudit(raw any) map[string]any {
 	}
 	out := map[string]any{}
 	if osa, ok := m["originating_system_audit"].(map[string]any); ok {
+		det := map[string]any{}
 		if sysID, _ := osa["system_id"].(string); sysID != "" {
-			out["originating_system_audit"] = map[string]any{"system_id": sysID}
+			det["system_id"] = sysID
+		}
+		// time (FEEDER_AUDIT_DETAILS.time, DV_DATE_TIME) → platte string, zodat
+		// het bron-verzendmoment (HL7 MSH-7) via de datamap terugleesbaar is.
+		switch t := osa["time"].(type) {
+		case string:
+			if t != "" {
+				det["time"] = t
+			}
+		case map[string]any:
+			if v, _ := t["value"].(string); v != "" {
+				det["time"] = v
+			}
+		}
+		if len(det) > 0 {
+			out["originating_system_audit"] = det
 		}
 	}
 	if rawIDs, ok := m["originating_system_item_ids"].([]any); ok {

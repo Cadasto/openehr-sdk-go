@@ -286,3 +286,21 @@ func TestDecodeAction_NoIsmTransition_NoPanic(t *testing.T) {
 		t.Errorf("careflow_step should be absent when ism_transition is absent, got %#v", root["careflow_step"])
 	}
 }
+
+// PROBE-0544 proves REQ-0037 — decodeFeederAudit surfaces originating_system_audit.time
+// (bron-verzendmoment, HL7 MSH-7) als platte string uit de RM DV_DATE_TIME.
+func TestDecodeFeederAudit_Time(t *testing.T) {
+	fa := decodeFeederAudit(map[string]any{
+		"originating_system_audit": map[string]any{
+			"system_id": "GLIMS",
+			"time":      map[string]any{"_type": "DV_DATE_TIME", "value": "2026-07-16T08:10:00"},
+		},
+	})
+	osa, ok := fa["originating_system_audit"].(map[string]any)
+	if !ok {
+		t.Fatalf("originating_system_audit missing: %v", fa)
+	}
+	if osa["time"] != "2026-07-16T08:10:00" {
+		t.Errorf("time = %v, want plain string 2026-07-16T08:10:00", osa["time"])
+	}
+}
