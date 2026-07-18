@@ -90,14 +90,58 @@ var knownTemplateMetadataFields = map[string]struct{}{
 	"description":       {},
 }
 
+// templateTimestampLayouts are the time formats accepted for
+// `created_timestamp`. The Definition API documents RFC3339, but some
+// deployments emit a space-separated, timezone-less form
+// ("2006-01-02 15:04:05"); decode tolerantly rather than failing the whole
+// response (a strict time.Time decode would abort ListTemplates entirely).
+var templateTimestampLayouts = []string{
+	time.RFC3339Nano,
+	time.RFC3339,
+	"2006-01-02 15:04:05.999999999",
+	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05",
+}
+
+// parseTemplateTimestamp decodes the created_timestamp JSON value leniently.
+// A JSON null or empty string yields the zero time (no error).
+func parseTemplateTimestamp(raw json.RawMessage) (time.Time, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return time.Time{}, nil
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return time.Time{}, fmt.Errorf("created_timestamp: %w", err)
+	}
+	if s == "" {
+		return time.Time{}, nil
+	}
+	for _, layout := range templateTimestampLayouts {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("created_timestamp: cannot parse %q as a known timestamp layout", s)
+}
+
 // UnmarshalJSON decodes both documented fields and Extras in one pass.
 func (m *TemplateMetadata) UnmarshalJSON(data []byte) error {
 	type alias TemplateMetadata
-	var a alias
-	if err := json.Unmarshal(data, &a); err != nil {
+	// Shadow created_timestamp as a RawMessage so the strict time.Time
+	// decoder never sees a non-RFC3339 deployment timestamp; parse it
+	// leniently afterwards.
+	aux := struct {
+		*alias
+		CreatedOn json.RawMessage `json:"created_timestamp,omitempty"`
+	}{alias: (*alias)(m)}
+	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	*m = TemplateMetadata(a)
+	ts, err := parseTemplateTimestamp(aux.CreatedOn)
+	if err != nil {
+		return err
+	}
+	m.CreatedOn = ts
 
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {

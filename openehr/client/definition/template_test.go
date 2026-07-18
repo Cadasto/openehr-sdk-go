@@ -191,6 +191,28 @@ func TestListTemplates(t *testing.T) {
 	}
 }
 
+// TestListTemplates_SpaceSeparatedTimestamp proves a deployment that emits a
+// space-separated, timezone-less created_timestamp ("2006-01-02 15:04:05")
+// instead of RFC3339 decodes without aborting the whole response.
+func TestListTemplates_SpaceSeparatedTimestamp(t *testing.T) {
+	const body = `[{"template_id":"body_weight.v1","created_timestamp":"2026-06-22 14:50:55"}]`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14)
+	if err != nil {
+		t.Fatalf("space-separated timestamp must not fail decode: %v", err)
+	}
+	if len(list) != 1 || list[0].TemplateID != "body_weight.v1" {
+		t.Fatalf("unexpected list: %+v", list)
+	}
+	if got := list[0].CreatedOn.UTC().Format("2006-01-02 15:04:05"); got != "2026-06-22 14:50:55" {
+		t.Errorf("CreatedOn = %q, want 2026-06-22 14:50:55", got)
+	}
+}
+
 func TestListTemplatesEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
