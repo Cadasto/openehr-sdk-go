@@ -22,10 +22,11 @@
 // docs/specifications/datamap.md). Round-trip test vectors live under
 // testdata/ (OPT + datamap + schema + composition fixtures).
 //
-// Building-block use: the codec operates on openEHR-core types only
-// (openehr/template, openehr/composition, openehr/rm, openehr/
-// validation) and does NOT import transport/, auth/, openehr/client/*,
-// or any other cadasto/<name> package. Validate is the sole exception:
+// Building-block use: the codec builds on openEHR-core only — it walks the
+// OPT via openehr/template (+ openehr/template/constraints) and emits
+// canonical-JSON RM shapes (map[string]any), so it does NOT import
+// openehr/composition, transport/, auth/, openehr/client/*, or any other
+// cadasto/<name> package. Validate is the sole exception:
 // it depends on a third-party JSON Schema engine (santhosh-tekuri/
 // jsonschema) to check a payload against Schema(opt). Per AGENTS.md the
 // domain client (cadasto/care) consumes this codec through an interface
