@@ -80,6 +80,71 @@ Examples:
 }]
 ```
 
+## Composer/performer external_ref id kind (order-collection)
+
+`ToComposition`'s composer field, and `other_participations[].performer`
+(which reuses the composer encoder), accept an expanded map with `id*` keys
+that become an `external_ref` (`PARTY_REF`) so the party is AQL-queryable on
+identifier instead of display name:
+
+```jsonc
+{"name": "...",
+ "id": "...", "id_scheme": "...", "id_namespace": "...", "id_type": "...",
+ "id_type_id": "..."}
+```
+
+The `external_ref.id` RM type defaults to `GENERIC_ID` (a scheme-bearing
+external code, e.g. an AGB):
+
+```jsonc
+{"_type": "GENERIC_ID", "value": "<id>", "scheme": "<id_scheme, default \"id\">"}
+```
+
+Setting `id_type_id: "HIER_OBJECT_ID"` switches the emitted id to a
+`HIER_OBJECT_ID` instead — no `scheme` attribute (`HIER_OBJECT_ID` has none):
+
+```jsonc
+{"_type": "HIER_OBJECT_ID", "value": "<id>"}
+```
+
+Use `HIER_OBJECT_ID` when the performer/composer is referenced by its own
+platform id (e.g. an `ORGANISATION` collection-point uid) rather than an
+external scheme code — needed for an order's collection performer to
+round-trip structurally. Any other value of `id_type_id` (or its absence)
+keeps the `GENERIC_ID` default, so existing payloads are unaffected. The
+decoder (`FromComposition`) reads the id kind back: a `GENERIC_ID` decodes its
+`scheme` into `id_scheme`; a `HIER_OBJECT_ID` decodes an `id_type_id:
+"HIER_OBJECT_ID"` marker instead (no `id_scheme`), so a read → merge → write
+round-trip reproduces the same id kind.
+
+## other_participations mode (order-collection)
+
+Each entry in a datamap `other_participations` array (§3.2.2) MAY carry a
+`mode` — the `PARTICIPATION.mode` `DV_CODED_TEXT` (e.g. the collection mode of
+an order's collection performer):
+
+```jsonc
+{"function": "requesting_organisation",
+ "performer": {"name": "...", "id": "...", "id_type_id": "HIER_OBJECT_ID",
+               "id_namespace": "local", "id_type": "ORGANISATION"},
+ "mode": "openehr::268"}
+```
+
+`mode` follows the same short/expanded coded-value rules as any other
+`_code`-shaped field in this document (§ Terminology binding): a
+`"terminology::code"` short string, a bare `"at..."`/arbitrary local code, or
+an expanded `{code, value, terminology}` object. When absent, `mode` is
+omitted from the emitted `PARTICIPATION` rather than emitted empty; a
+malformed value (no resolvable code) fails the encode. The decoder reads
+`mode` back as the expanded `{code, value, terminology}` object.
+
+> **Conformance probe:** `PROBE-0799` (REQ-058) —
+> `TestOtherParticipationsHierObjectIDPerformerAndMode` in
+> [`cadasto/datamap/other_participations_test.go`](../../cadasto/datamap/other_participations_test.go)
+> round-trips a `HIER_OBJECT_ID` performer id plus a participation `mode`
+> through `encodeOtherParticipations` → `decodeOtherParticipations` and asserts
+> the decoded datamap is identical to the input.
+
 ## RM substitutability on decode
 
 When the codec round-trips a Datamap-V2-derived composition through the typed `*rm.Composition` path (e.g. `care.SaveData` preflight, `canjson.Unmarshal`), the decoder MUST honour RM substitutability for the cluster `name` attribute:

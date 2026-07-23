@@ -1153,6 +1153,9 @@ requirements:
     status: draft
     implementation: planned
     packages: [cadasto/datamap]
+    notes: "Composer/performer external_ref id kind (GENERIC_ID default, opt-in HIER_OBJECT_ID via id_type_id) + other_participations mode (DV_CODED_TEXT) — order-collection-structural Task 1; PROBE-0799."
+    tests:
+      - cadasto/datamap/other_participations_test.go
 
   - id: REQ-065
     title: Per-client tenant binding

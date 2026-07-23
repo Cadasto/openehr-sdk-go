@@ -31,11 +31,22 @@ import (
 //
 //	{"name": "...",
 //	 "id": "...", "id_scheme": "...", "id_namespace": "...", "id_type": "...",
+//	 "id_type_id": "...",
 //	 "identifiers": [{"id": "...", "type": "...", "issuer": "...", "assigner": "..."}, ...]}
 //
-// The id* keys become an external_ref (PARTY_REF/GENERIC_ID) so the composer
-// is AQL-queryable on identifier (c/composer/external_ref/id/value) instead
-// of display name; identifiers become DV_IDENTIFIERs (e.g. AGB, tenant).
+// The id* keys become an external_ref (PARTY_REF) so the composer/performer is
+// AQL-queryable on identifier (c/composer/external_ref/id/value) instead of
+// display name; identifiers become DV_IDENTIFIERs (e.g. AGB, tenant).
+//
+// external_ref.id kind (REQ-058, order-collection): the id defaults to
+// GENERIC_ID (a scheme-bearing external code, e.g. an AGB). Setting
+// `id_type_id: "HIER_OBJECT_ID"` switches the emitted id to
+// `{"_type": "HIER_OBJECT_ID", "value": "..."}` instead — no `scheme`
+// attribute (HIER_OBJECT_ID has none) — for referencing a platform object by
+// its own hierarchical id (e.g. an ORGANISATION collection-point uid) rather
+// than an external scheme code. Any other value (or absence) keeps the
+// GENERIC_ID default so existing callers are unaffected. See
+// docs/specifications/datamap.md § Composer/performer external_ref id kind.
 func encodeComposer(v any) map[string]any {
 	out := map[string]any{"_type": "PARTY_IDENTIFIED", "name": "Cadasto SDK"}
 	switch c := v.(type) {
@@ -48,15 +59,19 @@ func encodeComposer(v any) map[string]any {
 			out["name"] = name
 		}
 		if id, _ := c["id"].(string); id != "" {
+			idNode := map[string]any{
+				"_type":  "GENERIC_ID",
+				"value":  id,
+				"scheme": stringOrDefault(c["id_scheme"], "id"),
+			}
+			if stringOrDefault(c["id_type_id"], "") == "HIER_OBJECT_ID" {
+				idNode = map[string]any{"_type": "HIER_OBJECT_ID", "value": id}
+			}
 			out["external_ref"] = map[string]any{
 				"_type":     "PARTY_REF",
 				"namespace": stringOrDefault(c["id_namespace"], "lab24"),
 				"type":      stringOrDefault(c["id_type"], "PERSON"),
-				"id": map[string]any{
-					"_type":  "GENERIC_ID",
-					"value":  id,
-					"scheme": stringOrDefault(c["id_scheme"], "id"),
-				},
+				"id":        idNode,
 			}
 		}
 		if ids, _ := c["identifiers"].([]any); len(ids) > 0 {
@@ -91,21 +106,33 @@ func encodeComposer(v any) map[string]any {
 //
 //	{"function": "requestor",
 //	 "performer": {"name": "...", "id": "...", "id_scheme": "AGB",
-//	               "id_namespace": "lab24", "id_type": "PERSON"}}
+//	               "id_namespace": "lab24", "id_type": "PERSON"},
+//	 "mode": "term::code" | {"code": "...", "value": "...", "terminology": "..."}}
 //
 // The performer reuses encodeComposer so the party is a PARTY_IDENTIFIED whose
-// id* keys land on external_ref (PARTY_REF/GENERIC_ID) — AQL-queryable on
+// id* keys land on external_ref (PARTY_REF) — AQL-queryable on
 // `.../other_participations/performer/external_ref/id/value`, the same seam the
-// composer uses. Entries without a function or performer are skipped; a
-// resulting empty list returns nil so the attribute is omitted rather than
-// emitted empty.
-func encodeOtherParticipations(payload map[string]any) []any {
+// composer uses (including the `id_type_id: "HIER_OBJECT_ID"` switch — REQ-058
+// order-collection — for a performer identified by its own platform id, e.g.
+// an ORGANISATION collection-point, rather than an external scheme code).
+//
+// `mode` is OPTIONAL and follows the same short/expanded coded-value rules as
+// every other `_code`-shaped field in Datamap V2 (docs/specifications/datamap.md
+// § Terminology binding): a `"terminology::code"` short string or an
+// `{code, value, terminology}` expanded object. When absent it is omitted from
+// the emitted PARTICIPATION rather than emitted as an empty DV_CODED_TEXT.
+//
+// Entries without a function or performer are skipped; a resulting empty list
+// returns nil so the attribute is omitted rather than emitted empty. A
+// malformed `mode` value fails the whole encode (mirrors encodeCodedText's
+// stance on malformed coded values elsewhere in the codec).
+func encodeOtherParticipations(payload map[string]any) ([]any, error) {
 	raw, ok := payload["other_participations"].([]any)
 	if !ok || len(raw) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]any, 0, len(raw))
-	for _, r := range raw {
+	for i, r := range raw {
 		m, ok := r.(map[string]any)
 		if !ok {
 			continue
@@ -115,16 +142,40 @@ func encodeOtherParticipations(payload map[string]any) []any {
 		if fn == "" || !ok {
 			continue
 		}
-		out = append(out, map[string]any{
+		p := map[string]any{
 			"_type":     "PARTICIPATION",
 			"function":  dvText(fn),
 			"performer": encodeComposer(perf),
-		})
+		}
+		if mode, present := m["mode"]; present && mode != nil {
+			dv, err := encodeParticipationMode(mode)
+			if err != nil {
+				return nil, fmt.Errorf("other_participations[%d].mode: %w", i, err)
+			}
+			p["mode"] = dv
+		}
+		out = append(out, p)
 	}
 	if len(out) == 0 {
-		return nil
+		return nil, nil
 	}
-	return out
+	return out, nil
+}
+
+// encodeParticipationMode builds a PARTICIPATION.mode DV_CODED_TEXT from a
+// datamap coded value, reusing the same short/expanded parsing rules as
+// cluster `_code` (parseCodeField): a `"terminology::code"` short string, a
+// bare `"at..."`/arbitrary local code, or an expanded
+// `{code, value, terminology}` object.
+func encodeParticipationMode(v any) (map[string]any, error) {
+	terminology, code, display, ok := parseCodeField(v)
+	if !ok {
+		return nil, fmt.Errorf("invalid coded value %#v", v)
+	}
+	if display == "" {
+		display = code
+	}
+	return dvCodedText(display, terminology, code), nil
 }
 
 func ToComposition(opt *template.OperationalTemplate, payload map[string]any) (map[string]any, error) {
@@ -347,7 +398,11 @@ func encodeArchetypeRoot(r contentRoot, payload map[string]any, startTime, langu
 	// ENTRY.other_participations (e.g. requesting clinician / organisation with
 	// an AGB in external_ref) — applies to every ENTRY subtype, so attach before
 	// the INSTRUCTION/ACTION branches. Omitted when the datamap carries none.
-	if parts := encodeOtherParticipations(payload); len(parts) > 0 {
+	parts, err := encodeOtherParticipations(payload)
+	if err != nil {
+		return nil, err
+	}
+	if len(parts) > 0 {
 		out["other_participations"] = parts
 	}
 

@@ -342,11 +342,15 @@ func decodeArchetypeRoot(node map[string]any, r contentRoot) (string, map[string
 //
 //	[{"function": "requestor",
 //	  "performer": {"name": "...", "id": "...", "id_scheme": "AGB",
-//	                "id_namespace": "lab24", "id_type": "PERSON"}}]
+//	                "id_namespace": "lab24", "id_type": "PERSON"},
+//	  "mode": {"code": "...", "value": "...", "terminology": "..."}}]
 //
-// so a read → merge → write round-trip preserves them. Returns nil when the
-// entry has no participations (the attribute is then omitted, not emitted
-// empty).
+// so a read → merge → write round-trip preserves them. `mode` is decoded to
+// the expanded {code, value, terminology} object (mirroring the other coded
+// fields this codec round-trips, e.g. ism_transition current_state/
+// careflow_step) and omitted when the PARTICIPATION carries none. Returns nil
+// when the entry has no participations (the attribute is then omitted, not
+// emitted empty).
 func decodeOtherParticipations(node map[string]any) []any {
 	raw, _ := node["other_participations"].([]any)
 	if len(raw) == 0 {
@@ -365,6 +369,9 @@ func decodeOtherParticipations(node map[string]any) []any {
 		if perf := decodePerformer(p["performer"]); len(perf) > 0 {
 			entry["performer"] = perf
 		}
+		if mode, ok := codedTextToPayload(p["mode"]); ok {
+			entry["mode"] = mode
+		}
 		if len(entry) > 0 {
 			out = append(out, entry)
 		}
@@ -377,7 +384,12 @@ func decodeOtherParticipations(node map[string]any) []any {
 
 // decodePerformer reads a PARTY_IDENTIFIED performer back into the datamap
 // composer/performer shape (name + external_ref id* keys), mirroring
-// encodeComposer. Returns an empty map when nothing usable is present.
+// encodeComposer. The external_ref.id kind is preserved: a GENERIC_ID decodes
+// its `scheme` into `id_scheme` (the default shape); a HIER_OBJECT_ID (REQ-058
+// order-collection — e.g. an ORGANISATION collection-point referenced by its
+// own platform id) has no scheme and instead decodes an `id_type_id:
+// "HIER_OBJECT_ID"` marker, so re-encoding via encodeComposer reproduces the
+// same id kind. Returns an empty map when nothing usable is present.
 func decodePerformer(v any) map[string]any {
 	perf, ok := v.(map[string]any)
 	if !ok {
@@ -398,7 +410,9 @@ func decodePerformer(v any) map[string]any {
 			if val, _ := id["value"].(string); val != "" {
 				out["id"] = val
 			}
-			if sch, _ := id["scheme"].(string); sch != "" {
+			if t, _ := id["_type"].(string); t == "HIER_OBJECT_ID" {
+				out["id_type_id"] = "HIER_OBJECT_ID"
+			} else if sch, _ := id["scheme"].(string); sch != "" {
 				out["id_scheme"] = sch
 			}
 		}
