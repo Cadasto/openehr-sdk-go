@@ -711,7 +711,9 @@ The exported tree is **not** a 1:1 mirror of the compiled OPT; it follows the re
 
 ### `id` generation (ADR 0014)
 
-The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name, with the reference's sibling-disambiguation rule when two siblings would collide. The exact normalisation and disambiguation are **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling. Until the disambiguation rule is derived from a fixture that exercises it, a would-be sibling collision **MUST** fail with a typed error — the export **MUST NOT** emit duplicate sibling `id`s.
+The node `id` is the FLAT-path segment consumers bind to, so its stability and cross-implementation fidelity are the export's load-bearing property. The `id` **MUST** mirror the locked EHRbase reference: a lower-snake sanitisation of the node's default-language display name. The exact normalisation is **derived from the vendored reference fixture** and pinned by tests — the SDK **MUST NOT** invent an id scheme, because a bespoke scheme would break FLAT-path interoperability with existing tooling.
+
+For a node that pins a **template-level name**, that name is the display name the `id` derives from — not the archetype's concept term, which is shared by every occurrence of a reused archetype and so cannot distinguish siblings; see [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths), which owns the naming rule. The reference needs no numeric suffixing, because names disambiguate siblings on their own. Where sibling `id`s would still collide, the export **MUST** fail with a typed error rather than emit duplicate sibling `id`s.
 
 ### `inputs` (core clinical subset)
 
@@ -740,6 +742,29 @@ Templates that **reuse one archetype under a multi-valued slot** (name-distingui
 - **Lives in:** [`openehr/template/webtemplate/`](../../openehr/template/webtemplate/).
 - **Verification (on delivery):** unit tests for id-generation, per-datatype `inputs` mapping, and tree shape; round-trip goldens per fixture OPT (determinism); and PROBE-075 structural parity against the vendored EHRbase `constrain_test` fixture. Catalogued in [`conformance.md`](conformance.md).
 - **Plan:** [`docs/plans/2026-05-22-webtemplate-export.md`](../plans/archive/2026-05-22-webtemplate-export.md).
+
+## REQ-116 — Template-level node naming and name-predicated paths
+
+An OPT node may pin its runtime `LOCATABLE.name` by constraining the `name` attribute to a fixed value — in ADL 1.4 XML, a `C_STRING` whose `list` holds one entry (`<item xsi:type="C_STRING"><list>Husten</list></item>`). This **template-level node name** is distinct from the *archetype's* concept term: a template that fills a slot with the same archetype more than once gives each occurrence its own name, while the archetype concept is identical across all of them. It is the only thing that distinguishes those siblings, and both the reference WebTemplate `id` (REQ-106) and the AQL paths addressing them depend on it.
+
+The SDK **MUST** parse the template-level node name and expose it on the parsed OPT node ([REQ-100](#req-100--adl-14-operational-template-opt-parse-and-paths)), **MUST** carry it through the compiled tree so consumers of the public bridge can read it ([REQ-111](#req-111--public-compiled-template-bridge)), and **MUST** use it as the disambiguator described below. Where a node constrains no fixed name, the SDK **MUST** treat the name as absent rather than substituting the archetype concept term.
+
+### Name predicates in AQL paths
+
+An AQL node predicate **MAY** carry a name alongside the archetype node id — `[openEHR-EHR-SECTION.adhoc.v1,'Symptome']` — which is how openEHR addresses one of several siblings that share an archetype node id.
+
+Where two or more sibling nodes share an archetype node id **and** each pins a distinct template-level name, the compiled AQL path **MUST** carry the name predicate on that segment, so that every such sibling receives a **unique** path and remains individually addressable. Where siblings share an archetype node id and pin **no** distinct names, the SDK **MUST NOT** invent a predicate: those siblings legitimately share a path and are distinguished positionally, and the compiled form **MUST** retain each of them rather than discarding the collision.
+
+Name predicates **MUST NOT** be emitted where they are not needed for uniqueness — a sole child keeps the bare `[archetype_node_id]` form — because a path is a consumer-visible contract and gratuitous predicates would break existing callers.
+
+> **Downstream consumers.** Path shape is consumed by composition validation ([REQ-102](#req-102--composition-validation)), the instance generator ([REQ-107](#req-107--template-driven-rm-instance-example-generator)), and FLAT/STRUCTURED path resolution ([REQ-053](wire.md#req-053)). A change here **MUST** keep those conformant: paths that need no name predicate **MUST** be byte-identical to those emitted before.
+
+### Acceptance
+
+- An OPT whose sibling archetype roots reuse one archetype id compiles, and each sibling is retrievable at a distinct name-predicated path.
+- A WebTemplate built from such a template emits one distinct `id` per sibling, derived from the template-level name, with no collision error (REQ-106).
+- A template with no repeated sibling archetype ids produces paths byte-identical to the pre-change output, and the existing WebTemplate parity fixture holds.
+- Both upstream reference templates that exercise this (`corona_anamnese`, `conformance-ehrbase.de.v0`) build a WebTemplate whose node `id` and `aqlPath` sets match the vendored reference goldens, within the documented deviations.
 
 ## REQ-112 — Template-less Reference Model validation floor
 

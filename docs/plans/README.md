@@ -17,6 +17,14 @@ Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ 
 | [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
 | [2026-07-16-web-template-tests-conformance.md](2026-07-16-web-template-tests-conformance.md) | Upstream FLAT parity harness in CI — **Phase 0 landed** (EHRbase FLAT corpus vendored + pinned, PROBE-086 catalogued Draft); Phases 1–3 blocked on the name-derived web `id` gap | REQ-080 (verifies REQ-053/106) | PROBE-086 |
 
+### Template-level node naming (2026-07-29)
+
+Unblocks the FLAT conformance harness above and any WebTemplate for a template that reuses an archetype among siblings. Spans OPT parse → compiled tree → AQL path predicates → WebTemplate `id`; the mechanism was established against the upstream reference goldens, not guessed.
+
+| Plan | Scope | Covers | Probes |
+|---|---|---|---|
+| [2026-07-29-template-node-naming.md](2026-07-29-template-node-naming.md) | Template-level node name: parse + expose, carry through compile, name-predicated AQL paths, name-derived WebTemplate `id` | REQ-116 (amends REQ-100/106/111) | PROBE-075, unblocks PROBE-086 |
+
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
 | Plan | Scope | Covers REQs / probes |

@@ -931,6 +931,40 @@ requirements:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
 
+  - id: REQ-116
+    title: Template-level node naming and name-predicated paths
+    canonical: docs/specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths
+    status: draft
+    # An OPT node may pin its LOCATABLE.name via a fixed C_STRING on the name
+    # attribute. That template-level name — not the archetype concept term,
+    # which every occurrence of a reused archetype shares — is what
+    # distinguishes sibling archetype roots that fill a slot with the same
+    # archetype. Spans four layers: parse + expose on the OPT node (REQ-100),
+    # carry through the compiled tree (REQ-111), emit name predicates
+    # ([archetype_id,'Name']) on compiled AQL paths only where needed for
+    # sibling uniqueness, and prefer the name for WebTemplate id derivation
+    # (REQ-106, ADR 0014). Established against the upstream EHRbase goldens
+    # 2026-07-29: there is NO numeric-suffix disambiguation rule (checked
+    # across corona_anamnese / multi_occurrence / AlternativeEvents); the
+    # reference disambiguates by name alone, and name-predicates aqlPath 350x
+    # in the corona golden vs 0x in constrain_test — which is why PROBE-075
+    # holds 104/104 without any of this. Blocks PROBE-086 (upstream FLAT
+    # parity) and any WebTemplate for a template reusing an archetype among
+    # siblings. Path shape is consumed by REQ-102 validation, REQ-107 instance
+    # synthesis, and REQ-053 FLAT/STRUCTURED, so predicate-free paths must stay
+    # byte-identical.
+    implementation: proposed
+    packages:
+      - openehr/template
+      - internal/templatecompile
+      - openehr/templatecompile
+      - openehr/template/webtemplate
+    adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
+    probes: [PROBE-075, PROBE-086]
+    tests: []
+    plans:
+      - docs/plans/2026-07-16-web-template-tests-conformance.md
+
   - id: REQ-120
     title: RM identifier parsing and derivation
     canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation
