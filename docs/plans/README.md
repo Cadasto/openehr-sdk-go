@@ -15,7 +15,7 @@ Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ 
 | [2026-07-16-flat-author-linter.md](2026-07-16-flat-author-linter.md) | Pre-submit FLAT path linter + CLI | REQ-115 (builds on REQ-053/106/111) | PROBE-083 |
 | [2026-07-16-opt-author-validator.md](2026-07-16-opt-author-validator.md) | OPT author validator + CLI | REQ-114 (builds on REQ-100/104/106/108) | PROBE-085 |
 | [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
-| [2026-07-16-web-template-tests-conformance.md](2026-07-16-web-template-tests-conformance.md) | Vendored web-template-tests adapter in CI | REQ-080 (verifies REQ-053/106) | PROBE-086 |
+| [2026-07-16-web-template-tests-conformance.md](2026-07-16-web-template-tests-conformance.md) | Upstream FLAT parity harness in CI — **Phase 0 landed** (EHRbase FLAT corpus vendored + pinned, PROBE-086 catalogued Draft); Phases 1–3 blocked on the name-derived web `id` gap | REQ-080 (verifies REQ-053/106) | PROBE-086 |
 
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 

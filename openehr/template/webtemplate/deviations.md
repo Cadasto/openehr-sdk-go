@@ -32,11 +32,42 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   document-language term, so no per-language override options are offered — they
   would relabel text without retranslating it; the reference's exact language
   packaging may differ.
-- **Sibling `id` disambiguation** — not implemented. When two sibling nodes sanitise
-  to the same `id`, EHRbase appends a disambiguating suffix; `constrain_test` contains
-  no such collision, so the exact rule is unverified. Rather than emit ambiguous
-  duplicate `id`s, `Build` returns `ErrIDCollision` for such templates. *(Deferred:
-  derive the suffix rule from a fixture that exercises it.)*
+- **Sibling `id` disambiguation** — not implemented; `Build` returns `ErrIDCollision`
+  rather than emit ambiguous duplicate `id`s.
+
+  **The mechanism, established against the reference (2026-07-29).** An earlier note
+  here guessed that "EHRbase appends a disambiguating suffix". That is **wrong** —
+  there is no suffix rule. Checked across the upstream `corona_anamnese`,
+  `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens, **no** sibling
+  group shares an `id` base with a numeric suffix. EHRbase never needs to
+  disambiguate because it derives the `id` from a different source than this builder
+  does:
+
+  - **EHRbase** uses the node's **template-level name** — the `name` attribute
+    constrained to a fixed `C_STRING` in the OPT (`<item xsi:type="C_STRING">
+    <list>Husten</list></item>`). Sibling archetype roots therefore differ naturally.
+  - **This builder** uses the *archetype's* concept term, looked up by `NodeID()`
+    (`idOf` → `termText`). Every sibling sharing an archetype id gets the **same**
+    text, hence the collision.
+
+  Worked example — five `openEHR-EHR-SECTION.adhoc.v1` siblings in `corona_anamnese`:
+  the reference emits `symptome`, `kontakt`, `risikogebiet`, `allgemeine_angaben`
+  (from their names), where this builder would emit one repeated
+  `screening-fragebogen_zur_symptomen_anzeichen`.
+
+  **`aqlPath` is affected too, not just `id`.** Where siblings share an archetype id
+  the reference adds a **name predicate** — `/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']`.
+  The `corona_anamnese` golden carries **350** such predicates; `constrain_test`
+  carries **0**, which is why PROBE-075 holds 104/104 today without implementing any
+  of this. `templatecompile` currently emits no name predicates, and
+  `openehr/template` does not parse or expose the OPT node name at all.
+
+  Closing this therefore spans four layers — parse + expose the OPT node name
+  (REQ-100), carry it through the compiled tree (REQ-111), emit name predicates in
+  AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and switch `id`
+  derivation to prefer it (REQ-106) — so it is a scoped feature, not a local fix.
+  **PROBE-086 is blocked on it**, as is any WebTemplate for a template that reuses an
+  archetype among siblings (`corona_anamnese`, `conformance-ehrbase.de.v0`).
 
 ## Input-level (contents beyond suffix/type)
 

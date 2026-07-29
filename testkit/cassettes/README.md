@@ -12,7 +12,19 @@ cassettes/
   rm/{name}.json | {name}.xml         # RM probe samples (ehrbase, leaf XML, …)
   submissions/{name}.json             # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
   its_rest/                           # ITS-REST / discovery wire
+  flat-conformance/                   # pinned upstream FLAT corpus (PROBE-086)
+    MANIFEST.txt                      #   commit pin + per-file sha256
+    templates/{name}.opt
+    compositions/{name}.json          #   upstream-authored FLAT bodies
 ```
+
+**Pinned subtree.** Everything under `flat-conformance/` is machine-synced from
+upstream at a recorded commit — do not hand-edit it. Refresh with
+`make flat-conformance-sync`; verify integrity and upstream drift with
+`make flat-conformance-check`. Resolve paths via
+[`fixtures.FlatConformanceOpt`](../fixtures/paths.go) /
+`fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
+this directory is curated by hand and is not covered by that manifest.
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`).
 

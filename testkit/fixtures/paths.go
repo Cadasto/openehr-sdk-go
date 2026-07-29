@@ -8,13 +8,19 @@
 //	rm/{name}.json | .xml          # RM probe samples (ehrbase, leaf, …)
 //	submissions/{name}.json       # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
 //	its_rest/                     # ITS-REST wire records
+//	flat-conformance/             # pinned upstream FLAT corpus (MANIFEST.txt)
+//	  templates/{name}.opt
+//	  compositions/{name}.json
 //
 // Vendor provenance is indexed in testkit/cassettes/README.md (not in paths).
 package fixtures
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 )
 
 // CassettesRoot is testkit/cassettes (absolute).
@@ -61,6 +67,45 @@ func RMXML(name string) string {
 // ORIGINAL_VERSION payloads), not persisted CONTRIBUTION with OBJECT_REF.
 func SubmissionJSON(name string) string {
 	return filepath.Join(submissionsDir(), name+".json")
+}
+
+// FlatConformanceRoot is testkit/cassettes/flat-conformance — the pinned
+// upstream EHRbase FLAT serialisation corpus (see MANIFEST.txt there, and
+// scripts/sync-flat-conformance.sh). Vendored Apache-2.0; provenance in
+// THIRD_PARTY_LICENSES.md.
+func FlatConformanceRoot() string {
+	return filepath.Join(CassettesRoot(), "flat-conformance")
+}
+
+// FlatConformanceOpt returns the single operational template every fixture in
+// the FLAT conformance corpus instantiates.
+func FlatConformanceOpt() string {
+	return filepath.Join(FlatConformanceRoot(), "templates", "conformance_ehrbase.de.v0.opt")
+}
+
+// FlatConformanceFlat returns testkit/cassettes/flat-conformance/compositions/{name}.json.
+func FlatConformanceFlat(name string) string {
+	return filepath.Join(FlatConformanceRoot(), "compositions", name+".json")
+}
+
+// ListFlatConformance returns the FLAT conformance fixture names (no
+// extension), sorted. It reports an error when the corpus is absent so a
+// caller can skip rather than silently assert nothing.
+func ListFlatConformance() ([]string, error) {
+	dir := filepath.Join(FlatConformanceRoot(), "compositions")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		names = append(names, strings.TrimSuffix(e.Name(), ".json"))
+	}
+	slices.Sort(names)
+	return names, nil
 }
 
 // idAlias maps test shorthands to on-disk template ids when they differ.
