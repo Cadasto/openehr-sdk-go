@@ -28,7 +28,13 @@
 #              1. offline — recompute sha256 and compare to MANIFEST
 #                 (detects local edits / corruption); fails on mismatch.
 #              2. online (best-effort) — compare the pinned commit to the
-#                 current upstream HEAD and report if a sync is due.
+#                 current upstream HEAD and report if a sync is due. Skipped
+#                 with a note when offline or when curl/jq are unavailable;
+#                 never fails the command.
+#   verify   Step 1 only — offline integrity, no network and no tool
+#            requirements. This is the form `make ci` runs, so a hand-edit to
+#            a vendored fixture fails the build even though the corpus is not
+#            yet consumed by a probe.
 #
 # Environment:
 #   FLAT_CONFORMANCE_REF   upstream git ref to pin (branch / tag / sha).
@@ -205,8 +211,18 @@ cmd_check() {
   fi
   echo "Integrity OK ($(grep -cE '  (compositions|templates)/' <<<"$hash_block") file(s))."
 
-  # 2. Online staleness (best-effort; never fails the command).
-  require_tools
+  # 2. Online staleness (best-effort; never fails the command). Do NOT
+  # require_tools here: the integrity check above is fully offline, so a host
+  # without curl/jq must still be able to verify the corpus. Bailing out on a
+  # missing tool would contradict "best-effort" and break hash-only
+  # environments (and `verify`, which shares this path, is used by `make ci`).
+  if [[ "${1:-}" == "offline" ]]; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
+    echo "(curl/jq unavailable — skipped upstream staleness check)"
+    return 0
+  fi
   local pinned upstream
   pinned="$(grep -E '^commit: ' "$MANIFEST" | awk '{print $2}')"
   if upstream="$(resolve_commit "$REF" 2>/dev/null)"; then
@@ -225,10 +241,11 @@ main() {
   case "${1:-}" in
     sync | ingest) cmd_sync ;;
     check) cmd_check ;;
+    verify) cmd_check offline ;;
     "" | -h | --help)
-      sed -n '2,44p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,48p' "$0" | sed 's/^# \{0,1\}//'
       ;;
-    *) die "unknown subcommand '$1' (want: sync | ingest | check)" ;;
+    *) die "unknown subcommand '$1' (want: sync | ingest | check | verify)" ;;
   esac
 }
 

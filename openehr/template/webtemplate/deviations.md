@@ -66,8 +66,17 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   (REQ-100), carry it through the compiled tree (REQ-111), emit name predicates in
   AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and switch `id`
   derivation to prefer it (REQ-106) — so it is a scoped feature, not a local fix.
-  **PROBE-086 is blocked on it**, as is any WebTemplate for a template that reuses an
-  archetype among siblings (`corona_anamnese`, `conformance-ehrbase.de.v0`).
+  **PROBE-086 is blocked on it**, as is any WebTemplate whose siblings sanitise to one
+  `id`. Two upstream templates reach it, by different routes:
+
+  - `conformance-ehrbase.de.v0` — sibling ELEMENTs that both sanitise to `dv_text`
+    under its ACTION (its nine archetype ids are all distinct, so this is *not* the
+    archetype-reuse case). **Vendored and compile-tested** in this repo.
+  - `corona_anamnese` — five `SECTION.adhoc.v1` siblings reusing one archetype, all
+    deriving `screening-fragebogen_zur_symptomen_anzeichen`. Observed against the
+    upstream fixture at the pinned commit; **not vendored**, so it carries no in-tree
+    regression guard. Vendoring it with its reference WebTemplate is Phase 0 of the
+    REQ-116 plan.
 
 ## Input-level (contents beyond suffix/type)
 
@@ -95,9 +104,11 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
 
 ## Scope
 
-- **Archetype-reuse-under-slot templates** (e.g. `corona_anamnese`) — unsupported: they
-  produce duplicate compiled AQL paths that `templatecompile` rejects. See REQ-106 and
-  ADR 0014 (a possible REQ-100/111 compiler follow-up).
+- **Archetype-reuse-under-slot templates** (e.g. `corona_anamnese`) — still unexportable,
+  but **not** because of compilation: `templatecompile` admits shared-path subtrees, so
+  these templates compile. `Build` fails with `ErrIDCollision` because each reused sibling
+  derives the same web `id`. The fix is the template-level node name + name predicates
+  (REQ-116) — see § Sibling `id` disambiguation above for the verified mechanism.
 - **Multiple value alternatives** — only the first value alternative is used, except the
   DV_CODED_TEXT + DV_TEXT pair, which is rendered as `code` + `other` inputs.
 - **Byte parity** — field ordering and absent optional fields differ from the reference by

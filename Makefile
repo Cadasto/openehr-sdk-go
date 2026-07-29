@@ -163,6 +163,9 @@ flat-conformance-sync: ## Vendor the upstream EHRbase FLAT conformance corpus in
 flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches MANIFEST + report upstream drift (offline integrity; network for drift)
 	@./scripts/sync-flat-conformance.sh check
 
+flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
+	@./scripts/sync-flat-conformance.sh verify
+
 ##@ Test
 
 test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
@@ -209,4 +212,4 @@ clean: ## Remove bin/, coverage artefacts, and *.out files
 
 ##@ CI
 
-ci: fmt-check mod-tidy-check vet test lint spec-check build ## Full local PR gate (see docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify build ## Full local PR gate (see docs/ci.md)

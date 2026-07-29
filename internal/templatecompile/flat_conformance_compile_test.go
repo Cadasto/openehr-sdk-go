@@ -9,7 +9,8 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
-// The vendored upstream EHRbase conformance OPT compiles. It is the
+// REQ-100, REQ-116 / PROBE-086 (Phase 0) — the vendored upstream EHRbase
+// conformance OPT compiles. It is the
 // regression guard for shared-path subtrees: its ACTION constrains
 // ism_transition with two ISM_TRANSITION alternatives, whose current_state
 // and careflow_step subtrees necessarily produce repeated AQL paths under

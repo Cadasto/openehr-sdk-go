@@ -18,8 +18,11 @@ import (
 const referenceDir = "../../../testkit/cassettes/webtemplate"
 
 // referenceStem is the vendored EHRbase parity fixture's filename stem.
-// constrain_test is used (not corona_anamnese) because it compiles under
-// templatecompile — see the archetype-reuse-under-slot gap in REQ-106.
+// constrain_test is used (not corona_anamnese) because it needs no sibling
+// disambiguation, so it exports cleanly. corona_anamnese compiles, but its
+// reused sibling archetype roots derive one shared web id and hit
+// ErrIDCollision — see REQ-116 and deviations.md § Sibling `id`
+// disambiguation.
 const referenceStem = "constrain_test"
 
 // loadReference decodes the vendored reference WebTemplate JSON.

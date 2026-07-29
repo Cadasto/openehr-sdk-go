@@ -116,9 +116,18 @@ type walker struct {
 	// descendants necessarily share paths too. Those descendants sit
 	// under *different* attribute objects (one per parent), so the
 	// currentAttr test in registerPath cannot recognise them; dupDepth
-	// does. The guard against genuine cross-attribute collisions (an OPT
-	// bug) is unaffected: it still applies to each node's own path,
-	// because the counter covers only the descent, never the node itself.
+	// does.
+	//
+	// Scope of the relaxation, stated precisely: every node's *own* path
+	// is still fully guarded, because the counter covers only the descent
+	// and is dropped before the node registers itself. Inside a shared-path
+	// subtree, however, descendants are admitted unconditionally — so a
+	// genuine cross-attribute collision occurring *only* within the second
+	// sibling's subtree (possible when siblings narrow the same archetype
+	// differently) is admitted rather than reported. That is a deliberate
+	// trade: the alternative is rejecting every legal shared-path template.
+	// The first-walked instance of any such collision still errors, so a
+	// bug present in both siblings is caught.
 	dupDepth int
 }
 

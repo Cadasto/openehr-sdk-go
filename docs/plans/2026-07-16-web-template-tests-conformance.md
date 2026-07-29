@@ -92,8 +92,8 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 
 ### Phase 3 — CI gate & documentation — blocked
 
-1. Add `flat-conformance-check` to `make ci` (after the corpus is load-bearing).
-2. Document in [`docs/ci.md`](../ci.md) and the AGENTS.md tooling table.
+1. ~~Add the corpus integrity check to `make ci`~~ — **done in Phase 0** (review follow-up): `make flat-conformance-verify` (offline `sha256` only, no network or `curl`/`jq`) runs in `make ci` and as a `ci.yml` step. The network-touching `flat-conformance-check` stays a dev helper, matching the `its-rest-check` convention.
+2. Document in [`docs/ci.md`](../ci.md) — **done**; add the AGENTS.md tooling-table row when the probe itself lands.
 3. `roadmap.md`: REQ-080 `planned → partial` (Sandbox slice landed).
 4. Cross-link PROBE-086 from the peer-SDK ecosystem notes; archive this plan.
 
