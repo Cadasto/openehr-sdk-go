@@ -12,6 +12,8 @@ cassettes/
   rm/{name}.json | {name}.xml         # RM probe samples (ehrbase, leaf XML, …)
   submissions/{name}.json             # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
   its_rest/                           # ITS-REST / discovery wire
+  webtemplate/{template-id}.opt       # OPT + EHRbase reference WebTemplate
+    | {template-id}.webtemplate.json  #   golden (PROBE-075 / REQ-116 oracles)
   flat-conformance/                   # pinned upstream FLAT corpus (PROBE-086)
     MANIFEST.txt                      #   commit pin + per-file sha256
     templates/{name}.opt
@@ -26,7 +28,7 @@ upstream at a recorded commit — do not hand-edit it. Refresh with
 `fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
 this directory is curated by hand and is not covered by that manifest.
 
-Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`).
+Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`).
 
 Composition JSON uses template ids **without** `::{uuid}` suffixes.
 
@@ -81,6 +83,16 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | `IDCR Problem List.v1` | yes | — | yes | XML round-trip |
 | `IDCR - Laboratory Test Report.v0` | yes | — | yes | XML round-trip |
 | `IDCR -  Adverse Reaction List.v1` | yes | — | yes | XML round-trip (upstream double space in id) |
+
+**WebTemplate oracles** (`webtemplate/`, pinned at commit `22b01e0c99b53669394e56da29c2410838b5cf7e` — OPT beside its reference WebTemplate golden, stems match `template_id`):
+
+| Template id | Role | Size (OPT + golden) |
+|---|---|---|
+| `constrain_test` | PROBE-075 parity oracle (104/104) | 444 KB + 139 KB |
+| `Corona_Anamnese` | REQ-116 oracle — loud mode: `Build` → `ErrIDCollision` (five `SECTION.adhoc.v1` siblings); 350 name-predicate occurrences in the golden | 1.2 MB + 230 KB |
+| `GECCO_Diagnose` | REQ-116 oracle — silent mode: builds today, 30 name-predicated reference `aqlPath`s this builder does not emit | 210 KB + 73 KB |
+
+The Corona pair is the largest cassette in the repo — the size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture rather than a synthetic cut-down.
 
 ### ehrbase (Robot integration-tests)
 

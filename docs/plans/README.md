@@ -23,7 +23,7 @@ Unblocks the FLAT conformance harness above and any WebTemplate for a template t
 
 | Plan | Scope | Covers | Probes |
 |---|---|---|---|
-| [2026-07-29-template-node-naming.md](2026-07-29-template-node-naming.md) | Template-level node name: parse + expose, carry through compile, name-predicated AQL paths, name-derived WebTemplate `id` | REQ-116 (amends REQ-100/106/111) | PROBE-075, unblocks PROBE-086 |
+| [2026-07-29-template-node-naming.md](2026-07-29-template-node-naming.md) | Template-level node name: parse + expose, carry through compile, name-predicated AQL paths, name-derived WebTemplate `id` — **Phase 0 landed** (Corona_Anamnese + GECCO_Diagnose oracles vendored; both gap modes test-pinned) | REQ-116 (amends REQ-100/106/111) | PROBE-075, unblocks PROBE-086 |
 
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
