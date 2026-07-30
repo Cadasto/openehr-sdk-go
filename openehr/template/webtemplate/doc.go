@@ -13,7 +13,8 @@
 // library — never the transport, auth, client, or serialize layers.
 //
 // Scope limits (see deviations.md): templates whose sibling nodes sanitise
-// to the same id return ErrIDCollision (the reference's disambiguation
-// rule is not yet implemented), and archetype-reuse-under-slot templates
-// are rejected upstream by templatecompile.
+// to the same id return ErrIDCollision, because the reference's
+// disambiguator — the template-level node name pinned in the OPT, which
+// also name-predicates aqlPath — is not emitted yet (REQ-116). Such
+// templates do compile: templatecompile admits shared-path subtrees.
 package webtemplate

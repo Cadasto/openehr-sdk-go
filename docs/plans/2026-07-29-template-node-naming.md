@@ -17,7 +17,11 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **Architecture.** No new packages. The name is parsed in `openehr/template`, carried on `CompiledNode`, consulted by the path builder in `internal/templatecompile`, and preferred by `idOf` in `openehr/template/webtemplate`. Public-API additions only (one accessor per layer); no signature changes.
 
-**Evidence base** (established 2026-07-29, recorded in [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation): there is **no** numeric-suffix rule — verified across the upstream `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens. The reference disambiguates by name alone and name-predicates `aqlPath` **350×** in the corona golden versus **0×** in `constrain_test`, which is why PROBE-075 holds 104/104 today without any of this.
+**Evidence base** (established 2026-07-29, recorded in [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation): there is **no** numeric-suffix rule — verified across the upstream `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens. The reference disambiguates by name alone and name-predicates `aqlPath` **350×** in the corona golden versus **0×** in `constrain_test`.
+
+**Correction (2026-07-30).** The predicate trigger is the **pinned name alone**, not sibling collision. Measured across the vendored goldens: every name in a golden predicate is a fixed `C_STRING` in its OPT (1:1 for both oracles), `constrain_test` pins none and carries 0 predicates over 104 nodes — *that* is why PROBE-075 holds 104/104 — and `GECCO_Diagnose` predicates all three `/content` children whose archetype ids are **distinct**, plus a sole `CLUSTER` child. A collision-conditioned rule emits too few predicates and would fail GECCO parity. **Blast radius is therefore wider than "the reuse templates":** 10 further vendored OPTs pin names (`test_template_rename_node{,_2}` 8 each, `clinical_content_validation`, `TestPerson.v2`, …), so their compiled paths change too — Phase 3's regression guard must be scoped by *pins-a-name*, not by *has-reused-siblings*.
+
+**Measured residual** (built `GECCO_Diagnose` vs its golden on the PROBE-075 surface, predicates normalised away): path set matches **exactly** (`missing=0`), so predicate emission closes the whole path gap. What remains is 4 extra `…/name` `DV_TEXT` leaves (the pinned name exported as *data* by `build.go`), 14 `min`/`max` deltas where the **GECCO golden is the outlier** (`1/1` vs `0/1`; `constrain_test` and Corona both agree with this builder, and GECCO's OPT constrains no `existence`), and 1 input-count delta. The min/max set needs a documented deviation in Phase 4, not a builder change.
 
 ## Definition of Ready
 
@@ -30,7 +34,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 ## Definition of Done
 
 - REQ-116 acceptance criteria all demonstrated by tests citing `// REQ-116`.
-- `corona_anamnese` and `conformance-ehrbase.de.v0` build a WebTemplate matching the vendored goldens on the `id` and `aqlPath` sets, within documented deviations.
+- `Corona_Anamnese` and `GECCO_Diagnose` — the two vendored oracles — build a WebTemplate matching their vendored goldens on the `id` and `aqlPath` sets, within documented deviations. `conformance-ehrbase.de.v0` is vendored **without** a WebTemplate golden (OPT + FLAT bodies only), so for it the bar is `Build` succeeding, until a golden is vendored.
 - PROBE-075 parity extended to at least one name-predicated fixture and still 104/104 on `constrain_test`.
 - **Predicate-free paths byte-identical to pre-change output** — asserted, not assumed.
 - REQ.md `Impl.` for REQ-116 → landed; `traceability.yaml` tests/probes filled; `deviations.md` updated (this deviation removed or narrowed).
@@ -42,7 +46,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **Tasks:**
 
-1. ~~Vendor `corona_anamnese`~~ — **done**: `Corona_Anamnese.opt` + `Corona_Anamnese.webtemplate.json` vendored at the `constrain_test` pin (`22b01e0c`), stems per `template_id` convention; provenance in `THIRD_PARTY_LICENSES.md`. **`multi_occurrence` was dropped**: its golden carries **zero** name-predicated `aqlPath`s (as does `AlternativeEvents`), so the "second name-predicated case" premise was wrong. Substituted **`GECCO_Diagnose`** (30 predicates, space-free `template_id`, ~⅕ corona's size) — and it turned out to cover the gap's *other* failure mode: it **builds without error** today (no sibling id collision) while silently diverging from its golden on `aqlPath`, where corona fails loudly with `ErrIDCollision`. Both modes are pinned by tests: compile guards in `internal/templatecompile/webtemplate_oracle_compile_test.go`, build outcomes in `openehr/template/webtemplate/req116_gap_test.go`.
+1. ~~Vendor `corona_anamnese`~~ — **done**: `Corona_Anamnese.opt` + `Corona_Anamnese.webtemplate.json` vendored at the `constrain_test` pin (`22b01e0c`), stems per `template_id` convention; provenance in `THIRD_PARTY_LICENSES.md`. **`multi_occurrence` was dropped**: its golden carries **zero** name-predicated `aqlPath`s (as does `AlternativeEvents`), so the "second name-predicated case" premise was wrong. Substituted **`GECCO_Diagnose`** (30 predicate segments over 24 paths, space-free `template_id`, ~⅕ corona's size) — and it turned out to cover the gap's *other* failure mode: it **builds without error** today (no sibling id collision) while silently diverging from its golden on `aqlPath`, where corona fails loudly with `ErrIDCollision`. Both modes are pinned by tests: compile guards in `internal/templatecompile/webtemplate_oracle_compile_test.go`, build outcomes in `openehr/template/webtemplate/req116_gap_test.go`.
 2. ~~Note the size cost in the cassettes README~~ — **done** (corona OPT 1.2 MB + golden 230 KB; GECCO 210 KB + 73 KB), plus `fixtures.WebTemplateOpt` / `WebTemplateReference` resolvers.
 
 **DoD:** met — fixtures resolve via `testkit/fixtures`; `make ci` green (no behaviour change).
@@ -69,22 +73,31 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **Tasks:**
 
-1. In the path builder, emit `[archetype_node_id,'Name']` **only** where siblings share an archetype node id *and* pin distinct names (REQ-116). Sole children and un-named collisions keep today's form.
+1. In the path builder, emit `[archetype_node_id,'Name']` on the segment of **every node that pins a template-level name** (REQ-116) — regardless of whether any sibling shares its archetype node id. Nodes that pin no name keep today's bare form, including un-named collisions.
 2. Interaction with the landed shared-path fix: name predicates make the *named* sibling case distinct, so `dupDepth` should stop being reached for it while continuing to cover genuine AOM alternatives and un-named same-`node_id` siblings. Assert both paths explicitly — the fix must not become dead code by accident, nor mask a predicate that failed to apply.
-3. **Regression guard first:** before changing emission, snapshot the compiled path set for every vendored template and assert byte-identity afterwards for templates with no repeated sibling archetype ids.
-4. Re-run REQ-102 validation, REQ-107 instance, and REQ-053 FLAT/STRUCTURED suites; investigate any diff rather than re-baselining it.
+3. **Regression guard first:** before changing emission, snapshot the compiled path set for every vendored template and assert byte-identity afterwards **for templates that pin no name** — that is the correct partition, and it is narrower than "no repeated sibling archetype ids" (10 vendored OPTs pin names). For the name-pinning ones, record the expected path delta deliberately.
+4. **Two path builders, not one.** `webtemplate` does *not* consume
+   `CompiledNode.AQLPath()` — it composes its own (`build.go:154`,
+   `childPath := parentPath + "/" + attr.Name() + predicate(c)`) via its own
+   `predicate()` helper (`build.go:271`, archetype-id-or-at-code only), and it drops
+   structural wrappers, so its paths legitimately differ from the compiled ones
+   (GECCO: 38 WebTemplate nodes vs 74 compiled). Changing only the
+   `internal/templatecompile` builder therefore leaves WebTemplate `aqlPath`
+   unpredicated and PROBE-075 still failing. Both need the name.
+5. Re-run REQ-102 validation, REQ-107 instance, and REQ-053 FLAT/STRUCTURED suites; investigate any diff rather than re-baselining it.
 
-**DoD:** corona's sibling SECTIONs each resolve at a distinct path; predicate-free templates byte-identical; downstream suites green.
+**DoD:** corona's sibling SECTIONs each resolve at a distinct path; GECCO's 24 predicated golden paths all resolve (`missing=0`); templates pinning no name byte-identical; downstream suites green.
 
 ### Phase 4 — Name-derived WebTemplate `id` (REQ-106)
 
 **Tasks:**
 
 1. `idOf` prefers the template-level name, falling back to today's term text, then attribute name, then RM type.
-2. Diff generated `id` + `aqlPath` sets against the corona golden; fold genuine, justified differences into `deviations.md` and delete the sibling-collision deviation once it no longer applies.
-3. Extend PROBE-075 parity to corona (and `multi_occurrence` if vendored); keep `constrain_test` at 104/104.
+2. Stop exporting the pinned `name` attribute as a data leaf — the reference carries the name on the node, not as a child. Measured on GECCO: 4 spurious `…/name` `DV_TEXT` nodes today (`build.go` walks the constrained `name` attribute).
+3. Diff generated `id` + `aqlPath` sets against the corona **and** GECCO goldens; fold genuine, justified differences into `deviations.md` and delete the sibling-collision deviation once it no longer applies. Expect to document the GECCO golden's `min=1` RM-attribute-leaf outlier (14 nodes) as a fixture deviation — this builder agrees with `constrain_test` and Corona, and GECCO's OPT constrains no `existence`.
+4. Extend PROBE-075 parity to `Corona_Anamnese` and `GECCO_Diagnose` (the vendored oracles — `multi_occurrence` was dropped in Phase 0); keep `constrain_test` at 104/104.
 
-**DoD:** `webtemplate.Build` succeeds for both blocked templates; parity asserted against goldens.
+**DoD:** `webtemplate.Build` succeeds for both blocked templates; parity asserted against both goldens.
 
 ### Phase 5 — Close out
 

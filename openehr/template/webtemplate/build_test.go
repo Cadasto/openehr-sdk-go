@@ -182,8 +182,10 @@ func refTree(t *testing.T, ref map[string]any) map[string]any {
 
 // Both parity tests index nodes by aqlPath; siblings sharing a path (one
 // at-code cloned under a Multiple attribute) would silently collapse into
-// one entry. constrain_test has no such duplicate; templates that do are
-// the deferred archetype-reuse-under-slot class the compiler rejects.
+// one entry. constrain_test has no such duplicate. Templates that do are
+// the archetype-reuse-under-slot class: they compile (templatecompile
+// admits shared-path subtrees) but Build returns ErrIDCollision until
+// REQ-116 emits the name predicate that separates them.
 
 func TestStructuralParity(t *testing.T) {
 	refByPath := map[string]nodeFacts{}
