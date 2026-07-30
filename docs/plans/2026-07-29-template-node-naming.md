@@ -1,7 +1,7 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Draft
+**Status:** Partial — Phase 0 landed 2026-07-30 (oracles vendored + pinned; both gap modes test-pinned); Phases 1–4 open
 **Owner:** SDK maintainers
 **Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `proposed`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
@@ -25,7 +25,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 - [x] REQ.md row + `traceability.yaml` entry landed.
 - [x] Mechanism verified against upstream goldens (not guessed).
 - [x] No irreversible fork: [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) already locks the SDK to the EHRbase reference, and this plan *converges* on it — so no new ADR is needed. (If reference behaviour turns out to be unmatchable on some construct, that exception needs an ADR amendment, not a silent deviation.)
-- [ ] Reference goldens vendored for the fixtures under test (Phase 0).
+- [x] Reference goldens vendored for the fixtures under test (Phase 0 — done).
 
 ## Definition of Done
 
@@ -38,14 +38,14 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 ## Phases
 
-### Phase 0 — Vendor the oracles
+### Phase 0 — Vendor the oracles — **done**
 
 **Tasks:**
 
-1. Vendor `corona_anamnese.opt` + `corona_anamnese.json` (reference WebTemplate) beside the existing PROBE-075 fixture in `testkit/cassettes/webtemplate/`, following the established stem convention (`*.webtemplate.json`); record commit + Apache-2.0 provenance in `THIRD_PARTY_LICENSES.md`. Consider `multi_occurrence` too — small, and a second name-predicated case.
-2. Note the size cost in the cassettes README (corona OPT ≈ 1.2 MB, golden ≈ 235 KB).
+1. ~~Vendor `corona_anamnese`~~ — **done**: `Corona_Anamnese.opt` + `Corona_Anamnese.webtemplate.json` vendored at the `constrain_test` pin (`22b01e0c`), stems per `template_id` convention; provenance in `THIRD_PARTY_LICENSES.md`. **`multi_occurrence` was dropped**: its golden carries **zero** name-predicated `aqlPath`s (as does `AlternativeEvents`), so the "second name-predicated case" premise was wrong. Substituted **`GECCO_Diagnose`** (30 predicates, space-free `template_id`, ~⅕ corona's size) — and it turned out to cover the gap's *other* failure mode: it **builds without error** today (no sibling id collision) while silently diverging from its golden on `aqlPath`, where corona fails loudly with `ErrIDCollision`. Both modes are pinned by tests: compile guards in `internal/templatecompile/webtemplate_oracle_compile_test.go`, build outcomes in `openehr/template/webtemplate/req116_gap_test.go`.
+2. ~~Note the size cost in the cassettes README~~ — **done** (corona OPT 1.2 MB + golden 230 KB; GECCO 210 KB + 73 KB), plus `fixtures.WebTemplateOpt` / `WebTemplateReference` resolvers.
 
-**DoD:** fixtures resolve via `testkit/fixtures`; `make ci` green (no behaviour change yet).
+**DoD:** met — fixtures resolve via `testkit/fixtures`; `make ci` green (no behaviour change).
 
 ### Phase 1 — Parse and expose the name (REQ-100)
 

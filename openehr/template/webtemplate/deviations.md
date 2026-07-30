@@ -67,16 +67,21 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and switch `id`
   derivation to prefer it (REQ-106) — so it is a scoped feature, not a local fix.
   **PROBE-086 is blocked on it**, as is any WebTemplate whose siblings sanitise to one
-  `id`. Two upstream templates reach it, by different routes:
+  `id`. Three upstream templates reach the gap, by different routes:
 
   - `conformance-ehrbase.de.v0` — sibling ELEMENTs that both sanitise to `dv_text`
     under its ACTION (its nine archetype ids are all distinct, so this is *not* the
     archetype-reuse case). **Vendored and compile-tested** in this repo.
-  - `corona_anamnese` — five `SECTION.adhoc.v1` siblings reusing one archetype, all
-    deriving `screening-fragebogen_zur_symptomen_anzeichen`. Observed against the
-    upstream fixture at the pinned commit; **not vendored**, so it carries no in-tree
-    regression guard. Vendoring it with its reference WebTemplate is Phase 0 of the
-    REQ-116 plan.
+  - `Corona_Anamnese` — five `SECTION.adhoc.v1` siblings reusing one archetype, all
+    deriving `screening-fragebogen_zur_symptomen_anzeichen`. **Vendored with its
+    reference WebTemplate** (REQ-116 plan Phase 0) and guarded twice: it compiles
+    (`internal/templatecompile` oracle test) and `Build` returns `ErrIDCollision`
+    (`req116_gap_test.go` pins the blocked state until REQ-116 flips it).
+  - `GECCO_Diagnose` — the **silent** route: no sibling id collision, so `Build`
+    succeeds today, but 30 reference `aqlPath`s carry name predicates this builder
+    never emits — output that would fail reference parity without any error being
+    raised. Vendored with its golden; only extending PROBE-075 parity to it (REQ-116
+    plan Phase 3) can catch this class.
 
 ## Input-level (contents beyond suffix/type)
 

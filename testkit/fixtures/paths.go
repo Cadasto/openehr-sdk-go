@@ -8,6 +8,8 @@
 //	rm/{name}.json | .xml          # RM probe samples (ehrbase, leaf, …)
 //	submissions/{name}.json       # CONTRIBUTION POST wire (inline ORIGINAL_VERSION)
 //	its_rest/                     # ITS-REST wire records
+//	webtemplate/{template-id}.opt # OPT + EHRbase reference WebTemplate golden
+//	  | {template-id}.webtemplate.json   (PROBE-075 / REQ-116 oracles)
 //	flat-conformance/             # pinned upstream FLAT corpus (MANIFEST.txt)
 //	  templates/{name}.opt
 //	  compositions/{name}.json
@@ -36,6 +38,7 @@ func templatesDir() string    { return filepath.Join(CassettesRoot(), "templates
 func compositionsDir() string { return filepath.Join(CassettesRoot(), "compositions") }
 func rmDir() string           { return filepath.Join(CassettesRoot(), "rm") }
 func submissionsDir() string  { return filepath.Join(CassettesRoot(), "submissions") }
+func webtemplateDir() string  { return filepath.Join(CassettesRoot(), "webtemplate") }
 
 // TemplateOpt returns testkit/cassettes/templates/{template-id}.opt.
 func TemplateOpt(templateID string) string {
@@ -67,6 +70,21 @@ func RMXML(name string) string {
 // ORIGINAL_VERSION payloads), not persisted CONTRIBUTION with OBJECT_REF.
 func SubmissionJSON(name string) string {
 	return filepath.Join(submissionsDir(), name+".json")
+}
+
+// WebTemplateOpt returns testkit/cassettes/webtemplate/{template-id}.opt — an
+// OPT vendored beside its EHRbase reference WebTemplate golden (the PROBE-075
+// / REQ-116 oracles). Vendored Apache-2.0 at a pinned upstream commit;
+// provenance in THIRD_PARTY_LICENSES.md. Stems match template_id values.
+func WebTemplateOpt(templateID string) string {
+	return filepath.Join(webtemplateDir(), templateID+".opt")
+}
+
+// WebTemplateReference returns
+// testkit/cassettes/webtemplate/{template-id}.webtemplate.json — the EHRbase
+// reference WebTemplate golden for the same-stem OPT.
+func WebTemplateReference(templateID string) string {
+	return filepath.Join(webtemplateDir(), templateID+".webtemplate.json")
 }
 
 // FlatConformanceRoot is testkit/cassettes/flat-conformance — the pinned

@@ -967,6 +967,8 @@ requirements:
     tests:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
+      - internal/templatecompile/webtemplate_oracle_compile_test.go
+      - openehr/template/webtemplate/req116_gap_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.
