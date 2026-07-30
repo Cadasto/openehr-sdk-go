@@ -66,8 +66,9 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   collision: an earlier note here said "where siblings share an archetype id", which is
   measurably wrong. `GECCO_Diagnose` predicates all three of its `/content` children
   although their archetype ids are **distinct**, and predicates a sole
-  `CLUSTER.anatomical_location.v1` child. Across both oracles every name appearing in a
-  golden predicate is a pinned `C_STRING` in the OPT (1:1, no exceptions). The
+  `CLUSTER.anatomical_location.v1` child. Across both oracles the names used in golden
+  predicates are exactly the names the OPT pins — GECCO 6 pinned / 6 used, Corona 24 / 24,
+  no exceptions either way. The
   `corona_anamnese` golden carries **350** predicate segments over 213 paths;
   `constrain_test` carries **0** because it pins **no** name anywhere — that, not an
   absence of collision, is why PROBE-075 holds 104/104 without implementing any of this.
@@ -79,8 +80,9 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   predicates in AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and
   switch `id` derivation to prefer it (REQ-106) — so it is a scoped feature, not a local
   fix. Because the trigger is the pinned name, the path change reaches **every** vendored
-  OPT that pins one (10 beyond the oracles, e.g. `test_template_rename_node{,_2}` with 8
-  names each), not only the archetype-reuse templates.
+  OPT that pins one — 9 of the 58 vendored OPTs, i.e. 7 beyond the two oracles, led by
+  `test_template_rename_node{,_2}` with 8 names each — not only the archetype-reuse
+  templates.
   **PROBE-086 is blocked on it**, as is any WebTemplate whose siblings sanitise to one
   `id`. Three upstream templates reach the gap, by different routes:
 
