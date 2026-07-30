@@ -1,7 +1,7 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Partial — Phases 0–1 landed 2026-07-30 (oracles vendored + pinned; node name parsed + exposed); Phases 2–4 open
+**Status:** Partial — Phases 0–2 landed 2026-07-30 (oracles vendored + pinned; node name parsed, exposed, carried through compile); Phases 3–4 open
 **Owner:** SDK maintainers
 **Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `proposed`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
@@ -60,14 +60,14 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **DoD:** met — accessor returns `Husten` / `Symptome` etc. for the corona nodes; existing `openehr/template` tests unchanged.
 
-### Phase 2 — Carry through the compiled tree (REQ-111)
+### Phase 2 — Carry through the compiled tree (REQ-111) — **done**
 
 **Tasks:**
 
-1. Add the field + accessor to `internal/templatecompile.CompiledNode`, populated in `descend`; re-export through the `openehr/templatecompile` bridge per REQ-111's aliasing approach.
-2. Assert the name survives compile for the corona fixture.
+1. ~~Field + accessor~~ — **done**: `CompiledNode.nodeName` populated in `descend` on both the `ArchetypeRoot` and plain-`ComplexObject` arms (slots carry no name); exposed as `CompiledNode.NodeName()`. The `openehr/templatecompile` bridge needs no change — its types are aliases, and REQ-111 commits everything reachable as a method, so the accessor is public automatically.
+2. ~~Corona assertion~~ — **done**: `compile_nodename_test.go` — `AllByArchetypeID` retains all four `SECTION.adhoc.v1` siblings with their distinct names post-compile (the exact precondition Phase 3's name predicates need, since `byPath` keeps only the first); the shared path resolves to `Symptome`; an unnamed node (`/context`) stays `""`; a synthetic OPT covers the plain-`ComplexObject` carry.
 
-**DoD:** compiled nodes expose the name; no path change yet, so all existing tests stay green.
+**DoD:** met — compiled nodes expose the name; no path change, all existing tests green.
 
 ### Phase 3 — Name predicates on compiled paths (the risky one)
 

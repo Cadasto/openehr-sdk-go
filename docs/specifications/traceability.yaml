@@ -982,6 +982,7 @@ requirements:
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/template/node_name_test.go
+      - internal/templatecompile/compile_nodename_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.

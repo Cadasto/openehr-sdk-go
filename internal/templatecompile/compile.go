@@ -201,6 +201,7 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 	case *template.ArchetypeRoot:
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
+		cn.nodeName = v.NodeName()
 		cn.archetypeID = v.ArchetypeID()
 		cn.occurrences = v.Occurrences()
 		// Per-archetype-root terms live on the node; bindings flatten
@@ -212,6 +213,7 @@ func (w *walker) descend(n template.Node, cn *CompiledNode) error {
 	case *template.ComplexObject:
 		cn.rmTypeName = v.RMTypeName()
 		cn.nodeID = v.NodeID()
+		cn.nodeName = v.NodeName()
 		cn.occurrences = v.Occurrences()
 		cn.primitive = v.PrimitiveConstraint()
 		return w.attachAttributes(cn, v.Attributes())
