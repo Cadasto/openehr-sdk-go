@@ -10,8 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // ParseOPT parses one ADL 1.4 operational template from r. It accepts
@@ -445,7 +443,7 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		}
 		co.attributes = append(co.attributes, attr)
 	}
-	co.nodeName = deriveNodeName(co.attributes)
+	co.nodeName = deriveNodeName(o.Attributes)
 	return co, nil
 }
 
@@ -458,17 +456,19 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 // attribute carries alternatives, the first child that pins a fixed
 // value wins, matching the first-alternative convention used across
 // the parse and compile layers.
-func deriveNodeName(attrs []*Attribute) string {
+//
+// The walk reads the *wire* structs, not the built tree: buildString
+// drops blank <list> entries, so a built single-entry list can also
+// be the remnant of a multi-entry choice (<list>A</list><list> </list>).
+// Fixedness is a property of what the OPT declared — exactly one raw
+// <list> element — so it is decided before that filtering.
+func deriveNodeName(attrs []*xmlCAttribute) string {
 	for _, a := range attrs {
-		if a.name != "name" {
+		if a.Name != "name" {
 			continue
 		}
-		for _, child := range a.children {
-			co, ok := child.(*ComplexObject)
-			if !ok {
-				continue
-			}
-			if name := fixedValueString(co); name != "" {
+		for _, child := range a.Children {
+			if name := fixedValueString(child); name != "" {
 				return name
 			}
 		}
@@ -476,26 +476,29 @@ func deriveNodeName(attrs []*Attribute) string {
 	return ""
 }
 
-// fixedValueString returns the single fixed string pinned on co's
-// value attribute, or "" when the constraint does not pin exactly one
-// value. buildString already trims entries and drops empties, so a
-// surviving single entry is the name verbatim.
-func fixedValueString(co *ComplexObject) string {
-	for _, a := range co.attributes {
-		if a.name != "value" {
+// fixedValueString returns the single fixed string pinned on the
+// value attribute of a wire name-constraint node, or "" when the
+// constraint does not pin exactly one raw non-blank <list> entry.
+// Handles both wire spellings: a C_PRIMITIVE_OBJECT wrapper carrying
+// <item xsi:type="C_STRING">, and a direct C_STRING child.
+func fixedValueString(o *xmlCObject) string {
+	if o == nil {
+		return ""
+	}
+	for _, a := range o.Attributes {
+		if a.Name != "value" {
 			continue
 		}
-		for _, child := range a.children {
-			leaf, ok := child.(*ComplexObject)
-			if !ok {
+		for _, child := range a.Children {
+			leaf := child
+			if leaf.Type == "C_PRIMITIVE_OBJECT" && leaf.Item != nil {
+				leaf = leaf.Item
+			}
+			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 {
 				continue
 			}
-			cs, ok := leaf.primitive.(constraints.CString)
-			if !ok {
-				continue
-			}
-			if len(cs.List) == 1 {
-				return cs.List[0]
+			if s := strings.TrimSpace(leaf.PrimitiveList[0].Text); s != "" {
+				return s
 			}
 		}
 	}

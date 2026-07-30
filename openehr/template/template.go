@@ -158,6 +158,12 @@ type ObjectNode interface {
 	// Occurrences returns the parsed occurrences interval, or nil
 	// when the OPT did not declare one for this node.
 	Occurrences() *Multiplicity
+	// NodeName returns the template-level node name (REQ-116), or ""
+	// when the node pins no fixed name; see ComplexObject.NodeName.
+	// On the interface so ObjectNode walkers (the compile carry,
+	// REQ-111) read it without asserting the concrete type — a
+	// *ComplexObject assertion would silently miss *ArchetypeRoot.
+	NodeName() string
 }
 
 // Multiplicity is the min/max interval that OPT uses for both

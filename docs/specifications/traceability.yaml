@@ -603,6 +603,7 @@ requirements:
       - openehr/template/template_test.go
       - openehr/template/path_test.go
       - testkit/probes/template/probes_test.go
+      - openehr/template/node_name_test.go
     plans:
       - docs/plans/archive/2026-05-21-template-parser.md
       - docs/plans/archive/2026-05-22-template-req100-followups.md
