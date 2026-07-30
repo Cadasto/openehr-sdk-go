@@ -95,4 +95,15 @@ func TestCompile_NodeNameCarriedCoronaOracle(t *testing.T) {
 	if got := ctx.NodeName(); got != "" {
 		t.Errorf("NodeAt(/context).NodeName() = %q, want \"\"", got)
 	}
+
+	// The COMPOSITION root is the sharper witness: it pins no name but
+	// carries its at0000 concept term ("Bericht") right on the node —
+	// a compile-layer fallback to the term would surface exactly here.
+	root := c.Root()
+	if term, ok := root.Term("at0000", ""); !ok || term.Items["text"] != "Bericht" {
+		t.Fatalf(`Root().Term("at0000") = %v, %v — fixture no longer carries the Bericht term`, term, ok)
+	}
+	if got := root.NodeName(); got != "" {
+		t.Errorf("Root().NodeName() = %q, want \"\" (concept term must not be substituted)", got)
+	}
 }

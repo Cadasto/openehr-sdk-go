@@ -79,7 +79,7 @@ func (n *CompiledNode) NodeID() string { return n.nodeID }
 // substituted: distinct sibling names are what disambiguate a reused
 // archetype under one slot, and the reference WebTemplate derives its
 // node ids and name-predicated paths from this value. Carried
-// verbatim from [template.ComplexObject.NodeName] (REQ-111).
+// verbatim from [template.ObjectNode.NodeName] (REQ-111).
 func (n *CompiledNode) NodeName() string { return n.nodeName }
 
 // ArchetypeID returns the slot-fill archetype id when this node was

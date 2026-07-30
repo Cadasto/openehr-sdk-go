@@ -3,11 +3,11 @@
 **Date:** 2026-07-29
 **Status:** Partial — Phases 0–2 landed 2026-07-30 (oracles vendored + pinned; node name parsed, exposed, carried through compile); Phases 3–4 open
 **Owner:** SDK maintainers
-**Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `proposed`
+**Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `partial`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
 **Must not regress:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-053](../specifications/wire.md#req-053) — all consume compiled path shape
 **Probes:** [PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) (extended to new fixtures), [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (unblocked by this plan)
-**Implementation:** planned
+**Implementation:** partial — Phases 0–2 landed; Phases 3–4 open
 **Depends on:** the shared-path-subtree compile fix and the vendored FLAT corpus (PR #79, landed)
 **Defers:** Better-platform dialect naming; multi-language name selection beyond the document default language; retro-fitting name predicates onto AQL *builder* output (REQ-055) — this plan changes compiled-template paths only
 
