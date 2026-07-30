@@ -158,6 +158,47 @@ func TestNodeName_Synthetic(t *testing.T) {
 			want: "Second",
 		},
 		{
+			// Exactly one raw entry, but blank: a whitespace-only name is
+			// useless as a disambiguator, so it pins nothing.
+			name:     "whitespace-only single entry pins nothing",
+			fragment: nameAttr("DV_TEXT", "<list>   </list>"),
+			want:     "",
+		},
+		{
+			// A blank-pinning alternative is treated as not-a-name, so a
+			// later alternative's fixed value wins — same fall-through as
+			// the unpinned-first-alternative case.
+			name: "blank-pinning first alternative falls through",
+			fragment: `<attributes xsi:type="C_SINGLE_ATTRIBUTE">
+      <rm_attribute_name>name</rm_attribute_name>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_TEXT</rm_type_name>
+        <node_id/>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>value</rm_attribute_name>
+          <children xsi:type="C_PRIMITIVE_OBJECT">
+            <rm_type_name>STRING</rm_type_name>
+            <node_id/>
+            <item xsi:type="C_STRING"><list>  </list></item>
+          </children>
+        </attributes>
+      </children>
+      <children xsi:type="C_COMPLEX_OBJECT">
+        <rm_type_name>DV_CODED_TEXT</rm_type_name>
+        <node_id/>
+        <attributes xsi:type="C_SINGLE_ATTRIBUTE">
+          <rm_attribute_name>value</rm_attribute_name>
+          <children xsi:type="C_PRIMITIVE_OBJECT">
+            <rm_type_name>STRING</rm_type_name>
+            <node_id/>
+            <item xsi:type="C_STRING"><list>Second</list></item>
+          </children>
+        </attributes>
+      </children>
+    </attributes>`,
+			want: "Second",
+		},
+		{
 			name:     "pattern-only constraint is not a fixed name",
 			fragment: nameAttr("DV_TEXT", "<pattern>.*</pattern>"),
 			want:     "",

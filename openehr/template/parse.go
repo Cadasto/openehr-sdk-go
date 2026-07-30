@@ -450,12 +450,15 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 // deriveNodeName extracts the template-level node name (REQ-116): the
 // fixed C_STRING the OPT pins on the node's name attribute — name →
 // a DV_TEXT/DV_CODED_TEXT child → value → C_STRING whose list holds
-// exactly one entry. Anything looser (no name attribute, an open
-// pattern, a multi-entry list) is not a *fixed* name and yields "" —
-// the archetype concept term is never substituted. When the name
-// attribute carries alternatives, the first child that pins a fixed
-// value wins, matching the first-alternative convention used across
-// the parse and compile layers.
+// exactly one non-blank entry, taken trimmed. Anything looser (no
+// name attribute, an open pattern, a multi-entry list, a lone blank
+// entry — a whitespace-only name is useless as a disambiguator) is
+// not a *fixed* name and yields "" — the archetype concept term is
+// never substituted. When the name attribute carries alternatives,
+// the first child that pins a fixed value wins (a non-pinning or
+// blank-pinning alternative falls through to the next), matching the
+// first-alternative convention used across the parse and compile
+// layers.
 //
 // The walk reads the *wire* structs, not the built tree: buildString
 // drops blank <list> entries, so a built single-entry list can also

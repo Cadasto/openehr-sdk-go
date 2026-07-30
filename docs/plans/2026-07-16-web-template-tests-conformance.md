@@ -42,7 +42,7 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 - `make flat-conformance-check` fails on fixture drift. *(landed)*
 - PROBE-086 runs under `make test` / `make ci` with no Docker/Java. *(blocked)*
 - `traceability.yaml` maps PROBE-086 to REQ-080 and records the REQ-053/106 coverage + REQ-082 Sandbox-partial. *(pending Phase 2)*
-- REQ.md **Impl.** for REQ-080 reflects the advance; residual skips documented in `SKIPPED.md`. *(pending Phase 3)*
+- REQ.md **Impl.** for REQ-080 reflects the advance; residual skips documented in `SKIPPED.md`. *(row flipped to `partial` + this plan registered on it, 2026-07-30; residual-skips doc pending Phase 3)*
 - `make spec-check` and `make ci` pass. *(green)*
 
 ## Implementation checklist
@@ -55,7 +55,7 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 | Name-derived web `id` feature specified + landed | **blocked — separate REQ** |
 | Adapter + runner code | not started |
 | Tests with `// PROBE-086` comments | not started |
-| `traceability.yaml` + REQ.md row | not started |
+| `traceability.yaml` + REQ.md row | partial — REQ-080 row `partial`, corpus + plan registered (2026-07-30); PROBE-086 mapping pending Phase 2 |
 | `make spec-check` / `make ci` | green |
 
 ## Phases

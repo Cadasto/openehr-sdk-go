@@ -75,6 +75,12 @@ flush_req() {
   if [[ -n "$current_status" && ! "$current_status" =~ ^(draft|stable|deprecated)$ ]]; then
     die "$current_id: invalid status '$current_status' (expected draft|stable|deprecated — implementation status is a separate field)"
   fi
+  # Out-of-vocabulary implementation values must fail loudly: an unmatched
+  # value used to leave the row's implementation empty, silently skipping
+  # every artefact check below (the REQ-116 'proposed' hole).
+  if [[ -n "$current_impl" && ! "$current_impl" =~ ^(landed|partial|planned|deprecated)$ ]]; then
+    die "$current_id: invalid implementation '$current_impl' (expected landed|partial|planned|deprecated)"
+  fi
   if [[ "$current_impl" == "landed" || "$current_impl" == "partial" ]]; then
     if [[ ${#pkg_paths[@]} -eq 0 && ${#test_paths[@]} -eq 0 ]]; then
       die "$current_id ($current_impl): no packages or tests listed"
@@ -98,6 +104,17 @@ flush_req() {
            | grep -qiE '\*\*Status:\*\*[[:space:]]*Draft'; then
         die "$current_id: cites ${pr}, which is Status: Draft in conformance.md (not implemented coverage — drop it until its test lands)"
       fi
+    done
+  elif [[ "$current_impl" == "planned" ]]; then
+    # Header contract: planned rows warn (never fail) on missing artefacts.
+    for p in "${pkg_paths[@]}"; do
+      [[ -e "${ROOT}/${p}" ]] || warn_msg "$current_id (planned): missing package path ${p}"
+    done
+    for t in "${test_paths[@]}"; do
+      [[ -f "${ROOT}/${t}" ]] || warn_msg "$current_id (planned): missing test path ${t}"
+    done
+    for pl in "${plan_paths[@]}"; do
+      [[ -f "${ROOT}/${pl}" ]] || warn_msg "$current_id (planned): missing plan ${pl}"
     done
   fi
   current_id=""
@@ -127,7 +144,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     current_id="$_next_id"
     continue
   fi
-  if [[ -n "$current_id" && "$line" =~ implementation:[[:space:]]*(landed|partial|planned|deprecated) ]]; then
+  if [[ -n "$current_id" && "$line" =~ ^[[:space:]]*implementation:[[:space:]]*([A-Za-z-]+) ]]; then
     current_impl="${BASH_REMATCH[1]}"
     continue
   fi

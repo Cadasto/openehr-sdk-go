@@ -35,7 +35,10 @@ func oracleGolden(t *testing.T, templateID string) map[string]any {
 
 // namePredicates reports how many aqlPath segments in a reference tree carry a
 // name predicate ([archetype_id,'Name']) and how many distinct paths carry at
-// least one. A predicate is the only place a comma appears inside brackets.
+// least one. Heuristic: it counts ",'" occurrences anywhere in the path
+// string, not just inside brackets — exact for the vendored goldens (no
+// pinned name there contains ",'"), so a count drift on a re-vendored
+// golden may mean a name with an embedded ",'" rather than a new predicate.
 func namePredicates(ref map[string]any) (segments, paths int) {
 	walkRefTree(ref, func(m map[string]any) {
 		n := strings.Count(refStr(m, "aqlPath"), ",'")
