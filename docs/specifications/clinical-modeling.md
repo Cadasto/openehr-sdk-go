@@ -43,7 +43,7 @@ The parsed definition tree is a closed taxonomy. `Node` is a sealed interface im
 
 | Concrete | OPT XML shape | Carries |
 |---|---|---|
-| `ComplexObject` | `xsi:type="C_COMPLEX_OBJECT"` | `RMTypeName()`, `NodeID()`, child `Attribute` list, optional occurrences |
+| `ComplexObject` | `xsi:type="C_COMPLEX_OBJECT"` | `RMTypeName()`, `NodeID()`, `NodeName()` (template-level node name — the fixed `C_STRING` pinned on the `name` attribute, `""` when absent; [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)), child `Attribute` list, optional occurrences |
 | `Attribute` | `xsi:type="C_SINGLE_ATTRIBUTE"` or `C_MULTIPLE_ATTRIBUTE"` | `Name()` (RM attribute name), `Cardinality()` (single vs multiple), child `Node` list |
 | `ArchetypeRoot` | `xsi:type="C_ARCHETYPE_ROOT"` | `ArchetypeID()` (e.g. `openEHR-EHR-OBSERVATION.blood_pressure.v1`), plus the same surface as `ComplexObject` |
 | `Slot` | `xsi:type="ARCHETYPE_SLOT"` | `Includes()` / `Excludes()` archetype-id assertion lists (lists may be empty) |

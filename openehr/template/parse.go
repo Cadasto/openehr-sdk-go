@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/template/constraints"
 )
 
 // ParseOPT parses one ADL 1.4 operational template from r. It accepts
@@ -443,7 +445,61 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		}
 		co.attributes = append(co.attributes, attr)
 	}
+	co.nodeName = deriveNodeName(co.attributes)
 	return co, nil
+}
+
+// deriveNodeName extracts the template-level node name (REQ-116): the
+// fixed C_STRING the OPT pins on the node's name attribute — name →
+// a DV_TEXT/DV_CODED_TEXT child → value → C_STRING whose list holds
+// exactly one entry. Anything looser (no name attribute, an open
+// pattern, a multi-entry list) is not a *fixed* name and yields "" —
+// the archetype concept term is never substituted. When the name
+// attribute carries alternatives, the first child that pins a fixed
+// value wins, matching the first-alternative convention used across
+// the parse and compile layers.
+func deriveNodeName(attrs []*Attribute) string {
+	for _, a := range attrs {
+		if a.name != "name" {
+			continue
+		}
+		for _, child := range a.children {
+			co, ok := child.(*ComplexObject)
+			if !ok {
+				continue
+			}
+			if name := fixedValueString(co); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// fixedValueString returns the single fixed string pinned on co's
+// value attribute, or "" when the constraint does not pin exactly one
+// value. buildString already trims entries and drops empties, so a
+// surviving single entry is the name verbatim.
+func fixedValueString(co *ComplexObject) string {
+	for _, a := range co.attributes {
+		if a.name != "value" {
+			continue
+		}
+		for _, child := range a.children {
+			leaf, ok := child.(*ComplexObject)
+			if !ok {
+				continue
+			}
+			cs, ok := leaf.primitive.(constraints.CString)
+			if !ok {
+				continue
+			}
+			if len(cs.List) == 1 {
+				return cs.List[0]
+			}
+		}
+	}
+	return ""
 }
 
 func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error) {

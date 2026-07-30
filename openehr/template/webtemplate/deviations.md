@@ -50,10 +50,15 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
     (`idOf` → `termText`). Every sibling sharing an archetype id gets the **same**
     text, hence the collision.
 
-  Worked example — five `openEHR-EHR-SECTION.adhoc.v1` siblings in `corona_anamnese`:
-  the reference emits `symptome`, `kontakt`, `risikogebiet`, `allgemeine_angaben`
-  (from their names), where this builder would emit one repeated
-  `screening-fragebogen_zur_symptomen_anzeichen`.
+  Worked example (counts verified against the vendored OPT, 2026-07-30 — an earlier
+  note here said "five" sections): **four** `openEHR-EHR-SECTION.adhoc.v1` siblings in
+  `Corona_Anamnese` are distinguished only by their pinned names — the reference emits
+  `symptome`, `kontakt`, `risikogebiet`, `allgemeine_angaben`, where this builder
+  repeats the shared concept term. The collision `Build` actually reports first is one
+  level down: **eight** `OBSERVATION.symptom_sign_screening.v0` siblings under the
+  Symptome section (ten across the template) all derive
+  `screening-fragebogen_zur_symptomen_anzeichen`, where the reference emits
+  `husten`, `schnupfen`, `heiserkeit`, … from their pinned names.
 
   **`aqlPath` is affected too, not just `id`.** Where siblings share an archetype id
   the reference adds a **name predicate** — `/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']`.
@@ -72,9 +77,11 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   - `conformance-ehrbase.de.v0` — sibling ELEMENTs that both sanitise to `dv_text`
     under its ACTION (its nine archetype ids are all distinct, so this is *not* the
     archetype-reuse case). **Vendored and compile-tested** in this repo.
-  - `Corona_Anamnese` — five `SECTION.adhoc.v1` siblings reusing one archetype, all
-    deriving `screening-fragebogen_zur_symptomen_anzeichen`. **Vendored with its
-    reference WebTemplate** (REQ-116 plan Phase 0) and guarded twice: it compiles
+  - `Corona_Anamnese` — reused archetypes at two levels: four `SECTION.adhoc.v1`
+    siblings, and eight `OBSERVATION.symptom_sign_screening.v0` siblings inside the
+    Symptome section (ten across the template) all deriving
+    `screening-fragebogen_zur_symptomen_anzeichen`. **Vendored with its reference
+    WebTemplate** (REQ-116 plan Phase 0) and guarded twice: it compiles
     (`internal/templatecompile` oracle test) and `Build` returns `ErrIDCollision`
     (`req116_gap_test.go` pins the blocked state until REQ-116 flips it).
   - `GECCO_Diagnose` — the **silent** route: no sibling id collision, so `Build`

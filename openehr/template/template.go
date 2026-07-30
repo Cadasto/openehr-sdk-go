@@ -223,6 +223,7 @@ func (c Cardinality) IsValid() bool {
 type ComplexObject struct {
 	rmTypeName  string
 	nodeID      string
+	nodeName    string
 	occurrences *Multiplicity
 	attributes  []*Attribute
 	primitive   constraints.PrimitiveConstraint
@@ -233,6 +234,17 @@ func (c *ComplexObject) RMTypeName() string { return c.rmTypeName }
 
 // NodeID implements Node.
 func (c *ComplexObject) NodeID() string { return c.nodeID }
+
+// NodeName returns the template-level node name — the runtime
+// LOCATABLE.name the OPT pins on this node by constraining its name
+// attribute to a fixed C_STRING (name → value → single-entry list,
+// e.g. <item xsi:type="C_STRING"><list>Husten</list></item>).
+// Returns "" when the node pins no fixed name; per REQ-116 the
+// archetype concept term is never substituted. Distinct sibling
+// names are what disambiguate a reused archetype under one slot —
+// the reference WebTemplate derives node ids from this name and
+// name-predicates the AQL paths of colliding siblings.
+func (c *ComplexObject) NodeName() string { return c.nodeName }
 
 // Occurrences returns the parsed occurrences block, or nil when the
 // OPT did not declare one for this node.

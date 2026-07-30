@@ -1,7 +1,7 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Partial — Phase 0 landed 2026-07-30 (oracles vendored + pinned; both gap modes test-pinned); Phases 1–4 open
+**Status:** Partial — Phases 0–1 landed 2026-07-30 (oracles vendored + pinned; node name parsed + exposed); Phases 2–4 open
 **Owner:** SDK maintainers
 **Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `proposed`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
@@ -47,14 +47,14 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **DoD:** met — fixtures resolve via `testkit/fixtures`; `make ci` green (no behaviour change).
 
-### Phase 1 — Parse and expose the name (REQ-100)
+### Phase 1 — Parse and expose the name (REQ-100) — **done**
 
 **Tasks:**
 
-1. In `openehr/template`, parse the `name` attribute's fixed `C_STRING` (`<item xsi:type="C_STRING"><list>…</list></item>`) on definition nodes; store it and expose one accessor (e.g. `NodeName() string`) on the node types that can carry it. Absent ⇒ empty string, never the archetype concept term (REQ-116).
-2. Table-driven tests over a small synthetic OPT plus the vendored corona fixture.
+1. ~~Parse + expose~~ — **done**: `deriveNodeName` in `openehr/template/parse.go` walks name → value → `C_STRING`; a **single-entry** list is a fixed name, anything looser (multi-entry list, pattern-only, absent attribute) yields `""` — never the concept term. Exposed as `ComplexObject.NodeName()` (ArchetypeRoot inherits by embedding; slots carry no attributes). Both wire variants covered: `C_PRIMITIVE_OBJECT`-wrapped `<item xsi:type="C_STRING">` and direct `C_STRING` children. REQ-100's node-taxonomy table amended.
+2. ~~Tests~~ — **done**: `node_name_test.go` — six synthetic table cases plus the corona oracle (four `SECTION.adhoc.v1` names, eight screening-OBSERVATION names incl. `Husten`). While pinning those counts, the docs' "five SECTION siblings" claim was found wrong (it is **four**; the reported collision is the eight OBSERVATIONs under Symptome) — `deviations.md` and the cassettes README corrected.
 
-**DoD:** accessor returns `Husten` / `Symptome` etc. for the corona nodes; existing `openehr/template` tests unchanged.
+**DoD:** met — accessor returns `Husten` / `Symptome` etc. for the corona nodes; existing `openehr/template` tests unchanged.
 
 ### Phase 2 — Carry through the compiled tree (REQ-111)
 
