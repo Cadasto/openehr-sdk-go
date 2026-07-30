@@ -67,8 +67,8 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   measurably wrong. `GECCO_Diagnose` predicates all three of its `/content` children
   although their archetype ids are **distinct**, and predicates a sole
   `CLUSTER.anatomical_location.v1` child. Across both oracles the names used in golden
-  predicates are exactly the names the OPT pins — GECCO 6 pinned / 6 used, Corona 24 / 24,
-  no exceptions either way. The
+  predicates are exactly the names the OPT pins — GECCO 6 distinct names (pinned on 7
+  nodes: 'Unbekannte Diagnose' twice) / 6 used, Corona 24 / 24, no exceptions either way. The
   `corona_anamnese` golden carries **350** predicate segments over 213 paths;
   `constrain_test` carries **0** because it pins **no** name anywhere — that, not an
   absence of collision, is why PROBE-075 holds 104/104 without implementing any of this.

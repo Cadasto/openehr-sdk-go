@@ -24,8 +24,9 @@ type Compiled = impl.Compiled
 // RM type it constrains (RMTypeName), its at-code / archetype id (NodeID,
 // ArchetypeID), occurrences, slot rules (IsSlot, SlotRules,
 // AllowsArchetypeID), primitive value constraint (PrimitiveConstraint),
-// human label (Term), parent (Parent), and child attributes (Attributes,
-// Attribute). Like [Compiled] it is a type alias of the engine form.
+// human label (Term), template-level pinned node name (NodeName),
+// parent (Parent), and child attributes (Attributes, Attribute).
+// Like [Compiled] it is a type alias of the engine form.
 type CompiledNode = impl.CompiledNode
 
 // CompiledAttribute is one attribute on a [CompiledNode] (e.g. "content",

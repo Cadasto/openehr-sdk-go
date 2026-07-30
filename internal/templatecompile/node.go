@@ -39,6 +39,7 @@ type CompiledNode struct {
 	aqlPath      string
 	rmTypeName   string
 	nodeID       string
+	nodeName     string
 	archetypeID  string // empty unless this node was an *ArchetypeRoot on the wire
 	occurrences  *template.Multiplicity
 	attributes   []*CompiledAttribute
@@ -71,6 +72,15 @@ func (n *CompiledNode) RMTypeName() string { return n.rmTypeName }
 // NodeID returns the archetype node id (at-code) of this node, or
 // "" when none is set on the wire.
 func (n *CompiledNode) NodeID() string { return n.nodeID }
+
+// NodeName returns the template-level node name — the fixed C_STRING
+// the OPT pins on this node's name attribute — or "" when the node
+// pins no fixed name. Per REQ-116 the archetype concept term is never
+// substituted: distinct sibling names are what disambiguate a reused
+// archetype under one slot, and the reference WebTemplate derives its
+// node ids and name-predicated paths from this value. Carried
+// verbatim from [template.ObjectNode.NodeName] (REQ-111).
+func (n *CompiledNode) NodeName() string { return n.nodeName }
 
 // ArchetypeID returns the slot-fill archetype id when this node was
 // a *ArchetypeRoot on the OPT wire side; otherwise "".

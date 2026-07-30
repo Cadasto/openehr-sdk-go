@@ -197,6 +197,12 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 // leaving cn's own path registration subject to the full collision
 // check.
 func (w *walker) descend(n template.Node, cn *CompiledNode) error {
+	// The template-level node name (REQ-116) is read via ObjectNode,
+	// the interface that exists so this carry cannot miss one of the
+	// two object kinds; slots are not ObjectNodes and cannot pin one.
+	if on, ok := n.(template.ObjectNode); ok {
+		cn.nodeName = on.NodeName()
+	}
 	switch v := n.(type) {
 	case *template.ArchetypeRoot:
 		cn.rmTypeName = v.RMTypeName()

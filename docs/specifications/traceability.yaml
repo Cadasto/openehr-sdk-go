@@ -982,6 +982,7 @@ requirements:
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/template/node_name_test.go
+      - internal/templatecompile/compile_nodename_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.
@@ -1222,8 +1223,15 @@ requirements:
     title: openEHR wire conformance
     canonical: docs/specifications/conformance.md#conformance-scope
     status: draft
-    implementation: planned
-    packages: [testkit/probes]
+    # Partial: the running probe suite under testkit/probes carries REQ-080
+    # marks, and the FLAT-conformance plan's Phase 0 landed the vendored
+    # upstream corpus (testkit/cassettes/flat-conformance/ + sync/check
+    # tooling, integrity-gated by `make ci`). The PROBE-086 adapter itself
+    # is blocked on REQ-116; PROBE-086 stays out of `probes:` while Draft.
+    implementation: partial
+    packages: [testkit/probes, testkit/cassettes/flat-conformance]
+    plans:
+      - docs/plans/2026-07-16-web-template-tests-conformance.md
 
   - id: REQ-081
     title: Wire-level parity (retired)

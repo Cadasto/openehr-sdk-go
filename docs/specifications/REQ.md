@@ -67,7 +67,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-071 | Discovery cache | [service-discovery.md § REQ-071](service-discovery.md#req-071) | landed |
 | REQ-072 | Discovery validation | [service-discovery.md § REQ-072](service-discovery.md#req-072) | landed |
 | REQ-073 | Discovery trust posture | [service-discovery.md § REQ-073](service-discovery.md#req-073--discovery-trust-posture) | landed |
-| REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | planned |
+| REQ-080 | openEHR wire conformance | [conformance.md § Conformance scope](conformance.md#conformance-scope) | partial |
 | REQ-081 | Wire-level parity (retired) | [conformance.md § REQ-081](conformance.md#req-081--wire-level-parity-retired) | deprecated |
 | REQ-082 | Probe runnability | [conformance.md § Runnability](conformance.md#req-082--runnability) | partial |
 | REQ-083 | Cadasto platform API conformance | [conformance.md § REQ-083](conformance.md#req-083--cadasto-platform-api-conformance) | partial |
