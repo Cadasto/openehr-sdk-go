@@ -603,6 +603,7 @@ requirements:
       - openehr/template/template_test.go
       - openehr/template/path_test.go
       - testkit/probes/template/probes_test.go
+      - openehr/template/node_name_test.go
     plans:
       - docs/plans/archive/2026-05-21-template-parser.md
       - docs/plans/archive/2026-05-22-template-req100-followups.md
@@ -944,31 +945,43 @@ requirements:
     # distinguishes sibling archetype roots that fill a slot with the same
     # archetype. Spans four layers: parse + expose on the OPT node (REQ-100),
     # carry through the compiled tree (REQ-111), emit name predicates
-    # ([archetype_id,'Name']) on compiled AQL paths only where needed for
-    # sibling uniqueness, and prefer the name for WebTemplate id derivation
-    # (REQ-106, ADR 0014). Established against the upstream EHRbase goldens
-    # 2026-07-29: there is NO numeric-suffix disambiguation rule (checked
-    # across corona_anamnese / multi_occurrence / AlternativeEvents); the
-    # reference disambiguates by name alone, and name-predicates aqlPath 350x
-    # in the corona golden vs 0x in constrain_test — which is why PROBE-075
-    # holds 104/104 without any of this. Blocks PROBE-086 (upstream FLAT
-    # parity) and any WebTemplate for a template reusing an archetype among
-    # siblings. Path shape is consumed by REQ-102 validation, REQ-107 instance
-    # synthesis, and REQ-053 FLAT/STRUCTURED, so predicate-free paths must stay
-    # byte-identical.
-    implementation: proposed
+    # ([archetype_id,'Name']) on the compiled AQL path of every node that pins
+    # a name, and prefer the name for WebTemplate id derivation (REQ-106,
+    # ADR 0014). Established against the upstream EHRbase goldens 2026-07-29:
+    # there is NO numeric-suffix disambiguation rule (checked across
+    # corona_anamnese / multi_occurrence / AlternativeEvents); the reference
+    # disambiguates by name alone, and name-predicates aqlPath 350x in the
+    # corona golden vs 0x in constrain_test — which is why PROBE-075 holds
+    # 104/104 without any of this. CORRECTED 2026-07-30: the predicate trigger
+    # is the pinned name ALONE, not sibling collision — GECCO_Diagnose
+    # predicates all three /content children though their archetype ids are
+    # distinct, and predicates a sole CLUSTER child; every predicate name in
+    # both goldens is a pinned C_STRING (1:1), and constrain_test pins none,
+    # which is the real reason parity holds. An earlier collision-conditioned
+    # reading of this rule was wrong and would emit too few predicates.
+    # Blocks PROBE-086 (upstream FLAT parity) and any WebTemplate for a
+    # template reusing an archetype among siblings. Path shape is consumed by
+    # REQ-102 validation, REQ-107 instance synthesis, and REQ-053
+    # FLAT/STRUCTURED, so paths through un-named nodes must stay byte-identical
+    # — but every vendored OPT that pins a name does change shape.
+    #
+    # PROBE-086 is deliberately NOT in `probes:` — this REQ *unblocks* it, it
+    # does not cover this REQ (and the guard forbids a partial REQ citing a
+    # Draft probe as coverage).
+    implementation: partial
     packages:
       - openehr/template
       - internal/templatecompile
       - openehr/templatecompile
       - openehr/template/webtemplate
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
-    probes: [PROBE-075, PROBE-086]
+    probes: [PROBE-075]
     tests:
       - internal/templatecompile/registerpath_test.go
       - internal/templatecompile/flat_conformance_compile_test.go
       - internal/templatecompile/webtemplate_oracle_compile_test.go
       - openehr/template/webtemplate/req116_gap_test.go
+      - openehr/template/node_name_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.

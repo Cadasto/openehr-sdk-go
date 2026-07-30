@@ -9,13 +9,21 @@ import (
 )
 
 // REQ-116 (Phase 0) / PROBE-075 — the vendored REQ-116 oracle OPTs compile.
-// Corona_Anamnese is the archetype-reuse-under-slot regression guard: five
-// SECTION.adhoc.v1 siblings reuse one archetype, so their subtrees produce
-// repeated AQL paths that only shared-path admission (REQ-100) lets through —
-// previously this class was claimed to compile with no in-tree guard.
-// WebTemplate export for both still fails with ErrIDCollision until REQ-116
-// lands; see openehr/template/webtemplate/deviations.md § Sibling `id`
-// disambiguation. Provenance: testkit/cassettes/THIRD_PARTY_LICENSES.md.
+//
+// Corona_Anamnese is the archetype-reuse-under-slot regression guard: four
+// SECTION.adhoc.v1 siblings (and, one level down, eight reused screening
+// OBSERVATIONs under Symptome) produce repeated AQL paths that only shared-path
+// admission lets through — legal per REQ-116, where registerPath's duplicate
+// rejection is REQ-100. Previously this class was claimed to compile with no
+// in-tree guard.
+//
+// Build outcomes differ between the two and are pinned separately in
+// openehr/template/webtemplate/req116_gap_test.go: Corona_Anamnese returns
+// ErrIDCollision, GECCO_Diagnose builds but silently diverges from its
+// name-predicated golden. Neither emits name predicates yet — asserted below
+// as the compile-layer tripwire for plan Phase 3. See
+// openehr/template/webtemplate/deviations.md § Sibling `id` disambiguation.
+// Provenance: testkit/cassettes/THIRD_PARTY_LICENSES.md.
 func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 	tests := []struct {
 		templateID string
@@ -23,6 +31,13 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 		// collide on ("" when the fixture has no such collision).
 		sharedPath string
 		wantRMType string
+		// wantPaths are further compiled paths that must resolve, with their
+		// expected RM type — the fixture's load-bearing structure.
+		wantPaths map[string]string
+		// notYetPath is the name-predicated form the reference golden uses for
+		// one of wantPaths. It must NOT resolve until Phase 3 emits predicates
+		// — the compile-layer tripwire.
+		notYetPath string
 	}{
 		{
 			templateID: "Corona_Anamnese",
@@ -30,9 +45,17 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 			wantRMType: "SECTION",
 		},
 		{
-			// Name-predicated in the reference golden (30 aqlPath predicates)
-			// without sibling archetype reuse — the second REQ-116 oracle.
+			// The reference golden name-predicates 24 of this fixture's paths
+			// (30 segments) with no sibling archetype reuse anywhere — its
+			// three /content children have distinct archetype ids and are all
+			// predicated, which is why a collision-conditioned rule is wrong.
 			templateID: "GECCO_Diagnose",
+			wantPaths: map[string]string{
+				"/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]":  "EVALUATION",
+				"/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]": "EVALUATION",
+				"/content[openEHR-EHR-EVALUATION.absence.v2]":            "EVALUATION",
+			},
+			notYetPath: "/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']",
 		},
 	}
 	for _, tc := range tests {
@@ -48,18 +71,36 @@ func TestCompile_WebTemplateOracleOPTs(t *testing.T) {
 			if got := c.TemplateID(); got != tc.templateID {
 				t.Errorf("TemplateID() = %q, want %q", got, tc.templateID)
 			}
-			if tc.sharedPath == "" {
-				return
+			if tc.sharedPath != "" {
+				// The first sibling wins the shared path and stays reachable (a
+				// failure here would mean the reused subtree was dropped rather
+				// than admitted).
+				n, err := c.NodeAt(tc.sharedPath)
+				if err != nil {
+					t.Fatalf("NodeAt(%q): %v — shared-path subtree was not registered", tc.sharedPath, err)
+				}
+				if got := n.RMTypeName(); got != tc.wantRMType {
+					t.Errorf("RMTypeName() = %q, want %q", got, tc.wantRMType)
+				}
 			}
-			// The first sibling wins the shared path and stays reachable (a
-			// failure here would mean the reused subtree was dropped rather
-			// than admitted).
-			n, err := c.NodeAt(tc.sharedPath)
-			if err != nil {
-				t.Fatalf("NodeAt(%q): %v — shared-path subtree was not registered", tc.sharedPath, err)
+			for path, wantRM := range tc.wantPaths {
+				n, err := c.NodeAt(path)
+				if err != nil {
+					t.Errorf("NodeAt(%q): %v", path, err)
+					continue
+				}
+				if got := n.RMTypeName(); got != wantRM {
+					t.Errorf("NodeAt(%q).RMTypeName() = %q, want %q", path, got, wantRM)
+				}
 			}
-			if got := n.RMTypeName(); got != tc.wantRMType {
-				t.Errorf("RMTypeName() = %q, want %q", got, tc.wantRMType)
+			// Bare form today; the golden's predicated form resolves to
+			// nothing. When Phase 3 lands this lookup succeeds, the assertion
+			// fires, and wantPaths must move to the predicated spelling.
+			if tc.notYetPath != "" {
+				if _, err := c.NodeAt(tc.notYetPath); err == nil {
+					t.Errorf("NodeAt(%q) resolved — REQ-116 Phase 3 has landed; "+
+						"switch wantPaths to the predicated form and extend PROBE-075 parity", tc.notYetPath)
+				}
 			}
 		})
 	}

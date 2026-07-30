@@ -43,7 +43,7 @@ The parsed definition tree is a closed taxonomy. `Node` is a sealed interface im
 
 | Concrete | OPT XML shape | Carries |
 |---|---|---|
-| `ComplexObject` | `xsi:type="C_COMPLEX_OBJECT"` | `RMTypeName()`, `NodeID()`, child `Attribute` list, optional occurrences |
+| `ComplexObject` | `xsi:type="C_COMPLEX_OBJECT"` | `RMTypeName()`, `NodeID()`, `NodeName()` (template-level node name — the fixed `C_STRING` pinned on the `name` attribute, `""` when absent; [REQ-116](#req-116--template-level-node-naming-and-name-predicated-paths)), child `Attribute` list, optional occurrences |
 | `Attribute` | `xsi:type="C_SINGLE_ATTRIBUTE"` or `C_MULTIPLE_ATTRIBUTE"` | `Name()` (RM attribute name), `Cardinality()` (single vs multiple), child `Node` list |
 | `ArchetypeRoot` | `xsi:type="C_ARCHETYPE_ROOT"` | `ArchetypeID()` (e.g. `openEHR-EHR-OBSERVATION.blood_pressure.v1`), plus the same surface as `ComplexObject` |
 | `Slot` | `xsi:type="ARCHETYPE_SLOT"` | `Includes()` / `Excludes()` archetype-id assertion lists (lists may be empty) |
@@ -753,18 +753,19 @@ The SDK **MUST** parse the template-level node name and expose it on the parsed 
 
 An AQL node predicate **MAY** carry a name alongside the archetype node id — `[openEHR-EHR-SECTION.adhoc.v1,'Symptome']` — which is how openEHR addresses one of several siblings that share an archetype node id.
 
-Where two or more sibling nodes share an archetype node id **and** each pins a distinct template-level name, the compiled AQL path **MUST** carry the name predicate on that segment, so that every such sibling receives a **unique** path and remains individually addressable. Where siblings share an archetype node id and pin **no** distinct names, the SDK **MUST NOT** invent a predicate: those siblings legitimately share a path and are distinguished positionally, and the compiled form **MUST** retain each of them rather than discarding the collision.
+Where a node pins a template-level name, the compiled AQL path **MUST** carry the name predicate on that node's segment. The trigger is the **pinned name alone**, not sibling collision: the reference emits the predicate on every named node — including a sole child, and siblings whose archetype node ids already differ — so a rule conditioned on siblings sharing a node id emits too few. Where a node pins **no** name, the SDK **MUST NOT** invent a predicate; this includes siblings that share an archetype node id and pin no distinct names, which legitimately share a path and are distinguished positionally, and whose compiled form **MUST** retain each of them rather than discarding the collision.
 
-Name predicates **MUST NOT** be emitted where they are not needed for uniqueness — a sole child keeps the bare `[archetype_node_id]` form — because a path is a consumer-visible contract and gratuitous predicates would break existing callers.
+> **Established against the reference (2026-07-30), superseding an earlier collision-conditioned reading.** Verified across the three vendored goldens: the set of names a golden uses in predicates is exactly the set of fixed `C_STRING` names its OPT pins — `GECCO_Diagnose` 6 pinned and 6 distinct predicate names, `Corona_Anamnese` 24 and 24, with no predicate name absent from the pinned set — while `constrain_test` pins **no** name and carries **zero** predicates across its 104 nodes, which is why [PROBE-075](conformance.md#probe-075--webtemplate-structural-parity) holds 104/104 without any of this. `GECCO_Diagnose` predicates all three of its `/content` children although their archetype node ids are **distinct**, and predicates a sole `CLUSTER.anatomical_location.v1` child.
 
-> **Downstream consumers.** Path shape is consumed by composition validation ([REQ-102](#req-102--composition-validation)), the instance generator ([REQ-107](#req-107--template-driven-rm-instance-example-generator)), and FLAT/STRUCTURED path resolution ([REQ-053](wire.md#req-053)). A change here **MUST** keep those conformant: paths that need no name predicate **MUST** be byte-identical to those emitted before.
+> **Downstream consumers.** Path shape is consumed by composition validation ([REQ-102](#req-102--composition-validation)), the instance generator ([REQ-107](#req-107--template-driven-rm-instance-example-generator)), and FLAT/STRUCTURED path resolution ([REQ-053](wire.md#req-053)). A change here **MUST** keep those conformant: paths whose segments pin **no** template-level name **MUST** be byte-identical to those emitted before. Paths through a named node **do** change shape — that is the consumer-visible break this requirement introduces, and it reaches every vendored OPT that pins a name, not only the archetype-reuse ones.
 
 ### Acceptance
 
 - An OPT whose sibling archetype roots reuse one archetype id compiles, and each sibling is retrievable at a distinct name-predicated path.
 - A WebTemplate built from such a template emits one distinct `id` per sibling, derived from the template-level name, with no collision error (REQ-106).
-- A template with no repeated sibling archetype ids produces paths byte-identical to the pre-change output, and the existing WebTemplate parity fixture holds.
-- Both upstream reference templates that exercise this (`corona_anamnese`, `conformance-ehrbase.de.v0`) build a WebTemplate whose node `id` and `aqlPath` sets match the vendored reference goldens, within the documented deviations.
+- A template that pins **no** template-level name produces paths byte-identical to the pre-change output, and the existing WebTemplate parity fixture (`constrain_test`, 0 predicates) holds at 104/104.
+- Every node that pins a name is retrievable at its predicated path, whether or not it shares an archetype node id with a sibling.
+- Both vendored REQ-116 oracles (`Corona_Anamnese`, `GECCO_Diagnose`) build a WebTemplate whose node `id` and `aqlPath` sets match their vendored reference goldens, within the documented deviations. (`conformance-ehrbase.de.v0`, which [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity) blocks on, is vendored without a WebTemplate golden, so it is a build-succeeds check only until one is vendored.)
 
 ## REQ-112 — Template-less Reference Model validation floor
 

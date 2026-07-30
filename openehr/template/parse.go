@@ -443,7 +443,66 @@ func buildComplexObject(o *xmlCObject, strict bool, depth int) (*ComplexObject, 
 		}
 		co.attributes = append(co.attributes, attr)
 	}
+	co.nodeName = deriveNodeName(o.Attributes)
 	return co, nil
+}
+
+// deriveNodeName extracts the template-level node name (REQ-116): the
+// fixed C_STRING the OPT pins on the node's name attribute — name →
+// a DV_TEXT/DV_CODED_TEXT child → value → C_STRING whose list holds
+// exactly one entry. Anything looser (no name attribute, an open
+// pattern, a multi-entry list) is not a *fixed* name and yields "" —
+// the archetype concept term is never substituted. When the name
+// attribute carries alternatives, the first child that pins a fixed
+// value wins, matching the first-alternative convention used across
+// the parse and compile layers.
+//
+// The walk reads the *wire* structs, not the built tree: buildString
+// drops blank <list> entries, so a built single-entry list can also
+// be the remnant of a multi-entry choice (<list>A</list><list> </list>).
+// Fixedness is a property of what the OPT declared — exactly one raw
+// <list> element — so it is decided before that filtering.
+func deriveNodeName(attrs []*xmlCAttribute) string {
+	for _, a := range attrs {
+		if a.Name != "name" {
+			continue
+		}
+		for _, child := range a.Children {
+			if name := fixedValueString(child); name != "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// fixedValueString returns the single fixed string pinned on the
+// value attribute of a wire name-constraint node, or "" when the
+// constraint does not pin exactly one raw non-blank <list> entry.
+// Handles both wire spellings: a C_PRIMITIVE_OBJECT wrapper carrying
+// <item xsi:type="C_STRING">, and a direct C_STRING child.
+func fixedValueString(o *xmlCObject) string {
+	if o == nil {
+		return ""
+	}
+	for _, a := range o.Attributes {
+		if a.Name != "value" {
+			continue
+		}
+		for _, child := range a.Children {
+			leaf := child
+			if leaf.Type == "C_PRIMITIVE_OBJECT" && leaf.Item != nil {
+				leaf = leaf.Item
+			}
+			if leaf.Type != "C_STRING" || len(leaf.PrimitiveList) != 1 {
+				continue
+			}
+			if s := strings.TrimSpace(leaf.PrimitiveList[0].Text); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
 }
 
 func buildAttribute(a *xmlCAttribute, strict bool, depth int) (*Attribute, error) {
