@@ -49,6 +49,11 @@ jobs:
       - name: Spec traceability
         run: make spec-check
 
+      # Offline sha256 only (no network, no curl/jq) — guards the pinned
+      # upstream FLAT corpus against hand-edits.
+      - name: Vendored fixture integrity
+        run: make flat-conformance-verify
+
       - name: Build
         run: make build
 

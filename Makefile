@@ -157,6 +157,15 @@ its-rest-sync: ## Vendor openEHR ITS-REST OpenAPI specs into resources/its-rest/
 its-rest-check: ## Verify vendored ITS-REST specs match MANIFEST + report upstream drift (needs network)
 	@./scripts/sync-its-rest-specs.sh check
 
+flat-conformance-sync: ## Vendor the upstream EHRbase FLAT conformance corpus into testkit/cassettes/flat-conformance/ (needs network; FLAT_CONFORMANCE_REF to pin)
+	@./scripts/sync-flat-conformance.sh sync
+
+flat-conformance-check: ## Verify the vendored FLAT conformance corpus matches MANIFEST + report upstream drift (offline integrity; network for drift)
+	@./scripts/sync-flat-conformance.sh check
+
+flat-conformance-verify: ## Offline sha256 integrity of the vendored FLAT corpus (no network, no curl/jq) — run by `make ci`
+	@./scripts/sync-flat-conformance.sh verify
+
 ##@ Test
 
 test: codegen-verify aqlgen-verify ## Run unit tests (includes codegen drift checks)
@@ -203,4 +212,4 @@ clean: ## Remove bin/, coverage artefacts, and *.out files
 
 ##@ CI
 
-ci: fmt-check mod-tidy-check vet test lint spec-check build ## Full local PR gate (see docs/ci.md)
+ci: fmt-check mod-tidy-check vet test lint spec-check flat-conformance-verify build ## Full local PR gate (see docs/ci.md)

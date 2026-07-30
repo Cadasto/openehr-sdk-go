@@ -67,6 +67,7 @@ func Compile(opt *template.OperationalTemplate, opts ...Options) (*Compiled, err
 		lookup:   o.Lookup,
 		opts:     o,
 		pathAttr: map[string]*template.Attribute{},
+		seenPath: map[string]bool{},
 	}
 	root, err := w.compileNode(opt.Root(), nil, "")
 	if err != nil {
@@ -100,6 +101,34 @@ type walker struct {
 	// attribute → alternative, keep first; different attribute →
 	// reject with ErrInvalidInput.
 	pathAttr map[string]*template.Attribute
+
+	// seenPath marks every AQL path reached at node *entry* (pre-order).
+	// byPath cannot serve here: registration is post-order (a node
+	// registers after its own subtree), so at the time a second node
+	// with the same path descends, the first node's own entry is not yet
+	// in byPath while its descendants already are.
+	seenPath map[string]bool
+
+	// dupDepth > 0 while descending the subtree of a node whose AQL path
+	// repeats one already seen. Two nodes may legally share a path — AOM
+	// 1.4 C_SINGLE_ATTRIBUTE alternatives, and sibling nodes carrying the
+	// same node_id (repeated CLUSTER/ELEMENT) — and when they do, their
+	// descendants necessarily share paths too. Those descendants sit
+	// under *different* attribute objects (one per parent), so the
+	// currentAttr test in registerPath cannot recognise them; dupDepth
+	// does.
+	//
+	// Scope of the relaxation, stated precisely: every node's *own* path
+	// is still fully guarded, because the counter covers only the descent
+	// and is dropped before the node registers itself. Inside a shared-path
+	// subtree, however, descendants are admitted unconditionally — so a
+	// genuine cross-attribute collision occurring *only* within the second
+	// sibling's subtree (possible when siblings narrow the same archetype
+	// differently) is admitted rather than reported. That is a deliberate
+	// trade: the alternative is rejecting every legal shared-path template.
+	// The first-walked instance of any such collision still errors, so a
+	// bug present in both siblings is caught.
+	dupDepth int
 }
 
 // compileNode walks one OPT node, computes its AQL path, recurses
@@ -130,37 +159,21 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		}
 	}
 
-	switch v := n.(type) {
-	case *template.ArchetypeRoot:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
-		cn.archetypeID = v.ArchetypeID()
-		cn.occurrences = v.Occurrences()
-		// Per-archetype-root terms live on the node; bindings flatten
-		// to the Compiled aggregate (binding records carry their own
-		// terminology + at-code/path, so collisions are non-issues).
-		cn.terms = copyTerms(v.Terms())
-		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
-		if err := w.attachAttributes(cn, v.Attributes()); err != nil {
-			return nil, err
-		}
-	case *template.ComplexObject:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
-		cn.occurrences = v.Occurrences()
-		cn.primitive = v.PrimitiveConstraint()
-		if err := w.attachAttributes(cn, v.Attributes()); err != nil {
-			return nil, err
-		}
-	case *template.Slot:
-		cn.rmTypeName = v.RMTypeName()
-		cn.nodeID = v.NodeID()
-		cn.isSlot = true
-		cn.slotIncludes = v.Includes()
-		cn.slotExcludes = v.Excludes()
-		cn.slotRules = v.SlotRules()
-	default:
-		return nil, fmt.Errorf("templatecompile: unhandled wire node type %T", n)
+	// A repeated path means this node shares an AQL path with one already
+	// walked (alternatives, or a same-node_id sibling). Mark the descent
+	// so registerPath admits the descendants that necessarily collide;
+	// the counter is dropped again before this node registers itself.
+	inDup := w.seenPath[cn.aqlPath]
+	w.seenPath[cn.aqlPath] = true
+	if inDup {
+		w.dupDepth++
+	}
+	err := w.descend(n, cn)
+	if inDup {
+		w.dupDepth--
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	if err := w.registerPath(cn); err != nil {
@@ -176,6 +189,43 @@ func (w *walker) compileNode(n template.Node, parent *CompiledNode, segment stri
 		w.compiled.byArchetypeID[cn.archetypeID] = append(w.compiled.byArchetypeID[cn.archetypeID], cn)
 	}
 	return cn, nil
+}
+
+// descend copies the wire node's own fields onto cn and recurses into
+// its children. Split out of compileNode so the caller can scope the
+// duplicate-path subtree marker (dupDepth) to the recursion alone,
+// leaving cn's own path registration subject to the full collision
+// check.
+func (w *walker) descend(n template.Node, cn *CompiledNode) error {
+	switch v := n.(type) {
+	case *template.ArchetypeRoot:
+		cn.rmTypeName = v.RMTypeName()
+		cn.nodeID = v.NodeID()
+		cn.archetypeID = v.ArchetypeID()
+		cn.occurrences = v.Occurrences()
+		// Per-archetype-root terms live on the node; bindings flatten
+		// to the Compiled aggregate (binding records carry their own
+		// terminology + at-code/path, so collisions are non-issues).
+		cn.terms = copyTerms(v.Terms())
+		w.compiled.termBindings = append(w.compiled.termBindings, v.TermBindings()...)
+		return w.attachAttributes(cn, v.Attributes())
+	case *template.ComplexObject:
+		cn.rmTypeName = v.RMTypeName()
+		cn.nodeID = v.NodeID()
+		cn.occurrences = v.Occurrences()
+		cn.primitive = v.PrimitiveConstraint()
+		return w.attachAttributes(cn, v.Attributes())
+	case *template.Slot:
+		cn.rmTypeName = v.RMTypeName()
+		cn.nodeID = v.NodeID()
+		cn.isSlot = true
+		cn.slotIncludes = v.Includes()
+		cn.slotExcludes = v.Excludes()
+		cn.slotRules = v.SlotRules()
+		return nil
+	default:
+		return fmt.Errorf("templatecompile: unhandled wire node type %T", n)
+	}
 }
 
 // attachAttributes builds the explicit attributes of cn from the
@@ -330,6 +380,15 @@ func (w *walker) registerPath(cn *CompiledNode) error {
 		// remaining alternatives via the parent attribute's
 		// Children() directly.
 		if w.currentAttr != nil && w.pathAttr[cn.aqlPath] == w.currentAttr {
+			return nil
+		}
+		// Inside the subtree of a node that legally repeated a path
+		// (alternatives, or a same-node_id sibling), every descendant
+		// repeats too, each under its own parent's attribute object —
+		// so the test above cannot see them. Keep the first, as with
+		// alternatives; the structural validator reaches the rest via
+		// the parent attribute's Children().
+		if w.dupDepth > 0 {
 			return nil
 		}
 		return fmt.Errorf(
