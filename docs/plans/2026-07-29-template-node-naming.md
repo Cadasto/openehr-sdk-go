@@ -1,13 +1,13 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Partial — Phases 0–2 landed 2026-07-30 (oracles vendored + pinned; node name parsed, exposed, carried through compile); Phases 3–4 open
+**Status:** Partial — Phases 0–3 landed (oracles vendored + pinned; node name parsed, exposed, carried through compile; name predicates emitted on both path builders); Phase 4–5 open
 **Owner:** SDK maintainers
 **Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `partial`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
 **Must not regress:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-053](../specifications/wire.md#req-053) — all consume compiled path shape
 **Probes:** [PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) (extended to new fixtures), [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (unblocked by this plan)
-**Implementation:** partial — Phases 0–2 landed; Phases 3–4 open
+**Implementation:** partial — Phases 0–3 landed; Phases 4–5 open
 **Depends on:** the shared-path-subtree compile fix and the vendored FLAT corpus (PR #79, landed)
 **Defers:** Better-platform dialect naming; multi-language name selection beyond the document default language; retro-fitting name predicates onto AQL *builder* output (REQ-055) — this plan changes compiled-template paths only
 
@@ -69,24 +69,17 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **DoD:** met — compiled nodes expose the name; no path change, all existing tests green.
 
-### Phase 3 — Name predicates on compiled paths (the risky one)
+### Phase 3 — Name predicates on compiled paths (the risky one) — **done**
 
 **Tasks:**
 
-1. In the path builder, emit `[archetype_node_id,'Name']` on the segment of **every node that pins a template-level name** (REQ-116) — regardless of whether any sibling shares its archetype node id. Nodes that pin no name keep today's bare form, including un-named collisions.
-2. Interaction with the landed shared-path fix: name predicates make the *named* sibling case distinct, so `dupDepth` should stop being reached for it while continuing to cover genuine AOM alternatives and un-named same-`node_id` siblings. Assert both paths explicitly — the fix must not become dead code by accident, nor mask a predicate that failed to apply.
-3. **Regression guard first:** before changing emission, snapshot the compiled path set for every vendored template and assert byte-identity afterwards **for templates that pin no name** — that is the correct partition, and it is narrower than "no repeated sibling archetype ids" (9 of the 58 vendored OPTs pin a name). For those 9, record the expected path delta deliberately.
-4. **Two path builders, not one.** `webtemplate` does *not* consume
-   `CompiledNode.AQLPath()` — it composes its own (`build.go:154`,
-   `childPath := parentPath + "/" + attr.Name() + predicate(c)`) via its own
-   `predicate()` helper (`build.go:271`, archetype-id-or-at-code only), and it drops
-   structural wrappers, so its paths legitimately differ from the compiled ones
-   (GECCO: 38 WebTemplate nodes vs 74 compiled). Changing only the
-   `internal/templatecompile` builder therefore leaves WebTemplate `aqlPath`
-   unpredicated and PROBE-075 still failing. Both need the name.
-5. Re-run REQ-102 validation, REQ-107 instance, and REQ-053 FLAT/STRUCTURED suites; investigate any diff rather than re-baselining it.
+1. ~~Emit on every named node~~ — **done**: `namePredicated`/`NamePredicate` in `internal/templatecompile`, applied in `pathSegment`. The rule is measured, not assumed: across both goldens the name is always *appended to an existing id* (corona 341 archetype-id + 9 at-code segments, GECCO 27 + 3) and never stands alone, so a name never *creates* a bracket. All 57 named nodes in the corpus sit under multiple-valued attributes and already carry an id predicate; the one named root (`IDCR - Laboratory Test Report.v0`) correctly gains nothing — no sibling to disambiguate, no bracket to extend. Commas inside the quoted name are literal (corona has one); the `\'` escape for an embedded quote is the conventional AQL reading, flagged in-code as not golden-verified.
+2. ~~dupDepth interaction~~ — **done**: named siblings now separate, and the shared-path route is still live for genuine AOM alternatives — 9 templates keep shared paths (a DV_TEXT and a DV_CODED_TEXT alternative both landing on `…/value`); corona went from whole shared subtrees to exactly one. Both directions pinned: `TestCompile_CoronaSiblingsResolveDistinctly` and `TestCompile_AlternativesStillShareAPath`, plus the oracle test asserting the bare spellings are **gone** so a predicate that failed to apply cannot pass silently.
+3. ~~Regression guard first~~ — **done**, landed before emission: `pathsnapshot_test.go` + `testdata/pathsnapshot/{no-name,pins-name}.txt`, partitioned structurally by `NodeName()` (not a hand-kept list) and carrying the corpus census. `no-name.txt` came through the change byte-identical; stripping every `,'…'` from the regenerated `pins-name.txt` reproduces the pre-change file exactly, proving predicate insertion is the only delta — no node added, dropped or moved. Guard verified non-vacuous.
+4. ~~Both builders~~ — **done**: `webtemplate`'s own `predicate()` now applies the same rule, sharing `impl.NamePredicate` so the two cannot drift. GECCO reproduces all 24 golden predicated paths (`missing=0`); its 4 surplus predicated paths are the spurious `…/name` leaves inheriting their parent's predicate — Phase 4 task 2.
+5. ~~Downstream suites~~ — **done**, and they found two silent REQ-053 breakages, both fixed rather than re-baselined: FLAT **encode** fed the predicated path to `rmpath`, which honours `node,'name'` and so began filtering instances by *runtime* name, dropping values (PROBE-076 caught it); FLAT **decode**'s `parseAQL` would have written `archetype_node_id` as `at0001,'Name'` and split segments on a `/` inside a pinned name. Both now strip the predicate at the resolution boundary (`bareAQLPath`). A third, quieter one: `buildNameIndex` keyed on the compiled path, unreachable from the decoder's bare lookup key — no FLAT fixture covers a name-pinning template, so nothing failed; `flat_nameindex_test.go` closes that hole.
 
-**DoD:** corona's sibling SECTIONs each resolve at a distinct path; GECCO's 24 predicated golden paths all resolve (`missing=0`); templates pinning no name byte-identical; downstream suites green.
+**DoD:** met — corona's four sibling SECTIONs each resolve at a distinct path; GECCO's 24 predicated golden paths all resolve (`missing=0`); templates pinning no name byte-identical; full suite and `make ci` green.
 
 ### Phase 4 — Name-derived WebTemplate `id` (REQ-106)
 

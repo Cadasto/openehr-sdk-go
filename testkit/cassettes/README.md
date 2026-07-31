@@ -90,7 +90,7 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 |---|---|---|
 | `constrain_test` | PROBE-075 parity oracle (104/104) — pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
 | `Corona_Anamnese` | REQ-116 oracle — loud mode: `Build` → `ErrIDCollision` (four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome); golden carries 350 name-predicate segments over 213 `aqlPath`s | 1.2 MB + 230 KB |
-| `GECCO_Diagnose` | REQ-116 oracle — silent mode: builds today, but its golden carries 30 name-predicate segments over 24 `aqlPath`s this builder does not emit (its three `/content` children have **distinct** archetype ids and are all predicated) | 210 KB + 73 KB |
+| `GECCO_Diagnose` | REQ-116 oracle — silent mode: builds today; its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated), all 24 now reproduced since Phase 3. Residual divergence: four spurious `…/name` data leaves (Phase 4) | 210 KB + 73 KB |
 
 The Corona pair is the largest cassette in the repo — the size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture rather than a synthetic cut-down.
 

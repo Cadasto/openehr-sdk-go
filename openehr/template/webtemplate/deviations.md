@@ -72,14 +72,17 @@ that makes a *pinned* field diverge is a test failure, not a deviation.
   `corona_anamnese` golden carries **350** predicate segments over 213 paths;
   `constrain_test` carries **0** because it pins **no** name anywhere — that, not an
   absence of collision, is why PROBE-075 holds 104/104 without implementing any of this.
-  `templatecompile` emits no name predicates yet; `openehr/template` does parse and
-  expose the name as of REQ-116 Phase 1 (`ComplexObject.NodeName()`).
+  As of REQ-116 Phase 3 both path builders emit the predicates: compiled paths and
+  WebTemplate `aqlPath` carry `[archetype_id,'Name']` on every node that pins a name.
+  GECCO reproduces its golden's 24 predicated paths exactly; what still differs is the
+  four spurious `…/name` data leaves (Phase 4 task 2). `id` derivation is unchanged, so
+  `Build(Corona_Anamnese)` still returns `ErrIDCollision` until Phase 4.
 
   Closing this therefore spans four layers — parse + expose the OPT node name
-  (REQ-100, **landed**), carry it through the compiled tree (REQ-111), emit name
-  predicates in AQL paths (consumed by REQ-102 validation and REQ-053 FLAT paths), and
-  switch `id` derivation to prefer it (REQ-106) — so it is a scoped feature, not a local
-  fix. Because the trigger is the pinned name, the path change reaches **every** vendored
+  (REQ-100, **landed**), carry it through the compiled tree (REQ-111, **landed**), emit
+  name predicates in AQL paths (**landed**; consumed by REQ-102 validation and REQ-053
+  FLAT paths), and switch `id` derivation to prefer it (REQ-106, open) — so it is a
+  scoped feature, not a local fix. Because the trigger is the pinned name, the path change reaches **every** vendored
   OPT that pins one — 9 of the 58 vendored OPTs, i.e. 7 beyond the two oracles, led by
   `test_template_rename_node{,_2}` with 8 names each — not only the archetype-reuse
   templates.

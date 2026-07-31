@@ -974,6 +974,9 @@ requirements:
       - internal/templatecompile
       - openehr/templatecompile
       - openehr/template/webtemplate
+      # Phase 3: the FLAT codec strips the name predicate at the rmpath
+      # resolution boundary and keys its name index on the bare spelling.
+      - openehr/serialize/simplified
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
     probes: [PROBE-075]
     tests:
@@ -983,6 +986,10 @@ requirements:
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/template/node_name_test.go
       - internal/templatecompile/compile_nodename_test.go
+      # Phase 3 — the emission guard (byte-identity for templates pinning
+      # no name) and the FLAT boundary where the predicate is stripped.
+      - internal/templatecompile/pathsnapshot_test.go
+      - openehr/serialize/simplified/flat_nameindex_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.

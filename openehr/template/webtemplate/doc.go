@@ -13,8 +13,10 @@
 // library — never the transport, auth, client, or serialize layers.
 //
 // Scope limits (see deviations.md): templates whose sibling nodes sanitise
-// to the same id return ErrIDCollision, because the reference's
-// disambiguator — the template-level node name pinned in the OPT, which
-// also name-predicates aqlPath — is not emitted yet (REQ-116). Such
-// templates do compile: templatecompile admits shared-path subtrees.
+// to the same id return ErrIDCollision. As of REQ-116 Phase 3 aqlPath does
+// carry the reference's name predicate ([archetype_id,'Name']), but id
+// derivation still takes the archetype concept term rather than the pinned
+// template-level name, so siblings reusing one archetype still collide
+// (REQ-116 Phase 4). Such templates do compile: templatecompile admits
+// shared-path subtrees.
 package webtemplate
