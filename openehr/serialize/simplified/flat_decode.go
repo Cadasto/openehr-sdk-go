@@ -379,13 +379,24 @@ type aqlSeg struct {
 }
 
 // parseAQL splits a canonical aqlPath into attribute+predicate segments. The
-// predicate is taken as a bare node id (archetype id or at-code); compound
-// predicates (e.g. [at0001 and name/value='x']) are not split — no supported
-// Web Template emits them in aqlPath (mirror rmpath.parsePredicate if that
-// changes).
+// predicate is taken as a bare node id (archetype id or at-code).
+//
+// REQ-116 name predicates are stripped first ([at0001,'Reaction details'] ->
+// [at0001]), which is both a correctness and a parsing requirement:
+//
+//   - archetype_node_id must carry the bare id — a name predicate constrains
+//     the node's name, it does not rename the node — and the WithTemplate
+//     name index is keyed on the bare spelling to match.
+//   - a pinned name may itself contain '/' or ',' — the corona oracle pins
+//     one of each — which the segment split below would otherwise tear
+//     apart.
+//
+// Compound predicates (e.g. [at0001 and name/value='x']) are still not
+// split — no supported Web Template emits them (mirror
+// rmpath.parsePredicate if that changes).
 func parseAQL(p string) []aqlSeg {
 	var out []aqlSeg
-	for part := range strings.SplitSeq(strings.TrimPrefix(p, "/"), "/") {
+	for part := range strings.SplitSeq(strings.TrimPrefix(bareAQLPath(p), "/"), "/") {
 		if part == "" {
 			continue
 		}

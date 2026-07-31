@@ -113,7 +113,16 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
 	}
-	relPath := strings.TrimPrefix(node.AQLPath, resolveRootAql)
+	// Resolution against the RM instance keys on archetype_node_id, so the
+	// REQ-116 name predicate the Web Template now carries is dropped here.
+	// rmpath *does* honour a `node,'name'` predicate, which would filter
+	// instances by their runtime LOCATABLE.name — an over-constraint: the
+	// template pins the name a node is *modelled* with, while encoding must
+	// emit whatever instance sits at that node id. Leaving it in silently
+	// drops values whose stored name differs, breaking the FLAT round-trip.
+	// The prefix trim runs first: both paths are the Web Template's
+	// predicated spelling, so they only line up before stripping.
+	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
 
 	if node.Max != 1 {
 		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)

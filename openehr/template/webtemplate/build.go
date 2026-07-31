@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	impl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
@@ -267,10 +268,18 @@ func setNames(node *Node, c *templatecompile.CompiledNode, cfg *config) {
 
 // predicate returns the aqlPath node predicate for c: its archetype id if
 // it is a slot/archetype root, else its at-code, else empty (RM-attribute
-// values carry no predicate).
+// values carry no predicate). A node that pins a template-level name
+// carries it inside the same brackets (REQ-116) — the reference's
+// `[archetype_id,'Name']` form.
+//
+// This builder composes its own paths rather than reading
+// CompiledNode.AQLPath (it drops structural wrappers, so its paths
+// legitimately differ), which is why the predicate rule has to be applied
+// here too; the quoting itself is shared with the compiled-path builder
+// via impl.NamePredicate so the two cannot drift.
 func predicate(c *templatecompile.CompiledNode) string {
 	if id := nodeIDOf(c); id != "" {
-		return "[" + id + "]"
+		return "[" + impl.NamePredicate(id, c.NodeName()) + "]"
 	}
 	return ""
 }

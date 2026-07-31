@@ -107,13 +107,17 @@ func TestBuild_CoronaAnamneseBlockedOnIDCollision(t *testing.T) {
 	}
 }
 
-// GECCO_Diagnose diverges silently: it builds without error, but its golden
-// name-predicates 24 of its paths (30 segments) where this builder emits none,
-// and this builder emits four extra `…/name` DV_TEXT leaves because it walks
-// the pinned name attribute as data. Neither is on the REQ-106 deviations
-// list, so both are parity failures no error surfaces — which is the whole
-// reason this fixture is vendored. Only extending PROBE-075 to it (plan
-// Phase 4 task 4) turns them into a visible failure.
+// GECCO_Diagnose is the silent-divergence oracle: it builds without error,
+// so nothing surfaces when its aqlPaths disagree with the reference.
+//
+// Since REQ-116 Phase 3 the predicates themselves agree — every one of the
+// golden's 24 name-predicated paths is now produced exactly. What remains
+// is the second manifestation: this builder still exports the pinned name
+// as a data leaf, so it emits four extra `…/name` DV_TEXT nodes the golden
+// does not have (they inherit their named parent's predicate, which is why
+// they show up here as extra predicated paths). That is plan Phase 4
+// task 2; extending PROBE-075 to this fixture (Phase 4 task 4) is what
+// finally makes any residual difference a visible failure.
 func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 	const templateID = "GECCO_Diagnose"
 
@@ -123,26 +127,44 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 		t.Fatalf("Build(%s) err = %v, want nil (collides on nothing; diverges on aqlPath only)", templateID, err)
 	}
 
-	var ourPredicated, ourNameLeaves int
+	ourPaths := make(map[string]bool)
+	var ourNameLeaves int
 	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
 		if strings.Contains(n.AQLPath, ",'") {
-			ourPredicated++
+			ourPaths[n.AQLPath] = true
 		}
 		if strings.HasSuffix(n.AQLPath, "/name") {
 			ourNameLeaves++
 		}
 	})
-
-	// The gap, from this side: zero predicates emitted.
-	if ourPredicated != 0 {
-		t.Errorf("built tree has %d name-predicated paths, want 0 — REQ-116 has landed; "+
-			"extend PROBE-075 parity to this fixture and drop this assertion", ourPredicated)
-	}
 	// The gap, from the golden's side: 30 predicate segments over 24 paths.
 	tree := refTree(t, oracleGolden(t, templateID))
 	segments, paths := namePredicates(tree)
 	if segments != 30 || paths != 24 {
 		t.Errorf("golden name predicates = %d segments over %d paths, want 30 over 24", segments, paths)
+	}
+
+	// Phase 3 DoD for this oracle: every golden predicated path is
+	// produced, exactly — missing = 0. A regression in the predicate rule
+	// (wrong quoting, wrong trigger, a missed node kind) lands here first.
+	refPaths := make(map[string]bool)
+	walkRefTree(tree, func(m map[string]any) {
+		if p := refStr(m, "aqlPath"); strings.Contains(p, ",'") {
+			refPaths[p] = true
+		}
+	})
+	for p := range refPaths {
+		if !ourPaths[p] {
+			t.Errorf("golden predicated path not produced: %s", p)
+		}
+	}
+	// The only surplus may be the spurious `…/name` leaves below: they
+	// inherit their named parent's predicate. Anything else means this
+	// builder invented a predicate the reference does not have.
+	for p := range ourPaths {
+		if !refPaths[p] && !strings.HasSuffix(p, "/name") {
+			t.Errorf("predicated path not in golden and not a `…/name` leaf: %s", p)
+		}
 	}
 
 	// The second, easily-missed manifestation: this builder exports the pinned

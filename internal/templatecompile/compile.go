@@ -355,31 +355,40 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 	return seg + "[@" + strconv.Itoa(siblingIndex+1) + "]"
 }
 
-// namePredicated appends the child's template-level node name to an
-// id-derived path predicate, yielding the reference's
-// `archetype_id,'Name'` form (REQ-116); it returns id unchanged when
-// the node pins no name.
+// NamePredicate appends a template-level node name to an id-derived path
+// predicate, yielding the reference's `archetype_id,'Name'` form
+// (REQ-116); it returns id unchanged when name is empty.
+//
+// Exported inside the module because REQ-116 paths are composed by *two*
+// builders — this package's [pathSegment] and the WebTemplate builder's
+// own `predicate` — and a quoting rule duplicated across both is a rule
+// that drifts.
 //
 // Measured across the vendored reference goldens: the name is always
 // *appended* to an id (341 archetype-id + 9 at-code segments in the
 // corona golden, 27 + 3 in GECCO) and never stands alone, which is why
-// this decorates an existing predicate rather than forming one.
+// callers decorate an existing predicate rather than forming one.
 //
-// Quoting follows the goldens: the name sits in single quotes and
-// commas inside it are literal — one corona name ("… zu Menschen, die
-// dort waren") carries one. No vendored name contains a single quote,
-// so the backslash escape below is the conventional AQL reading rather
-// than a golden-verified rule; revisit if a corpus name ever needs it.
+// Quoting follows the goldens: the name sits in single quotes and commas
+// inside it are literal — one corona name ("… zu Menschen, die dort
+// waren") carries one. No vendored name contains a single quote, so the
+// backslash escape is the conventional AQL reading rather than a
+// golden-verified rule; revisit if a corpus name ever needs it.
+func NamePredicate(id, name string) string {
+	if name == "" {
+		return id
+	}
+	return id + ",'" + strings.ReplaceAll(name, "'", `\'`) + "'"
+}
+
+// namePredicated is the wire-side adapter for [NamePredicate]: slots are
+// not ObjectNodes and pin no name, so they pass through unchanged.
 func namePredicated(id string, child template.Node) string {
 	on, ok := child.(template.ObjectNode)
 	if !ok {
 		return id
 	}
-	name := on.NodeName()
-	if name == "" {
-		return id
-	}
-	return id + ",'" + strings.ReplaceAll(name, "'", `\'`) + "'"
+	return NamePredicate(id, on.NodeName())
 }
 
 // slotPathPredicate derives a stable bracket predicate for an
