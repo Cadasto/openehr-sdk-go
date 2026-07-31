@@ -18,6 +18,38 @@ import (
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
 
+// REQ-116 acceptance — `conformance-ehrbase.de.v0` is vendored without a
+// WebTemplate golden (OPT + upstream FLAT bodies only), so its bar is
+// `Build` succeeding. It reaches the sibling-id problem by the third route:
+// two ELEMENTs under its ACTION both sanitise to `dv_text` (that OPT carries
+// the term text "DV_TEXT" ten times) and *neither pins a name*, so the
+// template-level name cannot separate them — only the reference's ordinal
+// fallback can. This is that fallback's in-tree guard, and the assertion
+// PROBE-086 needs before its adapter can be written.
+//
+// The expected spelling is not invented: the upstream FLAT bodies key these
+// two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`.
+func TestBuild_FlatConformanceOPTUsesOrdinalFallback(t *testing.T) {
+	c := compileFixture(t, fixtures.FlatConformanceOpt())
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build(conformance-ehrbase.de.v0) err = %v, want nil — PROBE-086 needs this template to export", err)
+	}
+
+	// Under the ACTION: dv_text and dv_text2, matching the upstream keys.
+	got := map[string]bool{}
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if strings.Contains(n.AQLPath, "ACTION.conformance_action_.v0") && strings.HasPrefix(n.ID, "dv_text") {
+			got[n.ID] = true
+		}
+	})
+	for _, want := range []string{"dv_text", "dv_text2"} {
+		if !got[want] {
+			t.Errorf("no node with id %q under the ACTION; got %v — ordinal fallback not applied as upstream spells it", want, got)
+		}
+	}
+}
+
 // oracleGolden decodes a vendored REQ-116 oracle's reference WebTemplate.
 // The parity fixture has loadReference; the oracles need it by template id.
 func oracleGolden(t *testing.T, templateID string) map[string]any {

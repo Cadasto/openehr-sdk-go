@@ -1,13 +1,13 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Partial — Phases 0–4 landed (oracles vendored + pinned; node name parsed, exposed, carried through compile; name predicates emitted on both path builders; name-derived WebTemplate `id`, both oracles at exact structural parity); Phase 5 (close-out) open
+**Status:** Done (2026-07-31) — all five phases executed; REQ-116 `landed`. Archived via `sdd-archive` in the implementing PR (#84).
 **Owner:** SDK maintainers
-**Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `partial`
-**Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
-**Must not regress:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-053](../specifications/wire.md#req-053) — all consume compiled path shape
-**Probes:** [PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) (extended to new fixtures), [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (unblocked by this plan)
-**Implementation:** partial — Phases 0–4 landed; Phase 5 (close-out) open
+**Covers:** **[REQ-116](../../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `landed`
+**Amends:** [REQ-100](../../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
+**Must not regress:** [REQ-102](../../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-053](../../specifications/wire.md#req-053) — all consume compiled path shape
+**Probes:** [PROBE-075](../../specifications/conformance.md#probe-075--webtemplate-structural-parity) (extended to new fixtures), [PROBE-086](../../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (unblocked by this plan)
+**Implementation:** landed
 **Depends on:** the shared-path-subtree compile fix and the vendored FLAT corpus (PR #79, landed)
 **Defers:** Better-platform dialect naming; multi-language name selection beyond the document default language; retro-fitting name predicates onto AQL *builder* output (REQ-055) — this plan changes compiled-template paths only
 
@@ -17,7 +17,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **Architecture.** No new packages. The name is parsed in `openehr/template`, carried on `CompiledNode`, consulted by the path builder in `internal/templatecompile`, and preferred by `idOf` in `openehr/template/webtemplate`. Public-API additions only (one accessor per layer); no signature changes.
 
-**Evidence base** (established 2026-07-29, recorded in [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation): there is **no** numeric-suffix rule — verified across the upstream `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens. The reference disambiguates by name alone and name-predicates `aqlPath` **350×** in the corona golden versus **0×** in `constrain_test`.
+**Evidence base** (established 2026-07-29, recorded in [`deviations.md`](../../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation): there is **no** numeric-suffix rule — verified across the upstream `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens. The reference disambiguates by name alone and name-predicates `aqlPath` **350×** in the corona golden versus **0×** in `constrain_test`.
 
 **Correction (Phase 4).** A numeric suffix *does* exist — as EHRbase's **last resort**, not its disambiguator. The claim above holds for every name-disambiguated golden, which is why no suffix appears there: each sibling pins a distinct name, so the fallback is never reached. Where no name separates siblings it is: the vendored upstream FLAT corpus keys `conformance-ehrbase.de.v0`'s two ACTION ELEMENTs — both sanitising to `dv_text`, neither pinning a name — as `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`. Phase 4 implements the ordinal for exactly that case, which is what lets the FLAT-conformance OPT build.
 
@@ -30,17 +30,17 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 - [x] Canonical REQ-116 prose exists, with acceptance criteria.
 - [x] REQ.md row + `traceability.yaml` entry landed.
 - [x] Mechanism verified against upstream goldens (not guessed).
-- [x] No irreversible fork: [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) already locks the SDK to the EHRbase reference, and this plan *converges* on it — so no new ADR is needed. (If reference behaviour turns out to be unmatchable on some construct, that exception needs an ADR amendment, not a silent deviation.)
+- [x] No irreversible fork: [ADR 0014](../../adr/0014-webtemplate-reference-implementation-lock.md) already locks the SDK to the EHRbase reference, and this plan *converges* on it — so no new ADR is needed. (If reference behaviour turns out to be unmatchable on some construct, that exception needs an ADR amendment, not a silent deviation.)
 - [x] Reference goldens vendored for the fixtures under test (Phase 0 — done).
 
 ## Definition of Done
 
-- REQ-116 acceptance criteria all demonstrated by tests citing `// REQ-116`.
-- `Corona_Anamnese` and `GECCO_Diagnose` — the two vendored oracles — build a WebTemplate matching their vendored goldens on the `id` and `aqlPath` sets, within documented deviations. `conformance-ehrbase.de.v0` is vendored **without** a WebTemplate golden (OPT + FLAT bodies only), so for it the bar is `Build` succeeding, until a golden is vendored.
-- PROBE-075 parity extended to at least one name-predicated fixture and still 104/104 on `constrain_test`.
-- **Predicate-free paths byte-identical to pre-change output** — asserted, not assumed.
-- REQ.md `Impl.` for REQ-116 → landed; `traceability.yaml` tests/probes filled; `deviations.md` updated (this deviation removed or narrowed).
-- `make spec-check` + `make ci` green; PROBE-086 unblocked (its own plan's Phase 1 can start).
+- [x] REQ-116 acceptance criteria all demonstrated by tests citing `// REQ-116` — all five, across `compile_nodename_test.go`, `webtemplate_oracle_compile_test.go`, `pathsnapshot_test.go`, `req116_gap_test.go`, `build_test.go`.
+- [x] `Corona_Anamnese` and `GECCO_Diagnose` build WebTemplates matching their goldens on `id` and `aqlPath` — **exactly** (230/230, 34/34), residuals documented and count-pinned. `conformance-ehrbase.de.v0` builds (ordinal fallback), guarded by `TestBuild_FlatConformanceOPTUsesOrdinalFallback`.
+- [x] PROBE-075 parity extended to **both** oracles, node facts and inputs; `constrain_test` still 104/104 exact.
+- [x] **Predicate-free paths byte-identical to pre-change output** — asserted by `pathsnapshot_test.go`; `no-name.txt` came through the emission change unchanged.
+- [x] REQ.md `Impl.` → `landed`; `traceability.yaml` tests/packages filled; `deviations.md` sibling-`id` entry marked RESOLVED and three new findings recorded.
+- [x] `make spec-check` + `make ci` green; PROBE-086 unblocked — [its plan](../2026-07-16-web-template-tests-conformance.md) Phase 1 can start.
 
 ## Phases
 
@@ -98,12 +98,12 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **DoD:** met — `Build` succeeds for `Corona_Anamnese`, `GECCO_Diagnose` **and** `conformance-ehrbase.de.v0`; structural parity is exact on all three vendored goldens (104/104, 230/230, 34/34) with every residual documented and count-pinned.
 
-### Phase 5 — Close out
+### Phase 5 — Close out — **done**
 
-1. `traceability.yaml` tests/probes for REQ-116; REQ.md `Impl.` → landed.
-2. CHANGELOG entry (public accessors + path-shape change — call out the path change explicitly for consumers).
-3. Hand back to [the FLAT conformance plan](2026-07-16-web-template-tests-conformance.md): its Phase 1 is now unblocked.
-4. Archive this plan.
+1. ~~Traceability + registry~~ — **done**: REQ-116 `implementation: landed` with all nine tests and five packages registered (incl. `openehr/serialize/simplified`, now REQ-116 surface); REQ.md `Impl.` → `landed`. The row's "there is NO numeric-suffix rule" note corrected in place. PROBE-086 stays out of `probes:` — this REQ unblocks it, it does not cover it, and the gate forbids citing a Draft probe as coverage.
+2. ~~CHANGELOG~~ — **done**: one `[Unreleased]` bullet calling the path-shape change out explicitly, since it is the consumer-visible break.
+3. ~~Hand back~~ — **done**: [the FLAT conformance plan](../2026-07-16-web-template-tests-conformance.md) has its blocker marked cleared, its Definition-of-Ready gate ticked, and Phases 1–3 flipped from blocked to ready. PROBE-086's catalogue status moved from "Draft — blocked" to "Draft — unblocked, adapter not yet written".
+4. ~~Archive~~ — **done**: `git mv` into `archive/`, plans index updated, in this PR.
 
 ## Risks
 
@@ -116,8 +116,8 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) — the normative contract
-- [clinical-modeling.md § REQ-106 `id` generation](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — defers the name source to REQ-116
-- [conformance.md § PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) / [§ PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity)
-- [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md) — reference lock this plan converges on
-- [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation — the evidence and the four layers
+- [clinical-modeling.md § REQ-116](../../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) — the normative contract
+- [clinical-modeling.md § REQ-106 `id` generation](../../specifications/clinical-modeling.md#req-106--webtemplate-json-export) — defers the name source to REQ-116
+- [conformance.md § PROBE-075](../../specifications/conformance.md#probe-075--webtemplate-structural-parity) / [§ PROBE-086](../../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity)
+- [ADR 0014](../../adr/0014-webtemplate-reference-implementation-lock.md) — reference lock this plan converges on
+- [`deviations.md`](../../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation — the evidence and the four layers

@@ -12,6 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **Template-level node naming and name-predicated paths (REQ-116).** Compiled and WebTemplate paths now carry the reference's `[archetype_id,'Name']` predicate and the WebTemplate `id` derives from the pinned name, so archetype-reuse templates export at last — **paths through name-pinning nodes change shape**.
+
 - **WebTemplate JSON export (REQ-106, ADR 0014).** New building block `openehr/template/webtemplate` projects a compiled OPT into EHRbase `openEHR_SDK` v2.3 WebTemplate JSON, pinned by structural parity (PROBE-075) against a vendored reference fixture.
 
 - **FLAT / STRUCTURED simplified-format codecs (REQ-053, PROBE-076).** New building block `openehr/serialize/simplified` — bidirectional, Web-Template-driven Flat/Structured codecs with OPT-free interconversion, strict fail-loud decode, and an OPT-validatable `WithTemplate` decode mode.
