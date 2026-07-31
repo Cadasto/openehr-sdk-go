@@ -480,9 +480,56 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 	return nil
 }
 
+// bareAQLPath strips REQ-116 name predicates from a compiled AQL path,
+// turning `/content[…SECTION.adhoc.v1,'Symptome']` back into
+// `/content[…SECTION.adhoc.v1]`. Embedded `\'` escapes are honoured.
+//
+// Decode builds its lookup key from the *incoming FLAT* segments, which
+// key on archetype id / at-code alone, so the index has to answer to the
+// bare spelling as well as the compiled one.
+func bareAQLPath(p string) string {
+	if !strings.Contains(p, ",'") {
+		return p
+	}
+	var b strings.Builder
+	b.Grow(len(p))
+	for i := 0; i < len(p); {
+		if p[i] == ',' && i+1 < len(p) && p[i+1] == '\'' {
+			j := i + 2
+			for j < len(p) {
+				if p[j] == '\\' && j+1 < len(p) {
+					j += 2
+					continue
+				}
+				if p[j] == '\'' {
+					j++
+					break
+				}
+				j++
+			}
+			i = j
+			continue
+		}
+		b.WriteByte(p[i])
+		i++
+	}
+	return b.String()
+}
+
 // buildNameIndex walks the compiled template and maps each archetype node's
 // canonical aqlPath to its LOCATABLE name (the node-id term rubric, default
 // language). Used by decode to repopulate LOCATABLE.name (see WithTemplate).
+//
+// Every node is indexed under both its compiled path and that path's bare
+// spelling (REQ-116 name predicates removed), because decode composes its
+// key from FLAT segments that carry no name. Siblings sharing a bare path
+// carry the same at-code and therefore the same rubric, so the collision
+// is value-preserving — the pre-REQ-116 behaviour exactly.
+//
+// Note for REQ-116 Phase 4: the value here is the *archetype concept term*.
+// For a node that pins a template-level name, REQ-116 makes that pinned
+// name the node's name; switching this index over is name-derived output
+// and belongs with the WebTemplate `id` work, not with path emission.
 func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 	names := make(map[string]string)
 	lang := c.Language()
@@ -491,7 +538,11 @@ func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 		if id := n.NodeID(); id != "" {
 			if t, ok := n.Term(id, lang); ok {
 				if txt := t.Items["text"]; txt != "" {
-					names[n.AQLPath()] = txt
+					path := n.AQLPath()
+					names[path] = txt
+					if bare := bareAQLPath(path); bare != path {
+						names[bare] = txt
+					}
 				}
 			}
 		}

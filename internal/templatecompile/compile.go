@@ -326,24 +326,60 @@ func (w *walker) buildAttribute(parent *CompiledNode, a *template.Attribute) (*C
 // attributes the delta is "/name"; for multiple attributes the
 // child contributes a predicate (archetype id, at-code, slot
 // include pattern, or a 1-based sibling suffix when the OPT omits
-// all of the above).
+// all of the above), with the template-level node name appended to
+// an id-derived predicate per REQ-116 — see [namePredicated].
 func pathSegment(attrName string, card template.Cardinality, child template.Node, siblingIndex int) string {
 	seg := "/" + attrName
 	if card != template.Multiple {
+		// No named node in the vendored corpus sits under a single
+		// attribute, and no reference golden predicates one, so the
+		// bare form stands: a name never *creates* a predicate.
 		return seg
 	}
 	if ar, ok := child.(*template.ArchetypeRoot); ok && ar.ArchetypeID() != "" {
-		return seg + "[" + ar.ArchetypeID() + "]"
+		return seg + "[" + namePredicated(ar.ArchetypeID(), child) + "]"
 	}
 	if id := child.NodeID(); id != "" {
-		return seg + "[" + id + "]"
+		return seg + "[" + namePredicated(id, child) + "]"
 	}
 	if sl, ok := child.(*template.Slot); ok {
 		if p := slotPathPredicate(sl); p != "" {
+			// Slots are not ObjectNodes and cannot pin a name.
 			return seg + "[" + p + "]"
 		}
 	}
+	// The synthetic positional key is our own fallback, never a shape
+	// the reference emits, and it already disambiguates siblings. No
+	// corpus node reaches it *with* a name; if one ever does, Phase 4
+	// parity is where the reference's actual shape would surface.
 	return seg + "[@" + strconv.Itoa(siblingIndex+1) + "]"
+}
+
+// namePredicated appends the child's template-level node name to an
+// id-derived path predicate, yielding the reference's
+// `archetype_id,'Name'` form (REQ-116); it returns id unchanged when
+// the node pins no name.
+//
+// Measured across the vendored reference goldens: the name is always
+// *appended* to an id (341 archetype-id + 9 at-code segments in the
+// corona golden, 27 + 3 in GECCO) and never stands alone, which is why
+// this decorates an existing predicate rather than forming one.
+//
+// Quoting follows the goldens: the name sits in single quotes and
+// commas inside it are literal — one corona name ("… zu Menschen, die
+// dort waren") carries one. No vendored name contains a single quote,
+// so the backslash escape below is the conventional AQL reading rather
+// than a golden-verified rule; revisit if a corpus name ever needs it.
+func namePredicated(id string, child template.Node) string {
+	on, ok := child.(template.ObjectNode)
+	if !ok {
+		return id
+	}
+	name := on.NodeName()
+	if name == "" {
+		return id
+	}
+	return id + ",'" + strings.ReplaceAll(name, "'", `\'`) + "'"
 }
 
 // slotPathPredicate derives a stable bracket predicate for an

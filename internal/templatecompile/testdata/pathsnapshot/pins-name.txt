@@ -13,10 +13,10 @@
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002]/name
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002]/name/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002,'Causative agent']
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002,'Causative agent']/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002,'Causative agent']/name
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0002,'Causative agent']/name/value
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0063]
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0063]/value
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0063]/value/defining_code
@@ -36,37 +36,37 @@
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0058]/value
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0006]
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0006]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0010]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0010]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0021]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0021]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0021]/value/defining_code
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0011]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0011]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0012]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0012]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0027]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0027]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]/value/defining_code
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]/name
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0089]/name/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0029]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0106]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0106]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0096]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0119]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0041]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0116]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0032]
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0032]/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0032]/name
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/items[at0032]/name/value
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/name
-/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009]/name/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0010]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0010]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0021]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0021]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0021]/value/defining_code
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0011]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0011]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0012]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0012]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0027]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0027]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']/value/defining_code
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']/name
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0089,'Severity']/name/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0029]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0106]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0106]/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0096]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0119]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0041]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0116]
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0032,'Comment']
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0032,'Comment']/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0032,'Comment']/name
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/items[at0032,'Comment']/name/value
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/name
+/content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/data/items[at0009,'Reaction details']/name/value
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/protocol
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/protocol/items[at0062]
 /content[openEHR-EHR-SECTION.allergies_adverse_reactions_rcp.v1]/items[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1]/protocol/items[at0062]/value
@@ -140,11 +140,11 @@
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/value
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/value/value
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/name
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/name/value
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'MY_DV_TEXT']
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'MY_DV_TEXT']/value
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'MY_DV_TEXT']/value/value
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'MY_DV_TEXT']/name
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'MY_DV_TEXT']/name/value
 /content[openEHR-EHR-OBSERVATION.test123.v0]/protocol
 
 ## templates/Test_dv_text_open_constraint.v0  nodes=19
@@ -162,10 +162,10 @@
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]
 /content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/value
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/name
-/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031]/name/value
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']/value
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']/name
+/content[openEHR-EHR-OBSERVATION.test123.v0]/data/events[at0002]/data/items[at0031,'null']/name/value
 /content[openEHR-EHR-OBSERVATION.test123.v0]/protocol
 
 ## templates/clinical_content_validation  nodes=31
@@ -178,24 +178,24 @@
 /content[openEHR-EHR-INSTRUCTION.valiadation_instruction_test.v0]/activities[at0001]/description
 /content[openEHR-EHR-ACTION.validation_action_test.v0]
 /content[openEHR-EHR-ACTION.validation_action_test.v0]/description
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]/data
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]/name
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1]/name/value
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/data
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/name
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0]/name/value
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]/data
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]/name
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2]/name/value
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rotated
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/data/rows[at0004]
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/name
-/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3]/name/value
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1,'Validation evaliation test with list']
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1,'Validation evaliation test with list']/data
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1,'Validation evaliation test with list']/name
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v1,'Validation evaliation test with list']/name/value
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']/data
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']/name
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v0,'Validation evaluation wth single']/name/value
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2,'Validation evaluation test with tree']
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2,'Validation evaluation test with tree']/data
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2,'Validation evaluation test with tree']/name
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v2,'Validation evaluation test with tree']/name/value
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rotated
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/data/rows[at0004]
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/name
+/content[openEHR-EHR-EVALUATION.validation_evaliation_test.v3,'Validation evaluation test with table']/name/value
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]/data
 /content[openEHR-EHR-OBSERVATION.validation_observation_test.v0]/data/events[at0002]
@@ -211,54 +211,54 @@
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/value/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/name/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Is_changed_in_cluster']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Is_changed_in_cluster']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Is_changed_in_cluster']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Is_changed_in_cluster']/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value/defining_code
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/value/defining_code
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value/defining_code
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name/value
 
 ## templates/test_template_rename_node_2  nodes=57
 /
@@ -270,54 +270,54 @@
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0010]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0011,'Text_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0012]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0013,'Count_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0014]/value/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/value/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/value/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0015,'Boolean_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0016]/items[at0018]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/items[at0019]/name/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/items[at0019,'Should_is_in_cluster']/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0017,'Cluster_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0020]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0021,'Quantity_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0023]/value/defining_code
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/value/defining_code
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/value/defining_code
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0027,'Coded_text_is_changed']/name/value
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]
 /content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0028]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/value
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/name
-/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029]/name/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/value
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name
+/content[openEHR-EHR-OBSERVATION.test_template_rename_node.v1]/data/events[at0002]/data/items[at0029,'Uri_is_changed']/name/value
 
 ## webtemplate/Corona_Anamnese  nodes=442
 /
@@ -339,429 +339,429 @@
 /content[openEHR-EHR-OBSERVATION.story.v1]/data/events[at0002]/data/items[at0006]
 /content[openEHR-EHR-OBSERVATION.story.v1]/protocol
 /content[openEHR-EHR-OBSERVATION.story.v1]/protocol/items[at0008]
-/content[openEHR-EHR-SECTION.adhoc.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0056]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0057]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0064]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0059]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0062]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0035]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0035]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0055]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0055]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/protocol/items[at0056]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0043]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0057]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0045]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0044]/items[at0046]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0055]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/data/events[at0002]/data/items[at0055]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/protocol/items[at0056]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0046]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0046]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0047]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0109]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_history.v0]/protocol/items[at0101]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0011]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0011]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0012]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0012]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0013]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0013]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0031]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0031]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0024]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0025]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0019]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0019]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.travel_event.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/data/events[at0002]/data/items[at0022]/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/protocol/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0039]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0043]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0046]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0071]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0027]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0027]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0002]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0021]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0021]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-OBSERVATION.medication_use.v0]/protocol/items[at0019]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0005]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0018]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0014]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0012]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0012]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0015]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0015]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0017]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0016]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0018]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/data/items[at0005]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/protocol/items[at0008]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.occupation_summary.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0003]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0003]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0007]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0007]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0028]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0028]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0003]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/protocol/items[at0011]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0013]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0013]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0013]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0027]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0013]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0013]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0017]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/items[at0027]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0024]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0024]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0025]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0025]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0011]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0002]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0002]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0002]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0039]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0043]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]/items[at0004]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]/items[at0004]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]/items[at0004]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0073]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0073]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0073]/value/defining_code
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0073]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0069]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/data/items[at0069]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/protocol/items[at0070]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/protocol/items[at0070]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/protocol/items[at0071]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/name
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1]/name/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]/value/value
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0151]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0132]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0149]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0116]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0141]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0142]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0128]
-/content[openEHR-EHR-SECTION.adhoc.v1]/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0112]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Husten']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Schnupfen']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Heiserkeit']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Fieber oder erhöhte Körpertemperatur']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/data/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0066]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0056]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/data/events[at0003]/state/items[at0057]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0064]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0059]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.body_temperature.v2]/protocol/items[at0062]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geruchssinn']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Gestörter Geschmackssinn']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Durchfall']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0035]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/data/events[at0002]/data/items[at0022]/items[at0035]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Weitere Symptome']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0043]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0043]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0043]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0057]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0057]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0057]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0045]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0045]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0045]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0046]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0046]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0044]/items[at0046]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0055]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/data/events[at0002]/data/items[at0055]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/protocol/items[at0056]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Personenkontakt']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0043]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0043]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0043]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0057]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0057]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0057]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0045]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0045]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0045]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0046]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0046]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0044]/items[at0046]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0055]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/data/events[at0002]/data/items[at0055]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/protocol/items[at0056]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Kontakt']/items[openEHR-EHR-OBSERVATION.exposure_assessment.v0,'Aufenthalt in Gesundheitseinrichtung']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111,'Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111,'Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren']/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111,'Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren']/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111,'Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0111,'Aufenthalt in den letzten 14 Tage in einem der Risikogebiete für Coronainfektion oder Kontakt zu Menschen, die dort waren']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0046]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0046]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0134]/items[openEHR-EHR-CLUSTER.location.v1]/items[at0047]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/data/events[at0002]/data/items[at0109]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_history.v0]/protocol/items[at0101]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004,'Letzte Reise?']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004,'Letzte Reise?']/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004,'Letzte Reise?']/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004,'Letzte Reise?']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0004,'Letzte Reise?']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0026]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0011]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0011]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0012]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0012]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0013]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0013]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0031]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0031]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0010]/items[at0024]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0025]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0019]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/data/events[at0002]/data/items[at0008]/items[at0019]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Risikogebiet']/items[openEHR-EHR-OBSERVATION.travel_event.v0]/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Andere aktuelle Erkrankungen']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0004]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0005]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/data/events[at0002]/data/items[at0022]/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/protocol/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.symptom_sign_screening.v0,'Chronische Erkrankungen']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0039]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0043]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0046]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0071]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0027]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0027]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0002]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0003]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0021]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0021]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/data/events[at0023]/data/items[at0026]/items[at0008]/items[at0024]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-OBSERVATION.medication_use.v0]/protocol/items[at0019]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0005]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0018]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012,'Name der Einrichtung']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012,'Name der Einrichtung']/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012,'Name der Einrichtung']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0012,'Name der Einrichtung']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0014]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0012]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0012]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0015]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[openEHR-EHR-CLUSTER.address_cc.v0]/items[at0015]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0017]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[openEHR-EHR-CLUSTER.organisation_cc.v0]/items[at0016]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[openEHR-EHR-CLUSTER.occupation_record.v1]/items[at0018]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/data/items[at0005]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/protocol/items[at0008]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.occupation_summary.v1,'Gesundheitsbezogener Beruf']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0003]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0003]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0007]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[at0007]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0028]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0028]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/data/items[openEHR-EHR-CLUSTER.dwelling.v0]/items[at0003]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.living_arrangement.v0]/protocol/items[at0011]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0002]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0013]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0013]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0013]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0017]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0017]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0017]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/items[at0027]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Spezifischer Risikofaktor']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0013]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0013]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0017]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0017]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0017]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/items[at0027]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0016,'Andere Risikofaktoren']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/data/items[at0003]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0024]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0024]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0025]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0025]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.health_risk.v1]/protocol/items[at0011]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0002]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0002]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0002]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0039]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0043]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']/items[at0004]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']/items[at0004]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']/items[at0004]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[openEHR-EHR-CLUSTER.problem_qualifier.v1,'Status']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0073]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0073]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0073]/value/defining_code
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0073]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0069]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/data/items[at0069]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/protocol/items[at0070]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/protocol/items[at0070]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/protocol/items[at0071]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/name
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-EVALUATION.problem_diagnosis_covid.v1,'Problem/Diganose Coronovirus']/name/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0121]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0062]/value/value
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0151]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0132]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0149]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/activities[at0001]/description/items[at0116]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0141]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0142]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0128]
+/content[openEHR-EHR-SECTION.adhoc.v1,'Allgemeine Angaben']/items[openEHR-EHR-INSTRUCTION.service_request.v1]/protocol/items[at0112]
 
 ## webtemplate/GECCO_Diagnose  nodes=74
 /
@@ -776,66 +776,66 @@
 /context/other_context/items[at0005]
 /context/other_context/items[at0005]/value
 /context/other_context/items[at0005]/value/defining_code
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0002]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0001]/value/defining_code
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0002]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0002]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0002]/value/defining_code
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0053]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/items[at0054]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/name
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1]/name/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0077]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0077]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0005]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0005]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0005]/value/defining_code
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0043]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0030]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0030]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0046]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0069]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/data/items[at0069]/value
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/protocol/items[at0071]
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/name
-/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1]/name/value
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0002]
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0002]/value
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0002]/value/defining_code
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]/name
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]/name/defining_code
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]/name/value
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]/value
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/data/items[at0003]/value/defining_code
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/protocol
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/protocol/items[at0011]
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/name
-/content[openEHR-EHR-EVALUATION.exclusion_specific.v1]/name/value
-/content[openEHR-EHR-EVALUATION.absence.v2]
-/content[openEHR-EHR-EVALUATION.absence.v2]/data
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0002]
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0002]/value
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0002]/value/defining_code
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0002]/name
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0002]/name/value
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0005]
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0005]/value
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0005]/value/defining_code
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0005]/name
-/content[openEHR-EHR-EVALUATION.absence.v2]/data/items[at0005]/name/value
-/content[openEHR-EHR-EVALUATION.absence.v2]/protocol
-/content[openEHR-EHR-EVALUATION.absence.v2]/protocol/items[at0006]
-/content[openEHR-EHR-EVALUATION.absence.v2]/name
-/content[openEHR-EHR-EVALUATION.absence.v2]/name/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0002]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0001]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0001]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0001]/value/defining_code
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0002]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0002]/value/defining_code
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0053]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/items[at0054]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/name
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[openEHR-EHR-CLUSTER.anatomical_location.v1,'Körperstelle']/name/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0077]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0077]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0005]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0005]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0005]/value/defining_code
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0043]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0030]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0030]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0046]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0069]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/data/items[at0069]/value
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/protocol
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/protocol/items[at0071]
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/name
+/content[openEHR-EHR-EVALUATION.problem_diagnosis.v1,'Vorliegende Diagnose']/name/value
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0002]
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0002]/value
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0002]/value/defining_code
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']/name
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']/name/defining_code
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']/name/value
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']/value
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/data/items[at0003,'Problem/Diagnose']/value/defining_code
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/protocol
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/protocol/items[at0011]
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/name
+/content[openEHR-EHR-EVALUATION.exclusion_specific.v1,'Ausgeschlossene Diagnose']/name/value
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0002,'Unbekannte Diagnose']
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0002,'Unbekannte Diagnose']/value
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0002,'Unbekannte Diagnose']/value/defining_code
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0002,'Unbekannte Diagnose']/name
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0002,'Unbekannte Diagnose']/name/value
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0005,'Aussage über die fehlende Information']
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0005,'Aussage über die fehlende Information']/value
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0005,'Aussage über die fehlende Information']/value/defining_code
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0005,'Aussage über die fehlende Information']/name
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/data/items[at0005,'Aussage über die fehlende Information']/name/value
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/protocol
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/protocol/items[at0006]
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/name
+/content[openEHR-EHR-EVALUATION.absence.v2,'Unbekannte Diagnose']/name/value
 
