@@ -89,10 +89,11 @@ var ErrEmptyTemplate = errors.New("webtemplate: compiled template has no root")
 // resolvable default language (REQ-106: never emit "defaultLanguage": "").
 var ErrNoDefaultLanguage = errors.New("webtemplate: compiled template has no default language")
 
-// ErrIDCollision is returned when two sibling nodes sanitise to the same
-// id. The reference's sibling-disambiguation rule is not yet implemented
-// (see deviations.md); failing loudly protects FLAT-path uniqueness, the
-// id's load-bearing property (ADR 0014).
+// ErrIDCollision is returned when two sibling nodes still share an id
+// after disambiguation — the pinned template-level name (REQ-116) and the
+// next-free ordinal fallback make that unreachable from template input, so
+// it signals a builder bug. Failing loudly protects FLAT-path uniqueness,
+// the id's load-bearing property (ADR 0014).
 var ErrIDCollision = errors.New("webtemplate: duplicate sibling id")
 
 // Marshal builds and JSON-encodes the WebTemplate (REQ-106).

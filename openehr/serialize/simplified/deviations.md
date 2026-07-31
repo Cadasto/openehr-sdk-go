@@ -119,5 +119,36 @@ not partially/silently accepted.
 (FLAT/STRUCTURED/interconversion) **and OPT-conformance**: when the source composition is
 itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
-It does **not** yet compare emitted FLAT/STRUCTURED byte-for-byte against vendored upstream
-simplified output — a documented follow-up needing those fixtures.
+It does **not** yet compare emitted FLAT/STRUCTURED against vendored upstream simplified
+output — that follow-up is **PROBE-086** (Draft — unblocked): its corpus is vendored at
+`testkit/cassettes/flat-conformance/`, and its adapter is the FLAT-conformance plan's
+Phase 1.
+
+**Archetype-reuse siblings (REQ-116 residual).** REQ-116 made templates that reuse one
+archetype among siblings *exportable* (distinct WebTemplate `id`s via the pinned
+template-level name; name-predicated `aqlPath`s), and this codec handles the pinned
+predicate on the paths it consumes: decode strips it when rebuilding lookup keys
+(`bareAQLPath`, keyed consistently across `resolveLeaf` / `placeLeaf` / the name index),
+and encode strips it before rmpath resolution. A **sole** pinned claimant of its bare
+path — every pinned node in `GECCO_Diagnose`, and pinned ELEMENTs generally — round-trips,
+with `WithTemplate` decode repopulating the **pinned** name (`flat_pinned_test.go`). What
+does **not** round-trip yet is *reused siblings*: several pinned siblings sharing one bare
+path (corona's four `SECTION.adhoc.v1`).
+
+- **Encode** — the bare relPath matches all of the sibling instances at once and fails
+  loudly on the rmpath ambiguity rather than aliasing one sibling's data as another's.
+  Disambiguating needs the runtime `name/value` carried into resolution — exactly what
+  the stripped predicate expressed — restricted to genuinely ambiguous nodes.
+- **Decode** — sibling FLAT ids map to one bare path, so their instances would collapse
+  onto one list slot (both default to index 0), landing different siblings' leaves in
+  **one** RM instance. Decode therefore **refuses** any key that walks through a reused
+  sibling (`ErrUnknownPath`, "reused siblings"; `ambiguousBarePaths` precomputes the
+  affected paths, `flat_pinned_test.go` pins the refusal on the corona oracle) — a loud
+  no rather than a silent merge. The name index likewise falls back to the shared
+  archetype rubric for the bare spelling. Fixing both needs the FLAT segment identity
+  (which sibling's id the key walked through) carried into placement — the information
+  the stripped predicate expressed.
+
+Reused-sibling FLAT is therefore **fail-loud in both directions** — nothing silently
+misattributes data — and closing it is owned by the PROBE-086 adapter work (the upstream
+corpus template pins no names, so its parity does not depend on this residual).

@@ -707,11 +707,10 @@ requirements:
     # fixture (104/104 node + input-suffix/type parity; documented deviations
     # in the package's deviations.md). Direct-slice: the shared
     # simplified-template model (umbrella Phase 1 / REQ-053) is deferred until
-    # a second consumer exists. Archetype-reuse-under-slot templates now
-    # COMPILE (templatecompile admits shared-path subtrees) but still fail
-    # export with ErrIDCollision: each reused sibling derives the same web id.
-    # Unblocked by REQ-116 (template-level node name + name predicates);
-    # see ADR 0014.
+    # a second consumer exists. Archetype-reuse-under-slot templates compile
+    # (shared-path subtrees admitted) and, since REQ-116 landed (2026-07-31,
+    # template-level node name + name predicates + next-free ordinal), also
+    # export — corona_anamnese is a PROBE-075 parity oracle now; see ADR 0014.
     implementation: landed
     packages:
       - openehr/template/webtemplate
@@ -996,7 +995,13 @@ requirements:
       # Phase 3 — the emission guard (byte-identity for templates pinning
       # no name) and the FLAT boundary where the predicate is stripped.
       - internal/templatecompile/pathsnapshot_test.go
+      - internal/templatecompile/namepredicate_test.go
       - openehr/serialize/simplified/flat_nameindex_test.go
+      # Post-review hardening: decode through a pinned container (the
+      # bare-keying regression), the reused-sibling refusal, and the
+      # next-free ordinal fallback.
+      - openehr/serialize/simplified/flat_pinned_test.go
+      - openehr/template/webtemplate/dedupe_test.go
       # Phase 4 — PROBE-075 parity extended to both oracles (node facts and
       # inputs), with the documented residuals pinned by count.
       - openehr/template/webtemplate/build_test.go

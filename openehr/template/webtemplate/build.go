@@ -59,9 +59,10 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 	}, nil
 }
 
-// dedupeSiblingIDs gives every sibling a unique id, appending an ordinal to
-// the second and later claimants of a name: `dv_text`, `dv_text2`,
-// `dv_text3`. Runs bottom-up over the whole tree.
+// dedupeSiblingIDs gives every sibling a unique id, renaming the second and
+// later claimants of a name to the next *free* ordinal spelling: `dv_text`,
+// `dv_text2`, `dv_text3`. Visits each sibling group pre-order, in document
+// order, so the result is deterministic.
 //
 // Ordinals are the reference's *last resort*, not its disambiguator of
 // choice: REQ-116's template-level node name does that job, and across the
@@ -72,25 +73,38 @@ func Build(c *templatecompile.Compiled, opts ...Option) (*WebTemplate, error) {
 // appears 10× in the template) and neither pinning a name, and the upstream
 // bodies key them `…/conformance_action/dv_text` and `…/dv_text2`.
 //
-// Numbering starts at 2 (the first claimant keeps the bare id) and counts
-// per id, so a template with no collision is untouched — which is every
-// template that could previously be built at all, since a collision used to
-// be a hard [ErrIDCollision].
+// Numbering starts at 2 and the first claimant keeps the bare id, so a
+// template with no collision is untouched — which is every template that
+// could previously be built at all, since a collision used to be a hard
+// [ErrIDCollision]. "Next free" matters: siblings sanitising to
+// [x, x2, x] must not rename the third to the already-taken `x2` — it takes
+// `x3`. Only the two-ELEMENT case is golden-evidenced; the next-free
+// extension keeps every other collision loud-failure-free without ever
+// emitting a duplicate, and [checkIDCollisions] still guards the invariant.
 func dedupeSiblingIDs(n *Node) {
-	counts := map[string]int{}
+	counts := make(map[string]int, len(n.Children))
+	taken := make(map[string]bool, len(n.Children))
+	for _, ch := range n.Children {
+		taken[ch.ID] = true
+	}
 	for _, ch := range n.Children {
 		counts[ch.ID]++
-		if c := counts[ch.ID]; c > 1 {
+		if counts[ch.ID] > 1 {
+			c := counts[ch.ID]
+			for taken[ch.ID+strconv.Itoa(c)] {
+				c++
+			}
 			ch.ID += strconv.Itoa(c)
+			taken[ch.ID] = true
 		}
 		dedupeSiblingIDs(ch)
 	}
 }
 
 // checkIDCollisions rejects trees where two sibling nodes still share an id
-// after [dedupeSiblingIDs] — which should now be unreachable, since the
-// ordinal fallback is total. It stays as a loud guard: an ambiguous FLAT
-// path is far worse than a failed export.
+// after [dedupeSiblingIDs]. The next-free ordinal makes sibling ids unique
+// by construction, so this firing means a builder bug — it stays as a loud
+// guard because an ambiguous FLAT path is far worse than a failed export.
 func checkIDCollisions(n *Node) error {
 	seen := map[string]bool{}
 	for _, ch := range n.Children {
@@ -123,10 +137,44 @@ func childrenOf(n *templatecompile.CompiledNode, parentPath string, cfg *config)
 		if seen[ic.AQLPath] {
 			continue
 		}
-		ic.Inputs = slices.Clone(ic.Inputs) // never alias the table's slices into returned trees
+		ic.Inputs = cloneInputs(ic.Inputs) // never alias the table's slices or pointers into returned trees
 		out = append(out, &ic)
 	}
 	return out
+}
+
+// cloneInputs deep-copies an in-context input set. The table prototypes now
+// carry Validation/Range pointers (unconstrainedDurationInputs), so a
+// shallow slice clone would share them across every tree ever built — a
+// consumer mutating one WebTemplate would corrupt all subsequent Builds.
+func cloneInputs(in []Input) []Input {
+	out := slices.Clone(in)
+	for i := range out {
+		out[i].List = slices.Clone(out[i].List)
+		if v := out[i].Validation; v != nil {
+			nv := *v
+			nv.Range = cloneRange(v.Range)
+			nv.Precision = cloneRange(v.Precision)
+			out[i].Validation = &nv
+		}
+	}
+	return out
+}
+
+func cloneRange(r *Range) *Range {
+	if r == nil {
+		return nil
+	}
+	nr := *r
+	if r.Min != nil {
+		m := *r.Min
+		nr.Min = &m
+	}
+	if r.Max != nil {
+		m := *r.Max
+		nr.Max = &m
+	}
+	return &nr
 }
 
 // emitAll emits the WebTemplate nodes contributed by all of n's attribute

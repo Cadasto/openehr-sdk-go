@@ -25,11 +25,13 @@ failure, not a deviation.
   RM-attribute leaves with `inContext: true` and carries per-node term bindings and
   UI annotations; this slice omits them (the leaves themselves, including their
   capitalized `name`, are emitted).
-- **inContext coverage** — the fixed RM-attribute leaf table covers the container
-  types the fixture exercises (COMPOSITION, EVENT_CONTEXT, the ENTRY types, EVENT
-  variants). The reference also synthesizes ACTIVITY `timing` /
-  `action_archetype_id` and ACTION `ism_transition` leaves; those are not emitted
-  yet. *(Deferred: extend parity with a fixture exercising INSTRUCTION/ACTION.)*
+- **inContext coverage** — the fixed RM-attribute leaf table covers COMPOSITION,
+  EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
+  `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), and
+  ACTIVITY (`timing` / `action_archetype_id`) — the INSTRUCTION/ACTIVITY sets
+  landed with REQ-116 Phase 4, measured on the corona golden. Still not emitted:
+  ACTION `ism_transition`. *(Deferred: extend parity with a fixture exercising a
+  full ACTION.)*
 - **`localizedName` / localized maps** — emitted for the compiled template's single
   document language only. The compiled bridge resolves every language to the
   document-language term, so no per-language override options are offered — they
@@ -109,17 +111,33 @@ failure, not a deviation.
     `aqlPath`s this builder never emitted — output that would fail reference parity
     with no error raised. Now 34/34 structural parity, with the two residuals below.
 
-- **Ordinal fallback for siblings that still collide** — matches the reference; no
-  divergence, recorded because it corrects the "there is no suffix rule" reading
-  above. When two siblings sanitise to one `id` and neither pins a distinguishing
-  name, the second and later claimants take an ordinal: `dv_text`, `dv_text2`.
-  Evidence is the vendored upstream FLAT corpus, whose bodies key the two ELEMENTs
-  under `conformance-ehrbase.de.v0`'s ACTION as
-  `…/conformance_action/dv_text` and `…/conformance_action/dv_text2` — that OPT
-  carries the term text "DV_TEXT" ten times and pins no name on either node. The
-  ordinal is a *last resort*, never the primary disambiguator: it appears in none of
-  the corona / multi_occurrence / AlternativeEvents goldens, because there the pinned
-  name already separates every sibling.
+- **Ordinal fallback for siblings that still collide** — matches the reference on
+  the evidenced case; recorded because it corrects the "there is no suffix rule"
+  reading above. When two siblings sanitise to one `id` and neither pins a
+  distinguishing name, the second and later claimants take the next **free**
+  ordinal spelling: `dv_text`, `dv_text2`. Evidence is the vendored upstream FLAT
+  corpus, whose bodies key the two ELEMENTs under `conformance-ehrbase.de.v0`'s
+  ACTION as `…/conformance_action/dv_text` and `…/conformance_action/dv_text2` —
+  that OPT carries the term text "DV_TEXT" ten times and pins no name on either
+  node. The ordinal is a *last resort*, never the primary disambiguator: it appears
+  in none of the corona / multi_occurrence / AlternativeEvents goldens, because
+  there the pinned name already separates every sibling.
+
+  Two edges of the fallback go beyond the vendored evidence and are this SDK's
+  conservative reading, pinned by table test rather than by a golden:
+
+  - **Next-free, not per-id counting** — siblings sanitising to `[x, x2, x]` rename
+    the third to `x3`, never onto the already-taken `x2`.
+  - **Synthesized in-context leaves participate** — a template ELEMENT whose name
+    sanitises to an in-context id (e.g. an ELEMENT named "Language" beside the
+    synthesized ENTRY `language` leaf) collides in the same sibling list; the later
+    claimant (document order — data children first, in-context last) takes the
+    ordinal. No vendored golden exercises this, so the reference's spelling for it
+    is unverified; before REQ-116 this case failed with `ErrIDCollision`. The
+    in-context leaf's `aqlPath` stays the bare RM attribute path either way — in
+    the reference, `id` and `aqlPath` are independent derivations, so a deduped
+    `id` with an un-suffixed `aqlPath` is the expected shape, and FLAT keys derive
+    from the `id` chain alone.
 
 - **Single-occurrence `EVENT` containers are lifted, not emitted** — matches the
   reference. An abstract `EVENT` constrained to at most one occurrence contributes

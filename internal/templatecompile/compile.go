@@ -371,14 +371,21 @@ func pathSegment(attrName string, card template.Cardinality, child template.Node
 //
 // Quoting follows the goldens: the name sits in single quotes and commas
 // inside it are literal — one corona name ("… zu Menschen, die dort
-// waren") carries one. No vendored name contains a single quote, so the
-// backslash escape is the conventional AQL reading rather than a
-// golden-verified rule; revisit if a corpus name ever needs it.
+// waren") carries one. No vendored name contains a single quote or a
+// backslash, so the escapes are the conventional AQL reading rather than
+// a golden-verified rule; revisit if a corpus name ever needs them.
+// Backslash is escaped first and quote second — the reverse order would
+// re-escape the backslash just written for the quote. Escaping the
+// backslash is not optional style: a name ending in `\` would otherwise
+// emit `,'…\'`, whose closing quote every scanner honouring `\'` consumes
+// as escaped, swallowing the rest of the path.
 func NamePredicate(id, name string) string {
 	if name == "" {
 		return id
 	}
-	return id + ",'" + strings.ReplaceAll(name, "'", `\'`) + "'"
+	name = strings.ReplaceAll(name, `\`, `\\`)
+	name = strings.ReplaceAll(name, "'", `\'`)
+	return id + ",'" + name + "'"
 }
 
 // namePredicated is the wire-side adapter for [NamePredicate]: slots are

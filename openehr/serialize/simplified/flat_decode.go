@@ -114,19 +114,23 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
 	budget := &allocBudget{limit: maxTotalNodes}
+	ambiguous := ambiguousBarePaths(wt)
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		sfx := groups[base]
 		pk, err := parseFlatKey(base)
 		if err != nil {
 			return nil, err
 		}
-		leaf, predIndex, predType, ok := resolveLeaf(wt, pk.segs)
-		if !ok {
+		leaf, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
+		if errors.Is(err, errSegNotFound) {
 			// A key that does not resolve to a WT node is a wrong template, a
 			// typo, or an unsupported _-prefixed RM attribute (see deviations.md
 			// — ctx/ is siphoned off above and |raw is a suffix, so neither
 			// reaches this branch). Fail loudly, never drop silently (REQ-053).
 			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, base)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("simplified: %q: %w", base, err)
 		}
 		dv, err := dvFromSuffixes(leaf.RMType, leafListOpen(leaf), sfx)
 		if err != nil {
@@ -338,16 +342,22 @@ func unmarshalObject(data []byte) (map[string]any, error) {
 // resolveLeaf walks the Web Template by FLAT segment ids to the leaf node,
 // collecting, for each ancestor that carries an archetype node id, its flat
 // :index (predIndex) and Web Template rmType (predType) — both keyed by the
-// ancestor's canonical AQLPath, which is unique per chain position. Keying by
-// bare node id would collide when the same at-code (or a self-nested archetype
-// id) appears twice along one path, silently applying one segment's index or
-// type to another. Returns ok=false when a segment id is not found.
-func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg) (*webtemplate.Node, map[string]int, map[string]string, bool) {
+// **bare** spelling of the ancestor's AQLPath (REQ-116 name predicates
+// stripped), because placeLeaf rebuilds its lookup prefix from parseAQL
+// segments, which are bare. Keying by the predicated spelling made every
+// lookup under a name-pinned container miss, so concreteType fell back to a
+// default RM type — wrong _type embedded silently where it resolved, decode
+// failure where it did not. Keying by bare node id alone would be worse
+// still: the same at-code (or a self-nested archetype id) appearing twice
+// along one path would silently apply one segment's index or type to
+// another; the bare path prefix stays unique per chain position. Returns
+// ok=false when a segment id is not found.
+func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[string]bool) (*webtemplate.Node, map[string]int, map[string]string, error) {
 	predIndex := make(map[string]int)
 	predType := make(map[string]string)
 	node := wt.Tree
 	if len(segs) == 0 || segs[0].id != node.ID {
-		return nil, nil, nil, false
+		return nil, nil, nil, errSegNotFound
 	}
 	for _, seg := range segs[1:] {
 		var next *webtemplate.Node
@@ -358,17 +368,59 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg) (*webtemplate.Node
 			}
 		}
 		if next == nil {
-			return nil, nil, nil, false
+			return nil, nil, nil, errSegNotFound
 		}
 		if next.NodeID != "" {
-			predType[next.AQLPath] = next.RMType
+			bare := bareAQLPath(next.AQLPath)
+			if ambiguous[bare] {
+				// Reused siblings (REQ-116) share this bare spelling, and
+				// placement below keys on it: distinct siblings' instances
+				// would collapse onto one list slot — a silent merge of one
+				// sibling's data into another. Refuse rather than corrupt;
+				// see deviations.md § Conformance (reused-sibling residual).
+				return nil, nil, nil, fmt.Errorf("%w: FLAT id %q reaches one of several reused siblings sharing the path %q — not yet decodable (see deviations.md)", ErrUnknownPath, seg.id, bare)
+			}
+			predType[bare] = next.RMType
 			if seg.idx >= 0 {
-				predIndex[next.AQLPath] = seg.idx
+				predIndex[bare] = seg.idx
 			}
 		}
 		node = next
 	}
-	return node, predIndex, predType, true
+	return node, predIndex, predType, nil
+}
+
+// errSegNotFound reports a FLAT segment id with no Web Template child — the
+// caller wraps it with the offending key (a wrong template, a typo, or an
+// unsupported _-prefixed RM attribute).
+var errSegNotFound = errors.New("segment not found")
+
+// ambiguousBarePaths returns the bare spellings claimed by more than one Web
+// Template node — the reused-sibling class REQ-116 made buildable (siblings
+// separated only by a pinned name predicate, or by an ordinal-deduped id).
+// Placement keys on the bare spelling, so these paths cannot be decoded
+// unambiguously yet; resolveLeaf refuses them loudly.
+func ambiguousBarePaths(wt *webtemplate.WebTemplate) map[string]bool {
+	counts := make(map[string]int)
+	var walk func(n *webtemplate.Node)
+	walk = func(n *webtemplate.Node) {
+		if n.NodeID != "" {
+			counts[bareAQLPath(n.AQLPath)]++
+		}
+		for _, ch := range n.Children {
+			walk(ch)
+		}
+	}
+	if wt.Tree != nil {
+		walk(wt.Tree)
+	}
+	ambiguous := make(map[string]bool)
+	for p, c := range counts {
+		if c > 1 {
+			ambiguous[p] = true
+		}
+	}
+	return ambiguous
 }
 
 // aqlSeg is one canonical-path segment: an attribute name and an optional
@@ -427,11 +479,13 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 	segs := parseAQL(aqlPath)
 	cur := compJSON
 	curType := "COMPOSITION"
-	// Two path keys are rebuilt in lockstep: aqlPrefix reproduces the WT
-	// aqlPath prefix exactly (predicate on every predicated segment) — the
-	// positional key predIndex/predType are stored under; namePrefix keeps a
-	// predicate only on container attributes (templatecompile's convention),
-	// the key of the WithTemplate name index.
+	// Two path keys are rebuilt in lockstep, both in the BARE spelling
+	// (parseAQL stripped any REQ-116 name predicate): aqlPrefix carries a
+	// predicate on every predicated segment — the positional key
+	// predIndex/predType are stored under, bare-keyed by resolveLeaf to
+	// match; namePrefix keeps a predicate only on container attributes
+	// (templatecompile's convention), the key of the WithTemplate name
+	// index, which aliases every entry under its bare spelling.
 	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
@@ -528,31 +582,46 @@ func bareAQLPath(p string) string {
 }
 
 // buildNameIndex walks the compiled template and maps each archetype node's
-// canonical aqlPath to its LOCATABLE name (the node-id term rubric, default
-// language). Used by decode to repopulate LOCATABLE.name (see WithTemplate).
+// aqlPath to its LOCATABLE name — the template-level node name where the OPT
+// pins one (REQ-116: that pinned value IS the node's modelled name, and it is
+// what the reference materialises), else the node-id term rubric in the
+// default language. Used by decode to repopulate LOCATABLE.name (see
+// WithTemplate).
 //
 // Every node is indexed under both its compiled path and that path's bare
 // spelling (REQ-116 name predicates removed), because decode composes its
 // key from FLAT segments that carry no name. Siblings sharing a bare path
-// carry the same at-code and therefore the same rubric, so the collision
-// is value-preserving — the pre-REQ-116 behaviour exactly.
-//
-// Note for REQ-116 Phase 4: the value here is the *archetype concept term*.
-// For a node that pins a template-level name, REQ-116 makes that pinned
-// name the node's name; switching this index over is name-derived output
-// and belongs with the WebTemplate `id` work, not with path emission.
+// carry the same at-code and therefore the same rubric — but where they pin
+// *distinct* names (archetype reuse under a slot), the bare spelling cannot
+// say which sibling is meant, so the alias falls back to the shared rubric
+// rather than guess: those instances decode with the pre-REQ-116 name. The
+// per-sibling pinned name at a bare key needs the FLAT segment identity
+// carried into this lookup — recorded in deviations.md § Conformance as part
+// of the reused-sibling residual the PROBE-086 adapter work owns.
 func buildNameIndex(c *templatecompile.Compiled) map[string]string {
 	names := make(map[string]string)
 	lang := c.Language()
 	var walk func(n *templatecompile.CompiledNode)
 	walk = func(n *templatecompile.CompiledNode) {
 		if id := n.NodeID(); id != "" {
+			var rubric string
 			if t, ok := n.Term(id, lang); ok {
-				if txt := t.Items["text"]; txt != "" {
-					path := n.AQLPath()
-					names[path] = txt
-					if bare := bareAQLPath(path); bare != path {
-						names[bare] = txt
+				rubric = t.Items["text"]
+			}
+			name := n.NodeName()
+			if name == "" {
+				name = rubric
+			}
+			if name != "" {
+				path := n.AQLPath()
+				names[path] = name
+				if bare := bareAQLPath(path); bare != path {
+					if prev, taken := names[bare]; taken && prev != name {
+						// Two named siblings share this bare spelling —
+						// ambiguous; keep the shared rubric instead.
+						names[bare] = rubric
+					} else {
+						names[bare] = name
 					}
 				}
 			}

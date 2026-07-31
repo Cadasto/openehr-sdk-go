@@ -51,6 +51,19 @@ func TestBareAQLPath(t *testing.T) {
 			`/items[at0001,'O\'Brien score']/value`,
 			"/items[at0001]/value",
 		},
+		{
+			// NamePredicate escapes `\` as `\\`; the scanner must treat the
+			// pair as one literal backslash, not as an escape of the closing
+			// quote — otherwise the rest of the path is swallowed.
+			"escaped trailing backslash",
+			`/items[at0001,'a\\']/value`,
+			"/items[at0001]/value",
+		},
+		{
+			"escaped backslash-quote pair",
+			`/items[at0001,'a\\\'b']/value`,
+			"/items[at0001]/value",
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

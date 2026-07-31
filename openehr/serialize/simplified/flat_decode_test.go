@@ -151,9 +151,9 @@ func TestResolveLeafPositionalPredicates(t *testing.T) {
 	wt := &webtemplate.WebTemplate{Tree: &webtemplate.Node{ID: "root", Children: []*webtemplate.Node{obs}}}
 
 	segs := []flatSeg{{"root", -1}, {"obs", 2}, {"ev", 5}, {"val", -1}}
-	node, predIndex, predType, ok := resolveLeaf(wt, segs)
-	if !ok || node != leaf {
-		t.Fatalf("resolveLeaf: ok=%v node=%v", ok, node)
+	node, predIndex, predType, err := resolveLeaf(wt, segs, ambiguousBarePaths(wt))
+	if err != nil || node != leaf {
+		t.Fatalf("resolveLeaf: err=%v node=%v", err, node)
 	}
 	if got := predIndex["/content[at0001]"]; got != 2 {
 		t.Errorf("obs index = %d, want 2 (keyed by its own AQLPath)", got)

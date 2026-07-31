@@ -17,14 +17,13 @@ import (
 // to this package.
 const referenceDir = "../../../testkit/cassettes/webtemplate"
 
-// referenceStem is the vendored EHRbase parity fixture's filename stem.
-// constrain_test is used (not corona_anamnese) because it pins no
-// template-level node name anywhere, so its golden carries zero name
-// predicates across all 104 nodes and it exports cleanly — that, not an
-// absence of sibling collision, is why parity holds here. corona_anamnese
-// compiles, but its reused sibling archetype roots derive one shared web id
-// and hit ErrIDCollision — see REQ-116 and deviations.md § Sibling `id`
-// disambiguation.
+// referenceStem is the first vendored EHRbase parity fixture's filename
+// stem — the historical single oracle, kept as the default other tests
+// load. constrain_test pins no template-level node name anywhere, so its
+// golden carries zero name predicates across all 104 nodes, which is why
+// it reached parity before REQ-116 existed. Since REQ-116 landed the
+// matrix is parityFixtures (build_test.go): this stem plus the two
+// name-pinning oracles Corona_Anamnese and GECCO_Diagnose.
 const referenceStem = "constrain_test"
 
 // loadReference decodes the vendored reference WebTemplate JSON.
