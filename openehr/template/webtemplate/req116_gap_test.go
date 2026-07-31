@@ -1,15 +1,15 @@
 package webtemplate_test
 
-// REQ-116 (Phase 0) / PROBE-075 — pins the two failure modes of the open
-// sibling-naming gap against the vendored oracles, so the documented blocked
-// state is guarded rather than observed. Every assertion here is expected to
-// change when REQ-116 lands: corona must then build, GECCO must then emit the
-// predicates its golden carries, and both fixtures join the PROBE-075 parity
-// matrix (plan Phase 4 task 4).
+// REQ-116 / PROBE-075 — the two vendored oracles for the sibling-naming
+// gap. Phase 0 vendored them and pinned the two failure modes (corona loud:
+// ErrIDCollision; GECCO silent: unpredicated aqlPaths and spurious name
+// leaves). Phases 3–4 closed both, and both fixtures have joined the
+// PROBE-075 parity matrix, so these tests now guard the *mechanism* —
+// distinct name-derived sibling ids, an exact predicate set, no `…/name`
+// data leaves — while TestStructuralParity guards the trees whole.
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -86,39 +86,85 @@ func TestReferenceOracleGoldensLoad(t *testing.T) {
 	}
 }
 
-// Corona_Anamnese fails loudly: four SECTION.adhoc.v1 siblings reuse one
-// archetype, and one level down eight OBSERVATION.symptom_sign_screening.v0
-// siblings under the Symptome section do the same. Each derives the same web
-// id from the shared archetype concept term, so Build refuses to emit
-// ambiguous duplicates. The collision reported first is the OBSERVATION one.
-func TestBuild_CoronaAnamneseBlockedOnIDCollision(t *testing.T) {
-	const collidingID = "screening-fragebogen_zur_symptomen_anzeichen"
-
+// Corona_Anamnese used to fail loudly: four SECTION.adhoc.v1 siblings reuse
+// one archetype, and one level down eight
+// OBSERVATION.symptom_sign_screening.v0 siblings under the Symptome section
+// do the same. Each derived the same web id from the shared archetype
+// concept term, so Build refused to emit ambiguous duplicates
+// (ErrIDCollision on "screening-fragebogen_zur_symptomen_anzeichen").
+//
+// REQ-116 Phase 4 resolves it at the source: the id now comes from the
+// template-level node name, which is distinct per sibling by construction.
+// This asserts the *mechanism*, not just that Build stopped erroring —
+// whole-tree parity is TestStructuralParity/Corona_Anamnese.
+func TestBuild_CoronaAnamneseSiblingsGetDistinctIDs(t *testing.T) {
 	c := compileFixture(t, fixtures.WebTemplateOpt("Corona_Anamnese"))
-	_, err := webtemplate.Build(c)
-	if !errors.Is(err, webtemplate.ErrIDCollision) {
-		t.Fatalf("Build(Corona_Anamnese) err = %v, want ErrIDCollision (REQ-116 open gap)", err)
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build(Corona_Anamnese) err = %v, want nil — REQ-116 Phase 4 removes the id collision", err)
 	}
-	// Pin *which* id collides, not just that something did: a collision that
-	// moved to another subtree would mean the fixture or the id derivation
-	// changed under us, and the documented mechanism no longer describes it.
-	if !strings.Contains(err.Error(), collidingID) {
-		t.Errorf("collision error = %q, want it to name %q (see deviations.md § Sibling `id` disambiguation)", err, collidingID)
+
+	// The four reused SECTIONs: distinct ids, each sanitised from its pinned
+	// name rather than from the archetype concept term they all share.
+	want := map[string]bool{
+		"symptome": false, "kontakt": false, "risikogebiet": false, "allgemeine_angaben": false,
+	}
+	var sections int
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType != "SECTION" || !strings.Contains(n.AQLPath, "SECTION.adhoc.v1") {
+			return
+		}
+		sections++
+		if _, ok := want[n.ID]; !ok {
+			t.Errorf("SECTION id %q not derived from a pinned name; path %s", n.ID, n.AQLPath)
+			return
+		}
+		if want[n.ID] {
+			t.Errorf("SECTION id %q emitted twice — the collision is back", n.ID)
+		}
+		want[n.ID] = true
+	})
+	if sections != 4 {
+		t.Errorf("found %d SECTION.adhoc.v1 nodes, want 4", sections)
+	}
+	for id, seen := range want {
+		if !seen {
+			t.Errorf("no SECTION emitted with id %q", id)
+		}
+	}
+
+	// The id that used to collide — the eight screening OBSERVATIONs reusing
+	// one archetype under Symptome — now yields eight distinct ids.
+	seen := map[string]bool{}
+	var screening int
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType != "OBSERVATION" ||
+			!strings.Contains(n.AQLPath, "SECTION.adhoc.v1,'Symptome']") ||
+			!strings.Contains(n.AQLPath, "OBSERVATION.symptom_sign_screening.v0") {
+			return
+		}
+		screening++
+		if seen[n.ID] {
+			t.Errorf("screening OBSERVATION id %q emitted twice — the collision is back", n.ID)
+		}
+		seen[n.ID] = true
+	})
+	if screening != 8 {
+		t.Errorf("found %d reused screening OBSERVATIONs under Symptome, want 8", screening)
 	}
 }
 
-// GECCO_Diagnose is the silent-divergence oracle: it builds without error,
-// so nothing surfaces when its aqlPaths disagree with the reference.
+// GECCO_Diagnose was the silent-divergence oracle: it built without error,
+// so nothing surfaced when its aqlPaths disagreed with the reference — its
+// golden name-predicates 24 paths this builder emitted bare, and this
+// builder emitted four `…/name` data leaves the golden does not have.
 //
-// Since REQ-116 Phase 3 the predicates themselves agree — every one of the
-// golden's 24 name-predicated paths is now produced exactly. What remains
-// is the second manifestation: this builder still exports the pinned name
-// as a data leaf, so it emits four extra `…/name` DV_TEXT nodes the golden
-// does not have (they inherit their named parent's predicate, which is why
-// they show up here as extra predicated paths). That is plan Phase 4
-// task 2; extending PROBE-075 to this fixture (Phase 4 task 4) is what
-// finally makes any residual difference a visible failure.
-func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
+// Both are closed (Phase 3 and Phase 4 task 2 respectively), and
+// TestStructuralParity now covers this fixture whole-tree, so silence is no
+// longer possible. What stays here is the mechanism detail parity does not
+// spell out: the predicate set matches the golden exactly, and neither side
+// carries a `…/name` node.
+func TestBuild_GeccoDiagnoseMatchesGoldenPredicates(t *testing.T) {
 	const templateID = "GECCO_Diagnose"
 
 	c := compileFixture(t, fixtures.WebTemplateOpt(templateID))
@@ -158,18 +204,17 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 			t.Errorf("golden predicated path not produced: %s", p)
 		}
 	}
-	// The only surplus may be the spurious `…/name` leaves below: they
-	// inherit their named parent's predicate. Anything else means this
-	// builder invented a predicate the reference does not have.
+	// No surplus either: inventing a predicate the reference does not have
+	// would break every consumer that addresses by path.
 	for p := range ourPaths {
-		if !refPaths[p] && !strings.HasSuffix(p, "/name") {
-			t.Errorf("predicated path not in golden and not a `…/name` leaf: %s", p)
+		if !refPaths[p] {
+			t.Errorf("predicated path not in golden: %s", p)
 		}
 	}
 
-	// The second, easily-missed manifestation: this builder exports the pinned
-	// name as a data leaf. The golden carries the name on the node itself and
-	// has no `…/name` child anywhere.
+	// The second manifestation, now closed: this builder used to export the
+	// pinned name as a data leaf. The reference carries the name on the node
+	// itself (its id and its predicate) and has no `…/name` child anywhere.
 	refNameLeaves := 0
 	walkRefTree(tree, func(m map[string]any) {
 		if strings.HasSuffix(refStr(m, "aqlPath"), "/name") {
@@ -179,7 +224,7 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 	if refNameLeaves != 0 {
 		t.Errorf("golden has %d `…/name` leaves, want 0", refNameLeaves)
 	}
-	if ourNameLeaves != 4 {
-		t.Errorf("built tree has %d `…/name` leaves, want 4 spurious (see plan Phase 4 task 2)", ourNameLeaves)
+	if ourNameLeaves != 0 {
+		t.Errorf("built tree has %d `…/name` leaves, want 0 — the pinned name is not data", ourNameLeaves)
 	}
 }

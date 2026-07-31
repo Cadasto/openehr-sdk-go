@@ -57,54 +57,36 @@
         "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]",
         "children": [
           {
-            "id": "cualquier_evento",
-            "name": "Cualquier evento",
-            "localizedName": "Cualquier evento",
-            "rmType": "EVENT",
-            "nodeId": "at0002",
+            "id": "text",
+            "name": "text",
+            "localizedName": "text",
+            "rmType": "DV_TEXT",
+            "nodeId": "at0004",
             "min": 0,
             "max": 1,
             "localizedNames": {
-              "en": "Cualquier evento"
+              "en": "text"
             },
             "localizedDescriptions": {
               "en": "*"
             },
-            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]",
-            "children": [
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value",
+            "inputs": [
               {
-                "id": "text",
-                "name": "text",
-                "localizedName": "text",
-                "rmType": "DV_TEXT",
-                "nodeId": "at0004",
-                "min": 0,
-                "max": 1,
-                "localizedNames": {
-                  "en": "text"
-                },
-                "localizedDescriptions": {
-                  "en": "*"
-                },
-                "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/data[at0003]/items[at0004]/value",
-                "inputs": [
-                  {
-                    "type": "TEXT"
-                  }
-                ]
-              },
+                "type": "TEXT"
+              }
+            ]
+          },
+          {
+            "id": "time",
+            "name": "Time",
+            "rmType": "DV_DATE_TIME",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/time",
+            "inputs": [
               {
-                "id": "time",
-                "name": "Time",
-                "rmType": "DV_DATE_TIME",
-                "min": 0,
-                "max": 1,
-                "aqlPath": "/content[openEHR-EHR-OBSERVATION.minimal.v1]/data[at0001]/events[at0002]/time",
-                "inputs": [
-                  {
-                    "type": "DATETIME"
-                  }
-                ]
+                "type": "DATETIME"
               }
             ]
           },

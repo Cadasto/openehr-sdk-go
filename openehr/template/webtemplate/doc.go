@@ -12,11 +12,12 @@
 // openehr/templatecompile, openehr/template/constraints, and the standard
 // library — never the transport, auth, client, or serialize layers.
 //
-// Scope limits (see deviations.md): templates whose sibling nodes sanitise
-// to the same id return ErrIDCollision. As of REQ-116 Phase 3 aqlPath does
-// carry the reference's name predicate ([archetype_id,'Name']), but id
-// derivation still takes the archetype concept term rather than the pinned
-// template-level name, so siblings reusing one archetype still collide
-// (REQ-116 Phase 4). Such templates do compile: templatecompile admits
-// shared-path subtrees.
+// Sibling disambiguation (REQ-116): a node's id comes from the
+// template-level name the OPT pins on it, falling back to the archetype
+// concept term, and aqlPath carries the matching name predicate
+// ([archetype_id,'Name']). Siblings that reuse one archetype are therefore
+// distinct by construction. Where nothing separates them — no pinned name
+// and one shared term — the second and later claimants take an ordinal
+// (dv_text, dv_text2), matching the reference; ErrIDCollision now signals a
+// builder bug rather than an unsupported template.
 package webtemplate

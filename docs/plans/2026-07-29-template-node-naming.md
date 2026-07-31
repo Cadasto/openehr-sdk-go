@@ -1,13 +1,13 @@
 # Plan — Template-level node naming and name-predicated paths
 
 **Date:** 2026-07-29
-**Status:** Partial — Phases 0–3 landed (oracles vendored + pinned; node name parsed, exposed, carried through compile; name predicates emitted on both path builders); Phase 4–5 open
+**Status:** Partial — Phases 0–4 landed (oracles vendored + pinned; node name parsed, exposed, carried through compile; name predicates emitted on both path builders; name-derived WebTemplate `id`, both oracles at exact structural parity); Phase 5 (close-out) open
 **Owner:** SDK maintainers
 **Covers:** **[REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths)** (template-level node naming and name-predicated paths) — canonical prose landed, registry row `partial`
 **Amends:** [REQ-100](../specifications/clinical-modeling.md#req-100--adl-14-operational-template-opt-parse-and-paths) (parse surface), [REQ-111](../specifications/clinical-modeling.md#req-111--public-compiled-template-bridge) (compiled carry), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (`id` source — prose already amended to defer to REQ-116)
 **Must not regress:** [REQ-102](../specifications/clinical-modeling.md#req-102--composition-validation), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-053](../specifications/wire.md#req-053) — all consume compiled path shape
 **Probes:** [PROBE-075](../specifications/conformance.md#probe-075--webtemplate-structural-parity) (extended to new fixtures), [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (unblocked by this plan)
-**Implementation:** partial — Phases 0–3 landed; Phases 4–5 open
+**Implementation:** partial — Phases 0–4 landed; Phase 5 (close-out) open
 **Depends on:** the shared-path-subtree compile fix and the vendored FLAT corpus (PR #79, landed)
 **Defers:** Better-platform dialect naming; multi-language name selection beyond the document default language; retro-fitting name predicates onto AQL *builder* output (REQ-055) — this plan changes compiled-template paths only
 
@@ -19,9 +19,11 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **Evidence base** (established 2026-07-29, recorded in [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation): there is **no** numeric-suffix rule — verified across the upstream `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` WebTemplate goldens. The reference disambiguates by name alone and name-predicates `aqlPath` **350×** in the corona golden versus **0×** in `constrain_test`.
 
+**Correction (Phase 4).** A numeric suffix *does* exist — as EHRbase's **last resort**, not its disambiguator. The claim above holds for every name-disambiguated golden, which is why no suffix appears there: each sibling pins a distinct name, so the fallback is never reached. Where no name separates siblings it is: the vendored upstream FLAT corpus keys `conformance-ehrbase.de.v0`'s two ACTION ELEMENTs — both sanitising to `dv_text`, neither pinning a name — as `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`. Phase 4 implements the ordinal for exactly that case, which is what lets the FLAT-conformance OPT build.
+
 **Correction (2026-07-30).** The predicate trigger is the **pinned name alone**, not sibling collision. Measured across the vendored goldens: every name in a golden predicate is a fixed `C_STRING` in its OPT (1:1 for both oracles), `constrain_test` pins none and carries 0 predicates over 104 nodes — *that* is why PROBE-075 holds 104/104 — and `GECCO_Diagnose` predicates all three `/content` children whose archetype ids are **distinct**, plus a sole `CLUSTER` child. A collision-conditioned rule emits too few predicates and would fail GECCO parity. **Blast radius is therefore wider than "the reuse templates":** counted across all 58 vendored OPTs, **9** pin at least one node name — the 2 oracles (`Corona_Anamnese` 24, `GECCO_Diagnose` 6, each exactly matching its golden's distinct predicate-name count) plus **7** others: `test_template_rename_node{,_2}` (8 each), `clinical_content_validation` (4), `IDCR -  Adverse Reaction List.v1` (4), `IDCR - Laboratory Test Report.v0`, `Test_dv_text_list_constraint.v0`, `Test_dv_text_open_constraint.v0` (1 each). Their compiled paths change too — Phase 3's regression guard must be scoped by *pins-a-name*, not by *has-reused-siblings*.
 
-**Measured residual** (built `GECCO_Diagnose` vs its golden on the PROBE-075 surface, predicates normalised away): path set matches **exactly** (`missing=0`), so predicate emission closes the whole path gap. What remains is 4 extra `…/name` `DV_TEXT` leaves (the pinned name exported as *data* by `build.go`), 14 `min`/`max` deltas where the **GECCO golden is the outlier** (`1/1` vs `0/1`; `constrain_test` and Corona both agree with this builder, and GECCO's OPT constrains no `existence`), and 1 input-count delta. The min/max set needs a documented deviation in Phase 4, not a builder change.
+**Measured residual** (2026-07-29 forecast, all resolved or documented by Phase 4): the GECCO path set already matched exactly (`missing=0`) once predicates were normalised away, so predicate emission closed the whole path gap. The 4 extra `…/name` `DV_TEXT` leaves are gone (Phase 4 task 2). The 14 `min`/`max` deltas — where the **GECCO golden is the outlier** (`1/1` vs `0/1`; `constrain_test` and Corona both agree with this builder, and GECCO's OPT constrains no `existence`) — are a documented fixture deviation with the count pinned, as forecast. The 1 input-count delta is real and now pinned alongside Corona's 20, as a pre-REQ-116 DV_TEXT value-list gap.
 
 ## Definition of Ready
 
@@ -81,16 +83,20 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 **DoD:** met — corona's four sibling SECTIONs each resolve at a distinct path; GECCO's 24 predicated golden paths all resolve (`missing=0`); templates pinning no name byte-identical; full suite and `make ci` green.
 
-### Phase 4 — Name-derived WebTemplate `id` (REQ-106)
+### Phase 4 — Name-derived WebTemplate `id` (REQ-106) — **done**
 
 **Tasks:**
 
-1. `idOf` prefers the template-level name, falling back to today's term text, then attribute name, then RM type.
-2. Stop exporting the pinned `name` attribute as a data leaf — the reference carries the name on the node, not as a child. Measured on GECCO: 4 spurious `…/name` `DV_TEXT` nodes today (`build.go` walks the constrained `name` attribute).
-3. Diff generated `id` + `aqlPath` sets against the corona **and** GECCO goldens; fold genuine, justified differences into `deviations.md` and delete the sibling-collision deviation once it no longer applies. Expect to document the GECCO golden's `min=1` RM-attribute-leaf outlier (14 nodes) as a fixture deviation — this builder agrees with `constrain_test` and Corona, and GECCO's OPT constrains no `existence`.
-4. Extend PROBE-075 parity to `Corona_Anamnese` and `GECCO_Diagnose` (the vendored oracles — `multi_occurrence` was dropped in Phase 0); keep `constrain_test` at 104/104.
+1. ~~`idOf` prefers the pinned name~~ — **done**: name → concept term → attribute name → RM type. This alone cleared `ErrIDCollision` on `Corona_Anamnese`.
+2. ~~Stop exporting the pinned name as a data leaf~~ — **done**: `emitAll` skips the LOCATABLE `name` attribute; removed 4 surplus nodes on GECCO and 21 on Corona, and neither golden has a `…/name` node anywhere.
+3. ~~Diff both goldens; fold justified differences into `deviations.md`~~ — **done**. The sibling-collision deviation is marked RESOLVED and the Scope entry rewritten. The diff turned up three things beyond the predicted ones, all measured and all now documented:
+   - **Single-occurrence `EVENT` containers are lifted, not emitted.** 14 corona extras were EVENT nodes the reference does not carry. Both halves of the discriminator are needed: corona drops 14 (all `max=1`) and keeps 2 (`max=-1`); `constrain_test` keeps 3 EVENT at `max=-1` **and** an INTERVAL_EVENT at `max=1`; the upstream FLAT corpus keys repeating `any_event` in 424 places, still emitted.
+   - **Three in-context RM-attribute sets were missing** — INSTRUCTION (`narrative`, `expiry_time`), ACTIVITY (`timing`, `action_archetype_id`), INTERVAL_EVENT (`math_function`, `width`) — the last 6 corona `missing`. Shapes copied from the golden, including the reference's lower-case `expiry_time` name.
+   - **An ordinal fallback exists after all** (`dv_text`, `dv_text2`), correcting this plan's "no numeric-suffix rule" evidence note: the suffix is EHRbase's *last resort* where no pinned name separates siblings, which is why it appears in none of the name-disambiguated goldens. Evidence is the upstream FLAT corpus keying `conformance-ehrbase.de.v0`'s two ACTION ELEMENTs as `…/dv_text` and `…/dv_text2`. Implementing it is what makes that template build — the DoD bar for the fixture vendored without a WebTemplate golden. Safe by construction: only templates that previously failed to build can gain a suffix.
+   The predicted GECCO `min=1` outlier (14 nodes) is documented as a fixture deviation with the count pinned, not a builder change.
+4. ~~Extend PROBE-075 parity to both oracles~~ — **done**: `TestStructuralParity` and `TestInputParity` are table-driven over `constrain_test`, `Corona_Anamnese`, `GECCO_Diagnose`. Extending *input* parity surfaced a pre-REQ-116 gap unrelated to naming — the reference enumerates a constrained DV_TEXT's allowed values where this builder emits the bare input (Corona 20, GECCO 1, the one this plan predicted). Pinned per fixture by count so it must shrink deliberately.
 
-**DoD:** `webtemplate.Build` succeeds for both blocked templates; parity asserted against both goldens.
+**DoD:** met — `Build` succeeds for `Corona_Anamnese`, `GECCO_Diagnose` **and** `conformance-ehrbase.de.v0`; structural parity is exact on all three vendored goldens (104/104, 230/230, 34/34) with every residual documented and count-pinned.
 
 ### Phase 5 — Close out
 

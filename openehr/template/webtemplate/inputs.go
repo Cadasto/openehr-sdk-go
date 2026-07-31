@@ -107,6 +107,25 @@ func durationInputs(v *templatecompile.CompiledNode) []Input {
 	return out
 }
 
+// unconstrainedDurationInputs emits the duration fields for an in-context
+// DV_DURATION leaf — one the template never constrains, so there is no
+// C_DURATION pattern to narrow the set. The reference emits all seven
+// fields, each carrying a ">= 0" range (a duration component cannot be
+// negative); measured on INTERVAL_EVENT.width in the corona golden.
+func unconstrainedDurationInputs() []Input {
+	fields := durationFields("")
+	out := make([]Input, 0, len(fields))
+	for _, f := range fields {
+		zero := 0.0
+		out = append(out, Input{
+			Suffix:     f,
+			Type:       "INTEGER",
+			Validation: &Validation{Range: &Range{Min: &zero, MinOp: ">="}},
+		})
+	}
+	return out
+}
+
 // durationFields returns the allowed duration component names in order. An
 // ISO-8601-style pattern (e.g. "PYMWD", "PYMDTHMS") maps each letter to a
 // field; "M" is month before the "T" separator and minute after it. An empty

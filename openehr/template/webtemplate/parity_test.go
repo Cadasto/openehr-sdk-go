@@ -30,13 +30,20 @@ const referenceStem = "constrain_test"
 // loadReference decodes the vendored reference WebTemplate JSON.
 func loadReference(t *testing.T) map[string]any {
 	t.Helper()
-	b, err := os.ReadFile(filepath.Join(referenceDir, referenceStem+".webtemplate.json"))
+	return loadReferenceStem(t, referenceStem)
+}
+
+// loadReferenceStem decodes the vendored reference WebTemplate JSON for one
+// fixture stem (see parityFixtures).
+func loadReferenceStem(t *testing.T, stem string) map[string]any {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(referenceDir, stem+".webtemplate.json"))
 	if err != nil {
-		t.Fatalf("vendored reference fixture unreadable (PROBE-075): %v", err)
+		t.Fatalf("vendored reference fixture %s unreadable (PROBE-075): %v", stem, err)
 	}
 	var m map[string]any
 	if err := json.Unmarshal(b, &m); err != nil {
-		t.Fatalf("reference is not valid JSON: %v", err)
+		t.Fatalf("reference %s is not valid JSON: %v", stem, err)
 	}
 	return m
 }
