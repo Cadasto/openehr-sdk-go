@@ -135,10 +135,16 @@ with `WithTemplate` decode repopulating the **pinned** name (`flat_pinned_test.g
 does **not** round-trip yet is *reused siblings*: several pinned siblings sharing one bare
 path (corona's four `SECTION.adhoc.v1`).
 
-- **Encode** — the bare relPath matches all of the sibling instances at once and fails
-  loudly on the rmpath ambiguity rather than aliasing one sibling's data as another's.
-  Disambiguating needs the runtime `name/value` carried into resolution — exactly what
-  the stripped predicate expressed — restricted to genuinely ambiguous nodes.
+- **Encode** — the bare relPath answers to *every* reused sibling: with several
+  instances present a `Max==1` node fails on the rmpath ambiguity, but with **one**
+  instance present (the common partially-filled composition) each sibling's Web Template
+  node would resolve that same instance and emit its data under **every** sibling's FLAT
+  id — silent misattribution, no error. Encode therefore **refuses** whenever data
+  resolves at a reused sibling (`refuseReusedSibling`, wrapping
+  `rmpath.ErrPathAmbiguous`; pinned in `flat_pinned_test.go`, which also pins that a
+  composition with no data in the reused region still encodes). Disambiguating needs
+  the runtime `name/value` carried into resolution — exactly what the stripped
+  predicate expressed — restricted to genuinely ambiguous nodes.
 - **Decode** — sibling FLAT ids map to one bare path, so their instances would collapse
   onto one list slot (both default to index 0), landing different siblings' leaves in
   **one** RM instance. Decode therefore **refuses** any key that walks through a reused

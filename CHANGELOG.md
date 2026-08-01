@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Template-level node naming and name-predicated paths (REQ-116).** Compiled and WebTemplate paths now carry the reference's `[archetype_id,'Name']` predicate and the WebTemplate `id` derives from the pinned name, so archetype-reuse templates export at last — **paths through name-pinning nodes change shape**. Reference-parity work in the same change also reshapes output for templates that pin **no** name: a single-occurrence abstract `EVENT` no longer emits a WebTemplate node, so **FLAT keys through such an event lose that segment** (`…/cualquier_evento/text` → `…/text`), and siblings whose ids still collide take the reference's next-free ordinal (`dv_text`, `dv_text2`) instead of failing with `ErrIDCollision`.
+- **Template-level node naming and name-predicated paths (REQ-116, PROBE-075).** Paths gain `[archetype_id,'Name']` predicates, WebTemplate `id`s derive from pinned names, and single-occurrence abstract EVENTs are lifted — **compiled-path and FLAT-key shapes change** (details: `webtemplate/deviations.md`).
 
 - **WebTemplate JSON export (REQ-106, ADR 0014).** New building block `openehr/template/webtemplate` projects a compiled OPT into EHRbase `openEHR_SDK` v2.3 WebTemplate JSON, pinned by structural parity (PROBE-075) against a vendored reference fixture.
 

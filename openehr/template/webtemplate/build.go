@@ -2,6 +2,7 @@ package webtemplate
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -151,6 +152,14 @@ func cloneInputs(in []Input) []Input {
 	out := slices.Clone(in)
 	for i := range out {
 		out[i].List = slices.Clone(out[i].List)
+		for j := range out[i].List {
+			it := &out[i].List[j]
+			if it.Ordinal != nil {
+				o := *it.Ordinal
+				it.Ordinal = &o
+			}
+			it.LocalizedLabels = maps.Clone(it.LocalizedLabels)
+		}
 		if v := out[i].Validation; v != nil {
 			nv := *v
 			nv.Range = cloneRange(v.Range)

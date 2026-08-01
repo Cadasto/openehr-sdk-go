@@ -724,6 +724,10 @@ requirements:
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/independence_test.go
+      # REQ-116 landed the id disambiguation this REQ mandates; these pin
+      # the next-free ordinal fallback and the per-oracle build outcomes.
+      - openehr/template/webtemplate/dedupe_test.go
+      - openehr/template/webtemplate/req116_gap_test.go
     plans:
       - docs/plans/archive/2026-05-22-webtemplate-export.md
 

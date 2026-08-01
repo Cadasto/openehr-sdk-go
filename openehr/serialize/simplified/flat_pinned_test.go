@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
@@ -148,5 +149,81 @@ func TestUnmarshalFlatReusedSiblingsRefused(t *testing.T) {
 		t.Fatal("UnmarshalFlat through a reused sibling succeeded — decode would silently merge siblings")
 	} else if !errors.Is(err, ErrUnknownPath) || !strings.Contains(err.Error(), "reused siblings") {
 		t.Fatalf("err = %v, want the reused-siblings ErrUnknownPath refusal", err)
+	}
+}
+
+// twoSiblingWT is a minimal WebTemplate with two reused siblings — one
+// archetype id, distinct pinned names 'A'/'B' — each wrapping one DV_TEXT
+// leaf. The smallest tree on which encode's reused-sibling hazard shows.
+func twoSiblingWT() *webtemplate.WebTemplate {
+	leaf := func(pin string) *webtemplate.Node {
+		return &webtemplate.Node{
+			ID: "x", RMType: "DV_TEXT", NodeID: "at0002", Max: 1,
+			AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1,'" + pin + "']/data[at0001]/items[at0002]/value",
+			Inputs:  []webtemplate.Input{{Type: "TEXT"}},
+		}
+	}
+	eval := func(id, pin string) *webtemplate.Node {
+		return &webtemplate.Node{
+			ID: id, RMType: "EVALUATION", NodeID: "openEHR-EHR-EVALUATION.test.v1", Max: 1,
+			AQLPath:  "/content[openEHR-EHR-EVALUATION.test.v1,'" + pin + "']",
+			Children: []*webtemplate.Node{leaf(pin)},
+		}
+	}
+	return &webtemplate.WebTemplate{
+		Tree: &webtemplate.Node{
+			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+			Children: []*webtemplate.Node{eval("a", "A"), eval("b", "B")},
+		},
+	}
+}
+
+// Encode-side counterpart of the decode refusal above. Resolution strips the
+// name predicate — the only thing distinguishing reused siblings — so a
+// composition holding ONE instance would resolve it for BOTH sibling ids and
+// emit the same data under `root/a/x` and `root/b/x` with no error: one
+// sibling's data silently aliased as the other's (reproduced before the
+// guard). MarshalFlat must refuse instead. A composition that never touches
+// the reused region still encodes — the guard fires only when data resolves
+// at an ambiguous node.
+func TestMarshalFlatReusedSiblingsRefused(t *testing.T) {
+	wt := twoSiblingWT()
+	comp := &rm.Composition{
+		Name:      rm.DVText{Value: "A"},
+		Language:  rm.CodePhrase{CodeString: "en"},
+		Territory: rm.CodePhrase{CodeString: "NL"},
+		Content: []rm.ContentItem{
+			&rm.Evaluation{
+				ArchetypeNodeID: "openEHR-EHR-EVALUATION.test.v1",
+				Name:            rm.DVText{Value: "A"},
+				Data: &rm.ItemTree{
+					ArchetypeNodeID: "at0001",
+					Name:            rm.DVText{Value: "tree"},
+					Items: []rm.Item{
+						&rm.Element{
+							ArchetypeNodeID: "at0002",
+							Name:            rm.DVText{Value: "x"},
+							Value:           &rm.DVText{Value: "hello"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if _, err := MarshalFlat(comp, wt); err == nil {
+		t.Fatal("MarshalFlat through a reused sibling succeeded — one instance would be emitted under every sibling id")
+	} else if !errors.Is(err, rmpath.ErrPathAmbiguous) || !strings.Contains(err.Error(), "reused siblings") {
+		t.Fatalf("err = %v, want the reused-siblings ErrPathAmbiguous refusal", err)
+	}
+
+	// Same template, no data in the reused region: still encodable.
+	empty := &rm.Composition{
+		Name:      rm.DVText{Value: "A"},
+		Language:  rm.CodePhrase{CodeString: "en"},
+		Territory: rm.CodePhrase{CodeString: "NL"},
+	}
+	if _, err := MarshalFlat(empty, wt); err != nil {
+		t.Fatalf("MarshalFlat with no data at the reused siblings = %v, want nil (guard must fire only when data resolves there)", err)
 	}
 }
