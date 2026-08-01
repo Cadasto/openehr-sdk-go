@@ -707,11 +707,10 @@ requirements:
     # fixture (104/104 node + input-suffix/type parity; documented deviations
     # in the package's deviations.md). Direct-slice: the shared
     # simplified-template model (umbrella Phase 1 / REQ-053) is deferred until
-    # a second consumer exists. Archetype-reuse-under-slot templates now
-    # COMPILE (templatecompile admits shared-path subtrees) but still fail
-    # export with ErrIDCollision: each reused sibling derives the same web id.
-    # Unblocked by REQ-116 (template-level node name + name predicates);
-    # see ADR 0014.
+    # a second consumer exists. Archetype-reuse-under-slot templates compile
+    # (shared-path subtrees admitted) and, since REQ-116 landed (2026-07-31,
+    # template-level node name + name predicates + next-free ordinal), also
+    # export — corona_anamnese is a PROBE-075 parity oracle now; see ADR 0014.
     implementation: landed
     packages:
       - openehr/template/webtemplate
@@ -725,6 +724,10 @@ requirements:
       - openehr/template/webtemplate/parity_test.go
       - openehr/template/webtemplate/id_internal_test.go
       - openehr/template/webtemplate/independence_test.go
+      # REQ-116 landed the id disambiguation this REQ mandates; these pin
+      # the next-free ordinal fallback and the per-oracle build outcomes.
+      - openehr/template/webtemplate/dedupe_test.go
+      - openehr/template/webtemplate/req116_gap_test.go
     plans:
       - docs/plans/archive/2026-05-22-webtemplate-export.md
 
@@ -948,9 +951,9 @@ requirements:
     # ([archetype_id,'Name']) on the compiled AQL path of every node that pins
     # a name, and prefer the name for WebTemplate id derivation (REQ-106,
     # ADR 0014). Established against the upstream EHRbase goldens 2026-07-29:
-    # there is NO numeric-suffix disambiguation rule (checked across
-    # corona_anamnese / multi_occurrence / AlternativeEvents); the reference
-    # disambiguates by name alone, and name-predicates aqlPath 350x in the
+    # the reference disambiguates by name alone (no numeric suffix appears in
+    # corona_anamnese / multi_occurrence / AlternativeEvents, because each
+    # sibling pins a distinct name), and name-predicates aqlPath 350x in the
     # corona golden vs 0x in constrain_test — which is why PROBE-075 holds
     # 104/104 without any of this. CORRECTED 2026-07-30: the predicate trigger
     # is the pinned name ALONE, not sibling collision — GECCO_Diagnose
@@ -959,8 +962,11 @@ requirements:
     # both goldens is a pinned C_STRING (1:1), and constrain_test pins none,
     # which is the real reason parity holds. An earlier collision-conditioned
     # reading of this rule was wrong and would emit too few predicates.
-    # Blocks PROBE-086 (upstream FLAT parity) and any WebTemplate for a
-    # template reusing an archetype among siblings. Path shape is consumed by
+    # LANDED 2026-07-31 (Phases 0-5). Unblocks PROBE-086 (upstream FLAT
+    # parity), whose adapter is its own plan's Phase 1, and exports any
+    # WebTemplate reusing an archetype among siblings. Where no pinned name
+    # separates siblings the reference's ordinal fallback applies (dv_text,
+    # dv_text2) — evidenced by the upstream FLAT bodies themselves. Path shape is consumed by
     # REQ-102 validation, REQ-107 instance synthesis, and REQ-053
     # FLAT/STRUCTURED, so paths through un-named nodes must stay byte-identical
     # — but every vendored OPT that pins a name does change shape.
@@ -968,12 +974,19 @@ requirements:
     # PROBE-086 is deliberately NOT in `probes:` — this REQ *unblocks* it, it
     # does not cover this REQ (and the guard forbids a partial REQ citing a
     # Draft probe as coverage).
-    implementation: partial
+    implementation: landed
     packages:
       - openehr/template
       - internal/templatecompile
       - openehr/templatecompile
       - openehr/template/webtemplate
+      # Phase 3: the FLAT codec strips the name predicate at the rmpath
+      # resolution boundary and keys its name index on the bare spelling.
+      - openehr/serialize/simplified
+      # Phase 0 vendored the two oracles here and added the accessors that
+      # resolve them (paths.go carries the REQ-116 marks).
+      - testkit/fixtures
+      - testkit/cassettes/webtemplate
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
     probes: [PROBE-075]
     tests:
@@ -983,10 +996,24 @@ requirements:
       - openehr/template/webtemplate/req116_gap_test.go
       - openehr/template/node_name_test.go
       - internal/templatecompile/compile_nodename_test.go
+      # Phase 3 — the emission guard (byte-identity for templates pinning
+      # no name) and the FLAT boundary where the predicate is stripped.
+      - internal/templatecompile/pathsnapshot_test.go
+      - internal/templatecompile/namepredicate_test.go
+      - openehr/serialize/simplified/flat_nameindex_test.go
+      # Post-review hardening: decode through a pinned container (the
+      # bare-keying regression), the reused-sibling refusal, and the
+      # next-free ordinal fallback.
+      - openehr/serialize/simplified/flat_pinned_test.go
+      - openehr/template/webtemplate/dedupe_test.go
+      # Phase 4 — PROBE-075 parity extended to both oracles (node facts and
+      # inputs), with the documented residuals pinned by count.
+      - openehr/template/webtemplate/build_test.go
+      - openehr/template/webtemplate/inputs_test.go
     plans:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.
-      - docs/plans/2026-07-29-template-node-naming.md
+      - docs/plans/archive/2026-07-29-template-node-naming.md
       - docs/plans/2026-07-16-web-template-tests-conformance.md
 
   - id: REQ-120
@@ -1227,7 +1254,8 @@ requirements:
     # marks, and the FLAT-conformance plan's Phase 0 landed the vendored
     # upstream corpus (testkit/cassettes/flat-conformance/ + sync/check
     # tooling, integrity-gated by `make ci`). The PROBE-086 adapter itself
-    # is blocked on REQ-116; PROBE-086 stays out of `probes:` while Draft.
+    # is unwritten (its plan's Phase 1) — its REQ-116 blocker cleared 2026-07-31;
+    # PROBE-086 stays out of `probes:` while Draft.
     implementation: partial
     packages: [testkit/probes, testkit/cassettes/flat-conformance]
     plans:

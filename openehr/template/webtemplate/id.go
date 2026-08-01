@@ -53,12 +53,18 @@ func termText(n *templatecompile.CompiledNode, lang string) string {
 	return ""
 }
 
-// idOf resolves a node's web id: its display name if any, else the RM
+// idOf resolves a node's web id: the template-level node name the OPT pins
+// on it (REQ-116) if any, else the archetype concept term, else the RM
 // attribute name that reached it, else the RM type — all sanitised. The
 // fallback applies after sanitisation, so a punctuation-only display
 // name (which sanitises to "") still yields a usable FLAT-path segment.
+//
+// The pinned name comes first because it is what the reference uses, and
+// it is the only thing that distinguishes siblings filling one slot with
+// the same archetype: they share a concept term, so deriving from the term
+// gave every one of them the same id and hit [ErrIDCollision].
 func idOf(n *templatecompile.CompiledNode, attrName string, cfg *config) string {
-	return firstNonEmptyID(termText(n, cfg.defaultLanguage), attrName, n.RMTypeName())
+	return firstNonEmptyID(n.NodeName(), termText(n, cfg.defaultLanguage), attrName, n.RMTypeName())
 }
 
 // firstNonEmptyID returns the first candidate whose sanitised form is

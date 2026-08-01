@@ -1,14 +1,14 @@
 # Plan — Upstream FLAT serialisation conformance harness
 
 **Date:** 2026-07-16 (re-scoped 2026-07-29 — corpus pivot + blocker found, see § Re-scope)
-**Status:** Partial — Phase 0 landed (corpus, pin, tooling, PROBE-086 catalogued Draft); Phases 1–3 blocked
+**Status:** Partial — Phase 0 landed (corpus, pin, tooling, PROBE-086 catalogued Draft); Phases 1–3 **unblocked 2026-07-31** by REQ-116 (see Blocked by), not yet started
 **Owner:** SDK maintainers
 **Covers:** [REQ-080](../specifications/conformance.md#conformance-scope) (openEHR wire conformance — the simplified-format slice this plan advances)
 **Verifies:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED), [REQ-106](../specifications/clinical-modeling.md#req-106--webtemplate-json-export) (Web Template export) — exercised, not advanced
 **Partially satisfies:** [REQ-082](../specifications/conformance.md#req-082--runnability) — PROBE-086 is **in-repo/Sandbox-only** in v1; the Cassette/Live modes REQ-082 mandates are deferred (see Defers), so this is a documented partial, not full runnability.
-**Probes:** **PROBE-086** (upstream FLAT serialisation parity) — catalogued Draft/blocked
-**Implementation:** partial — Phase 0 landed; Phase 1 blocked on the name-derived web `id` gap
-**Depends on:** landed FLAT/STRUCTURED codecs (REQ-053), Web Template export (REQ-106), PROBE-075 structural parity. **Blocked by:** the sibling web-`id` derivation gap in [`deviations.md`](../../openehr/template/webtemplate/deviations.md) § Sibling `id` disambiguation — to be specified and landed separately (REQ-100/111/106).
+**Probes:** **PROBE-086** (upstream FLAT serialisation parity) — catalogued Draft; blocker cleared 2026-07-31, adapter is Phase 1
+**Implementation:** partial — Phase 0 landed; Phase 1 ready to start (its blocker cleared)
+**Depends on:** landed FLAT/STRUCTURED codecs (REQ-053), Web Template export (REQ-106), PROBE-075 structural parity. **Blocked by:** ~~the sibling web-`id` derivation gap~~ — **cleared 2026-07-31** by [REQ-116](../specifications/clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) ([its plan](archive/2026-07-29-template-node-naming.md), landed). `webtemplate.Build(conformance-ehrbase.de.v0)` now succeeds: its two ACTION ELEMENTs that both sanitise to `dv_text` take the reference's ordinal fallback (`dv_text`, `dv_text2`) — the spelling the upstream FLAT bodies use — guarded by `TestBuild_FlatConformanceOPTUsesOrdinalFallback`. Phase 1 can start.
 **Defers:** Running the upstream Java suite verbatim (the adapter asserts against vendored fixtures instead); Cassette/Live modes for PROBE-086; Better-platform dialect corpora and STRUCTURED goldens (Better `web-template` `compatibility/`), deferred per the fit-gap review's "Better not a target" recommendation and [ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)
 
 ## Goal
@@ -26,7 +26,7 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 **2. Two blockers surfaced, one fixed.** Neither was visible before the corpus existed:
 
 - **`templatecompile` rejected the corpus OPT** — `duplicate AQL path .../ism_transition/current_state/defining_code`. Cause: the ACTION constrains `ism_transition` with two `ISM_TRANSITION` alternatives, and the existing alternatives carve-out compared `pathAttr[path] == currentAttr`, which holds for the alternatives' root nodes but fails one level down (each alternative owns its own `defining_code` attribute). **Fixed** — shared-path subtrees are now admitted, scoped to the descent so each node's own path keeps the full cross-attribute collision guard. The same fix made `corona_anamnese` compile, correcting the PROBE-075 note that had attributed its failure to archetype reuse under a slot.
-- **`webtemplate.Build` still returns `ErrIDCollision`** — and this one blocks Phases 1–3. Sibling archetype roots that reuse one archetype id all derive the same web `id`, because this builder takes the id from the *archetype's* concept term while the reference takes it from the **template-level node name** (OPT `name` → fixed `C_STRING`). There is **no suffix rule** — checked across the `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` goldens, no sibling group carries a numeric suffix; `deviations.md`'s earlier guess to that effect was wrong and has been corrected. The reference also name-predicates `aqlPath` (`[…SECTION.adhoc.v1,'Symptome']` — 350 occurrences in the corona golden, 0 in `constrain_test`, which is why PROBE-075 holds 104/104 without it). Closing it spans four layers — parse + expose the OPT node name (REQ-100), carry it through the compiled tree (REQ-111), emit name predicates (consumed by REQ-102 validation and REQ-053 FLAT paths), prefer it for `id` (REQ-106) — so it is a specified feature in its own right, not a fix folded into this plan.
+- **`webtemplate.Build` still returns `ErrIDCollision`** — and this one blocked Phases 1–3 *(cleared 2026-07-31 by REQ-116; see **Blocked by** in the header)*. Sibling archetype roots that reuse one archetype id all derive the same web `id`, because this builder takes the id from the *archetype's* concept term while the reference takes it from the **template-level node name** (OPT `name` → fixed `C_STRING`). There is **no suffix rule** — checked across the `corona_anamnese`, `multi_occurrence`, and `AlternativeEvents` goldens, no sibling group carries a numeric suffix; `deviations.md`'s earlier guess to that effect was wrong and has been corrected. *(Corrected 2026-07-31: an ordinal fallback does exist as EHRbase's **last resort** where no pinned name separates siblings — which is why none of those goldens shows one. It is exactly what this corpus OPT needed; see REQ-116 Phase 4.)* The reference also name-predicates `aqlPath` (`[…SECTION.adhoc.v1,'Symptome']` — 350 occurrences in the corona golden, 0 in `constrain_test`, which is why PROBE-075 holds 104/104 without it). Closing it spans four layers — parse + expose the OPT node name (REQ-100), carry it through the compiled tree (REQ-111), emit name predicates (consumed by REQ-102 validation and REQ-053 FLAT paths), prefer it for `id` (REQ-106) — so it is a specified feature in its own right, not a fix folded into this plan.
 
 ## Definition of Ready
 
@@ -35,12 +35,12 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 - [x] Vendored-fixture-vs-JAR scoping recorded (no irreversible fork, so no ADR gate) — continues ADR 0014's vendored-reference pattern.
 - [x] **PROBE-086 defined in `conformance.md` (Draft) before any adapter code** — the "Adding probes" rule.
 - [x] Pin policy + layout recorded (`MANIFEST.txt`, `THIRD_PARTY_LICENSES.md`, `testkit/cassettes/README.md`).
-- [ ] **Blocking:** the name-derived web `id` feature is specified and landed.
+- [x] **Blocking:** the name-derived web `id` feature is specified and landed (REQ-116, 2026-07-31).
 
 ## Definition of Done
 
 - `make flat-conformance-check` fails on fixture drift. *(landed)*
-- PROBE-086 runs under `make test` / `make ci` with no Docker/Java. *(blocked)*
+- PROBE-086 runs under `make test` / `make ci` with no Docker/Java. *(unblocked; adapter is Phase 1)*
 - `traceability.yaml` maps PROBE-086 to REQ-080 and records the REQ-053/106 coverage + REQ-082 Sandbox-partial. *(pending Phase 2)*
 - REQ.md **Impl.** for REQ-080 reflects the advance; residual skips documented in `SKIPPED.md`. *(row flipped to `partial` + this plan registered on it, 2026-07-30; residual-skips doc pending Phase 3)*
 - `make spec-check` and `make ci` pass. *(green)*
@@ -52,7 +52,7 @@ The corpus that *does* supply upstream simplified output is EHRbase `openEHR_SDK
 | PROBE-086 defined in `conformance.md` (Draft) | done |
 | Fixtures vendored + PIN committed + sync/check tooling | done |
 | Blocker documented (`deviations.md`, PROBE-075 note corrected) | done |
-| Name-derived web `id` feature specified + landed | **blocked — separate REQ** |
+| Name-derived web `id` feature specified + landed | done — REQ-116 (Phases 0–5, landed 2026-07-31) |
 | Adapter + runner code | not started |
 | Tests with `// PROBE-086` comments | not started |
 | `traceability.yaml` + REQ.md row | partial — REQ-080 row `partial`, corpus + plan registered (2026-07-30); PROBE-086 mapping pending Phase 2 |

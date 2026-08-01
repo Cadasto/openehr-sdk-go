@@ -182,14 +182,52 @@ func refTree(t *testing.T, ref map[string]any) map[string]any {
 
 // Both parity tests index nodes by aqlPath; siblings sharing a path (one
 // at-code cloned under a Multiple attribute) would silently collapse into
-// one entry. constrain_test has no such duplicate. Templates that do are
-// the archetype-reuse-under-slot class: they compile (templatecompile
-// admits shared-path subtrees) but Build returns ErrIDCollision until
-// REQ-116 emits the name predicate that separates them.
+// one entry. Since REQ-116 Phase 3 the name predicate separates exactly
+// that class — the archetype-reuse-under-slot templates — so indexing by
+// path is now sound for the reuse oracles too, not just constrain_test.
+
+// parityFixtures are the vendored references PROBE-075 asserts against.
+// constrain_test pins no node name (104 nodes, zero name predicates);
+// Corona_Anamnese and GECCO_Diagnose are the REQ-116 oracles, added in
+// Phase 4 once name-derived ids and predicated paths made them buildable.
+var parityFixtures = []string{referenceStem, "Corona_Anamnese", "GECCO_Diagnose"}
+
+// deviationCounts is the exact number of documented-deviation mismatches
+// tolerated per fixture (see deviations.md). Pinning the count keeps the
+// allowance from widening into cover for a regression.
+var deviationCounts = map[string]int{
+	referenceStem:     0,
+	"Corona_Anamnese": 0,
+	"GECCO_Diagnose":  14,
+}
+
+// inContextMinDeviation reports whether a mismatch is the documented
+// GECCO-golden outlier: that golden marks in-context RM-attribute leaves
+// (language, encoding, subject, composer, territory, setting, start_time)
+// min=1 where this builder emits min=0. GECCO's OPT constrains no
+// `existence` on them, and both other vendored goldens agree with min=0 —
+// so the golden is the outlier, not the builder. Everything else about the
+// node must still match exactly.
+func inContextMinDeviation(stem string, ref, ours nodeFacts) bool {
+	if stem != "GECCO_Diagnose" || ref.nodeID != "" {
+		return false
+	}
+	if ref.min != 1 || ours.min != 0 {
+		return false
+	}
+	return ref.rmType == ours.rmType && ref.id == ours.id && ref.max == ours.max
+}
 
 func TestStructuralParity(t *testing.T) {
+	for _, stem := range parityFixtures {
+		t.Run(stem, func(t *testing.T) { assertStructuralParity(t, stem) })
+	}
+}
+
+func assertStructuralParity(t *testing.T, stem string) {
+	t.Helper()
 	refByPath := map[string]nodeFacts{}
-	walkRefTree(refTree(t, loadReference(t)), func(m map[string]any) {
+	walkRefTree(refTree(t, loadReferenceStem(t, stem)), func(m map[string]any) {
 		num := func(k string) int {
 			if v, ok := m[k].(float64); ok {
 				return int(v)
@@ -199,7 +237,7 @@ func TestStructuralParity(t *testing.T) {
 		refByPath[refStr(m, "aqlPath")] = nodeFacts{refStr(m, "rmType"), refStr(m, "nodeId"), refStr(m, "id"), num("min"), num("max")}
 	})
 
-	c := compileFixture(t, referenceDir+"/"+referenceStem+".opt")
+	c := compileFixture(t, referenceDir+"/"+stem+".opt")
 	wt, err := webtemplate.Build(c)
 	if err != nil {
 		t.Fatalf("build: %v", err)
@@ -210,15 +248,26 @@ func TestStructuralParity(t *testing.T) {
 	})
 
 	var missing, extra, mismatch []string
+	var allowed int
 	for p, rf := range refByPath {
 		of, ok := ourByPath[p]
 		if !ok {
 			missing = append(missing, p)
 			continue
 		}
-		if of != rf {
-			mismatch = append(mismatch, fmt.Sprintf("%s\n    ref:  %s\n    ours: %s", p, rf, of))
+		if of == rf {
+			continue
 		}
+		if inContextMinDeviation(stem, rf, of) {
+			allowed++
+			continue
+		}
+		mismatch = append(mismatch, fmt.Sprintf("%s\n    ref:  %s\n    ours: %s", p, rf, of))
+	}
+	// The allowance is pinned to its measured size so it cannot quietly widen
+	// into cover for a real regression.
+	if want := deviationCounts[stem]; allowed != want {
+		t.Errorf("documented deviations = %d, want %d (see deviations.md § GECCO in-context min)", allowed, want)
 	}
 	for p := range ourByPath {
 		if _, ok := refByPath[p]; !ok {

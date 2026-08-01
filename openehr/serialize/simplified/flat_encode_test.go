@@ -89,8 +89,12 @@ func TestMarshalFlatDVTextLeaf(t *testing.T) {
 		}
 	}
 	// The DV_TEXT leaf under the (single) observation/event carries its value
-	// as a bare (suffix-less) FLAT entry.
-	const key = "minimal/minimal:0/cualquier_evento/text"
+	// as a bare (suffix-less) FLAT entry. The event contributes no segment of
+	// its own: this fixture's EVENT can occur at most once, and the reference
+	// lifts such a degenerate wrapper rather than emitting a node for it
+	// (REQ-116 Phase 4, webtemplate.isCollapsedEvent) — a repeating event
+	// keeps its segment, as `any_event` does in the upstream FLAT corpus.
+	const key = "minimal/minimal:0/text"
 	v, ok := m[key]
 	if !ok {
 		t.Fatalf("missing key %q; keys=%v", key, sortedKeys(m))

@@ -42,8 +42,11 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 		return nil, err
 	}
 	root := wt.Tree
+	// Reused siblings (REQ-116) share one bare path, and resolution below
+	// keys on the bare spelling — emitNode refuses to emit through them.
+	ambiguous := ambiguousBarePaths(wt)
 	for _, ch := range root.Children {
-		if err := emitNode(out, ch, root.ID, comp, root.AQLPath); err != nil {
+		if err := emitNode(out, ch, root.ID, comp, root.AQLPath, ambiguous); err != nil {
 			return nil, err
 		}
 	}
@@ -103,7 +106,15 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 // enumerates its instances and stamps a zero-based :index; a container
 // recurses into its children; a value leaf maps its datatype to suffix keys.
 // Absent optional nodes resolve to nothing and are silently skipped.
-func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string) error {
+//
+// ambiguous holds the bare spellings claimed by several reused siblings
+// (REQ-116). Resolution strips the name predicate, so for such a node the
+// same RM instance answers to *every* sibling — with data present, one
+// sibling's values would be emitted under all sibling ids, silently
+// misattributed. emitNode refuses instead; a node in the ambiguous set that
+// resolves to nothing is still skipped like any absent optional, so
+// compositions that do not touch the reused region keep encoding.
+func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, ambiguous map[string]bool) error {
 	isContainer := len(node.Children) > 0
 	// A value leaf normally carries input descriptors, but the Web Template emits
 	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, …); any childless
@@ -113,12 +124,26 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
 	}
-	relPath := strings.TrimPrefix(node.AQLPath, resolveRootAql)
+	// Resolution against the RM instance keys on archetype_node_id, so the
+	// REQ-116 name predicate the Web Template now carries is dropped here.
+	// rmpath *does* honour a `node,'name'` predicate, which would filter
+	// instances by their runtime LOCATABLE.name — an over-constraint: the
+	// template pins the name a node is *modelled* with, while encoding must
+	// emit whatever instance sits at that node id. Leaving it in silently
+	// drops values whose stored name differs, breaking the FLAT round-trip.
+	// The prefix trim runs first: both paths are the Web Template's
+	// predicated spelling, so they only line up before stripping.
+	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
 
 	if node.Max != 1 {
 		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)
 		if err != nil {
 			return skipNotFound(err, relPath)
+		}
+		if len(vals) > 0 {
+			if err := refuseReusedSibling(node, ambiguous); err != nil {
+				return err
+			}
 		}
 		// The :index counts emitted instances, not RM list positions: an
 		// instance whose subtree contributes no FLAT keys is omitted without
@@ -128,7 +153,7 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 		idx := 0
 		for _, v := range vals {
 			sub := make(map[string]any)
-			if err := emitValue(sub, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(idx), v, isContainer, resolveRoot, resolveRootAql); err != nil {
+			if err := emitValue(sub, node, flatPrefix+"/"+node.ID+":"+strconv.Itoa(idx), v, isContainer, resolveRoot, resolveRootAql, ambiguous); err != nil {
 				return err
 			}
 			if len(sub) == 0 {
@@ -143,7 +168,27 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	if err != nil {
 		return skipNotFound(err, relPath)
 	}
-	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql)
+	if err := refuseReusedSibling(node, ambiguous); err != nil {
+		return err
+	}
+	return emitValue(out, node, flatPrefix+"/"+node.ID, v, isContainer, resolveRoot, resolveRootAql, ambiguous)
+}
+
+// refuseReusedSibling fails encoding when node is one of several reused
+// siblings (its bare path is claimed more than once) and data resolved at it:
+// the instance cannot be attributed to this sibling id versus the others, so
+// emitting would alias one sibling's data under every sibling's FLAT id. The
+// wrapped sentinel is rmpath.ErrPathAmbiguous — the ambiguity is real, it
+// just lives across template nodes rather than across RM instances.
+func refuseReusedSibling(node *webtemplate.Node, ambiguous map[string]bool) error {
+	if node.NodeID == "" {
+		return nil
+	}
+	bare := bareAQLPath(node.AQLPath)
+	if !ambiguous[bare] {
+		return nil
+	}
+	return fmt.Errorf("simplified: FLAT id %q is one of several reused siblings sharing the path %q — not yet encodable (see deviations.md): %w", node.ID, bare, rmpath.ErrPathAmbiguous)
 }
 
 // skipNotFound treats an absent optional node (ErrPathNotFound) as a no-op,
@@ -162,7 +207,7 @@ func skipNotFound(err error, relPath string) error {
 // which node was resolved; they carry through when a container is not itself
 // Locatable (e.g. EVENT_CONTEXT), so its children resolve from that ancestor by
 // their full relative paths rather than being dropped.
-func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string) error {
+func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, ambiguous map[string]bool) error {
 	if isContainer {
 		root, rootAql := ancestorRoot, ancestorAql
 		if loc, ok := v.(rm.Locatable); ok {
@@ -171,7 +216,7 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 			root, rootAql = loc, node.AQLPath
 		}
 		for _, ch := range node.Children {
-			if err := emitNode(out, ch, flatPath, root, rootAql); err != nil {
+			if err := emitNode(out, ch, flatPath, root, rootAql, ambiguous); err != nil {
 				return err
 			}
 		}

@@ -89,8 +89,8 @@ Composition JSON uses template ids **without** `::{uuid}` suffixes.
 | Template id | Role | Size (OPT + golden) |
 |---|---|---|
 | `constrain_test` | PROBE-075 parity oracle (104/104) — pins **no** node name, so its golden carries **0** name predicates | 444 KB + 139 KB |
-| `Corona_Anamnese` | REQ-116 oracle — loud mode: `Build` → `ErrIDCollision` (four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome); golden carries 350 name-predicate segments over 213 `aqlPath`s | 1.2 MB + 230 KB |
-| `GECCO_Diagnose` | REQ-116 oracle — silent mode: builds today, but its golden carries 30 name-predicate segments over 24 `aqlPath`s this builder does not emit (its three `/content` children have **distinct** archetype ids and are all predicated) | 210 KB + 73 KB |
+| `Corona_Anamnese` | REQ-116 oracle — was the loud mode (`Build` → `ErrIDCollision`: four `SECTION.adhoc.v1` siblings; eight reused screening OBSERVATIONs under Symptome); golden carries 350 name-predicate segments over 213 `aqlPath`s. Since REQ-116 Phase 4 it builds and holds **230/230** structural parity | 1.2 MB + 230 KB |
+| `GECCO_Diagnose` | REQ-116 oracle — silent mode: always built, but its golden carries 30 name-predicate segments over 24 `aqlPath`s (its three `/content` children have **distinct** archetype ids and are all predicated) it emitted bare. Since REQ-116 Phase 4: **34/34** structural parity; residuals are the golden's own `min=1` outlier (14 nodes) and 1 input delta, both documented | 210 KB + 73 KB |
 
 The Corona pair is the largest cassette in the repo — the size is the cost of guarding the archetype-reuse-under-slot class with the real reference fixture rather than a synthetic cut-down.
 

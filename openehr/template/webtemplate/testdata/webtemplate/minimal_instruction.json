@@ -93,6 +93,37 @@
                     "type": "INTEGER"
                   }
                 ]
+              },
+              {
+                "id": "timing",
+                "name": "Timing",
+                "rmType": "DV_PARSABLE",
+                "min": 0,
+                "max": 1,
+                "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/activities[at0001]/timing",
+                "inputs": [
+                  {
+                    "suffix": "value",
+                    "type": "TEXT"
+                  },
+                  {
+                    "suffix": "formalism",
+                    "type": "TEXT"
+                  }
+                ]
+              },
+              {
+                "id": "action_archetype_id",
+                "name": "Action_archetype_id",
+                "rmType": "STRING",
+                "min": 0,
+                "max": 1,
+                "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/activities[at0001]/action_archetype_id",
+                "inputs": [
+                  {
+                    "type": "TEXT"
+                  }
+                ]
               }
             ]
           },
@@ -135,6 +166,32 @@
               {
                 "suffix": "name",
                 "type": "TEXT"
+              }
+            ]
+          },
+          {
+            "id": "narrative",
+            "name": "Narrative",
+            "rmType": "DV_TEXT",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/narrative",
+            "inputs": [
+              {
+                "type": "TEXT"
+              }
+            ]
+          },
+          {
+            "id": "expiry_time",
+            "name": "expiry_time",
+            "rmType": "DV_DATE_TIME",
+            "min": 0,
+            "max": 1,
+            "aqlPath": "/content[openEHR-EHR-INSTRUCTION.minimal.v1]/expiry_time",
+            "inputs": [
+              {
+                "type": "DATETIME"
               }
             ]
           }

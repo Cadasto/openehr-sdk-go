@@ -126,6 +126,60 @@ func ListFlatConformance() ([]string, error) {
 	return names, nil
 }
 
+// optDirs are every cassette directory holding operational templates,
+// in [ListAllOPTs] scan order.
+func optDirs() []string {
+	return []string{
+		templatesDir(),
+		webtemplateDir(),
+		filepath.Join(FlatConformanceRoot(), "templates"),
+		filepath.Join(CassettesRoot(), "its_rest", "definition"),
+	}
+}
+
+// OPTRef is one vendored operational template: a stable Name (the
+// dir-qualified stem, e.g. `templates/minimal_evaluation.en.v1` or
+// `webtemplate/Corona_Anamnese`) and its absolute Path. The name is
+// dir-qualified because stems are only unique within a directory.
+type OPTRef struct {
+	Name string
+	Path string
+}
+
+// ListAllOPTs returns every operational template vendored under
+// [CassettesRoot] — across templates/, webtemplate/, the FLAT
+// conformance corpus, and the ITS-REST definition cassettes — sorted by
+// Name. Callers that must cover the whole corpus (REQ-116's compiled-path
+// regression guard) use this rather than naming templates individually,
+// so a newly vendored OPT is picked up automatically.
+func ListAllOPTs() ([]OPTRef, error) {
+	var refs []OPTRef
+	for _, dir := range optDirs() {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		label := filepath.Base(dir)
+		if label == "templates" && filepath.Base(filepath.Dir(dir)) == "flat-conformance" {
+			label = "flat-conformance"
+		}
+		for _, e := range entries {
+			if e.IsDir() || filepath.Ext(e.Name()) != ".opt" {
+				continue
+			}
+			refs = append(refs, OPTRef{
+				Name: label + "/" + strings.TrimSuffix(e.Name(), ".opt"),
+				Path: filepath.Join(dir, e.Name()),
+			})
+		}
+	}
+	slices.SortFunc(refs, func(a, b OPTRef) int { return strings.Compare(a.Name, b.Name) })
+	return refs, nil
+}
+
 // idAlias maps test shorthands to on-disk template ids when they differ.
 var idAlias = map[string]string{
 	"clinical_note": "clinical_notes.v0",

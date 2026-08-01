@@ -95,7 +95,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) | landed |
 | REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | landed |
 | REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | landed |
-| REQ-116 | Template-level node naming and name-predicated paths | [clinical-modeling.md § REQ-116](clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) | partial |
+| REQ-116 | Template-level node naming and name-predicated paths | [clinical-modeling.md § REQ-116](clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) | landed |
 | REQ-120 | RM identifier parsing and derivation | [rm-functions.md § REQ-120](rm-functions.md#req-120--rm-identifier-parsing-and-derivation) | landed |
 | REQ-121 | Locatable path read access | [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) | landed |
 | REQ-122 | Version-control derived helpers | [rm-functions.md § REQ-122](rm-functions.md#req-122--version-control-derived-helpers) | landed |

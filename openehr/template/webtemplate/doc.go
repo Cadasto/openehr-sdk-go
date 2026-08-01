@@ -9,12 +9,17 @@
 //
 // The package is a building block (REQ-013): it takes a
 // *templatecompile.Compiled in and returns bytes out, importing only
-// openehr/templatecompile, openehr/template/constraints, and the standard
-// library — never the transport, auth, client, or serialize layers.
+// openehr/templatecompile, openehr/template/constraints,
+// internal/templatecompile (the shared REQ-116 name-predicate quoting,
+// so the two path builders cannot drift), and the standard library —
+// never the transport, auth, client, or serialize layers.
 //
-// Scope limits (see deviations.md): templates whose sibling nodes sanitise
-// to the same id return ErrIDCollision, because the reference's
-// disambiguator — the template-level node name pinned in the OPT, which
-// also name-predicates aqlPath — is not emitted yet (REQ-116). Such
-// templates do compile: templatecompile admits shared-path subtrees.
+// Sibling disambiguation (REQ-116): a node's id comes from the
+// template-level name the OPT pins on it, falling back to the archetype
+// concept term, and aqlPath carries the matching name predicate
+// ([archetype_id,'Name']). Siblings that reuse one archetype are therefore
+// distinct by construction. Where nothing separates them — no pinned name
+// and one shared term — the second and later claimants take the next free
+// ordinal (dv_text, dv_text2), matching the reference; ErrIDCollision now
+// signals a builder bug rather than an unsupported template.
 package webtemplate

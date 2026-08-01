@@ -1,15 +1,15 @@
 package webtemplate_test
 
-// REQ-116 (Phase 0) / PROBE-075 — pins the two failure modes of the open
-// sibling-naming gap against the vendored oracles, so the documented blocked
-// state is guarded rather than observed. Every assertion here is expected to
-// change when REQ-116 lands: corona must then build, GECCO must then emit the
-// predicates its golden carries, and both fixtures join the PROBE-075 parity
-// matrix (plan Phase 4 task 4).
+// REQ-116 / PROBE-075 — the two vendored oracles for the sibling-naming
+// gap. Phase 0 vendored them and pinned the two failure modes (corona loud:
+// ErrIDCollision; GECCO silent: unpredicated aqlPaths and spurious name
+// leaves). Phases 3–4 closed both, and both fixtures have joined the
+// PROBE-075 parity matrix, so these tests now guard the *mechanism* —
+// distinct name-derived sibling ids, an exact predicate set, no `…/name`
+// data leaves — while TestStructuralParity guards the trees whole.
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -17,6 +17,38 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 )
+
+// REQ-116 acceptance — `conformance-ehrbase.de.v0` is vendored without a
+// WebTemplate golden (OPT + upstream FLAT bodies only), so its bar is
+// `Build` succeeding. It reaches the sibling-id problem by the third route:
+// two ELEMENTs under its ACTION both sanitise to `dv_text` (that OPT carries
+// the term text "DV_TEXT" ten times) and *neither pins a name*, so the
+// template-level name cannot separate them — only the reference's ordinal
+// fallback can. This is that fallback's in-tree guard, and the assertion
+// PROBE-086 needs before its adapter can be written.
+//
+// The expected spelling is not invented: the upstream FLAT bodies key these
+// two nodes `…/conformance_action/dv_text` and `…/conformance_action/dv_text2`.
+func TestBuild_FlatConformanceOPTUsesOrdinalFallback(t *testing.T) {
+	c := compileFixture(t, fixtures.FlatConformanceOpt())
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build(conformance-ehrbase.de.v0) err = %v, want nil — PROBE-086 needs this template to export", err)
+	}
+
+	// Under the ACTION: dv_text and dv_text2, matching the upstream keys.
+	got := map[string]bool{}
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if strings.Contains(n.AQLPath, "ACTION.conformance_action_.v0") && strings.HasPrefix(n.ID, "dv_text") {
+			got[n.ID] = true
+		}
+	})
+	for _, want := range []string{"dv_text", "dv_text2"} {
+		if !got[want] {
+			t.Errorf("no node with id %q under the ACTION; got %v — ordinal fallback not applied as upstream spells it", want, got)
+		}
+	}
+}
 
 // oracleGolden decodes a vendored REQ-116 oracle's reference WebTemplate.
 // The parity fixture has loadReference; the oracles need it by template id.
@@ -86,35 +118,85 @@ func TestReferenceOracleGoldensLoad(t *testing.T) {
 	}
 }
 
-// Corona_Anamnese fails loudly: four SECTION.adhoc.v1 siblings reuse one
-// archetype, and one level down eight OBSERVATION.symptom_sign_screening.v0
-// siblings under the Symptome section do the same. Each derives the same web
-// id from the shared archetype concept term, so Build refuses to emit
-// ambiguous duplicates. The collision reported first is the OBSERVATION one.
-func TestBuild_CoronaAnamneseBlockedOnIDCollision(t *testing.T) {
-	const collidingID = "screening-fragebogen_zur_symptomen_anzeichen"
-
+// Corona_Anamnese used to fail loudly: four SECTION.adhoc.v1 siblings reuse
+// one archetype, and one level down eight
+// OBSERVATION.symptom_sign_screening.v0 siblings under the Symptome section
+// do the same. Each derived the same web id from the shared archetype
+// concept term, so Build refused to emit ambiguous duplicates
+// (ErrIDCollision on "screening-fragebogen_zur_symptomen_anzeichen").
+//
+// REQ-116 Phase 4 resolves it at the source: the id now comes from the
+// template-level node name, which is distinct per sibling by construction.
+// This asserts the *mechanism*, not just that Build stopped erroring —
+// whole-tree parity is TestStructuralParity/Corona_Anamnese.
+func TestBuild_CoronaAnamneseSiblingsGetDistinctIDs(t *testing.T) {
 	c := compileFixture(t, fixtures.WebTemplateOpt("Corona_Anamnese"))
-	_, err := webtemplate.Build(c)
-	if !errors.Is(err, webtemplate.ErrIDCollision) {
-		t.Fatalf("Build(Corona_Anamnese) err = %v, want ErrIDCollision (REQ-116 open gap)", err)
+	wt, err := webtemplate.Build(c)
+	if err != nil {
+		t.Fatalf("Build(Corona_Anamnese) err = %v, want nil — REQ-116 Phase 4 removes the id collision", err)
 	}
-	// Pin *which* id collides, not just that something did: a collision that
-	// moved to another subtree would mean the fixture or the id derivation
-	// changed under us, and the documented mechanism no longer describes it.
-	if !strings.Contains(err.Error(), collidingID) {
-		t.Errorf("collision error = %q, want it to name %q (see deviations.md § Sibling `id` disambiguation)", err, collidingID)
+
+	// The four reused SECTIONs: distinct ids, each sanitised from its pinned
+	// name rather than from the archetype concept term they all share.
+	want := map[string]bool{
+		"symptome": false, "kontakt": false, "risikogebiet": false, "allgemeine_angaben": false,
+	}
+	var sections int
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType != "SECTION" || !strings.Contains(n.AQLPath, "SECTION.adhoc.v1") {
+			return
+		}
+		sections++
+		if _, ok := want[n.ID]; !ok {
+			t.Errorf("SECTION id %q not derived from a pinned name; path %s", n.ID, n.AQLPath)
+			return
+		}
+		if want[n.ID] {
+			t.Errorf("SECTION id %q emitted twice — the collision is back", n.ID)
+		}
+		want[n.ID] = true
+	})
+	if sections != 4 {
+		t.Errorf("found %d SECTION.adhoc.v1 nodes, want 4", sections)
+	}
+	for id, seen := range want {
+		if !seen {
+			t.Errorf("no SECTION emitted with id %q", id)
+		}
+	}
+
+	// The id that used to collide — the eight screening OBSERVATIONs reusing
+	// one archetype under Symptome — now yields eight distinct ids.
+	seen := map[string]bool{}
+	var screening int
+	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
+		if n.RMType != "OBSERVATION" ||
+			!strings.Contains(n.AQLPath, "SECTION.adhoc.v1,'Symptome']") ||
+			!strings.Contains(n.AQLPath, "OBSERVATION.symptom_sign_screening.v0") {
+			return
+		}
+		screening++
+		if seen[n.ID] {
+			t.Errorf("screening OBSERVATION id %q emitted twice — the collision is back", n.ID)
+		}
+		seen[n.ID] = true
+	})
+	if screening != 8 {
+		t.Errorf("found %d reused screening OBSERVATIONs under Symptome, want 8", screening)
 	}
 }
 
-// GECCO_Diagnose diverges silently: it builds without error, but its golden
-// name-predicates 24 of its paths (30 segments) where this builder emits none,
-// and this builder emits four extra `…/name` DV_TEXT leaves because it walks
-// the pinned name attribute as data. Neither is on the REQ-106 deviations
-// list, so both are parity failures no error surfaces — which is the whole
-// reason this fixture is vendored. Only extending PROBE-075 to it (plan
-// Phase 4 task 4) turns them into a visible failure.
-func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
+// GECCO_Diagnose was the silent-divergence oracle: it built without error,
+// so nothing surfaced when its aqlPaths disagreed with the reference — its
+// golden name-predicates 24 paths this builder emitted bare, and this
+// builder emitted four `…/name` data leaves the golden does not have.
+//
+// Both are closed (Phase 3 and Phase 4 task 2 respectively), and
+// TestStructuralParity now covers this fixture whole-tree, so silence is no
+// longer possible. What stays here is the mechanism detail parity does not
+// spell out: the predicate set matches the golden exactly, and neither side
+// carries a `…/name` node.
+func TestBuild_GeccoDiagnoseMatchesGoldenPredicates(t *testing.T) {
 	const templateID = "GECCO_Diagnose"
 
 	c := compileFixture(t, fixtures.WebTemplateOpt(templateID))
@@ -123,21 +205,16 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 		t.Fatalf("Build(%s) err = %v, want nil (collides on nothing; diverges on aqlPath only)", templateID, err)
 	}
 
-	var ourPredicated, ourNameLeaves int
+	ourPaths := make(map[string]bool)
+	var ourNameLeaves int
 	walkOurTree(wt.Tree, func(n *webtemplate.Node) {
 		if strings.Contains(n.AQLPath, ",'") {
-			ourPredicated++
+			ourPaths[n.AQLPath] = true
 		}
 		if strings.HasSuffix(n.AQLPath, "/name") {
 			ourNameLeaves++
 		}
 	})
-
-	// The gap, from this side: zero predicates emitted.
-	if ourPredicated != 0 {
-		t.Errorf("built tree has %d name-predicated paths, want 0 — REQ-116 has landed; "+
-			"extend PROBE-075 parity to this fixture and drop this assertion", ourPredicated)
-	}
 	// The gap, from the golden's side: 30 predicate segments over 24 paths.
 	tree := refTree(t, oracleGolden(t, templateID))
 	segments, paths := namePredicates(tree)
@@ -145,9 +222,31 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 		t.Errorf("golden name predicates = %d segments over %d paths, want 30 over 24", segments, paths)
 	}
 
-	// The second, easily-missed manifestation: this builder exports the pinned
-	// name as a data leaf. The golden carries the name on the node itself and
-	// has no `…/name` child anywhere.
+	// Phase 3 DoD for this oracle: every golden predicated path is
+	// produced, exactly — missing = 0. A regression in the predicate rule
+	// (wrong quoting, wrong trigger, a missed node kind) lands here first.
+	refPaths := make(map[string]bool)
+	walkRefTree(tree, func(m map[string]any) {
+		if p := refStr(m, "aqlPath"); strings.Contains(p, ",'") {
+			refPaths[p] = true
+		}
+	})
+	for p := range refPaths {
+		if !ourPaths[p] {
+			t.Errorf("golden predicated path not produced: %s", p)
+		}
+	}
+	// No surplus either: inventing a predicate the reference does not have
+	// would break every consumer that addresses by path.
+	for p := range ourPaths {
+		if !refPaths[p] {
+			t.Errorf("predicated path not in golden: %s", p)
+		}
+	}
+
+	// The second manifestation, now closed: this builder used to export the
+	// pinned name as a data leaf. The reference carries the name on the node
+	// itself (its id and its predicate) and has no `…/name` child anywhere.
 	refNameLeaves := 0
 	walkRefTree(tree, func(m map[string]any) {
 		if strings.HasSuffix(refStr(m, "aqlPath"), "/name") {
@@ -157,7 +256,7 @@ func TestBuild_GeccoDiagnoseSilentlyDivergesFromGolden(t *testing.T) {
 	if refNameLeaves != 0 {
 		t.Errorf("golden has %d `…/name` leaves, want 0", refNameLeaves)
 	}
-	if ourNameLeaves != 4 {
-		t.Errorf("built tree has %d `…/name` leaves, want 4 spurious (see plan Phase 4 task 2)", ourNameLeaves)
+	if ourNameLeaves != 0 {
+		t.Errorf("built tree has %d `…/name` leaves, want 0 — the pinned name is not data", ourNameLeaves)
 	}
 }

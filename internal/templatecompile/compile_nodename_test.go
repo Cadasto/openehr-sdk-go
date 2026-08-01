@@ -77,13 +77,16 @@ func TestCompile_NodeNameCarriedCoronaOracle(t *testing.T) {
 		}
 	}
 
-	// The shared path resolves to the first sibling — its name comes along.
-	n, err := c.NodeAt("/content[openEHR-EHR-SECTION.adhoc.v1]")
+	// Since Phase 3 the siblings no longer share a path: each resolves at
+	// its own name-predicated one, carrying the name the predicate names.
+	// (Sibling separation itself is asserted in
+	// TestCompile_CoronaSiblingsResolveDistinctly.)
+	n, err := c.NodeAt("/content[openEHR-EHR-SECTION.adhoc.v1,'Symptome']")
 	if err != nil {
 		t.Fatalf("NodeAt: %v", err)
 	}
 	if got := n.NodeName(); got != "Symptome" {
-		t.Errorf("NodeAt(shared).NodeName() = %q, want Symptome", got)
+		t.Errorf("NodeAt(predicated).NodeName() = %q, want Symptome", got)
 	}
 
 	// A node with no pinned name reports "" — the archetype concept term
