@@ -473,13 +473,16 @@ func TestRealCodecRefusal(t *testing.T) {
 	}
 	base, body := modelledQuantityLeaf(t, target)
 
-	// |precision is a DV_QUANTITY suffix the codec does not map (SKIPPED.md
-	// § Excluded families). Appending it to a leaf that otherwise decodes makes
-	// the codec produce exactly the shape refusedSuffix has to read.
-	body[base+"|precision"] = json.Number("1")
+	// |normal_range is a DV_QUANTITY attribute with no suffix mapping: it is a
+	// DV_INTERVAL, so it can never reduce to a scalar suffix and rides |raw
+	// instead — which makes it a durable choice here. (|precision served until
+	// the optional-suffix set landed and made it modelled.) Appending it to a
+	// leaf that otherwise decodes makes the codec produce exactly the shape
+	// refusedSuffix has to read.
+	body[base+"|normal_range"] = json.Number("1")
 	_, err = decodeSubset(target, body)
 	if err == nil {
-		t.Fatalf("%q|precision decoded — the codec now models this suffix, so this test "+
+		t.Fatalf("%q|normal_range decoded — the codec now models this suffix, so this test "+
 			"needs a different unmodelled one (and SKIPPED.md needs regenerating)", base)
 	}
 	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
@@ -488,9 +491,9 @@ func TestRealCodecRefusal(t *testing.T) {
 	if got := offendingKey(err); got != base {
 		t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, base, err)
 	}
-	if got, ok := refusedSuffix(err); !ok || got != "|precision" {
+	if got, ok := refusedSuffix(err); !ok || got != "|normal_range" {
 		t.Errorf("refusedSuffix(real refusal) = %q, %v; want %q, true\nrefusal: %v",
-			got, ok, "|precision", err)
+			got, ok, "|normal_range", err)
 	}
 	if got, want := reasonOf(err, base), "unsupported |suffix for DV_QUANTITY"; got != want {
 		t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)

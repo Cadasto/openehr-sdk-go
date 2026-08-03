@@ -1304,8 +1304,8 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 328 of the corpus's 1824 keys are in the modelled
-    # subset today (18.0%) — 1178 refused by the REQ-053 codec, 318 held out as
+    # Scope, stated plainly: 356 of the corpus's 1824 keys are in the modelled
+    # subset today (19.5%) — 1150 refused by the REQ-053 codec, 318 held out as
     # composition metadata. That hold-out is respellings (language, territory,
     # composer, context/start_time, which REQ-053 reads and writes as the ctx/
     # short forms) plus ONE waiver: context/setting decodes and then re-encodes
@@ -1319,9 +1319,12 @@ requirements:
     # round-tripping byte-for-byte and are now compared — that is the whole of
     # the 90 → 192 move; no codec gap closed to earn it.
     #
-    # 192 → 328 (2026-08-03) is the opposite: a real codec gap closing. The
+    # 192 → 356 (2026-08-03) is the opposite: real codec gaps closing. The
     # CODE_PHRASE leaf mapping (ENTRY language/encoding, 136 keys over 68
-    # refusals) removed that family from the census entirely. See
+    # refusals) removed that family from the census entirely, then the optional
+    # DV_ORDERED/QUANTIFIED/AMOUNT suffixes added 28 more and removed every
+    # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
+    # an optional attribute). See
     # docs/plans/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
     # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #

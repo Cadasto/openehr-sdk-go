@@ -910,7 +910,11 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"_type": rmType, attr: v}, nil
+		dv := map[string]any{"_type": rmType, attr: v}
+		if err := applyOrderedSuffixes(dv, sfx); err != nil {
+			return nil, err
+		}
+		return dv, nil
 	}
 	switch rmType {
 	case "DV_QUANTITY":
@@ -922,7 +926,11 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"_type": "DV_QUANTITY", "magnitude": mag, "units": unit}, nil
+		dv := map[string]any{"_type": "DV_QUANTITY", "magnitude": mag, "units": unit}
+		if err := applyOrderedSuffixes(dv, sfx); err != nil {
+			return nil, err
+		}
+		return dv, nil
 	case "DV_CODED_TEXT":
 		// |other is the open-value-set free-text fallback: the leaf is persisted
 		// as a DV_TEXT, not a DV_CODED_TEXT (spec §Open Value-Sets and |other).
@@ -947,7 +955,11 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if t, ok := sfx["terminology"]; ok {
 			dc["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
-		return map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}, nil
+		dv := map[string]any{"_type": "DV_CODED_TEXT", "value": val, "defining_code": dc}
+		if err := applyOrderedSuffixes(dv, sfx); err != nil {
+			return nil, err
+		}
+		return dv, nil
 	case "DV_ORDINAL":
 		code, err := requireSuffix(rmType, sfx, "code")
 		if err != nil {
@@ -983,7 +995,11 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"_type": "DV_PROPORTION", "numerator": num, "denominator": den, "type": typ}, nil
+		dv := map[string]any{"_type": "DV_PROPORTION", "numerator": num, "denominator": den, "type": typ}
+		if err := applyOrderedSuffixes(dv, sfx); err != nil {
+			return nil, err
+		}
+		return dv, nil
 	case "CODE_PHRASE":
 		// A leaf CODE_PHRASE (ENTRY language / encoding), not the defining_code
 		// nested inside DV_CODED_TEXT. |code is required — a CODE_PHRASE without
@@ -1019,21 +1035,65 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 // decorated attribute like |accuracy that only rides |raw) is rejected rather
 // than silently dropped. |other and |raw are handled before this check.
 var allowedSuffixes = map[string]map[string]bool{
-	"DV_TEXT":       {"": true},
-	"DV_CODED_TEXT": {"code": true, "value": true, "terminology": true},
-	"DV_DATE_TIME":  {"": true},
-	"DV_DATE":       {"": true},
-	"DV_TIME":       {"": true},
-	"DV_DURATION":   {"": true},
+	"DV_TEXT":       {"": true, "formatting": true},
+	"DV_CODED_TEXT": {"code": true, "value": true, "terminology": true, "formatting": true},
+	"DV_DATE_TIME":  {"": true, "magnitude_status": true, "normal_status": true},
+	"DV_DATE":       {"": true, "magnitude_status": true, "normal_status": true},
+	"DV_TIME":       {"": true, "magnitude_status": true, "normal_status": true},
+	"DV_DURATION":   {"": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_URI":        {"": true},
 	"DV_EHR_URI":    {"": true},
-	"DV_QUANTITY":   {"magnitude": true, "unit": true},
-	"DV_COUNT":      {"": true},
-	"DV_BOOLEAN":    {"": true},
-	"DV_ORDINAL":    {"code": true, "value": true, "ordinal": true},
-	"DV_PROPORTION": {"numerator": true, "denominator": true, "type": true},
+	"DV_QUANTITY": {
+		"magnitude": true, "unit": true,
+		"magnitude_status": true, "normal_status": true,
+		"accuracy": true, "accuracy_is_percent": true,
+		"precision": true, "units_system": true, "units_display_name": true,
+	},
+	"DV_COUNT":   {"": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
+	"DV_BOOLEAN": {"": true},
+	"DV_ORDINAL": {"code": true, "value": true, "ordinal": true},
+	"DV_PROPORTION": {
+		"numerator": true, "denominator": true, "type": true,
+		"magnitude_status": true, "normal_status": true,
+		"accuracy": true, "accuracy_is_percent": true, "precision": true,
+	},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
 	"CODE_PHRASE":   {"code": true, "terminology": true},
+}
+
+// orderedSuffixAttr maps the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixes onto the canonical RM attribute each rebuilds, for the datatypes
+// whose allowedSuffixes admit them. The value passes through as decoded (a
+// json.Number keeps its exact lexical form), so canjson enforces the RM type; the
+// one exception is normal_status, a CODE_PHRASE rebuilt from a bare code.
+var orderedSuffixAttr = map[string]string{
+	"magnitude_status":    "magnitude_status",
+	"accuracy":            "accuracy",
+	"accuracy_is_percent": "accuracy_is_percent",
+	"precision":           "precision",
+	"units_system":        "units_system",
+	"units_display_name":  "units_display_name",
+	"formatting":          "formatting",
+}
+
+// applyOrderedSuffixes copies the optional suffixes present in sfx onto the
+// canonical object dv. An absent suffix sets nothing — the attributes are all
+// optional in the RM, so a missing one must stay absent rather than become a
+// zero value (the same contract requireSuffix enforces for mandatory ones).
+func applyOrderedSuffixes(dv, sfx map[string]any) error {
+	for suffix, attr := range orderedSuffixAttr {
+		if v, ok := sfx[suffix]; ok {
+			dv[attr] = v
+		}
+	}
+	if v, ok := sfx["normal_status"]; ok {
+		code, err := ctxString("|normal_status", v)
+		if err != nil {
+			return err
+		}
+		dv["normal_status"] = codePhraseJSON(code, normalStatusTerminology)
+	}
+	return nil
 }
 
 // checkSuffixAllowlist rejects any suffix a datatype does not map. An unmapped

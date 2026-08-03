@@ -45,7 +45,7 @@ Hence Phase 1 before Phase 2. Phase 3 is orthogonal to both — an input-surface
 | Step | Status |
 |---|---|
 | Phase 1 — CODE_PHRASE leaf mapping (encode + decode + rmpath + guard) | **done** — 192 → 328 keys, 10.5% → 18.0% |
-| Phase 2 — optional datatype suffixes | |
+| Phase 2 — optional datatype suffixes | **done** — 328 → 356 keys, 18.0% → 19.5% |
 | Phase 3 — metadata spelling (ADR 0015) | **done** — census unchanged by design; REQ-115 unblocked |
 | `SKIPPED.md` census refreshed, ratchet re-pinned | **done** (Phase 1) |
 | `deviations.md` updated | **done** (Phase 1) |
@@ -80,6 +80,16 @@ Upstream spells these `<entry>/language|code` + `|terminology` (values `en` / `I
 3. Assert the round-trip both ways for each added suffix.
 
 **Verification:** `make ci`; census coverage up by ~33 keys; PROBE-076 green.
+
+**Outcome — landed, 28 keys not 33.** 328 → 356 compared (18.0% → 19.5%). The 33 in `SKIPPED.md`'s ranking counted four keys that are not optional attributes at all, plus one double-count:
+
+- `dv_text|code` / `|terminology` / `|value` (3) — a DV_CODED_TEXT stored at a DV_TEXT leaf, i.e. **subtype substitution**, which encode deliberately routes to `|raw` so decode cannot demote it. Accepting them on decode alone would *break* the round-trip (decode builds DV_CODED_TEXT, re-encode emits `|raw` → one missing plus one extra key). Closing it needs a carve-out in the substitution rule and is now its own item in `SKIPPED.md`.
+- the bare `dv_proportion` value (1) — the **derived** magnitude (`numerator/denominator`). DV_PROPORTION has no such RM attribute, so there is nothing to decode into and emitting it would mean reproducing the reference's float formatting.
+- `|formatting` was counted once for DV_TEXT and once for DV_CODED_TEXT in the 33, but only one of those two was a separate refusal.
+
+A new census row appeared as a *consequence*, not a regression: `unsupported datatype: DV_TEXT missing required bare value` (1 key). On the `dv_coded_text_as_dv_text` leaf the now-modelled `|formatting` survives while its `|code`/`|terminology`/`|value` siblings are refused, leaving the group with no bare value to rebuild from. It clears when the substitution item does.
+
+Three existing tests needed updating, none by weakening an assertion: `TestQuantityDecoratedRaw`, `TestRawFragmentPreservesLargeInteger` and `TestDecoratedTextAtCodedLeafStampsDynamicType` all used a decoration (`magnitude_status`, `formatting`) that this phase **captures**, so they were re-pointed at one that stays uncaptured (`normal_range`, `language`). `TestDecodeRejectsIndexCollision` needed the same multi-suffix-leaf fix Phase 1 applied to the sparse-index test. And the harness's own refusal-parsing pin, `TestRealCodecRefusal`, hardcoded `|precision` as its unmodelled example — now `|normal_range`, which is a DV_INTERVAL and so can never become a scalar suffix.
 
 ### Phase 3 — the metadata spelling fork — **decided and landed**
 

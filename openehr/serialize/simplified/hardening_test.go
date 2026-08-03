@@ -7,6 +7,8 @@ package simplified_test
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 
@@ -103,17 +105,30 @@ func TestDecodeRejectsIndexCollision(t *testing.T) {
 	if err := json.Unmarshal(f1, &m); err != nil {
 		t.Fatal(err)
 	}
-	added := false
-	for k, v := range m {
+	// Duplicate a whole leaf family, and pick it deterministically. Copying one
+	// key leaves the un-indexed group holding a partial suffix set, and the
+	// resulting datatype error ("missing required |code") fires before the slot
+	// collision this test is about — masking it.
+	var base string
+	for _, k := range slices.Sorted(maps.Keys(m)) {
 		if strings.Contains(k, ":0/") {
-			m[strings.Replace(k, ":0/", "/", 1)] = v
-			added = true
+			base = k
+			if i := strings.LastIndex(k, "|"); i >= 0 {
+				base = k[:i]
+			}
 			break
 		}
 	}
-	if !added {
+	if base == "" {
 		t.Skip("no repeatable :index in fixture to duplicate")
 	}
+	dupes := map[string]any{}
+	for k, v := range m {
+		if k == base || strings.HasPrefix(k, base+"|") {
+			dupes[strings.Replace(k, ":0/", "/", 1)] = v
+		}
+	}
+	maps.Copy(m, dupes)
 	dup, _ := json.Marshal(m)
 	if _, err := simplified.UnmarshalFlat(dup, wt); !errors.Is(err, simplified.ErrUnknownPath) {
 		t.Errorf("UnmarshalFlat(index collision) err = %v, want ErrUnknownPath", err)
