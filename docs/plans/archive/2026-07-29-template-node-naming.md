@@ -40,7 +40,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 - [x] PROBE-075 parity extended to **both** oracles, node facts and inputs; `constrain_test` still 104/104 exact.
 - [x] **Predicate-free paths byte-identical to pre-change output** — asserted by `pathsnapshot_test.go`; `no-name.txt` came through the emission change unchanged.
 - [x] REQ.md `Impl.` → `landed`; `traceability.yaml` tests/packages filled; `deviations.md` sibling-`id` entry marked RESOLVED and three new findings recorded.
-- [x] `make spec-check` + `make ci` green; PROBE-086 unblocked — [its plan](../2026-07-16-web-template-tests-conformance.md) Phase 1 can start.
+- [x] `make spec-check` + `make ci` green; PROBE-086 unblocked — [its plan](2026-07-16-web-template-tests-conformance.md) Phase 1 can start.
 
 ## Phases
 
@@ -102,7 +102,7 @@ Close the gap that blocks PROBE-086 and any WebTemplate for a template that reus
 
 1. ~~Traceability + registry~~ — **done**: REQ-116 `implementation: landed` with all nine tests and five packages registered (incl. `openehr/serialize/simplified`, now REQ-116 surface); REQ.md `Impl.` → `landed`. The row's "there is NO numeric-suffix rule" note corrected in place. PROBE-086 stays out of `probes:` — this REQ unblocks it, it does not cover it, and the gate forbids citing a Draft probe as coverage.
 2. ~~CHANGELOG~~ — **done**: one `[Unreleased]` bullet calling the path-shape change out explicitly, since it is the consumer-visible break.
-3. ~~Hand back~~ — **done**: [the FLAT conformance plan](../2026-07-16-web-template-tests-conformance.md) has its blocker marked cleared, its Definition-of-Ready gate ticked, and Phases 1–3 flipped from blocked to ready. PROBE-086's catalogue status moved from "Draft — blocked" to "Draft — unblocked, adapter not yet written".
+3. ~~Hand back~~ — **done**: [the FLAT conformance plan](2026-07-16-web-template-tests-conformance.md) has its blocker marked cleared, its Definition-of-Ready gate ticked, and Phases 1–3 flipped from blocked to ready. PROBE-086's catalogue status moved from "Draft — blocked" to "Draft — unblocked, adapter not yet written".
 4. ~~Archive~~ — **done**: `git mv` into `archive/`, plans index updated, in this PR.
 
 ## Risks
