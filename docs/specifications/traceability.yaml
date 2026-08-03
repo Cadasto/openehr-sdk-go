@@ -433,8 +433,10 @@ requirements:
     # context/start_time, …) is accepted alongside the ctx/ short forms and
     # normalised onto them; ctx/ stays the only EMITTED spelling, so this is
     # additive and moves no PROBE-086 number (the probe re-encodes, so a real-path
-    # key still returns respelled). context/setting and the composer external_ref
-    # are NOT aliases and stay refused.
+    # key still returns respelled). The composer external_ref suffixes are NOT
+    # aliases and stay refused (visible in the census); context/setting is not
+    # aliased either — it decodes via its real path where the template carries
+    # the node and is dropped on encode, the harness's one documented waiver.
     implementation: landed
     adrs: [docs/adr/0015-flat-metadata-spelling.md]
     packages:
@@ -1306,10 +1308,12 @@ requirements:
     # day (REQ-121).
     #
     # Scope, stated plainly: 356 of the corpus's 1824 keys are in the modelled
-    # subset today (19.5%) — 1150 refused by the REQ-053 codec, 318 held out as
-    # composition metadata. That hold-out is respellings (language, territory,
-    # composer, context/start_time, which REQ-053 reads and writes as the ctx/
-    # short forms) plus ONE waiver: context/setting decodes and then re-encodes
+    # subset today (19.5%) — 1162 refused by the REQ-053 codec, 306 held out as
+    # composition metadata. That hold-out is suffix-aware respellings (language,
+    # territory, composer|name, composer_self, context/start_time, which REQ-053
+    # reads and writes as the ctx/ short forms; the composer external_ref
+    # suffixes are deliberately NOT held out — they are refused and visible in
+    # the census) plus ONE waiver: context/setting decodes and then re-encodes
     # to nothing, so holding it out waives a real encode-side drop. ADR 0015
     # settled the spelling without clearing that: it is an emission gap
     # (ctx/setting is not written), so it clears when that emission lands.

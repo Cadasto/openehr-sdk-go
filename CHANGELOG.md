@@ -12,10 +12,9 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **CODE_PHRASE FLAT leaves (REQ-053, REQ-121, PROBE-086).** `openehr/serialize/simplified` round-trips standalone `CODE_PHRASE` leaves (ENTRY `language` / `encoding`) as `|code` + `|terminology`, raising upstream conformance coverage from 10.5% to 18.0% of the pinned corpus — **encode emits four new keys per ENTRY**.
-- **Reference metadata spellings accepted on decode (REQ-053, ADR 0015).** FLAT decode now accepts the reference's real-path composition metadata (`<root>/language|code`, `composer|name`, `context/start_time`, …) alongside the `ctx/` short forms — which stay the only emitted spelling — so an EHRbase-authored body no longer fails over a respelling.
-- **Optional datatype suffixes in FLAT (REQ-053, PROBE-086).** `|magnitude_status`, `|normal_status`, `|accuracy`, `|accuracy_is_percent`, `|precision`, `|units_system`, `|units_display_name` and `|formatting` round-trip as suffixes, lifting upstream coverage to 19.5% — **a value carrying one of these now emits suffixes where it previously emitted `|raw`**.
-- **`|other` and context-conflict hardening (REQ-053, REQ-108).** A decorated `DV_TEXT` at an open coded leaf rides `|raw` instead of losing its decoration to a bare `|other`, decode rejects `|other` beside any other suffix, and a malformed composite context value reports a typed error rather than panicking.
+- **CODE_PHRASE FLAT leaves (REQ-053, REQ-121, PROBE-086).** `openehr/serialize/simplified` round-trips standalone `CODE_PHRASE` leaves as `|code` + `|terminology` — the larger half of the 10.5% → 19.5% PROBE-086 coverage ratchet, and **encode emits four new keys per ENTRY**.
+- **Reference metadata spellings accepted on decode (REQ-053, REQ-025, ADR 0015).** FLAT decode accepts the reference's real-path composition metadata alongside the `ctx/` short forms — still the only emitted spelling — and a malformed composite context value reports a typed error instead of panicking.
+- **Optional datatype suffixes in FLAT (REQ-053, PROBE-086).** Optional `DV_ORDERED` / `QUANTIFIED` / `AMOUNT` decorations round-trip as suffixes instead of `|raw`, and a decorated `DV_TEXT` at an open coded leaf keeps its decoration rather than flattening to a bare `|other`, now refused beside other suffixes.
 
 ## [0.17.0] - 2026-08-03
 

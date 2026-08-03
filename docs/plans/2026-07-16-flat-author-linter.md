@@ -70,6 +70,8 @@ Implementation (Phase 1+) may start once **Phase 0 has landed REQ-115**:
 
 Author the canonical contract first, so Phases 1–3 cite an existing REQ rather than inventing one.
 
+**Settled input:** the metadata spelling question this phase was blocked on is decided — [ADR 0015](../adr/0015-flat-metadata-spelling.md) (accept both spellings on decode, emit `ctx/` only), so REQ-115 states the key set in `ctx/` terms and names the reference's real paths as accepted aliases.
+
 **Tasks:**
 
 1. Author **REQ-115** in `docs/specifications/clinical-modeling.md` (via `sdd-specify`). Draft normative surface to land there (canonical home is the spec, not this plan):

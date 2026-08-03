@@ -97,9 +97,19 @@ Composition-metadata spelling was `ctx/` versus the reference's real paths. Reso
 
 **Tasks (done):** ADR 0015; REQ-053 normative prose in `wire.md` (decode MUST accept either spelling, encode MUST emit `ctx/`, a disagreeing pair MUST fail); `siphonContext` + the `metadataAliases` / `metadataAliasTerminology` tables in `flat_decode.go`; six tests in `context_test.go`; `deviations.md` + `SKIPPED.md`.
 
-**Outcome, stated against the expectation.** This **does not move the census** — coverage stays at **18.0%**, and the 318 keys stay held out. PROBE-086 decodes upstream FLAT and *re-encodes* it, so a real-path key still returns respelled as `ctx/`: one missing key plus one extra. Only emitting the reference's spelling would move the number, and ADR 0015 rejects that as a breaking output change for no interop gain. What the phase actually buys is the thing that was blocking: REQ-115 can now state its required-key set, and an EHRbase-authored body decodes instead of failing with `ErrUnknownPath`.
+**Outcome, stated against the expectation.** This **does not move the census** — coverage stays at **18.0%** (the standing figure when Phase 3 landed; Phase 2 followed and took it to the final **19.5%**), and the 318 keys stay held out. PROBE-086 decodes upstream FLAT and *re-encodes* it, so a real-path key still returns respelled as `ctx/`: one missing key plus one extra. Only emitting the reference's spelling would move the number, and ADR 0015 rejects that as a breaking output change for no interop gain. What the phase actually buys is the thing that was blocking: REQ-115 can now state its required-key set, and an EHRbase-authored body decodes instead of failing with `ErrUnknownPath`.
 
 Two of the 318 turned out **not** to be respellings and stay refused rather than aliased — `context/setting|*` (102 keys; `ctx/setting` is unsupported on decode too, so it is an unimplemented field on both surfaces, not a spelling gap) and `composer|id*` (12 keys; an `external_ref` the `ctx/` forms structurally cannot carry, and dropping it would breach REQ-053). The `context/setting` waiver therefore survives this phase — it needs `ctx/setting` **emission**, which is its own slice.
+
+> **Correction — 2026-08-03, PR #86 review round 3** (appended; the paragraphs above are left as written).
+>
+> The "stay refused" framing holds for `composer|id*` and does **not** hold for `context/setting`:
+>
+> - `composer|id` / `|id_scheme` / `|id_namespace` are genuinely refused on decode (`PARTY_PROXY`). The harness hold-out became **suffix-aware** so those 12 keys reach decode and land in the census's excluded table, visible rather than absorbed.
+> - `context/setting|*` is **not** refused. What is unimplemented on both surfaces is the `ctx/setting` **short form**; the real path decodes wherever the template's Web Template carries the `setting` node, and the value is then dropped on encode because nothing emits `ctx/setting`. Its 102 keys therefore stay **held out** — the harness's one documented waiver of a real encode-side drop, closed by emitting `ctx/setting` on encode and accepting it on decode.
+> - The "one missing key plus one extra" reading is off too: a held-out key counts as nothing on either side, and dropping one from the hold-out would read as **Missing only** — the `ctx/` key the encoder wrote in its place is itself skipped on the emitted side.
+>
+> Consequently the metadata hold-out is **306** keys, not 318, and the final census reads Meta **306** / Excluded **1162** / Compared **356** — **19.5%**, unchanged by either correction. Two further claims above are overstated: the pre-alias failure on the coded pair was `ErrUnsupportedDatatype` (`CODE_PHRASE`), not `ErrUnknownPath` — only `composer_self` raised the latter — and no corpus body decodes end-to-end at HEAD, since all 34 still refuse on `_`-prefixed RM attribute keys. See [ADR 0015](../../adr/0015-flat-metadata-spelling.md) § Decision 5 and § Consequences.
 
 ## Mapping to specs
 

@@ -2,7 +2,7 @@
 
 Closed architecture decisions for `openehr-sdk-go`. Each ADR is a numbered Markdown file with the standard headings (Status, Context, Decision, Consequences). Status reaches **Accepted** before the ADR is considered closed.
 
-Open decisions (those that would be ADRs once resolved) currently live as research strands in the **Cadasto SDK Specification proposal** (private). When a strand is resolved, an ADR lands here.
+Open decisions (those that would be ADRs once resolved) live in this repo as **research strands** — [`docs/specifications/research-strands.md`](../specifications/research-strands.md). When a strand is resolved, an ADR lands here.
 
 | # | Title | Status |
 |---|---|---|
