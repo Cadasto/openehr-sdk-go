@@ -173,7 +173,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface (REQ-024 compatibility question); the second keeps the hazard class alive but contained.
 
-**Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel); whether any consumer outside the encoder needs the distinction.
+**Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel); whether any consumer outside the encoder needs the distinction. First datum — **2026-08-03 PROBE-086 coverage ratchet:** ten `unserialisableIC` exemptions deleted (ENTRY `language` / `encoding` across all five subtypes) and `rmpath` extended to resolve them, so the list churned once already.
 
 **Resolution form:** ADR-NNN; the REQ-121 open-question paragraph and the guard-test exemption mechanism are updated together with it.
 

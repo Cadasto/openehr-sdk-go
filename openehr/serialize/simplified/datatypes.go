@@ -19,25 +19,39 @@ import (
 
 // capturedKeys maps a leaf rmType to the canonical top-level attribute keys its
 // FLAT suffix form fully represents. A value carrying any canonical key outside
-// this set (mappings, normal_range, magnitude_status, accuracy, …) is not
+// this set (mappings, normal_range, other_reference_ranges, hyperlink, …) is not
 // faithfully expressible as suffixes, so it is emitted as a lossless |raw
 // fragment instead. This keeps the codec semantics-preserving (REQ-053) while
 // still producing the human-readable suffix form for the common, undecorated case.
 var capturedKeys = map[string]map[string]bool{
-	"DV_TEXT":       {"value": true},
-	"DV_CODED_TEXT": {"value": true, "defining_code": true},
-	"DV_DATE_TIME":  {"value": true},
-	"DV_DATE":       {"value": true},
-	"DV_TIME":       {"value": true},
-	"DV_DURATION":   {"value": true},
+	"DV_TEXT":       {"value": true, "formatting": true},
+	"DV_CODED_TEXT": {"value": true, "defining_code": true, "formatting": true},
+	"DV_DATE_TIME":  {"value": true, "magnitude_status": true, "normal_status": true},
+	"DV_DATE":       {"value": true, "magnitude_status": true, "normal_status": true},
+	"DV_TIME":       {"value": true, "magnitude_status": true, "normal_status": true},
+	"DV_DURATION":   {"value": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_URI":        {"value": true},
 	"DV_EHR_URI":    {"value": true},
-	"DV_QUANTITY":   {"magnitude": true, "units": true},
-	"DV_COUNT":      {"magnitude": true},
-	"DV_BOOLEAN":    {"value": true},
-	"DV_ORDINAL":    {"symbol": true, "value": true},
-	"DV_PROPORTION": {"numerator": true, "denominator": true, "type": true},
+	"DV_QUANTITY": {
+		"magnitude": true, "units": true,
+		"magnitude_status": true, "normal_status": true,
+		"accuracy": true, "accuracy_is_percent": true,
+		"precision": true, "units_system": true, "units_display_name": true,
+	},
+	"DV_COUNT":   {"magnitude": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
+	"DV_BOOLEAN": {"value": true},
+	"DV_ORDINAL": {"symbol": true, "value": true},
+	"DV_PROPORTION": {
+		"numerator": true, "denominator": true, "type": true,
+		"magnitude_status": true, "normal_status": true,
+		"accuracy": true, "accuracy_is_percent": true, "precision": true,
+	},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+	// CODE_PHRASE is not a DataValue, but the reference emits it as a leaf in its
+	// own right (ENTRY language / encoding) under the same |code + |terminology
+	// pair a DV_CODED_TEXT's defining_code uses. A preferred_term makes it
+	// uncaptured and it rides |raw, as everywhere else.
+	"CODE_PHRASE": {"code_string": true, "terminology_id": true},
 }
 
 // leafToFlat writes the FLAT entries for a single leaf value at flatPath. rmType
@@ -45,8 +59,10 @@ var capturedKeys = map[string]map[string]bool{
 // captured by the suffix mapping (the common case) is emitted as suffixes; a
 // decorated DV_* value (extra attributes, incl. nested decorations of the
 // composite keys), a substituted subtype, or an unmapped DV_* type is embedded
-// losslessly as a |raw canonical fragment; a non-DV_ leaf (party / context /
-// other RM attribute) is a documented skip (see deviations.md).
+// losslessly as a |raw canonical fragment; a leaf datatype this codec does not
+// map at all (party / context / other RM attribute) is a documented skip (see
+// deviations.md). CODE_PHRASE is mapped despite not being a DataValue — the
+// reference emits ENTRY language / encoding as leaves in their own right.
 //
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
@@ -76,10 +92,26 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listO
 			return emitCoreLeaf(out, flatPath, v, rmType, listOpen)
 		}
 	}
-	if strings.HasPrefix(rmType, "DV_") {
+	// A modelled leaf type whose value the suffix form cannot capture (a
+	// preferred_term, a decorated TERMINOLOGY_ID) rides |raw rather than falling
+	// through to the non-value skip below, which would lose it silently.
+	if isValueLeafType(rmType) {
 		return emitRaw(out, flatPath, v, cmp.Or(dyn, rmType))
 	}
 	return nil
+}
+
+// isValueLeafType reports whether a childless Web Template node of this RM type
+// carries a value this codec emits.
+//
+// Every DV_* type qualifies — |raw is the backstop for one with no suffix
+// mapping. CODE_PHRASE qualifies too, and cannot be recognised by an
+// Inputs-presence test: the reference emits ENTRY `language` / `encoding` as
+// in-context leaves with no input descriptors at all (webtemplate.entryIC), and
+// PROBE-075 parity locks that shape, so the reference's silence about inputs
+// must not be read as "no value here".
+func isValueLeafType(rmType string) bool {
+	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE"
 }
 
 // canonicalMap returns v's canonical JSON parsed as a generic object — the
@@ -111,10 +143,44 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 			return false
 		}
 	}
+	// normal_status is a CODE_PHRASE but travels as a bare code (|normal_status:
+	// "N"), so decode rebuilds it in the implied openEHR terminology. A value
+	// coded elsewhere, or carrying a preferred_term, would be silently rewritten
+	// by that rebuild — it rides |raw instead. Checked here rather than per type
+	// because seven datatypes inherit the attribute from DV_ORDERED.
+	if ns, present := m["normal_status"]; present && !normalStatusCaptured(ns) {
+		return false
+	}
 	switch rmType {
+	case "CODE_PHRASE":
+		// The standalone form reuses the nested check, which also bounds the
+		// TERMINOLOGY_ID shape the |terminology suffix reduces to a string.
+		//
+		// An empty code_string is the one shape where "captured" depends on the
+		// rest of the value: codePhraseToFlat writes *nothing* for it (see there —
+		// load-bearing for a zero-valued ENTRY.language / .encoding, which is a
+		// non-pointer field with no nil for [leafToFlat] to catch). That skip is
+		// lossless only when there is nothing else to write, so a partly-populated
+		// value — a terminology with no code — must not count as captured, or it
+		// would encode to nothing at all. It rides |raw instead, the same way a
+		// preferred_term beside an empty code already does.
+		if cs, _ := m["code_string"].(string); cs == "" {
+			return codePhraseTerminology(m) == "" && codePhraseCaptured(m)
+		}
+		return codePhraseCaptured(m)
 	case "DV_CODED_TEXT":
-		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form.
-		return m["defining_code"] == nil || codePhraseCaptured(m["defining_code"])
+		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form, and
+		// |other carries the value **alone** — the grammar gives it no companion
+		// suffix. So `formatting`, capturable at an ordinary DV_TEXT leaf, is not
+		// capturable here and the value must ride |raw.
+		//
+		// This is load-bearing, not defensive: adding `formatting` to
+		// capturedKeys["DV_CODED_TEXT"] without this made emitText write |other
+		// and silently discard the formatting (caught in PR #86 review).
+		if m["defining_code"] == nil {
+			return m["formatting"] == nil
+		}
+		return codePhraseCaptured(m["defining_code"])
 	case "DV_ORDINAL":
 		sym, ok := m["symbol"].(map[string]any)
 		if !ok {
@@ -132,14 +198,45 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// the symbol as archetype-local; a non-local terminology would be
 		// silently rewritten, so it rides |raw instead.
 		if dc, ok := sym["defining_code"].(map[string]any); ok {
-			if tid, ok := dc["terminology_id"].(map[string]any); ok {
-				if tv, _ := tid["value"].(string); tv != "" && tv != "local" {
-					return false
-				}
+			if tv := codePhraseTerminology(dc); tv != "" && tv != "local" {
+				return false
 			}
 		}
 	}
 	return true
+}
+
+// normalStatusTerminology is the openEHR terminology the |normal_status suffix
+// implies: the wire carries only the ordinal code (N, H, HH, L, LL, …), which the
+// RM defines against the openEHR code set `normal statuses` — hence the
+// terminology_id `openehr` decode rebuilds the CODE_PHRASE with.
+const normalStatusTerminology = "openehr"
+
+// normalStatusCaptured reports whether a canonical normal_status CODE_PHRASE is
+// representable as the bare |normal_status code — that is, it carries nothing
+// beyond the code and sits in the terminology decode will rebuild it in.
+func normalStatusCaptured(v any) bool {
+	if !codePhraseCaptured(v) {
+		return false
+	}
+	cp, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+	// An absent or empty terminology contradicts nothing, so it survives the
+	// implication decode makes.
+	tv := codePhraseTerminology(cp)
+	return tv == "" || tv == normalStatusTerminology
+}
+
+// codePhraseTerminology returns the terminology_id value carried by a canonical
+// CODE_PHRASE object, or "" when it has none — the one attribute the
+// |terminology suffix reduces to a bare string, and the one a rebuild can
+// therefore silently rewrite.
+func codePhraseTerminology(cp map[string]any) string {
+	tid, _ := cp["terminology_id"].(map[string]any)
+	v, _ := tid["value"].(string)
+	return v
 }
 
 // codePhraseCaptured reports whether a canonical CODE_PHRASE object carries
@@ -187,7 +284,7 @@ func as[T any](v any) (T, bool) {
 // only reached for values whose canonical form passed capturedFully.
 func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, listOpen bool) error {
 	if dv, ok := as[rm.DVText](v); ok {
-		return emitText(out, flatPath, dv.Value, rmType, listOpen)
+		return emitText(out, flatPath, dv, rmType, listOpen)
 	}
 	if dv, ok := as[rm.DVCodedText](v); ok {
 		codedToFlat(out, flatPath, dv)
@@ -195,14 +292,17 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 	}
 	if dv, ok := as[rm.DVDateTime](v); ok {
 		out[flatPath] = dv.Value
+		emitOrdered(out, flatPath, ordered{magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus})
 		return nil
 	}
 	if dv, ok := as[rm.DVDate](v); ok {
 		out[flatPath] = dv.Value
+		emitOrdered(out, flatPath, ordered{magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus})
 		return nil
 	}
 	if dv, ok := as[rm.DVTime](v); ok {
 		out[flatPath] = dv.Value
+		emitOrdered(out, flatPath, ordered{magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus})
 		return nil
 	}
 	if dv, ok := as[rm.DVQuantity](v); ok {
@@ -211,6 +311,10 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 	}
 	if dv, ok := as[rm.DVCount](v); ok {
 		out[flatPath] = dv.Magnitude
+		emitOrdered(out, flatPath, ordered{
+			magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus,
+			accuracy: dv.Accuracy, accuracyIsPercent: dv.AccuracyIsPercent,
+		})
 		return nil
 	}
 	if dv, ok := as[rm.DVBoolean](v); ok {
@@ -219,6 +323,10 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 	}
 	if dv, ok := as[rm.DVDuration](v); ok {
 		out[flatPath] = dv.Value
+		emitOrdered(out, flatPath, ordered{
+			magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus,
+			accuracy: dv.Accuracy, accuracyIsPercent: dv.AccuracyIsPercent,
+		})
 		return nil
 	}
 	if dv, ok := as[rm.DVURI](v); ok {
@@ -241,6 +349,10 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 		identifierToFlat(out, flatPath, dv)
 		return nil
 	}
+	if cp, ok := as[rm.CodePhrase](v); ok {
+		codePhraseToFlat(out, flatPath, cp)
+		return nil
+	}
 	return nil
 }
 
@@ -249,16 +361,30 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 // entry stored as DV_TEXT (spec §Open Value-Sets and |other). A DV_TEXT at a
 // *closed* coded leaf has no FLAT representation the decoder accepts, so encode
 // fails loudly instead of emitting an undecodable payload.
-func emitText(out map[string]any, flatPath, value, rmType string, listOpen bool) error {
+func emitText(out map[string]any, flatPath string, dv rm.DVText, rmType string, listOpen bool) error {
 	if rmType == "DV_CODED_TEXT" {
 		if !listOpen {
 			return fmt.Errorf("%w: DV_TEXT at closed DV_CODED_TEXT leaf %q (|other requires an open value-set)", ErrUnsupportedDatatype, flatPath)
 		}
-		out[flatPath+"|other"] = value
+		// |other is the free-text escape at a coded leaf and carries the value
+		// alone. Any DV_TEXT decoration — `formatting` included — makes the value
+		// uncapturable in this form, and [capturedFully] has already routed it to
+		// |raw before we get here; writing |other unconditionally would drop the
+		// decoration silently.
+		out[flatPath+"|other"] = dv.Value
 		return nil
 	}
-	out[flatPath] = value
+	out[flatPath] = dv.Value
+	emitFormatting(out, flatPath, dv.Formatting)
 	return nil
+}
+
+// emitFormatting writes DV_TEXT's optional |formatting suffix, shared by the
+// plain and coded forms.
+func emitFormatting(out map[string]any, flatPath string, formatting *string) {
+	if formatting != nil {
+		out[flatPath+"|formatting"] = *formatting
+	}
 }
 
 // emitRaw embeds v as a |raw canonical fragment stamped with the given _type. A
@@ -385,6 +511,77 @@ func codedToFlat(out map[string]any, flatPath string, dv rm.DVCodedText) {
 	if term := dv.DefiningCode.TerminologyID.Value; term != "" {
 		out[flatPath+"|terminology"] = term
 	}
+	emitFormatting(out, flatPath, dv.Formatting)
+}
+
+// ordered carries the optional attributes a value leaf inherits from DV_ORDERED
+// (`normal_status`), DV_QUANTIFIED (`magnitude_status`) and DV_AMOUNT
+// (`accuracy`, `accuracy_is_percent`), plus DV_QUANTITY / DV_PROPORTION's
+// `precision`. The generated RM types flatten the DataValue hierarchy — each
+// struct carries its own copy of the inherited fields with no shared interface —
+// so the attributes are gathered here rather than reached through a supertype.
+//
+// A nil field is an absent attribute and writes no suffix, which is what keeps
+// an undecorated value's FLAT form byte-identical to before these suffixes were
+// modelled.
+//
+// `accuracy` is deliberately absent for DV_DATE / DV_DATE_TIME / DV_TIME: those
+// inherit from DV_TEMPORAL, which redefines accuracy as a DV_DURATION object
+// (DV_ABSOLUTE_QUANTITY, its own parent, declares it as a DV_AMOUNT) rather than
+// the Real DV_AMOUNT carries, so it has no scalar suffix form and stays on |raw.
+type ordered struct {
+	magnitudeStatus   *string
+	normalStatus      *rm.CodePhrase
+	accuracy          *rm.Real
+	accuracyIsPercent *bool
+	precision         *rm.Integer
+}
+
+// emitOrdered writes the present optional suffixes beside a value leaf. These are
+// the suffixes the reference emits alongside the core value; before they were
+// modelled, a value carrying any of them rode |raw as a whole.
+func emitOrdered(out map[string]any, flatPath string, o ordered) {
+	if o.magnitudeStatus != nil {
+		out[flatPath+"|magnitude_status"] = *o.magnitudeStatus
+	}
+	if o.normalStatus != nil {
+		// The bare ordinal code; the terminology is implied (see
+		// normalStatusTerminology) and normalStatusCaptured has already refused
+		// any value that would not survive that implication.
+		out[flatPath+"|normal_status"] = o.normalStatus.CodeString
+	}
+	if o.accuracy != nil {
+		out[flatPath+"|accuracy"] = float64(*o.accuracy)
+	}
+	if o.accuracyIsPercent != nil {
+		out[flatPath+"|accuracy_is_percent"] = *o.accuracyIsPercent
+	}
+	if o.precision != nil {
+		out[flatPath+"|precision"] = int64(*o.precision)
+	}
+}
+
+// codePhraseToFlat emits the |code and |terminology suffixes for a standalone
+// CODE_PHRASE leaf (ENTRY language / encoding).
+//
+// An empty code_string writes nothing. CODE_PHRASE sits in non-pointer fields
+// (ENTRY.language, ENTRY.encoding), so "absent" and "zero" are the same value
+// here and there is no pointer for [leafToFlat]'s nil check to catch. Emitting
+// unconditionally would put empty |code / |terminology leaves on every
+// composition whose metadata arrived through the ctx/ forms — the hazard
+// EVENT_CONTEXT.setting documents in deviations.md.
+//
+// The skip is only safe because [capturedFully] holds back the values it would
+// lose: a code-less CODE_PHRASE that still carries a terminology rides |raw and
+// never reaches here.
+func codePhraseToFlat(out map[string]any, flatPath string, cp rm.CodePhrase) {
+	if cp.CodeString == "" {
+		return
+	}
+	out[flatPath+"|code"] = cp.CodeString
+	if term := cp.TerminologyID.Value; term != "" {
+		out[flatPath+"|terminology"] = term
+	}
 }
 
 // quantityToFlat emits the |magnitude and |unit suffix entries for a
@@ -392,6 +589,17 @@ func codedToFlat(out map[string]any, flatPath string, dv rm.DVCodedText) {
 func quantityToFlat(out map[string]any, flatPath string, dv rm.DVQuantity) {
 	out[flatPath+"|magnitude"] = float64(dv.Magnitude)
 	out[flatPath+"|unit"] = dv.Units
+	if dv.UnitsSystem != nil {
+		out[flatPath+"|units_system"] = *dv.UnitsSystem
+	}
+	if dv.UnitsDisplayName != nil {
+		out[flatPath+"|units_display_name"] = *dv.UnitsDisplayName
+	}
+	emitOrdered(out, flatPath, ordered{
+		magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus,
+		accuracy: dv.Accuracy, accuracyIsPercent: dv.AccuracyIsPercent,
+		precision: dv.Precision,
+	})
 }
 
 // ordinalToFlat emits the |code, |value and |ordinal suffixes for a DV_ORDINAL
@@ -410,6 +618,11 @@ func proportionToFlat(out map[string]any, flatPath string, dv rm.DVProportion) {
 	out[flatPath+"|numerator"] = float64(dv.Numerator)
 	out[flatPath+"|denominator"] = float64(dv.Denominator)
 	out[flatPath+"|type"] = int64(dv.Type)
+	emitOrdered(out, flatPath, ordered{
+		magnitudeStatus: dv.MagnitudeStatus, normalStatus: dv.NormalStatus,
+		accuracy: dv.Accuracy, accuracyIsPercent: dv.AccuracyIsPercent,
+		precision: dv.Precision,
+	})
 }
 
 // identifierToFlat emits the |id and optional |issuer, |assigner, |type

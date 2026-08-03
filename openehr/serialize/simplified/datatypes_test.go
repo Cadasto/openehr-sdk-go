@@ -4,6 +4,7 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -72,6 +73,19 @@ func TestNewDatatypesEncodeDecode(t *testing.T) {
 			check: func(t *testing.T, dv map[string]any) {
 				if dv["id"] != "A123" || dv["issuer"] != "Issuer" {
 					t.Errorf("identifier = %#v", dv)
+				}
+			},
+		},
+		{
+			// A standalone CODE_PHRASE leaf — ENTRY language / encoding, which the
+			// reference emits in its own right rather than nested in a
+			// DV_CODED_TEXT (PROBE-086).
+			rmType: "CODE_PHRASE",
+			v:      rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}},
+			check: func(t *testing.T, dv map[string]any) {
+				tid, _ := dv["terminology_id"].(map[string]any)
+				if dv["code_string"] != "en" || tid["value"] != "ISO_639-1" {
+					t.Errorf("code phrase = %#v", dv)
 				}
 			},
 		},
@@ -278,8 +292,9 @@ func TestClosedCodedTextEncodeErrors(t *testing.T) {
 // the leaf type would make decode reconstruct a DV_CODED_TEXT with the text's
 // fields silently dropped.
 func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
-	fm := "markdown"
-	v := rm.DVText{Value: "x", Formatting: &fm}
+	// `language` rather than `formatting`: the latter became a modelled suffix
+	// with the optional-suffix set, so it no longer forces |raw.
+	v := rm.DVText{Value: "x", Language: &rm.CodePhrase{CodeString: "de"}}
 	out := map[string]any{}
 	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
@@ -293,13 +308,14 @@ func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
 	}
 }
 
-// TestQuantityDecoratedRaw checks a decorated value (a DV_QUANTITY carrying
-// magnitude_status) falls back to |raw rather than silently dropping the extra
-// attribute.
+// TestQuantityDecoratedRaw checks a decorated value falls back to |raw rather
+// than silently dropping the extra attribute. The decoration is `normal_range`:
+// `magnitude_status` used to serve here but is a modelled suffix since the
+// optional-suffix set landed, so it no longer forces the fallback.
 func TestQuantityDecoratedRaw(t *testing.T) {
-	status := "~"
 	out := map[string]any{}
-	if err := leafToFlat(out, "p/x", rm.DVQuantity{Magnitude: 1, Units: "mm", MagnitudeStatus: &status}, "DV_QUANTITY", false); err != nil {
+	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: &rm.DVInterval[rm.DVQuantity]{}}
+	if err := leafToFlat(out, "p/x", q, "DV_QUANTITY", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
 	if _, ok := out["p/x|raw"]; !ok {
@@ -313,10 +329,11 @@ func TestQuantityDecoratedRaw(t *testing.T) {
 // TestRawFragmentPreservesLargeInteger checks a decorated DV_COUNT above 2^53
 // keeps its magnitude exactly through the |raw path (json.Number, not float64).
 func TestRawFragmentPreservesLargeInteger(t *testing.T) {
-	status := "~"
 	out := map[string]any{}
-	// A decorated DV_COUNT (magnitude_status) rides |raw.
-	if err := leafToFlat(out, "p/x", rm.DVCount{Magnitude: 9007199254740993, MagnitudeStatus: &status}, "DV_COUNT", false); err != nil {
+	// A decorated DV_COUNT rides |raw — decorated by normal_range, which stays
+	// outside the modelled suffix set.
+	c := rm.DVCount{Magnitude: 9007199254740993, NormalRange: &rm.DVInterval[rm.DVCount]{}}
+	if err := leafToFlat(out, "p/x", c, "DV_COUNT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
 	raw, ok := out["p/x|raw"].(map[string]any)
@@ -357,5 +374,490 @@ func TestLeafToFlatRawFallback(t *testing.T) {
 	}
 	if raw["_type"] != "DV_PARAGRAPH" {
 		t.Errorf("|raw _type = %v, want DV_PARAGRAPH", raw["_type"])
+	}
+}
+
+// TestCodePhraseEmptyCodeSkipped: ENTRY language / encoding are non-pointer
+// CODE_PHRASE fields, so an unset one arrives as a zero value with no pointer
+// for the nil check to catch. Writing it anyway would put empty |code leaves on
+// every composition whose metadata came in through the ctx/ forms.
+func TestCodePhraseEmptyCodeSkipped(t *testing.T) {
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/language", rm.CodePhrase{}, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat(zero CODE_PHRASE): %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("zero CODE_PHRASE wrote %v, want no entries", out)
+	}
+}
+
+// TestCodePhraseTerminologyOptional: the encoder omits |terminology for an
+// empty TERMINOLOGY_ID, so the decoder must accept a |code-only leaf rather
+// than demand a suffix its own encoder never wrote.
+func TestCodePhraseTerminologyOptional(t *testing.T) {
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", rm.CodePhrase{CodeString: "UTF-8"}, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|terminology"]; ok {
+		t.Errorf("empty TERMINOLOGY_ID wrote a |terminology suffix: %v", out)
+	}
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["code_string"] != "UTF-8" {
+		t.Errorf("code_string = %#v", dv["code_string"])
+	}
+	if _, ok := dv["terminology_id"]; ok {
+		t.Errorf("absent |terminology rebuilt a terminology_id: %#v", dv)
+	}
+}
+
+// TestCodePhraseMissingCodeErrors: |code is what makes a CODE_PHRASE a code, so
+// its absence must fail loudly rather than rebuild an empty-coded value.
+func TestCodePhraseMissingCodeErrors(t *testing.T) {
+	_, err := dvFromSuffixes("CODE_PHRASE", false, map[string]any{"terminology": "ISO_639-1"})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// TestCodePhrasePreferredTermRidesRaw: a preferred_term is outside the
+// |code/|terminology pair, so the value must ride |raw rather than be emitted
+// with the term silently discarded — the same rule the nested CODE_PHRASE
+// inside a DV_CODED_TEXT already follows.
+func TestCodePhrasePreferredTermRidesRaw(t *testing.T) {
+	pref := "English"
+	out := map[string]any{}
+	cp := rm.CodePhrase{CodeString: "en", PreferredTerm: &pref, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected p/x|raw, got %#v", out)
+	}
+	if raw["preferred_term"] != "English" {
+		t.Errorf("|raw dropped preferred_term: %#v", raw)
+	}
+}
+
+// TestOptionalOrderedSuffixesRoundTrip: the optional attributes a value leaf
+// inherits from DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT survive encode and decode
+// as suffixes. Before they were modelled, a value carrying any of them rode
+// |raw as a whole — the PROBE-086 corpus emits them beside ordinary values.
+func TestOptionalOrderedSuffixesRoundTrip(t *testing.T) {
+	status, pct, acc, prec := "~", true, rm.Real(50.5), rm.Integer(1)
+	sys, disp := "units_system", "units_display_name"
+	normal := &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "openehr"}}
+
+	tests := []struct {
+		rmType string
+		v      any
+		want   map[string]any
+	}{
+		{
+			rmType: "DV_QUANTITY",
+			v: rm.DVQuantity{
+				Magnitude: 65.9, Units: "unit",
+				MagnitudeStatus: &status, NormalStatus: normal,
+				Accuracy: &acc, AccuracyIsPercent: &pct, Precision: &prec,
+				UnitsSystem: &sys, UnitsDisplayName: &disp,
+			},
+			want: map[string]any{
+				"p/x|magnitude": 65.9, "p/x|unit": "unit",
+				"p/x|magnitude_status": "~", "p/x|normal_status": "N",
+				"p/x|accuracy": 50.5, "p/x|accuracy_is_percent": true,
+				"p/x|precision":    int64(1),
+				"p/x|units_system": "units_system", "p/x|units_display_name": "units_display_name",
+			},
+		},
+		{
+			rmType: "DV_COUNT",
+			v: rm.DVCount{
+				Magnitude: 7, MagnitudeStatus: &status, NormalStatus: normal,
+				Accuracy: &acc, AccuracyIsPercent: &pct,
+			},
+			want: map[string]any{
+				"p/x": int64(7), "p/x|magnitude_status": "~", "p/x|normal_status": "N",
+				"p/x|accuracy": 50.5, "p/x|accuracy_is_percent": true,
+			},
+		},
+		{
+			rmType: "DV_PROPORTION",
+			v: rm.DVProportion{
+				Numerator: 20.5, Denominator: 12.4, Type: 0,
+				MagnitudeStatus: &status, NormalStatus: normal,
+				Accuracy: &acc, AccuracyIsPercent: &pct, Precision: &prec,
+			},
+			want: map[string]any{
+				"p/x|numerator": 20.5, "p/x|denominator": 12.4, "p/x|type": int64(0),
+				"p/x|magnitude_status": "~", "p/x|normal_status": "N",
+				"p/x|accuracy": 50.5, "p/x|accuracy_is_percent": true, "p/x|precision": int64(1),
+			},
+		},
+		{
+			rmType: "DV_DATE",
+			v:      rm.DVDate{Value: "2022-01-12", MagnitudeStatus: &status, NormalStatus: normal},
+			want: map[string]any{
+				"p/x": "2022-01-12", "p/x|magnitude_status": "~", "p/x|normal_status": "N",
+			},
+		},
+		{
+			rmType: "DV_TEXT",
+			v:      rm.DVText{Value: "DV_TEXT value", Formatting: new("plain")},
+			want:   map[string]any{"p/x": "DV_TEXT value", "p/x|formatting": "plain"},
+		},
+		{
+			// DV_DURATION inherits accuracy from DV_AMOUNT as a Real, so unlike the
+			// DV_TEMPORAL types (see TestDateAccuracyRidesRaw) it has a scalar suffix
+			// form and must not fall back to |raw.
+			rmType: "DV_DURATION",
+			v: rm.DVDuration{
+				Value: "PT1H30M", MagnitudeStatus: &status, NormalStatus: normal,
+				Accuracy: &acc, AccuracyIsPercent: &pct,
+			},
+			want: map[string]any{
+				"p/x": "PT1H30M", "p/x|magnitude_status": "~", "p/x|normal_status": "N",
+				"p/x|accuracy": 50.5, "p/x|accuracy_is_percent": true,
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.rmType, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/x", tc.v, tc.rmType, false); err != nil {
+				t.Fatalf("leafToFlat: %v", err)
+			}
+			if _, rode := out["p/x|raw"]; rode {
+				t.Fatalf("value rode |raw; the suffixes should now capture it: %#v", out)
+			}
+			if len(out) != len(tc.want) {
+				t.Fatalf("got %d entries %#v, want %d %#v", len(out), out, len(tc.want), tc.want)
+			}
+			for k, w := range tc.want {
+				if out[k] != w {
+					t.Errorf("out[%q] = %#v, want %#v", k, out[k], w)
+				}
+			}
+			// And back: every emitted suffix must rebuild its RM attribute. Asserted
+			// per suffix rather than on magnitude_status alone — a rebuild that
+			// dropped, say, units_system would otherwise pass while losing data.
+			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"))
+			if err != nil {
+				t.Fatalf("dvFromSuffixes: %v", err)
+			}
+			// suffix -> (canonical attribute, value the rebuild must carry)
+			for suffix, exp := range map[string]struct {
+				attr string
+				want any
+			}{
+				"magnitude_status":    {"magnitude_status", "~"},
+				"accuracy":            {"accuracy", 50.5},
+				"accuracy_is_percent": {"accuracy_is_percent", true},
+				"precision":           {"precision", int64(1)},
+				"units_system":        {"units_system", "units_system"},
+				"units_display_name":  {"units_display_name", "units_display_name"},
+				"formatting":          {"formatting", "plain"},
+			} {
+				if _, emitted := tc.want["p/x|"+suffix]; !emitted {
+					continue
+				}
+				if dv[exp.attr] != exp.want {
+					t.Errorf("decoded %s = %#v, want %#v", exp.attr, dv[exp.attr], exp.want)
+				}
+			}
+			if _, expected := tc.want["p/x|normal_status"]; expected {
+				ns, _ := dv["normal_status"].(map[string]any)
+				if ns["code_string"] != "N" {
+					t.Errorf("decoded normal_status = %#v, want code_string N", dv["normal_status"])
+				}
+				tid, _ := ns["terminology_id"].(map[string]any)
+				if tid["value"] != "openehr" {
+					t.Errorf("decoded normal_status terminology = %#v, want openehr", ns["terminology_id"])
+				}
+			}
+		})
+	}
+}
+
+// TestUndecoratedValueUnchangedBySuffixSet: the optional suffixes are written
+// only when present, so a plain value's FLAT form is byte-identical to what the
+// codec emitted before they were modelled. This is what makes the change
+// additive for the common case.
+func TestUndecoratedValueUnchangedBySuffixSet(t *testing.T) {
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", rm.DVQuantity{Magnitude: 120, Units: "mm[Hg]"}, "DV_QUANTITY", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	want := map[string]any{"p/x|magnitude": float64(120), "p/x|unit": "mm[Hg]"}
+	if len(out) != len(want) {
+		t.Fatalf("undecorated quantity emitted %#v, want exactly %#v", out, want)
+	}
+	for k, w := range want {
+		if out[k] != w {
+			t.Errorf("out[%q] = %#v, want %#v", k, out[k], w)
+		}
+	}
+}
+
+// TestNonOpenehrNormalStatusRidesRaw: |normal_status carries a bare code and
+// decode rebuilds it in the implied openEHR terminology, so a status coded
+// elsewhere would be silently re-terminologised. It rides |raw instead — the
+// same rule the non-local DV_ORDINAL symbol follows.
+func TestNonOpenehrNormalStatusRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	q := rm.DVQuantity{
+		Magnitude: 1, Units: "mm",
+		NormalStatus: &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}
+	if err := leafToFlat(out, "p/x", q, "DV_QUANTITY", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|raw"]; !ok {
+		t.Errorf("non-openehr normal_status should ride |raw, got %#v", out)
+	}
+}
+
+// TestOptionalSuffixAbsentStaysAbsent: an omitted optional suffix must not
+// become a zero value in the canonical RM — "unset" and "zero" are different
+// clinical claims (a magnitude_status of "" is not the same as none).
+func TestOptionalSuffixAbsentStaysAbsent(t *testing.T) {
+	dv, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{"magnitude": 1.0, "unit": "mm"})
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	for _, attr := range []string{"magnitude_status", "normal_status", "accuracy", "accuracy_is_percent", "precision"} {
+		if _, present := dv[attr]; present {
+			t.Errorf("absent |%s materialised as %#v", attr, dv[attr])
+		}
+	}
+}
+
+// TestFormattedTextAtOpenCodedLeafRidesRaw — regression, PR #86 review.
+// `formatting` joined capturedKeys["DV_CODED_TEXT"] with the optional-suffix
+// set, which made capturedFully accept a *formatted* DV_TEXT at an open coded
+// leaf; emitText then wrote |other alone and discarded the formatting. |other
+// carries the value by itself, so the value has to ride |raw.
+func TestFormattedTextAtOpenCodedLeafRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	v := rm.DVText{Value: "free text", Formatting: new("markdown")}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("formatting silently dropped — expected |raw, got %#v", out)
+	}
+	if raw["formatting"] != "markdown" {
+		t.Errorf("|raw lost the formatting: %#v", raw)
+	}
+	if _, leaked := out["p/x|other"]; leaked {
+		t.Errorf("emitted |other beside |raw: %#v", out)
+	}
+	// An *un*formatted DV_TEXT at the same leaf must still take the |other form.
+	plain := map[string]any{}
+	if err := leafToFlat(plain, "p/x", rm.DVText{Value: "free text"}, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat(plain): %v", err)
+	}
+	if plain["p/x|other"] != "free text" || len(plain) != 1 {
+		t.Errorf("undecorated DV_TEXT at open coded leaf = %#v, want just |other", plain)
+	}
+}
+
+// TestOtherRejectsCompanionSuffixes — regression, PR #86 review. The |other
+// rebuild returns a bare DV_TEXT, so any companion suffix the allowlist admits
+// would be accepted and then dropped. |other is mutually exclusive with every
+// other suffix, not just |code.
+func TestOtherRejectsCompanionSuffixes(t *testing.T) {
+	for _, sfx := range []map[string]any{
+		{"other": "x", "formatting": "markdown"},
+		{"other": "x", "code": "c", "value": "v"},
+		{"other": "x", "terminology": "local"},
+	} {
+		_, err := dvFromSuffixes("DV_CODED_TEXT", true, sfx)
+		if !errors.Is(err, ErrUnsupportedDatatype) {
+			t.Errorf("dvFromSuffixes(%v) err = %v, want ErrUnsupportedDatatype", sfx, err)
+		}
+	}
+	// |other alone still decodes to a DV_TEXT.
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x"})
+	if err != nil {
+		t.Fatalf("bare |other rejected: %v", err)
+	}
+	if dv["_type"] != "DV_TEXT" || dv["value"] != "x" {
+		t.Errorf("|other alone = %#v, want DV_TEXT", dv)
+	}
+}
+
+// TestTerminologyOnlyCodePhraseRidesRaw — regression, PR #86 review round 3. A
+// CODE_PHRASE with a terminology but no code encoded to *nothing*: the empty-code
+// skip in codePhraseToFlat fired, and capturedFully still called the value
+// captured, so the |raw backstop never engaged. The all-zero value must keep
+// skipping (TestCodePhraseEmptyCodeSkipped — it is what a ctx/-decoded
+// composition's ENTRY language / encoding hold), but a partly-populated one has to
+// ride |raw losslessly, as a preferred_term already does.
+func TestTerminologyOnlyCodePhraseRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	cp := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("terminology-only CODE_PHRASE encoded to %#v, want a |raw fragment", out)
+	}
+	if raw["_type"] != "CODE_PHRASE" {
+		t.Errorf("|raw _type = %v, want CODE_PHRASE", raw["_type"])
+	}
+	tid, _ := raw["terminology_id"].(map[string]any)
+	if tid["value"] != "ISO_639-1" {
+		t.Errorf("|raw lost the terminology: %#v", raw)
+	}
+	// And back: |raw decodes to the same canonical fragment, so the value survives
+	// the round-trip rather than being reconstructed from suffixes it never had.
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["_type"] != "CODE_PHRASE" {
+		t.Errorf("_type = %v, want CODE_PHRASE", dv["_type"])
+	}
+	if cs, _ := dv["code_string"].(string); cs != "" {
+		t.Errorf("code_string = %q, want empty (none was encoded)", cs)
+	}
+	tid, _ = dv["terminology_id"].(map[string]any)
+	if tid["value"] != "ISO_639-1" {
+		t.Errorf("decoded terminology_id = %#v, want ISO_639-1", dv["terminology_id"])
+	}
+}
+
+// TestCodedTextWithFormattingRoundTrips covers the third corner of the
+// |other/formatting family: |other alone and a formatted DV_TEXT at an open coded
+// leaf are pinned above, but a *genuine* DV_CODED_TEXT carrying `formatting`
+// alongside its defining_code must keep the suffix form — both the code and the
+// decoration survive, and nothing falls back to |raw.
+func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
+	v := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "event", Formatting: new("markdown")},
+		DefiningCode: rm.CodePhrase{CodeString: "433", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+	}
+	for _, listOpen := range []bool{false, true} {
+		out := map[string]any{}
+		if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", listOpen); err != nil {
+			t.Fatalf("leafToFlat(listOpen=%v): %v", listOpen, err)
+		}
+		want := map[string]any{
+			"p/x|code": "433", "p/x|value": "event",
+			"p/x|terminology": "openehr", "p/x|formatting": "markdown",
+		}
+		if len(out) != len(want) {
+			t.Fatalf("listOpen=%v: got %#v, want exactly %#v", listOpen, out, want)
+		}
+		for k, w := range want {
+			if out[k] != w {
+				t.Errorf("listOpen=%v: out[%q] = %#v, want %#v", listOpen, k, out[k], w)
+			}
+		}
+		dv, err := dvFromSuffixes("DV_CODED_TEXT", listOpen, suffixesOf(out, "p/x"))
+		if err != nil {
+			t.Fatalf("dvFromSuffixes(listOpen=%v): %v", listOpen, err)
+		}
+		if dv["_type"] != "DV_CODED_TEXT" || dv["formatting"] != "markdown" {
+			t.Errorf("listOpen=%v: decoded %#v, want DV_CODED_TEXT with formatting", listOpen, dv)
+		}
+		dc, _ := dv["defining_code"].(map[string]any)
+		if dc["code_string"] != "433" {
+			t.Errorf("listOpen=%v: decoded defining_code = %#v", listOpen, dv["defining_code"])
+		}
+	}
+}
+
+// TestOrderedSuffixWrongKindRejected — PR #86 review round 3. The pass-through
+// suffixes hand their value to canjson untouched, so a malformed one used to
+// surface as a bare canjson error naming the canonical path and no FLAT key at
+// all. The kind is checked while the key is still in hand (see
+// TestMalformedOrderedSuffixNamesFlatKey for the surfaced message). No gap
+// sentinel: a malformed value is a payload defect, not a modelled-gap refusal.
+func TestOrderedSuffixWrongKindRejected(t *testing.T) {
+	base := map[string]any{"magnitude": 1.0, "unit": "mm"}
+	for _, tc := range []struct {
+		suffix string
+		bad    any
+		want   string
+	}{
+		{"magnitude_status", 1.0, "string"},
+		{"accuracy", "abc", "number"},
+		{"accuracy_is_percent", "yes", "boolean"},
+		{"precision", true, "number"},
+		{"units_system", 1.0, "string"},
+		{"units_display_name", false, "string"},
+	} {
+		t.Run(tc.suffix, func(t *testing.T) {
+			sfx := maps.Clone(base)
+			sfx[tc.suffix] = tc.bad
+			_, err := dvFromSuffixes("DV_QUANTITY", false, sfx)
+			if err == nil {
+				t.Fatalf("|%s = %#v accepted", tc.suffix, tc.bad)
+			}
+			for _, want := range []string{"|" + tc.suffix, tc.want} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not mention %q", err, want)
+				}
+			}
+			if errors.Is(err, ErrUnknownPath) || errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+			}
+			// The well-formed value of the same kind still passes through.
+			sfx[tc.suffix] = map[string]any{
+				"string": any("~"), "number": any(1.5), "boolean": any(true),
+			}[tc.want]
+			if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+				t.Errorf("well-formed |%s rejected: %v", tc.suffix, err)
+			}
+		})
+	}
+	// |formatting rides the same table on DV_TEXT.
+	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "x", "formatting": 1.0}); err == nil {
+		t.Error("|formatting = 1.0 accepted, want a kind error")
+	}
+	// json.Number is the kind a decoded body actually carries.
+	if _, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{
+		"magnitude": json.Number("1"), "unit": "mm", "accuracy": json.Number("0.5"),
+	}); err != nil {
+		t.Errorf("json.Number |accuracy rejected: %v", err)
+	}
+	// The check adds no strictness of its own: canjson parses a *quoted* number
+	// into Real / Integer, so a producer that quotes every scalar must keep
+	// decoding. Only a string that is no number at all is refused.
+	for _, sfx := range []map[string]any{
+		{"magnitude": 1.0, "unit": "mm", "accuracy": "0.5"},
+		{"magnitude": 1.0, "unit": "mm", "precision": "2"},
+	} {
+		if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+			t.Errorf("quoted number rejected (canjson accepts it): %v in %v", err, sfx)
+		}
+	}
+}
+
+// TestDateAccuracyRidesRaw: DV_DATE / DV_DATE_TIME / DV_TIME inherit from
+// DV_TEMPORAL, which redefines `accuracy` as a DV_DURATION object (its parent
+// DV_ABSOLUTE_QUANTITY declares a DV_AMOUNT) rather than the Real that DV_AMOUNT —
+// and so DV_QUANTITY, DV_COUNT, DV_DURATION, DV_PROPORTION — carries. It
+// therefore has no scalar suffix form and must keep forcing |raw. Guards against
+// `accuracy` being added to their capturedKeys by symmetry with DV_QUANTITY, which
+// would emit an object where a number belongs.
+func TestDateAccuracyRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	d := rm.DVDate{Value: "2022-01-12", Accuracy: &rm.DVDuration{Value: "P1D"}}
+	if err := leafToFlat(out, "p/x", d, "DV_DATE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|raw"]; !ok {
+		t.Errorf("DV_DATE with a DV_DURATION accuracy should ride |raw, got %#v", out)
+	}
+	if _, scalar := out["p/x|accuracy"]; scalar {
+		t.Error("emitted a scalar |accuracy for a DV_DURATION-typed accuracy")
 	}
 }

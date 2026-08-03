@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -119,7 +120,7 @@ func TestRunNilTarget(t *testing.T) {
 // cover it either, since both are counted *before* the comparison. Without
 // this, a compare that returned nothing at all would leave the suite green.
 func TestCompare(t *testing.T) {
-	const root = "conformance_ehrbase.de.v0"
+	const root = corpusRoot
 	const key = "c/obs/quantity|magnitude"
 
 	tests := []struct {
@@ -424,20 +425,166 @@ func TestReasonOfIsKeyIndependent(t *testing.T) {
 	}
 }
 
+// corpusRoot is the Web Template tree id of the pinned corpus OPT, which is also
+// the first segment of every upstream FLAT key. Hyphens, not underscores: the OPT
+// *file* is `conformance_ehrbase.de.v0.opt`, the template id inside it is not, and
+// a root literal that matches nothing would make every hold-out assertion below
+// vacuously true. [TestHoldOutMatchesCodecAliases] pins the literal against the
+// real target for exactly that reason.
+const corpusRoot = "conformance-ehrbase.de.v0"
+
+// settingWaiver is the one hold-out the harness applies that no accepted codec
+// spelling backs: `context/setting|*` decodes through the real path wherever the
+// Web Template carries the node, and then re-encodes to nothing until
+// `ctx/setting` emission lands. A documented waiver (SKIPPED.md), not a
+// respelling — and the only one.
+const settingWaiver = "context/setting"
+
+// TestHoldOutMatchesCodecAliases pins the hold-out against the codec's *own*
+// tables, in both directions. Neither direction is symmetric noise-avoidance:
+// they fail on opposite, differently dangerous drifts.
+//
+// Forward — every spelling the decoder accepts as composition metadata
+// ([simplified.MetadataAliasSpellings] plus the terminology witnesses of
+// [simplified.MetadataWitnessSpellings], ADR 0015) must be held out. One accepted
+// there but compared here is reported as both missing and extra: cosmetic noise,
+// and no corpus fixture need exercise the spelling for the inconsistency to be
+// real. Derived from the exported accessors rather than a restated list, so a new
+// alias cannot land in the codec without this test noticing.
+//
+// Reverse — every hold-out the harness actually applies over the corpus key
+// universe must be one of those accepted spellings, or the single named waiver.
+// This is the direction that matters: a hold-out with no codec spelling behind it
+// silently absorbs a **refusal**, so a key the codec loses stops being counted as
+// lost. It is what the base-matched `composer` entry did to
+// `composer|id`/`|id_scheme`/`|id_namespace` — 12 corpus keys of PARTY_PROXY
+// `external_ref` loss, held out as if they were respellings, while SKIPPED.md,
+// ADR 0015 and the codec's own doc comments all said they were refused and
+// visible in the census (PR #86 review, round 3).
+func TestHoldOutMatchesCodecAliases(t *testing.T) {
+	target, err := NewTarget()
+	if err != nil {
+		t.Fatalf("build target: %v", err)
+	}
+	if target.Root != corpusRoot {
+		t.Fatalf("corpus Web Template root is %q, but this file's tests assert against %q — "+
+			"every hold-out assertion here would be vacuous; update corpusRoot", target.Root, corpusRoot)
+	}
+
+	accepted := map[string]bool{}
+	for _, rel := range slices.Concat(simplified.MetadataAliasSpellings(), simplified.MetadataWitnessSpellings()) {
+		accepted[rel] = true
+	}
+	if len(accepted) == 0 {
+		t.Fatal("the codec reports no metadata spellings at all — the accessors, not the hold-out, are broken")
+	}
+
+	// notHeldOut records accepted spellings the harness deliberately compares
+	// instead of holding out, each with its reason. Expected to stay empty: a
+	// spelling decode normalises into ctx/ has no real-path counterpart on the
+	// emitted side, so comparing it can only produce a false verdict. It exists so
+	// that if one ever is justified, the justification is in the source rather
+	// than in a weakened assertion.
+	notHeldOut := map[string]string{}
+	for _, rel := range slices.Sorted(maps.Keys(accepted)) {
+		held := IsCompositionMeta(corpusRoot+"/"+rel, corpusRoot)
+		why, waived := notHeldOut[rel]
+		switch {
+		case !held && !waived:
+			t.Errorf("codec accepts %q as a composition-metadata spelling but the comparison does not "+
+				"hold it out — it will be reported as both missing and extra; hold it out, or record "+
+				"it in notHeldOut with the reason", rel)
+		case held && waived:
+			t.Errorf("%q is held out but still listed in notHeldOut (%s) — drop the stale entry", rel, why)
+		}
+	}
+
+	// The reverse direction, over the real corpus rather than a hand-picked list:
+	// whatever the harness holds out when it runs is what has to be justified.
+	cases, err := Cases()
+	if err != nil {
+		t.Fatalf("enumerate cases: %v", err)
+	}
+	heldOut := map[string]int{}
+	for _, c := range cases {
+		raw, err := os.ReadFile(c.Flat)
+		if err != nil {
+			t.Fatalf("read %s: %v", c.Name, err)
+		}
+		body, err := parseFlat(raw)
+		if err != nil {
+			t.Fatalf("parse %s: %v", c.Name, err)
+		}
+		for key := range body {
+			if !IsCompositionMeta(key, corpusRoot) {
+				continue
+			}
+			if strings.HasPrefix(key, ctxPrefix) {
+				// The ctx/ side of the hold-out is unbounded by design — see
+				// IsCompositionMeta, with PROBE-076's decode leg as its backstop.
+				// One corpus key rides it (`ctx/composer_self`, in party_self:
+				// upstream writes the short form there, not the real path), and it
+				// needs no per-spelling justification because the ctx/ forms are
+				// this codec's own surface.
+				continue
+			}
+			rel, rooted := strings.CutPrefix(key, corpusRoot+"/")
+			if !rooted {
+				t.Errorf("held out %q, which is neither ctx/-prefixed nor under the corpus root", key)
+				continue
+			}
+			heldOut[rel]++
+		}
+	}
+	if len(heldOut) == 0 {
+		t.Fatal("the corpus produced no hold-outs at all — it writes real-path metadata, so the " +
+			"matcher or the root is wrong and the Meta count is silently zero")
+	}
+	for _, rel := range slices.Sorted(maps.Keys(heldOut)) {
+		if accepted[rel] || baseOf(rel) == settingWaiver {
+			continue
+		}
+		t.Errorf("the harness holds out %d corpus keys spelled %q, but the codec accepts no such "+
+			"metadata spelling and it is not the %q waiver — the hold-out is absorbing a refusal, "+
+			"so the loss stops being counted. Either the codec must accept the spelling "+
+			"(simplified.metadataAliases) or the hold-out needs a documented waiver in SKIPPED.md",
+			heldOut[rel], rel, settingWaiver)
+	}
+}
+
 // TestIsCompositionMeta guards the hold-out's edges. It is the one place the
 // harness excuses a difference on *both* sides, so it has to stay narrow:
-// `context/other_context` carries archetyped data and must never be swallowed.
+// `context/other_context` carries archetyped data and must never be swallowed,
+// and the composer's `external_ref` must not ride in on its `|name` sibling.
 func TestIsCompositionMeta(t *testing.T) {
-	const root = "conformance_ehrbase.de.v0"
+	const root = corpusRoot
 	tests := []struct {
 		key  string
 		want bool
 	}{
 		{"ctx/language", true},
 		{root + "/language|code", true},
+		// The terminology witness has no separate ctx/ counterpart at all — one
+		// ctx/language stands for the whole CODE_PHRASE — so language and territory
+		// hold out every suffix, not just the aliased one.
+		{root + "/language|terminology", true},
+		{root + "/territory|terminology", true},
 		{root + "/composer|name", true},
 		{root + "/context/start_time", true},
 		{root + "/context/setting|code", true},
+		// The composer hold-out is suffix-aware: `|name` is respelled as
+		// `ctx/composer_name`, but the external_ref suffixes are refused by ADR 0015
+		// and must reach the codec so the loss lands in the census. Base-matching
+		// `composer` absorbed all four and hid 12 corpus keys (PR #86 review).
+		{root + "/composer|id", false},
+		{root + "/composer|id_scheme", false},
+		{root + "/composer|id_namespace", false},
+		// composer_self is an accepted real-path alias (ADR 0015), so it must be
+		// held out on both sides like the other respellings — the present corpus
+		// writes only the ctx/ form, which is why its absence from the hold-out went
+		// unnoticed until the PR #86 review.
+		{root + "/composer_self", true},
+		{"ctx/composer_self", true},
 		// category is *not* a ctx/ field: it is a template-constrained Web
 		// Template leaf, spelled identically on both sides, so it is compared
 		// like any other content key rather than held out.
@@ -473,13 +620,16 @@ func TestRealCodecRefusal(t *testing.T) {
 	}
 	base, body := modelledQuantityLeaf(t, target)
 
-	// |precision is a DV_QUANTITY suffix the codec does not map (SKIPPED.md
-	// § Excluded families). Appending it to a leaf that otherwise decodes makes
-	// the codec produce exactly the shape refusedSuffix has to read.
-	body[base+"|precision"] = json.Number("1")
+	// |normal_range is a DV_QUANTITY attribute with no suffix mapping: it is a
+	// DV_INTERVAL, so it can never reduce to a scalar suffix and rides |raw
+	// instead — which makes it a durable choice here. (|precision served until
+	// the optional-suffix set landed and made it modelled.) Appending it to a
+	// leaf that otherwise decodes makes the codec produce exactly the shape
+	// refusedSuffix has to read.
+	body[base+"|normal_range"] = json.Number("1")
 	_, err = decodeSubset(target, body)
 	if err == nil {
-		t.Fatalf("%q|precision decoded — the codec now models this suffix, so this test "+
+		t.Fatalf("%q|normal_range decoded — the codec now models this suffix, so this test "+
 			"needs a different unmodelled one (and SKIPPED.md needs regenerating)", base)
 	}
 	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
@@ -488,9 +638,9 @@ func TestRealCodecRefusal(t *testing.T) {
 	if got := offendingKey(err); got != base {
 		t.Errorf("offendingKey(real refusal) = %q, want the leaf base %q\nrefusal: %v", got, base, err)
 	}
-	if got, ok := refusedSuffix(err); !ok || got != "|precision" {
+	if got, ok := refusedSuffix(err); !ok || got != "|normal_range" {
 		t.Errorf("refusedSuffix(real refusal) = %q, %v; want %q, true\nrefusal: %v",
-			got, ok, "|precision", err)
+			got, ok, "|normal_range", err)
 	}
 	if got, want := reasonOf(err, base), "unsupported |suffix for DV_QUANTITY"; got != want {
 		t.Errorf("reasonOf(real refusal) = %q, want %q\nrefusal: %v", got, want, err)
@@ -502,11 +652,11 @@ func TestRealCodecRefusal(t *testing.T) {
 	if !gap || removed != 1 {
 		t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
 	}
-	if _, still := body[base+"|precision"]; still {
-		t.Error("|precision survived its own refusal")
+	if _, still := body[base+"|normal_range"]; still {
+		t.Error("|normal_range survived its own refusal")
 	}
 	if _, ok := body[base+"|magnitude"]; !ok {
-		t.Error("|magnitude was dropped by a |precision refusal — the leaf, not the entry, went")
+		t.Error("|magnitude was dropped by a |normal_range refusal — the leaf, not the entry, went")
 	}
 
 	// What remains must decode: otherwise the assertions above passed on an

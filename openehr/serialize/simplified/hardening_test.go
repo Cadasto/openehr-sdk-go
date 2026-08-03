@@ -7,6 +7,8 @@ package simplified_test
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 
@@ -77,7 +79,11 @@ func TestDecodeRejectsSparseIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
 	}
-	mutated := strings.Replace(string(f1), ":0/", ":2/", 1)
+	// Move the whole instance, not the first key: a single replacement splits
+	// whichever multi-suffix leaf happens to sort first across :0 and :2, and the
+	// resulting incomplete leaf fails as a datatype error before the index
+	// sequence is ever examined — masking the property under test.
+	mutated := strings.ReplaceAll(string(f1), ":0/", ":2/")
 	if mutated == string(f1) {
 		t.Skip("no repeatable :index in fixture to mutate")
 	}
@@ -99,17 +105,30 @@ func TestDecodeRejectsIndexCollision(t *testing.T) {
 	if err := json.Unmarshal(f1, &m); err != nil {
 		t.Fatal(err)
 	}
-	added := false
-	for k, v := range m {
+	// Duplicate a whole leaf family, and pick it deterministically. Copying one
+	// key leaves the un-indexed group holding a partial suffix set, and the
+	// resulting datatype error ("missing required |code") fires before the slot
+	// collision this test is about — masking it.
+	var base string
+	for _, k := range slices.Sorted(maps.Keys(m)) {
 		if strings.Contains(k, ":0/") {
-			m[strings.Replace(k, ":0/", "/", 1)] = v
-			added = true
+			base = k
+			if i := strings.LastIndex(k, "|"); i >= 0 {
+				base = k[:i]
+			}
 			break
 		}
 	}
-	if !added {
+	if base == "" {
 		t.Skip("no repeatable :index in fixture to duplicate")
 	}
+	dupes := map[string]any{}
+	for k, v := range m {
+		if k == base || strings.HasPrefix(k, base+"|") {
+			dupes[strings.Replace(k, ":0/", "/", 1)] = v
+		}
+	}
+	maps.Copy(m, dupes)
 	dup, _ := json.Marshal(m)
 	if _, err := simplified.UnmarshalFlat(dup, wt); !errors.Is(err, simplified.ErrUnknownPath) {
 		t.Errorf("UnmarshalFlat(index collision) err = %v, want ErrUnknownPath", err)
@@ -144,6 +163,68 @@ func TestDecodeRejectsWrongTypedCtx(t *testing.T) {
 		if _, err := simplified.UnmarshalFlat(mutated, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 			t.Errorf("UnmarshalFlat(%s = %v) err = %v, want ErrUnsupportedDatatype", bad.key, bad.val, err)
 		}
+	}
+}
+
+// TestMalformedOrderedSuffixNamesFlatKey — PR #86 review round 3. A malformed
+// value for one of the pass-through DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixes used to escape as a raw canjson error — "decode /content/3:
+// typereg.Decode …" — naming a canonical path the payload author never wrote and
+// no FLAT key at all, which is undiagnosable from the payload side. The refusal
+// now happens while the offending FLAT key is still in hand.
+//
+// Deliberately no sentinel: a malformed value is a defect in the payload, not a
+// datatype or path the codec declines to model, and the PROBE-086 census counts
+// only the latter (a non-sentinel error is a fault there, which is correct here).
+func TestMalformedOrderedSuffixNamesFlatKey(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f1, &m); err != nil {
+		t.Fatal(err)
+	}
+	// Any DV_QUANTITY leaf will do; take it from the encoder's own output so the
+	// test does not hard-code a fixture path.
+	var base string
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		if rest, ok := strings.CutSuffix(k, "|magnitude"); ok {
+			base = rest
+			break
+		}
+	}
+	if base == "" {
+		t.Fatal("no |magnitude leaf in the encoded fixture")
+	}
+	m[base+"|accuracy"] = "abc" // a Real attribute, given a string
+	mutated, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = simplified.UnmarshalFlat(mutated, wt)
+	if err == nil {
+		t.Fatal("UnmarshalFlat(|accuracy = \"abc\") = nil error, want a refusal")
+	}
+	for _, want := range []string{base, "|accuracy", "number"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	if errors.Is(err, simplified.ErrUnknownPath) || errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+	}
+	// The same key with a well-formed value decodes, so the check bounds the kind
+	// and nothing more.
+	m[base+"|accuracy"] = 0.5
+	m[base+"|accuracy_is_percent"] = true
+	ok, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := simplified.UnmarshalFlat(ok, wt); err != nil {
+		t.Errorf("well-formed |accuracy rejected: %v", err)
 	}
 }
 

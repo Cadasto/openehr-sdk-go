@@ -235,10 +235,12 @@ func decodeReducing(t *Target, candidate map[string]any) (*rm.Composition, []Ref
 
 // decodeSubset decodes the given keys with the template attached.
 //
-// ctx/language and ctx/territory are injected because decode requires them
-// and upstream carries the same information only as real paths
-// (`<root>/language|code`), which the codec refuses — see [ctxPrefix]. They
-// are synthetic scaffolding for the decode, never compared.
+// ctx/language and ctx/territory are injected because decode requires them and
+// the real-path spellings upstream uses (`<root>/language|code`) are held out of
+// the candidate set before it gets here — see [IsCompositionMeta]. (Decode does
+// accept those spellings since ADR 0015; the hold-out, not a refusal, is why
+// they are absent.) They are synthetic scaffolding for the decode, never
+// compared.
 func decodeSubset(t *Target, keys map[string]any) (*rm.Composition, error) {
 	body := make(map[string]any, len(keys)+2)
 	maps.Copy(body, keys)

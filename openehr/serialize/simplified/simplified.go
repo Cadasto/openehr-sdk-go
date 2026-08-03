@@ -56,12 +56,17 @@ var (
 	// conversion that needs one to resolve identifiers, types, and level
 	// removal.
 	ErrNoTemplate = errors.New("simplified: nil web template")
-	// ErrUnknownPath is returned when a FLAT/STRUCTURED key does not resolve to
-	// a Web Template node (a typo, a wrong template, an unsupported ctx/ field)
-	// or cannot be placed faithfully (an invalid / out-of-bound / sparse
-	// :index, a slot conflict between two keys, or the decoded-node budget).
-	// The codec fails loudly rather than dropping the entry (REQ-053
-	// semantics-preserving).
+	// ErrUnknownPath is returned when a FLAT/STRUCTURED key is unresolvable or
+	// structurally inadmissible. Unresolvable: the key does not name a Web
+	// Template node (a typo, a wrong template, an unsupported ctx/ field), or it
+	// cannot be placed faithfully (an invalid / out-of-bound / sparse :index, a
+	// slot conflict between two keys, or the decoded-node budget).
+	// Inadmissible: every key resolves, but the set of them cannot be honoured at
+	// once — two accepted spellings of one composition-metadata field that
+	// disagree, or ctx/composer_self beside a composer name (mutually exclusive
+	// representations of one RM attribute). The codec fails loudly rather than
+	// dropping the entry or inventing a precedence rule (REQ-053
+	// semantics-preserving; ADR 0015 decision 4).
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/

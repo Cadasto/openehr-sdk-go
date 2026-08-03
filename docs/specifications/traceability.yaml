@@ -420,13 +420,32 @@ requirements:
     # types on input. The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
     # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
+    #
+    # Datatype coverage widened 2026-08-03 by the PROBE-086 ratchet: standalone
+    # CODE_PHRASE leaves (ENTRY language/encoding) round-trip as |code +
+    # |terminology, and leaf-ness is decided by simplified.isValueLeafType rather
+    # than by the presence of Web Template input descriptors — the reference emits
+    # those in-context leaves with no inputs, so an Inputs test skipped them as
+    # structural.
+    #
+    # Decode input surface amended by ADR 0015: the reference's real-path
+    # composition metadata (<root>/language|code, composer|name,
+    # context/start_time, …) is accepted alongside the ctx/ short forms and
+    # normalised onto them; ctx/ stays the only EMITTED spelling, so this is
+    # additive and moves no PROBE-086 number (the probe re-encodes, so a real-path
+    # key still returns respelled). The composer external_ref suffixes are NOT
+    # aliases and stay refused (visible in the census); context/setting is not
+    # aliased either — it decodes via its real path where the template carries
+    # the node and is dropped on encode, the harness's one documented waiver.
     implementation: landed
+    adrs: [docs/adr/0015-flat-metadata-spelling.md]
     packages:
       - openehr/serialize/simplified
     probes:
       - PROBE-076
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
+      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -1054,7 +1073,10 @@ requirements:
       # narrative/expiry_time; 2026-08-03: EVENT_CONTEXT other_context (the only
       # template-constrained one — its data was being dropped outright),
       # end_time/health_care_facility/location/participations, ACTIVITY timing,
-      # ACTION time. EVENT_CONTEXT start_time/setting stay exempt by design.
+      # ACTION time, and `language`/`encoding` on all five ENTRY subtypes (via
+      # the shared entryChildren resolver) once the CODE_PHRASE leaf mapping gave
+      # the encoder something to write there — the PROBE-086 coverage ratchet.
+      # EVENT_CONTEXT start_time/setting stay exempt by design.
       #
       # These two tests jointly enforce rm-functions.md § REQ-121 "Attribute
       # coverage for synthesized in-context leaves". The guard lives beside the
@@ -1065,6 +1087,7 @@ requirements:
       - openehr/template/webtemplate/incontext_rmpath_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
 
   - id: REQ-122
     title: Version-control derived helpers
@@ -1284,13 +1307,16 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 192 of the corpus's 1824 keys are in the modelled
-    # subset today (10.5%) — 1314 refused by the REQ-053 codec, 318 held out as
-    # composition metadata. That hold-out is respellings (language, territory,
-    # composer, context/start_time, which REQ-053 reads and writes as the ctx/
-    # short forms) plus ONE waiver: context/setting decodes and then re-encodes
-    # to nothing, so holding it out waives a real encode-side drop until the
-    # metadata real-path decision lands.
+    # Scope, stated plainly: 356 of the corpus's 1824 keys are in the modelled
+    # subset today (19.5%) — 1162 refused by the REQ-053 codec, 306 held out as
+    # composition metadata. That hold-out is suffix-aware respellings (language,
+    # territory, composer|name, composer_self, context/start_time, which REQ-053
+    # reads and writes as the ctx/ short forms; the composer external_ref
+    # suffixes are deliberately NOT held out — they are refused and visible in
+    # the census) plus ONE waiver: context/setting decodes and then re-encodes
+    # to nothing, so holding it out waives a real encode-side drop. ADR 0015
+    # settled the spelling without clearing that: it is an emission gap
+    # (ctx/setting is not written), so it clears when that emission lands.
     #
     # The earlier figure (90 / 4.9%) was a measurement error, not a smaller
     # codec: `category` was held out as metadata although it is a
@@ -1298,6 +1324,15 @@ requirements:
     # identically on both sides. Its 102 keys (34 fixtures × 3) were already
     # round-tripping byte-for-byte and are now compared — that is the whole of
     # the 90 → 192 move; no codec gap closed to earn it.
+    #
+    # 192 → 356 (2026-08-03) is the opposite: real codec gaps closing. The
+    # CODE_PHRASE leaf mapping (ENTRY language/encoding, 136 keys over 68
+    # refusals) removed that family from the census entirely, then the optional
+    # DV_ORDERED/QUANTIFIED/AMOUNT suffixes added 28 more and removed every
+    # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
+    # an optional attribute). See
+    # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
+    # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #
     # The probe is exact on what it compares (no tolerated-drop list: a key
     # that decodes and then does not re-encode fails) and adds a coverage floor
