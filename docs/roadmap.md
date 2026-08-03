@@ -154,7 +154,7 @@ REST delivery detail: [2026-05-15-rest-api-client.md](plans/archive/2026-05-15-r
 | Release / semver strategy | **Landed** | Tag-driven [`release.yml`](../.github/workflows/release.yml); policy in [`releases.md`](releases.md), `v1.0.0` ceremony tracked separately ([archived plan](plans/archive/2026-05-25-versioning-strategy.md)) |
 | Developer onboarding | **Landed** | [`quick-start.md`](quick-start.md) + [`examples.md`](examples.md) — install, REST wiring, catalog of all `cmd/examples/` programs |
 | `cmd/bmmgen` / `cmd/bmmdiff` | **Landed** | |
-| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — `canonical_json`, `canxml_roundtrip`, `ehr_create`, `generate-example`, `opt-parse`, `primitive-validate`, `validate-composition`, `validate-from-json`; catalog in [`examples.md`](examples.md) |
+| Worked examples | **Landed** | [`cmd/examples/`](../cmd/examples/) — 16 runnable programs; the catalog (one entry each, with the REQ it demonstrates) is [`examples.md`](examples.md), which stays the single list |
 
 ---
 

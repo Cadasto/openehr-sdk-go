@@ -36,8 +36,8 @@ What the SDK provides today and what's planned. The authoritative landed-vs-plan
 
 - **openEHR REST client** — System, EHR, EHR_STATUS, Composition, Directory, Contribution, Query, Definition (stored AQL), and Admin operations over a versioned transport. → [wire](docs/specifications/wire.md), [transport](docs/specifications/transport.md)
 - **Reference Model** — typed RM structs with a central type registry, generated from pinned BMM dictionaries, plus hand-written identifier, temporal, and locatable-path helpers. → [rm-modeling](docs/specifications/rm-modeling.md)
-- **Serialization** — canonical JSON and XML round-trips; FLAT / STRUCTURED planned. → [wire](docs/specifications/wire.md)
-- **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints and a compiled-template foundation. → [rm-modeling](docs/specifications/rm-modeling.md)
+- **Serialization** — canonical JSON and XML round-trips, plus bidirectional FLAT / STRUCTURED simplified-format codecs driven by a Web Template. → [wire](docs/specifications/wire.md)
+- **Templates (ADL 1.4 OPT)** — operational-template parsing with typed primitive constraints, a compiled-template foundation, and WebTemplate JSON export for form generation. → [rm-modeling](docs/specifications/rm-modeling.md)
 - **Compositions** — OPT-driven builder, template-driven validation, and RM-instance synthesis from a template. → [wire](docs/specifications/wire.md)
 - **AQL** — literal AQL wire models and result sets, fluent struct/verb builders, and static parse-and-lint. → [wire](docs/specifications/wire.md)
 - **Authentication** — SMART-on-openEHR (PKCE), client-credentials, JWT-bearer, and basic token sources, layered over a generic injected `TokenSource`. → [auth](docs/specifications/auth.md)
