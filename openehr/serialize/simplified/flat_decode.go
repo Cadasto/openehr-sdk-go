@@ -92,17 +92,16 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		"archetype_node_id": root.NodeID,
 		"name":              textJSON(cmp.Or(root.Name, wt.TemplateID)),
 	}
-	// Separate composition-level context (ctx/) from clinical content; context
-	// is rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx := make(map[string]any)
+	// Separate composition-level context from clinical content; context is
+	// rebuilt from RM attributes, not from a Web Template leaf path.
+	ctx, content, err := siphonContext(flat, root.ID)
+	if err != nil {
+		return nil, err
+	}
 	// Group FLAT keys by leaf instance (key minus the |suffix); each group's
 	// suffix->value pairs build one DataValue.
 	groups := make(map[string]map[string]any)
-	for key, val := range flat {
-		if strings.HasPrefix(key, "ctx/") {
-			ctx[key] = val
-			continue
-		}
+	for key, val := range content {
 		base, suffix := splitSuffix(key)
 		if groups[base] == nil {
 			groups[base] = make(map[string]any)
@@ -162,6 +161,104 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		completeRequired(compJSON, ci)
 	}
 	return compJSON, nil
+}
+
+// metadataAliases maps the reference implementation's real-path spelling of
+// composition-level metadata — relative to the template root — onto the ctx/
+// short form REQ-053 canonically emits.
+//
+// The codec is deliberately asymmetric here: both spellings are accepted on
+// input, only ctx/ is written on output (ADR 0015). Upstream FLAT carries
+// `<root>/language|code` where this SDK reads and writes `ctx/language`; before
+// this table such a body failed with ErrUnknownPath, which made an
+// EHRbase-authored composition undecodable over a pure respelling.
+//
+// Entries here are respellings *only* — same information, different surface. Two
+// composition-level families deliberately stay out, because admitting them would
+// be adding a field rather than accepting a spelling:
+//
+//   - `context/setting|*` — ctx/setting is unsupported on decode *too*, so this
+//     is an unimplemented field on both surfaces, not a spelling gap.
+//   - `composer|id` / `|id_scheme` / `|id_namespace` — the composer's
+//     external_ref, which the ctx/ short forms structurally cannot carry. Silently
+//     dropping it would violate REQ-053's semantics-preserving contract.
+//
+// Both remain refused, and so remain visible in the PROBE-086 census.
+var metadataAliases = map[string]string{
+	"language|code":      "ctx/language",
+	"territory|code":     "ctx/territory",
+	"composer|name":      "ctx/composer_name",
+	"composer_self":      "ctx/composer_self",
+	"context/start_time": "ctx/time",
+}
+
+// metadataAliasTerminology pins the terminology each respelled CODE_PHRASE
+// carries implicitly in the ctx/ form, where only the code travels. The suffix
+// is a witness, not data: the value is checked and discarded. Accepting a
+// mismatch would silently rewrite the terminology, since applyContext hardcodes
+// these when rebuilding the CODE_PHRASE.
+var metadataAliasTerminology = map[string]string{
+	"language|terminology":  "ISO_639-1",
+	"territory|terminology": "ISO_3166-1",
+}
+
+// siphonContext splits a FLAT map into composition-level context and clinical
+// content, normalising both accepted metadata spellings into one ctx/-keyed map.
+//
+// A real path that contradicts an explicit ctx/ entry is an error rather than a
+// precedence rule: preferring either silently would corrupt composition
+// metadata, the same stance the codec already takes on an index collision.
+func siphonContext(flat map[string]any, rootID string) (ctx, content map[string]any, err error) {
+	ctx, content = make(map[string]any), make(map[string]any)
+	// Sorted so a body carrying two conflicting real-path spellings reports the
+	// same key first on every run — a map-order-dependent error message is not
+	// reproducible for whoever has to fix the payload.
+	for _, key := range slices.Sorted(maps.Keys(flat)) {
+		val := flat[key]
+		switch {
+		case strings.HasPrefix(key, "ctx/"):
+			if err := putCtx(ctx, key, val, key); err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
+		rel, isRooted := strings.CutPrefix(key, rootID+"/")
+		if !isRooted {
+			content[key] = val
+			continue
+		}
+		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
+			got, err := ctxString(key, val)
+			if err != nil {
+				return nil, nil, err
+			}
+			if got != want {
+				return nil, nil, fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
+					ErrUnsupportedDatatype, key, got, want)
+			}
+			continue
+		}
+		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
+			if err := putCtx(ctx, ctxKey, val, key); err != nil {
+				return nil, nil, err
+			}
+			continue
+		}
+		content[key] = val
+	}
+	return ctx, content, nil
+}
+
+// putCtx records a context value, rejecting a second spelling that disagrees.
+// origin names the key as the caller wrote it, so the error points at the
+// payload rather than at the normalised ctx/ form they may never have used.
+func putCtx(ctx map[string]any, ctxKey string, val any, origin string) error {
+	if prev, seen := ctx[ctxKey]; seen && prev != val {
+		return fmt.Errorf("%w: conflicting spellings of %s — %s gives %#v, another key already gave %#v; remove one",
+			ErrUnknownPath, ctxKey, origin, val, prev)
+	}
+	ctx[ctxKey] = val
+	return nil
 }
 
 // ctxInfo is the parsed ctx/ context — the shared source for applyContext and

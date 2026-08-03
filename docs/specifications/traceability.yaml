@@ -420,13 +420,30 @@ requirements:
     # types on input. The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
     # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
+    #
+    # Datatype coverage widened 2026-08-03 by the PROBE-086 ratchet: standalone
+    # CODE_PHRASE leaves (ENTRY language/encoding) round-trip as |code +
+    # |terminology, and leaf-ness is decided by simplified.isValueLeafType rather
+    # than by the presence of Web Template input descriptors — the reference emits
+    # those in-context leaves with no inputs, so an Inputs test skipped them as
+    # structural.
+    #
+    # Decode input surface amended by ADR 0015: the reference's real-path
+    # composition metadata (<root>/language|code, composer|name,
+    # context/start_time, …) is accepted alongside the ctx/ short forms and
+    # normalised onto them; ctx/ stays the only EMITTED spelling, so this is
+    # additive and moves no PROBE-086 number (the probe re-encodes, so a real-path
+    # key still returns respelled). context/setting and the composer external_ref
+    # are NOT aliases and stay refused.
     implementation: landed
+    adrs: [docs/adr/0015-flat-metadata-spelling.md]
     packages:
       - openehr/serialize/simplified
     probes:
       - PROBE-076
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
+      - docs/plans/2026-08-03-flat-coverage-ratchet.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go

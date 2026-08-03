@@ -20,5 +20,6 @@ Open decisions (those that would be ADRs once resolved) currently live as resear
 | [0012](0012-retire-sdk-gap-identifier.md) | Retire SDK-GAP as a durable identifier; REQ/PROBE is the feature register | Accepted (2026-07-02) |
 | [0013](0013-generated-locatable-identity-surface.md) | Generated LOCATABLE identity surface and reverse type lookup | Accepted (2026-07-12) |
 | [0014](0014-webtemplate-reference-implementation-lock.md) | WebTemplate export locked to EHRbase openEHR_SDK v2.3, structural parity | Accepted (2026-07-14) |
+| [0015](0015-flat-metadata-spelling.md) | Composition-level FLAT metadata: accept both spellings on input, emit `ctx/` only | Accepted (2026-08-03) |
 
 See [docs/architecture.md § Open decisions](../architecture.md#open-decisions) for the strand-to-ADR mapping.
