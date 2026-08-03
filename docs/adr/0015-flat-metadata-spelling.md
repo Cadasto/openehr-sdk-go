@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — decode input surface). **Applies:** REQ-115 (FLAT author linter — consumes this decision), REQ-080 / PROBE-086 (the probe that surfaced it).
-- **Plan:** [2026-08-03-flat-coverage-ratchet.md](../plans/2026-08-03-flat-coverage-ratchet.md) Phase 3.
+- **Plan:** [2026-08-03-flat-coverage-ratchet.md](../plans/archive/2026-08-03-flat-coverage-ratchet.md) Phase 3.
 - **Related:** [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling this admits; the package deviation register is [`simplified/deviations.md`](../../openehr/serialize/simplified/deviations.md); the census is [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md).
 
 ## Context
@@ -48,7 +48,7 @@ PROBE-086 held these 318 corpus keys out of its comparison **on both sides** pre
 - **Positive — interop.** An EHRbase-authored composition, or one hand-written from EHRbase docs, decodes. This was a hard adoption blocker and it is the main point of the change.
 - **Positive — REQ-115 unblocked.** Phase 0 can now state the required-key set in `ctx/` terms and name the real-path spellings as accepted aliases, which is exactly the prose that was impossible to write before.
 - **No output change, no break.** Encode still emits `ctx/` only, so nothing downstream shifts. This is additive on the input surface.
-- **The PROBE-086 census does not move.** Worth stating plainly, because it is the natural thing to expect and it is wrong: the probe decodes upstream FLAT and **re-encodes** it, so a real-path key still comes back respelled as `ctx/`, still reads as one missing plus one extra key, and stays held out. The 318 keys remain held out and coverage remains **18.0%**. What changed is that a body carrying them now *decodes* instead of erroring — which the round-trip metric structurally cannot show.
+- **The PROBE-086 census does not move.** Worth stating plainly, because it is the natural thing to expect and it is wrong: the probe decodes upstream FLAT and **re-encodes** it, so a real-path key still comes back respelled as `ctx/`, still reads as one missing plus one extra key, and stays held out. The 318 keys remain held out and this decision moves the coverage figure by **exactly zero** (18.0% when it landed; later movement came from the unrelated datatype-suffix work in the same plan). What changed is that a body carrying them now *decodes* instead of erroring — which the round-trip metric structurally cannot show.
 - **`context/setting`'s waiver survives.** The one hold-out that hides a real encode-side drop is an *emission* gap (`ctx/setting` is not written), not a spelling gap, so this decision does not clear it. It needs `ctx/setting` emission on both sides; tracked in `deviations.md` and `SKIPPED.md`.
 - **Alias table is load-bearing.** Every accepted alias must be in one table with its `ctx/` target, so adding a sixth is a reviewed edit rather than scattered string comparisons.
 - **A template constraining a COMPOSITION-level `language` node is intercepted.** Such a key routes to `ctx/language` rather than through leaf placement. That is correct — it is the same RM attribute either way — but it means the alias table shadows those Web Template paths, which is why the table is restricted to attributes that genuinely *are* composition metadata.

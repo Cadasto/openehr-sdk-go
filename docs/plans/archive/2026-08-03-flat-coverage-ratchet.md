@@ -1,17 +1,17 @@
 # Plan — PROBE-086 coverage ratchet (upstream FLAT datatype coverage)
 
 **Date:** 2026-08-03
-**Status:** Draft
+**Status:** Complete — landed 2026-08-03
 **Owner:** SDK maintainers
-**Covers:** [REQ-053](../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — datatype coverage + the decode input surface amended by [ADR 0015](../adr/0015-flat-metadata-spelling.md)), [REQ-121](../specifications/rm-functions.md#req-121--locatable-path-read-access) (the rmpath resolution each new leaf needs). No new REQ: REQ-053 pins the grammar to the upstream *Simplified Formats* spec rather than enumerating a closed datatype set, so widening coverage is **conformance to an existing contract**, not new normative text — nothing here needs an `sdd-specify` gate.
-**Probes:** [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (the measurement this plan moves), PROBE-076 (must stay green)
-**Implementation:** planned
+**Covers:** [REQ-053](../../specifications/wire.md#req-053) (FLAT/STRUCTURED codecs — datatype coverage + the decode input surface amended by [ADR 0015](../../adr/0015-flat-metadata-spelling.md)), [REQ-121](../../specifications/rm-functions.md#req-121--locatable-path-read-access) (the rmpath resolution each new leaf needs). No new REQ: REQ-053 pins the grammar to the upstream *Simplified Formats* spec rather than enumerating a closed datatype set, so widening coverage is **conformance to an existing contract**, not new normative text — nothing here needs an `sdd-specify` gate.
+**Probes:** [PROBE-086](../../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) (the measurement this plan moves), PROBE-076 (must stay green)
+**Implementation:** landed
 **Depends on:** landed `openehr/serialize/simplified/`, `openehr/rm/rmpath/`, `openehr/template/webtemplate/`; the PROBE-086 harness and its census
 **Defers:** `ctx/setting` emission (the one PROBE-086 hold-out that waives a real encode-side drop — Phase 3 settled the *spelling*, not this *emission* gap); `_`-prefixed RM attributes (1092 keys — its own REQ); PARTY_PROXY / DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL<DV_QUANTITY> leaf mappings
 
 ## Goal
 
-Raise the share of the pinned upstream EHRbase FLAT corpus that PROBE-086 compares **exactly**, from the 10.5% (192 of 1824 keys) the harness reported on landing. The ranked inventory already exists in [`SKIPPED.md` § What would move these numbers](../../testkit/conformance/webtemplate/SKIPPED.md); this plan executes the cheapest items and settles the one that needed a normative decision (Phase 3, [ADR 0015](../adr/0015-flat-metadata-spelling.md)).
+Raise the share of the pinned upstream EHRbase FLAT corpus that PROBE-086 compares **exactly**, from the 10.5% (192 of 1824 keys) the harness reported on landing. The ranked inventory already exists in [`SKIPPED.md` § What would move these numbers](../../../testkit/conformance/webtemplate/SKIPPED.md); this plan executes the cheapest items and settles the one that needed a normative decision (Phase 3, [ADR 0015](../../adr/0015-flat-metadata-spelling.md)).
 
 Consumers: anyone decoding FLAT this SDK did not write — the whole point of PROBE-086 over PROBE-076.
 
@@ -93,7 +93,7 @@ Three existing tests needed updating, none by weakening an assertion: `TestQuant
 
 ### Phase 3 — the metadata spelling fork — **decided and landed**
 
-Composition-metadata spelling was `ctx/` versus the reference's real paths. Resolved by **[ADR 0015](../adr/0015-flat-metadata-spelling.md): accept both on input, emit `ctx/` only.**
+Composition-metadata spelling was `ctx/` versus the reference's real paths. Resolved by **[ADR 0015](../../adr/0015-flat-metadata-spelling.md): accept both on input, emit `ctx/` only.**
 
 **Tasks (done):** ADR 0015; REQ-053 normative prose in `wire.md` (decode MUST accept either spelling, encode MUST emit `ctx/`, a disagreeing pair MUST fail); `siphonContext` + the `metadataAliases` / `metadataAliasTerminology` tables in `flat_decode.go`; six tests in `context_test.go`; `deviations.md` + `SKIPPED.md`.
 
@@ -103,8 +103,8 @@ Two of the 318 turned out **not** to be respellings and stay refused rather than
 
 ## Mapping to specs
 
-- [wire.md § REQ-053](../specifications/wire.md#req-053) — the codec contract (grammar pinned upstream; no closed datatype list)
-- [rm-functions.md § REQ-121](../specifications/rm-functions.md#req-121--locatable-path-read-access) — locatable path read access
-- [conformance.md § PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) — the probe whose census this moves
-- [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) — the ranked inventory (informative)
-- [`simplified/deviations.md`](../../openehr/serialize/simplified/deviations.md) — package deviation register
+- [wire.md § REQ-053](../../specifications/wire.md#req-053) — the codec contract (grammar pinned upstream; no closed datatype list)
+- [rm-functions.md § REQ-121](../../specifications/rm-functions.md#req-121--locatable-path-read-access) — locatable path read access
+- [conformance.md § PROBE-086](../../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) — the probe whose census this moves
+- [`SKIPPED.md`](../../../testkit/conformance/webtemplate/SKIPPED.md) — the ranked inventory (informative)
+- [`simplified/deviations.md`](../../../openehr/serialize/simplified/deviations.md) — package deviation register

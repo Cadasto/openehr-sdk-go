@@ -443,7 +443,7 @@ requirements:
       - PROBE-076
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
-      - docs/plans/2026-08-03-flat-coverage-ratchet.md
+      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -1325,7 +1325,7 @@ requirements:
     # DV_ORDERED/QUANTIFIED/AMOUNT suffixes added 28 more and removed every
     # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
     # an optional attribute). See
-    # docs/plans/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
+    # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
     # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #
     # The probe is exact on what it compares (no tolerated-drop list: a key
