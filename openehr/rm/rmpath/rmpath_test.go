@@ -363,6 +363,8 @@ func TestItemAtPathInContextAttributes(t *testing.T) {
 	when := rm.DVDateTime{Value: "2026-08-01T09:30:00Z"}
 	expiry := rm.DVDateTime{Value: "2026-09-01T00:00:00Z"}
 	timing := &rm.DVParsable{Value: "R2/2026-08-01T09:00:00Z/P1D", Formalism: "ISO8601"}
+	lang := rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	enc := rm.CodePhrase{CodeString: "UTF-8", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
 
 	tests := []struct {
 		name   string
@@ -434,6 +436,36 @@ func TestItemAtPathInContextAttributes(t *testing.T) {
 			parent: &rm.Action{Name: rm.DVText{Value: "act"}, Time: when},
 			path:   "/time",
 			want:   when,
+		},
+		{
+			// ENTRY `language` / `encoding` are non-pointer CODE_PHRASE fields,
+			// so entryChildren resolves them by value — the convention for
+			// non-pointer attributes (cf. ACTION `time` above), not a pointer
+			// into the instance.
+			name:   "OBSERVATION language",
+			parent: &rm.Observation{Name: rm.DVText{Value: "o"}, Language: lang},
+			path:   "/language",
+			want:   lang,
+		},
+		{
+			name:   "OBSERVATION encoding",
+			parent: &rm.Observation{Name: rm.DVText{Value: "o"}, Encoding: enc},
+			path:   "/encoding",
+			want:   enc,
+		},
+		{
+			// The same shared helper serves all five ENTRY subtypes; a second
+			// subtype pins that the delegation, not just OBSERVATION, is wired.
+			name:   "ADMIN_ENTRY language",
+			parent: &rm.AdminEntry{Name: rm.DVText{Value: "a"}, Language: lang},
+			path:   "/language",
+			want:   lang,
+		},
+		{
+			name:   "ADMIN_ENTRY encoding",
+			parent: &rm.AdminEntry{Name: rm.DVText{Value: "a"}, Encoding: enc},
+			path:   "/encoding",
+			want:   enc,
 		},
 	}
 	for _, tc := range tests {

@@ -16,16 +16,17 @@ package webtemplate
 // in-context leaf, rmpath must resolve the attribute on a populated instance of
 // the container.
 //
-// Exempted leaves are listed in unserialisableIC. They are not
-// rmpath-attributable data loss today: for non-DV_ datatypes the encoder's leaf
-// mapping (simplified.leafToFlat) silently skips the value regardless of what
-// rmpath does — a documented deviations.md gap — and unmapped DV_* values ride
-// |raw. Each exemption records why the leaf stays unresolved and what the
-// encode consequence is; when the blocking condition clears, delete the entry
-// and the guard then enforces resolution. An entry that no longer matches any
-// emitted leaf is reported as stale.
+// Exempted leaves are listed in unserialisableIC. None of them is
+// rmpath-attributable data loss today, for one of two reasons (see that map's
+// doc): the encoder's leaf mapping drops the datatype regardless of what rmpath
+// does, or the value is deliberately carried on the ctx/ surface instead. Each
+// exemption records which reason applies and what the encode consequence is;
+// when the blocking condition clears, delete the entry and the guard then
+// enforces resolution. An entry that no longer matches any emitted leaf is
+// reported as stale.
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -33,20 +34,31 @@ import (
 )
 
 // unserialisableIC maps "RMTYPE.attr" to why the leaf is deliberately left
-// unresolved in rmpath, and what that costs on encode. Every reason states the
-// real mechanism: a non-DV_ datatype is dropped by leafToFlat whether or not
-// rmpath resolves it, so those entries record a codec gap, not an rmpath one.
+// unresolved in rmpath, and what that costs on encode. Two reason classes are
+// present, and each entry states the mechanism that applies to it:
+//
+//   - Codec gap — a non-DV_ datatype (PARTY_PROXY, STRING) that leafToFlat drops
+//     whether or not rmpath resolves it, so resolving would change nothing.
+//   - Deliberate deferral — the value is already carried on another surface
+//     (the ctx/ short forms, whose encode-only spelling ADR 0015 made
+//     permanent), so resolving would double-spell it; or its ctx/ emission is
+//     not written yet, so nothing consumes the resolution.
+//
+// Datatype is therefore not a standing reason: CODE_PHRASE is a non-DV_ type
+// that leafToFlat *does* map since the PROBE-086 ratchet.
 var unserialisableIC = map[string]string{
 	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
 	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
 	"COMPOSITION.composer":  "PARTY_PROXY: leafToFlat silently skips non-DV_ values; ctx/composer_name carries the name (external_ref is dropped — known deviation)",
 	"EVENT_CONTEXT.start_time": "carried by ctx/time on encode; resolving here would double-spell the value " +
-		"until the metadata real-path decision — no data loss today",
-	"EVENT_CONTEXT.setting": "ctx/setting emission is deferred (simplified/deviations.md); resolving here would emit " +
-		"zero-valued leaves for ctx-decoded compositions. A non-default setting is currently dropped on encode — known deviation",
-	// ENTRY-level language / encoding are deliberately absent: the CODE_PHRASE
-	// leaf mapping landed, so those leaves now resolve through rmpath and this
-	// guard enforces it.
+		"(ADR 0015 keeps encode ctx/-only) — no data loss today",
+	"EVENT_CONTEXT.setting": "ctx/setting emission is deferred (simplified/deviations.md), so nothing consumes a resolution; " +
+		"a template-less decode or a hand-built RM value would then emit a zero-valued leaf (a conformant WithTemplate " +
+		"decode defaults it to 238|other care). A non-default setting is currently dropped on encode — known deviation",
+	// ENTRY-level language / encoding are deliberately absent from this map: the
+	// CODE_PHRASE leaf mapping landed, so those leaves now resolve through rmpath
+	// — this guard enforces that, and TestEntryLanguageEncodingResolveToValues
+	// pins the resolved value.
 	"OBSERVATION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"EVALUATION.subject":           "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"INSTRUCTION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
@@ -69,6 +81,11 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 	code := func(s string) rm.CodePhrase {
 		return rm.CodePhrase{CodeString: s, TerminologyID: rm.TerminologyID{Value: "openehr"}}
 	}
+	// ENTRY language / encoding are set on every ENTRY subtype so that
+	// TestEntryLanguageEncodingResolveToValues can compare a resolution against
+	// a distinguishable value rather than a zero CODE_PHRASE.
+	lang := rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	enc := rm.CodePhrase{CodeString: "UTF-8", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
 	switch rmType {
 	case "COMPOSITION", "EVENT_CONTEXT":
 		who, where := "Dr Who", "ward A3"
@@ -92,16 +109,19 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 		}
 		return comp, "", true
 	case "OBSERVATION":
-		return &rm.Observation{Name: name}, "", true
+		return &rm.Observation{Name: name, Language: lang, Encoding: enc}, "", true
 	case "EVALUATION":
-		return &rm.Evaluation{Name: name}, "", true
+		return &rm.Evaluation{Name: name, Language: lang, Encoding: enc}, "", true
 	case "INSTRUCTION":
 		exp := when
-		return &rm.Instruction{Name: name, Narrative: &rm.DVText{Value: "n"}, ExpiryTime: &exp}, "", true
+		return &rm.Instruction{
+			Name: name, Language: lang, Encoding: enc,
+			Narrative: &rm.DVText{Value: "n"}, ExpiryTime: &exp,
+		}, "", true
 	case "ACTION":
-		return &rm.Action{Name: name, Time: when}, "", true
+		return &rm.Action{Name: name, Language: lang, Encoding: enc, Time: when}, "", true
 	case "ADMIN_ENTRY":
-		return &rm.AdminEntry{Name: name}, "", true
+		return &rm.AdminEntry{Name: name, Language: lang, Encoding: enc}, "", true
 	case "ACTIVITY":
 		return &rm.Activity{
 			Name:   name,
@@ -162,6 +182,61 @@ func TestInContextLeavesResolveViaRmpath(t *testing.T) {
 			t.Errorf("stale unserialisableIC entry %q (%s): no in-context leaf with that "+
 				"RMTYPE.attr is emitted — delete it or fix the key", key, why)
 		}
+	}
+}
+
+// entryCodes returns the ENTRY-level language / encoding an instance carries, so
+// a resolution can be compared against the real field instead of against
+// "non-nil". A type switch keeps it reflection-free, as rmpath is (REQ-024).
+func entryCodes(root rm.Locatable) (language, encoding rm.CodePhrase, ok bool) {
+	switch e := root.(type) {
+	case *rm.Observation:
+		return e.Language, e.Encoding, true
+	case *rm.Evaluation:
+		return e.Language, e.Encoding, true
+	case *rm.Instruction:
+		return e.Language, e.Encoding, true
+	case *rm.Action:
+		return e.Language, e.Encoding, true
+	case *rm.AdminEntry:
+		return e.Language, e.Encoding, true
+	}
+	return rm.CodePhrase{}, rm.CodePhrase{}, false
+}
+
+// TestEntryLanguageEncodingResolveToValues pins *what* the ENTRY language /
+// encoding resolutions yield, which the guard above cannot: it only checks
+// non-nil, and entryChildren always returns a child for these non-pointer
+// CODE_PHRASE fields — a zero CODE_PHRASE would satisfy it. rmpath resolves both
+// by value, so the FLAT encoder receives the instance's real code; that is the
+// property the encode path depends on and this test asserts.
+func TestEntryLanguageEncodingResolveToValues(t *testing.T) {
+	for _, rmType := range []string{"OBSERVATION", "EVALUATION", "INSTRUCTION", "ACTION", "ADMIN_ENTRY"} {
+		t.Run(rmType, func(t *testing.T) {
+			root, prefix, ok := populated(rmType)
+			if !ok {
+				t.Fatalf("no populated instance for %s", rmType)
+			}
+			language, encoding, ok := entryCodes(root)
+			if !ok {
+				t.Fatalf("populated(%s) = %T, not an ENTRY subtype entryCodes knows", rmType, root)
+			}
+			if language.CodeString == "" || encoding.CodeString == "" {
+				t.Fatalf("populated(%s) leaves language/encoding unset — a value assertion "+
+					"would then pass on a zero CODE_PHRASE", rmType)
+			}
+			for attr, want := range map[string]rm.CodePhrase{"language": language, "encoding": encoding} {
+				path := prefix + "/" + attr
+				got, err := rmpath.ItemAtPath(root, path)
+				if err != nil {
+					t.Fatalf("ItemAtPath(%s) on %s = %v", path, rmType, err)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Errorf("ItemAtPath(%s) on %s = %#v, want the CODE_PHRASE value %#v",
+						path, rmType, got, want)
+				}
+			}
+		})
 	}
 }
 
