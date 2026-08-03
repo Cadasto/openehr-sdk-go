@@ -94,7 +94,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	}
 	// Separate composition-level context from clinical content; context is
 	// rebuilt from RM attributes, not from a Web Template leaf path.
-	ctx, content, err := siphonContext(flat, root.ID)
+	ctx, ctxOrigin, content, err := siphonContext(flat, root.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	}
 	// Context: parse once, then apply (with the mandatory-field check) after
 	// content, so an unresolvable content key surfaces as ErrUnknownPath first.
-	ci, err := parseCtx(ctx)
+	ci, err := parseCtx(ctx, ctxOrigin)
 	if err != nil {
 		return nil, err
 	}
@@ -169,9 +169,21 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //
 // The codec is deliberately asymmetric here: both spellings are accepted on
 // input, only ctx/ is written on output (ADR 0015). Upstream FLAT carries
-// `<root>/language|code` where this SDK reads and writes `ctx/language`; before
-// this table such a body failed with ErrUnknownPath, which made an
-// EHRbase-authored composition undecodable over a pure respelling.
+// `<root>/language|code` where this SDK reads and writes `ctx/language`, and
+// before this table that pure respelling was mishandled twice over:
+//
+//   - First it was refused, but not as a path gap: the composition-level
+//     `language` / `territory` / `composer` Web Template leaves are CODE_PHRASE
+//     and PARTY_PROXY, neither of which had a suffix mapping, so an
+//     EHRbase-authored body failed with ErrUnsupportedDatatype. Only
+//     `composer_self`, which reaches no Web Template node at all, was
+//     ErrUnknownPath.
+//   - Then, once CODE_PHRASE became a mapped leaf type (the PROBE-086 ratchet),
+//     those keys stopped failing and started decoding *silently* through ordinary
+//     leaf placement — bypassing ctx normalisation entirely. The value landed on
+//     the RM attribute directly, where applyContext (which runs after content and
+//     assigns from the ctx/ values) overwrote it; a body carrying only the real
+//     path failed the mandatory-context check instead.
 //
 // Entries here are respellings *only* — same information, different surface. Two
 // composition-level families deliberately stay out, because admitting them would
@@ -183,7 +195,11 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //     external_ref, which the ctx/ short forms structurally cannot carry. Silently
 //     dropping it would violate REQ-053's semantics-preserving contract.
 //
-// Both remain refused, and so remain visible in the PROBE-086 census.
+// The composer external_ref suffixes stay refused and appear in the PROBE-086
+// census; `context/setting` is held out of that census as the documented waiver —
+// its real path decodes wherever the Web Template carries the node, then
+// re-encodes to nothing until ctx/setting emission lands (see deviations.md and
+// docs/specifications/conformance.md § PROBE-086).
 var metadataAliases = map[string]string{
 	"language|code":      "ctx/language",
 	"territory|code":     "ctx/territory",
@@ -202,23 +218,54 @@ var metadataAliasTerminology = map[string]string{
 	"territory|terminology": "ISO_3166-1",
 }
 
+// MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
+// accepts as aliases of the ctx/ composition-metadata short forms (ADR 0015),
+// sorted. `"language|code"`, for instance, is accepted at
+// `<root>/language|code` and normalised to `ctx/language`.
+//
+// This is informative public surface for conformance tooling, not a decode knob.
+// A harness that has to hold composition metadata out of a like-for-like FLAT
+// comparison (PROBE-086) derives that hold-out from here rather than restating
+// the table, so an alias the codec accepts cannot silently diverge from the
+// spellings a census excuses. The returned slice is freshly allocated, so a
+// caller may sort or filter it without reaching the decoder's own table.
+func MetadataAliasSpellings() []string {
+	return slices.Sorted(maps.Keys(metadataAliases))
+}
+
+// MetadataWitnessSpellings returns the root-relative FLAT spellings the decoder
+// accepts as terminology witnesses beside an aliased CODE_PHRASE, sorted: the
+// `|terminology` keys whose value is checked against the terminology the ctx/
+// short form implies and then discarded.
+//
+// Informative public surface for conformance tooling on the same terms as
+// [MetadataAliasSpellings], reported separately because a witness is not data —
+// nothing on the ctx/ side carries it, so a comparison has to account for it as
+// a checked-and-dropped key rather than as a respelling. The returned slice is
+// freshly allocated.
+func MetadataWitnessSpellings() []string {
+	return slices.Sorted(maps.Keys(metadataAliasTerminology))
+}
+
 // siphonContext splits a FLAT map into composition-level context and clinical
 // content, normalising both accepted metadata spellings into one ctx/-keyed map.
+// ctxOrigin records, per normalised ctx/ key, the body key the value arrived
+// under, so an error names the spelling the payload actually used rather than a
+// ctx/ form its author may never have written.
 //
 // A real path that contradicts an explicit ctx/ entry is an error rather than a
 // precedence rule: preferring either silently would corrupt composition
 // metadata, the same stance the codec already takes on an index collision.
-func siphonContext(flat map[string]any, rootID string) (ctx, content map[string]any, err error) {
-	ctx, content = make(map[string]any), make(map[string]any)
+func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxOrigin map[string]string, content map[string]any, err error) {
+	ctx, ctxOrigin, content = make(map[string]any), make(map[string]string), make(map[string]any)
 	// Sorted so a body carrying two conflicting real-path spellings reports the
 	// same key first on every run — a map-order-dependent error message is not
 	// reproducible for whoever has to fix the payload.
 	for _, key := range slices.Sorted(maps.Keys(flat)) {
 		val := flat[key]
-		switch {
-		case strings.HasPrefix(key, "ctx/"):
-			if err := putCtx(ctx, key, val, key); err != nil {
-				return nil, nil, err
+		if strings.HasPrefix(key, "ctx/") {
+			if err := putCtx(ctx, ctxOrigin, key, val, key); err != nil {
+				return nil, nil, nil, err
 			}
 			continue
 		}
@@ -230,61 +277,83 @@ func siphonContext(flat map[string]any, rootID string) (ctx, content map[string]
 		if want, isWitness := metadataAliasTerminology[rel]; isWitness {
 			got, err := ctxString(key, val)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 			if got != want {
-				return nil, nil, fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
+				return nil, nil, nil, fmt.Errorf("%w: %s = %q, but the ctx/ form implies %q (a differing terminology cannot be carried)",
 					ErrUnsupportedDatatype, key, got, want)
 			}
 			continue
 		}
 		if ctxKey, isAlias := metadataAliases[rel]; isAlias {
-			if err := putCtx(ctx, ctxKey, val, key); err != nil {
-				return nil, nil, err
+			if err := putCtx(ctx, ctxOrigin, ctxKey, val, key); err != nil {
+				return nil, nil, nil, err
 			}
 			continue
 		}
 		content[key] = val
 	}
-	return ctx, content, nil
+	return ctx, ctxOrigin, content, nil
 }
 
-// putCtx records a context value, rejecting a second spelling that disagrees.
-// origin names the key as the caller wrote it, so the error points at the
-// payload rather than at the normalised ctx/ form they may never have used.
-func putCtx(ctx map[string]any, ctxKey string, val any, origin string) error {
-	if prev, seen := ctx[ctxKey]; seen && provablyDifferent(prev, val) {
-		return fmt.Errorf("%w: conflicting spellings of %s — %s gives %#v, another key already gave %#v; remove one",
-			ErrUnknownPath, ctxKey, origin, val, prev)
+// putCtx records a context value under its normalised ctx/ key, tracking in
+// origin the body key it arrived under. The admissibility check is total — every
+// value shape is either stored, refused as a shape no ctx/ field can hold, or
+// compared against what an earlier spelling already gave:
+//
+//   - A composite (JSON object or array) is refused outright. No supported ctx/
+//     field holds one, and leaving it to the comparison below is what let a
+//     malformed payload through before: a composite could not be compared, so the
+//     scalar spelling beside it silently overwrote it whenever the sorted key
+//     order put the composite first (PR #86 review round 3).
+//   - Anything else is compared as canonical JSON bytes, which stays total across
+//     kinds — a string against a number, a bool against null — where a type switch
+//     on one side alone has to give up on the pairs it does not enumerate. Numbers
+//     keep their exact lexical form (json.Number marshals verbatim), so "1" and
+//     "1.0" are a conflict rather than being rounded into agreement.
+//
+// A comparison, never a precedence rule: silently preferring either spelling
+// would corrupt composition metadata (ADR 0015, decision 4).
+func putCtx(ctx map[string]any, origin map[string]string, ctxKey string, val any, bodyKey string) error {
+	switch val.(type) {
+	case map[string]any, []any:
+		return fmt.Errorf("%w: %s must be a scalar value, got %T (from %s)",
+			ErrUnsupportedDatatype, ctxKey, val, bodyKey)
+	}
+	if prev, seen := ctx[ctxKey]; seen && !sameCtxValue(prev, val) {
+		return fmt.Errorf("%w: conflicting spellings of %s: %q gives %#v, %q gives %#v; remove one",
+			ErrUnknownPath, ctxKey, ctxSpelling(origin, ctxKey), prev, bodyKey, val)
 	}
 	ctx[ctxKey] = val
+	origin[ctxKey] = bodyKey
 	return nil
 }
 
-// provablyDifferent compares two candidate values for one context key without
-// assuming they are comparable. A malformed payload can put a JSON object or
-// array here, and `!=` on those panics at runtime — a crash on untrusted input,
-// which this codec must never do (REQ-108).
+// sameCtxValue reports whether two candidate values for one ctx/ key are the same
+// value, comparing their canonical JSON encodings byte for byte. `==` on `any` is
+// not an option: it panics for the JSON object or array a malformed payload can
+// carry, and this codec must not panic on untrusted input (REQ-025 — no panics).
+// Marshalling keeps the comparison independent of the caller's own shape checks.
 //
-// Only the scalar kinds a ctx/ field can legitimately hold are compared. An
-// unprovable pair (either side a composite) is left to [parseCtx], which types
-// every supported field as a string or a bool and rejects anything else with a
-// typed error — so deferring cannot let a bad value through.
-func provablyDifferent(prev, val any) bool {
-	switch p := prev.(type) {
-	case string:
-		v, ok := val.(string)
-		return !ok || p != v
-	case bool:
-		v, ok := val.(bool)
-		return !ok || p != v
-	case json.Number:
-		v, ok := val.(json.Number)
-		return !ok || p.String() != v.String()
-	case nil:
-		return val != nil
+// A value that will not marshal counts as different: an incomparable pair is not
+// a proven agreement, and refusing it is the safe outcome.
+func sameCtxValue(a, b any) bool {
+	ab, err := json.Marshal(a)
+	if err != nil {
+		return false
 	}
-	return false
+	bb, err := json.Marshal(b)
+	if err != nil {
+		return false
+	}
+	return bytes.Equal(ab, bb)
+}
+
+// ctxSpelling names the body key a ctx/ value arrived under. [siphonContext] always
+// records one; the fallback keeps an error legible for a ctx map assembled some
+// other way (in-package callers, tests).
+func ctxSpelling(origin map[string]string, ctxKey string) string {
+	return cmp.Or(origin[ctxKey], ctxKey)
 }
 
 // ctxInfo is the parsed ctx/ context — the shared source for applyContext and
@@ -302,27 +371,32 @@ type ctxInfo struct {
 // any other ctx/ field is ErrUnknownPath (see deviations.md). Values of the
 // wrong JSON type are rejected — coercing them would silently corrupt
 // composition metadata (e.g. a numeric composer_name becoming an empty
-// PARTY_IDENTIFIED name).
-func parseCtx(ctx map[string]any) (ctxInfo, error) {
+// PARTY_IDENTIFIED name). origin (from [siphonContext]) names the body key each
+// value arrived under, so an error points at the payload's own spelling.
+//
+// Keys are walked in sorted order: a body with two bad ctx/ fields must name the
+// same one on every run.
+func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 	var ci ctxInfo
 	var err error
-	for key, val := range ctx {
+	for _, key := range slices.Sorted(maps.Keys(ctx)) {
+		val, label := ctx[key], ctxSpelling(origin, key)
 		switch strings.TrimPrefix(key, "ctx/") {
 		case "language":
-			ci.language, err = ctxString(key, val)
+			ci.language, err = ctxString(label, val)
 		case "territory":
-			ci.territory, err = ctxString(key, val)
+			ci.territory, err = ctxString(label, val)
 		case "composer_name":
-			ci.composerName, err = ctxString(key, val)
+			ci.composerName, err = ctxString(label, val)
 			ci.haveComposerName = true
 		case "composer_self":
 			b, ok := val.(bool)
 			if !ok {
-				err = fmt.Errorf("%w: %s must be a boolean, got %T", ErrUnsupportedDatatype, key, val)
+				err = fmt.Errorf("%w: %s must be a boolean, got %T", ErrUnsupportedDatatype, label, val)
 			}
 			ci.composerSelf = b
 		case "time":
-			ci.time, err = ctxString(key, val)
+			ci.time, err = ctxString(label, val)
 			ci.haveTime = true
 		default:
 			err = fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
@@ -330,6 +404,18 @@ func parseCtx(ctx map[string]any) (ctxInfo, error) {
 		if err != nil {
 			return ci, err
 		}
+	}
+	// composer_self and a composer name are two mutually exclusive
+	// representations of one RM attribute: PARTY_SELF carries no name, and
+	// PARTY_IDENTIFIED is not the EHR subject. [applyContext] can only build one,
+	// and its switch prefers PARTY_SELF — so accepting the pair would drop the
+	// name silently, exactly what refusing two conflicting spellings of one field
+	// prevents. `composer_self: false` beside a name is not a conflict: it denies
+	// nothing the name asserts, and the encoder's own PARTY_IDENTIFIED output
+	// omits composer_self entirely.
+	if ci.composerSelf && ci.haveComposerName {
+		return ci, fmt.Errorf("%w: conflicting composer spellings: %q makes the composer the EHR subject (PARTY_SELF), %q names one (PARTY_IDENTIFIED); remove one",
+			ErrUnknownPath, ctxSpelling(origin, "ctx/composer_self"), ctxSpelling(origin, "ctx/composer_name"))
 	}
 	return ci, nil
 }
@@ -1093,30 +1179,111 @@ var allowedSuffixes = map[string]map[string]bool{
 	"CODE_PHRASE":   {"code": true, "terminology": true},
 }
 
-// orderedSuffixAttr maps the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixKind is the JSON value kind an optional pass-through suffix must carry.
+// The value itself is handed to canjson untouched, so this is the last point at
+// which a wrong kind can be reported against the FLAT key carrying it.
+type suffixKind uint8
+
+const (
+	kindString suffixKind = iota
+	kindNumber
+	kindBool
+)
+
+func (k suffixKind) String() string {
+	switch k {
+	case kindNumber:
+		return "number"
+	case kindBool:
+		return "boolean"
+	default:
+		return "string"
+	}
+}
+
+// holds reports whether v could satisfy this kind. It is a necessary condition,
+// not a full type check: canjson remains the authority on the RM type, and this
+// deliberately admits everything canjson does so that naming the FLAT key never
+// costs a body that decodes today.
+//
+//   - Numbers arrive as json.Number from a decoded body (unmarshalObject
+//     preserves exact magnitudes) but as ordinary Go numerics from in-package
+//     callers, so both spellings count.
+//   - A *quoted* number satisfies kindNumber: canjson parses a numeric string
+//     into Real / Integer, and some producers quote every scalar. Only a string
+//     that is not a number at all (`|accuracy: "abc"`) is refused — the case
+//     canjson would fail on anyway, but too late to name the key.
+func (k suffixKind) holds(v any) bool {
+	switch t := v.(type) {
+	case string:
+		if k == kindString {
+			return true
+		}
+		_, err := strconv.ParseFloat(t, 64)
+		return k == kindNumber && err == nil
+	case bool:
+		return k == kindBool
+	case json.Number, float32, float64, int, int32, int64:
+		return k == kindNumber
+	}
+	return false
+}
+
+// orderedSuffix is one optional pass-through suffix: the canonical RM attribute
+// it rebuilds and the JSON kind its value must carry.
+type orderedSuffix struct {
+	attr string
+	kind suffixKind
+}
+
+// orderedSuffixes maps the optional DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
 // suffixes onto the canonical RM attribute each rebuilds, for the datatypes
 // whose allowedSuffixes admit them. The value passes through as decoded (a
 // json.Number keeps its exact lexical form), so canjson enforces the RM type; the
 // one exception is normal_status, a CODE_PHRASE rebuilt from a bare code.
-var orderedSuffixAttr = map[string]string{
-	"magnitude_status":    "magnitude_status",
-	"accuracy":            "accuracy",
-	"accuracy_is_percent": "accuracy_is_percent",
-	"precision":           "precision",
-	"units_system":        "units_system",
-	"units_display_name":  "units_display_name",
-	"formatting":          "formatting",
+//
+// The kind is carried alongside because canjson enforces the RM type too late to
+// say *which FLAT key* was malformed — see [applyOrderedSuffixes].
+var orderedSuffixes = map[string]orderedSuffix{
+	"magnitude_status":    {"magnitude_status", kindString},
+	"accuracy":            {"accuracy", kindNumber},
+	"accuracy_is_percent": {"accuracy_is_percent", kindBool},
+	"precision":           {"precision", kindNumber},
+	"units_system":        {"units_system", kindString},
+	"units_display_name":  {"units_display_name", kindString},
+	"formatting":          {"formatting", kindString},
 }
+
+// orderedSuffixNames holds the [orderedSuffixes] keys in sorted order, so a leaf
+// carrying two malformed suffixes names the same one on every run.
+var orderedSuffixNames = slices.Sorted(maps.Keys(orderedSuffixes))
 
 // applyOrderedSuffixes copies the optional suffixes present in sfx onto the
 // canonical object dv. An absent suffix sets nothing — the attributes are all
 // optional in the RM, so a missing one must stay absent rather than become a
 // zero value (the same contract requireSuffix enforces for mandatory ones).
+//
+// A value of the wrong JSON kind is refused here, where the caller still has the
+// FLAT key in hand to name it (decode %q). Passed through, it would instead
+// surface from canjson against the *rebuilt tree* — "decode /content/0:
+// typereg.Decode …" — naming a canonical path the payload author never wrote and
+// no FLAT key at all. Deliberately no gap sentinel: a malformed value is a defect
+// in the payload, not a datatype or path this codec declines to model, and the
+// conformance census counts only the latter. The check adds no strictness of its
+// own — it admits everything canjson admits, quoted numbers included (see
+// [suffixKind.holds]) — and the RM's own value constraints (magnitude_status
+// against its code set, …) stay with the validation package.
 func applyOrderedSuffixes(dv, sfx map[string]any) error {
-	for suffix, attr := range orderedSuffixAttr {
-		if v, ok := sfx[suffix]; ok {
-			dv[attr] = v
+	for _, suffix := range orderedSuffixNames {
+		v, ok := sfx[suffix]
+		if !ok {
+			continue
 		}
+		want := orderedSuffixes[suffix]
+		if !want.kind.holds(v) {
+			return fmt.Errorf("|%s must be a %s, got %T", suffix, want.kind, v)
+		}
+		dv[want.attr] = v
 	}
 	if v, ok := sfx["normal_status"]; ok {
 		code, err := ctxString("|normal_status", v)

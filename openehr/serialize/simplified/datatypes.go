@@ -155,6 +155,18 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 	case "CODE_PHRASE":
 		// The standalone form reuses the nested check, which also bounds the
 		// TERMINOLOGY_ID shape the |terminology suffix reduces to a string.
+		//
+		// An empty code_string is the one shape where "captured" depends on the
+		// rest of the value: codePhraseToFlat writes *nothing* for it (see there —
+		// load-bearing for a zero-valued ENTRY.language / .encoding, which is a
+		// non-pointer field with no nil for [leafToFlat] to catch). That skip is
+		// lossless only when there is nothing else to write, so a partly-populated
+		// value — a terminology with no code — must not count as captured, or it
+		// would encode to nothing at all. It rides |raw instead, the same way a
+		// preferred_term beside an empty code already does.
+		if cs, _ := m["code_string"].(string); cs == "" {
+			return codePhraseTerminology(m) == "" && codePhraseCaptured(m)
+		}
 		return codePhraseCaptured(m)
 	case "DV_CODED_TEXT":
 		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form, and
@@ -186,10 +198,8 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// the symbol as archetype-local; a non-local terminology would be
 		// silently rewritten, so it rides |raw instead.
 		if dc, ok := sym["defining_code"].(map[string]any); ok {
-			if tid, ok := dc["terminology_id"].(map[string]any); ok {
-				if tv, _ := tid["value"].(string); tv != "" && tv != "local" {
-					return false
-				}
+			if tv := codePhraseTerminology(dc); tv != "" && tv != "local" {
+				return false
 			}
 		}
 	}
@@ -197,8 +207,9 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 }
 
 // normalStatusTerminology is the openEHR terminology the |normal_status suffix
-// implies: the wire carries only the ordinal code (N, H, HH, L, LL, …), which
-// the RM defines against the openEHR terminology group `normal_status`.
+// implies: the wire carries only the ordinal code (N, H, HH, L, LL, …), which the
+// RM defines against the openEHR code set `normal statuses` — hence the
+// terminology_id `openehr` decode rebuilds the CODE_PHRASE with.
 const normalStatusTerminology = "openehr"
 
 // normalStatusCaptured reports whether a canonical normal_status CODE_PHRASE is
@@ -212,13 +223,20 @@ func normalStatusCaptured(v any) bool {
 	if !ok {
 		return false
 	}
-	tid, ok := cp["terminology_id"].(map[string]any)
-	if !ok {
-		// No terminology to contradict the implied one.
-		return true
-	}
-	tv, _ := tid["value"].(string)
+	// An absent or empty terminology contradicts nothing, so it survives the
+	// implication decode makes.
+	tv := codePhraseTerminology(cp)
 	return tv == "" || tv == normalStatusTerminology
+}
+
+// codePhraseTerminology returns the terminology_id value carried by a canonical
+// CODE_PHRASE object, or "" when it has none — the one attribute the
+// |terminology suffix reduces to a bare string, and the one a rebuild can
+// therefore silently rewrite.
+func codePhraseTerminology(cp map[string]any) string {
+	tid, _ := cp["terminology_id"].(map[string]any)
+	v, _ := tid["value"].(string)
+	return v
 }
 
 // codePhraseCaptured reports whether a canonical CODE_PHRASE object carries
@@ -508,8 +526,9 @@ func codedToFlat(out map[string]any, flatPath string, dv rm.DVCodedText) {
 // modelled.
 //
 // `accuracy` is deliberately absent for DV_DATE / DV_DATE_TIME / DV_TIME: those
-// inherit from DV_ABSOLUTE_QUANTITY, where accuracy is a DV_DURATION object
-// rather than a Real, so it has no scalar suffix form and stays on |raw.
+// inherit from DV_TEMPORAL, which redefines accuracy as a DV_DURATION object
+// (DV_ABSOLUTE_QUANTITY, its own parent, declares it as a DV_AMOUNT) rather than
+// the Real DV_AMOUNT carries, so it has no scalar suffix form and stays on |raw.
 type ordered struct {
 	magnitudeStatus   *string
 	normalStatus      *rm.CodePhrase
@@ -551,6 +570,10 @@ func emitOrdered(out map[string]any, flatPath string, o ordered) {
 // unconditionally would put empty |code / |terminology leaves on every
 // composition whose metadata arrived through the ctx/ forms — the hazard
 // EVENT_CONTEXT.setting documents in deviations.md.
+//
+// The skip is only safe because [capturedFully] holds back the values it would
+// lose: a code-less CODE_PHRASE that still carries a terminology rides |raw and
+// never reaches here.
 func codePhraseToFlat(out map[string]any, flatPath string, cp rm.CodePhrase) {
 	if cp.CodeString == "" {
 		return

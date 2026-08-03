@@ -166,6 +166,68 @@ func TestDecodeRejectsWrongTypedCtx(t *testing.T) {
 	}
 }
 
+// TestMalformedOrderedSuffixNamesFlatKey — PR #86 review round 3. A malformed
+// value for one of the pass-through DV_ORDERED / DV_QUANTIFIED / DV_AMOUNT
+// suffixes used to escape as a raw canjson error — "decode /content/3:
+// typereg.Decode …" — naming a canonical path the payload author never wrote and
+// no FLAT key at all, which is undiagnosable from the payload side. The refusal
+// now happens while the offending FLAT key is still in hand.
+//
+// Deliberately no sentinel: a malformed value is a defect in the payload, not a
+// datatype or path the codec declines to model, and the PROBE-086 census counts
+// only the latter (a non-sentinel error is a fault there, which is correct here).
+func TestMalformedOrderedSuffixNamesFlatKey(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f1, &m); err != nil {
+		t.Fatal(err)
+	}
+	// Any DV_QUANTITY leaf will do; take it from the encoder's own output so the
+	// test does not hard-code a fixture path.
+	var base string
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		if rest, ok := strings.CutSuffix(k, "|magnitude"); ok {
+			base = rest
+			break
+		}
+	}
+	if base == "" {
+		t.Fatal("no |magnitude leaf in the encoded fixture")
+	}
+	m[base+"|accuracy"] = "abc" // a Real attribute, given a string
+	mutated, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = simplified.UnmarshalFlat(mutated, wt)
+	if err == nil {
+		t.Fatal("UnmarshalFlat(|accuracy = \"abc\") = nil error, want a refusal")
+	}
+	for _, want := range []string{base, "|accuracy", "number"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %q", err, want)
+		}
+	}
+	if errors.Is(err, simplified.ErrUnknownPath) || errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+	}
+	// The same key with a well-formed value decodes, so the check bounds the kind
+	// and nothing more.
+	m[base+"|accuracy"] = 0.5
+	m[base+"|accuracy_is_percent"] = true
+	ok, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := simplified.UnmarshalFlat(ok, wt); err != nil {
+		t.Errorf("well-formed |accuracy rejected: %v", err)
+	}
+}
+
 // TestDecodeRejectsTrailingJSON: content after the first JSON object is an error,
 // not silently ignored.
 func TestDecodeRejectsTrailingJSON(t *testing.T) {

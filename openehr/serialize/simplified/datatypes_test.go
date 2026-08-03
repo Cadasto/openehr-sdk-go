@@ -4,6 +4,7 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -508,6 +509,20 @@ func TestOptionalOrderedSuffixesRoundTrip(t *testing.T) {
 			v:      rm.DVText{Value: "DV_TEXT value", Formatting: new("plain")},
 			want:   map[string]any{"p/x": "DV_TEXT value", "p/x|formatting": "plain"},
 		},
+		{
+			// DV_DURATION inherits accuracy from DV_AMOUNT as a Real, so unlike the
+			// DV_TEMPORAL types (see TestDateAccuracyRidesRaw) it has a scalar suffix
+			// form and must not fall back to |raw.
+			rmType: "DV_DURATION",
+			v: rm.DVDuration{
+				Value: "PT1H30M", MagnitudeStatus: &status, NormalStatus: normal,
+				Accuracy: &acc, AccuracyIsPercent: &pct,
+			},
+			want: map[string]any{
+				"p/x": "PT1H30M", "p/x|magnitude_status": "~", "p/x|normal_status": "N",
+				"p/x|accuracy": 50.5, "p/x|accuracy_is_percent": true,
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.rmType, func(t *testing.T) {
@@ -676,11 +691,163 @@ func TestOtherRejectsCompanionSuffixes(t *testing.T) {
 	}
 }
 
+// TestTerminologyOnlyCodePhraseRidesRaw — regression, PR #86 review round 3. A
+// CODE_PHRASE with a terminology but no code encoded to *nothing*: the empty-code
+// skip in codePhraseToFlat fired, and capturedFully still called the value
+// captured, so the |raw backstop never engaged. The all-zero value must keep
+// skipping (TestCodePhraseEmptyCodeSkipped — it is what a ctx/-decoded
+// composition's ENTRY language / encoding hold), but a partly-populated one has to
+// ride |raw losslessly, as a preferred_term already does.
+func TestTerminologyOnlyCodePhraseRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	cp := rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("terminology-only CODE_PHRASE encoded to %#v, want a |raw fragment", out)
+	}
+	if raw["_type"] != "CODE_PHRASE" {
+		t.Errorf("|raw _type = %v, want CODE_PHRASE", raw["_type"])
+	}
+	tid, _ := raw["terminology_id"].(map[string]any)
+	if tid["value"] != "ISO_639-1" {
+		t.Errorf("|raw lost the terminology: %#v", raw)
+	}
+	// And back: |raw decodes to the same canonical fragment, so the value survives
+	// the round-trip rather than being reconstructed from suffixes it never had.
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["_type"] != "CODE_PHRASE" {
+		t.Errorf("_type = %v, want CODE_PHRASE", dv["_type"])
+	}
+	if cs, _ := dv["code_string"].(string); cs != "" {
+		t.Errorf("code_string = %q, want empty (none was encoded)", cs)
+	}
+	tid, _ = dv["terminology_id"].(map[string]any)
+	if tid["value"] != "ISO_639-1" {
+		t.Errorf("decoded terminology_id = %#v, want ISO_639-1", dv["terminology_id"])
+	}
+}
+
+// TestCodedTextWithFormattingRoundTrips covers the third corner of the
+// |other/formatting family: |other alone and a formatted DV_TEXT at an open coded
+// leaf are pinned above, but a *genuine* DV_CODED_TEXT carrying `formatting`
+// alongside its defining_code must keep the suffix form — both the code and the
+// decoration survive, and nothing falls back to |raw.
+func TestCodedTextWithFormattingRoundTrips(t *testing.T) {
+	v := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "event", Formatting: new("markdown")},
+		DefiningCode: rm.CodePhrase{CodeString: "433", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+	}
+	for _, listOpen := range []bool{false, true} {
+		out := map[string]any{}
+		if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", listOpen); err != nil {
+			t.Fatalf("leafToFlat(listOpen=%v): %v", listOpen, err)
+		}
+		want := map[string]any{
+			"p/x|code": "433", "p/x|value": "event",
+			"p/x|terminology": "openehr", "p/x|formatting": "markdown",
+		}
+		if len(out) != len(want) {
+			t.Fatalf("listOpen=%v: got %#v, want exactly %#v", listOpen, out, want)
+		}
+		for k, w := range want {
+			if out[k] != w {
+				t.Errorf("listOpen=%v: out[%q] = %#v, want %#v", listOpen, k, out[k], w)
+			}
+		}
+		dv, err := dvFromSuffixes("DV_CODED_TEXT", listOpen, suffixesOf(out, "p/x"))
+		if err != nil {
+			t.Fatalf("dvFromSuffixes(listOpen=%v): %v", listOpen, err)
+		}
+		if dv["_type"] != "DV_CODED_TEXT" || dv["formatting"] != "markdown" {
+			t.Errorf("listOpen=%v: decoded %#v, want DV_CODED_TEXT with formatting", listOpen, dv)
+		}
+		dc, _ := dv["defining_code"].(map[string]any)
+		if dc["code_string"] != "433" {
+			t.Errorf("listOpen=%v: decoded defining_code = %#v", listOpen, dv["defining_code"])
+		}
+	}
+}
+
+// TestOrderedSuffixWrongKindRejected — PR #86 review round 3. The pass-through
+// suffixes hand their value to canjson untouched, so a malformed one used to
+// surface as a bare canjson error naming the canonical path and no FLAT key at
+// all. The kind is checked while the key is still in hand (see
+// TestMalformedOrderedSuffixNamesFlatKey for the surfaced message). No gap
+// sentinel: a malformed value is a payload defect, not a modelled-gap refusal.
+func TestOrderedSuffixWrongKindRejected(t *testing.T) {
+	base := map[string]any{"magnitude": 1.0, "unit": "mm"}
+	for _, tc := range []struct {
+		suffix string
+		bad    any
+		want   string
+	}{
+		{"magnitude_status", 1.0, "string"},
+		{"accuracy", "abc", "number"},
+		{"accuracy_is_percent", "yes", "boolean"},
+		{"precision", true, "number"},
+		{"units_system", 1.0, "string"},
+		{"units_display_name", false, "string"},
+	} {
+		t.Run(tc.suffix, func(t *testing.T) {
+			sfx := maps.Clone(base)
+			sfx[tc.suffix] = tc.bad
+			_, err := dvFromSuffixes("DV_QUANTITY", false, sfx)
+			if err == nil {
+				t.Fatalf("|%s = %#v accepted", tc.suffix, tc.bad)
+			}
+			for _, want := range []string{"|" + tc.suffix, tc.want} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not mention %q", err, want)
+				}
+			}
+			if errors.Is(err, ErrUnknownPath) || errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v carries a modelled-gap sentinel; a malformed value is a payload defect", err)
+			}
+			// The well-formed value of the same kind still passes through.
+			sfx[tc.suffix] = map[string]any{
+				"string": any("~"), "number": any(1.5), "boolean": any(true),
+			}[tc.want]
+			if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+				t.Errorf("well-formed |%s rejected: %v", tc.suffix, err)
+			}
+		})
+	}
+	// |formatting rides the same table on DV_TEXT.
+	if _, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "x", "formatting": 1.0}); err == nil {
+		t.Error("|formatting = 1.0 accepted, want a kind error")
+	}
+	// json.Number is the kind a decoded body actually carries.
+	if _, err := dvFromSuffixes("DV_QUANTITY", false, map[string]any{
+		"magnitude": json.Number("1"), "unit": "mm", "accuracy": json.Number("0.5"),
+	}); err != nil {
+		t.Errorf("json.Number |accuracy rejected: %v", err)
+	}
+	// The check adds no strictness of its own: canjson parses a *quoted* number
+	// into Real / Integer, so a producer that quotes every scalar must keep
+	// decoding. Only a string that is no number at all is refused.
+	for _, sfx := range []map[string]any{
+		{"magnitude": 1.0, "unit": "mm", "accuracy": "0.5"},
+		{"magnitude": 1.0, "unit": "mm", "precision": "2"},
+	} {
+		if _, err := dvFromSuffixes("DV_QUANTITY", false, sfx); err != nil {
+			t.Errorf("quoted number rejected (canjson accepts it): %v in %v", err, sfx)
+		}
+	}
+}
+
 // TestDateAccuracyRidesRaw: DV_DATE / DV_DATE_TIME / DV_TIME inherit from
-// DV_ABSOLUTE_QUANTITY, where `accuracy` is a DV_DURATION object rather than a
-// Real, so it has no scalar suffix form and must keep forcing |raw. Guards
-// against `accuracy` being added to their capturedKeys by symmetry with
-// DV_QUANTITY, which would emit an object where a number belongs.
+// DV_TEMPORAL, which redefines `accuracy` as a DV_DURATION object (its parent
+// DV_ABSOLUTE_QUANTITY declares a DV_AMOUNT) rather than the Real that DV_AMOUNT —
+// and so DV_QUANTITY, DV_COUNT, DV_DURATION, DV_PROPORTION — carries. It
+// therefore has no scalar suffix form and must keep forcing |raw. Guards against
+// `accuracy` being added to their capturedKeys by symmetry with DV_QUANTITY, which
+// would emit an object where a number belongs.
 func TestDateAccuracyRidesRaw(t *testing.T) {
 	out := map[string]any{}
 	d := rm.DVDate{Value: "2022-01-12", Accuracy: &rm.DVDuration{Value: "P1D"}}

@@ -6,6 +6,7 @@ package simplified_test
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,6 +14,13 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
+
+// bodyWeightOPT is a fixture whose Web Template root id ("body_weight") sorts
+// *before* the literal "ctx/" prefix, where minimalObsOPT ("minimal") and
+// vitalSignsOPT ("encounter") sort after it. siphonContext walks a body in sorted
+// key order, so the pair pins both directions of that walk — see
+// TestMetadataCompositeValueRefusedInBothKeyOrders.
+const bodyWeightOPT = "../../../testkit/cassettes/templates/body_weight.opt"
 
 func TestContextEncodeAndRoundTrip(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
@@ -184,8 +192,13 @@ func reflatten(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate, 
 
 // TestMetadataRealPathSpellingAccepted — ADR 0015. The reference spells
 // composition metadata as real paths under the template root where REQ-053 reads
-// the ctx/ short forms. Both are accepted on input; before this, an
-// EHRbase-authored body failed with ErrUnknownPath over a pure respelling.
+// the ctx/ short forms. Both are accepted on input; before the alias table an
+// EHRbase-authored body was mishandled over a pure respelling — first refused as
+// ErrUnsupportedDatatype (the composition-level language / territory / composer
+// leaves are CODE_PHRASE and PARTY_PROXY; only composer_self, which reaches no
+// Web Template node, was ErrUnknownPath), then, once CODE_PHRASE became a mapped
+// leaf type, decoded silently through ordinary leaf placement with ctx
+// normalisation bypassed altogether.
 func TestMetadataRealPathSpellingAccepted(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
 	tests := []struct {
@@ -347,15 +360,22 @@ func TestMetadataTerminologyWitnessChecked(t *testing.T) {
 }
 
 // TestMetadataNonRespellingsStillRefused — ADR 0015 admits respellings only.
-// context/setting is unsupported on the ctx/ side too (an unimplemented field,
-// not a spelling gap) and the composer's external_ref cannot be carried by the
-// short forms at all; both must stay loud rather than be quietly absorbed.
+// Neither of these keys is aliased onto ctx/: context/setting is an unimplemented
+// field on both surfaces (ctx/setting is unsupported on decode too), and the
+// composer's external_ref cannot be carried by the short forms at all. So neither
+// may be quietly absorbed into the context — each has to surface as an error from
+// whatever refuses it.
 func TestMetadataNonRespellingsStillRefused(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
 	for _, tc := range []struct {
 		name string
 		mut  func(root string, m map[string]any)
 	}{
+		// Not aliased onto ctx/ — and with this fixture the refusal comes from the
+		// Web Template, which carries no context/setting node, rather than from a
+		// codec rule about the key itself. Where a template *does* carry the node
+		// the real path decodes, which is the documented PROBE-086 waiver (see
+		// deviations.md); what this pins is that it is never absorbed as metadata.
 		{"context/setting", func(root string, m map[string]any) {
 			m[root+"/context/setting|code"] = "238"
 			m[root+"/context/setting|value"] = "other care"
@@ -377,7 +397,7 @@ func TestMetadataNonRespellingsStillRefused(t *testing.T) {
 // putCtx compared two candidate values with `!=` on `any`, which panics for a
 // JSON object or array. A malformed payload reaches that path whenever both
 // accepted spellings of one field are present, so the codec crashed on
-// untrusted input instead of reporting a typed error (REQ-108).
+// untrusted input instead of reporting a typed error (REQ-025 — no panics).
 func TestMetadataConflictOnCompositeValueDoesNotPanic(t *testing.T) {
 	_, wt := genComposition(t, minimalObsOPT)
 	root := wt.Tree.ID
@@ -431,5 +451,272 @@ func TestMetadataRealPathComposerSelf(t *testing.T) {
 	}
 	if _, ok := got.Composer.(*rm.PartySelf); !ok {
 		t.Errorf("composer = %T, want *rm.PartySelf", got.Composer)
+	}
+}
+
+// TestMetadataAliasAccessorsPinned pins the exported alias tables. The PROBE-086
+// conformance harness derives its metadata hold-out from these accessors instead
+// of restating the codec's table (conformance.md § PROBE-086), so their contents
+// are public API: a spelling added or dropped here changes what a census excuses
+// and must be a deliberate edit, not a side effect.
+func TestMetadataAliasAccessorsPinned(t *testing.T) {
+	wantAliases := []string{"composer_self", "composer|name", "context/start_time", "language|code", "territory|code"}
+	if got := simplified.MetadataAliasSpellings(); !slices.Equal(got, wantAliases) {
+		t.Errorf("MetadataAliasSpellings() = %q, want %q", got, wantAliases)
+	}
+	wantWitnesses := []string{"language|terminology", "territory|terminology"}
+	if got := simplified.MetadataWitnessSpellings(); !slices.Equal(got, wantWitnesses) {
+		t.Errorf("MetadataWitnessSpellings() = %q, want %q", got, wantWitnesses)
+	}
+	// Both are root-relative (the decoder strips "<root>/" before the lookup), so
+	// a caller composes "<root>/" + spelling; a ctx/-prefixed or absolute entry
+	// would silently match nothing.
+	for _, a := range append(simplified.MetadataAliasSpellings(), simplified.MetadataWitnessSpellings()...) {
+		if strings.HasPrefix(a, "ctx/") || strings.HasPrefix(a, "/") {
+			t.Errorf("spelling %q is not root-relative", a)
+		}
+	}
+	// Fresh slices: mutating the result must not reach the decoder's own table.
+	mutated := simplified.MetadataAliasSpellings()
+	mutated[0] = "clobbered"
+	if again := simplified.MetadataAliasSpellings(); !slices.Equal(again, wantAliases) {
+		t.Errorf("MetadataAliasSpellings() aliases internal state: after mutation = %q", again)
+	}
+}
+
+// TestMetadataCompositeValueRefusedInBothKeyOrders — regression, PR #86 review
+// round 3. siphonContext walks a body in sorted key order, so which spelling of a
+// metadata field lands in the ctx map first depends on how the template root sorts
+// against "ctx/". The conflict check used to type-switch on the value already
+// stored and could not classify a JSON object or array, returning "not provably
+// different" — so a composite followed by a scalar was silently *overwritten* and
+// the body decoded clean, while the mirror order errored. Refusing the composite
+// up front makes the check total: both orders now fail, and the error names the
+// body key that carries the bad value.
+func TestMetadataCompositeValueRefusedInBothKeyOrders(t *testing.T) {
+	for _, fx := range []struct{ name, opt string }{
+		{"root sorts before ctx/", bodyWeightOPT},
+		{"root sorts after ctx/", minimalObsOPT},
+	} {
+		t.Run(fx.name, func(t *testing.T) {
+			_, wt := genComposition(t, fx.opt)
+			root := wt.Tree.ID
+			for _, tc := range []struct {
+				name      string
+				body      string
+				wantNamed []string
+			}{
+				{
+					name:      "object under ctx/, scalar on the real path",
+					body:      `{"ctx/language":{"a":1},"` + root + `/language|code":"de","ctx/territory":"US"}`,
+					wantNamed: []string{"ctx/language"},
+				},
+				{
+					name:      "scalar under ctx/, object on the real path",
+					body:      `{"ctx/language":"en","` + root + `/language|code":{"b":2},"ctx/territory":"US"}`,
+					wantNamed: []string{"ctx/language", root + "/language|code"},
+				},
+				{
+					name:      "array under ctx/, scalar on the real path",
+					body:      `{"ctx/territory":["NL"],"` + root + `/territory|code":"NL","ctx/language":"en"}`,
+					wantNamed: []string{"ctx/territory"},
+				},
+				{
+					name:      "scalar under ctx/, array on the real path",
+					body:      `{"ctx/territory":"NL","` + root + `/territory|code":["NL"],"ctx/language":"en"}`,
+					wantNamed: []string{"ctx/territory", root + "/territory|code"},
+				},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					_, err := simplified.UnmarshalFlat([]byte(tc.body), wt)
+					if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+						t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+					}
+					for _, want := range tc.wantNamed {
+						if !strings.Contains(err.Error(), want) {
+							t.Errorf("error %q does not name %q", err, want)
+						}
+					}
+				})
+			}
+		})
+	}
+}
+
+// TestMetadataAliasFamilyConflictAndAgreement sweeps every aliased metadata
+// family, and every terminology witness, through both halves of the ADR 0015
+// decision-4 rule: two spellings that disagree are a payload defect and must be
+// refused naming both, while two that agree are merely redundant and must decode.
+// Table-driven because the rule is per-family — a family wired into the alias
+// table but not into the conflict check would decode a contradiction silently, and
+// one wired the other way round would reject an agreeing body.
+func TestMetadataAliasFamilyConflictAndAgreement(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	root := wt.Tree.ID
+	for _, tc := range []struct {
+		name      string
+		agree     func(root string, m map[string]any)
+		disagree  func(root string, m map[string]any)
+		wantErr   error
+		wantNamed []string
+	}{
+		{
+			name:  "language",
+			agree: func(root string, m map[string]any) { m[root+"/language|code"] = m["ctx/language"] },
+			disagree: func(root string, m map[string]any) {
+				m["ctx/language"] = "en"
+				m[root+"/language|code"] = "de"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/language", root + "/language|code"},
+		},
+		{
+			name:  "territory",
+			agree: func(root string, m map[string]any) { m[root+"/territory|code"] = m["ctx/territory"] },
+			disagree: func(root string, m map[string]any) {
+				m["ctx/territory"] = "NL"
+				m[root+"/territory|code"] = "BE"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/territory", root + "/territory|code"},
+		},
+		{
+			name:  "composer_name",
+			agree: func(root string, m map[string]any) { m[root+"/composer|name"] = m["ctx/composer_name"] },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/composer|name"] = "Dr Someone Else"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/composer_name", root + "/composer|name"},
+		},
+		{
+			// A PARTY_SELF composer carries no name, so both bodies drop
+			// ctx/composer_name — keeping it would be the *other* refusal
+			// (TestComposerSelfWithComposerNameRejected), not a spelling conflict.
+			name: "composer_self",
+			agree: func(root string, m map[string]any) {
+				delete(m, "ctx/composer_name")
+				m["ctx/composer_self"] = true
+				m[root+"/composer_self"] = true
+			},
+			disagree: func(root string, m map[string]any) {
+				delete(m, "ctx/composer_name")
+				m["ctx/composer_self"] = true
+				m[root+"/composer_self"] = false
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/composer_self", root + "/composer_self"},
+		},
+		{
+			name:  "time / context start_time",
+			agree: func(root string, m map[string]any) { m[root+"/context/start_time"] = m["ctx/time"] },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/context/start_time"] = "1999-12-31T23:59:00Z"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/time", root + "/context/start_time"},
+		},
+		{
+			// A witness is checked and discarded, so "disagree" means naming a
+			// terminology the ctx/ short form cannot carry — a different refusal
+			// class (ErrUnsupportedDatatype) with only the witness key to name.
+			name:  "language terminology witness",
+			agree: func(root string, m map[string]any) { m[root+"/language|terminology"] = "ISO_639-1" },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/language|terminology"] = "ISO_639-2"
+			},
+			wantErr:   simplified.ErrUnsupportedDatatype,
+			wantNamed: []string{root + "/language|terminology"},
+		},
+		{
+			name:  "territory terminology witness",
+			agree: func(root string, m map[string]any) { m[root+"/territory|terminology"] = "ISO_3166-1" },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/territory|terminology"] = "ISO_3166-2"
+			},
+			wantErr:   simplified.ErrUnsupportedDatatype,
+			wantNamed: []string{root + "/territory|terminology"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Run("conflict refused", func(t *testing.T) {
+				_, err := simplified.UnmarshalFlat(reflatten(t, comp, wt, tc.disagree), wt)
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("err = %v, want %v", err, tc.wantErr)
+				}
+				for _, want := range tc.wantNamed {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("error %q does not name %q", err, want)
+					}
+				}
+			})
+			t.Run("agreement accepted", func(t *testing.T) {
+				if _, err := simplified.UnmarshalFlat(reflatten(t, comp, wt, tc.agree), wt); err != nil {
+					t.Fatalf("agreeing spellings rejected: %v", err)
+				}
+			})
+		})
+	}
+}
+
+// TestComposerSelfWithComposerNameRejected — PR #86 review round 3. composer_self
+// and a composer name are mutually exclusive representations of one RM attribute:
+// applyContext's switch prefers PARTY_SELF, so the pair used to decode to a
+// PARTY_SELF with the name silently dropped. That is the same class of defect as
+// two disagreeing spellings of one field and gets the same refusal. `false` beside
+// a name denies nothing the name asserts, and must still decode.
+func TestComposerSelfWithComposerNameRejected(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	root := wt.Tree.ID
+	for _, tc := range []struct {
+		name      string
+		mut       func(root string, m map[string]any)
+		wantNamed []string
+	}{
+		{
+			name: "ctx/composer_self with the real-path name",
+			mut: func(root string, m map[string]any) {
+				delete(m, "ctx/composer_name")
+				m["ctx/composer_self"] = true
+				m[root+"/composer|name"] = "Dr X"
+			},
+			wantNamed: []string{"ctx/composer_self", root + "/composer|name"},
+		},
+		{
+			name: "both in the ctx/ spelling",
+			mut: func(root string, m map[string]any) {
+				m["ctx/composer_self"] = true
+				m["ctx/composer_name"] = "Dr X"
+			},
+			wantNamed: []string{"ctx/composer_self", "ctx/composer_name"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := simplified.UnmarshalFlat(reflatten(t, comp, wt, tc.mut), wt)
+			if !errors.Is(err, simplified.ErrUnknownPath) {
+				t.Fatalf("err = %v, want ErrUnknownPath", err)
+			}
+			for _, want := range tc.wantNamed {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error %q does not name %q", err, want)
+				}
+			}
+		})
+	}
+	// composer_self: false is not an assertion of PARTY_SELF, so the name stands.
+	got, err := simplified.UnmarshalFlat(reflatten(t, comp, wt, func(root string, m map[string]any) {
+		delete(m, "ctx/composer_name")
+		m["ctx/composer_self"] = false
+		m[root+"/composer|name"] = "Dr X"
+	}), wt)
+	if err != nil {
+		t.Fatalf("composer_self=false beside a name rejected: %v", err)
+	}
+	p, ok := got.Composer.(*rm.PartyIdentified)
+	if !ok {
+		t.Fatalf("composer = %T, want *rm.PartyIdentified", got.Composer)
+	}
+	if p.Name == nil || *p.Name != "Dr X" {
+		t.Errorf("composer name = %v, want Dr X", p.Name)
 	}
 }
