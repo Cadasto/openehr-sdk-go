@@ -2,8 +2,11 @@ package serializeprobes_test
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	conformance "github.com/cadasto/openehr-sdk-go/testkit/conformance/webtemplate"
 	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	serializeprobes "github.com/cadasto/openehr-sdk-go/testkit/probes/serialize"
 )
@@ -165,5 +168,90 @@ func TestProbe076(t *testing.T) {
 	}
 	if passes == 0 {
 		t.Error("PROBE-076 produced no passes — check cassette discovery / codec regressions")
+	}
+}
+
+// TestProbe086 — upstream FLAT serialisation parity over the pinned EHRbase
+// conformance corpus (REQ-080). Unlike PROBE-076 above, the input is FLAT
+// this SDK did not write, so it can catch a path the SDK never emits or a
+// leaf it silently drops.
+//
+// The corpus is enumerated once here and each case is handed to the probe:
+// corpus I/O is the caller's job, as with every other probe in this package.
+func TestProbe086(t *testing.T) {
+	target, err := serializeprobes.NewProbe086Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	cases, err := conformance.Cases()
+	if err != nil {
+		t.Fatalf("enumerate corpus: %v", err)
+	}
+	if len(cases) == 0 {
+		t.Fatal("PROBE-086 found no corpus fixtures — check the vendored corpus")
+	}
+	var passes int
+	for _, c := range cases {
+		t.Run(c.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe086UpstreamFlatParity(target, c)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+				return
+			}
+			passes++
+		})
+	}
+	if passes != len(cases) {
+		t.Errorf("PROBE-086 passed %d/%d fixtures", passes, len(cases))
+	}
+}
+
+// TestProbe086CoverageFloor pins the coverage floor: a fixture the codec
+// refuses in its entirety compares nothing, and Report.Clean() is vacuously
+// true over an empty compared set — so the probe must report "fail", not the
+// "pass" a consumer reading Status alone would otherwise be given.
+//
+// The synthetic body is a single key under a template root that does not
+// exist, which the codec refuses as an unknown path. That drives Compared to
+// 0 without needing any new API from the conformance package: Case is exported
+// and carries only a name and a path to a FLAT body.
+func TestProbe086CoverageFloor(t *testing.T) {
+	target, err := serializeprobes.NewProbe086Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	path := filepath.Join(t.TempDir(), "synthetic_all_refused.flat.json")
+	if err := os.WriteFile(path, []byte(`{"no_such_root/no_such_path|value":"x"}`), 0o600); err != nil {
+		t.Fatalf("write synthetic fixture: %v", err)
+	}
+	r, err := serializeprobes.Probe086UpstreamFlatParity(target,
+		conformance.Case{Name: "synthetic_all_refused", Flat: path})
+	if err != nil {
+		t.Fatalf("probe framework error: %v", err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("status = %q (detail: %s); want fail — a fixture comparing 0 keys must not pass", r.Status, r.Detail)
+	}
+	if !strings.Contains(r.Detail, "compared 0") {
+		t.Errorf("detail = %q; want it to report the zero-coverage cause", r.Detail)
+	}
+}
+
+// TestProbe086FrameworkMisuse — a nil target or a case with no FLAT body is
+// framework misuse (a non-nil error), not a probe failure, so a harness can
+// tell "the probe could not run" from "the codec is wrong".
+func TestProbe086FrameworkMisuse(t *testing.T) {
+	if _, err := serializeprobes.Probe086UpstreamFlatParity(nil, conformance.Case{Name: "x", Flat: "x.json"}); err == nil {
+		t.Error("nil target: err = nil; want a framework error")
+	}
+	target, err := serializeprobes.NewProbe086Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	if _, err := serializeprobes.Probe086UpstreamFlatParity(target, conformance.Case{Name: "x"}); err == nil {
+		t.Error("case with empty Flat: err = nil; want a framework error")
 	}
 }

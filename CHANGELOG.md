@@ -12,6 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **Upstream FLAT serialisation conformance (REQ-080, PROBE-086).** `testkit/conformance/webtemplate` round-trips the pinned EHRbase FLAT corpus through the REQ-053 codec, exact on the modelled subset (10.5% of upstream keys) with the rest counted per fixture and zero coverage failing.
+
 - **In-context RM attribute path resolution (REQ-121).** `openehr/rm/rmpath` now resolves the `EVENT_CONTEXT`, `ACTIVITY.timing` and `ACTION.time` attributes the Web Template synthesizes, fixing a silent FLAT encode drop of template-constrained `other_context` data, with a guard test pinning the class.
 
 - **Template-level node naming and name-predicated paths (REQ-116, PROBE-075).** Paths gain `[archetype_id,'Name']` predicates, WebTemplate `id`s derive from pinned names, and single-occurrence abstract EVENTs are lifted — **compiled-path and FLAT-key shapes change** (details: `webtemplate/deviations.md`).

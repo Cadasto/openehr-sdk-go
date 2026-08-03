@@ -95,6 +95,7 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Spec traceability | `make spec-check` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
+| FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored upstream EHRbase FLAT corpus (PROBE-086's input) against its `MANIFEST.txt`; runs under `make ci`. `make flat-conformance-check` adds an upstream-drift report (needs network; dev helper, not a gate). Never hand-edit a vendored fixture: being byte-identical to upstream is its whole value |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
 
 Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies are kept deliberately minimal and reviewed; the current set is: **OpenTelemetry** (tracing, confined to `transport/`), **antlr4-go** (AQL parser, `openehr/aql/parse`), and — adopted for SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — **`golang.org/x/oauth2`** and **`github.com/coreos/go-oidc/v3`**; the latter also requires **`go-jose/v4`**, which `auth/jwtbearer` + `smart` import directly for JWS signing — all scoped to `auth/` and `smart/` — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
