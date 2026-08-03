@@ -70,8 +70,16 @@ const ctxPrefix = "ctx/"
 // template-constrained Web Template leaf that rides its own FLAT path (see
 // openehr/serialize/simplified/deviations.md § `ctx/` context), so both sides
 // spell it identically and it is compared like any other content key.
+//
+// The list MUST stay in step with simplified.metadataAliases (ADR 0015): that
+// table decides which real-path spellings decode accepts, and this one decides
+// which the comparison holds out. A spelling accepted there but absent here
+// re-creates exactly the false missing/extra noise the hold-out exists to
+// prevent — held out as `ctx/…` on the emitted side, compared as a real path on
+// the upstream side. `composer_self` is here for that reason, not because the
+// present corpus needs it (it writes only the `ctx/` form).
 var metaLeaves = map[string]bool{
-	"language": true, "territory": true, "composer": true,
+	"language": true, "territory": true, "composer": true, "composer_self": true,
 }
 
 // contextMetaLeaves are the EVENT_CONTEXT attributes upstream writes under
@@ -107,10 +115,12 @@ var contextMetaLeaves = map[string]bool{
 //     `238 other care`) and then re-encodes to *nothing at all*: the
 //     `ctx/setting` short form is deferred, so the value is dropped on the way
 //     out — openehr/serialize/simplified/deviations.md § `ctx/` context. Held
-//     out deliberately, and only until the ctx/-versus-real-path decision is
-//     taken (SKIPPED.md § What would move these numbers): whichever spelling
-//     wins, this key stops being a hold-out and becomes compared. Until then
-//     the loss is recorded in SKIPPED.md, not concealed by the hold-out.
+//     out deliberately. It survived the ctx/-versus-real-path decision
+//     ([ADR 0015](../../../docs/adr/0015-flat-metadata-spelling.md), which
+//     settled the *spelling*): this is an **emission** gap — `ctx/setting` is
+//     not written at all — so it clears when that emission lands, not when a
+//     spelling wins. Until then the loss is recorded in SKIPPED.md, not
+//     concealed by the hold-out.
 //
 // Keys are held out even when decode happens to accept them, so a metadata
 // key that survives decode does not resurface as a phantom "missing" when

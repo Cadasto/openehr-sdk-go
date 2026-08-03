@@ -53,7 +53,7 @@ not partially/silently accepted.
 | Optional `DV_ORDERED` / `DV_QUANTIFIED` / `DV_AMOUNT` attributes — **first-class** suffix form: `\|magnitude_status`, `\|normal_status`, `\|accuracy`, `\|accuracy_is_percent`, `\|precision`, `\|units_system`, `\|units_display_name`, and `DV_TEXT`'s `\|formatting`. | Supported both directions. **This changed emitted bytes:** a value carrying one of these previously rode `\|raw` as a whole and now rides the suffix form. An *undecorated* value is byte-identical to before — an absent attribute writes no suffix. `\|normal_status` carries the bare ordinal code and decode rebuilds it in the implied `openehr` terminology, so a status coded elsewhere still rides `\|raw`. | landed (PROBE-086 ratchet) |
 | Remaining `_`-prefixed / uncaptured RM attributes (`_uid`, `normal_range`, `other_reference_ranges`, `mappings`, …) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Deferred |
 | `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix; encode stamps the fragment with the value's **dynamic** type when it can classify it. On decode, `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
-| `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: a `DV_TEXT` at a `DV_CODED_TEXT` leaf whose Web Template input is `listOpen` encodes to `\|other`; decode maps `\|other` back to `DV_TEXT`, requiring `listOpen` and rejecting `\|other`+`\|code`. | landed (Task 6) |
+| `\|other` open-value-set free text for `DV_CODED_TEXT` | Supported: an **undecorated** `DV_TEXT` at a `DV_CODED_TEXT` leaf whose Web Template input is `listOpen` encodes to `\|other`; decode maps `\|other` back to `DV_TEXT`, requiring `listOpen` and rejecting `\|other` combined with **any** other suffix. `\|other` carries the value alone, so a decorated `DV_TEXT` (a `formatting`, a `hyperlink`, …) is not expressible in this form and rides `\|raw` instead. | landed (Task 6) |
 | `.schema`-suffixed media types on input | Not accepted. (Canonical types only; see [simplified.go](simplified.go).) | Deferred |
 | `CODE_PHRASE` leaves (ENTRY `language` / `encoding`) — the reference emits these as leaves in their own right, under the same `\|code` + `\|terminology` pair a `DV_CODED_TEXT`'s `defining_code` uses. | Supported both directions. An empty `code_string` writes nothing (the field is non-pointer, so "unset" and "zero" coincide and an unconditional emit would put blank leaves on every `ctx/`-decoded composition); a `preferred_term` or decorated `TERMINOLOGY_ID` rides `\|raw`. | landed (PROBE-086 ratchet) |
 | Other non-`DV_` leaves (party/`subject`, remaining RM leaves) on encode | Skipped on encode (source value dropped). `subject` is **defaulted** on `WithTemplate` decode (PARTY_SELF) so the result validates; a non-default source value is not round-tripped. | Deferred |
@@ -87,9 +87,10 @@ not partially/silently accepted.
   (above), and the real path `…/context/setting` is deliberately left unresolvable in `rmpath`
   (REQ-121), because `setting` is a non-pointer `DV_CODED_TEXT` on `EVENT_CONTEXT` — resolving
   it would emit a zero-valued leaf on *every* composition decoded through the `ctx/` forms,
-  which is worse output than none. Both halves are held until the metadata real-path decision
-  (whether the codec accepts the reference's real-path spelling alongside `ctx/`); whichever
-  spelling wins settles this in one move. Consequence: a `WithTemplate` decode still *defaults*
+  which is worse output than none. [ADR 0015](../../../docs/adr/0015-flat-metadata-spelling.md)
+  settled the metadata *spelling* (both accepted on input, `ctx/` emitted) and deliberately did
+  **not** clear this: `setting` is an **emission** gap, not a spelling one, so it needs
+  `ctx/setting` emission rather than a spelling verdict. Consequence: a `WithTemplate` decode still *defaults*
   the setting to `238 other care` so the composition validates, but a non-default source
   setting does not survive a round-trip. The PROBE-086 conformance harness holds
   `context/setting` out of its comparison as an **explicit waiver** — the one hold-out on its

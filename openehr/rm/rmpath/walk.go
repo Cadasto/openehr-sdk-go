@@ -28,21 +28,24 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // WebTemplate can emit is resolvable here unless deliberately exempted.
 //
 // Resolving an attribute here does not by itself make the FLAT encoder fail:
-// leafToFlat silently skips non-DV_ leaf datatypes (CODE_PHRASE, PARTY_PROXY,
-// STRING — a documented skip, see openehr/serialize/simplified/deviations.md)
-// and emits unmapped DV_* datatypes as |raw. "The codec cannot write it" is
-// therefore a reason for a leaf to stay unemitted, never a reason for an
-// attribute to stay unresolvable.
+// leafToFlat skips the leaf datatypes it does not map (PARTY_PROXY, STRING — a
+// documented skip, see openehr/serialize/simplified/deviations.md) and emits
+// unmapped DV_* datatypes as |raw. "The codec cannot write it" is therefore a
+// reason for a leaf to stay unemitted, never a reason for an attribute to stay
+// unresolvable. CODE_PHRASE was in that skip list until the PROBE-086 coverage
+// ratchet gave it a |code + |terminology leaf mapping, which is why ENTRY
+// `language` / `encoding` resolve here now.
 //
 // The attributes deliberately still absent are EVENT_CONTEXT `start_time` and
 // EVENT_CONTEXT `setting`: both are owned by the ctx/ short-form spelling on
 // encode, and resolving them here would double-spell the value (`start_time`
 // rides ctx/time) or emit zero-valued leaves for ctx-decoded compositions
-// (`setting`) until the metadata real-path decision lands. A non-default
-// EVENT_CONTEXT `setting` is currently dropped on encode — recorded in
+// (`setting`). ADR 0015 settled the metadata *spelling* without clearing
+// either: `ctx/setting` emission is still deferred, so a non-default
+// EVENT_CONTEXT `setting` is dropped on encode — recorded in
 // simplified/deviations.md. The rest of the REQ-121 completeness set (ENTRY
-// `language` / `encoding` / `subject`, COMPOSITION `language` / `territory`,
-// ACTIVITY `action_archetype_id`) is simply not written yet.
+// `subject`, COMPOSITION `language` / `territory` / `composer`, ACTIVITY
+// `action_archetype_id`) is simply not written yet.
 func childrenAt(parent any, attr string) []any {
 	if isNilPointer(parent) {
 		return nil
@@ -215,9 +218,11 @@ func sectionChildren(s *rm.Section, attr string) []any {
 	return nil
 }
 
-// entryChildren resolves the two attributes every ENTRY subtype shares and the
-// Web Template emits as leaves in their own right: `language` and `encoding`
-// (REQ-121). Both are non-pointer CODE_PHRASE fields, so a child is always
+// entryChildren resolves the two attributes the five ENTRY subtypes share and
+// the Web Template emits as leaves in their own right: `language` and `encoding`
+// (REQ-121). Delegated to from OBSERVATION / EVALUATION / INSTRUCTION / ACTION /
+// ADMIN_ENTRY; GENERIC_ENTRY is deliberately not among them — it descends from
+// CONTENT_ITEM, not ENTRY, and carries neither attribute. Both are non-pointer CODE_PHRASE fields, so a child is always
 // returned and "unset" reaches the caller as a zero CODE_PHRASE — the FLAT
 // encoder's leaf mapping is what declines to write an empty code (see
 // simplified.codePhraseToFlat). Resolution and writability are separate

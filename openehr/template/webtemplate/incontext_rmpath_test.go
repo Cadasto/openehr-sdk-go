@@ -37,8 +37,8 @@ import (
 // real mechanism: a non-DV_ datatype is dropped by leafToFlat whether or not
 // rmpath resolves it, so those entries record a codec gap, not an rmpath one.
 var unserialisableIC = map[string]string{
-	"COMPOSITION.language":  "CODE_PHRASE: leafToFlat silently skips non-DV_ values; ctx/language carries it instead",
-	"COMPOSITION.territory": "CODE_PHRASE: leafToFlat silently skips non-DV_ values; ctx/territory carries it instead",
+	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
+	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
 	"COMPOSITION.composer":  "PARTY_PROXY: leafToFlat silently skips non-DV_ values; ctx/composer_name carries the name (external_ref is dropped — known deviation)",
 	"EVENT_CONTEXT.start_time": "carried by ctx/time on encode; resolving here would double-spell the value " +
 		"until the metadata real-path decision — no data loss today",

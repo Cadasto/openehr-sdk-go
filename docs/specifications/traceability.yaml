@@ -1085,6 +1085,7 @@ requirements:
       - openehr/template/webtemplate/incontext_rmpath_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
+      - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
 
   - id: REQ-122
     title: Version-control derived helpers
@@ -1309,8 +1310,9 @@ requirements:
     # composition metadata. That hold-out is respellings (language, territory,
     # composer, context/start_time, which REQ-053 reads and writes as the ctx/
     # short forms) plus ONE waiver: context/setting decodes and then re-encodes
-    # to nothing, so holding it out waives a real encode-side drop until the
-    # metadata real-path decision lands.
+    # to nothing, so holding it out waives a real encode-side drop. ADR 0015
+    # settled the spelling without clearing that: it is an emission gap
+    # (ctx/setting is not written), so it clears when that emission lands.
     #
     # The earlier figure (90 / 4.9%) was a measurement error, not a smaller
     # codec: `category` was held out as metadata although it is a

@@ -424,6 +424,27 @@ func TestReasonOfIsKeyIndependent(t *testing.T) {
 	}
 }
 
+// TestMetaLeavesMatchCodecAliases pins the invariant the two lists share: every
+// composition-level real-path spelling the codec accepts on decode
+// (simplified.metadataAliases, ADR 0015) must also be held out here. One accepted
+// there but missing here is reported as both missing and extra — the exact noise
+// the hold-out exists to remove — and no corpus fixture need exercise the
+// spelling for the inconsistency to be real.
+func TestMetaLeavesMatchCodecAliases(t *testing.T) {
+	const root = "conformance_ehrbase.de.v0"
+	// Mirrors simplified.metadataAliases; that table is unexported, so the
+	// spellings are restated rather than imported. Adding one there without
+	// adding it here fails this test.
+	for _, rel := range []string{
+		"language|code", "territory|code", "composer|name",
+		"composer_self", "context/start_time",
+	} {
+		if !IsCompositionMeta(root+"/"+rel, root) {
+			t.Errorf("codec accepts %q as a metadata alias but the comparison does not hold it out", rel)
+		}
+	}
+}
+
 // TestIsCompositionMeta guards the hold-out's edges. It is the one place the
 // harness excuses a difference on *both* sides, so it has to stay narrow:
 // `context/other_context` carries archetyped data and must never be swallowed.
@@ -438,6 +459,12 @@ func TestIsCompositionMeta(t *testing.T) {
 		{root + "/composer|name", true},
 		{root + "/context/start_time", true},
 		{root + "/context/setting|code", true},
+		// composer_self is an accepted real-path alias (ADR 0015), so it must be
+		// held out on both sides like the other respellings — the present corpus
+		// writes only the ctx/ form, which is why its absence from metaLeaves went
+		// unnoticed until the PR #86 review.
+		{root + "/composer_self", true},
+		{"ctx/composer_self", true},
 		// category is *not* a ctx/ field: it is a template-constrained Web
 		// Template leaf, spelled identically on both sides, so it is compared
 		// like any other content key rather than held out.
@@ -505,11 +532,11 @@ func TestRealCodecRefusal(t *testing.T) {
 	if !gap || removed != 1 {
 		t.Fatalf("dropRefused(real refusal) = %d, %v; want 1, true", removed, gap)
 	}
-	if _, still := body[base+"|precision"]; still {
-		t.Error("|precision survived its own refusal")
+	if _, still := body[base+"|normal_range"]; still {
+		t.Error("|normal_range survived its own refusal")
 	}
 	if _, ok := body[base+"|magnitude"]; !ok {
-		t.Error("|magnitude was dropped by a |precision refusal — the leaf, not the entry, went")
+		t.Error("|magnitude was dropped by a |normal_range refusal — the leaf, not the entry, went")
 	}
 
 	// What remains must decode: otherwise the assertions above passed on an

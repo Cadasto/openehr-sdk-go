@@ -253,12 +253,38 @@ func siphonContext(flat map[string]any, rootID string) (ctx, content map[string]
 // origin names the key as the caller wrote it, so the error points at the
 // payload rather than at the normalised ctx/ form they may never have used.
 func putCtx(ctx map[string]any, ctxKey string, val any, origin string) error {
-	if prev, seen := ctx[ctxKey]; seen && prev != val {
+	if prev, seen := ctx[ctxKey]; seen && provablyDifferent(prev, val) {
 		return fmt.Errorf("%w: conflicting spellings of %s — %s gives %#v, another key already gave %#v; remove one",
 			ErrUnknownPath, ctxKey, origin, val, prev)
 	}
 	ctx[ctxKey] = val
 	return nil
+}
+
+// provablyDifferent compares two candidate values for one context key without
+// assuming they are comparable. A malformed payload can put a JSON object or
+// array here, and `!=` on those panics at runtime — a crash on untrusted input,
+// which this codec must never do (REQ-108).
+//
+// Only the scalar kinds a ctx/ field can legitimately hold are compared. An
+// unprovable pair (either side a composite) is left to [parseCtx], which types
+// every supported field as a string or a bool and rejects anything else with a
+// typed error — so deferring cannot let a bad value through.
+func provablyDifferent(prev, val any) bool {
+	switch p := prev.(type) {
+	case string:
+		v, ok := val.(string)
+		return !ok || p != v
+	case bool:
+		v, ok := val.(bool)
+		return !ok || p != v
+	case json.Number:
+		v, ok := val.(json.Number)
+		return !ok || p.String() != v.String()
+	case nil:
+		return val != nil
+	}
+	return false
 }
 
 // ctxInfo is the parsed ctx/ context — the shared source for applyContext and
@@ -938,8 +964,14 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			if !listOpen {
 				return nil, fmt.Errorf("%w: |other requires an open value-set (listOpen)", ErrUnsupportedDatatype)
 			}
-			if _, hasCode := sfx["code"]; hasCode {
-				return nil, fmt.Errorf("%w: |other is mutually exclusive with |code", ErrUnsupportedDatatype)
+			// |other carries the value alone, so it is mutually exclusive with
+			// *every* other suffix — not just |code. The rebuild below returns a
+			// bare DV_TEXT, so admitting a companion (|formatting, |terminology, …)
+			// would accept it and then discard it silently; the encoder routes such
+			// a value to |raw, and decode has to refuse the shape it never writes.
+			if len(sfx) > 1 {
+				return nil, fmt.Errorf("%w: |other is mutually exclusive with every other suffix, got %s",
+					ErrUnsupportedDatatype, strings.Join(slices.Sorted(maps.Keys(sfx)), "+"))
 			}
 			return map[string]any{"_type": "DV_TEXT", "value": other}, nil
 		}

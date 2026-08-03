@@ -372,3 +372,64 @@ func TestMetadataNonRespellingsStillRefused(t *testing.T) {
 		})
 	}
 }
+
+// TestMetadataConflictOnCompositeValueDoesNotPanic — regression, PR #86 review.
+// putCtx compared two candidate values with `!=` on `any`, which panics for a
+// JSON object or array. A malformed payload reaches that path whenever both
+// accepted spellings of one field are present, so the codec crashed on
+// untrusted input instead of reporting a typed error (REQ-108).
+func TestMetadataConflictOnCompositeValueDoesNotPanic(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	root := wt.Tree.ID
+	for _, body := range []string{
+		`{"ctx/language":{"a":1},"` + root + `/language|code":{"b":2},"ctx/territory":"US"}`,
+		`{"ctx/language":["a"],"` + root + `/language|code":["b"],"ctx/territory":"US"}`,
+		`{"ctx/territory":{"a":1},"` + root + `/territory|code":{"a":1},"ctx/language":"en"}`,
+	} {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Errorf("panic on malformed input %s: %v", body, r)
+				}
+			}()
+			if _, err := simplified.UnmarshalFlat([]byte(body), wt); err == nil {
+				t.Errorf("composite ctx value accepted: %s", body)
+			} else if !errors.Is(err, simplified.ErrUnsupportedDatatype) && !errors.Is(err, simplified.ErrUnknownPath) {
+				t.Errorf("unexpected error class for %s: %v", body, err)
+			}
+		}()
+	}
+}
+
+// TestMetadataTerritoryTerminologyWitnessChecked mirrors the language case for
+// territory: the ctx/ form carries only the code and applyContext rebuilds the
+// CODE_PHRASE as ISO_3166-1, so a real path naming another terminology must fail
+// rather than be silently re-terminologised.
+func TestMetadataTerritoryTerminologyWitnessChecked(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+		m[root+"/territory|terminology"] = "not-ISO-3166"
+	})
+	if _, err := simplified.UnmarshalFlat(in, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// TestMetadataRealPathComposerSelf: composer_self is in metadataAliases, so the
+// real-path spelling must decode to a PARTY_SELF composer just as
+// ctx/composer_self does.
+func TestMetadataRealPathComposerSelf(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+		delete(m, "ctx/composer_self")
+		delete(m, "ctx/composer_name")
+		m[root+"/composer_self"] = true
+	})
+	got, err := simplified.UnmarshalFlat(in, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat(real-path composer_self): %v", err)
+	}
+	if _, ok := got.Composer.(*rm.PartySelf); !ok {
+		t.Errorf("composer = %T, want *rm.PartySelf", got.Composer)
+	}
+}

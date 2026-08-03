@@ -19,7 +19,7 @@ import (
 
 // capturedKeys maps a leaf rmType to the canonical top-level attribute keys its
 // FLAT suffix form fully represents. A value carrying any canonical key outside
-// this set (mappings, normal_range, magnitude_status, accuracy, …) is not
+// this set (mappings, normal_range, other_reference_ranges, hyperlink, …) is not
 // faithfully expressible as suffixes, so it is emitted as a lossless |raw
 // fragment instead. This keeps the codec semantics-preserving (REQ-053) while
 // still producing the human-readable suffix form for the common, undecorated case.
@@ -59,8 +59,10 @@ var capturedKeys = map[string]map[string]bool{
 // captured by the suffix mapping (the common case) is emitted as suffixes; a
 // decorated DV_* value (extra attributes, incl. nested decorations of the
 // composite keys), a substituted subtype, or an unmapped DV_* type is embedded
-// losslessly as a |raw canonical fragment; a non-DV_ leaf (party / context /
-// other RM attribute) is a documented skip (see deviations.md).
+// losslessly as a |raw canonical fragment; a leaf datatype this codec does not
+// map at all (party / context / other RM attribute) is a documented skip (see
+// deviations.md). CODE_PHRASE is mapped despite not being a DataValue — the
+// reference emits ENTRY language / encoding as leaves in their own right.
 //
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
@@ -155,8 +157,18 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		// TERMINOLOGY_ID shape the |terminology suffix reduces to a string.
 		return codePhraseCaptured(m)
 	case "DV_CODED_TEXT":
-		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form.
-		return m["defining_code"] == nil || codePhraseCaptured(m["defining_code"])
+		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form, and
+		// |other carries the value **alone** — the grammar gives it no companion
+		// suffix. So `formatting`, capturable at an ordinary DV_TEXT leaf, is not
+		// capturable here and the value must ride |raw.
+		//
+		// This is load-bearing, not defensive: adding `formatting` to
+		// capturedKeys["DV_CODED_TEXT"] without this made emitText write |other
+		// and silently discard the formatting (caught in PR #86 review).
+		if m["defining_code"] == nil {
+			return m["formatting"] == nil
+		}
+		return codePhraseCaptured(m["defining_code"])
 	case "DV_ORDINAL":
 		sym, ok := m["symbol"].(map[string]any)
 		if !ok {
@@ -337,8 +349,10 @@ func emitText(out map[string]any, flatPath string, dv rm.DVText, rmType string, 
 			return fmt.Errorf("%w: DV_TEXT at closed DV_CODED_TEXT leaf %q (|other requires an open value-set)", ErrUnsupportedDatatype, flatPath)
 		}
 		// |other is the free-text escape at a coded leaf and carries the value
-		// alone; a formatting alongside it has no |other counterpart, so
-		// capturedFully has already routed such a value to |raw.
+		// alone. Any DV_TEXT decoration — `formatting` included — makes the value
+		// uncapturable in this form, and [capturedFully] has already routed it to
+		// |raw before we get here; writing |other unconditionally would drop the
+		// decoration silently.
 		out[flatPath+"|other"] = dv.Value
 		return nil
 	}

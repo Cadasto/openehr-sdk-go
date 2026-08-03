@@ -526,20 +526,41 @@ func TestOptionalOrderedSuffixesRoundTrip(t *testing.T) {
 					t.Errorf("out[%q] = %#v, want %#v", k, out[k], w)
 				}
 			}
-			// And back: every emitted suffix must rebuild its RM attribute.
+			// And back: every emitted suffix must rebuild its RM attribute. Asserted
+			// per suffix rather than on magnitude_status alone — a rebuild that
+			// dropped, say, units_system would otherwise pass while losing data.
 			dv, err := dvFromSuffixes(tc.rmType, false, suffixesOf(out, "p/x"))
 			if err != nil {
 				t.Fatalf("dvFromSuffixes: %v", err)
 			}
-			for attr, want := range map[string]any{"magnitude_status": "~"} {
-				if _, expected := tc.want["p/x|"+attr]; expected && dv[attr] != want {
-					t.Errorf("decoded %s = %#v, want %#v", attr, dv[attr], want)
+			// suffix -> (canonical attribute, value the rebuild must carry)
+			for suffix, exp := range map[string]struct {
+				attr string
+				want any
+			}{
+				"magnitude_status":    {"magnitude_status", "~"},
+				"accuracy":            {"accuracy", 50.5},
+				"accuracy_is_percent": {"accuracy_is_percent", true},
+				"precision":           {"precision", int64(1)},
+				"units_system":        {"units_system", "units_system"},
+				"units_display_name":  {"units_display_name", "units_display_name"},
+				"formatting":          {"formatting", "plain"},
+			} {
+				if _, emitted := tc.want["p/x|"+suffix]; !emitted {
+					continue
+				}
+				if dv[exp.attr] != exp.want {
+					t.Errorf("decoded %s = %#v, want %#v", exp.attr, dv[exp.attr], exp.want)
 				}
 			}
 			if _, expected := tc.want["p/x|normal_status"]; expected {
 				ns, _ := dv["normal_status"].(map[string]any)
 				if ns["code_string"] != "N" {
 					t.Errorf("decoded normal_status = %#v, want code_string N", dv["normal_status"])
+				}
+				tid, _ := ns["terminology_id"].(map[string]any)
+				if tid["value"] != "openehr" {
+					t.Errorf("decoded normal_status terminology = %#v, want openehr", ns["terminology_id"])
 				}
 			}
 		})
@@ -596,5 +617,80 @@ func TestOptionalSuffixAbsentStaysAbsent(t *testing.T) {
 		if _, present := dv[attr]; present {
 			t.Errorf("absent |%s materialised as %#v", attr, dv[attr])
 		}
+	}
+}
+
+// TestFormattedTextAtOpenCodedLeafRidesRaw — regression, PR #86 review.
+// `formatting` joined capturedKeys["DV_CODED_TEXT"] with the optional-suffix
+// set, which made capturedFully accept a *formatted* DV_TEXT at an open coded
+// leaf; emitText then wrote |other alone and discarded the formatting. |other
+// carries the value by itself, so the value has to ride |raw.
+func TestFormattedTextAtOpenCodedLeafRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	v := rm.DVText{Value: "free text", Formatting: new("markdown")}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("formatting silently dropped — expected |raw, got %#v", out)
+	}
+	if raw["formatting"] != "markdown" {
+		t.Errorf("|raw lost the formatting: %#v", raw)
+	}
+	if _, leaked := out["p/x|other"]; leaked {
+		t.Errorf("emitted |other beside |raw: %#v", out)
+	}
+	// An *un*formatted DV_TEXT at the same leaf must still take the |other form.
+	plain := map[string]any{}
+	if err := leafToFlat(plain, "p/x", rm.DVText{Value: "free text"}, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat(plain): %v", err)
+	}
+	if plain["p/x|other"] != "free text" || len(plain) != 1 {
+		t.Errorf("undecorated DV_TEXT at open coded leaf = %#v, want just |other", plain)
+	}
+}
+
+// TestOtherRejectsCompanionSuffixes — regression, PR #86 review. The |other
+// rebuild returns a bare DV_TEXT, so any companion suffix the allowlist admits
+// would be accepted and then dropped. |other is mutually exclusive with every
+// other suffix, not just |code.
+func TestOtherRejectsCompanionSuffixes(t *testing.T) {
+	for _, sfx := range []map[string]any{
+		{"other": "x", "formatting": "markdown"},
+		{"other": "x", "code": "c", "value": "v"},
+		{"other": "x", "terminology": "local"},
+	} {
+		_, err := dvFromSuffixes("DV_CODED_TEXT", true, sfx)
+		if !errors.Is(err, ErrUnsupportedDatatype) {
+			t.Errorf("dvFromSuffixes(%v) err = %v, want ErrUnsupportedDatatype", sfx, err)
+		}
+	}
+	// |other alone still decodes to a DV_TEXT.
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "x"})
+	if err != nil {
+		t.Fatalf("bare |other rejected: %v", err)
+	}
+	if dv["_type"] != "DV_TEXT" || dv["value"] != "x" {
+		t.Errorf("|other alone = %#v, want DV_TEXT", dv)
+	}
+}
+
+// TestDateAccuracyRidesRaw: DV_DATE / DV_DATE_TIME / DV_TIME inherit from
+// DV_ABSOLUTE_QUANTITY, where `accuracy` is a DV_DURATION object rather than a
+// Real, so it has no scalar suffix form and must keep forcing |raw. Guards
+// against `accuracy` being added to their capturedKeys by symmetry with
+// DV_QUANTITY, which would emit an object where a number belongs.
+func TestDateAccuracyRidesRaw(t *testing.T) {
+	out := map[string]any{}
+	d := rm.DVDate{Value: "2022-01-12", Accuracy: &rm.DVDuration{Value: "P1D"}}
+	if err := leafToFlat(out, "p/x", d, "DV_DATE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|raw"]; !ok {
+		t.Errorf("DV_DATE with a DV_DURATION accuracy should ride |raw, got %#v", out)
+	}
+	if _, scalar := out["p/x|accuracy"]; scalar {
+		t.Error("emitted a scalar |accuracy for a DV_DURATION-typed accuracy")
 	}
 }
