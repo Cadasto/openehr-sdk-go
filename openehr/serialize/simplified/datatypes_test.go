@@ -75,6 +75,19 @@ func TestNewDatatypesEncodeDecode(t *testing.T) {
 				}
 			},
 		},
+		{
+			// A standalone CODE_PHRASE leaf — ENTRY language / encoding, which the
+			// reference emits in its own right rather than nested in a
+			// DV_CODED_TEXT (PROBE-086).
+			rmType: "CODE_PHRASE",
+			v:      rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}},
+			check: func(t *testing.T, dv map[string]any) {
+				tid, _ := dv["terminology_id"].(map[string]any)
+				if dv["code_string"] != "en" || tid["value"] != "ISO_639-1" {
+					t.Errorf("code phrase = %#v", dv)
+				}
+			},
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.rmType, func(t *testing.T) {
@@ -357,5 +370,71 @@ func TestLeafToFlatRawFallback(t *testing.T) {
 	}
 	if raw["_type"] != "DV_PARAGRAPH" {
 		t.Errorf("|raw _type = %v, want DV_PARAGRAPH", raw["_type"])
+	}
+}
+
+// TestCodePhraseEmptyCodeSkipped: ENTRY language / encoding are non-pointer
+// CODE_PHRASE fields, so an unset one arrives as a zero value with no pointer
+// for the nil check to catch. Writing it anyway would put empty |code leaves on
+// every composition whose metadata came in through the ctx/ forms.
+func TestCodePhraseEmptyCodeSkipped(t *testing.T) {
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/language", rm.CodePhrase{}, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat(zero CODE_PHRASE): %v", err)
+	}
+	if len(out) != 0 {
+		t.Errorf("zero CODE_PHRASE wrote %v, want no entries", out)
+	}
+}
+
+// TestCodePhraseTerminologyOptional: the encoder omits |terminology for an
+// empty TERMINOLOGY_ID, so the decoder must accept a |code-only leaf rather
+// than demand a suffix its own encoder never wrote.
+func TestCodePhraseTerminologyOptional(t *testing.T) {
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", rm.CodePhrase{CodeString: "UTF-8"}, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := out["p/x|terminology"]; ok {
+		t.Errorf("empty TERMINOLOGY_ID wrote a |terminology suffix: %v", out)
+	}
+	dv, err := dvFromSuffixes("CODE_PHRASE", false, suffixesOf(out, "p/x"))
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["code_string"] != "UTF-8" {
+		t.Errorf("code_string = %#v", dv["code_string"])
+	}
+	if _, ok := dv["terminology_id"]; ok {
+		t.Errorf("absent |terminology rebuilt a terminology_id: %#v", dv)
+	}
+}
+
+// TestCodePhraseMissingCodeErrors: |code is what makes a CODE_PHRASE a code, so
+// its absence must fail loudly rather than rebuild an empty-coded value.
+func TestCodePhraseMissingCodeErrors(t *testing.T) {
+	_, err := dvFromSuffixes("CODE_PHRASE", false, map[string]any{"terminology": "ISO_639-1"})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// TestCodePhrasePreferredTermRidesRaw: a preferred_term is outside the
+// |code/|terminology pair, so the value must ride |raw rather than be emitted
+// with the term silently discarded — the same rule the nested CODE_PHRASE
+// inside a DV_CODED_TEXT already follows.
+func TestCodePhrasePreferredTermRidesRaw(t *testing.T) {
+	pref := "English"
+	out := map[string]any{}
+	cp := rm.CodePhrase{CodeString: "en", PreferredTerm: &pref, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected p/x|raw, got %#v", out)
+	}
+	if raw["preferred_term"] != "English" {
+		t.Errorf("|raw dropped preferred_term: %#v", raw)
 	}
 }

@@ -215,6 +215,23 @@ func sectionChildren(s *rm.Section, attr string) []any {
 	return nil
 }
 
+// entryChildren resolves the two attributes every ENTRY subtype shares and the
+// Web Template emits as leaves in their own right: `language` and `encoding`
+// (REQ-121). Both are non-pointer CODE_PHRASE fields, so a child is always
+// returned and "unset" reaches the caller as a zero CODE_PHRASE — the FLAT
+// encoder's leaf mapping is what declines to write an empty code (see
+// simplified.codePhraseToFlat). Resolution and writability are separate
+// concerns; conflating them is what previously hid an encode-side drop.
+func entryChildren(language, encoding *rm.CodePhrase, attr string) []any {
+	switch attr {
+	case "language":
+		return []any{language}
+	case "encoding":
+		return []any{encoding}
+	}
+	return nil
+}
+
 func observationChildren(o *rm.Observation, attr string) []any {
 	switch attr {
 	case "data":
@@ -229,7 +246,7 @@ func observationChildren(o *rm.Observation, attr string) []any {
 	case "name":
 		return iface(o.Name)
 	}
-	return nil
+	return entryChildren(&o.Language, &o.Encoding, attr)
 }
 
 func evaluationChildren(e *rm.Evaluation, attr string) []any {
@@ -241,7 +258,7 @@ func evaluationChildren(e *rm.Evaluation, attr string) []any {
 	case "name":
 		return iface(e.Name)
 	}
-	return nil
+	return entryChildren(&e.Language, &e.Encoding, attr)
 }
 
 func instructionChildren(i *rm.Instruction, attr string) []any {
@@ -264,7 +281,7 @@ func instructionChildren(i *rm.Instruction, attr string) []any {
 		}
 		return []any{i.ExpiryTime}
 	}
-	return nil
+	return entryChildren(&i.Language, &i.Encoding, attr)
 }
 
 func actionChildren(a *rm.Action, attr string) []any {
@@ -280,7 +297,7 @@ func actionChildren(a *rm.Action, attr string) []any {
 		// ACTION `time` leaf — but ItemAtPath is a public reader (REQ-121).
 		return []any{a.Time}
 	}
-	return nil
+	return entryChildren(&a.Language, &a.Encoding, attr)
 }
 
 func adminEntryChildren(a *rm.AdminEntry, attr string) []any {
@@ -290,7 +307,7 @@ func adminEntryChildren(a *rm.AdminEntry, attr string) []any {
 	case "name":
 		return iface(a.Name)
 	}
-	return nil
+	return entryChildren(&a.Language, &a.Encoding, attr)
 }
 
 func genericEntryChildren(g *rm.GenericEntry, attr string) []any {

@@ -117,10 +117,10 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, resolveRoot rm.Locatable, resolveRootAql string, ambiguous map[string]bool) error {
 	isContainer := len(node.Children) > 0
 	// A value leaf normally carries input descriptors, but the Web Template emits
-	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, …); any childless
-	// DV_* node is still a value leaf and must be emitted (bare/suffixed or |raw),
-	// not dropped.
-	isLeaf := !isContainer && (len(node.Inputs) > 0 || strings.HasPrefix(node.RMType, "DV_"))
+	// none for some datatypes (DV_URI, DV_MULTIMEDIA, DV_PARSABLE, the in-context
+	// CODE_PHRASE pair, …); any childless node of a value leaf type is still a
+	// value leaf and must be emitted (bare/suffixed or |raw), not dropped.
+	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(node.RMType))
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
 	}

@@ -77,7 +77,11 @@ func TestDecodeRejectsSparseIndex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MarshalFlat: %v", err)
 	}
-	mutated := strings.Replace(string(f1), ":0/", ":2/", 1)
+	// Move the whole instance, not the first key: a single replacement splits
+	// whichever multi-suffix leaf happens to sort first across :0 and :2, and the
+	// resulting incomplete leaf fails as a datatype error before the index
+	// sequence is ever examined — masking the property under test.
+	mutated := strings.ReplaceAll(string(f1), ":0/", ":2/")
 	if mutated == string(f1) {
 		t.Skip("no repeatable :index in fixture to mutate")
 	}

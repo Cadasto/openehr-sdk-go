@@ -1054,7 +1054,10 @@ requirements:
       # narrative/expiry_time; 2026-08-03: EVENT_CONTEXT other_context (the only
       # template-constrained one — its data was being dropped outright),
       # end_time/health_care_facility/location/participations, ACTIVITY timing,
-      # ACTION time. EVENT_CONTEXT start_time/setting stay exempt by design.
+      # ACTION time, and `language`/`encoding` on all five ENTRY subtypes (via
+      # the shared entryChildren resolver) once the CODE_PHRASE leaf mapping gave
+      # the encoder something to write there — the PROBE-086 coverage ratchet.
+      # EVENT_CONTEXT start_time/setting stay exempt by design.
       #
       # These two tests jointly enforce rm-functions.md § REQ-121 "Attribute
       # coverage for synthesized in-context leaves". The guard lives beside the
@@ -1284,8 +1287,8 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 192 of the corpus's 1824 keys are in the modelled
-    # subset today (10.5%) — 1314 refused by the REQ-053 codec, 318 held out as
+    # Scope, stated plainly: 328 of the corpus's 1824 keys are in the modelled
+    # subset today (18.0%) — 1178 refused by the REQ-053 codec, 318 held out as
     # composition metadata. That hold-out is respellings (language, territory,
     # composer, context/start_time, which REQ-053 reads and writes as the ctx/
     # short forms) plus ONE waiver: context/setting decodes and then re-encodes
@@ -1298,6 +1301,12 @@ requirements:
     # identically on both sides. Its 102 keys (34 fixtures × 3) were already
     # round-tripping byte-for-byte and are now compared — that is the whole of
     # the 90 → 192 move; no codec gap closed to earn it.
+    #
+    # 192 → 328 (2026-08-03) is the opposite: a real codec gap closing. The
+    # CODE_PHRASE leaf mapping (ENTRY language/encoding, 136 keys over 68
+    # refusals) removed that family from the census entirely. See
+    # docs/plans/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
+    # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #
     # The probe is exact on what it compares (no tolerated-drop list: a key
     # that decodes and then does not re-encode fails) and adds a coverage floor

@@ -38,6 +38,11 @@ var capturedKeys = map[string]map[string]bool{
 	"DV_ORDINAL":    {"symbol": true, "value": true},
 	"DV_PROPORTION": {"numerator": true, "denominator": true, "type": true},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+	// CODE_PHRASE is not a DataValue, but the reference emits it as a leaf in its
+	// own right (ENTRY language / encoding) under the same |code + |terminology
+	// pair a DV_CODED_TEXT's defining_code uses. A preferred_term makes it
+	// uncaptured and it rides |raw, as everywhere else.
+	"CODE_PHRASE": {"code_string": true, "terminology_id": true},
 }
 
 // leafToFlat writes the FLAT entries for a single leaf value at flatPath. rmType
@@ -76,10 +81,26 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listO
 			return emitCoreLeaf(out, flatPath, v, rmType, listOpen)
 		}
 	}
-	if strings.HasPrefix(rmType, "DV_") {
+	// A modelled leaf type whose value the suffix form cannot capture (a
+	// preferred_term, a decorated TERMINOLOGY_ID) rides |raw rather than falling
+	// through to the non-value skip below, which would lose it silently.
+	if isValueLeafType(rmType) {
 		return emitRaw(out, flatPath, v, cmp.Or(dyn, rmType))
 	}
 	return nil
+}
+
+// isValueLeafType reports whether a childless Web Template node of this RM type
+// carries a value this codec emits.
+//
+// Every DV_* type qualifies — |raw is the backstop for one with no suffix
+// mapping. CODE_PHRASE qualifies too, and cannot be recognised by an
+// Inputs-presence test: the reference emits ENTRY `language` / `encoding` as
+// in-context leaves with no input descriptors at all (webtemplate.entryIC), and
+// PROBE-075 parity locks that shape, so the reference's silence about inputs
+// must not be read as "no value here".
+func isValueLeafType(rmType string) bool {
+	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE"
 }
 
 // canonicalMap returns v's canonical JSON parsed as a generic object — the
@@ -112,6 +133,10 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 		}
 	}
 	switch rmType {
+	case "CODE_PHRASE":
+		// The standalone form reuses the nested check, which also bounds the
+		// TERMINOLOGY_ID shape the |terminology suffix reduces to a string.
+		return codePhraseCaptured(m)
 	case "DV_CODED_TEXT":
 		// Absent defining_code is the DV_TEXT-at-coded-leaf (|other) form.
 		return m["defining_code"] == nil || codePhraseCaptured(m["defining_code"])
@@ -239,6 +264,10 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 	}
 	if dv, ok := as[rm.DVIdentifier](v); ok {
 		identifierToFlat(out, flatPath, dv)
+		return nil
+	}
+	if cp, ok := as[rm.CodePhrase](v); ok {
+		codePhraseToFlat(out, flatPath, cp)
 		return nil
 	}
 	return nil
@@ -383,6 +412,25 @@ func codedToFlat(out map[string]any, flatPath string, dv rm.DVCodedText) {
 	out[flatPath+"|code"] = dv.DefiningCode.CodeString
 	out[flatPath+"|value"] = dv.Value
 	if term := dv.DefiningCode.TerminologyID.Value; term != "" {
+		out[flatPath+"|terminology"] = term
+	}
+}
+
+// codePhraseToFlat emits the |code and |terminology suffixes for a standalone
+// CODE_PHRASE leaf (ENTRY language / encoding).
+//
+// An empty code_string writes nothing. CODE_PHRASE sits in non-pointer fields
+// (ENTRY.language, ENTRY.encoding), so "absent" and "zero" are the same value
+// here and there is no pointer for [leafToFlat]'s nil check to catch. Emitting
+// unconditionally would put empty |code / |terminology leaves on every
+// composition whose metadata arrived through the ctx/ forms — the hazard
+// EVENT_CONTEXT.setting documents in deviations.md.
+func codePhraseToFlat(out map[string]any, flatPath string, cp rm.CodePhrase) {
+	if cp.CodeString == "" {
+		return
+	}
+	out[flatPath+"|code"] = cp.CodeString
+	if term := cp.TerminologyID.Value; term != "" {
 		out[flatPath+"|terminology"] = term
 	}
 }

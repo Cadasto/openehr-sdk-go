@@ -44,20 +44,13 @@ var unserialisableIC = map[string]string{
 		"until the metadata real-path decision — no data loss today",
 	"EVENT_CONTEXT.setting": "ctx/setting emission is deferred (simplified/deviations.md); resolving here would emit " +
 		"zero-valued leaves for ctx-decoded compositions. A non-default setting is currently dropped on encode — known deviation",
-	"OBSERVATION.language":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"OBSERVATION.encoding":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
+	// ENTRY-level language / encoding are deliberately absent: the CODE_PHRASE
+	// leaf mapping landed, so those leaves now resolve through rmpath and this
+	// guard enforces it.
 	"OBSERVATION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"EVALUATION.language":          "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"EVALUATION.encoding":          "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"EVALUATION.subject":           "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"INSTRUCTION.language":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"INSTRUCTION.encoding":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"INSTRUCTION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ACTION.language":              "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ACTION.encoding":              "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"ACTION.subject":               "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ADMIN_ENTRY.language":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ADMIN_ENTRY.encoding":         "CODE_PHRASE: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"ADMIN_ENTRY.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 	"ACTIVITY.action_archetype_id": "STRING: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 }

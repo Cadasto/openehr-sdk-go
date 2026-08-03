@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **CODE_PHRASE FLAT leaves (REQ-053, REQ-121, PROBE-086).** `openehr/serialize/simplified` round-trips standalone `CODE_PHRASE` leaves (ENTRY `language` / `encoding`) as `|code` + `|terminology`, raising upstream conformance coverage from 10.5% to 18.0% of the pinned corpus — **encode emits four new keys per ENTRY**.
+
 ## [0.17.0] - 2026-08-03
 
 Seventeenth `v0.x` minor — the simplified-formats stack lands: a WebTemplate JSON export and the bidirectional FLAT/STRUCTURED codecs built on it, plus template-level node naming and the first upstream FLAT conformance slice. **Breaking:** REQ-116 changes compiled-path and FLAT-key shapes for templates that pin a node name — read [`webtemplate/deviations.md`](openehr/template/webtemplate/deviations.md) before upgrading.

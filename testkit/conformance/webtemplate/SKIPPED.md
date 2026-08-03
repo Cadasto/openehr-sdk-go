@@ -10,16 +10,24 @@ go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v
 
 The census output is deterministic — diff it across commits to see the surface move.
 
-## Position as of 2026-08-03
+## Position as of 2026-08-03 (CODE_PHRASE leaves landed)
 
 ```
-corpus: 34 fixtures, 1824 keys — 192 compared, 1314 excluded, 318 metadata held out
-coverage: 10.5% of upstream keys are in the modelled subset
+corpus: 34 fixtures, 1824 keys — 328 compared, 1178 excluded, 318 metadata held out
+coverage: 18.0% of upstream keys are in the modelled subset
 ```
 
-**10.5% is the honest number, and it is the point of this probe.** The corpus is upstream-authored FLAT written against a mature Java implementation; this SDK's REQ-053 codec models a deliberately narrow slice of it. Nothing here was known before the harness ran — [PROBE-076](../../../docs/specifications/conformance.md#probe-076--flat--structured-composition-round-trip) round-trips the SDK's *own* output and so reports 24/25 green over the same codec. The gap between those two numbers is exactly the value of feeding in FLAT this SDK did not write.
+**18.0% is the honest number, and it is the point of this probe.** The corpus is upstream-authored FLAT written against a mature Java implementation; this SDK's REQ-053 codec models a deliberately narrow slice of it. Nothing here was known before the harness ran — [PROBE-076](../../../docs/specifications/conformance.md#probe-076--flat--structured-composition-round-trip) round-trips the SDK's *own* output and so reports 24/25 green over the same codec. The gap between those two numbers is exactly the value of feeding in FLAT this SDK did not write.
 
-This file's first revision recorded 4.9% / 90 compared. That figure was wrong against the codec's actual behaviour: `category` was held out as composition metadata, when it is nothing of the kind (see below). Its 102 keys — 34 fixtures × 3 — were already round-tripping byte-for-byte and are now compared, which is the whole of the move from 90 to 192. No codec gap closed to earn it, and none of the excluded surface moved.
+### How the number has moved
+
+| Position | Compared | Coverage | Earned by |
+|---|---:|---:|---|
+| first revision | 90 | 4.9% | — |
+| 2026-08-01 | 192 | 10.5% | **nothing** — `category` was wrongly held out as composition metadata (see below); its 102 keys were already round-tripping byte-for-byte. No codec gap closed, no excluded surface moved. |
+| 2026-08-03 | 328 | 18.0% | **a real codec gap closing** — the CODE_PHRASE leaf mapping ([plan](../../../docs/plans/2026-08-03-flat-coverage-ratchet.md) Phase 1). The `unsupported datatype: CODE_PHRASE` family, 68 refusals over 136 keys, is gone from the census: excluded fell 1314 → 1178 and every fixture gained exactly its ENTRY's `language\|code`, `language\|terminology`, `encoding\|code`, `encoding\|terminology`. |
+
+The CODE_PHRASE round trip needed three things, and the third is the one worth remembering: the encoder's leaf test gated on *input descriptors or a `DV_` prefix*, and the reference emits these in-context leaves with **no inputs at all**, so every such node was classed as structural and skipped before any datatype mapping was consulted. A leaf type is now recognised by `simplified.isValueLeafType`; the reference's silence about inputs is not evidence that a node carries no value. `rmpath` also had to resolve `language` / `encoding` on the five ENTRY subtypes (REQ-121) — with the leaf mapping in place but resolution missing, the keys would have decoded and then silently failed to re-emit, which is exactly the shape of the encode-side drop closed on 2026-08-01.
 
 ## How the exclusion list is produced
 
@@ -48,12 +56,11 @@ Two things are treated differently:
 
 Everything that survives into the comparison must round-trip exactly: a missing key, an extra key, or a changed value **fails** the test.
 
-## Excluded families (1314 keys)
+## Excluded families (1178 keys)
 
 | Keys | Refusals | Reason | Owner |
 |---:|---:|---|---|
 | 1118 | 289 | `path not in web template` | overwhelmingly the `_`-prefixed RM attribute family, which REQ-053 does not model at all: 1092 of the corpus's 1824 keys carry an `_` segment — `_feeder_audit/…` alone is 530, then `_health_care_facility` 143, `_other_participation:N` 97, `_other_reference_ranges` 44, `_uid` 43, `_link:N` 39, `_participation:N` 31, `_normal_range` 30, `_mapping` 27, `_work_flow_id` 24, `_guideline_id` 20, `_identifier` 16, … Also `ism_transition/*` and the ACTION `time` leaf, neither of which the WebTemplate builder synthesizes — webtemplate/deviations.md § inContext coverage names `ism_transition` as the outstanding in-context set, which is the largest but not the only one; ACTION `time` is unemitted too. |
-| 136 | 68 | `unsupported datatype: CODE_PHRASE` | ENTRY-level `language` / `encoding`, emitted by the reference as CODE_PHRASE leaves; the codec has no CODE_PHRASE leaf mapping. |
 | 8 | 2 | `unsupported datatype: PARTY_PROXY` | `subject` / `composer` addressed as a leaf. |
 | 7 | 1 | `unsupported datatype: DV_MULTIMEDIA` | datatype not modelled by the codec. |
 | 7 | 7 | `unsupported \|suffix for DV_QUANTITY` | optional datatype suffixes (`\|precision`, `\|magnitude_status`, …) beside modelled ones that now stay in the comparison. |
@@ -103,9 +110,8 @@ What is actually exempt today, and why:
 
 ## What would move these numbers
 
-Ranked by keys unlocked, cheapest first:
+Ranked by keys unlocked, cheapest first. **~~CODE_PHRASE leaves (136 keys)~~ — done 2026-08-03**, and the ranking below now carries a risk column, because "cheapest to implement" and "safest to land" turned out to disagree.
 
-1. **Optional datatype suffixes** (33 keys across DV_TEXT / QUANTITY / PROPORTION / CODED_TEXT / COUNT / DURATION / DATE / DATE_TIME / TIME) — accept and round-trip the suffixes the reference emits. Cheapest by far, and now a small number precisely because each unmodelled suffix costs only itself.
-2. **CODE_PHRASE leaves** (136 keys) — one datatype mapping in `leafToFlat`, plus deleting the matching `unserialisableIC` entries once it lands. rmpath resolution is *not* a co-requisite; see the corrected hazard model above.
-3. **Composition metadata real-path spelling** (318 keys, currently held out rather than counted against us) — accepting the reference's spelling alongside `ctx/` would let these be compared instead of held out. It is also what settles `context/setting`, the one hold-out that waives a real encode-side drop rather than a respelling, and what unblocks EVENT_CONTEXT `start_time` / `setting` in rmpath.
-4. **`_`-prefixed RM attributes** (1092 keys, 60% of the corpus) — by far the largest, and a genuine feature rather than a deviation to close: `_feeder_audit` (530 on its own), `_health_care_facility`, participations, `_uid`, links, reference ranges, workflow ids. Its own REQ.
+1. **Optional datatype suffixes** (33 keys across DV_TEXT / QUANTITY / PROPORTION / CODED_TEXT / COUNT / DURATION / DATE / DATE_TIME / TIME) — accept and round-trip the suffixes the reference emits (`|magnitude_status`, `|normal_status`, `|accuracy`, `|accuracy_is_percent`, `|precision`, `|units_system`, `|units_display_name`, `|formatting`, `|preferred_term`). Cheapest to write, but **not** additive: `capturedKeys` decides suffix-form versus `|raw`, so admitting these re-routes a decorated value that rides `|raw` today into the suffix form — a change in emitted bytes for existing consumers, and a `deviations.md` entry rather than a silent improvement. Contrast CODE_PHRASE, which was purely additive because nothing emitted those paths at all.
+2. **Composition metadata real-path spelling** (318 keys, currently held out rather than counted against us) — accepting the reference's spelling alongside `ctx/` would let these be compared instead of held out. It is also what settles `context/setting`, the one hold-out that waives a real encode-side drop rather than a respelling, and what unblocks EVENT_CONTEXT `start_time` / `setting` in rmpath. **Needs an ADR before either side proceeds:** it decides the vocabulary REQ-115 (FLAT author linter) states its required-key set in, so it gates that plan's Phase 0 too.
+3. **`_`-prefixed RM attributes** (1092 keys, 60% of the corpus) — by far the largest, and a genuine feature rather than a deviation to close: `_feeder_audit` (530 on its own), `_health_care_facility`, participations, `_uid`, links, reference ranges, workflow ids. Its own REQ.

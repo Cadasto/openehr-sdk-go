@@ -887,6 +887,20 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			return nil, err
 		}
 		return map[string]any{"_type": "DV_PROPORTION", "numerator": num, "denominator": den, "type": typ}, nil
+	case "CODE_PHRASE":
+		// A leaf CODE_PHRASE (ENTRY language / encoding), not the defining_code
+		// nested inside DV_CODED_TEXT. |code is required — a CODE_PHRASE without
+		// one is not a code; |terminology is optional, matching the encoder, which
+		// omits an empty TERMINOLOGY_ID rather than writing a blank suffix.
+		code, err := requireSuffix(rmType, sfx, "code")
+		if err != nil {
+			return nil, err
+		}
+		cp := map[string]any{"_type": "CODE_PHRASE", "code_string": code}
+		if t, ok := sfx["terminology"]; ok {
+			cp["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
+		}
+		return cp, nil
 	case "DV_IDENTIFIER":
 		id, err := requireSuffix(rmType, sfx, "id")
 		if err != nil {
@@ -922,6 +936,7 @@ var allowedSuffixes = map[string]map[string]bool{
 	"DV_ORDINAL":    {"code": true, "value": true, "ordinal": true},
 	"DV_PROPORTION": {"numerator": true, "denominator": true, "type": true},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
+	"CODE_PHRASE":   {"code": true, "terminology": true},
 }
 
 // checkSuffixAllowlist rejects any suffix a datatype does not map. An unmapped
