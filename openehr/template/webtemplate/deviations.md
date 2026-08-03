@@ -29,9 +29,15 @@ failure, not a deviation.
   EVENT_CONTEXT, the ENTRY types, the EVENT variants (INTERVAL_EVENT adds
   `math_function` / `width`), INSTRUCTION (`narrative` / `expiry_time`), and
   ACTIVITY (`timing` / `action_archetype_id`) — the INSTRUCTION/ACTIVITY sets
-  landed with REQ-116 Phase 4, measured on the corona golden. Still not emitted:
-  ACTION `ism_transition`. *(Deferred: extend parity with a fixture exercising a
-  full ACTION.)*
+  landed with REQ-116 Phase 4, measured on the corona golden. Still not emitted,
+  both on ACTION: `ism_transition` (the larger set — the reference emits
+  `current_state` / `transition` / `careflow_step` leaves) and `time`. Neither is
+  synthesized here, so the upstream FLAT corpus's keys for both fall into
+  PROBE-086's `path not in web template` bucket
+  ([SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md)). `time` is
+  unemitted only at this layer — `rmpath` resolves `ACTION.time` (REQ-121), so
+  synthesizing the leaf is all that is missing. *(Deferred: extend parity with a
+  fixture exercising a full ACTION.)*
 - **`localizedName` / localized maps** — emitted for the compiled template's single
   document language only. The compiled bridge resolves every language to the
   document-language term, so no per-language override options are offered — they

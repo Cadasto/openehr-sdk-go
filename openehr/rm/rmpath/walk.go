@@ -10,6 +10,39 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // A typed-nil pointer parent (including a typed-nil root, e.g. a
 // (*rm.Composition)(nil) passed to ItemAtPath) yields no children rather
 // than a nil-receiver dereference — upholding the no-panic contract.
+//
+// # Coverage and the silent-drop hazard
+//
+// "Unknown attribute" and "attribute present but empty" are indistinguishable
+// to callers: both yield no children, and [ItemAtPath] reports
+// [ErrPathNotFound] for each. A caller that treats that as "absent optional"
+// — as the FLAT encoder's skipNotFound does — will therefore *silently drop*
+// data for any attribute missing from these switches.
+//
+// PROBE-086 caught exactly that: EVENT `time`, INSTRUCTION `narrative` /
+// `expiry_time`, and — worse, because it carries template-constrained clinical
+// data — every EVENT_CONTEXT attribute were absent here, so upstream
+// compositions round-tripped through the FLAT codec with those values
+// discarded and no error. `webtemplate.TestInContextLeavesResolveViaRmpath`
+// guards the class by asserting that every synthesized in-context leaf the
+// WebTemplate can emit is resolvable here unless deliberately exempted.
+//
+// Resolving an attribute here does not by itself make the FLAT encoder fail:
+// leafToFlat silently skips non-DV_ leaf datatypes (CODE_PHRASE, PARTY_PROXY,
+// STRING — a documented skip, see openehr/serialize/simplified/deviations.md)
+// and emits unmapped DV_* datatypes as |raw. "The codec cannot write it" is
+// therefore a reason for a leaf to stay unemitted, never a reason for an
+// attribute to stay unresolvable.
+//
+// The attributes deliberately still absent are EVENT_CONTEXT `start_time` and
+// EVENT_CONTEXT `setting`: both are owned by the ctx/ short-form spelling on
+// encode, and resolving them here would double-spell the value (`start_time`
+// rides ctx/time) or emit zero-valued leaves for ctx-decoded compositions
+// (`setting`) until the metadata real-path decision lands. A non-default
+// EVENT_CONTEXT `setting` is currently dropped on encode — recorded in
+// simplified/deviations.md. The rest of the REQ-121 completeness set (ENTRY
+// `language` / `encoding` / `subject`, COMPOSITION `language` / `territory`,
+// ACTIVITY `action_archetype_id`) is simply not written yet.
 func childrenAt(parent any, attr string) []any {
 	if isNilPointer(parent) {
 		return nil
@@ -19,6 +52,11 @@ func childrenAt(parent any, attr string) []any {
 		return compositionChildren(p, attr)
 	case rm.Composition:
 		return compositionChildren(&p, attr)
+
+	case *rm.EventContext:
+		return eventContextChildren(p, attr)
+	case rm.EventContext:
+		return eventContextChildren(&p, attr)
 
 	case *rm.Section:
 		return sectionChildren(p, attr)
@@ -138,6 +176,35 @@ func compositionChildren(c *rm.Composition, attr string) []any {
 	return nil
 }
 
+// eventContextChildren resolves the EVENT_CONTEXT attributes reachable from
+// COMPOSITION `context`. `other_context` matters most: it is the only
+// template-constrained one, so before this existed every
+// /context/other_context/… path was unresolvable and the FLAT encoder dropped
+// the data. `start_time` and `setting` are deliberately absent — see the
+// hazard note on childrenAt.
+func eventContextChildren(c *rm.EventContext, attr string) []any {
+	switch attr {
+	case "other_context":
+		return iface(c.OtherContext)
+	case "end_time":
+		return iface(c.EndTime)
+	case "health_care_facility":
+		return iface(c.HealthCareFacility)
+	case "location":
+		if c.Location == nil {
+			return nil
+		}
+		return []any{c.Location}
+	case "participations":
+		out := make([]any, 0, len(c.Participations))
+		for k := range c.Participations {
+			out = append(out, &c.Participations[k])
+		}
+		return out
+	}
+	return nil
+}
+
 func sectionChildren(s *rm.Section, attr string) []any {
 	switch attr {
 	case "items":
@@ -189,6 +256,13 @@ func instructionChildren(i *rm.Instruction, attr string) []any {
 		return iface(i.Protocol)
 	case "name":
 		return iface(i.Name)
+	case "narrative":
+		return iface(i.Narrative)
+	case "expiry_time":
+		if i.ExpiryTime == nil {
+			return nil
+		}
+		return []any{i.ExpiryTime}
 	}
 	return nil
 }
@@ -201,6 +275,10 @@ func actionChildren(a *rm.Action, attr string) []any {
 		return iface(a.Protocol)
 	case "name":
 		return iface(a.Name)
+	case "time":
+		// Inert on encode today — the WebTemplate builder synthesizes no
+		// ACTION `time` leaf — but ItemAtPath is a public reader (REQ-121).
+		return []any{a.Time}
 	}
 	return nil
 }
@@ -231,6 +309,11 @@ func activityChildren(a *rm.Activity, attr string) []any {
 		return iface(a.Description)
 	case "name":
 		return iface(a.Name)
+	case "timing":
+		if a.Timing == nil {
+			return nil
+		}
+		return []any{a.Timing}
 	}
 	return nil
 }
@@ -255,6 +338,8 @@ func pointEventChildren(e *rm.PointEvent[rm.ItemStructure], attr string) []any {
 		return iface(e.State)
 	case "name":
 		return iface(e.Name)
+	case "time":
+		return []any{e.Time}
 	}
 	return nil
 }
@@ -267,6 +352,12 @@ func intervalEventChildren(e *rm.IntervalEvent[rm.ItemStructure], attr string) [
 		return iface(e.State)
 	case "name":
 		return iface(e.Name)
+	case "time":
+		return []any{e.Time}
+	case "math_function":
+		return []any{e.MathFunction}
+	case "width":
+		return []any{e.Width}
 	}
 	return nil
 }

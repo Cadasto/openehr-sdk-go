@@ -1043,6 +1043,20 @@ requirements:
       - openehr/rm/rmpath
     tests:
       - openehr/rm/rmpath/rmpath_test.go
+      # The in-context RM attributes PROBE-086 found missing — 2026-08-01: EVENT
+      # time, INTERVAL_EVENT math_function/width, INSTRUCTION
+      # narrative/expiry_time; 2026-08-03: EVENT_CONTEXT other_context (the only
+      # template-constrained one — its data was being dropped outright),
+      # end_time/health_care_facility/location/participations, ACTIVITY timing,
+      # ACTION time. EVENT_CONTEXT start_time/setting stay exempt by design.
+      #
+      # These two tests jointly enforce rm-functions.md § REQ-121 "Attribute
+      # coverage for synthesized in-context leaves". The guard lives beside the
+      # WebTemplate builder that synthesizes those leaves, because that is where
+      # a new one is added: it asserts every in-context leaf whose datatype the
+      # FLAT codec can write resolves through rmpath, so the next one cannot be
+      # dropped silently, and reports a stale exemption.
+      - openehr/template/webtemplate/incontext_rmpath_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
 

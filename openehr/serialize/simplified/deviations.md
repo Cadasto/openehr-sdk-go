@@ -22,7 +22,8 @@ semantics-preserving). Concretely:
   keys) and any datatype outside the core set are embedded as a lossless `|raw` canonical
   fragment rather than partially/silently dropped. A `DV_*` leaf the Web Template gives no
   input descriptors for (e.g. `DV_URI`, `DV_MULTIMEDIA`, `DV_PARSABLE`) is still emitted (as
-  bare/suffixed or `|raw`), not skipped. A non-`DV_` leaf (party / context / other RM
+  bare/suffixed or `|raw`), not skipped — including the in-context `ACTIVITY.timing`
+  (`DV_PARSABLE`), which rides `|raw` when populated now that `rmpath` resolves it (REQ-121). A non-`DV_` leaf (party / context / other RM
   attribute) is a documented skip. A container node that resolves to a
   non-`Locatable` RM object (e.g. `EVENT_CONTEXT`) is recursed via the enclosing Locatable
   ancestor, not dropped. A typed-nil RM pointer is treated as an absent leaf (skipped).
@@ -45,7 +46,7 @@ not partially/silently accepted.
 | Feature | Current behaviour | Lands in |
 |---|---|---|
 | `ctx/` context — **core supported**: `ctx/language`, `ctx/territory` (both mandatory on decode → `ErrMissingContext`), `ctx/composer_name` / `ctx/composer_self`, `ctx/time` (context `start_time`). | Emitted on encode; rebuilt on decode. | landed (Task 6) |
-| `ctx/` context — **rest deferred**: the `ctx/` short forms for participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, and `setting`. | Not emitted on encode (those source values are dropped); any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). All are optional except `setting`, which is **defaulted** on `WithTemplate` decode (`238 other care`) — valid, but a non-default source setting is not round-tripped. Note the fields that do NOT belong here: `category` is a template-constrained Web Template leaf and round-trips via its own path; a composer **name** round-trips via `ctx/composer_name` (only the external ref is lost); template-constrained `other_context` content rides its Web Template paths. | Deferred |
+| `ctx/` context — **rest deferred**: the `ctx/` short forms for participations, `health_care_facility`, `work_flow_id`, composer `external_ref` (`composer_id` / `id_namespace` / `id_scheme`), `end_time`, `location`, and `setting`. | Not emitted on encode (those source values are dropped); any such `ctx/*` key is rejected on decode (`ErrUnknownPath`). All are optional except `setting`, which is **defaulted** on `WithTemplate` decode (`238 other care`) — valid, but a non-default source setting is **dropped on encode** (see § Deviations → `EVENT_CONTEXT.setting`). Note the fields that do NOT belong here: `category` is a template-constrained Web Template leaf and round-trips via its own path; a composer **name** round-trips via `ctx/composer_name` (only the external ref is lost); template-constrained `other_context` content rides its Web Template paths, and does so end-to-end since `rmpath` resolves `EVENT_CONTEXT.other_context` (REQ-121) — before that the paths existed in the Web Template but the encoder dropped the data. | Deferred |
 | Datatypes — **first-class** suffix form: `DV_TEXT`, `DV_CODED_TEXT`, `DV_DATE_TIME`, `DV_DATE`, `DV_TIME`, `DV_QUANTITY`, `DV_COUNT`, `DV_BOOLEAN`, `DV_DURATION`, `DV_URI`, `DV_EHR_URI`, `DV_ORDINAL`, `DV_PROPORTION`, `DV_IDENTIFIER`. Any other `DV_*`, a decorated instance of the above, or a **substituted subtype** (the value's dynamic type differs from the leaf type, e.g. `DV_EHR_URI` at a `DV_URI` leaf), rides `\|raw`. | Both directions. | landed (Task 6) |
 | `_`-prefixed optional RM attributes (`_uid`, `_normal_range/…`, `\|magnitude_status`, `\|accuracy`) — **first-class** suffix decomposition. | Not decomposed into suffixes; a value carrying them is emitted losslessly as `\|raw` instead (no data loss). First-class suffix form deferred. | Deferred |
 | `\|raw` escape hatch (canonical fragment for exotic/decorated datatypes) | Supported both directions: encode emits `\|raw` for non-core or decorated `DV_*`; decode accepts a `\|raw` fragment that carries a string `_type` and is not combined with any other suffix; encode stamps the fragment with the value's **dynamic** type when it can classify it. On decode, `\|raw` is **not** checked for RM-type compatibility with the leaf constraint (an explicit bypass) — a documented relaxation. | landed (Task 6) |
@@ -77,6 +78,20 @@ not partially/silently accepted.
   (pinned by `names_test.go`). Without `WithTemplate`, decode omits names and defaults
   entirely (format-idempotent only).
 
+- **`EVENT_CONTEXT.setting` is dropped on encode** — the one in-context attribute this codec
+  loses outright. Neither spelling is emitted: `ctx/setting` is a deferred `ctx/` short form
+  (above), and the real path `…/context/setting` is deliberately left unresolvable in `rmpath`
+  (REQ-121), because `setting` is a non-pointer `DV_CODED_TEXT` on `EVENT_CONTEXT` — resolving
+  it would emit a zero-valued leaf on *every* composition decoded through the `ctx/` forms,
+  which is worse output than none. Both halves are held until the metadata real-path decision
+  (whether the codec accepts the reference's real-path spelling alongside `ctx/`); whichever
+  spelling wins settles this in one move. Consequence: a `WithTemplate` decode still *defaults*
+  the setting to `238 other care` so the composition validates, but a non-default source
+  setting does not survive a round-trip. The PROBE-086 conformance harness holds
+  `context/setting` out of its comparison as an **explicit waiver** — the one hold-out on its
+  metadata allow-list that waives a real encode-side drop rather than a respelling
+  ([SKIPPED.md](../../../testkit/conformance/webtemplate/SKIPPED.md)).
+
 - **Empty repeat instances are not representable in FLAT** — an instance of a repeatable
   node whose subtree contributes no FLAT keys (all leaves below it absent) is omitted on
   encode and does **not** consume an `:index`; later instances close ranks. Stamping the
@@ -98,6 +113,13 @@ not partially/silently accepted.
 - **Integer precision** — FLAT/STRUCTURED JSON is decoded with `json.Number`
   (`UseNumber`), so a `DV_COUNT` magnitude above 2^53 is preserved exactly through
   decode and through OPT-free interconversion rather than being rounded via `float64`.
+- **Zero-valued mandatory in-context attributes emit empty leaves** — an in-context RM
+  attribute that is RM-**mandatory** and value-typed (a non-pointer struct, e.g. `EVENT.time`)
+  always resolves, so a composition that left it at its zero value emits the leaf with an empty
+  value rather than omitting it: the encoder cannot tell "unset" from "set to the zero value"
+  for a non-pointer field. Only reachable with RM-invalid input — a valid composition populates
+  it, and a `WithTemplate` decode synthesises it (§ Deviations, RM-mandatory attributes).
+
 - **`:index` strictness** — a FLAT `:index` must be canonically spelled (`0`, `1`, …;
   negative, `+`, or zero-padded spellings are rejected — they would collide with other
   keys), must not be sparse (a gap would fabricate a phantom empty instance), and is capped
@@ -119,10 +141,11 @@ not partially/silently accepted.
 (FLAT/STRUCTURED/interconversion) **and OPT-conformance**: when the source composition is
 itself OPT-valid, a `WithTemplate` decode must also validate against the OPT. The conformance
 leg catches dropped/mistyped leaves that idempotence alone (a symmetric omission) would miss.
-It does **not** yet compare emitted FLAT/STRUCTURED against vendored upstream simplified
-output — that follow-up is **PROBE-086** (Draft — unblocked): its corpus is vendored at
-`testkit/cassettes/flat-conformance/`, and its adapter is the FLAT-conformance plan's
-Phase 1.
+It does **not** compare emitted FLAT/STRUCTURED against vendored upstream simplified
+output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness at
+`testkit/conformance/webtemplate/` round-trips the corpus vendored at
+`testkit/cassettes/flat-conformance/` over the modelled subset, with the refusal
+inventory in that package's `SKIPPED.md`.
 
 **Archetype-reuse siblings (REQ-116 residual).** REQ-116 made templates that reuse one
 archetype among siblings *exportable* (distinct WebTemplate `id`s via the pinned

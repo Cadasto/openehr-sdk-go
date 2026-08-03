@@ -2,6 +2,7 @@ package rmpath_test
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -349,5 +350,256 @@ func TestNamePredicateTypedNilNameNoPanic(t *testing.T) {
 	path := `/content[openEHR-EHR-OBSERVATION.blood_pressure.v1 and name/value='Blood pressure']/data`
 	if _, err := rmpath.ItemAtPath(comp, path); !errors.Is(err, rmpath.ErrPathNotFound) {
 		t.Errorf("ItemAtPath(name predicate, typed-nil Name) err = %v, want ErrPathNotFound", err)
+	}
+}
+
+// TestItemAtPathInContextAttributes — REQ-121. The RM attributes the
+// WebTemplate synthesizes as in-context leaves must resolve here, because
+// the FLAT encoder (REQ-053) reads them through rmpath and treats a
+// not-found as an absent optional: an attribute missing from childrenAt is
+// silently dropped data, not an error. PROBE-086 caught EVENT `time` and
+// INSTRUCTION `narrative` / `expiry_time` being lost exactly that way.
+func TestItemAtPathInContextAttributes(t *testing.T) {
+	when := rm.DVDateTime{Value: "2026-08-01T09:30:00Z"}
+	expiry := rm.DVDateTime{Value: "2026-09-01T00:00:00Z"}
+	timing := &rm.DVParsable{Value: "R2/2026-08-01T09:00:00Z/P1D", Formalism: "ISO8601"}
+
+	tests := []struct {
+		name   string
+		parent rm.Locatable
+		path   string
+		want   any
+	}{
+		{
+			name:   "POINT_EVENT time",
+			parent: &rm.PointEvent[rm.ItemStructure]{Name: rm.DVText{Value: "e"}, Time: when},
+			path:   "/time",
+			want:   when,
+		},
+		{
+			name:   "INTERVAL_EVENT time",
+			parent: &rm.IntervalEvent[rm.ItemStructure]{Name: rm.DVText{Value: "e"}, Time: when},
+			path:   "/time",
+			want:   when,
+		},
+		{
+			name: "INTERVAL_EVENT math_function",
+			parent: &rm.IntervalEvent[rm.ItemStructure]{
+				Name:         rm.DVText{Value: "e"},
+				MathFunction: rm.DVCodedText{DVText: rm.DVText{Value: "actual"}},
+			},
+			path: "/math_function",
+			want: rm.DVCodedText{DVText: rm.DVText{Value: "actual"}},
+		},
+		{
+			name: "INTERVAL_EVENT width",
+			parent: &rm.IntervalEvent[rm.ItemStructure]{
+				Name:  rm.DVText{Value: "e"},
+				Width: rm.DVDuration{Value: "PT1H"},
+			},
+			path: "/width",
+			want: rm.DVDuration{Value: "PT1H"},
+		},
+		{
+			name: "INSTRUCTION narrative",
+			parent: &rm.Instruction{
+				Name:      rm.DVText{Value: "i"},
+				Narrative: &rm.DVText{Value: "take one daily"},
+			},
+			path: "/narrative",
+			want: &rm.DVText{Value: "take one daily"},
+		},
+		{
+			// An optional pointer attribute resolves to the pointer, not a
+			// dereferenced copy — the convention every sibling case follows.
+			name: "INSTRUCTION expiry_time",
+			parent: &rm.Instruction{
+				Name:       rm.DVText{Value: "i"},
+				Narrative:  &rm.DVText{Value: "n"},
+				ExpiryTime: &expiry,
+			},
+			path: "/expiry_time",
+			want: &expiry,
+		},
+		{
+			name:   "ACTIVITY timing",
+			parent: &rm.Activity{Name: rm.DVText{Value: "a"}, Timing: timing},
+			path:   "/timing",
+			want:   timing,
+		},
+		{
+			// Inert on encode (the WebTemplate synthesizes no ACTION `time`
+			// leaf), but ItemAtPath is a public reader — REQ-121.
+			name:   "ACTION time",
+			parent: &rm.Action{Name: rm.DVText{Value: "act"}, Time: when},
+			path:   "/time",
+			want:   when,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := rmpath.ItemAtPath(tc.parent, tc.path)
+			if err != nil {
+				t.Fatalf("ItemAtPath(%s) = %v", tc.path, err)
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("ItemAtPath(%s) = %#v, want %#v", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+// An absent optional still resolves to nothing rather than erroring oddly —
+// the case skipNotFound is legitimately for.
+func TestItemAtPathAbsentOptionalInContext(t *testing.T) {
+	ins := &rm.Instruction{Name: rm.DVText{Value: "i"}, Narrative: &rm.DVText{Value: "n"}}
+	if _, err := rmpath.ItemAtPath(ins, "/expiry_time"); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(/expiry_time) on an INSTRUCTION without one = %v, want ErrPathNotFound", err)
+	}
+	act := &rm.Activity{Name: rm.DVText{Value: "a"}}
+	if _, err := rmpath.ItemAtPath(act, "/timing"); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(/timing) on an ACTIVITY without one = %v, want ErrPathNotFound", err)
+	}
+}
+
+// contextComposition builds a COMPOSITION whose EVENT_CONTEXT carries every
+// attribute rmpath resolves: the template-constrained other_context tree plus
+// health_care_facility / location / participations. It returns the context and
+// the tree so tests can assert pointer identity.
+func contextComposition() (*rm.Composition, *rm.EventContext, *rm.ItemTree) {
+	tree := &rm.ItemTree{
+		ArchetypeNodeID: "openEHR-EHR-ITEM_TREE.visit.v1",
+		Name:            rm.DVText{Value: "Visit details"},
+		Items: []rm.Item{&rm.Element{
+			ArchetypeNodeID: "at0002",
+			Name:            rm.DVText{Value: "Report ID"},
+			Value:           rm.DVText{Value: "R-42"},
+		}},
+	}
+	location := "ward A3"
+	facility, performer := "Ward A3 nursing", "Dr Who"
+	ctx := &rm.EventContext{
+		StartTime:          rm.DVDateTime{Value: "2026-08-01T09:00:00Z"},
+		EndTime:            &rm.DVDateTime{Value: "2026-08-01T09:30:00Z"},
+		Setting:            rm.DVCodedText{DVText: rm.DVText{Value: "other care"}},
+		OtherContext:       tree,
+		HealthCareFacility: rm.PartyIdentified{Name: &facility},
+		Location:           &location,
+		Participations: []rm.Participation{{
+			Function:  rm.DVText{Value: "requester"},
+			Performer: rm.PartyIdentified{Name: &performer},
+		}},
+	}
+	return &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.ctx.v1",
+		Name:            rm.DVText{Value: "Ctx"},
+		Context:         ctx,
+	}, ctx, tree
+}
+
+// TestItemAtPathEventContextAttributes — REQ-121. EVENT_CONTEXT sits behind
+// COMPOSITION `context` and is not itself LOCATABLE, so it can only be reached
+// as a walk step. Before childrenAt handled it, every /context/… path was
+// unresolvable and the FLAT encoder's skipNotFound silently dropped
+// template-constrained `other_context` data.
+func TestItemAtPathEventContextAttributes(t *testing.T) {
+	comp, ctx, tree := contextComposition()
+
+	t.Run("other_context is the ITEM_STRUCTURE itself", func(t *testing.T) {
+		got, err := rmpath.ItemAtPath(comp, "/context/other_context")
+		if err != nil {
+			t.Fatalf("ItemAtPath(/context/other_context) = %v", err)
+		}
+		if got != any(tree) {
+			t.Errorf("= %#v, want the ITEM_TREE pointer %p", got, tree)
+		}
+	})
+
+	t.Run("other_context leaf", func(t *testing.T) {
+		// The path a template-constrained context leaf actually takes.
+		const p = "/context/other_context[openEHR-EHR-ITEM_TREE.visit.v1]/items[at0002]/value"
+		got, err := rmpath.ItemAtPath(comp, p)
+		if err != nil {
+			t.Fatalf("ItemAtPath(%q) = %v", p, err)
+		}
+		if dv, ok := got.(rm.DVText); !ok || dv.Value != "R-42" {
+			t.Errorf("= %v (%T), want DVText R-42", got, got)
+		}
+	})
+
+	t.Run("health_care_facility", func(t *testing.T) {
+		got, err := rmpath.ItemAtPath(comp, "/context/health_care_facility")
+		if err != nil {
+			t.Fatalf("ItemAtPath(/context/health_care_facility) = %v", err)
+		}
+		if !reflect.DeepEqual(got, ctx.HealthCareFacility) {
+			t.Errorf("= %#v, want %#v", got, ctx.HealthCareFacility)
+		}
+	})
+
+	t.Run("location is the pointer", func(t *testing.T) {
+		got, err := rmpath.ItemAtPath(comp, "/context/location")
+		if err != nil {
+			t.Fatalf("ItemAtPath(/context/location) = %v", err)
+		}
+		if got != any(ctx.Location) {
+			t.Errorf("= %#v, want the *string %p", got, ctx.Location)
+		}
+	})
+
+	t.Run("participations", func(t *testing.T) {
+		got, err := rmpath.ItemAtPath(comp, "/context/participations")
+		if err != nil {
+			t.Fatalf("ItemAtPath(/context/participations) = %v", err)
+		}
+		if got != any(&ctx.Participations[0]) {
+			t.Errorf("= %#v, want &ctx.Participations[0]", got)
+		}
+	})
+
+	t.Run("end_time is the pointer", func(t *testing.T) {
+		got, err := rmpath.ItemAtPath(comp, "/context/end_time")
+		if err != nil {
+			t.Fatalf("ItemAtPath(/context/end_time) = %v", err)
+		}
+		if got != any(ctx.EndTime) {
+			t.Errorf("= %#v, want the *DVDateTime %p", got, ctx.EndTime)
+		}
+	})
+}
+
+// Absent optionals under EVENT_CONTEXT resolve to nothing (the legitimate
+// skipNotFound case), and so do `start_time` / `setting` — deliberately left
+// unresolved because the ctx/ short forms own them on encode. If that decision
+// is revisited, these expectations must change deliberately.
+func TestItemAtPathEventContextAbsentAndDeferred(t *testing.T) {
+	bare := &rm.Composition{
+		ArchetypeNodeID: "openEHR-EHR-COMPOSITION.ctx.v1",
+		Name:            rm.DVText{Value: "Ctx"},
+		Context:         &rm.EventContext{StartTime: rm.DVDateTime{Value: "2026-08-01T09:00:00Z"}},
+	}
+	for _, p := range []string{
+		"/context/other_context",
+		"/context/end_time",
+		"/context/health_care_facility",
+		"/context/location",
+		"/context/participations",
+	} {
+		if _, err := rmpath.ItemAtPath(bare, p); !errors.Is(err, rmpath.ErrPathNotFound) {
+			t.Errorf("ItemAtPath(%q) on an empty EVENT_CONTEXT = %v, want ErrPathNotFound", p, err)
+		}
+	}
+
+	comp, _, _ := contextComposition()
+	for _, p := range []string{"/context/start_time", "/context/setting"} {
+		if _, err := rmpath.ItemAtPath(comp, p); !errors.Is(err, rmpath.ErrPathNotFound) {
+			t.Errorf("ItemAtPath(%q) = %v, want ErrPathNotFound (deliberately deferred to the ctx/ short forms)", p, err)
+		}
+	}
+
+	// No context at all: the /context step itself yields nothing.
+	none := &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.ctx.v1", Name: rm.DVText{Value: "Ctx"}}
+	if _, err := rmpath.ItemAtPath(none, "/context/other_context"); !errors.Is(err, rmpath.ErrPathNotFound) {
+		t.Errorf("ItemAtPath(/context/other_context) with no context = %v, want ErrPathNotFound", err)
 	}
 }
