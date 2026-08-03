@@ -163,6 +163,22 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
+## STRAND-10 — rmpath: one sentinel for two not-found conditions
+
+**Status:** Open — opened by the PROBE-086 review round ([2026-07-16 plan](../plans/archive/2026-07-16-web-template-tests-conformance.md), follow-ups).
+
+**Question:** should `rmpath.ItemAtPath` distinguish *attribute unknown to the navigator* from *attribute known but unpopulated*, instead of returning `ErrPathNotFound` for both?
+
+**Why it's open:** the FLAT encoder treats resolution failure as an absent optional (`skipNotFound`), which is correct for the unpopulated case and silent data loss for the unknown-attribute case — the exact defect class PROBE-086 surfaced (`EVENT.time`, `INSTRUCTION.narrative`/`expiry_time`, `EVENT_CONTEXT.other_context`, `ACTIVITY.timing`). Because the encoder cannot tell the two conditions apart, the coverage rule in [rm-functions.md § REQ-121](rm-functions.md#req-121--rm-path-navigation-pathable) is enforced by a hand-kept guard test and exemption list rather than derived from the API.
+
+**Resolution options:** a distinct sentinel (e.g. `ErrUnknownAttribute`) letting `skipNotFound` fail loudly on unmodelled attributes and retiring the exemption list; or keeping the single sentinel and the guard-test enforcement. The first adds an exported error to a landed surface (REQ-024 compatibility question); the second keeps the hazard class alive but contained.
+
+**Evidence needed:** whether the exemption list churns (each churn is an argument for the sentinel); whether any consumer outside the encoder needs the distinction.
+
+**Resolution form:** ADR-NNN; the REQ-121 open-question paragraph and the guard-test exemption mechanism are updated together with it.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -176,3 +192,4 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-07](#strand-07--versioning-and-module-path) | Versioning + module path | **Resolved** | REQ-001, REQ-004, REQ-005 |
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |
 | [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query `fetch`) | Open (deferred) | REQ-059, REQ-095, REQ-099 |
+| [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |

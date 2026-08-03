@@ -22,8 +22,9 @@ cassettes/
 
 **Pinned subtree.** Everything under `flat-conformance/` is machine-synced from
 upstream at a recorded commit — do not hand-edit it. Refresh with
-`make flat-conformance-sync`; verify integrity and upstream drift with
-`make flat-conformance-check`. Resolve paths via
+`make flat-conformance-sync`; verify integrity with `make flat-conformance-verify`
+(offline `sha256`, the gate `make ci` runs). `make flat-conformance-check` adds an
+upstream-drift report (needs network; dev helper, not a gate). Resolve paths via
 [`fixtures.FlatConformanceOpt`](../fixtures/paths.go) /
 `fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
 this directory is curated by hand and is not covered by that manifest.

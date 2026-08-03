@@ -417,7 +417,9 @@ requirements:
     # composer external_ref — optional, no validity impact; non-default source
     # values for the defaulted attributes are not round-tripped); first-class
     # _-attr suffix decomposition (covered losslessly via |raw); .schema media
-    # types on input; and an upstream byte-conformance probe.
+    # types on input. The upstream byte-conformance probe landed 2026-08-01 as
+    # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
+    # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
     implementation: landed
     packages:
       - openehr/serialize/simplified
@@ -590,7 +592,9 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
-    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071]
+    # PROBE-086 is Sandbox-only (in-repo parity property; Cassette/Live out of
+    # scope) — listed as the documented partial its Satisfies line declares.
+    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086]
 
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths
@@ -962,8 +966,8 @@ requirements:
     # both goldens is a pinned C_STRING (1:1), and constrain_test pins none,
     # which is the real reason parity holds. An earlier collision-conditioned
     # reading of this rule was wrong and would emit too few predicates.
-    # LANDED 2026-07-31 (Phases 0-5). Unblocks PROBE-086 (upstream FLAT
-    # parity), whose adapter is its own plan's Phase 1, and exports any
+    # LANDED 2026-07-31 (Phases 0-5). Unblocked PROBE-086 (upstream FLAT
+    # parity), which landed on it 2026-08-01, and exports any
     # WebTemplate reusing an archetype among siblings. Where no pinned name
     # separates siblings the reference's ordinal fallback applies (dv_text,
     # dv_text2) — evidenced by the upstream FLAT bodies themselves. Path shape is consumed by
@@ -971,9 +975,11 @@ requirements:
     # FLAT/STRUCTURED, so paths through un-named nodes must stay byte-identical
     # — but every vendored OPT that pins a name does change shape.
     #
-    # PROBE-086 is deliberately NOT in `probes:` — this REQ *unblocks* it, it
-    # does not cover this REQ (and the guard forbids a partial REQ citing a
-    # Draft probe as coverage).
+    # PROBE-086 is deliberately NOT in `probes:` — this REQ *unblocks* it; the
+    # probe asserts REQ-053 FLAT parity, not the naming rule this REQ states,
+    # so citing it here would claim coverage it does not give. That holds now
+    # that PROBE-086 is Implemented, for the same reason it held while it was
+    # Draft.
     implementation: landed
     packages:
       - openehr/template
@@ -1014,7 +1020,7 @@ requirements:
       # The owning plan (declares "Covers: REQ-116") first; the conformance
       # plan is the consumer this unblocks.
       - docs/plans/archive/2026-07-29-template-node-naming.md
-      - docs/plans/2026-07-16-web-template-tests-conformance.md
+      - docs/plans/archive/2026-07-16-web-template-tests-conformance.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation
@@ -1043,6 +1049,20 @@ requirements:
       - openehr/rm/rmpath
     tests:
       - openehr/rm/rmpath/rmpath_test.go
+      # The in-context RM attributes PROBE-086 found missing — 2026-08-01: EVENT
+      # time, INTERVAL_EVENT math_function/width, INSTRUCTION
+      # narrative/expiry_time; 2026-08-03: EVENT_CONTEXT other_context (the only
+      # template-constrained one — its data was being dropped outright),
+      # end_time/health_care_facility/location/participations, ACTIVITY timing,
+      # ACTION time. EVENT_CONTEXT start_time/setting stay exempt by design.
+      #
+      # These two tests jointly enforce rm-functions.md § REQ-121 "Attribute
+      # coverage for synthesized in-context leaves". The guard lives beside the
+      # WebTemplate builder that synthesizes those leaves, because that is where
+      # a new one is added: it asserts every in-context leaf whose datatype the
+      # FLAT codec can write resolves through rmpath, so the next one cannot be
+      # dropped silently, and reports a stale exemption.
+      - openehr/template/webtemplate/incontext_rmpath_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
 
@@ -1251,15 +1271,54 @@ requirements:
     canonical: docs/specifications/conformance.md#conformance-scope
     status: draft
     # Partial: the running probe suite under testkit/probes carries REQ-080
-    # marks, and the FLAT-conformance plan's Phase 0 landed the vendored
-    # upstream corpus (testkit/cassettes/flat-conformance/ + sync/check
-    # tooling, integrity-gated by `make ci`). The PROBE-086 adapter itself
-    # is unwritten (its plan's Phase 1) — its REQ-116 blocker cleared 2026-07-31;
-    # PROBE-086 stays out of `probes:` while Draft.
+    # marks, and the FLAT-conformance plan landed the vendored upstream corpus
+    # (testkit/cassettes/flat-conformance/ + sync/check tooling, integrity-gated
+    # by `make ci`) plus, 2026-08-01, PROBE-086 itself — the round-trip harness
+    # in testkit/conformance/webtemplate and its probe wrapper.
+    #
+    # PROBE-086 asserts parity against upstream-AUTHORED FLAT, which PROBE-076
+    # structurally cannot: PROBE-076's input is this SDK's own output, so it
+    # cannot see a path the SDK never emits or a leaf it drops symmetrically.
+    # It earned that distinction immediately, catching a silent encode-side
+    # data loss (EVENT.time, INSTRUCTION.narrative/expiry_time — 32 keys over
+    # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
+    # day (REQ-121).
+    #
+    # Scope, stated plainly: 192 of the corpus's 1824 keys are in the modelled
+    # subset today (10.5%) — 1314 refused by the REQ-053 codec, 318 held out as
+    # composition metadata. That hold-out is respellings (language, territory,
+    # composer, context/start_time, which REQ-053 reads and writes as the ctx/
+    # short forms) plus ONE waiver: context/setting decodes and then re-encodes
+    # to nothing, so holding it out waives a real encode-side drop until the
+    # metadata real-path decision lands.
+    #
+    # The earlier figure (90 / 4.9%) was a measurement error, not a smaller
+    # codec: `category` was held out as metadata although it is a
+    # template-constrained Web Template leaf on its own FLAT path, spelled
+    # identically on both sides. Its 102 keys (34 fixtures × 3) were already
+    # round-tripping byte-for-byte and are now compared — that is the whole of
+    # the 90 → 192 move; no codec gap closed to earn it.
+    #
+    # The probe is exact on what it compares (no tolerated-drop list: a key
+    # that decodes and then does not re-encode fails) and adds a coverage floor
+    # (a fixture that compared zero keys fails, since Clean() is vacuously true
+    # over an empty set). The per-fixture excluded/compared ratchet lives in
+    # the harness's own runner_test.go pins, not in the probe.
+    # The inventory and what would move it:
+    # testkit/conformance/webtemplate/SKIPPED.md. Cassette/Live modes remain
+    # out of scope, so REQ-082 stays a documented partial.
     implementation: partial
-    packages: [testkit/probes, testkit/cassettes/flat-conformance]
+    packages:
+      - testkit/probes
+      - testkit/cassettes/flat-conformance
+      - testkit/conformance/webtemplate
+    probes: [PROBE-086]
+    tests:
+      - testkit/conformance/webtemplate/runner_test.go
+      - testkit/conformance/webtemplate/helpers_test.go
+      - testkit/probes/serialize/probes_test.go
     plans:
-      - docs/plans/2026-07-16-web-template-tests-conformance.md
+      - docs/plans/archive/2026-07-16-web-template-tests-conformance.md
 
   - id: REQ-081
     title: Wire-level parity (retired)
