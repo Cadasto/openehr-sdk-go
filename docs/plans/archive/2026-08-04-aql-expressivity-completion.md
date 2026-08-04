@@ -1,13 +1,13 @@
 # Plan — AQL expressivity completion (structured-AST catalogue, lint gate, builder algebra)
 
 **Date:** 2026-08-04
-**Status:** Draft
+**Status:** Done (2026-08-04) — all four phases executed; REQ-117 `landed`, PROBE-087/088 Implemented.
 **Owner:** SDK maintainers
-**Covers:** [REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (extends the landed REQ-113 / REQ-109 / REQ-055 surfaces)
-**Probes:** PROBE-087 (catalogue completeness), PROBE-088 (builder stability)
-**Implementation:** planned
+**Covers:** [REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (extends the landed REQ-113 / REQ-109 / REQ-055 surfaces)
+**Probes:** [PROBE-087](../../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (catalogue completeness), [PROBE-088](../../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) (builder stability)
+**Implementation:** landed
 **Depends on:** REQ-113 (structured AST, landed), REQ-109 (lint, landed), REQ-055 (builder, landed); no grammar-profile change (every target shape is already admitted by `resources/aql/grammar/active/`)
-**Defers:** aggregate operands beyond `identifiedPath`/`*` (a grammar + upstream-spec question, not an extractor gap); grammar-level function positions the published grammar rejects (LIKE/MATCHES LHS, EXISTS operand, ORDER BY key, aggregate args — upstream AQL-change territory); query-client paging/header options (`openehr-ehr-id` header option is STRAND-09 item 1 adjacent); CDR-grade path resolution (REQ-109 out-of-scope list, unchanged)
+**Defers:** a **builder entry point for a FROM-root containment junction** — the parse side models it (`parse.FromClause.Junction`), but the write side keeps a single root class until a consumer needs write-side root junctions (recorded in [§ REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) and in `aql.Containment`'s godoc); aggregate operands beyond `identifiedPath`/`*` (a grammar + upstream-spec question, not an extractor gap); grammar-level function positions the published grammar rejects (LIKE/MATCHES LHS, EXISTS operand, ORDER BY key, aggregate args — upstream AQL-change territory); query-client paging/header options (`openehr-ehr-id` header option is STRAND-09 item 1 adjacent); CDR-grade path resolution (REQ-109 out-of-scope list, unchanged)
 
 ## Goal
 
@@ -15,15 +15,15 @@ Close the declared expressivity gaps that force AQL-consuming engines and corpus
 
 ## Definition of Ready
 
-- **Covers** lists REQ-117; canonical prose exists ([clinical-modeling.md § REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion), registry row in [REQ.md](../specifications/REQ.md)). ✔
+- **Covers** lists REQ-117; canonical prose exists ([clinical-modeling.md § REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion), registry row in [REQ.md](../../specifications/REQ.md)). ✔
 - No irreversible fork: all vocabulary extensions are additive to sealed interface sets (documented consumer contract: unrecognised case = out-of-catalogue); no ADR needed. ✔
-- PROBE-087 / PROBE-088 catalogued Draft in [conformance.md](../specifications/conformance.md). ✔
+- PROBE-087 / PROBE-088 catalogued Draft in [conformance.md](../../specifications/conformance.md). ✔
 - Phases below name tasks and verification commands. ✔
 
 ## Definition of Done
 
 - Code and tests land with `// REQ-117` / `// PROBE-087` / `// PROBE-088` citations.
-- REQ-113's "v1 catalogue gaps" list in clinical-modeling.md is rewritten to the residual overflow guard, citing REQ-117; REQ-117 **Status** flips; [traceability.yaml](../specifications/traceability.yaml) `implementation` and REQ.md **Impl.** updated.
+- REQ-113's "v1 catalogue gaps" list in clinical-modeling.md is rewritten to the residual overflow guard, citing REQ-117; REQ-117 **Status** flips; [traceability.yaml](../../specifications/traceability.yaml) `implementation` and REQ.md **Impl.** updated.
 - wire.md § REQ-055 gains the one-line cross-reference to REQ-117 for the added canonical write forms (canonical home for the new constructs stays REQ-117).
 - `make spec-check` and `make ci` pass; `make aqlgen-verify` untouched (no grammar change).
 - Plan archived under `docs/plans/archive/`.
@@ -33,11 +33,11 @@ Close the declared expressivity gaps that force AQL-consuming engines and corpus
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row, § REQ-117, PROBE-087/088) | done (Phase 0) |
-| Phase 1 — vocabulary + extractor + emitter | |
-| Phase 2 — lint acceptance | |
-| Phase 3 — builder algebra + in-text paging | |
-| Phase 4 — close-out (spec status, examples, CHANGELOG, archive) | |
-| `make spec-check` + `make ci` | |
+| Phase 1 — vocabulary + extractor + emitter | done — all eight closures; residual = the unrepresentable-integer guard |
+| Phase 2 — lint acceptance | done — ORDER BY on a SELECT `AS` alias; boolean literal comparison operand |
+| Phase 3 — builder algebra + in-text paging | done — `Class`/`Contains`/`NotContains`/`ContainsAnd`/`ContainsOr` + `LimitInline`/`OffsetInline`; PROBE-088 goldens |
+| Phase 4 — close-out (spec status, examples, CHANGELOG, archive) | done — REQ-117 `landed`, PROBE-087/088 Implemented, both AQL examples extended, plan archived |
+| `make spec-check` + `make ci` | done |
 
 ## Design constraints (binding for every phase)
 
@@ -109,7 +109,7 @@ REQ.md row, clinical-modeling.md § REQ-117, conformance.md PROBE-087/088 (Draft
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) — normative contract (canonical home for all new constructs)
-- [clinical-modeling.md § REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) / [§ REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — the extended surfaces
-- [wire.md § REQ-055](../specifications/wire.md#req-055--wire-boundary) — builder canonical write form (cross-reference only)
-- [REQ.md](../specifications/REQ.md) — registry row
+- [clinical-modeling.md § REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) — normative contract (canonical home for all new constructs)
+- [clinical-modeling.md § REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) / [§ REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) — the extended surfaces
+- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — builder canonical write form (cross-reference only)
+- [REQ.md](../../specifications/REQ.md) — registry row

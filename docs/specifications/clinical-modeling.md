@@ -556,6 +556,8 @@ The parse layer **MUST** validate against the **SDK-maintained grammar profile**
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
 
+Two grammar-admitted, server-executable shapes are explicit **acceptances** of the alias-binding check, specified by [§ REQ-117](#req-117--aql-expression-catalogue-completion): an `ORDER BY` key that binds no FROM / CONTAINS alias is resolved against the SELECT `AS` aliases before `aql_unknown_alias` is raised (FROM / CONTAINS is consulted first, and an `AS` alias labels a projected column, so it never binds a class for Layer 3 nor admits a path tail); and a bare boolean literal in a comparison-operand position (`WHERE s/is_queryable = true`) is a literal, not a path root, so it raises no alias issue. Codes, severities, and the collect-all contract are unchanged.
+
 ### Layer 3 — Path & template (only when a compiled OPT is supplied)
 
 | Check | Code | Severity | Rule |
@@ -925,40 +927,35 @@ The first emit normalises whitespace, keyword casing, optional defaults (ASC), a
 
 ### Trust model
 
-The structured AST is **syntax-faithful for the v1 catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`); function names are normalised to upper case (`count` → `COUNT`) so emission produces canonical AQL regardless of source casing. It does **not** evaluate:
+The structured AST is **syntax-faithful for the catalogue**: across the buildable grammar plus the parser-only shapes (`Not` / `Exists` / `Like` / `Matches`) it carries the source path text verbatim (`IdentifiedPath.Raw`); function names are normalised to upper case (`count` → `COUNT`) so emission produces canonical AQL regardless of source casing. It does **not** evaluate:
 
 - archetype / template constraints (that is REQ-102 / REQ-110);
 - terminology binding;
 - semantic validity beyond the SDK grammar profile (the server remains the execute-time authority, [PROBE-021](#req-109--aql-static-lint)).
 
-**v1 catalogue gaps** (shapes the grammar accepts but the structured extractor does not yet model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), and a partial AST refuses to render through [`(*Query).Emit`](../../openehr/aql/parse/query.go) (same error) so the loss is never silently emitted as canonical text. Today the catalogue gaps are:
+**Catalogue gaps** (shapes the grammar accepts but the structured extractor does not model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), and a partial AST refuses to render through [`(*Query).Emit`](../../openehr/aql/parse/query.go) (same error) so the loss is never silently emitted as canonical text.
 
-- Primitive literal in SELECT projection (`SELECT 1 FROM …`)
-- Mixed `SELECT *, col` (star + column projections in the same SELECT)
-- Function-call WHERE LHS (`WHERE LENGTH(x) > 5`)
-- MATCHES with `terminology(...)` or `{URI}` operand
-- Path-vs-path comparisons (`WHERE a/x = b/y`)
-- Top-level boolean junction at the FROM root (`FROM A OR B`)
-- Parameter or Primitive argument inside a function call in SELECT (`SELECT CONCAT('a', p/name) FROM …`)
-- AND/OR WHERE junction where one or more operands is itself an out-of-catalogue shape (each dropped operand records a gap reason)
-- LIMIT / OFFSET integer literal that overflows Go `int` (`LIMIT 9223372036854775808`)
+The v1 gap list is closed by [§ REQ-117](#req-117--aql-expression-catalogue-completion): the extractor models the whole SDK grammar profile. The **only** residual gap is the **integer-overflow guard** — an INTEGER literal the AST cannot represent:
 
-Each gap is a forward-compatible extension. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
+- a `LIMIT` / `OFFSET` value beyond Go `int` (`LIMIT 9223372036854775808`), which [`IntLimit`](../../openehr/aql/parse/query.go) cannot carry;
+- an INTEGER primitive beyond `int64` in a **value** position — a SELECT literal, a comparison operand, or a `MATCHES` member — because [`aql.IntValue`](../../openehr/aql/value.go) carries an `int64`, and degrading such a literal to a float would be silent precision loss.
+
+Both are refused loudly rather than degraded. Beyond that class the extractor keeps a **defensive** gap on every grammar position it does not recognise, so a later grammar widening records a reason instead of dropping a clause. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
 
 ### Building-block independence (REQ-013)
 
 `openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
-- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (34 idempotence cases + 11 canonical-input preservation cases across the v1 catalogue, plus a 10-case incomplete-AST suite that asserts ParseQuery and Emit both surface `aql.ErrIncompleteAST`). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (71 idempotence cases + 31 canonical-input preservation cases across the catalogue, plus the residual-gap suite asserting ParseQuery and Emit both surface `aql.ErrIncompleteAST` for an unrepresentable integer literal — the corpus grew under [§ REQ-117](#req-117--aql-expression-catalogue-completion), which pins the closed shapes as PROBE-087). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
 - **Plan:** [`docs/plans/archive/2026-06-29-aql-execution-ast.md`](../plans/archive/2026-06-29-aql-execution-ast.md) — REQ-113 (archived after PR #58).
 
 
 ## REQ-117 — AQL expression-catalogue completion
 
-**Status:** Draft · **Implementation:** planned · **Plan:** [2026-08-04-aql-expressivity-completion.md](../plans/2026-08-04-aql-expressivity-completion.md)
+**Status:** Draft · **Implementation:** landed · **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) (archived after Phase 4)
 
-Consumers building AQL execution engines and conformance tooling on the structured AST ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)) need the catalogue to cover the **whole SDK grammar profile**, not a subset: every v1 catalogue gap forces a consumer to refuse the statement wholesale (`aql.ErrIncompleteAST` is fail-closed by design), so each gap is a query shape no downstream engine can accept even when its own execution layer could. The same consumers author benchmark and conformance corpora through the builder, which today cannot express containment shapes the grammar (and the parse side) already admit.
+Consumers building AQL execution engines and conformance tooling on the structured AST ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)) need the catalogue to cover the **whole SDK grammar profile**, not a subset: every v1 catalogue gap forces a consumer to refuse the statement wholesale (`aql.ErrIncompleteAST` is fail-closed by design), so each gap is a query shape no downstream engine can accept even when its own execution layer could. The same consumers author benchmark and conformance corpora through the builder, which could not express containment shapes the grammar (and the parse side) already admit.
 
 ### Structured-AST catalogue (extends REQ-113)
 
@@ -973,7 +970,7 @@ Consumers building AQL execution engines and conformance tooling on the structur
 7. **Parameter, primitive, or nested-function argument inside a function call** (`SELECT CONCAT('a', $p, LENGTH(x/y)) …`), in SELECT and in WHERE.
 8. **AND/OR junctions over any in-catalogue operand** — a junction is in-catalogue exactly when all its operands are.
 
-The **only** remaining `ErrIncompleteAST` condition after this REQ is a `LIMIT`/`OFFSET` integer literal that overflows Go `int` — unrepresentable in the AST, fail-loud, unchanged.
+The **only** remaining `ErrIncompleteAST` condition after this REQ is an INTEGER literal the AST cannot represent — a `LIMIT`/`OFFSET` value beyond Go `int`, or an INTEGER primitive beyond `int64` in a value position (a SELECT literal, a comparison operand, a `MATCHES` member, since `aql.IntValue` carries an `int64`). Such a literal MUST be refused loudly, never degraded to a float; the guard is fail-loud and unchanged.
 
 `(*Query).Emit` MUST round-trip every newly modelled shape under the existing fixed-point property (`Emit(ParseQuery(Emit(ParseQuery(x)))) == Emit(ParseQuery(x))`), and MUST refuse (same error) any AST a future gap still cannot render — the no-silent-loss rule is unchanged.
 
@@ -990,11 +987,13 @@ Existing REQ-109 codes, their meanings, and the collect-all/deterministic-order 
 
 ### Builder containment algebra and in-text paging (extends REQ-055)
 
-The write side ([`openehr/aql`](../../openehr/aql/) builder) MUST be able to express what the parse side already models:
+The write side ([`openehr/aql`](../../openehr/aql/) builder) MUST be able to express the following three forms the parse side already models — the enumerated list is the whole normative scope here, not read-write parity across the catalogue:
 
 - **Negated containment** — `CONTAINS … NOT CONTAINS …` per the grammar's `classExprOperand (NOT? CONTAINS containsExpr)?`.
 - **Sibling containment junctions** — `AND` / `OR` over containment operands, with parentheses emitted exactly when nesting departs from the default precedence (`NOT` binds tightest, then `AND`, then `OR` — mirroring the parse profile).
 - **In-text `LIMIT n [OFFSET m]`** as an explicit opt-in, so a bound survives stored-query registration; the existing envelope paging (`Query.Fetch`/`Query.Offset`) stays the default and the two channels MUST NOT be silently combined — requesting both is a build-time error.
+
+A builder entry point for a **containment junction at the FROM root** (`FROM COMPOSITION c1 OR COMPOSITION c2`, which the read side models via `parse.FromClause.Junction`) is **deferred** until a consumer needs write-side root junctions: the builder keeps a single root class, so `Builder.From` / `Builder.FromEHR` are unchanged and a builder-emitted FROM root is never parenthesised.
 
 All additions are **additive to the canonical write form** ([wire.md § REQ-055](wire.md#req-055--wire-boundary)): a builder program that uses none of the new API MUST produce byte-identical output to today (semver-minor). Canonical forms for the new constructs: single space around `AND`/`OR`/`NOT CONTAINS` keywords; parentheses only where required by precedence; `LIMIT`/`OFFSET` emitted after ORDER BY in clause order.
 

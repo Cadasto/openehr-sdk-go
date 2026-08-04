@@ -652,6 +652,11 @@ requirements:
     title: AQL static lint
     canonical: docs/specifications/clinical-modeling.md#req-109--aql-static-lint
     status: draft
+    # REQ-117 (2026-08-04) narrowed the aql_unknown_alias check by two
+    # documented over-rejections — an ORDER BY key naming a SELECT `AS` alias,
+    # and a bare boolean comparison operand. No new codes, no severity change,
+    # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
+    # row and its § in clinical-modeling.md.
     implementation: landed
     packages:
       - openehr/aql/parse
@@ -929,9 +934,13 @@ requirements:
     # BoolValue/NullValue the Builder constructs. (*Query).Emit +
     # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
     # property) is carried inline by openehr/aql/parse/roundtrip_test.go
-    # — 34 idempotence cases plus 11 canonical-input preservation cases
-    # across the v1 catalogue, plus a 10-case incomplete-AST suite
-    # asserting ParseQuery and Emit both surface aql.ErrIncompleteAST.
+    # — 71 idempotence cases plus 31 canonical-input preservation cases
+    # across the catalogue, plus the residual-gap suite asserting
+    # ParseQuery and Emit both surface aql.ErrIncompleteAST. The corpus
+    # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04):
+    # the extractor now covers the whole SDK grammar profile and the lone
+    # residual refusal is an unrepresentable integer literal — see the
+    # REQ-117 row and PROBE-087, which own that closure.
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
@@ -1054,14 +1063,62 @@ requirements:
     # execution engines and conformance corpora on the structured AST, where
     # ErrIncompleteAST is fail-closed and every catalogue gap is a refused
     # statement.
-    implementation: planned
+    #
+    # LANDED. All eight catalogue closures are modelled: primitive SELECT
+    # literals (LiteralExpr) and mixed `SELECT *, col` (StarExpr), function
+    # calls on either side of a comparison with Path/Value/Param/nested-call
+    # arguments, path-valued operands (aql.PathValue), structured MATCHES
+    # TERMINOLOGY / {URI} operands, the FROM-root containment junction
+    # (parse.FromClause.Junction), and junctions over any in-catalogue operand.
+    # The single residual ErrIncompleteAST class is an INTEGER literal the AST
+    # cannot represent — LIMIT/OFFSET beyond Go `int`, or a primitive beyond
+    # int64 in a value position (aql.IntValue is an int64; degrading to a float
+    # would be silent loss) — pinned by TestParseQuerySurfacesIncompleteAST,
+    # with TestFormerCatalogueGapsModelled asserting the nine former gap shapes
+    # now parse, emit, and round-trip (PROBE-087).
+    #
+    # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
+    # SelectAliases so an ORDER BY key resolves FROM/CONTAINS first, then the
+    # SELECT `AS` aliases (TestLintOrderBySelectAlias,
+    # TestLintSelectAliasDoesNotBindClass); a bare boolean comparison operand
+    # is no longer collected as a pseudo-path (TestLintBooleanComparisonOperand,
+    # TestExtractPathsSkipsBooleanKeywordOperand).
+    #
+    # Builder (PROBE-088): aql.Containment became a whole expression —
+    # Class/Archetype leaves, Contains/NotContains nesting, ContainsAnd/
+    # ContainsOr junctions with precedence-driven parentheses — plus opt-in
+    # LimitInline/OffsetInline (+Param) refused against the envelope channel.
+    # NOTE: Containment gained a slice field, so it is no longer ==-comparable
+    # (fields unexported; no in-repo comparisons). A builder program using none
+    # of the new API is byte-identical (the PROBE-020 golden is re-pinned by
+    # TestProbe088DetectsProbe020Drift). DEFERRED: no builder entry point for a
+    # FROM-root junction — the write side keeps a single root class until a
+    # consumer needs write-side root junctions.
+    implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
       - openehr/aql/lint
-    probes: []
+      - testkit/probes/aql
+    probes: [PROBE-087, PROBE-088]
+    tests:
+      # PROBE-087 — catalogue closures, per-shape structural pins, and the
+      # residual unrepresentable-integer guard.
+      - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/roundtrip_test.go
+      - openehr/aql/introspect_test.go
+      # Lint acceptances (REQ-109 surface) and the pseudo-path exclusion.
+      - openehr/aql/lint/lint_test.go
+      - openehr/aql/lint/extract_test.go
+      - openehr/aql/parse/ast_test.go
+      - openehr/aql/parse/parse_test.go
+      # PROBE-088 — builder containment algebra, in-text paging, goldens.
+      - openehr/aql/containment_test.go
+      - openehr/aql/containment_roundtrip_test.go
+      - openehr/aql/paging_test.go
+      - testkit/probes/aql/probes_test.go
     plans:
-      - docs/plans/2026-08-04-aql-expressivity-completion.md
+      - docs/plans/archive/2026-08-04-aql-expressivity-completion.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation
