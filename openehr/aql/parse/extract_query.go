@@ -519,13 +519,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 		}
 		if c.MATCHES() != nil {
 			if op := c.MatchesOperand(); op != nil {
-				vs, ok := ex.matchesOperandValues(op)
-				if !ok {
-					return nil
-				}
-				if len(vs) > 0 {
-					return aql.Matches(path, vs...)
-				}
+				return ex.matchesExpr(path, op)
 			}
 			return nil
 		}
@@ -892,30 +886,44 @@ func likeOperandValue(c gen.ILikeOperandContext) aql.Value {
 	return nil
 }
 
-// matchesOperandValues collects the value-list members of a MATCHES
-// operand. Returns ok=false when the operand uses the terminology-
-// function or URI alternatives (grammar `matchesOperand: '{'
-// valueListItem (',' valueListItem)* '}' | terminologyFunction |
-// '{' URI '}'`), recording a catalogue gap so the predicate doesn't
-// silently disappear.
-func (ex *astExtractor) matchesOperandValues(c gen.IMatchesOperandContext) ([]aql.Value, bool) {
-	items := c.AllValueListItem()
-	if len(items) == 0 {
-		// terminologyFunction or URI alternative — outside v1.
-		ex.incomplete("MATCHES terminology-function / URI operand is outside the v1 catalogue")
-		return nil, false
+// matchesExpr models a MATCHES predicate's right-hand side (REQ-117).
+//
+// Grammar: `matchesOperand : '{' valueListItem (',' valueListItem)* '}' |
+// terminologyFunction | '{' URI '}'`. All three forms are structured: the
+// value list into [aql.MatchesExpr.Values] (a `valueListItem` may itself
+// be a terminologyFunction, modelled as an [aql.FuncCall]), the bare
+// terminology function into Terminology, and the URI — carried verbatim,
+// the lexer token is unquoted — into URI.
+func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) aql.WhereExpr {
+	if tf := c.TerminologyFunction(); tf != nil {
+		fc := aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)}
+		return aql.MatchesExpr{Path: path, Terminology: &fc}
 	}
+	if u := c.URI(); u != nil {
+		return aql.MatchesExpr{Path: path, URI: u.GetText()}
+	}
+	items := c.AllValueListItem()
 	out := make([]aql.Value, 0, len(items))
 	for _, it := range items {
 		if p := it.Primitive(); p != nil {
-			if v := primitiveAsValue(p); v != nil {
-				out = append(out, v)
+			v := primitiveAsValue(p)
+			if v == nil {
+				ex.incomplete("MATCHES value %q is out of range for the value vocabulary", p.GetText())
+				continue
 			}
+			out = append(out, v)
 			continue
 		}
 		if t := it.PARAMETER(); t != nil {
 			out = append(out, aql.ParamValue{Name: strings.TrimPrefix(t.GetText(), "$")})
+			continue
+		}
+		if tf := it.TerminologyFunction(); tf != nil {
+			out = append(out, aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)})
 		}
 	}
-	return out, true
+	if len(out) == 0 {
+		return nil
+	}
+	return aql.Matches(path, out...)
 }

@@ -639,6 +639,105 @@ func TestParseQueryWhereMatchesExpr(t *testing.T) {
 	}
 }
 
+// TestParseQueryMatchesTerminologyOperand pins REQ-117 catalogue shape 4:
+// a `MATCHES TERMINOLOGY('op','api','params')` operand models structurally
+// (function name + three string arguments), not as raw text.
+// PROBE-087
+func TestParseQueryMatchesTerminologyOperand(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o " +
+		"WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	me, ok := q.Where.(aql.MatchesExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.MatchesExpr", q.Where)
+	}
+	if me.Path != "o/code" {
+		t.Errorf("MatchesExpr.Path = %q, want o/code", me.Path)
+	}
+	if len(me.Values) != 0 {
+		t.Errorf("MatchesExpr.Values len = %d, want 0 for the terminology operand form", len(me.Values))
+	}
+	if me.Terminology == nil {
+		t.Fatal("MatchesExpr.Terminology is nil; want the structured TERMINOLOGY call")
+	}
+	if me.Terminology.Name != aql.TerminologyFunc {
+		t.Errorf("Terminology.Name = %q, want %s", me.Terminology.Name, aql.TerminologyFunc)
+	}
+	if len(me.Terminology.Args) != 3 {
+		t.Fatalf("Terminology.Args len = %d, want 3", len(me.Terminology.Args))
+	}
+	for i, want := range []string{"SNOMED-CT", "near", "12345"} {
+		sv, ok := me.Terminology.Args[i].(aql.StringValue)
+		if !ok || sv.S != want {
+			t.Errorf("Terminology.Args[%d] = %#v, want aql.StringValue{%s}", i, me.Terminology.Args[i], want)
+		}
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	want := "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES TERMINOLOGY('SNOMED-CT', 'near', '12345')"
+	if out != want {
+		t.Errorf("Emit = %q, want %q", out, want)
+	}
+}
+
+// TestParseQueryMatchesURIOperand pins the `{URI}` MATCHES operand form:
+// the URI is carried verbatim on the structured predicate (REQ-117).
+// PROBE-087
+func TestParseQueryMatchesURIOperand(t *testing.T) {
+	const src = "SELECT o FROM EHR e CONTAINS OBSERVATION o " +
+		"WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	me, ok := q.Where.(aql.MatchesExpr)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.MatchesExpr", q.Where)
+	}
+	if me.URI != "uri://terminology.hl7.org/CodeSystem/v3-ActCode" {
+		t.Errorf("MatchesExpr.URI = %q, want the source URI", me.URI)
+	}
+	if len(me.Values) != 0 || me.Terminology != nil {
+		t.Errorf("MatchesExpr = %+v, want only the URI operand set", me)
+	}
+	if out, err := q.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want the canonical input", out, err)
+	}
+}
+
+// TestParseQueryMatchesValueListTerminology pins the grammar's
+// `valueListItem : terminologyFunction` alternative — a terminology call
+// INSIDE the braces is one value of the list (REQ-117).
+// PROBE-087
+func TestParseQueryMatchesValueListTerminology(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o " +
+		"WHERE o/code MATCHES {terminology('SNOMED-CT','near','12345'), 'other'}")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	me := q.Where.(aql.MatchesExpr)
+	if me.Terminology != nil {
+		t.Errorf("MatchesExpr.Terminology = %+v, want nil for the value-list form", me.Terminology)
+	}
+	if len(me.Values) != 2 {
+		t.Fatalf("MatchesExpr.Values len = %d, want 2", len(me.Values))
+	}
+	fc, ok := me.Values[0].(aql.FuncCall)
+	if !ok {
+		t.Fatalf("Values[0] = %T, want aql.FuncCall", me.Values[0])
+	}
+	if fc.Name != aql.TerminologyFunc || len(fc.Args) != 3 {
+		t.Errorf("Values[0] = %+v, want TERMINOLOGY with three arguments", fc)
+	}
+	if sv, ok := me.Values[1].(aql.StringValue); !ok || sv.S != "other" {
+		t.Errorf("Values[1] = %#v, want aql.StringValue{other}", me.Values[1])
+	}
+}
+
 // TestParseQueryWhereFunctionLHS pins REQ-117 catalogue shape 3: a
 // function call as the LEFT operand of a WHERE comparison models as an
 // [aql.Comparison] whose Left carries the structured [aql.FuncCall]

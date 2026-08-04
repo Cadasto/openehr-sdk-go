@@ -302,15 +302,33 @@ func (e ExistsExpr) validate() error {
 // build time, not at construction.
 func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 
-// MatchesExpr is the `<path> MATCHES { <value-list> }` AQL predicate.
-// The right-hand side is one or more [Value] alternatives, joined with
-// commas inside the braces.
+// MatchesExpr is the `<path> MATCHES <operand>` AQL predicate. The
+// grammar admits three operand forms and exactly ONE of the fields below
+// carries the operand:
+//
+//   - Values — the braced value list (`{'active', 'archived'}`); each
+//     member is any [Value], including a [FuncCall] for the grammar's
+//     `valueListItem : terminologyFunction` alternative.
+//   - Terminology — a BARE `TERMINOLOGY('op','api','params')` operand,
+//     with no braces (REQ-117); construct with [MatchesTerminology].
+//   - URI — a braced URI operand (`{uri://…}`), carried verbatim
+//     (REQ-117); construct with [MatchesURI].
 type MatchesExpr struct {
-	Path   string
-	Values []Value
+	Path        string
+	Values      []Value
+	Terminology *FuncCall
+	URI         string
 }
 
 func (m MatchesExpr) expr() string {
+	switch {
+	case m.Terminology != nil:
+		// Bare terminology operand — the grammar's `matchesOperand :
+		// terminologyFunction` alternative takes no braces.
+		return m.Path + " MATCHES " + m.Terminology.token()
+	case m.URI != "":
+		return m.Path + " MATCHES {" + m.URI + "}"
+	}
 	parts := make([]string, len(m.Values))
 	for i, v := range m.Values {
 		if v == nil {
@@ -326,20 +344,56 @@ func (m MatchesExpr) validate() error {
 	if strings.TrimSpace(m.Path) == "" {
 		return fmt.Errorf("%w: empty path in MATCHES", ErrInvalidQuery)
 	}
-	if len(m.Values) == 0 {
+	// The three operand forms are mutually exclusive: emitting more than
+	// one would silently drop an operand (REQ-117).
+	forms := 0
+	if len(m.Values) > 0 {
+		forms++
+	}
+	if m.Terminology != nil {
+		forms++
+	}
+	if strings.TrimSpace(m.URI) != "" {
+		forms++
+	}
+	switch {
+	case forms == 0:
 		return fmt.Errorf("%w: empty value list in MATCHES on %q", ErrInvalidQuery, m.Path)
+	case forms > 1:
+		return fmt.Errorf("%w: MATCHES on %q sets more than one operand form", ErrInvalidQuery, m.Path)
+	}
+	if m.Terminology != nil {
+		return validateValue(*m.Terminology)
 	}
 	for i, v := range m.Values {
 		if v == nil {
 			return fmt.Errorf("%w: nil value at index %d in MATCHES on %q", ErrInvalidQuery, i, m.Path)
 		}
+		if err := validateValue(v); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// Matches constructs a [MatchesExpr].
+// Matches constructs a [MatchesExpr] over a braced value list.
 func Matches(path string, values ...Value) WhereExpr {
 	return MatchesExpr{Path: path, Values: values}
+}
+
+// MatchesTerminology constructs the `<path> MATCHES
+// TERMINOLOGY(operation, api, params)` predicate — the bare
+// terminology-function operand form (REQ-117).
+func MatchesTerminology(path, operation, api, params string) WhereExpr {
+	fc := Terminology(operation, api, params).(FuncCall)
+	return MatchesExpr{Path: path, Terminology: &fc}
+}
+
+// MatchesURI constructs the `<path> MATCHES {uri}` predicate — the URI
+// operand form (REQ-117). The URI is emitted verbatim inside the braces
+// (the grammar's URI token is unquoted).
+func MatchesURI(path, uri string) WhereExpr {
+	return MatchesExpr{Path: path, URI: strings.TrimSpace(uri)}
 }
 
 // LikeExpr is the `<path> LIKE <pattern>` AQL predicate. Pattern is a
@@ -365,7 +419,7 @@ func (l LikeExpr) validate() error {
 	if l.Pattern == nil {
 		return fmt.Errorf("%w: nil pattern in LIKE on %q", ErrInvalidQuery, l.Path)
 	}
-	return nil
+	return validateValue(l.Pattern)
 }
 
 // Like constructs a [LikeExpr].

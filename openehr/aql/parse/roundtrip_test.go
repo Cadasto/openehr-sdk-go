@@ -91,6 +91,10 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"where_not_over_function_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE NOT LENGTH(o/name) > 5"},
 		{"where_mixed_junction_precedence", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/a = 1 AND (o/b = o/c OR LENGTH(o/d) > 2)"},
 		{"where_terminology_rhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code = terminology('SNOMED-CT','near','12345')"},
+		{"matches_terminology_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')"},
+		{"matches_uri_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}"},
+		{"matches_value_list_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {terminology('SNOMED-CT','near','12345'), 'other'}"},
+		{"matches_param_and_literal", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {$code, 'other'}"},
 	}
 
 	for _, tc := range cases {
@@ -152,6 +156,8 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE CONCAT('a', $p, LENGTH(o/y)) = 'abc'",
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5 AND o/p = o/q",
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/a = 1 AND (o/b = o/c OR LENGTH(o/d) > 2)",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES TERMINOLOGY('SNOMED-CT', 'near', '12345')",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {
@@ -186,6 +192,8 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 		{"function_call_where_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name) > 5"},
 		{"path_vs_path", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/y"},
 		{"and_junction_with_function_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5"},
+		{"matches_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')"},
+		{"matches_uri", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

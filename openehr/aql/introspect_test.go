@@ -194,6 +194,50 @@ func TestComparisonRejectsMalformedOperands(t *testing.T) {
 	}
 }
 
+// REQ-117: the two non-value-list MATCHES operands are constructible and
+// introspectable on the write side too — a bare TERMINOLOGY(...) call and a
+// `{URI}` operand.
+func TestMatchesOperandForms(t *testing.T) {
+	term := aql.MatchesTerminology("o/code", "SNOMED-CT", "near", "12345")
+	me, ok := term.(aql.MatchesExpr)
+	if !ok {
+		t.Fatalf("MatchesTerminology returned %T, want aql.MatchesExpr", term)
+	}
+	if me.Terminology == nil || me.Terminology.Name != aql.TerminologyFunc {
+		t.Fatalf("MatchesExpr.Terminology = %+v, want the TERMINOLOGY call", me.Terminology)
+	}
+	if got := mustFormat(t, term); got != "o/code MATCHES TERMINOLOGY('SNOMED-CT', 'near', '12345')" {
+		t.Errorf("FormatWhere = %q, want the bare TERMINOLOGY operand form", got)
+	}
+
+	uri := aql.MatchesURI("o/code", "uri://terminology.hl7.org/CodeSystem/v3-ActCode")
+	if got := mustFormat(t, uri); got != "o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}" {
+		t.Errorf("FormatWhere = %q, want the braced URI operand form", got)
+	}
+
+	// A terminology call is also a value-list member (grammar
+	// `valueListItem : terminologyFunction`).
+	list := aql.Matches("o/code", aql.Terminology("SNOMED-CT", "near", "12345"), aql.String("other"))
+	if got := mustFormat(t, list); got != "o/code MATCHES {TERMINOLOGY('SNOMED-CT', 'near', '12345'), 'other'}" {
+		t.Errorf("FormatWhere = %q, want the value-list form", got)
+	}
+}
+
+// REQ-117: the MATCHES operand forms are mutually exclusive and an empty
+// operand stays a build-time error — no silent widening.
+func TestMatchesRejectsAmbiguousOperands(t *testing.T) {
+	for name, w := range map[string]aql.WhereExpr{
+		"no_operand":       aql.MatchesExpr{Path: "o/code"},
+		"empty_path":       aql.MatchesURI("", "uri://x/y"),
+		"values_and_uri":   aql.MatchesExpr{Path: "o/code", Values: []aql.Value{aql.String("a")}, URI: "uri://x/y"},
+		"terminology_only": aql.MatchesExpr{Path: "o/code", Terminology: &aql.FuncCall{}},
+	} {
+		if _, err := aql.FormatWhere(w); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("%s: FormatWhere error = %v, want ErrInvalidQuery", name, err)
+		}
+	}
+}
+
 func mustFormat(t *testing.T, w aql.WhereExpr) string {
 	t.Helper()
 	got, err := aql.FormatWhere(w)
