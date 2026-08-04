@@ -577,7 +577,7 @@ Two grammar-admitted, server-executable shapes are explicit **acceptances** of t
 
 - **Terminology** (`TERMINOLOGY()` / `MATCHES` value-set membership), function signatures, `ORDER BY` type checking, and version predicates beyond parse.
 - **CDR-grade path resolution** — full AQL-path-to-canonical-path mapping (node-id-on-structural-attribute vs canonical placement) is PROBE-021 territory; Layer 3 is best-effort, hence `aql_path_not_in_template` is a Warning.
-- **Re-emission / pretty-printing** — parse does not round-trip to AQL text in v1.
+- **Re-emission / pretty-printing** — not part of this REQ; canonical re-emission from the structured AST is provided by [§ REQ-113](#req-113--execution-oriented-parsed-aql-ast) via [`(*Query).Emit`](../../openehr/aql/parse/query.go).
 
 ### Building-block independence (REQ-013)
 
@@ -992,6 +992,8 @@ The write side ([`openehr/aql`](../../openehr/aql/) builder) MUST be able to exp
 - **Negated containment** — `CONTAINS … NOT CONTAINS …` per the grammar's `classExprOperand (NOT? CONTAINS containsExpr)?`.
 - **Sibling containment junctions** — `AND` / `OR` over containment operands, with parentheses emitted exactly when nesting departs from the default precedence (`NOT` binds tightest, then `AND`, then `OR` — mirroring the parse profile).
 - **In-text `LIMIT n [OFFSET m]`** as an explicit opt-in, so a bound survives stored-query registration; the existing envelope paging (`Query.Fetch`/`Query.Offset`) stays the default and the two channels MUST NOT be silently combined — requesting both is a build-time error.
+
+A containment junction MUST be the **final** child of the chain it sits in: the grammar takes a parenthesised group as a whole `containsExpr` alternative (`classExprOperand (NOT? CONTAINS containsExpr)? | '(' containsExpr ')'`), so no `CONTAINS` keyword may follow one, and deeper nesting is written inside the junction's operands instead. A builder tree that places a junction in a non-final chain position — through `Containment.Contains` / `Containment.NotContains`, or across repeated `Builder.Contains` / `Builder.NotContains` calls, which emit as one chain — MUST fail at `Build()` time with an error wrapping `aql.ErrInvalidQuery`; emission MUST NOT be re-shaped to make such a placement expressible, because distributing the chain tail under the junction's operands changes what the query asks.
 
 A builder entry point for a **containment junction at the FROM root** (`FROM COMPOSITION c1 OR COMPOSITION c2`, which the read side models via `parse.FromClause.Junction`) is **deferred** until a consumer needs write-side root junctions: the builder keeps a single root class, so `Builder.From` / `Builder.FromEHR` are unchanged and a builder-emitted FROM root is never parenthesised.
 
