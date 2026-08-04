@@ -249,6 +249,71 @@ func TestParseQuerySelectLiteralAlias(t *testing.T) {
 	}
 }
 
+// TestParseQuerySelectKeywordLiteral pins the SELECT-side lift of a bare
+// boolean / null keyword projection. The SDK lexer lexes `true` / `false` as
+// IDENTIFIER (the IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4), so
+// `SELECT true` reaches the extractor as an IDENTIFIER-only identifiedPath —
+// the same shape the WHERE side already lifts to a typed literal. The SELECT
+// column position must agree: a bare keyword is a [parse.LiteralExpr], never a
+// [parse.PathExpr] rooted at a pseudo-alias.
+// PROBE-087
+func TestParseQuerySelectKeywordLiteral(t *testing.T) {
+	for _, tc := range []struct {
+		name, in string
+		want     aql.Value
+		emit     string
+	}{
+		{name: "true", in: "SELECT true FROM EHR e", want: aql.BoolValue{B: true}, emit: "SELECT true FROM EHR e"},
+		{name: "false", in: "SELECT false FROM EHR e", want: aql.BoolValue{B: false}, emit: "SELECT false FROM EHR e"},
+		// Keyword casing normalises to the canonical literal, matching the
+		// WHERE-side treatment of the same keyword.
+		{name: "uppercase", in: "SELECT TRUE FROM EHR e", want: aql.BoolValue{B: true}, emit: "SELECT true FROM EHR e"},
+		// `null` reaches the extractor as the NULL token (a primitive), not an
+		// IDENTIFIER — pinned here so both routes to a keyword literal agree.
+		{name: "null", in: "SELECT null FROM EHR e", want: aql.NullValue{}, emit: "SELECT NULL FROM EHR e"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", tc.in, err)
+			}
+			if len(q.Select.Items) != 1 {
+				t.Fatalf("Select.Items len = %d, want 1", len(q.Select.Items))
+			}
+			lit, ok := q.Select.Items[0].Expr.(parse.LiteralExpr)
+			if !ok {
+				t.Fatalf("Select.Items[0].Expr = %#v, want parse.LiteralExpr", q.Select.Items[0].Expr)
+			}
+			if lit.Value != tc.want {
+				t.Errorf("LiteralExpr.Value = %#v, want %#v", lit.Value, tc.want)
+			}
+			if out, err := q.Emit(); err != nil || out != tc.emit {
+				t.Errorf("Emit = %q, %v; want %q", out, err, tc.emit)
+			}
+		})
+	}
+}
+
+// TestParseQuerySelectKeywordWithPathTailStaysPath is the negative of
+// [TestParseQuerySelectKeywordLiteral]: only a BARE keyword is a literal. A
+// keyword carrying a path tail (or a path predicate) is a real path whatever it
+// is rooted at, in the SELECT column position exactly as in WHERE.
+// PROBE-087
+func TestParseQuerySelectKeywordWithPathTailStaysPath(t *testing.T) {
+	for _, in := range []string{
+		"SELECT true/nested FROM EHR e",
+		"SELECT false[at0001] FROM EHR e",
+	} {
+		q, err := parse.ParseQuery(in)
+		if err != nil {
+			t.Fatalf("ParseQuery(%q): %v", in, err)
+		}
+		if _, ok := q.Select.Items[0].Expr.(parse.PathExpr); !ok {
+			t.Errorf("%q: Select.Items[0].Expr = %#v, want parse.PathExpr", in, q.Select.Items[0].Expr)
+		}
+	}
+}
+
 // TestParseQuerySelectStarWithColumns pins REQ-117 catalogue shape 2: a
 // star mixed with column projections is an ORDER-PRESERVING item list
 // carrying a [parse.StarExpr] at the star's position, while the

@@ -123,6 +123,15 @@ func (ex *astExtractor) extractSelectItem(c gen.ISelectExprContext) SelectItem {
 
 func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 	if ip := c.IdentifiedPath(); ip != nil {
+		// REQ-117: a BARE `true` / `false` in a SELECT column position is a
+		// literal projection, not a path — the SDK lexer lexes those keywords
+		// as IDENTIFIER (the IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4),
+		// so they arrive here as an IDENTIFIER-only identifiedPath. This mirrors
+		// the WHERE-side lift in [astExtractor.terminalAsValue]; the flat lint
+		// view skips the identical shape via isKeywordLiteral.
+		if v, ok := bareKeywordLiteral(ip); ok {
+			return LiteralExpr{Value: v}
+		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
 	if afc := c.AggregateFunctionCall(); afc != nil {
@@ -773,7 +782,7 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 		return v, ""
 	}
 	if ip := c.IdentifiedPath(); ip != nil {
-		if v, ok := keywordLiteralValue(ip.GetText()); ok {
+		if v, ok := bareKeywordLiteral(ip); ok {
 			return v, ""
 		}
 		// REQ-117: an identified path in a value position — carried as
@@ -787,16 +796,18 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 	return nil, ""
 }
 
-// keywordLiteralValue maps a bare literal keyword occupying a comparison
-// `terminal` position to its typed [aql.Value]. The SDK lexer lexes `true` /
-// `false` as IDENTIFIER (the IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4),
-// so they arrive as an IDENTIFIER-only identifiedPath rather than a primitive;
-// `null` is included because the same rule order could shift. Reports
-// ok=false for any other text.
+// keywordLiteralValue maps a bare literal keyword occupying a value position —
+// a comparison `terminal` or a SELECT `columnExpr` — to its typed [aql.Value].
+// The SDK lexer lexes `true` / `false` as IDENTIFIER (the IDENTIFIER rule
+// precedes BOOLEAN in AqlLexer.g4), so they arrive as an IDENTIFIER-only
+// identifiedPath rather than a primitive; `null` is included because the same
+// rule order could shift. Reports ok=false for any other text.
 //
-// Shared by the structured extractor ([astExtractor.terminalAsValue]) and the
-// flat lint view ([extractor.EnterIdentifiedPath]) so both agree these are
-// literals, not paths (REQ-117).
+// Reached through bareKeywordLiteral, which adds the shape gate. Shared by the
+// structured extractor ([astExtractor.terminalAsValue],
+// [astExtractor.extractColumnExpr]) and the flat lint view
+// ([extractor.EnterIdentifiedPath]) so both agree these are literals, not
+// paths (REQ-117).
 func keywordLiteralValue(text string) (aql.Value, bool) {
 	switch strings.ToLower(text) {
 	case "true":

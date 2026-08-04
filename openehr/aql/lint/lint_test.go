@@ -198,6 +198,36 @@ func TestLintBooleanComparisonOperand(t *testing.T) {
 	}
 }
 
+// TestLintSelectBooleanKeywordLiteral extends the REQ-117 boolean-literal
+// acceptance to the SELECT column position: `SELECT true` is a projected
+// literal, not a path rooted at a pseudo-alias, so it draws no
+// aql_unknown_alias. A keyword carrying a path tail is a real path and keeps
+// its alias check.
+func TestLintSelectBooleanKeywordLiteral(t *testing.T) {
+	const from = " FROM EHR e CONTAINS COMPOSITION s[openEHR-EHR-COMPOSITION.encounter.v1]"
+	for _, tc := range []struct {
+		name        string
+		projection  string
+		wantUnknown bool
+	}{
+		{name: "true", projection: "true"},
+		{name: "false", projection: "false"},
+		{name: "uppercase", projection: "TRUE"},
+		{name: "null", projection: "null"},
+		{name: "mixed_with_path", projection: "true, s/uid/value"},
+		{name: "aliased", projection: "true AS flag"},
+		// A keyword with a path tail is a path: `true` binds no class.
+		{name: "keyword_path_tail", projection: "true/nested", wantUnknown: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString("SELECT "+tc.projection+from, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
 func TestLintFromArchetypeWarning(t *testing.T) {
 	r := lint.LintString("SELECT c FROM COMPOSITION c", nil)
 	if !has(r, "aql_from_archetype") {

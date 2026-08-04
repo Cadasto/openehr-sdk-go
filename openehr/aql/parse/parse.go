@@ -77,8 +77,12 @@ type Document struct {
 	Classes []ClassExpr
 	// Paths are every alias-qualified identified path across the SELECT,
 	// WHERE, and ORDER BY clauses, in document order. A bare `true` /
-	// `false` comparison operand is a literal, not a path, and is absent
-	// even though the lexer yields it as an IDENTIFIER (REQ-117).
+	// `false` keyword in a value position — a comparison operand
+	// (`WHERE s/x = true`) or a SELECT projection item (`SELECT true`) — is a
+	// literal, not a path, and is absent even though the lexer yields it as an
+	// IDENTIFIER (REQ-117). A keyword carrying a path predicate or a path tail
+	// (`true/nested`) is a real path and IS recorded, as is an ORDER BY key
+	// naming a keyword (the ORDER BY position admits no literal).
 	Paths []IdentifiedPath
 	// Params are the distinct $parameter names referenced anywhere in the
 	// query, in first-seen order, with the leading `$` stripped.

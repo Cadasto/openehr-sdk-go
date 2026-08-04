@@ -75,7 +75,17 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"select_literal_int", "SELECT 1, e/ehr_id/value FROM EHR e"},
 		{"select_literal_string_alias", "SELECT 'urgent' AS label FROM EHR e"},
 		{"select_literal_real", "SELECT 1.5 FROM EHR e"},
+		// The keyword-literal SELECT rows pin the EMITTED bytes only; the AST
+		// shape behind them (a LiteralExpr, never a PathExpr rooted at a
+		// pseudo-alias) is pinned structurally by
+		// TestParseQuerySelectKeywordLiteral in query_test.go.
 		{"select_literal_bool", "SELECT true FROM EHR e"},
+		{"select_literal_bool_false", "SELECT false FROM EHR e"},
+		{"select_literal_bool_uppercase", "SELECT TRUE FROM EHR e"},
+		{"select_literal_bool_aliased", "SELECT true AS flag FROM EHR e"},
+		{"select_literal_bool_mixed", "SELECT true, e/ehr_id/value FROM EHR e"},
+		{"select_keyword_path_tail", "SELECT true/nested FROM EHR e"},
+		{"order_by_select_alias", "SELECT e/time_created AS score FROM EHR e ORDER BY score DESC"},
 		{"select_star_mixed", "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"},
 		{"select_star_after_column", "SELECT c/uid/value, * FROM EHR e CONTAINS COMPOSITION c"},
 		{"select_count_star_literal_alias", "SELECT COUNT(*), 1, e/x AS a FROM EHR e"},
@@ -179,6 +189,17 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT o FROM (COMPOSITION c1 CONTAINS OBSERVATION o) OR EHR e",
 		"SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 AND EHR e",
 		"SELECT c FROM EHR e CONTAINS ((COMPOSITION c OR SECTION s) AND OBSERVATION o)",
+		// A bare boolean keyword projected from SELECT: canonical bytes are the
+		// lower-case literal, so a canonical input is preserved verbatim even
+		// though the AST now carries an aql.BoolValue rather than a path.
+		"SELECT true FROM EHR e",
+		"SELECT false FROM EHR e",
+		"SELECT true, e/ehr_id/value FROM EHR e",
+		// ORDER BY resolving against a SELECT AS alias — the parse→emit tie to
+		// the REQ-109/REQ-117 lint acceptance (an AS alias is a legal ORDER BY
+		// key and survives the round trip unchanged).
+		"SELECT e/time_created AS score FROM EHR e ORDER BY score DESC",
+		"SELECT o/data[at0001]/value/magnitude AS score FROM EHR e CONTAINS OBSERVATION o ORDER BY score ASC",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {

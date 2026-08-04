@@ -118,6 +118,38 @@ func TestExtractPathsSkipsBooleanKeywordOperand(t *testing.T) {
 	}
 }
 
+// TestExtractPathsSkipsBooleanKeywordSelectItem is the SELECT-side sibling of
+// [TestExtractPathsSkipsBooleanKeywordOperand]: a bare `true` / `false`
+// projected from SELECT is a literal, not a path root, so it contributes no
+// entry to Document.Paths and the lint layer raises no aql_unknown_alias for
+// it. A keyword carrying a path tail stays a path in this view too.
+func TestExtractPathsSkipsBooleanKeywordSelectItem(t *testing.T) {
+	for _, q := range []string{
+		"SELECT true FROM EHR e",
+		"SELECT FALSE FROM EHR e",
+		"SELECT true, e/ehr_id/value FROM EHR e",
+	} {
+		doc, err := parse.Parse(q)
+		if err != nil {
+			t.Fatalf("parse %q: %v", q, err)
+		}
+		for _, p := range doc.Paths {
+			if p.Alias == "true" || p.Alias == "false" || p.Alias == "FALSE" {
+				t.Errorf("%q: keyword literal recorded as a path root: %+v", q, p)
+			}
+		}
+	}
+
+	// A keyword with a path tail in a SELECT column position is a real path.
+	doc, err := parse.Parse("SELECT true/nested FROM EHR e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Paths) != 1 || doc.Paths[0].Alias != "true" {
+		t.Errorf("keyword with a path tail must stay a path: Paths = %+v", doc.Paths)
+	}
+}
+
 func TestExtractParams(t *testing.T) {
 	doc, err := parse.Parse(representativeQuery)
 	if err != nil {
