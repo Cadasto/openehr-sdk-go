@@ -275,6 +275,30 @@ func TestContainmentJunctionMustTerminateChain(t *testing.T) {
 				aql.Class("ACTION", "a"),
 			)).Build()
 		},
+		// The junction ENDS its own chain, but Build flattens the nesting
+		// levels into ONE emitted chain, so a term appended at any level
+		// above still lands a CONTAINS keyword after the closing paren.
+		// The rule therefore spans the whole flattened chain, not each
+		// level in isolation.
+		"junction ends an inner chain, term follows across builder calls": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").Contains(junction())).
+				Contains(aql.Class("ACTION", "a")).Build()
+		},
+		"junction ends an inner chain, negated term follows": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").Contains(junction())).
+				NotContains(aql.Class("ACTION", "a")).Build()
+		},
+		"junction ends an inner chain, sibling follows in one expression": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(aql.Class("SECTION", "s").Contains(junction())).
+				Contains(aql.Class("ACTION", "a"))).Build()
+		},
+		"junction ends a deeply nested chain, term follows": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(aql.Class("SECTION", "s").
+					Contains(aql.Class("ADMIN_ENTRY", "ae").Contains(junction())))).
+				Contains(aql.Class("ACTION", "a")).Build()
+		},
 	}
 	for name, build := range refused {
 		t.Run(name, func(t *testing.T) {
@@ -315,6 +339,55 @@ func TestContainmentJunctionMustTerminateChain(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := build(); err != nil {
 				t.Fatalf("Build: %v", err)
+			}
+		})
+	}
+}
+
+// TestContainmentJunctionRefusesNestedContains pins that CONTAINS below a
+// junction is REFUSED rather than absorbed as one more operand. The grammar
+// admits no `(A OR B) CONTAINS C` form, and absorbing the term would emit
+// valid-but-different AQL: a junction operand carries no connector, so the
+// NOT of a NotContains is dropped and an EXCLUSION silently becomes an
+// alternative. No round-trip or golden assertion can catch that, which is
+// why it is pinned here at Build time.
+// REQ-117
+func TestContainmentJunctionRefusesNestedContains(t *testing.T) {
+	sel := func() *aql.Builder {
+		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e")
+	}
+	junction := func() aql.Containment {
+		return aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))
+	}
+
+	refused := map[string]func() (aql.Query, error){
+		"contains below a junction": func() (aql.Query, error) {
+			return sel().Contains(junction().Contains(aql.Class("ACTION", "a"))).Build()
+		},
+		"not-contains below a junction": func() (aql.Query, error) {
+			return sel().Contains(junction().NotContains(aql.Class("ACTION", "a"))).Build()
+		},
+		"junction below a junction": func() (aql.Query, error) {
+			return sel().Contains(junction().Contains(junction())).Build()
+		},
+		"contains below a nested junction operand": func() (aql.Query, error) {
+			return sel().Contains(aql.ContainsAnd(
+				junction().Contains(aql.Class("ACTION", "a")),
+				aql.Class("SECTION", "s"),
+			)).Build()
+		},
+		// A class node is identified by its stored kind, not by an empty
+		// RM type: a class missing its RM type must fail the completeness
+		// check, never be mistaken for a junction and skipped.
+		"class missing its rm type with a child": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("", "o").Contains(aql.Class("ACTION", "a"))).Build()
+		},
+	}
+	for name, build := range refused {
+		t.Run(name, func(t *testing.T) {
+			q, err := build()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
 			}
 		})
 	}

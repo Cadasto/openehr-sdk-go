@@ -24,9 +24,18 @@ import (
 //
 // A junction may only END a containment chain. The grammar's `containsExpr`
 // admits a parenthesised group as a whole alternative, which no CONTAINS may
-// follow, so a junction with a further term after it in the same chain — from
-// either [Containment.Contains] or [Builder.Contains] — is refused by
-// [Builder.Build]. Write the deeper nesting inside the junction's operands.
+// follow, so [Builder.Build] refuses a junction with a further term after it.
+// The rule is applied to the FLATTENED chain: nesting levels built with
+// [Containment.Contains] and appended with [Builder.Contains] emit as one
+// chain, so a junction that ends an inner level is still followed by whatever
+// a level above appends, and that is refused too. Write the deeper nesting
+// inside the junction's operands.
+//
+// Likewise, a junction is never a CONTAINS receiver: calling
+// [Containment.Contains] / [Containment.NotContains] ON a junction is refused
+// at [Builder.Build] rather than absorbed as one more operand — absorbing it
+// would drop the connector, silently turning a NOT CONTAINS exclusion into
+// one more alternative.
 //
 // A junction always sits below a CONTAINS keyword here. A junction at the FROM
 // ROOT (`FROM COMPOSITION c1 OR COMPOSITION c2`) is grammar-admitted and the
@@ -34,6 +43,12 @@ import (
 // keeps a single root class, so the FROM root is never parenthesised and
 // [Builder.From] / [Builder.FromEHR] stay unchanged.
 type Containment struct {
+	// kind records which variant this node is. It is STORED rather than
+	// inferred from field emptiness: a class node that is merely missing
+	// its RM type must fail the completeness check below, not pass as a
+	// junction and skip it.
+	kind containmentKind
+
 	rmType      string
 	alias       string
 	archetypeID string
@@ -50,7 +65,23 @@ type Containment struct {
 	// consumes it when it writes the keyword — mirroring
 	// parse.Containment.Negated.
 	negated bool
+
+	// invalid records a combinator misuse that has no valid tree to
+	// return. The combinators return a Containment, not (Containment,
+	// error), so the defect is carried here and surfaced by validateTree
+	// at [Builder.Build] time — never silently absorbed into a shape that
+	// means something else.
+	invalid error
 }
+
+// containmentKind distinguishes the two node variants. The zero value is a
+// class node, so the zero [Containment] fails the RM-type/alias check.
+type containmentKind int
+
+const (
+	kindClass containmentKind = iota
+	kindJunction
+)
 
 // Archetype is a containment constraint: `<rmType> <alias>[<archetypeID>]`. An
 // empty archetypeID emits `<rmType> <alias>` with no predicate.
@@ -87,7 +118,19 @@ func (c Containment) NotContains(child Containment) Containment {
 // withChild returns c with child appended. The children slice is CLONED so
 // two derivations from the same operand cannot write the same backing array
 // (`base.Contains(x)` and `base.Contains(y)` are independent).
+//
+// A junction receiver is REFUSED (REQ-117). The grammar admits no
+// `(A OR B) CONTAINS C` form, and appending to a junction would not nest
+// anything: the child would become one more boolean OPERAND, and because an
+// operand carries no connector its negation would be dropped — silently
+// turning `NotContains` (an exclusion) into one more alternative. The defect
+// is recorded and surfaced by [Builder.Build].
 func (c Containment) withChild(child Containment) Containment {
+	if c.isJunction() {
+		c.invalid = fmt.Errorf("%w: CONTAINS below a containment junction — the grammar admits no "+
+			"`(A OR B) CONTAINS C` form; write the nesting inside the junction's operands", ErrInvalidQuery)
+		return c
+	}
 	c.children = append(slices.Clone(c.children), child)
 	return c
 }
@@ -122,7 +165,7 @@ func containmentJunction(j containsJoin, operands []Containment) Containment {
 	case 1:
 		return operands[0]
 	default:
-		return Containment{children: slices.Clone(operands), join: j}
+		return Containment{kind: kindJunction, children: slices.Clone(operands), join: j}
 	}
 }
 
@@ -144,7 +187,26 @@ func (j containsJoin) keyword() string {
 
 // isJunction reports whether c is a pure boolean grouping — operands only,
 // no class of its own. Mirrors parse's isContainmentJunction.
-func (c Containment) isJunction() bool { return c.rmType == "" && len(c.children) > 0 }
+func (c Containment) isJunction() bool { return c.kind == kindJunction }
+
+// chainEndsInJunction reports whether the CONTAINS chain rooted at c ENDS in
+// a junction — c itself, or the tail of its chain at any depth.
+//
+// [ast.build] flattens the nesting levels into one emitted chain, so a
+// junction that terminates an inner chain is still followed by whatever the
+// level above appends. The junction-placement rule therefore has to be asked
+// of the flattened chain, not of one level in isolation. A junction's
+// operands are NOT walked: they are unordered and each is parenthesised, so
+// nothing can follow one with a CONTAINS keyword.
+func (c Containment) chainEndsInJunction() bool {
+	if c.isJunction() {
+		return true
+	}
+	if n := len(c.children); n > 0 {
+		return c.children[n-1].chainEndsInJunction()
+	}
+	return false
+}
 
 // classToken renders the class expression at this node (never the children).
 func (c Containment) classToken() string {
@@ -229,6 +291,9 @@ func (c Containment) emitOperands() string {
 // parse's duplicateAlias walk so the read and write sides refuse the same
 // trees.
 func (c Containment) validateTree(seen map[string]bool) error {
+	if c.invalid != nil {
+		return c.invalid
+	}
 	if !c.isJunction() {
 		if c.rmType == "" || c.alias == "" {
 			return fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
@@ -266,7 +331,10 @@ func (c Containment) validateTree(seen map[string]bool) error {
 // they meant.
 func validateContainsChain(chain []Containment) error {
 	for _, c := range chain[:max(len(chain)-1, 0)] {
-		if c.isJunction() {
+		// chainEndsInJunction, not isJunction: the emitted chain is the
+		// FLATTENED one, so an element whose own chain merely ends in a
+		// junction is still followed by the next element's CONTAINS.
+		if c.chainEndsInJunction() {
 			return fmt.Errorf("%w: containment junction followed by a further CONTAINS term — a junction may "+
 				"only end a containment chain; write the deeper nesting inside its operands", ErrInvalidQuery)
 		}
