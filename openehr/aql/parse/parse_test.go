@@ -96,6 +96,38 @@ func TestParseClausePresence(t *testing.T) {
 	}
 }
 
+// TestParseSelectAliases pins REQ-117: the flat view records the SELECT `AS`
+// aliases in document order so the lint layer can resolve an ORDER BY key
+// against them once FROM/CONTAINS has had its turn. Projection items without
+// an AS clause contribute nothing.
+func TestParseSelectAliases(t *testing.T) {
+	doc, err := parse.Parse(
+		"SELECT o/data[at0001]/value/magnitude AS score, o/name/value, COUNT(*) AS n " +
+			"FROM OBSERVATION o ORDER BY score DESC",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"score", "n"}
+	if len(doc.SelectAliases) != len(want) {
+		t.Fatalf("SelectAliases = %v, want %v", doc.SelectAliases, want)
+	}
+	for i, w := range want {
+		if doc.SelectAliases[i] != w {
+			t.Errorf("SelectAliases[%d] = %q, want %q", i, doc.SelectAliases[i], w)
+		}
+	}
+
+	// A projection list with no AS clause records none.
+	bare, err := parse.Parse("SELECT o/name/value FROM OBSERVATION o")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bare.SelectAliases) != 0 {
+		t.Errorf("SelectAliases = %v, want none", bare.SelectAliases)
+	}
+}
+
 // TestParseREQ055Golden parses the REQ-055 builder reference query, tying the
 // parse front-end to the canonical AQL the builders emit.
 func TestParseREQ055Golden(t *testing.T) {

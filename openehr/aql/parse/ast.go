@@ -178,6 +178,16 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 }
 
 func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
+	// REQ-117: a bare `true` / `false` in a value position is a literal, not a
+	// path — the SDK lexer hands it to this listener as an IDENTIFIER-only
+	// identifiedPath. Skipping it keeps the flat lint view from reporting a
+	// spurious aql_unknown_alias for a grammar-admitted, server-executable
+	// shape, and keeps it in lockstep with the structured extractor
+	// (terminalAsValue / extractColumnExpr), which lifts the same shape to a
+	// typed [aql.Value].
+	if isKeywordLiteral(c) {
+		return
+	}
 	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clauseOf(c)}
 	ip.Raw = c.GetText()
 	if id := c.IDENTIFIER(); id != nil {
@@ -199,6 +209,40 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 		}
 	}
 	e.paths = append(e.paths, ip)
+}
+
+// isKeywordLiteral reports whether c is a bare literal keyword occupying one of
+// the two grammar positions where a literal is admitted but the lexer yields an
+// IDENTIFIER: a comparison `terminal` (the right-hand operand) and a
+// `columnExpr` (a SELECT projection item). The structured extractor lifts both
+// to a typed [aql.Value] — [astExtractor.terminalAsValue] and
+// [astExtractor.extractColumnExpr] — so the flat view must skip exactly the
+// same shapes.
+//
+// An ORDER BY key is deliberately NOT included: `orderByExpr` admits only an
+// identifiedPath, the [OrderTerm] AST carries no literal alternative, and
+// ordering by a constant is not a shape the REQ-117 catalogue models — so
+// `ORDER BY true` stays a path and keeps its alias check.
+func isKeywordLiteral(c *gen.IdentifiedPathContext) bool {
+	if _, ok := bareKeywordLiteral(c); !ok {
+		return false
+	}
+	switch c.GetParent().(type) {
+	case *gen.TerminalContext, *gen.ColumnExprContext:
+		return true
+	}
+	return false
+}
+
+// bareKeywordLiteral lifts an identifiedPath that is a BARE literal keyword —
+// no path predicate, no object path — to its typed [aql.Value]. Anything
+// qualified by a predicate or a path tail (`true/nested`, `false[at0001]`) is a
+// real path whatever it is rooted at, and reports ok=false.
+func bareKeywordLiteral(c gen.IIdentifiedPathContext) (aql.Value, bool) {
+	if c == nil || c.PathPredicate() != nil || c.ObjectPath() != nil {
+		return nil, false
+	}
+	return keywordLiteralValue(c.GetText())
 }
 
 // VisitTerminal collects $parameter references from anywhere in the tree,

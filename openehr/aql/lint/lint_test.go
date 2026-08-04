@@ -96,6 +96,138 @@ func TestLintUnknownAlias(t *testing.T) {
 	}
 }
 
+// TestLintOrderBySelectAlias pins the REQ-117 lint acceptance: an ORDER BY key
+// that names no FROM/CONTAINS alias is resolved against the SELECT `AS`
+// aliases before aql_unknown_alias is raised. FROM is consulted first, and an
+// AS alias labels a projected column — never a path root — so a key carrying a
+// path tail stays unknown.
+func TestLintOrderBySelectAlias(t *testing.T) {
+	const from = " FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	for _, tc := range []struct {
+		name        string
+		query       string
+		wantUnknown bool
+	}{
+		{
+			name:  "as_alias_hit",
+			query: "SELECT o/data[at0001]/value/magnitude AS score" + from + " ORDER BY score DESC",
+		},
+		{
+			name:  "as_alias_hit_no_direction",
+			query: "SELECT o/data[at0001]/value/magnitude AS score" + from + " ORDER BY score",
+		},
+		{
+			name:        "unknown_identifier",
+			query:       "SELECT o/name/value" + from + " ORDER BY nope",
+			wantUnknown: true,
+		},
+		{
+			// The SELECT alias reuses a FROM alias: FROM wins, and either
+			// resolution order leaves the query clean.
+			name:  "select_alias_shadows_from_alias",
+			query: "SELECT o/name/value AS o" + from + " ORDER BY o",
+		},
+		{
+			name:        "as_alias_with_path_tail",
+			query:       "SELECT o/name/value AS score" + from + " ORDER BY score/magnitude",
+			wantUnknown: true,
+		},
+		{
+			// The fallback is scoped to ORDER BY: a SELECT alias is not a
+			// WHERE operand root.
+			name:        "select_alias_not_visible_in_where",
+			query:       "SELECT o/name/value AS score" + from + " WHERE score = 1",
+			wantUnknown: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString(tc.query, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
+// TestLintSelectAliasDoesNotBindClass pins the namespace separation behind
+// "FROM wins" (REQ-117): a SELECT `AS` alias resolves an ORDER BY key but
+// never enters the class-binding map, so Layer 3 cannot anchor a path to it.
+func TestLintSelectAliasDoesNotBindClass(t *testing.T) {
+	md := lint.Extract(mustParse(
+		t,
+		"SELECT o/name/value AS score FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] "+
+			"ORDER BY score",
+	))
+	if _, ok := md.Aliases["score"]; ok {
+		t.Errorf("SELECT alias leaked into the class-binding map: %v", md.Aliases)
+	}
+	if len(md.SelectAliases) != 1 || md.SelectAliases[0] != "score" {
+		t.Errorf("SelectAliases = %v, want [score]", md.SelectAliases)
+	}
+}
+
+// TestLintBooleanComparisonOperand pins the second REQ-117 lint acceptance: a
+// boolean literal as a comparison operand is a literal, not a path. The SDK
+// lexer lexes `true` / `false` as IDENTIFIER (the IDENTIFIER rule precedes
+// BOOLEAN), so the operand used to reach the alias check as a pseudo-path and
+// draw aql_unknown_alias.
+func TestLintBooleanComparisonOperand(t *testing.T) {
+	const head = "SELECT s/is_queryable FROM EHR e " +
+		"CONTAINS COMPOSITION s[openEHR-EHR-COMPOSITION.encounter.v1] WHERE s/is_queryable "
+	for _, tc := range []struct {
+		name        string
+		predicate   string
+		wantUnknown bool
+	}{
+		{name: "true", predicate: "= true"},
+		{name: "false", predicate: "= false"},
+		{name: "uppercase", predicate: "!= TRUE"},
+		{name: "null", predicate: "= null"},
+		{name: "parameter", predicate: "= $flag"},
+		// A genuine path operand keeps its alias check: `zz` binds nothing.
+		{name: "unbound_path_operand", predicate: "= zz/other", wantUnknown: true},
+		// …and a bound one stays clean.
+		{name: "bound_path_operand", predicate: "= e/ehr_id/value"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString(head+tc.predicate, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
+// TestLintSelectBooleanKeywordLiteral extends the REQ-117 boolean-literal
+// acceptance to the SELECT column position: `SELECT true` is a projected
+// literal, not a path rooted at a pseudo-alias, so it draws no
+// aql_unknown_alias. A keyword carrying a path tail is a real path and keeps
+// its alias check.
+func TestLintSelectBooleanKeywordLiteral(t *testing.T) {
+	const from = " FROM EHR e CONTAINS COMPOSITION s[openEHR-EHR-COMPOSITION.encounter.v1]"
+	for _, tc := range []struct {
+		name        string
+		projection  string
+		wantUnknown bool
+	}{
+		{name: "true", projection: "true"},
+		{name: "false", projection: "false"},
+		{name: "uppercase", projection: "TRUE"},
+		{name: "null", projection: "null"},
+		{name: "mixed_with_path", projection: "true, s/uid/value"},
+		{name: "aliased", projection: "true AS flag"},
+		// A keyword with a path tail is a path: `true` binds no class.
+		{name: "keyword_path_tail", projection: "true/nested", wantUnknown: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString("SELECT "+tc.projection+from, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
 func TestLintFromArchetypeWarning(t *testing.T) {
 	r := lint.LintString("SELECT c FROM COMPOSITION c", nil)
 	if !has(r, "aql_from_archetype") {

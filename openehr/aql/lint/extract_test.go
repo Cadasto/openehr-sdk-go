@@ -49,6 +49,12 @@ func TestExtractMetadata(t *testing.T) {
 		t.Errorf("alias o RMType = %q, want OBSERVATION", md.Aliases["o"].RMType)
 	}
 
+	// REQ-117: SELECT `AS` aliases are a separate namespace from the
+	// class bindings above.
+	if len(md.SelectAliases) != 1 || md.SelectAliases[0] != "sys" {
+		t.Errorf("SelectAliases = %v, want [sys]", md.SelectAliases)
+	}
+
 	if len(md.Params) != 2 || md.Params[0] != "ehr" || md.Params[1] != "threshold" {
 		t.Errorf("Params = %v, want [ehr threshold]", md.Params)
 	}

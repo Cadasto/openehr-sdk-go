@@ -73,6 +73,10 @@ type Query struct {
 // LimitExpr is the sealed type of a LIMIT / OFFSET value. Concrete shapes
 // are [IntLimit] (integer literal) and [ParamLimit] (parameter-bound limit
 // — the AQL `LIMIT $n` form). Consumers dispatch via type assertion.
+//
+// The set grows ADDITIVELY (REQ-117), so a consumer type-switching over it
+// MUST treat an unrecognised case as out-of-catalogue — refuse, skip, or
+// report — and MUST NOT panic on it.
 type LimitExpr interface {
 	isLimitExpr()
 	// token is the canonical wire form: an integer literal for [IntLimit],
@@ -99,20 +103,24 @@ func (l ParamLimit) token() string { return "$" + l.Name }
 
 // SelectClause is the SELECT projection list.
 //
-// `Distinct` mirrors the `SELECT DISTINCT` keyword; `Star` is true for
-// the bare `SELECT *` form (SDK-AQL-002 relaxation), in which case
-// `Items` is empty. Otherwise `Items` carries one entry per projected
-// expression in source order.
+// `Distinct` mirrors the `SELECT DISTINCT` keyword; `Star` is true when
+// the projection carries a `*` (SDK-AQL-002 relaxation). For the BARE
+// `SELECT *` form `Items` is empty — the flag alone carries the
+// projection. Otherwise `Items` carries one entry per projected
+// expression in source order, including a [StarExpr] at the star's
+// position when a star is mixed with column projections
+// (`SELECT *, c/uid/value` — REQ-117).
 type SelectClause struct {
 	Distinct bool
 	Star     bool
 	Items    []SelectItem
 }
 
-// SelectItem is one projected expression in a SELECT list. `Expr` is
-// either a [PathExpr] (a bare alias-qualified path) or a [FunctionCall]
-// (an aggregate or function wrapper around one or more paths). `Alias`
-// is the AS alias when the source used `<expr> AS <name>`; empty
+// SelectItem is one projected expression in a SELECT list. `Expr` is one
+// of the [SelectExpr] shapes — a [PathExpr] (a bare alias-qualified
+// path), a [FunctionCall] (an aggregate or function wrapper), a
+// [LiteralExpr] (a primitive or parameter literal), or a [StarExpr].
+// `Alias` is the AS alias when the source used `<expr> AS <name>`; empty
 // otherwise.
 type SelectItem struct {
 	Expr  SelectExpr
@@ -120,9 +128,14 @@ type SelectItem struct {
 }
 
 // SelectExpr is the sealed type of a SELECT operand. The concrete
-// shapes are [PathExpr] and [FunctionCall]; consumers dispatch via
-// type assertion. Adding a new shape (e.g. arithmetic, literal
-// projection) MUST land here and in the extractor at the same time.
+// shapes are [PathExpr], [FunctionCall], [LiteralExpr], and [StarExpr];
+// consumers dispatch via type assertion.
+//
+// The set grows ADDITIVELY as the catalogue closes further grammar
+// positions (REQ-117), so a consumer type-switching over it MUST treat
+// an unrecognised case as out-of-catalogue — refuse, skip, or report —
+// and MUST NOT panic on it. Adding a new shape lands here, in the
+// extractor, and in the emitter at the same time.
 type SelectExpr interface {
 	isSelectExpr()
 }
@@ -133,6 +146,28 @@ type PathExpr struct {
 }
 
 func (PathExpr) isSelectExpr() {}
+
+// LiteralExpr is a primitive or parameter literal projected from a
+// SELECT — `SELECT 1, e/ehr_id/value FROM …` — or supplied as a
+// function-call argument (`CONCAT('a', $p, …)`). Value carries the
+// shared [aql.Value] vocabulary the WHERE side uses, so a consumer
+// reads a projected literal and a compared literal through one model
+// (REQ-117).
+type LiteralExpr struct {
+	Value aql.Value
+}
+
+func (LiteralExpr) isSelectExpr() {}
+
+// StarExpr is an explicit `*` projection item. It appears in
+// [SelectClause.Items] only when the star is mixed with column
+// projections (`SELECT *, c/uid/value`), so the item list stays
+// order-preserving; the bare `SELECT *` form leaves Items empty and is
+// carried by [SelectClause.Star] alone (REQ-117). Star is true in both
+// cases.
+type StarExpr struct{}
+
+func (StarExpr) isSelectExpr() {}
 
 // FunctionCall is an aggregate or function wrapping one or more SELECT
 // operands — `COUNT(o)`, `MAX(o/data[at0001]/value/magnitude)`,
@@ -152,15 +187,26 @@ type FunctionCall struct {
 
 func (FunctionCall) isSelectExpr() {}
 
-// FromClause is the FROM clause: a root class plus the optional
-// containment tree below it.
+// FromClause is the FROM clause: either a root class plus the optional
+// containment tree below it, or a boolean junction of containment
+// operands.
 //
 // `Root` is the leftmost class expression (e.g. `EHR e`, `COMPOSITION c`,
 // `EHR e[ehr_id/value=$x]`). `Contains` is the optional CONTAINS
 // expression rooted at the FROM root; nil when no CONTAINS appears.
+//
+// `Junction` carries a boolean junction AT the FROM root
+// (`FROM COMPOSITION c1 OR COMPOSITION c2`, incl. AND and grouping) —
+// the same [Containment] tree the nested side already uses (REQ-117).
+// It is nil for the ordinary single-root FROM, so `Root` keeps working
+// unchanged there. When Junction is non-nil the clause has NO single
+// root class, so `Root` and `Contains` are left ZERO: a consumer that
+// only reads `Root` sees an empty FROM (and its own validation refuses)
+// rather than a silently truncated one.
 type FromClause struct {
 	Root     ClassExpr
 	Contains *Containment
+	Junction *Containment
 }
 
 // Containment is one node in the CONTAINS tree.
@@ -252,15 +298,20 @@ func (d OrderDir) String() string {
 // (Builder) and the round-trip suites here (parse).
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
-// q produced by [ParseQuery] — the v1 catalogue is the buildable
-// grammar plus the parser-only shapes (NotExpr / ExistsExpr / LikeExpr
-// / MatchesExpr) and the typed LIMIT / OFFSET forms ([IntLimit] +
-// [ParamLimit]). Source shapes outside the v1 extractor catalogue
-// produce a PARTIAL Query — clauses that extracted cleanly are
+// q produced by [ParseQuery] — since REQ-117 the catalogue is the whole
+// SDK grammar profile (see [aql.ErrIncompleteAST] for the residual
+// integer-literal refusal). A source shape the extractor cannot model
+// produces a PARTIAL Query — clauses that extracted cleanly are
 // populated, dropped clauses are left zero-value — plus an
 // [aql.ErrIncompleteAST] error from [ParseQuery]. Emit on a partial
 // AST refuses with the same error so a caller who ignored the parse
 // return cannot accidentally emit semantically wrong AQL.
+//
+// Canonical form for the constructs REQ-117 added: function names
+// upper-cased, arguments joined by `, `, `TERMINOLOGY(a, b, c)` as a bare
+// MATCHES operand (no braces) and `{uri}` for the URI form, and
+// containment junctions parenthesised only where the grouping is
+// load-bearing (see [emitContainmentOperands]).
 //
 // Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
 // a malformed sub-expression (a nil WHERE comparison value, an empty
@@ -286,7 +337,10 @@ func (q *Query) Emit() (string, error) {
 		sb.WriteString("DISTINCT ")
 	}
 	switch {
-	case q.Select.Star:
+	// Items lead: a mixed `SELECT *, col` carries the star as a
+	// [StarExpr] item, so the list is authoritative whenever it is
+	// populated (REQ-117). The bare `SELECT *` form has no items.
+	case len(q.Select.Items) == 0 && q.Select.Star:
 		sb.WriteByte('*')
 	case len(q.Select.Items) == 0:
 		return "", fmt.Errorf("%w: empty SELECT projection", aql.ErrInvalidQuery)
@@ -304,14 +358,27 @@ func (q *Query) Emit() (string, error) {
 	}
 
 	// FROM
-	if q.From.Root.RMType == "" {
+	if q.From.Junction == nil && q.From.Root.RMType == "" {
 		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
+	}
+	// A junction root and a single root are mutually exclusive: the
+	// grammar has no `(A OR B) CONTAINS C` form, so emitting both would
+	// produce text the parser rejects (REQ-117).
+	if q.From.Junction != nil && (q.From.Root.RMType != "" || q.From.Contains != nil) {
+		return "", fmt.Errorf("%w: FROM sets both a root class and a root junction", aql.ErrInvalidQuery)
 	}
 	if dup := duplicateAlias(q.From); dup != "" {
 		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
 	}
 	sb.WriteString(" FROM ")
-	sb.WriteString(emitClassExpr(q.From.Root))
+	if q.From.Junction != nil {
+		// REQ-117: a junction AT the root needs no grouping parentheses —
+		// nothing encloses it. Nested junctions keep the parentheses
+		// emitContainment writes for them.
+		sb.WriteString(emitContainmentOperands(*q.From.Junction))
+	} else {
+		sb.WriteString(emitClassExpr(q.From.Root))
+	}
 	if q.From.Contains != nil {
 		// Containment.Negated belongs to the connector: the parent of a
 		// negated subtree writes `NOT CONTAINS` instead of `CONTAINS`.
@@ -380,6 +447,16 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 	switch v := e.(type) {
 	case PathExpr:
 		return v.Raw, nil
+	case StarExpr:
+		// REQ-117: an explicit star item inside a mixed projection list.
+		return "*", nil
+	case LiteralExpr:
+		// REQ-117: a primitive / parameter literal projection, rendered
+		// through the shared value emitter so escaping matches WHERE.
+		if v.Value == nil {
+			return "", fmt.Errorf("%w: SELECT literal with nil value", aql.ErrInvalidQuery)
+		}
+		return aql.FormatValue(v.Value), nil
 	case FunctionCall:
 		var body string
 		switch {
@@ -475,7 +552,48 @@ func duplicateAlias(from FromClause) string {
 		}
 		return ""
 	}
+	// REQ-117: a FROM-root junction binds its aliases too.
+	if dup := walk(from.Junction); dup != "" {
+		return dup
+	}
 	return walk(from.Contains)
+}
+
+// isContainmentJunction reports whether a node is a pure boolean
+// grouping — operands only, no class of its own (REQ-117).
+func isContainmentJunction(c Containment) bool {
+	return c.Class.RMType == "" && len(c.Children) > 0
+}
+
+// emitContainmentOperands renders a junction node's operands joined by its
+// keyword, WITHOUT enclosing parentheses (REQ-117). The FROM root uses it
+// directly; [emitContainment] wraps the result for a nested junction.
+//
+// An operand is parenthesised only where the grouping is load-bearing:
+//   - an OR junction inside an AND junction (precedence: AND binds tighter);
+//   - a CONTAINS chain, because the grammar's `CONTAINS containsExpr` right
+//     operand is greedy — without the parentheses the following AND / OR
+//     operand would re-parse INTO the chain.
+//
+// A same- or tighter-binding junction operand needs no grouping, mirroring
+// [aql.Junction]'s WHERE-side rule.
+func emitContainmentOperands(c Containment) string {
+	parts := make([]string, len(c.Children))
+	for i, ch := range c.Children {
+		switch {
+		case isContainmentJunction(ch):
+			inner := emitContainmentOperands(ch)
+			if c.ChildJoin == ContainsAnd && ch.ChildJoin == ContainsOr {
+				inner = "(" + inner + ")"
+			}
+			parts[i] = inner
+		case len(ch.Children) > 0:
+			parts[i] = "(" + emitContainment(ch) + ")"
+		default:
+			parts[i] = emitContainment(ch)
+		}
+	}
+	return strings.Join(parts, " "+c.ChildJoin.String()+" ")
 }
 
 // emitContainment renders a Containment node. The Negated flag is
@@ -483,14 +601,12 @@ func duplicateAlias(from FromClause) string {
 // `CONTAINS`) — emitContainment itself ignores it and just renders
 // the class + chained children.
 func emitContainment(c Containment) string {
-	// Boolean junction: render each child and join with the operator.
-	if len(c.Children) > 0 && c.Class.RMType == "" {
-		parts := make([]string, len(c.Children))
-		for i, ch := range c.Children {
-			parts[i] = emitContainment(ch)
-		}
-		joiner := " " + c.ChildJoin.String() + " "
-		return "(" + strings.Join(parts, joiner) + ")"
+	// Boolean junction: render the operands and group them. A junction
+	// nested under a CONTAINS keyword or inside another junction keeps
+	// its parentheses so the grouping survives a re-parse; only the FROM
+	// root drops them (see [Query.Emit]).
+	if isContainmentJunction(c) {
+		return "(" + emitContainmentOperands(c) + ")"
 	}
 	// Class + optional inner chain. A child's Negated flag selects
 	// `NOT CONTAINS` over `CONTAINS` for the connector to that child.

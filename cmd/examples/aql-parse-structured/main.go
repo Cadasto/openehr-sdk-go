@@ -7,16 +7,20 @@
 // package. The unified WhereExpr / Value vocabulary (aql.Comparison /
 // aql.Junction / aql.NotExpr / aql.ExistsExpr / aql.LikeExpr /
 // aql.MatchesExpr / aql.ParamValue / aql.StringValue / aql.IntValue /
-// aql.RealValue / aql.BoolValue) is the same one Builder constructs.
+// aql.RealValue / aql.BoolValue / aql.PathValue / aql.FuncCall) is the
+// same one Builder constructs.
 //
 // Run:
 //
 //	go run ./cmd/examples/aql-parse-structured
 //	go run ./cmd/examples/aql-parse-structured "SELECT c FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = \$id"
 //
-// With no argument it uses a representative built-in query exercising
-// SELECT projection, CONTAINS chain, WHERE comparison, ORDER BY DESC,
-// and LIMIT/OFFSET.
+// With no argument it walks two built-in queries: a representative one
+// exercising SELECT projection, CONTAINS chain, WHERE comparison, ORDER BY
+// DESC and LIMIT/OFFSET, then a REQ-117 query exercising the catalogue
+// closures the v1 extractor refused — a mixed `SELECT *, col` list with a
+// primitive literal, a function-call WHERE left operand, a path-vs-path
+// comparison, and a containment junction at the FROM root.
 package main
 
 import (
@@ -38,12 +42,34 @@ WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%'
 ORDER BY c/uid/value DESC
 LIMIT 50 OFFSET 100`
 
-func main() {
-	q := defaultQuery
-	if args := os.Args[1:]; len(args) > 0 {
-		q = strings.Join(args, " ")
-	}
+// req117Query exercises the catalogue closures REQ-117 landed — each of these
+// shapes used to make ParseQuery return aql.ErrIncompleteAST, so a consumer
+// had to refuse the whole statement:
+//
+//   - `*, 1 AS rank` — a star mixed with column projections, plus a primitive
+//     literal item (parse.StarExpr / parse.LiteralExpr);
+//   - `LENGTH(c/name/value)` as a projection AND as a comparison left operand;
+//   - `c/uid/value = c/name/value` — a path as the comparison right operand;
+//   - `FROM COMPOSITION c OR EHR e` — a containment junction at the FROM root.
+const req117Query = `SELECT *, 1 AS rank, LENGTH(c/name/value)
+FROM COMPOSITION c OR EHR e
+WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value`
 
+func main() {
+	if args := os.Args[1:]; len(args) > 0 {
+		walk(strings.Join(args, " "))
+		return
+	}
+	walk(defaultQuery)
+	fmt.Println()
+	fmt.Println("--- REQ-117 catalogue closures ---")
+	fmt.Println()
+	walk(req117Query)
+}
+
+// walk parses one query and prints its structured AST plus the canonical
+// re-emission.
+func walk(q string) {
 	fmt.Println("input AQL:")
 	for line := range strings.SplitSeq(q, "\n") {
 		fmt.Println("  " + line)
@@ -72,14 +98,23 @@ func main() {
 }
 
 func printSelect(s parse.SelectClause) {
-	switch {
-	case s.Star:
-		fmt.Println("  SELECT *")
-	case s.Distinct:
-		fmt.Println("  SELECT DISTINCT:")
-	default:
-		fmt.Println("  SELECT:")
+	head := "  SELECT"
+	if s.Distinct {
+		head += " DISTINCT"
 	}
+	// Items lead: since REQ-117 a mixed `SELECT *, col` carries the star as a
+	// parse.StarExpr item, so the list is authoritative whenever it is
+	// populated. The bare `SELECT *` form leaves Items empty and is carried by
+	// the Star flag alone.
+	if len(s.Items) == 0 {
+		if s.Star {
+			fmt.Println(head + " *")
+		} else {
+			fmt.Println(head + " <no projection>")
+		}
+		return
+	}
+	fmt.Println(head + ":")
 	for i, item := range s.Items {
 		desc := describeSelectExpr(item.Expr)
 		if item.Alias != "" {
@@ -93,6 +128,13 @@ func describeSelectExpr(e parse.SelectExpr) string {
 	switch v := e.(type) {
 	case parse.PathExpr:
 		return v.Raw
+	case parse.StarExpr:
+		// REQ-117: an explicit star item inside a mixed projection list.
+		return "*"
+	case parse.LiteralExpr:
+		// REQ-117: a primitive or parameter literal projection — same
+		// aql.Value vocabulary the WHERE side uses.
+		return describeValue(v.Value)
 	case parse.FunctionCall:
 		var body string
 		switch {
@@ -113,13 +155,42 @@ func describeSelectExpr(e parse.SelectExpr) string {
 		}
 		return v.Name + "(" + body + ")"
 	}
-	return fmt.Sprintf("%T", e)
+	// The SelectExpr set grows additively, so an unrecognised case is
+	// out-of-catalogue for this consumer — report it, never panic.
+	return fmt.Sprintf("<out-of-catalogue SelectExpr %T>", e)
 }
 
 func printFrom(f parse.FromClause) {
+	// REQ-117: a boolean junction AT the FROM root has no single root class,
+	// so Root and Contains are left zero — a consumer reading only Root would
+	// see an empty FROM. Check Junction first.
+	if f.Junction != nil {
+		fmt.Printf("  FROM %s (root junction, %d operands):\n", f.Junction.ChildJoin, len(f.Junction.Children))
+		for _, operand := range f.Junction.Children {
+			printOperand("    ", operand)
+		}
+		return
+	}
 	fmt.Printf("  FROM %s\n", describeClassExpr(f.Root))
 	if f.Contains != nil {
 		printContainment("    ", *f.Contains)
+	}
+}
+
+// printOperand prints one operand of a containment junction. Unlike
+// printContainment it writes no CONTAINS keyword — a junction operand is a
+// sibling, not something the node above it contains.
+func printOperand(indent string, c parse.Containment) {
+	if c.Class.RMType == "" && len(c.Children) > 0 {
+		fmt.Printf("%s%s (%d operands):\n", indent, c.ChildJoin, len(c.Children))
+		for _, operand := range c.Children {
+			printOperand(indent+"  ", operand)
+		}
+		return
+	}
+	fmt.Printf("%s%s\n", indent, describeClassExpr(c.Class))
+	for _, ch := range c.Children {
+		printContainment(indent+"  ", ch)
 	}
 }
 
@@ -167,7 +238,13 @@ func printWhere(w aql.WhereExpr) {
 func printWhereExpr(indent string, w aql.WhereExpr) {
 	switch v := w.(type) {
 	case aql.Comparison:
-		fmt.Printf("%s%s %s %s\n", indent, v.Path, v.Op, describeValue(v.Val))
+		// REQ-117: Left carries the left operand when it is not a plain path
+		// (a function call); Path is empty then.
+		left := v.Path
+		if v.Left != nil {
+			left = describeValue(v.Left)
+		}
+		fmt.Printf("%s%s %s %s\n", indent, left, v.Op, describeValue(v.Val))
 	case aql.Junction:
 		fmt.Printf("%s%s:\n", indent, v.Op)
 		for _, t := range v.Terms {
@@ -181,13 +258,25 @@ func printWhereExpr(indent string, w aql.WhereExpr) {
 	case aql.LikeExpr:
 		fmt.Printf("%s%s LIKE %s\n", indent, v.Path, describeValue(v.Pattern))
 	case aql.MatchesExpr:
-		vals := make([]string, 0, len(v.Values))
-		for _, val := range v.Values {
-			vals = append(vals, describeValue(val))
+		// REQ-117: exactly one of Values / Terminology / URI carries the
+		// operand — the bare TERMINOLOGY(...) and {uri} forms take no braces
+		// around a value list.
+		switch {
+		case v.Terminology != nil:
+			fmt.Printf("%s%s MATCHES %s\n", indent, v.Path, describeValue(*v.Terminology))
+		case v.URI != "":
+			fmt.Printf("%s%s MATCHES {%s} (uri)\n", indent, v.Path, v.URI)
+		default:
+			vals := make([]string, 0, len(v.Values))
+			for _, val := range v.Values {
+				vals = append(vals, describeValue(val))
+			}
+			fmt.Printf("%s%s MATCHES {%s}\n", indent, v.Path, strings.Join(vals, ", "))
 		}
-		fmt.Printf("%s%s MATCHES {%s}\n", indent, v.Path, strings.Join(vals, ", "))
 	default:
-		fmt.Printf("%s<unknown WhereExpr %T>\n", indent, w)
+		// The WhereExpr set grows additively (REQ-117): report an
+		// unrecognised case as out-of-catalogue rather than panicking.
+		fmt.Printf("%s<out-of-catalogue WhereExpr %T>\n", indent, w)
 	}
 }
 
@@ -212,6 +301,14 @@ func describeValue(v aql.Value) string {
 		return wire + " (bool)"
 	case aql.NullValue:
 		return wire + " (null)"
+	case aql.PathValue:
+		// REQ-117: a path in a value position (path-vs-path comparison, or a
+		// function argument).
+		return wire + " (path)"
+	case aql.FuncCall:
+		// REQ-117: a function call in a value position — args are themselves
+		// Values, so nesting is uniform.
+		return wire + " (func)"
 	}
 	return wire
 }

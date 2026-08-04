@@ -24,11 +24,19 @@ var ErrSyntax = errors.New("aql: syntax error")
 // semantics. Returned wrapped by parse.ParseQuery (and surfaced via
 // parse.Document.QueryErr) so callers can branch on errors.Is.
 //
-// Catalogue gaps that produce this error today: function-call LHS in WHERE
-// (`LENGTH(x) > 5`), MATCHES with terminology-function / URI operand, path-vs-
-// path comparisons (`a/x = b/y`), Primitive in SELECT projection, mixed
-// `SELECT *, col` star plus columns, and a top-level boolean junction at the
-// FROM root (`FROM A AND B`). Each gap is a forward-compatible extension —
-// the v1 catalogue is the buildable grammar plus the parser-only shapes
-// (Not / Exists / Like / Matches).
+// Since REQ-117 the catalogue models every SELECT / FROM / WHERE / ORDER BY
+// / LIMIT construct the SDK grammar profile admits, and two residual
+// conditions remain:
+//
+//   - A numeric literal the value vocabulary cannot represent — a `LIMIT` /
+//     `OFFSET` value beyond Go `int`, an INTEGER beyond `int64`, or a REAL
+//     beyond `float64`, in any value position (a SELECT literal, a
+//     comparison operand, a MATCHES member). Refused loudly rather than
+//     degraded, so the precision loss is never emitted as canonical text.
+//   - A `SELECT TOP n` clause. The profile retains the deprecated `top`
+//     production but the AST carries no equivalent, and dropping it would
+//     turn a bounded query into an unbounded one.
+//
+// Every other extractor branch is defensive: it is unreachable against the
+// current profile and records a gap if a widened grammar ever reaches it.
 var ErrIncompleteAST = errors.New("aql: parsed query carries a shape outside the structured-AST catalogue")

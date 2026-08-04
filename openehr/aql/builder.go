@@ -57,8 +57,25 @@ func (b *Builder) FromEHR(alias string, id Value) *Builder {
 	return b
 }
 
-// Contains appends a CONTAINS containment to the FROM clause.
+// Contains appends a CONTAINS containment to the FROM clause. Repeated calls
+// chain (`… CONTAINS A CONTAINS B`), matching the grammar's right-greedy
+// `CONTAINS containsExpr`.
+//
+// Since REQ-117 the argument may be a whole containment expression — a nested
+// chain ([Containment.Contains] / [Containment.NotContains]) or a sibling
+// junction ([ContainsAnd] / [ContainsOr]) — not only a single class. A single
+// class emits exactly as it did before.
 func (b *Builder) Contains(c Containment) *Builder {
+	c.negated = false
+	b.ast.contains = append(b.ast.contains, c)
+	return b
+}
+
+// NotContains appends a containment connected by NOT CONTAINS — the grammar's
+// `classExprOperand NOT CONTAINS containsExpr` (REQ-117), i.e. the absence of
+// c below the preceding term. Otherwise identical to [Builder.Contains].
+func (b *Builder) NotContains(c Containment) *Builder {
+	c.negated = true
 	b.ast.contains = append(b.ast.contains, c)
 	return b
 }
@@ -77,16 +94,60 @@ func (b *Builder) OrderBy(path string, dir Direction) *Builder {
 }
 
 // Offset sets the row offset. It populates [Query.Offset] (the request
-// envelope), not the AQL string — paging is one channel, the envelope.
+// envelope), not the AQL string — the envelope is the default paging channel.
+// Use [Builder.OffsetInline] for the opt-in in-text form.
 func (b *Builder) Offset(n int) *Builder {
 	b.ast.offset = n
 	return b
 }
 
 // Limit sets the maximum row count. It populates [Query.Fetch] (the request
-// envelope), not the AQL string.
+// envelope), not the AQL string. Use [Builder.LimitInline] for the opt-in
+// in-text form.
 func (b *Builder) Limit(n int) *Builder {
 	b.ast.limit = n
+	return b
+}
+
+// LimitInline sets an IN-TEXT `LIMIT n`, emitted into the AQL string after
+// ORDER BY instead of travelling in the request envelope (REQ-117). Reach for
+// it when the bound must survive stored-query registration — the string is
+// what the server stores — or when the query text is handed to another
+// engine; the envelope channel ([Builder.Limit] / [Builder.Offset]) remains
+// the default.
+//
+// The two channels are mutually exclusive: setting both makes [Builder.Build]
+// return an error wrapping [ErrInvalidQuery] rather than silently combining
+// them. A negative n is likewise refused (the grammar's `limitValue` is a
+// non-negative INTEGER). Later calls replace earlier ones.
+func (b *Builder) LimitInline(n int) *Builder {
+	b.ast.limitInline = Int(int64(n))
+	return b
+}
+
+// LimitInlineParam sets an in-text `LIMIT $name` — the grammar's
+// parameter-valued limit, bound by the server at execution time (REQ-117).
+// A leading `$` in name is stripped, as in [Param]. Same channel-exclusivity
+// rule as [Builder.LimitInline].
+func (b *Builder) LimitInlineParam(name string) *Builder {
+	b.ast.limitInline = Param(name)
+	return b
+}
+
+// OffsetInline sets an in-text `OFFSET n`, emitted after the in-text LIMIT
+// (REQ-117). The grammar admits OFFSET only after LIMIT
+// (`LIMIT limitValue (OFFSET limitValue)?`), so an in-text OFFSET without an
+// in-text LIMIT is refused by [Builder.Build] rather than emitted as text the
+// parser would reject.
+func (b *Builder) OffsetInline(n int) *Builder {
+	b.ast.offsetInline = Int(int64(n))
+	return b
+}
+
+// OffsetInlineParam sets an in-text `OFFSET $name` (REQ-117). Same rules as
+// [Builder.OffsetInline] and [Builder.LimitInlineParam].
+func (b *Builder) OffsetInlineParam(name string) *Builder {
+	b.ast.offsetInline = Param(name)
 	return b
 }
 
@@ -110,19 +171,6 @@ type SelectField struct{ path string }
 
 // Col is a projected path or alias, e.g. Col("o") or Col("o/data[at0001]").
 func Col(path string) SelectField { return SelectField{path: strings.TrimSpace(path)} }
-
-// Containment is a CONTAINS term in the FROM clause. Construct with [Archetype].
-type Containment struct {
-	rmType      string
-	alias       string
-	archetypeID string
-}
-
-// Archetype is a containment constraint: `<rmType> <alias>[<archetypeID>]`. An
-// empty archetypeID emits `<rmType> <alias>` with no predicate.
-func Archetype(rmType, alias, archetypeID string) Containment {
-	return Containment{rmType: rmType, alias: alias, archetypeID: archetypeID}
-}
 
 // Direction is an ORDER BY sort direction.
 type Direction int
@@ -162,7 +210,14 @@ type ast struct {
 	orderBy   []orderTerm
 	offset    int
 	limit     int
-	params    map[string]any
+	// limitInline / offsetInline are the opt-in IN-TEXT paging operands
+	// (REQ-117), emitted after ORDER BY. Nil means the clause is absent —
+	// distinct from the envelope's zero, so `LIMIT 0` stays expressible.
+	// Concrete shapes are [IntValue] and [ParamValue], the grammar's
+	// `limitValue : INTEGER | PARAMETER`.
+	limitInline  Value
+	offsetInline Value
+	params       map[string]any
 }
 
 func (a *ast) build() (Query, error) {
@@ -180,15 +235,21 @@ func (a *ast) build() (Query, error) {
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
 	}
+	// REQ-117: a containment term is a whole expression (chain, negation,
+	// junction), so alias uniqueness and the class-completeness rule are
+	// checked over the entire tree. Repeated Contains / NotContains calls emit
+	// as ONE chain, so the junction-placement rule spans them as well.
+	if err := validateContainsChain(a.contains); err != nil {
+		return Query{}, err
+	}
 	seen := map[string]bool{a.from.alias: true}
 	for _, c := range a.contains {
-		if c.rmType == "" || c.alias == "" {
-			return Query{}, fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
+		if err := c.validateTree(seen); err != nil {
+			return Query{}, err
 		}
-		if seen[c.alias] {
-			return Query{}, fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
-		}
-		seen[c.alias] = true
+	}
+	if err := a.validatePaging(); err != nil {
+		return Query{}, err
 	}
 
 	var sb strings.Builder
@@ -206,15 +267,11 @@ func (a *ast) build() (Query, error) {
 	sb.WriteString(a.from.alias)
 
 	for _, c := range a.contains {
-		sb.WriteString(" CONTAINS ")
-		sb.WriteString(c.rmType)
-		sb.WriteByte(' ')
-		sb.WriteString(c.alias)
-		if c.archetypeID != "" {
-			sb.WriteByte('[')
-			sb.WriteString(c.archetypeID)
-			sb.WriteByte(']')
-		}
+		// REQ-117: the connector carries the term's negation, and emit
+		// renders the whole containment expression (chain / junction) —
+		// a single class emits the pre-REQ-117 bytes unchanged.
+		sb.WriteString(c.connector())
+		sb.WriteString(c.emit())
 	}
 
 	// The implicit ehr_id filter from FromEHR AND-combines with any explicit
@@ -248,11 +305,70 @@ func (a *ast) build() (Query, error) {
 		}
 	}
 
-	// OFFSET / LIMIT are carried in the request envelope (Query.Offset /
-	// Query.Fetch), not the AQL string — a single paging channel the executor
-	// already maps.
+	// Paging: by default OFFSET / LIMIT are carried in the request envelope
+	// (Query.Offset / Query.Fetch), not the AQL string. REQ-117 adds the
+	// opt-in in-text channel, emitted here after ORDER BY in clause order
+	// (grammar: `LIMIT limitValue (OFFSET limitValue)?`); validatePaging has
+	// already refused a query that sets both channels.
+	if a.limitInline != nil {
+		sb.WriteString(" LIMIT ")
+		sb.WriteString(a.limitInline.token())
+	}
+	if a.offsetInline != nil {
+		sb.WriteString(" OFFSET ")
+		sb.WriteString(a.offsetInline.token())
+	}
+
 	// Clone so the built query does not alias the builder's internal map.
 	return Query{Q: sb.String(), Offset: a.offset, Fetch: a.limit, Parameters: maps.Clone(a.params)}, nil
+}
+
+// validatePaging enforces the REQ-117 paging rules: the in-text channel and
+// the request envelope are never silently combined, the grammar admits OFFSET
+// only after LIMIT, and an in-text operand must be a non-negative integer or
+// a named parameter (`limitValue : INTEGER | PARAMETER`).
+func (a *ast) validatePaging() error {
+	inline := a.limitInline != nil || a.offsetInline != nil
+	if inline && (a.limit != 0 || a.offset != 0) {
+		return fmt.Errorf("%w: paging set on both channels — in-text LIMIT/OFFSET and the request envelope "+
+			"(Limit/Offset); pick one", ErrInvalidQuery)
+	}
+	if a.offsetInline != nil && a.limitInline == nil {
+		return fmt.Errorf("%w: in-text OFFSET without LIMIT", ErrInvalidQuery)
+	}
+	if err := validateLimitValue("LIMIT", a.limitInline); err != nil {
+		return err
+	}
+	return validateLimitValue("OFFSET", a.offsetInline)
+}
+
+// validateLimitValue rejects an in-text paging operand the grammar's
+// `limitValue : INTEGER | PARAMETER` cannot carry. A nil operand means the
+// clause is absent.
+//
+// The default arm is fail-closed: the [Builder.LimitInline] /
+// [Builder.LimitInlineParam] / [Builder.OffsetInline] /
+// [Builder.OffsetInlineParam] setters only ever store an [IntValue] or a
+// [ParamValue], so no public route reaches it today — it is here so a widened
+// setter (or a new [Value] shape) refuses loudly instead of emitting AQL the
+// grammar rejects.
+func validateLimitValue(keyword string, v Value) error {
+	switch t := v.(type) {
+	case nil:
+		return nil // clause absent
+	case IntValue:
+		if t.N < 0 {
+			return fmt.Errorf("%w: negative in-text %s (%d)", ErrInvalidQuery, keyword, t.N)
+		}
+	case ParamValue:
+		if strings.TrimSpace(t.Name) == "" {
+			return fmt.Errorf("%w: in-text %s parameter with an empty name", ErrInvalidQuery, keyword)
+		}
+	default:
+		return fmt.Errorf("%w: in-text %s must be an integer or a $parameter, got %T",
+			ErrInvalidQuery, keyword, v)
+	}
+	return nil
 }
 
 // effectiveWhere combines the implicit ehr_id filter (from FromEHR) with any

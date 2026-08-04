@@ -28,6 +28,12 @@ type Metadata struct {
 	// Aliases maps each bound alias to its class expression. Anonymous
 	// class expressions (no alias) are absent.
 	Aliases map[string]parse.ClassExpr
+	// SelectAliases are the `AS` aliases declared in the SELECT list, in
+	// document order (REQ-117). They are a separate namespace from
+	// [Metadata.Aliases]: an ORDER BY key resolves against FROM/CONTAINS
+	// first and only then against these, and a SELECT alias never binds a
+	// class for the Layer-3 archetype / path checks.
+	SelectAliases []string
 	// Paths are the identified paths across SELECT / WHERE / ORDER BY.
 	Paths []parse.IdentifiedPath
 	// Params are the distinct $parameter names referenced, in first-seen
@@ -49,6 +55,7 @@ func Extract(doc *parse.Document) Metadata {
 			md.Archetypes = append(md.Archetypes, ce.Archetype)
 		}
 	}
+	md.SelectAliases = slices.Clone(doc.SelectAliases)
 	md.Paths = slices.Clone(doc.Paths)
 	md.Params = slices.Clone(doc.Params)
 	return md

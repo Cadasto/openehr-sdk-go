@@ -5,11 +5,16 @@ package parse
 // type-free [Query] AST. Pure recursive descent — no
 // listeners, no shared mutable state between calls.
 //
-// Catalogue: the v1 supported shapes are the buildable grammar plus the
-// parser-only shapes (Not / Exists / Like / Matches). Inputs that parse
-// cleanly but contain an out-of-catalogue shape surface as
-// [aql.ErrIncompleteAST] from [ParseQuery] / [Document.QueryErr] so the
-// loss is visible at parse time, not silently dropped at emit.
+// Catalogue: since REQ-117 the supported shapes are the whole SDK grammar
+// profile — the buildable grammar, the parser-only predicates (Not /
+// Exists / Like / Matches incl. its TERMINOLOGY and {URI} operands),
+// literal and star SELECT items, function calls on either side of a
+// comparison, path-valued operands, and boolean junctions at the FROM root
+// and in WHERE. The residual refusal is an INTEGER literal the AST cannot
+// represent (see [aql.ErrIncompleteAST]); it — and any defensive gap a
+// widened grammar would trip — surfaces as [aql.ErrIncompleteAST] from
+// [ParseQuery] / [Document.QueryErr] so the loss is visible at parse time,
+// not silently dropped at emit.
 
 import (
 	"fmt"
@@ -85,18 +90,39 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 
 func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectClause {
 	out := SelectClause{Distinct: c.DISTINCT() != nil}
+	// The grammar profile keeps the deprecated `top` production
+	// (`selectClause : SELECT DISTINCT? top? selectExpr …`), but the AST has
+	// no carrier for it. Record a gap rather than drop it: a dropped TOP
+	// silently turns a bounded query into an unbounded one, which is exactly
+	// the no-silent-loss rule (REQ-117).
+	if top := c.Top(); top != nil {
+		// GetText concatenates tokens without separators, so report the
+		// INTEGER on its own rather than a mangled "TOP5".
+		n := "?"
+		if i := top.INTEGER(); i != nil {
+			n = i.GetText()
+		}
+		ex.incomplete("SELECT TOP %s is outside the catalogue — the structured AST has no carrier for a top clause", n)
+	}
+	columns := 0
 	for _, item := range c.AllSelectExpr() {
 		if item.SYM_ASTERISK() != nil {
 			out.Star = true
+			// REQ-117: record the star's POSITION as an item so a mixed
+			// `SELECT *, col` projection stays order-preserving.
+			out.Items = append(out.Items, SelectItem{Expr: StarExpr{}})
 			continue
 		}
+		columns++
 		out.Items = append(out.Items, ex.extractSelectItem(item))
 	}
-	// Star + columns mix: grammar permits it but the structured Query
-	// has no carrier for both. Surface so emit doesn't silently drop
-	// the column list.
-	if out.Star && len(out.Items) > 0 {
-		ex.incomplete("SELECT mixes `*` with column projections — only one form is supported per query")
+	// A bare `SELECT *` keeps its pre-REQ-117 shape — Star set, Items
+	// empty — so consumers reading only the flag are unaffected. The
+	// collapse is deliberately limited to a SINGLE star: `SELECT *, *` is
+	// two projections and must keep both items, or the re-emitted query
+	// silently changes arity.
+	if out.Star && columns == 0 && len(out.Items) == 1 {
+		out.Items = nil
 	}
 	return out
 }
@@ -114,6 +140,15 @@ func (ex *astExtractor) extractSelectItem(c gen.ISelectExprContext) SelectItem {
 
 func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 	if ip := c.IdentifiedPath(); ip != nil {
+		// REQ-117: a BARE `true` / `false` in a SELECT column position is a
+		// literal projection, not a path — the SDK lexer lexes those keywords
+		// as IDENTIFIER (the IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4),
+		// so they arrive here as an IDENTIFIER-only identifiedPath. This mirrors
+		// the WHERE-side lift in [astExtractor.terminalAsValue]; the flat lint
+		// view skips the identical shape via isKeywordLiteral.
+		if v, ok := bareKeywordLiteral(ip); ok {
+			return LiteralExpr{Value: v}
+		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
 	if afc := c.AggregateFunctionCall(); afc != nil {
@@ -123,10 +158,28 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 		return ex.extractFunctionCall(fc)
 	}
 	if p := c.Primitive(); p != nil {
-		ex.incomplete("Primitive literal in SELECT projection (`%s`) is outside the v1 catalogue", p.GetText())
+		// REQ-117: a primitive literal projection carries the shared
+		// value vocabulary.
+		return ex.primitiveAsSelectExpr(p)
+	}
+	// Defensive: every columnExpr alternative in the SDK grammar profile is
+	// handled above, so this is unreachable today — record a gap rather
+	// than drop a projection silently if the grammar ever widens.
+	ex.incomplete("SELECT projection %q is outside the catalogue", c.GetText())
+	return nil
+}
+
+// primitiveAsSelectExpr lifts a Primitive into a [LiteralExpr] (REQ-117).
+// A primitive the value vocabulary cannot represent — an integer literal
+// beyond int64 — records a gap rather than degrading the literal to a
+// float, so the loss is never silently emitted.
+func (ex *astExtractor) primitiveAsSelectExpr(p gen.IPrimitiveContext) SelectExpr {
+	v := primitiveAsValue(p)
+	if v == nil {
+		ex.incomplete("primitive literal %q is out of range for the value vocabulary", p.GetText())
 		return nil
 	}
-	return nil
+	return LiteralExpr{Value: v}
 }
 
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
@@ -145,8 +198,22 @@ func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCal
 }
 
 func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) FunctionCall {
+	// Grammar alternative `functionCall : terminologyFunction` — the
+	// TERMINOLOGY call has no `name` token and no Terminal children; its
+	// three STRING arguments are modelled as literal operands (REQ-117).
+	if tf := c.TerminologyFunction(); tf != nil {
+		out := FunctionCall{Name: aql.TerminologyFunc}
+		for _, s := range terminologyArgs(tf) {
+			out.Args = append(out.Args, LiteralExpr{Value: s})
+		}
+		return out
+	}
 	out := FunctionCall{Name: functionName(c)}
 	for _, t := range c.AllTerminal() {
+		// INVARIANT: terminalAsSelectExpr returns nil only after recording a
+		// gap (an unrepresentable primitive, or a defensively-unhandled
+		// alternative), so skipping the argument here can never be a silent
+		// drop — [Query.Emit] refuses the resulting partial AST.
 		if expr := ex.terminalAsSelectExpr(t); expr != nil {
 			out.Args = append(out.Args, expr)
 		}
@@ -154,22 +221,50 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	return out
 }
 
-// terminalAsSelectExpr lifts a Terminal context into a SelectExpr —
-// either a PathExpr (when the terminal carries an identifiedPath) or
-// a nested FunctionCall. Parameter and Primitive terminals (e.g.
-// `MAX(42)`, `COUNT($id)`) are outside the SELECT vocabulary today;
-// the caller decides whether to record a catalogue gap.
+// terminalAsSelectExpr lifts a Terminal context into a SelectExpr — a
+// PathExpr (identifiedPath), a nested FunctionCall, or a LiteralExpr for
+// a parameter / primitive argument (`CONCAT('a', $p, LENGTH(x/y))` —
+// REQ-117). It returns nil ONLY after recording a gap: either the terminal
+// carries a primitive the value vocabulary cannot represent, or (defensively)
+// it matches no grammar alternative at all.
 func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr {
 	if ip := t.IdentifiedPath(); ip != nil {
+		// A bare `true` / `false` keyword lexes as IDENTIFIER, so it arrives
+		// here as an identifiedPath. Lift it to a literal exactly as the
+		// WHERE-side terminalAsValue does, or the same construct would model
+		// as a path in SELECT and as a literal in WHERE (REQ-117).
+		if v, ok := bareKeywordLiteral(ip); ok {
+			return LiteralExpr{Value: v}
+		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
 	if fc := t.FunctionCall(); fc != nil {
 		return ex.extractFunctionCall(fc)
 	}
-	if t.PARAMETER() != nil || t.Primitive() != nil {
-		ex.incomplete("Parameter or Primitive argument in function call (`%s`) is outside the v1 SELECT catalogue", t.GetText())
+	if p := t.PARAMETER(); p != nil {
+		return LiteralExpr{Value: aql.ParamValue{Name: strings.TrimPrefix(p.GetText(), "$")}}
 	}
+	if p := t.Primitive(); p != nil {
+		return ex.primitiveAsSelectExpr(p)
+	}
+	// Defensive: `terminal : primitive | PARAMETER | identifiedPath |
+	// functionCall` is fully covered above, so this is unreachable today —
+	// record a gap rather than drop a function argument silently if the grammar
+	// ever widens.
+	ex.incomplete("function argument %q is outside the catalogue", t.GetText())
 	return nil
+}
+
+// terminologyArgs lifts a terminologyFunction's three STRING arguments
+// into the shared value vocabulary, in grammar order (operation, api,
+// params) — REQ-117.
+func terminologyArgs(c gen.ITerminologyFunctionContext) []aql.Value {
+	strs := c.AllSTRING()
+	out := make([]aql.Value, 0, len(strs))
+	for _, s := range strs {
+		out = append(out, unquoteAQLString(s.GetText()))
+	}
+	return out
 }
 
 func aggregateName(c gen.IAggregateFunctionCallContext) string {
@@ -225,17 +320,11 @@ func (ex *astExtractor) extractFromClause(c gen.IFromClauseContext) FromClause {
 	}
 	// FromClause.Root captures the class at the FROM root; Contains
 	// captures the chain BELOW it. A junction at the very root has no
-	// single class — the emitter requires one, so surface the gap
-	// rather than silently emit `missing FROM root` at emit time.
+	// single class, so it lands on FromClause.Junction instead — the
+	// same containment tree the nested side uses (REQ-117) — and Root /
+	// Contains stay zero.
 	if root.Class.RMType == "" && len(root.Children) > 0 {
-		ex.incomplete("FROM top-level boolean junction (`FROM A %s B`) is outside the v1 catalogue", root.ChildJoin.String())
-		// Best-effort: hoist the first child's class as Root so a
-		// caller inspecting the AST gets something rather than zero.
-		first := root.Children[0]
-		out.Root = first.Class
-		if rest := root.Children[1:]; len(rest) > 0 {
-			out.Contains = &Containment{Children: rest, ChildJoin: root.ChildJoin}
-		}
+		out.Junction = root
 		return out
 	}
 	out.Root = root.Class
@@ -283,9 +372,18 @@ func (ex *astExtractor) extractContainment(c gen.IContainsExprContext) *Containm
 		out := &Containment{ChildJoin: join}
 		for _, op := range operands {
 			child := ex.extractContainment(op)
-			if child != nil {
-				out.Children = append(out.Children, *child)
+			if child == nil {
+				continue
 			}
+			// REQ-117: flatten a same-operator operand so `A OR B OR C`
+			// is ONE junction with three operands rather than the
+			// parser's left-nested pair-of-pairs. Emission is unaffected
+			// (a same-operator group needs no parentheses).
+			if child.Class.RMType == "" && len(child.Children) > 0 && child.ChildJoin == join && !child.Negated {
+				out.Children = append(out.Children, child.Children...)
+				continue
+			}
+			out.Children = append(out.Children, *child)
 		}
 		return out
 	}
@@ -400,6 +498,10 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 		return aql.Not(ex.extractWhereExpr(ops[0]))
 	}
 	if c.AND() != nil || c.OR() != nil {
+		join := aql.OpAnd
+		if c.OR() != nil {
+			join = aql.OpOr
+		}
 		ops := c.AllWhereExpr()
 		terms := make([]aql.WhereExpr, 0, len(ops))
 		for i, op := range ops {
@@ -408,9 +510,18 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 				ex.incomplete("AND/OR junction dropped operand %d (unsupported shape)", i)
 				continue
 			}
+			// REQ-117: flatten a same-operator operand so `a AND b AND c`
+			// is ONE [aql.Junction] with three terms — the documented
+			// shared-vocabulary contract — rather than the parser's
+			// left-nested pair-of-pairs. Emission is unaffected (a nested
+			// same-operator junction needs no parentheses).
+			if inner, ok := t.(aql.Junction); ok && inner.Op == join {
+				terms = append(terms, inner.Terms...)
+				continue
+			}
 			terms = append(terms, t)
 		}
-		if c.AND() != nil {
+		if join == aql.OpAnd {
 			return aql.And(terms...)
 		}
 		return aql.Or(terms...)
@@ -438,6 +549,8 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			path := pathRaw(ip)
 			return aql.Exists(path)
 		}
+		ex.incomplete("EXISTS operand %q is outside the catalogue", c.GetText())
+		return nil
 	}
 	// Parenthesised inner identifiedExpr.
 	if c.SYM_LEFT_PAREN() != nil {
@@ -454,18 +567,16 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return aql.Like(path, v)
 				}
 			}
+			// Defensive: likeOperand is `STRING | PARAMETER`, both
+			// modelled — a gap here can only mean a widened grammar.
+			ex.incomplete("LIKE operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		if c.MATCHES() != nil {
 			if op := c.MatchesOperand(); op != nil {
-				vs, ok := ex.matchesOperandValues(op)
-				if !ok {
-					return nil
-				}
-				if len(vs) > 0 {
-					return aql.Matches(path, vs...)
-				}
+				return ex.matchesExpr(path, op)
 			}
+			ex.incomplete("MATCHES operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		// path <op> terminal — the comparison form.
@@ -474,7 +585,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			if t := c.Terminal(); t != nil {
 				v, gap := ex.terminalAsValue(t)
 				if gap != "" {
-					ex.incomplete("comparison RHS terminal %q is outside the v1 catalogue (%s)", t.GetText(), gap)
+					ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
 					return nil
 				}
 				if v != nil {
@@ -485,15 +596,70 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: &parsed.IdentifiedPath}
 				}
 			}
+			ex.incomplete("comparison %q is outside the catalogue", c.GetText())
+			return nil
 		}
 	}
 	// Function-call LHS in WHERE (e.g. `LENGTH(x) > 5`) — grammar
-	// alternative `functionCall COMPARISON_OPERATOR terminal`. Outside
-	// the v1 catalogue; surface so the predicate isn't silently lost.
-	if c.FunctionCall() != nil {
-		ex.incomplete("function-call WHERE LHS (`%s`) is outside the v1 catalogue", c.GetText())
+	// alternative `functionCall COMPARISON_OPERATOR terminal`. The left
+	// operand is a structured [aql.FuncCall] value (REQ-117).
+	if fc := c.FunctionCall(); fc != nil {
+		cmp, t := c.COMPARISON_OPERATOR(), c.Terminal()
+		if cmp == nil || t == nil {
+			// Defensive: the grammar's only functionCall alternative is
+			// `functionCall COMPARISON_OPERATOR terminal`, so both are present
+			// after a successful parse — record a gap rather than drop the
+			// predicate silently if the grammar ever widens.
+			ex.incomplete("function-call comparison %q is outside the catalogue (incomplete operator or right operand)", c.GetText())
+			return nil
+		}
+		v, gap := ex.terminalAsValue(t)
+		if gap != "" {
+			ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
+			return nil
+		}
+		left, gap := ex.functionCallAsValue(fc)
+		if gap != "" {
+			ex.incomplete("function-call WHERE LHS %q is outside the catalogue (%s)", fc.GetText(), gap)
+			return nil
+		}
+		if left == nil || v == nil {
+			// Defensive: both lifts return a non-empty gap for anything they
+			// cannot model, so a nil-without-gap can only mean a widened
+			// grammar handed us an operand shape neither recognises.
+			ex.incomplete("function-call comparison %q is outside the catalogue (unrecognised operand)", c.GetText())
+			return nil
+		}
+		return aql.Comparison{Op: aql.Operator(cmp.GetText()), Val: v, Left: left}
 	}
+	// Defensive: every identifiedExpr alternative in the SDK grammar profile is
+	// handled above, so this is unreachable today — record a gap rather than
+	// drop the predicate silently if the grammar ever widens.
+	ex.incomplete("WHERE predicate %q is outside the catalogue", c.GetText())
 	return nil
+}
+
+// functionCallAsValue lifts a functionCall context into an [aql.FuncCall]
+// value — the shape used on both sides of a WHERE comparison and as a
+// nested argument (REQ-117). Returns a non-empty gap reason when an
+// argument is outside the value vocabulary.
+func (ex *astExtractor) functionCallAsValue(c gen.IFunctionCallContext) (aql.Value, string) {
+	// Grammar alternative `functionCall : terminologyFunction`.
+	if tf := c.TerminologyFunction(); tf != nil {
+		return aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}, ""
+	}
+	out := aql.FuncCall{Name: functionName(c)}
+	for _, t := range c.AllTerminal() {
+		v, gap := ex.terminalAsValue(t)
+		if gap != "" {
+			return nil, gap
+		}
+		if v == nil {
+			return nil, fmt.Sprintf("unsupported argument %q", t.GetText())
+		}
+		out.Args = append(out.Args, v)
+	}
+	return out, ""
 }
 
 // --- ORDER BY + LIMIT ------------------------------------------------
@@ -542,6 +708,11 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 	if t := v.PARAMETER(); t != nil {
 		return ParamLimit{Name: strings.TrimPrefix(t.GetText(), "$")}
 	}
+	// Defensive: `limitValue : INTEGER | PARAMETER` is fully covered above,
+	// so this is unreachable today. Record a gap rather than drop the whole
+	// clause if the grammar profile ever widens — a dropped LIMIT/OFFSET
+	// silently returns more rows than the source asked for.
+	ex.incomplete("%s value %q is outside the catalogue", clause, v.GetText())
 	return nil
 }
 
@@ -635,15 +806,18 @@ func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
 	return nil
 }
 
-// terminalAsValue lifts a comparison-RHS terminal into an [aql.Value].
+// terminalAsValue lifts a comparison terminal into an [aql.Value].
 //
 // Grammar: terminal is one of `primitive | PARAMETER | identifiedPath |
-// functionCall`. The first two map cleanly; an identifiedPath whose text
-// is the bare boolean keyword `true` / `false` is normalised to a
-// [BoolValue] (the SDK grammar lexes those as IDENTIFIER because the
-// IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4). Other identifiedPath
-// shapes (path-vs-path comparisons like `a/x = b/y`) and functionCall
-// terminals report a non-empty gap string for the caller to record.
+// functionCall`. Primitives and parameters map to the literal vocabulary;
+// an identifiedPath whose text is the bare keyword `true` / `false` /
+// `null` is normalised to the typed literal (the SDK grammar lexes those
+// as IDENTIFIER because the IDENTIFIER rule precedes BOOLEAN in
+// AqlLexer.g4), any other identifiedPath becomes an [aql.PathValue]
+// (path-vs-path comparison, REQ-117), and a functionCall becomes an
+// [aql.FuncCall]. A non-empty gap string reports a value the vocabulary
+// cannot represent (an out-of-range integer literal) for the caller to
+// record.
 func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, string) {
 	if c == nil {
 		return nil, ""
@@ -655,29 +829,47 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 	if p := c.Primitive(); p != nil {
 		v := primitiveAsValue(p)
 		if v == nil {
-			return nil, "unsupported primitive form"
+			return nil, fmt.Sprintf("literal %q is out of range for the value vocabulary", p.GetText())
 		}
 		return v, ""
 	}
 	if ip := c.IdentifiedPath(); ip != nil {
-		// Boolean keyword lexed as IDENTIFIER (lexer rule order:
-		// IDENTIFIER precedes BOOLEAN, so `true` / `false` parse as
-		// an IDENTIFIER-only IdentifiedPath).
-		txt := ip.GetText()
-		switch strings.ToLower(txt) {
-		case "true":
-			return aql.BoolValue{B: true}, ""
-		case "false":
-			return aql.BoolValue{B: false}, ""
-		case "null":
-			return aql.NullValue{}, ""
+		if v, ok := bareKeywordLiteral(ip); ok {
+			return v, ""
 		}
-		return nil, "identifiedPath RHS (path-vs-path comparison)"
+		// REQ-117: an identified path in a value position — carried as
+		// structured alias + segments, not raw text.
+		parsed := extractIdentifiedPath(ip, ClauseWhere)
+		return aql.PathValue{IdentifiedPath: parsed.IdentifiedPath}, ""
 	}
-	if c.FunctionCall() != nil {
-		return nil, "functionCall RHS"
+	if fc := c.FunctionCall(); fc != nil {
+		return ex.functionCallAsValue(fc)
 	}
 	return nil, ""
+}
+
+// keywordLiteralValue maps a bare literal keyword occupying a value position —
+// a comparison `terminal` or a SELECT `columnExpr` — to its typed [aql.Value].
+// The SDK lexer lexes `true` / `false` as IDENTIFIER (the IDENTIFIER rule
+// precedes BOOLEAN in AqlLexer.g4), so they arrive as an IDENTIFIER-only
+// identifiedPath rather than a primitive; `null` is included because the same
+// rule order could shift. Reports ok=false for any other text.
+//
+// Reached through bareKeywordLiteral, which adds the shape gate. Shared by the
+// structured extractor ([astExtractor.terminalAsValue],
+// [astExtractor.extractColumnExpr]) and the flat lint view
+// ([extractor.EnterIdentifiedPath]) so both agree these are literals, not
+// paths (REQ-117).
+func keywordLiteralValue(text string) (aql.Value, bool) {
+	switch strings.ToLower(text) {
+	case "true":
+		return aql.BoolValue{B: true}, true
+	case "false":
+		return aql.BoolValue{B: false}, true
+	case "null":
+		return aql.NullValue{}, true
+	}
+	return nil, false
 }
 
 // primitiveAsValue lifts a Primitive to an [aql.Value] — STRING /
@@ -785,30 +977,47 @@ func likeOperandValue(c gen.ILikeOperandContext) aql.Value {
 	return nil
 }
 
-// matchesOperandValues collects the value-list members of a MATCHES
-// operand. Returns ok=false when the operand uses the terminology-
-// function or URI alternatives (grammar `matchesOperand: '{'
-// valueListItem (',' valueListItem)* '}' | terminologyFunction |
-// '{' URI '}'`), recording a catalogue gap so the predicate doesn't
-// silently disappear.
-func (ex *astExtractor) matchesOperandValues(c gen.IMatchesOperandContext) ([]aql.Value, bool) {
-	items := c.AllValueListItem()
-	if len(items) == 0 {
-		// terminologyFunction or URI alternative — outside v1.
-		ex.incomplete("MATCHES terminology-function / URI operand is outside the v1 catalogue")
-		return nil, false
+// matchesExpr models a MATCHES predicate's right-hand side (REQ-117).
+//
+// Grammar: `matchesOperand : '{' valueListItem (',' valueListItem)* '}' |
+// terminologyFunction | '{' URI '}'`. All three forms are structured: the
+// value list into [aql.MatchesExpr.Values] (a `valueListItem` may itself
+// be a terminologyFunction, modelled as an [aql.FuncCall]), the bare
+// terminology function into Terminology, and the URI — carried verbatim,
+// the lexer token is unquoted — into URI.
+func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) aql.WhereExpr {
+	if tf := c.TerminologyFunction(); tf != nil {
+		fc := aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}
+		return aql.MatchesExpr{Path: path, Terminology: &fc}
 	}
+	if u := c.URI(); u != nil {
+		return aql.MatchesExpr{Path: path, URI: u.GetText()}
+	}
+	items := c.AllValueListItem()
 	out := make([]aql.Value, 0, len(items))
 	for _, it := range items {
 		if p := it.Primitive(); p != nil {
-			if v := primitiveAsValue(p); v != nil {
-				out = append(out, v)
+			v := primitiveAsValue(p)
+			if v == nil {
+				ex.incomplete("MATCHES value %q is out of range for the value vocabulary", p.GetText())
+				continue
 			}
+			out = append(out, v)
 			continue
 		}
 		if t := it.PARAMETER(); t != nil {
 			out = append(out, aql.ParamValue{Name: strings.TrimPrefix(t.GetText(), "$")})
+			continue
+		}
+		if tf := it.TerminologyFunction(); tf != nil {
+			out = append(out, aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)})
 		}
 	}
-	return out, true
+	if len(out) == 0 {
+		// The grammar requires at least one valueListItem, so an empty
+		// list means every member was refused above (each recorded a gap)
+		// — never a silent drop.
+		return nil
+	}
+	return aql.Matches(path, out...)
 }

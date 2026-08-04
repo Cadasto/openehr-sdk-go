@@ -66,11 +66,23 @@ type Document struct {
 	HasOrderBy bool
 	HasLimit   bool
 
+	// SelectAliases are the `AS` aliases declared on SELECT projection
+	// items, in document order; a projection without an AS clause
+	// contributes nothing. They are a namespace of their own — an ORDER BY
+	// key MAY name one instead of a FROM/CONTAINS alias (REQ-117), which is
+	// why they are NOT merged into [Document.Classes].
+	SelectAliases []string
 	// Classes are the class expressions bound in the FROM / CONTAINS tree,
 	// flattened to document order.
 	Classes []ClassExpr
 	// Paths are every alias-qualified identified path across the SELECT,
-	// WHERE, and ORDER BY clauses, in document order.
+	// WHERE, and ORDER BY clauses, in document order. A bare `true` /
+	// `false` keyword in a value position — a comparison operand
+	// (`WHERE s/x = true`) or a SELECT projection item (`SELECT true`) — is a
+	// literal, not a path, and is absent even though the lexer yields it as an
+	// IDENTIFIER (REQ-117). A keyword carrying a path predicate or a path tail
+	// (`true/nested`) is a real path and IS recorded, as is an ORDER BY key
+	// naming a keyword (the ORDER BY position admits no literal).
 	Paths []IdentifiedPath
 	// Params are the distinct $parameter names referenced anywhere in the
 	// query, in first-seen order, with the leading `$` stripped.
@@ -203,6 +215,13 @@ func (d *Document) populate() {
 		for _, e := range exprs {
 			if e.SYM_ASTERISK() != nil {
 				d.Star = true
+			}
+			// REQ-117: `columnExpr AS alias` — the only IDENTIFIER that is a
+			// direct child of selectExpr is the AS alias (a columnExpr's own
+			// identifiers sit deeper). Kept in lockstep with the structured
+			// extractor's extractSelectItem.
+			if id := e.IDENTIFIER(); id != nil {
+				d.SelectAliases = append(d.SelectAliases, id.GetText())
 			}
 		}
 	}

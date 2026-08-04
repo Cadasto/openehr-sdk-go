@@ -16,6 +16,11 @@ import (
 //
 // Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
 // when emitting a parsed [parse.Query] back to a string).
+//
+// The set grows ADDITIVELY as the structured-AST catalogue closes further
+// grammar positions (REQ-117), so a consumer type-switching over it MUST
+// treat an unrecognised case as out-of-catalogue — refuse, skip, or
+// report — and MUST NOT panic on it.
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
@@ -75,6 +80,20 @@ const (
 	OpLe Operator = "<="
 )
 
+// known reports whether o is one of the six operators the grammar's
+// COMPARISON_OPERATOR admits. Operator is a named string so a parsed query
+// keeps its wire spelling, which leaves the type open — [Compare] is the
+// first constructor to take one from the caller, so the value is checked at
+// validate time rather than emitted verbatim (REQ-117).
+func (o Operator) known() bool {
+	switch o {
+	case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe:
+		return true
+	default:
+		return false
+	}
+}
+
 // Comparison is a `path <op> value` predicate. It is the concrete type both
 // the construction helpers ([Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]) and the
 // parser populate; consumers reading a parsed query type-assert
@@ -94,23 +113,60 @@ const (
 // ParsedPath.Raw equals Path (both derive from the same source path).
 // Emission uses Path, not ParsedPath, so round-trip is unaffected by its
 // presence or absence.
+//
+// Left carries the left operand when it is NOT a plain path — the
+// grammar's `functionCall COMPARISON_OPERATOR terminal` alternative
+// (`LENGTH(o/name/value) > 5`, `TERMINOLOGY('a','b','c') = 'x'`), modelled
+// as a [FuncCall] (REQ-117). It is nil for the ordinary path form, where
+// Path carries the left operand; when Left is non-nil it is authoritative
+// for emission and Path is empty (the parser leaves it so). Construct this
+// form with [Compare].
 type Comparison struct {
 	Path       string
 	Op         Operator
 	Val        Value
 	ParsedPath *IdentifiedPath
+	Left       Value
 }
 
-func (c Comparison) expr() string { return c.Path + " " + string(c.Op) + " " + c.Val.token() }
+func (c Comparison) expr() string {
+	return c.leftToken() + " " + string(c.Op) + " " + c.Val.token()
+}
+
+// leftToken renders the left operand: the structured [Comparison.Left]
+// value when present, the raw path otherwise (REQ-117).
+func (c Comparison) leftToken() string {
+	if c.Left != nil {
+		return c.Left.token()
+	}
+	return c.Path
+}
 
 func (c Comparison) validate() error {
-	if strings.TrimSpace(c.Path) == "" {
+	if !c.Op.known() {
+		return fmt.Errorf("%w: unknown comparison operator %q on %q",
+			ErrInvalidQuery, string(c.Op), c.leftToken())
+	}
+	if c.Left == nil && strings.TrimSpace(c.Path) == "" {
 		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, string(c.Op))
 	}
-	if c.Val == nil {
-		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.Path)
+	// Path and Left are the two spellings of ONE left operand, so setting
+	// both is a caller error, not a precedence question: leftToken would
+	// silently discard Path (REQ-117). The sibling MatchesExpr counts its
+	// operand forms the same way.
+	if c.Left != nil && strings.TrimSpace(c.Path) != "" {
+		return fmt.Errorf("%w: comparison sets both Path %q and a structured Left operand",
+			ErrInvalidQuery, c.Path)
 	}
-	return nil
+	if c.Left != nil {
+		if err := validateValue(c.Left); err != nil {
+			return err
+		}
+	}
+	if c.Val == nil {
+		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.leftToken())
+	}
+	return validateValue(c.Val)
 }
 
 // Eq is `path = value`.
@@ -130,6 +186,16 @@ func Lt(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLt
 
 // Le is `path <= value`.
 func Le(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLe, Val: v} }
+
+// Compare is `<left> <op> <right>` where the LEFT operand is a structured
+// [Value] rather than a path — the write-side mirror of the parser's
+// function-call comparison LHS (REQ-117), e.g.
+// Compare(Func("LENGTH", Path("o/name/value")), OpGt, Int(5)) emits
+// `LENGTH(o/name/value) > 5`. Use [Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]
+// for the ordinary path form.
+func Compare(left Value, op Operator, right Value) WhereExpr {
+	return Comparison{Op: op, Val: right, Left: left}
+}
 
 // BoolOp is a boolean junction operator (AND or OR) joining terms in a
 // [Junction]. NOT is a single-operand prefix; see [Not] (when introduced
@@ -262,15 +328,41 @@ func (e ExistsExpr) validate() error {
 // build time, not at construction.
 func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 
-// MatchesExpr is the `<path> MATCHES { <value-list> }` AQL predicate.
-// The right-hand side is one or more [Value] alternatives, joined with
-// commas inside the braces.
+// MatchesExpr is the `<path> MATCHES <operand>` AQL predicate. The
+// grammar admits three operand forms and exactly ONE of the fields below
+// carries the operand:
+//
+//   - Values — the braced value list (`{'active', 'archived'}`); each
+//     member is any [Value], including a [FuncCall] for the grammar's
+//     `valueListItem : terminologyFunction` alternative.
+//   - Terminology — a BARE `TERMINOLOGY('op','api','params')` operand,
+//     with no braces (REQ-117); construct with [MatchesTerminology].
+//   - URI — a braced URI operand (`{uri://…}`), carried verbatim
+//     (REQ-117); construct with [MatchesURI]. A whitespace-only URI counts as
+//     ABSENT — for both validation and emission — so it never shadows a
+//     populated Values list.
 type MatchesExpr struct {
-	Path   string
-	Values []Value
+	Path        string
+	Values      []Value
+	Terminology *FuncCall
+	URI         string
 }
 
 func (m MatchesExpr) expr() string {
+	// The URI-operand test MUST use the same emptiness rule as validate() —
+	// TrimSpace, not `!= ""`. A whitespace-only URI is not an operand there, so
+	// treating it as one here would emit `MATCHES {   }` and silently drop a
+	// validated value list.
+	uri := strings.TrimSpace(m.URI)
+	switch {
+	case m.Terminology != nil:
+		// Bare terminology operand — the grammar's `matchesOperand :
+		// terminologyFunction` alternative takes no braces.
+		return m.Path + " MATCHES " + m.Terminology.token()
+	case uri != "":
+		// Emitted trimmed, consistent with the [MatchesURI] constructor.
+		return m.Path + " MATCHES {" + uri + "}"
+	}
 	parts := make([]string, len(m.Values))
 	for i, v := range m.Values {
 		if v == nil {
@@ -286,20 +378,56 @@ func (m MatchesExpr) validate() error {
 	if strings.TrimSpace(m.Path) == "" {
 		return fmt.Errorf("%w: empty path in MATCHES", ErrInvalidQuery)
 	}
-	if len(m.Values) == 0 {
+	// The three operand forms are mutually exclusive: emitting more than
+	// one would silently drop an operand (REQ-117).
+	forms := 0
+	if len(m.Values) > 0 {
+		forms++
+	}
+	if m.Terminology != nil {
+		forms++
+	}
+	if strings.TrimSpace(m.URI) != "" {
+		forms++
+	}
+	switch {
+	case forms == 0:
 		return fmt.Errorf("%w: empty value list in MATCHES on %q", ErrInvalidQuery, m.Path)
+	case forms > 1:
+		return fmt.Errorf("%w: MATCHES on %q sets more than one operand form", ErrInvalidQuery, m.Path)
+	}
+	if m.Terminology != nil {
+		return validateValue(*m.Terminology)
 	}
 	for i, v := range m.Values {
 		if v == nil {
 			return fmt.Errorf("%w: nil value at index %d in MATCHES on %q", ErrInvalidQuery, i, m.Path)
 		}
+		if err := validateValue(v); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// Matches constructs a [MatchesExpr].
+// Matches constructs a [MatchesExpr] over a braced value list.
 func Matches(path string, values ...Value) WhereExpr {
 	return MatchesExpr{Path: path, Values: values}
+}
+
+// MatchesTerminology constructs the `<path> MATCHES
+// TERMINOLOGY(operation, api, params)` predicate — the bare
+// terminology-function operand form (REQ-117).
+func MatchesTerminology(path, operation, api, params string) WhereExpr {
+	fc := Terminology(operation, api, params).(FuncCall)
+	return MatchesExpr{Path: path, Terminology: &fc}
+}
+
+// MatchesURI constructs the `<path> MATCHES {uri}` predicate — the URI
+// operand form (REQ-117). The URI is emitted verbatim inside the braces
+// (the grammar's URI token is unquoted).
+func MatchesURI(path, uri string) WhereExpr {
+	return MatchesExpr{Path: path, URI: strings.TrimSpace(uri)}
 }
 
 // LikeExpr is the `<path> LIKE <pattern>` AQL predicate. Pattern is a
@@ -325,7 +453,7 @@ func (l LikeExpr) validate() error {
 	if l.Pattern == nil {
 		return fmt.Errorf("%w: nil pattern in LIKE on %q", ErrInvalidQuery, l.Path)
 	}
-	return nil
+	return validateValue(l.Pattern)
 }
 
 // Like constructs a [LikeExpr].

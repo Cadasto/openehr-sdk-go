@@ -15,6 +15,15 @@
 // issue-code multiset. Any implementation of REQ-109 with the same grammar
 // profile + template MUST report the same codes. Cassettes live under
 // testkit/cassettes/aql/lint/.
+//
+// PROBE-088 extends the PROBE-020 property to the builder constructs REQ-117
+// adds — negated containment, sibling AND / OR junctions with
+// precedence-driven parenthesisation, and opt-in in-text LIMIT / OFFSET — each
+// against its own golden in openehr/aql/testdata/wire/. It also pins the
+// PROBE-020 golden itself ([Probe020CanonicalQuery]): REQ-117 is semver-minor,
+// so a builder program using none of the new API MUST still emit the
+// pre-REQ-117 bytes. Requesting both paging channels MUST be a build-time
+// error rather than a silently combined emission.
 package aqlprobes
 
 // Result captures the outcome of a probe invocation. Status is

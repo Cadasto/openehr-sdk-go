@@ -24,8 +24,8 @@ make build
 | [validate-composition](#validate-composition) | No | `template`, `validation` | In-memory composition vs OPT |
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
-| [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055) |
-| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113) |
+| [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055); containment algebra + in-text paging (REQ-117) |
+| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113), incl. the REQ-117 catalogue closures |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
@@ -187,7 +187,7 @@ go run ./cmd/examples/validate-from-json /tmp/generated.json testkit/cassettes/t
 
 ### aql-build
 
-**Purpose:** Build the same logical AQL query two ways — the struct-builder and the verb-functions — and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). Pure building block: no transport, no auth. The executor lives at `openehr/client/query`.
+**Purpose:** Build the same logical AQL query two ways — the struct-builder and the verb-functions — and prove both emit the same canonical string on the wire (REQ-055, PROBE-020). A third query demonstrates the REQ-117 containment algebra (`aql.Class` / `Contains` / `NotContains` / `ContainsOr`) and opt-in in-text paging (`LimitInline` / `OffsetInline`). Pure building block: no transport, no auth. The executor lives at `openehr/client/query`.
 
 ```bash
 go run ./cmd/examples/aql-build
@@ -201,13 +201,17 @@ go run ./cmd/examples/aql-build
 struct-builder : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5
 verb-functions : SELECT o FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] WHERE e/ehr_id/value = $ehr_id AND o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5
 byte-identical : true
+
+containment algebra + in-text paging (REQ-117):
+  SELECT c FROM EHR e CONTAINS COMPOSITION c CONTAINS ((OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] NOT CONTAINS CLUSTER cl) OR EVALUATION ev) WHERE e/ehr_id/value = $ehr_id ORDER BY c/context/start_time/value DESC LIMIT 20 OFFSET 40
+  envelope paging unused — Fetch/Offset stay zero: 0 0
 ```
 
-**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`.
+**What to copy into your app:** compose with the style you prefer; bind caller data with `aql.Param` (never interpolate into a path), then hand the built `aql.Query` to `query.Execute`. Keep paging on **one** channel — the envelope (`Limit`/`Offset`) by default, the in-text form only when the bound must survive stored-query registration; requesting both is a build-time error.
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Inputs outside the v1 catalogue surface as `aql.ErrIncompleteAST` from `ParseQuery` rather than silently dropping a clause. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile; the residual `aql.ErrIncompleteAST` is an integer literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. With no argument the program walks two queries: the representative one below, then a REQ-117 query exercising the closed shapes. Pure building block: no transport, no auth.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -245,7 +249,32 @@ structured AST:
 
 canonical emission:
   SELECT c/uid/value, c/name/value FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = $cid AND c/name/value LIKE 'Vital%' ORDER BY c/uid/value DESC LIMIT 50 OFFSET 100
+
+--- REQ-117 catalogue closures ---
+
+input AQL:
+  SELECT *, 1 AS rank, LENGTH(c/name/value)
+  FROM COMPOSITION c OR EHR e
+  WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value
+
+structured AST:
+  SELECT:
+    [0] *
+    [1] 1 (int) AS rank
+    [2] LENGTH(c/name/value)
+  FROM OR (root junction, 2 operands):
+    COMPOSITION c
+    EHR e
+  WHERE:
+    AND:
+      LENGTH(c/name/value) (func) > $min (param)
+      c/uid/value = c/name/value (path)
+
+canonical emission:
+  SELECT *, 1 AS rank, LENGTH(c/name/value) FROM COMPOSITION c OR EHR e WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value
 ```
+
+**What to copy into your app:** type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue — the sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.
 
 **What to copy into your app:** use `parse.ParseQuery(src)` to get the structured AST when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings); check `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution against the CDR.
 

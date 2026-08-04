@@ -154,16 +154,27 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 	var issues []Issue
 
 	// aql_unknown_alias — every identified path's root alias MUST bind to a
-	// class in FROM / CONTAINS.
+	// class in FROM / CONTAINS. REQ-117: an ORDER BY key that binds nothing
+	// there is resolved against the SELECT `AS` aliases before the issue is
+	// raised. FROM/CONTAINS is consulted first, so a SELECT alias reusing a
+	// bound alias never shadows the class binding.
+	selectAliases := make(map[string]bool, len(md.SelectAliases))
+	for _, a := range md.SelectAliases {
+		selectAliases[a] = true
+	}
 	for _, p := range doc.Paths {
-		if _, ok := md.Aliases[p.Alias]; !ok {
-			issues = append(issues, Issue{
-				Code:     "aql_unknown_alias",
-				Path:     p.Raw,
-				Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias),
-				Severity: Error,
-			})
+		if _, ok := md.Aliases[p.Alias]; ok {
+			continue
 		}
+		if namesSelectAlias(p, selectAliases) {
+			continue
+		}
+		issues = append(issues, Issue{
+			Code:     "aql_unknown_alias",
+			Path:     p.Raw,
+			Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias),
+			Severity: Error,
+		})
 	}
 
 	// aql_from_archetype — the query SHOULD identify what it selects: at
@@ -177,6 +188,18 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 		})
 	}
 	return issues
+}
+
+// namesSelectAlias reports whether p is an ORDER BY key naming one of the
+// SELECT `AS` aliases (REQ-117). Only a BARE identifier qualifies: an AS alias
+// labels a projected column, not a path root, so `ORDER BY score/magnitude`
+// (or a predicated key) stays aql_unknown_alias. The fallback is scoped to
+// ORDER BY — a SELECT alias is not a SELECT or WHERE operand root.
+func namesSelectAlias(p parse.IdentifiedPath, selectAliases map[string]bool) bool {
+	if p.Clause != parse.ClauseOrderBy || len(p.Segments) > 0 || p.Predicate != "" {
+		return false
+	}
+	return selectAliases[p.Alias]
 }
 
 func hasIdentifiableScope(doc *parse.Document) bool {
