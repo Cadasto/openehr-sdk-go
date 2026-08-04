@@ -15,6 +15,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **CODE_PHRASE FLAT leaves (REQ-053, REQ-121, PROBE-086).** `openehr/serialize/simplified` round-trips standalone `CODE_PHRASE` leaves as `|code` + `|terminology` — the larger half of the 10.5% → 19.5% PROBE-086 coverage ratchet, and **encode emits four new keys per ENTRY**.
 - **Reference metadata spellings accepted on decode (REQ-053, REQ-025, ADR 0015).** FLAT decode accepts the reference's real-path composition metadata alongside the `ctx/` short forms — still the only emitted spelling — and a malformed composite context value reports a typed error instead of panicking.
 - **Optional datatype suffixes in FLAT (REQ-053, PROBE-086).** Optional `DV_ORDERED` / `QUANTIFIED` / `AMOUNT` decorations round-trip as suffixes instead of `|raw`, and a decorated `DV_TEXT` at an open coded leaf keeps its decoration rather than flattening to a bare `|other`, now refused beside other suffixes.
+- **AQL expression-catalogue completion (REQ-117, PROBE-087/088).** The structured AST covers the whole SDK grammar profile, the lint gate accepts two over-rejected shapes, and the builder gains a containment algebra plus opt-in in-text paging. *Breaking:* `aql.Containment` is no longer `==`-comparable.
 
 ## [0.17.0] - 2026-08-03
 
