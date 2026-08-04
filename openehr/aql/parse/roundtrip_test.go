@@ -332,6 +332,34 @@ func TestEmitDuplicateAlias(t *testing.T) {
 	}
 }
 
+// TestEmitFromRootAndJunction guards a hand-built AST that sets BOTH a
+// single FROM root and a root junction: the grammar has no
+// `(A OR B) CONTAINS C` form, so the emitter refuses rather than produce
+// text the parser rejects (REQ-117).
+// PROBE-087
+func TestEmitFromRootAndJunction(t *testing.T) {
+	q := &parse.Query{
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c"}}}}}},
+		From: parse.FromClause{
+			Root: parse.ClassExpr{RMType: "EHR", Alias: "e"},
+			Junction: &parse.Containment{
+				ChildJoin: parse.ContainsOr,
+				Children: []parse.Containment{
+					{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c1"}},
+					{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c2"}},
+				},
+			},
+		},
+	}
+	_, err := q.Emit()
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Fatalf("Emit root+junction: want ErrInvalidQuery, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "root junction") {
+		t.Errorf("error message should mention the root junction: %v", err)
+	}
+}
+
 // TestEmitNilQuery covers the nil-query guard.
 func TestEmitNilQuery(t *testing.T) {
 	var q *parse.Query

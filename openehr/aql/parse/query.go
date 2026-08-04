@@ -361,6 +361,12 @@ func (q *Query) Emit() (string, error) {
 	if q.From.Junction == nil && q.From.Root.RMType == "" {
 		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
 	}
+	// A junction root and a single root are mutually exclusive: the
+	// grammar has no `(A OR B) CONTAINS C` form, so emitting both would
+	// produce text the parser rejects (REQ-117).
+	if q.From.Junction != nil && (q.From.Root.RMType != "" || q.From.Contains != nil) {
+		return "", fmt.Errorf("%w: FROM sets both a root class and a root junction", aql.ErrInvalidQuery)
+	}
 	if dup := duplicateAlias(q.From); dup != "" {
 		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
 	}
