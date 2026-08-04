@@ -1,0 +1,1 @@
+SELECT o, ev FROM EHR e CONTAINS COMPOSITION c CONTAINS (OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] AND EVALUATION ev[openEHR-EHR-EVALUATION.problem_diagnosis.v1]) WHERE e/ehr_id/value = $ehr_id

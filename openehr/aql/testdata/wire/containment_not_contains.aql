@@ -1,0 +1,1 @@
+SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c[openEHR-EHR-COMPOSITION.report.v1] NOT CONTAINS EVALUATION ev[openEHR-EHR-EVALUATION.adverse_reaction_risk.v1] WHERE e/ehr_id/value = $ehr_id

@@ -1,0 +1,1 @@
+SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c WHERE e/ehr_id/value = $ehr_id ORDER BY c/context/start_time/value DESC LIMIT 50 OFFSET 100
