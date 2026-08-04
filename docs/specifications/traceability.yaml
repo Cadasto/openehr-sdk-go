@@ -654,7 +654,7 @@ requirements:
     status: draft
     # REQ-117 (2026-08-04) narrowed the aql_unknown_alias check by two
     # documented over-rejections — an ORDER BY key naming a SELECT `AS` alias,
-    # and a bare boolean comparison operand. No new codes, no severity change,
+    # and a bare boolean literal in any value position (comparison operand, SELECT projection, function argument). No new codes, no severity change,
     # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
     # row and its § in clinical-modeling.md.
     implementation: landed
@@ -934,7 +934,7 @@ requirements:
     # BoolValue/NullValue the Builder constructs. (*Query).Emit +
     # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
     # property) is carried inline by openehr/aql/parse/roundtrip_test.go
-    # — 71 idempotence cases plus 31 canonical-input preservation cases
+    # — 77 idempotence cases plus 36 canonical-input preservation cases
     # across the catalogue, plus the residual-gap suite asserting
     # ParseQuery and Emit both surface aql.ErrIncompleteAST. The corpus
     # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04):
@@ -1074,14 +1074,14 @@ requirements:
     # cannot represent — LIMIT/OFFSET beyond Go `int`, or a primitive beyond
     # int64 in a value position (aql.IntValue is an int64; degrading to a float
     # would be silent loss) — pinned by TestParseQuerySurfacesIncompleteAST,
-    # with TestFormerCatalogueGapsModelled asserting the nine former gap shapes
+    # with TestFormerCatalogueGapsModelled asserting the nine round-trip cases covering the eight closed gap shapes
     # now parse, emit, and round-trip (PROBE-087).
     #
     # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
     # SelectAliases so an ORDER BY key resolves FROM/CONTAINS first, then the
     # SELECT `AS` aliases (TestLintOrderBySelectAlias,
     # TestLintSelectAliasDoesNotBindClass); a bare boolean keyword in a value
-    # position — a comparison operand OR a SELECT projection item — is no longer
+    # position — a comparison operand, a SELECT projection item, or a function-call argument — is no longer
     # collected as a pseudo-path, and the structured AST carries it as a typed
     # literal on both sides (TestLintBooleanComparisonOperand,
     # TestLintSelectBooleanKeywordLiteral,
@@ -1109,7 +1109,7 @@ requirements:
     probes: [PROBE-087, PROBE-088]
     tests:
       # PROBE-087 — catalogue closures, per-shape structural pins, and the
-      # residual unrepresentable-integer guard.
+      # residual guards (unrepresentable numeric literal; SELECT TOP).
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/roundtrip_test.go
       - openehr/aql/introspect_test.go
