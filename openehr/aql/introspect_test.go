@@ -10,6 +10,7 @@ package aql_test
 // is covered by builder_test.go.
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -99,6 +100,107 @@ func TestParamValueStripsLeadingDollar(t *testing.T) {
 			t.Errorf("Param(%q).Name = %q, want ehr_id", in, p.Name)
 		}
 	}
+}
+
+// REQ-117: PathValue puts an identified path in a value position (a
+// path-vs-path comparison RHS or a function argument). The write-side
+// constructor sets Raw; the parser additionally decomposes alias +
+// segments.
+func TestPathValueIntrospection(t *testing.T) {
+	v := aql.Path("b/y")
+	pv, ok := v.(aql.PathValue)
+	if !ok {
+		t.Fatalf("aql.Path returned %T, want aql.PathValue", v)
+	}
+	if pv.Raw != "b/y" {
+		t.Errorf("PathValue.Raw = %q, want b/y", pv.Raw)
+	}
+	if got := aql.FormatValue(v); got != "b/y" {
+		t.Errorf("FormatValue(Path) = %q, want b/y (unquoted path text)", got)
+	}
+	// Read-side shape: alias + segments are introspectable through the
+	// embedded aql.IdentifiedPath.
+	structured := aql.PathValue{IdentifiedPath: aql.IdentifiedPath{
+		Alias:    "b",
+		Segments: []aql.PathSegment{{Name: "y"}},
+		Raw:      "b/y",
+	}}
+	if structured.Alias != "b" || len(structured.Segments) != 1 {
+		t.Errorf("PathValue embedded path = %+v, want alias b + one segment", structured.IdentifiedPath)
+	}
+	if w := aql.Eq("a/x", aql.Path("b/y")); mustFormat(t, w) != "a/x = b/y" {
+		t.Errorf("path-vs-path comparison = %q, want a/x = b/y", mustFormat(t, w))
+	}
+}
+
+// REQ-117: FuncCall is a function call in a value position — a comparison
+// operand on either side, or a nested argument. Emission upper-cases the
+// name and joins arguments with the package's `, ` convention.
+func TestFuncCallIntrospection(t *testing.T) {
+	v := aql.Func("length", aql.Path("o/name/value"))
+	fc, ok := v.(aql.FuncCall)
+	if !ok {
+		t.Fatalf("aql.Func returned %T, want aql.FuncCall", v)
+	}
+	if fc.Name != "LENGTH" {
+		t.Errorf("FuncCall.Name = %q, want LENGTH (canonical upper case)", fc.Name)
+	}
+	if len(fc.Args) != 1 {
+		t.Fatalf("FuncCall.Args len = %d, want 1", len(fc.Args))
+	}
+	if got := aql.FormatValue(v); got != "LENGTH(o/name/value)" {
+		t.Errorf("FormatValue(Func) = %q, want LENGTH(o/name/value)", got)
+	}
+	nested := aql.Func("CONCAT", aql.String("a"), aql.Param("p"), aql.Func("LENGTH", aql.Path("x/y")))
+	if got := aql.FormatValue(nested); got != "CONCAT('a', $p, LENGTH(x/y))" {
+		t.Errorf("nested FormatValue = %q, want CONCAT('a', $p, LENGTH(x/y))", got)
+	}
+}
+
+// REQ-117: Compare builds a comparison whose LEFT operand is a structured
+// value rather than a path — the write-side mirror of the parser's
+// function-call WHERE LHS.
+func TestCompareFunctionLeftOperand(t *testing.T) {
+	w := aql.Compare(aql.Func("LENGTH", aql.Path("o/name/value")), aql.OpGt, aql.Int(5))
+	c, ok := w.(aql.Comparison)
+	if !ok {
+		t.Fatalf("aql.Compare returned %T, want aql.Comparison", w)
+	}
+	if c.Path != "" {
+		t.Errorf("Comparison.Path = %q, want empty for a value left operand", c.Path)
+	}
+	if _, ok := c.Left.(aql.FuncCall); !ok {
+		t.Fatalf("Comparison.Left = %T, want aql.FuncCall", c.Left)
+	}
+	if got := mustFormat(t, w); got != "LENGTH(o/name/value) > 5" {
+		t.Errorf("FormatWhere = %q, want LENGTH(o/name/value) > 5", got)
+	}
+}
+
+// REQ-117: an empty left operand and a nil value stay build-time errors —
+// the new shapes do not widen what the emitter will improvise.
+func TestComparisonRejectsMalformedOperands(t *testing.T) {
+	for name, w := range map[string]aql.WhereExpr{
+		"empty_path":      aql.Eq("", aql.Int(1)),
+		"nil_value":       aql.Eq("a/x", nil),
+		"empty_path_val":  aql.Eq("a/x", aql.Path("  ")),
+		"unnamed_func":    aql.Compare(aql.FuncCall{}, aql.OpEq, aql.Int(1)),
+		"nil_func_arg":    aql.Compare(aql.FuncCall{Name: "LENGTH", Args: []aql.Value{nil}}, aql.OpEq, aql.Int(1)),
+		"empty_func_path": aql.Compare(aql.Func("LENGTH", aql.Path("")), aql.OpEq, aql.Int(1)),
+	} {
+		if _, err := aql.FormatWhere(w); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("%s: FormatWhere error = %v, want ErrInvalidQuery", name, err)
+		}
+	}
+}
+
+func mustFormat(t *testing.T, w aql.WhereExpr) string {
+	t.Helper()
+	got, err := aql.FormatWhere(w)
+	if err != nil {
+		t.Fatalf("FormatWhere: %v", err)
+	}
+	return got
 }
 
 // REQ-113: NullValue is a typed sentinel distinct from StringValue{"NULL"};

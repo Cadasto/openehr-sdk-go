@@ -16,6 +16,11 @@ import (
 //
 // Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
 // when emitting a parsed [parse.Query] back to a string).
+//
+// The set grows ADDITIVELY as the structured-AST catalogue closes further
+// grammar positions (REQ-117), so a consumer type-switching over it MUST
+// treat an unrecognised case as out-of-catalogue — refuse, skip, or
+// report — and MUST NOT panic on it.
 type WhereExpr interface {
 	// expr is the canonical wire form of the predicate.
 	expr() string
@@ -94,23 +99,48 @@ const (
 // ParsedPath.Raw equals Path (both derive from the same source path).
 // Emission uses Path, not ParsedPath, so round-trip is unaffected by its
 // presence or absence.
+//
+// Left carries the left operand when it is NOT a plain path — the
+// grammar's `functionCall COMPARISON_OPERATOR terminal` alternative
+// (`LENGTH(o/name/value) > 5`, `TERMINOLOGY('a','b','c') = 'x'`), modelled
+// as a [FuncCall] (REQ-117). It is nil for the ordinary path form, where
+// Path carries the left operand; when Left is non-nil it is authoritative
+// for emission and Path is empty (the parser leaves it so). Construct this
+// form with [Compare].
 type Comparison struct {
 	Path       string
 	Op         Operator
 	Val        Value
 	ParsedPath *IdentifiedPath
+	Left       Value
 }
 
-func (c Comparison) expr() string { return c.Path + " " + string(c.Op) + " " + c.Val.token() }
+func (c Comparison) expr() string {
+	return c.leftToken() + " " + string(c.Op) + " " + c.Val.token()
+}
+
+// leftToken renders the left operand: the structured [Comparison.Left]
+// value when present, the raw path otherwise (REQ-117).
+func (c Comparison) leftToken() string {
+	if c.Left != nil {
+		return c.Left.token()
+	}
+	return c.Path
+}
 
 func (c Comparison) validate() error {
-	if strings.TrimSpace(c.Path) == "" {
+	if c.Left == nil && strings.TrimSpace(c.Path) == "" {
 		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, string(c.Op))
 	}
-	if c.Val == nil {
-		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.Path)
+	if c.Left != nil {
+		if err := validateValue(c.Left); err != nil {
+			return err
+		}
 	}
-	return nil
+	if c.Val == nil {
+		return fmt.Errorf("%w: nil value in comparison on %q", ErrInvalidQuery, c.leftToken())
+	}
+	return validateValue(c.Val)
 }
 
 // Eq is `path = value`.
@@ -130,6 +160,16 @@ func Lt(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLt
 
 // Le is `path <= value`.
 func Le(path string, v Value) WhereExpr { return Comparison{Path: path, Op: OpLe, Val: v} }
+
+// Compare is `<left> <op> <right>` where the LEFT operand is a structured
+// [Value] rather than a path — the write-side mirror of the parser's
+// function-call comparison LHS (REQ-117), e.g.
+// Compare(Func("LENGTH", Path("o/name/value")), OpGt, Int(5)) emits
+// `LENGTH(o/name/value) > 5`. Use [Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]
+// for the ordinary path form.
+func Compare(left Value, op Operator, right Value) WhereExpr {
+	return Comparison{Op: op, Val: right, Left: left}
+}
 
 // BoolOp is a boolean junction operator (AND or OR) joining terms in a
 // [Junction]. NOT is a single-operand prefix; see [Not] (when introduced

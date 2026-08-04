@@ -448,6 +448,10 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 		return aql.Not(ex.extractWhereExpr(ops[0]))
 	}
 	if c.AND() != nil || c.OR() != nil {
+		join := aql.OpAnd
+		if c.OR() != nil {
+			join = aql.OpOr
+		}
 		ops := c.AllWhereExpr()
 		terms := make([]aql.WhereExpr, 0, len(ops))
 		for i, op := range ops {
@@ -456,9 +460,18 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 				ex.incomplete("AND/OR junction dropped operand %d (unsupported shape)", i)
 				continue
 			}
+			// REQ-117: flatten a same-operator operand so `a AND b AND c`
+			// is ONE [aql.Junction] with three terms — the documented
+			// shared-vocabulary contract — rather than the parser's
+			// left-nested pair-of-pairs. Emission is unaffected (a nested
+			// same-operator junction needs no parentheses).
+			if inner, ok := t.(aql.Junction); ok && inner.Op == join {
+				terms = append(terms, inner.Terms...)
+				continue
+			}
 			terms = append(terms, t)
 		}
-		if c.AND() != nil {
+		if join == aql.OpAnd {
 			return aql.And(terms...)
 		}
 		return aql.Or(terms...)
@@ -522,7 +535,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			if t := c.Terminal(); t != nil {
 				v, gap := ex.terminalAsValue(t)
 				if gap != "" {
-					ex.incomplete("comparison RHS terminal %q is outside the v1 catalogue (%s)", t.GetText(), gap)
+					ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
 					return nil
 				}
 				if v != nil {
@@ -536,12 +549,52 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 		}
 	}
 	// Function-call LHS in WHERE (e.g. `LENGTH(x) > 5`) — grammar
-	// alternative `functionCall COMPARISON_OPERATOR terminal`. Outside
-	// the v1 catalogue; surface so the predicate isn't silently lost.
-	if c.FunctionCall() != nil {
-		ex.incomplete("function-call WHERE LHS (`%s`) is outside the v1 catalogue", c.GetText())
+	// alternative `functionCall COMPARISON_OPERATOR terminal`. The left
+	// operand is a structured [aql.FuncCall] value (REQ-117).
+	if fc := c.FunctionCall(); fc != nil {
+		cmp, t := c.COMPARISON_OPERATOR(), c.Terminal()
+		if cmp == nil || t == nil {
+			return nil
+		}
+		v, gap := ex.terminalAsValue(t)
+		if gap != "" {
+			ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
+			return nil
+		}
+		left, gap := ex.functionCallAsValue(fc)
+		if gap != "" {
+			ex.incomplete("function-call WHERE LHS %q is outside the catalogue (%s)", fc.GetText(), gap)
+			return nil
+		}
+		if left == nil || v == nil {
+			return nil
+		}
+		return aql.Comparison{Op: aql.Operator(cmp.GetText()), Val: v, Left: left}
 	}
 	return nil
+}
+
+// functionCallAsValue lifts a functionCall context into an [aql.FuncCall]
+// value — the shape used on both sides of a WHERE comparison and as a
+// nested argument (REQ-117). Returns a non-empty gap reason when an
+// argument is outside the value vocabulary.
+func (ex *astExtractor) functionCallAsValue(c gen.IFunctionCallContext) (aql.Value, string) {
+	// Grammar alternative `functionCall : terminologyFunction`.
+	if tf := c.TerminologyFunction(); tf != nil {
+		return aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)}, ""
+	}
+	out := aql.FuncCall{Name: functionName(c)}
+	for _, t := range c.AllTerminal() {
+		v, gap := ex.terminalAsValue(t)
+		if gap != "" {
+			return nil, gap
+		}
+		if v == nil {
+			return nil, fmt.Sprintf("unsupported argument %q", t.GetText())
+		}
+		out.Args = append(out.Args, v)
+	}
+	return out, ""
 }
 
 // --- ORDER BY + LIMIT ------------------------------------------------
@@ -683,15 +736,18 @@ func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
 	return nil
 }
 
-// terminalAsValue lifts a comparison-RHS terminal into an [aql.Value].
+// terminalAsValue lifts a comparison terminal into an [aql.Value].
 //
 // Grammar: terminal is one of `primitive | PARAMETER | identifiedPath |
-// functionCall`. The first two map cleanly; an identifiedPath whose text
-// is the bare boolean keyword `true` / `false` is normalised to a
-// [BoolValue] (the SDK grammar lexes those as IDENTIFIER because the
-// IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4). Other identifiedPath
-// shapes (path-vs-path comparisons like `a/x = b/y`) and functionCall
-// terminals report a non-empty gap string for the caller to record.
+// functionCall`. Primitives and parameters map to the literal vocabulary;
+// an identifiedPath whose text is the bare keyword `true` / `false` /
+// `null` is normalised to the typed literal (the SDK grammar lexes those
+// as IDENTIFIER because the IDENTIFIER rule precedes BOOLEAN in
+// AqlLexer.g4), any other identifiedPath becomes an [aql.PathValue]
+// (path-vs-path comparison, REQ-117), and a functionCall becomes an
+// [aql.FuncCall]. A non-empty gap string reports a value the vocabulary
+// cannot represent (an out-of-range integer literal) for the caller to
+// record.
 func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, string) {
 	if c == nil {
 		return nil, ""
@@ -720,10 +776,13 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 		case "null":
 			return aql.NullValue{}, ""
 		}
-		return nil, "identifiedPath RHS (path-vs-path comparison)"
+		// REQ-117: an identified path in a value position — carried as
+		// structured alias + segments, not raw text.
+		parsed := extractIdentifiedPath(ip, ClauseWhere)
+		return aql.PathValue{IdentifiedPath: parsed.IdentifiedPath}, ""
 	}
-	if c.FunctionCall() != nil {
-		return nil, "functionCall RHS"
+	if fc := c.FunctionCall(); fc != nil {
+		return ex.functionCallAsValue(fc)
 	}
 	return nil, ""
 }

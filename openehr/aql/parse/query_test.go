@@ -639,6 +639,178 @@ func TestParseQueryWhereMatchesExpr(t *testing.T) {
 	}
 }
 
+// TestParseQueryWhereFunctionLHS pins REQ-117 catalogue shape 3: a
+// function call as the LEFT operand of a WHERE comparison models as an
+// [aql.Comparison] whose Left carries the structured [aql.FuncCall]
+// (Path stays empty — the left operand is not a path).
+// PROBE-087
+func TestParseQueryWhereFunctionLHS(t *testing.T) {
+	const src = "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name/value) > 5"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	cmp, ok := q.Where.(aql.Comparison)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.Comparison", q.Where)
+	}
+	if cmp.Path != "" {
+		t.Errorf("Comparison.Path = %q, want empty for a function-call LHS", cmp.Path)
+	}
+	fc, ok := cmp.Left.(aql.FuncCall)
+	if !ok {
+		t.Fatalf("Comparison.Left = %T, want aql.FuncCall", cmp.Left)
+	}
+	if fc.Name != "LENGTH" {
+		t.Errorf("FuncCall.Name = %q, want LENGTH", fc.Name)
+	}
+	if len(fc.Args) != 1 {
+		t.Fatalf("FuncCall.Args len = %d, want 1", len(fc.Args))
+	}
+	pv, ok := fc.Args[0].(aql.PathValue)
+	if !ok {
+		t.Fatalf("FuncCall.Args[0] = %T, want aql.PathValue", fc.Args[0])
+	}
+	if pv.Raw != "o/name/value" || pv.Alias != "o" {
+		t.Errorf("PathValue = {Raw:%q Alias:%q}, want {o/name/value o}", pv.Raw, pv.Alias)
+	}
+	if cmp.Op != aql.OpGt {
+		t.Errorf("Comparison.Op = %q, want >", cmp.Op)
+	}
+	if iv, ok := cmp.Val.(aql.IntValue); !ok || iv.N != 5 {
+		t.Errorf("Comparison.Val = %#v, want aql.IntValue{5}", cmp.Val)
+	}
+	if out, err := q.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want the canonical input", out, err)
+	}
+}
+
+// TestParseQueryWhereFunctionRHS pins the grammar's `terminal :
+// functionCall` alternative on the right of a comparison — the function
+// call is a structured [aql.FuncCall] in the value position (REQ-117).
+// PROBE-087
+func TestParseQueryWhereFunctionRHS(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = LENGTH(o/y)")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	cmp := q.Where.(aql.Comparison)
+	if cmp.Path != "o/x" {
+		t.Errorf("Comparison.Path = %q, want o/x", cmp.Path)
+	}
+	fc, ok := cmp.Val.(aql.FuncCall)
+	if !ok {
+		t.Fatalf("Comparison.Val = %T, want aql.FuncCall", cmp.Val)
+	}
+	if fc.Name != "LENGTH" || len(fc.Args) != 1 {
+		t.Errorf("FuncCall = %+v, want LENGTH with one argument", fc)
+	}
+}
+
+// TestParseQueryPathVsPathComparison pins REQ-117 catalogue shape 5: an
+// identified path as the RIGHT operand models as an introspectable
+// [aql.PathValue] (alias + segments), not raw text.
+// PROBE-087
+func TestParseQueryPathVsPathComparison(t *testing.T) {
+	const src = "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/data[at0001]/value"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	cmp := q.Where.(aql.Comparison)
+	pv, ok := cmp.Val.(aql.PathValue)
+	if !ok {
+		t.Fatalf("Comparison.Val = %T, want aql.PathValue", cmp.Val)
+	}
+	if pv.Alias != "o" {
+		t.Errorf("PathValue.Alias = %q, want o", pv.Alias)
+	}
+	if len(pv.Segments) != 2 {
+		t.Fatalf("PathValue.Segments len = %d, want 2 (%+v)", len(pv.Segments), pv.Segments)
+	}
+	if got := pv.Segments[0]; got.Name != "data" || got.Predicate != "at0001" {
+		t.Errorf("Segments[0] = %+v, want {data at0001}", got)
+	}
+	if pv.Raw != "o/data[at0001]/value" {
+		t.Errorf("PathValue.Raw = %q, want o/data[at0001]/value", pv.Raw)
+	}
+	if out, err := q.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want the canonical input", out, err)
+	}
+}
+
+// TestParseQueryWhereFunctionArguments pins REQ-117 catalogue shape 7 on
+// the WHERE side: parameter, primitive, and nested-function arguments
+// inside a function call in a comparison.
+// PROBE-087
+func TestParseQueryWhereFunctionArguments(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE CONCAT('a', $p, LENGTH(o/y)) = 'abc'")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	cmp := q.Where.(aql.Comparison)
+	fc, ok := cmp.Left.(aql.FuncCall)
+	if !ok {
+		t.Fatalf("Comparison.Left = %T, want aql.FuncCall", cmp.Left)
+	}
+	if len(fc.Args) != 3 {
+		t.Fatalf("FuncCall.Args len = %d, want 3", len(fc.Args))
+	}
+	if sv, ok := fc.Args[0].(aql.StringValue); !ok || sv.S != "a" {
+		t.Errorf("Args[0] = %#v, want aql.StringValue{a}", fc.Args[0])
+	}
+	if pv, ok := fc.Args[1].(aql.ParamValue); !ok || pv.Name != "p" {
+		t.Errorf("Args[1] = %#v, want aql.ParamValue{p}", fc.Args[1])
+	}
+	nested, ok := fc.Args[2].(aql.FuncCall)
+	if !ok {
+		t.Fatalf("Args[2] = %T, want aql.FuncCall", fc.Args[2])
+	}
+	if nested.Name != "LENGTH" || len(nested.Args) != 1 {
+		t.Errorf("nested call = %+v, want LENGTH with one argument", nested)
+	}
+}
+
+// TestParseQueryWhereJunctionOverNewOperands pins REQ-117 catalogue
+// shape 8: a junction is in-catalogue exactly when all its operands are,
+// so an AND/OR over the newly modelled operands models without a gap and
+// keeps its operand order.
+// PROBE-087
+func TestParseQueryWhereJunctionOverNewOperands(t *testing.T) {
+	const src = "SELECT o FROM EHR e CONTAINS OBSERVATION o " +
+		"WHERE o/x = $a AND LENGTH(o/name) > 5 AND o/p = o/q"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	j, ok := q.Where.(aql.Junction)
+	if !ok {
+		t.Fatalf("Where = %T, want aql.Junction", q.Where)
+	}
+	if j.Op != aql.OpAnd {
+		t.Errorf("Junction.Op = %q, want AND", j.Op)
+	}
+	if len(j.Terms) != 3 {
+		t.Fatalf("Junction.Terms len = %d, want 3 (%+v)", len(j.Terms), j.Terms)
+	}
+	if cmp, ok := j.Terms[0].(aql.Comparison); !ok || cmp.Path != "o/x" {
+		t.Errorf("Terms[0] = %#v, want the o/x comparison", j.Terms[0])
+	}
+	if cmp, ok := j.Terms[1].(aql.Comparison); !ok {
+		t.Errorf("Terms[1] = %T, want aql.Comparison", j.Terms[1])
+	} else if _, ok := cmp.Left.(aql.FuncCall); !ok {
+		t.Errorf("Terms[1].Left = %T, want aql.FuncCall", cmp.Left)
+	}
+	if cmp, ok := j.Terms[2].(aql.Comparison); !ok {
+		t.Errorf("Terms[2] = %T, want aql.Comparison", j.Terms[2])
+	} else if _, ok := cmp.Val.(aql.PathValue); !ok {
+		t.Errorf("Terms[2].Val = %T, want aql.PathValue", cmp.Val)
+	}
+	if out, err := q.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want the canonical input", out, err)
+	}
+}
+
 // TestDocumentQueryErrContract pins the QueryErr accessor: nil for a
 // clean parse, an ErrIncompleteAST wrap for a catalogue-gap parse,
 // stable across repeated calls (same sync.Once guard as Query).

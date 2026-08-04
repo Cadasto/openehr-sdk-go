@@ -81,6 +81,16 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"select_count_star_literal_alias", "SELECT COUNT(*), 1, e/x AS a FROM EHR e"},
 		{"select_function_args", "SELECT CONCAT('hello', $p, LENGTH(p/name)) FROM EHR e CONTAINS PERSON p"},
 		{"select_terminology_lowercase", "SELECT terminology('SNOMED-CT','near','12345') FROM EHR e"},
+		{"where_function_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name/value) > 5"},
+		{"where_function_lhs_lowercase", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE length(o/name/value) > 5"},
+		{"where_function_rhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = LENGTH(o/y)"},
+		{"where_path_vs_path", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/data[at0001]/value"},
+		{"where_function_args", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE CONCAT('a', $p, LENGTH(o/y)) = 'abc'"},
+		{"where_junction_new_operands", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5 AND o/p = o/q"},
+		{"where_or_junction_new_operands", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/p = o/q OR LENGTH(o/name) > 5"},
+		{"where_not_over_function_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE NOT LENGTH(o/name) > 5"},
+		{"where_mixed_junction_precedence", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/a = 1 AND (o/b = o/c OR LENGTH(o/d) > 2)"},
+		{"where_terminology_rhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code = terminology('SNOMED-CT','near','12345')"},
 	}
 
 	for _, tc := range cases {
@@ -137,6 +147,11 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT COUNT(*), 1, e/x AS a FROM EHR e",
 		"SELECT CONCAT('hello', $p, LENGTH(p/name)) FROM EHR e CONTAINS PERSON p",
 		"SELECT TERMINOLOGY('SNOMED-CT', 'near', '12345') FROM EHR e",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name/value) > 5",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/data[at0001]/value",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE CONCAT('a', $p, LENGTH(o/y)) = 'abc'",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5 AND o/p = o/q",
+		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/a = 1 AND (o/b = o/c OR LENGTH(o/d) > 2)",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {
@@ -168,6 +183,9 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 		{"primitive_in_select", "SELECT 1 FROM EHR e"},
 		{"select_star_mix", "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"},
 		{"concat_primitive_arg", "SELECT CONCAT('hello', p/name) FROM EHR e CONTAINS PERSON p"},
+		{"function_call_where_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name) > 5"},
+		{"path_vs_path", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/y"},
+		{"and_junction_with_function_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
