@@ -15,6 +15,7 @@ Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ 
 | [2026-07-16-flat-author-linter.md](2026-07-16-flat-author-linter.md) | Pre-submit FLAT path linter + CLI | REQ-115 (builds on REQ-053/106/111) | PROBE-083 |
 | [2026-07-16-opt-author-validator.md](2026-07-16-opt-author-validator.md) | OPT author validator + CLI | REQ-114 (builds on REQ-100/104/106/108) | PROBE-085 |
 | [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
+| [2026-08-04-aql-expressivity-completion.md](2026-08-04-aql-expressivity-completion.md) | AQL structured-AST catalogue completion + lint-gate acceptance + builder containment algebra | REQ-117 (extends REQ-113/109/055) | PROBE-087, PROBE-088 |
 
 The fourth plan in this set — the upstream FLAT parity harness — **landed 2026-08-01 and was archived** ([archive/2026-07-16-web-template-tests-conformance.md](archive/2026-07-16-web-template-tests-conformance.md)): PROBE-086 is Implemented (Sandbox), and REQ-080's roadmap row moved `planned → partial`.
 

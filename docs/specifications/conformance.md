@@ -320,6 +320,24 @@ client scenarios to SDK coverage:
 - **Status:** Implemented (inline) — see [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go).
 - **Satisfies:** REQ-113.
 
+#### PROBE-087 — AQL structured-AST catalogue completeness
+
+- **Title:** Every shape in the REQ-117 catalogue list — primitive SELECT literal, mixed `SELECT *, col`, function-call WHERE LHS, `MATCHES` with `TERMINOLOGY(...)`/`{URI}`, path-vs-path comparison, FROM-root boolean junction, parameter/primitive/nested-function arguments in function calls, and junctions over any in-catalogue operand — parses into `parse.Query` without `aql.ErrIncompleteAST` and round-trips through `(*Query).Emit` under the PROBE-080 fixed-point property.
+- **Preconditions:** The REQ-117 catalogue corpus in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) / [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go), including the former v1 gap corpus asserting the gap is closed.
+- **Wire assertion:** In-repo property — for each catalogue shape, `ParseQuery` MUST return a structurally faithful AST (pinned per shape) and `Emit` MUST be a fixed point; the only remaining `ErrIncompleteAST` condition is the `LIMIT`/`OFFSET` Go-`int` overflow guard, which MUST still fire.
+- **Modes:** In-repo (unit-level property; no backend).
+- **Status:** Draft — planned under [2026-08-04-aql-expressivity-completion.md](../plans/2026-08-04-aql-expressivity-completion.md).
+- **Satisfies:** REQ-117.
+
+#### PROBE-088 — AQL builder containment and paging stability
+
+- **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR` with precedence-driven parenthesisation), and opt-in in-text `LIMIT`/`OFFSET` emit byte-stable canonical AQL, and a builder program using none of the new API produces byte-identical output to the pre-REQ-117 golden.
+- **Preconditions:** Golden fixtures under [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) covering the new constructs plus the untouched PROBE-020 golden.
+- **Wire assertion:** In-repo golden comparison — built query strings MUST match the committed goldens byte-for-byte; requesting both in-text and envelope paging MUST be a build-time error, never a silently combined emission.
+- **Modes:** In-repo (golden comparison; no backend).
+- **Status:** Draft — planned under [2026-08-04-aql-expressivity-completion.md](../plans/2026-08-04-aql-expressivity-completion.md).
+- **Satisfies:** REQ-117.
+
 #### PROBE-022 — OPT path resolution
 
 - **Title:** Parsing an ADL 1.4 operational template (OPT) and resolving a fixture-defined list of openEHR paths returns nodes whose RM type, archetype node id, and (for archetype roots) archetype id match the expected values; explicitly unknown attributes and unmatched predicates produce `ErrPathNotFound`.
