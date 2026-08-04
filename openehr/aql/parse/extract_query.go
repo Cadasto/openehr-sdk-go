@@ -90,6 +90,20 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 
 func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectClause {
 	out := SelectClause{Distinct: c.DISTINCT() != nil}
+	// The grammar profile keeps the deprecated `top` production
+	// (`selectClause : SELECT DISTINCT? top? selectExpr …`), but the AST has
+	// no carrier for it. Record a gap rather than drop it: a dropped TOP
+	// silently turns a bounded query into an unbounded one, which is exactly
+	// the no-silent-loss rule (REQ-117).
+	if top := c.Top(); top != nil {
+		// GetText concatenates tokens without separators, so report the
+		// INTEGER on its own rather than a mangled "TOP5".
+		n := "?"
+		if i := top.INTEGER(); i != nil {
+			n = i.GetText()
+		}
+		ex.incomplete("SELECT TOP %s is outside the catalogue — the structured AST has no carrier for a top clause", n)
+	}
 	columns := 0
 	for _, item := range c.AllSelectExpr() {
 		if item.SYM_ASTERISK() != nil {
@@ -103,8 +117,11 @@ func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectCl
 		out.Items = append(out.Items, ex.extractSelectItem(item))
 	}
 	// A bare `SELECT *` keeps its pre-REQ-117 shape — Star set, Items
-	// empty — so consumers reading only the flag are unaffected.
-	if out.Star && columns == 0 {
+	// empty — so consumers reading only the flag are unaffected. The
+	// collapse is deliberately limited to a SINGLE star: `SELECT *, *` is
+	// two projections and must keep both items, or the re-emitted query
+	// silently changes arity.
+	if out.Star && columns == 0 && len(out.Items) == 1 {
 		out.Items = nil
 	}
 	return out
@@ -212,6 +229,13 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 // it matches no grammar alternative at all.
 func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr {
 	if ip := t.IdentifiedPath(); ip != nil {
+		// A bare `true` / `false` keyword lexes as IDENTIFIER, so it arrives
+		// here as an identifiedPath. Lift it to a literal exactly as the
+		// WHERE-side terminalAsValue does, or the same construct would model
+		// as a path in SELECT and as a literal in WHERE (REQ-117).
+		if v, ok := bareKeywordLiteral(ip); ok {
+			return LiteralExpr{Value: v}
+		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
 	if fc := t.FunctionCall(); fc != nil {
@@ -684,6 +708,11 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 	if t := v.PARAMETER(); t != nil {
 		return ParamLimit{Name: strings.TrimPrefix(t.GetText(), "$")}
 	}
+	// Defensive: `limitValue : INTEGER | PARAMETER` is fully covered above,
+	// so this is unreachable today. Record a gap rather than drop the whole
+	// clause if the grammar profile ever widens — a dropped LIMIT/OFFSET
+	// silently returns more rows than the source asked for.
+	ex.incomplete("%s value %q is outside the catalogue", clause, v.GetText())
 	return nil
 }
 

@@ -266,6 +266,38 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 	}
 }
 
+// TestParseQuerySurfacesTopClauseGap pins the second residual catalogue gap
+// after REQ-117: the grammar profile retains the deprecated `top` production
+// (`selectClause : SELECT DISTINCT? top? selectExpr …`) but the AST has no
+// carrier for it. A source that sets TOP MUST surface aql.ErrIncompleteAST
+// rather than parse cleanly and re-emit without the clause — dropping it
+// silently turns a bounded query into an unbounded one.
+// PROBE-087
+func TestParseQuerySurfacesTopClauseGap(t *testing.T) {
+	for _, in := range []string{
+		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",
+		"SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c",
+		"SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c",
+		"SELECT DISTINCT TOP 5 c/uid/value FROM COMPOSITION c",
+	} {
+		t.Run(in, func(t *testing.T) {
+			q, err := parse.ParseQuery(in)
+			if !errors.Is(err, aql.ErrIncompleteAST) {
+				t.Fatalf("ParseQuery(%q) error = %v, want ErrIncompleteAST", in, err)
+			}
+			if q == nil {
+				t.Fatal("partial AST should be non-nil on a gap")
+			}
+			// Emit must refuse the partial AST with the same error, so a
+			// caller who ignored the parse error cannot emit the weaker
+			// query.
+			if _, eerr := q.Emit(); !errors.Is(eerr, aql.ErrIncompleteAST) {
+				t.Fatalf("Emit error = %v, want ErrIncompleteAST", eerr)
+			}
+		})
+	}
+}
+
 // TestParseQuerySurfacesIncompleteAST pins the RESIDUAL catalogue gap after
 // REQ-117: an integer literal that cannot be represented in the AST
 // (LIMIT / OFFSET beyond Go `int`) still surfaces aql.ErrIncompleteAST on

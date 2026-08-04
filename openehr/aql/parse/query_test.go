@@ -1121,3 +1121,66 @@ func TestParseQueryLimitOverflow(t *testing.T) {
 		t.Fatalf("ParseQuery overflow: want ErrIncompleteAST, got %v", err)
 	}
 }
+
+// TestSelectFunctionArgLiftsBareKeyword pins that a bare `true` / `false` /
+// `null` keyword in a SELECT function ARGUMENT is modelled as a literal, the
+// same as in the WHERE-side terminal position. The SDK lexer hands these
+// over as IDENTIFIER, so without the lift the argument would model as a
+// PathExpr and typed consumers would read the same construct differently
+// depending on the clause it sits in.
+// REQ-117
+func TestSelectFunctionArgLiftsBareKeyword(t *testing.T) {
+	cases := map[string]struct {
+		in       string
+		want     aql.Value
+		wantEmit string
+	}{
+		"concat_true": {
+			"SELECT CONCAT(true, 'x') FROM COMPOSITION c",
+			aql.BoolValue{B: true},
+			"SELECT CONCAT(true, 'x') FROM COMPOSITION c",
+		},
+		"length_false": {
+			"SELECT LENGTH(false) FROM COMPOSITION c",
+			aql.BoolValue{B: false},
+			"SELECT LENGTH(false) FROM COMPOSITION c",
+		},
+		// `null` is a grammar primitive rather than an IDENTIFIER, so it
+		// already lifts; it is pinned here so the two spellings of a bare
+		// keyword argument stay modelled the same way. Canonical emission
+		// upper-cases it.
+		"concat_null": {
+			"SELECT CONCAT(null, 'x') FROM COMPOSITION c",
+			aql.NullValue{},
+			"SELECT CONCAT(NULL, 'x') FROM COMPOSITION c",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+			if !ok {
+				t.Fatalf("SELECT item is %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+			}
+			lit, ok := fc.Args[0].(parse.LiteralExpr)
+			if !ok {
+				t.Fatalf("arg 0 is %T, want parse.LiteralExpr (a bare keyword is a literal, not a path)", fc.Args[0])
+			}
+			if lit.Value != tc.want {
+				t.Errorf("arg 0 value = %#v, want %#v", lit.Value, tc.want)
+			}
+			// Emission is unaffected by the lift, so the round-trip and the
+			// canonical form stay exactly as before.
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out != tc.wantEmit {
+				t.Errorf("Emit = %q, want %q", out, tc.wantEmit)
+			}
+		})
+	}
+}
