@@ -80,6 +80,20 @@ const (
 	OpLe Operator = "<="
 )
 
+// known reports whether o is one of the six operators the grammar's
+// COMPARISON_OPERATOR admits. Operator is a named string so a parsed query
+// keeps its wire spelling, which leaves the type open — [Compare] is the
+// first constructor to take one from the caller, so the value is checked at
+// validate time rather than emitted verbatim (REQ-117).
+func (o Operator) known() bool {
+	switch o {
+	case OpEq, OpNe, OpGt, OpGe, OpLt, OpLe:
+		return true
+	default:
+		return false
+	}
+}
+
 // Comparison is a `path <op> value` predicate. It is the concrete type both
 // the construction helpers ([Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]) and the
 // parser populate; consumers reading a parsed query type-assert
@@ -129,8 +143,20 @@ func (c Comparison) leftToken() string {
 }
 
 func (c Comparison) validate() error {
+	if !c.Op.known() {
+		return fmt.Errorf("%w: unknown comparison operator %q on %q",
+			ErrInvalidQuery, string(c.Op), c.leftToken())
+	}
 	if c.Left == nil && strings.TrimSpace(c.Path) == "" {
 		return fmt.Errorf("%w: empty path in %s comparison", ErrInvalidQuery, string(c.Op))
+	}
+	// Path and Left are the two spellings of ONE left operand, so setting
+	// both is a caller error, not a precedence question: leftToken would
+	// silently discard Path (REQ-117). The sibling MatchesExpr counts its
+	// operand forms the same way.
+	if c.Left != nil && strings.TrimSpace(c.Path) != "" {
+		return fmt.Errorf("%w: comparison sets both Path %q and a structured Left operand",
+			ErrInvalidQuery, c.Path)
 	}
 	if c.Left != nil {
 		if err := validateValue(c.Left); err != nil {

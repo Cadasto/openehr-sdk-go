@@ -321,3 +321,50 @@ func TestNullValueTokenIsUnquoted(t *testing.T) {
 		t.Errorf("FormatValue(Null) = %q, want NULL (no quotes)", got)
 	}
 }
+
+// TestComparisonRefusesConflictingOperands pins the exclusivity the
+// [aql.Comparison] doc asserts: Path carries the left operand for the
+// ordinary form, Left for the structured (function-call) form, and setting
+// BOTH must be refused rather than resolved by silently discarding Path.
+// The sibling MatchesExpr already counts its operand forms this way.
+// REQ-117
+func TestComparisonRefusesConflictingOperands(t *testing.T) {
+	_, err := aql.FormatWhere(aql.Comparison{
+		Path: "o/discarded",
+		Op:   aql.OpEq,
+		Val:  aql.Int(1),
+		Left: aql.Func("LENGTH", aql.Path("o/name/value")),
+	})
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "o/discarded") {
+		t.Errorf("error should name the conflicting path, got: %v", err)
+	}
+}
+
+// TestComparisonRefusesUnknownOperator pins that the comparison operator is
+// drawn from the closed Op* set. [aql.Compare] is the first constructor that
+// takes an Operator from the caller, so an empty or arbitrary string would
+// otherwise interpolate straight into the emitted AQL.
+// REQ-117
+func TestComparisonRefusesUnknownOperator(t *testing.T) {
+	for name, op := range map[string]aql.Operator{
+		"empty":      "",
+		"arbitrary":  "MATCHES {1} OR 1=1 AND o/y",
+		"wrong case": "eq",
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := aql.FormatWhere(aql.Compare(aql.Path("o/x"), op, aql.Int(1)))
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("op %q: err = %v, want ErrInvalidQuery", op, err)
+			}
+		})
+	}
+	// The closed set still passes.
+	for _, op := range []aql.Operator{aql.OpEq, aql.OpNe, aql.OpGt, aql.OpGe, aql.OpLt, aql.OpLe} {
+		if _, err := aql.FormatWhere(aql.Compare(aql.Path("o/x"), op, aql.Int(1))); err != nil {
+			t.Errorf("op %q: unexpected error %v", op, err)
+		}
+	}
+}

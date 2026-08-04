@@ -4,6 +4,7 @@ package aql
 // fields the public API cannot put into an out-of-catalogue state. The public
 // surface is covered from aql_test (see builder_test.go / paging_test.go); only
 // checks that need the internal seam live here.
+// REQ-117 · PROBE-088
 
 import (
 	"errors"
