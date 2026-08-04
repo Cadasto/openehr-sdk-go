@@ -96,6 +96,76 @@ func TestLintUnknownAlias(t *testing.T) {
 	}
 }
 
+// TestLintOrderBySelectAlias pins the REQ-117 lint acceptance: an ORDER BY key
+// that names no FROM/CONTAINS alias is resolved against the SELECT `AS`
+// aliases before aql_unknown_alias is raised. FROM is consulted first, and an
+// AS alias labels a projected column — never a path root — so a key carrying a
+// path tail stays unknown.
+func TestLintOrderBySelectAlias(t *testing.T) {
+	const from = " FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1]"
+	for _, tc := range []struct {
+		name        string
+		query       string
+		wantUnknown bool
+	}{
+		{
+			name:  "as_alias_hit",
+			query: "SELECT o/data[at0001]/value/magnitude AS score" + from + " ORDER BY score DESC",
+		},
+		{
+			name:  "as_alias_hit_no_direction",
+			query: "SELECT o/data[at0001]/value/magnitude AS score" + from + " ORDER BY score",
+		},
+		{
+			name:        "unknown_identifier",
+			query:       "SELECT o/name/value" + from + " ORDER BY nope",
+			wantUnknown: true,
+		},
+		{
+			// The SELECT alias reuses a FROM alias: FROM wins, and either
+			// resolution order leaves the query clean.
+			name:  "select_alias_shadows_from_alias",
+			query: "SELECT o/name/value AS o" + from + " ORDER BY o",
+		},
+		{
+			name:        "as_alias_with_path_tail",
+			query:       "SELECT o/name/value AS score" + from + " ORDER BY score/magnitude",
+			wantUnknown: true,
+		},
+		{
+			// The fallback is scoped to ORDER BY: a SELECT alias is not a
+			// WHERE operand root.
+			name:        "select_alias_not_visible_in_where",
+			query:       "SELECT o/name/value AS score" + from + " WHERE score = 1",
+			wantUnknown: true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString(tc.query, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
+// TestLintSelectAliasDoesNotBindClass pins the namespace separation behind
+// "FROM wins" (REQ-117): a SELECT `AS` alias resolves an ORDER BY key but
+// never enters the class-binding map, so Layer 3 cannot anchor a path to it.
+func TestLintSelectAliasDoesNotBindClass(t *testing.T) {
+	md := lint.Extract(mustParse(
+		t,
+		"SELECT o/name/value AS score FROM OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] "+
+			"ORDER BY score",
+	))
+	if _, ok := md.Aliases["score"]; ok {
+		t.Errorf("SELECT alias leaked into the class-binding map: %v", md.Aliases)
+	}
+	if len(md.SelectAliases) != 1 || md.SelectAliases[0] != "score" {
+		t.Errorf("SelectAliases = %v, want [score]", md.SelectAliases)
+	}
+}
+
 func TestLintFromArchetypeWarning(t *testing.T) {
 	r := lint.LintString("SELECT c FROM COMPOSITION c", nil)
 	if !has(r, "aql_from_archetype") {

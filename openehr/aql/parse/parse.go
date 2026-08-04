@@ -66,6 +66,12 @@ type Document struct {
 	HasOrderBy bool
 	HasLimit   bool
 
+	// SelectAliases are the `AS` aliases declared on SELECT projection
+	// items, in document order; a projection without an AS clause
+	// contributes nothing. They are a namespace of their own — an ORDER BY
+	// key MAY name one instead of a FROM/CONTAINS alias (REQ-117), which is
+	// why they are NOT merged into [Document.Classes].
+	SelectAliases []string
 	// Classes are the class expressions bound in the FROM / CONTAINS tree,
 	// flattened to document order.
 	Classes []ClassExpr
@@ -203,6 +209,13 @@ func (d *Document) populate() {
 		for _, e := range exprs {
 			if e.SYM_ASTERISK() != nil {
 				d.Star = true
+			}
+			// REQ-117: `columnExpr AS alias` — the only IDENTIFIER that is a
+			// direct child of selectExpr is the AS alias (a columnExpr's own
+			// identifiers sit deeper). Kept in lockstep with the structured
+			// extractor's extractSelectItem.
+			if id := e.IDENTIFIER(); id != nil {
+				d.SelectAliases = append(d.SelectAliases, id.GetText())
 			}
 		}
 	}
