@@ -176,7 +176,7 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	// TERMINOLOGY call has no `name` token and no Terminal children; its
 	// three STRING arguments are modelled as literal operands (REQ-117).
 	if tf := c.TerminologyFunction(); tf != nil {
-		out := FunctionCall{Name: terminologyName}
+		out := FunctionCall{Name: aql.TerminologyFunc}
 		for _, s := range terminologyArgs(tf) {
 			out.Args = append(out.Args, LiteralExpr{Value: s})
 		}
@@ -211,11 +211,6 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 	}
 	return nil
 }
-
-// terminologyName is the canonical (upper-case) name of the AQL
-// `TERMINOLOGY(op, api, params)` function, emitted for every
-// terminologyFunction position regardless of source casing.
-const terminologyName = "TERMINOLOGY"
 
 // terminologyArgs lifts a terminologyFunction's three STRING arguments
 // into the shared value vocabulary, in grammar order (operation, api,
@@ -595,7 +590,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 func (ex *astExtractor) functionCallAsValue(c gen.IFunctionCallContext) (aql.Value, string) {
 	// Grammar alternative `functionCall : terminologyFunction`.
 	if tf := c.TerminologyFunction(); tf != nil {
-		return aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)}, ""
+		return aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}, ""
 	}
 	out := aql.FuncCall{Name: functionName(c)}
 	for _, t := range c.AllTerminal() {
@@ -916,7 +911,7 @@ func likeOperandValue(c gen.ILikeOperandContext) aql.Value {
 // the lexer token is unquoted — into URI.
 func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) aql.WhereExpr {
 	if tf := c.TerminologyFunction(); tf != nil {
-		fc := aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)}
+		fc := aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}
 		return aql.MatchesExpr{Path: path, Terminology: &fc}
 	}
 	if u := c.URI(); u != nil {
@@ -939,7 +934,7 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 			continue
 		}
 		if tf := it.TerminologyFunction(); tf != nil {
-			out = append(out, aql.FuncCall{Name: terminologyName, Args: terminologyArgs(tf)})
+			out = append(out, aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)})
 		}
 	}
 	if len(out) == 0 {
