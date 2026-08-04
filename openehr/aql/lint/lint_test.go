@@ -166,6 +166,38 @@ func TestLintSelectAliasDoesNotBindClass(t *testing.T) {
 	}
 }
 
+// TestLintBooleanComparisonOperand pins the second REQ-117 lint acceptance: a
+// boolean literal as a comparison operand is a literal, not a path. The SDK
+// lexer lexes `true` / `false` as IDENTIFIER (the IDENTIFIER rule precedes
+// BOOLEAN), so the operand used to reach the alias check as a pseudo-path and
+// draw aql_unknown_alias.
+func TestLintBooleanComparisonOperand(t *testing.T) {
+	const head = "SELECT s/is_queryable FROM EHR e " +
+		"CONTAINS COMPOSITION s[openEHR-EHR-COMPOSITION.encounter.v1] WHERE s/is_queryable "
+	for _, tc := range []struct {
+		name        string
+		predicate   string
+		wantUnknown bool
+	}{
+		{name: "true", predicate: "= true"},
+		{name: "false", predicate: "= false"},
+		{name: "uppercase", predicate: "!= TRUE"},
+		{name: "null", predicate: "= null"},
+		{name: "parameter", predicate: "= $flag"},
+		// A genuine path operand keeps its alias check: `zz` binds nothing.
+		{name: "unbound_path_operand", predicate: "= zz/other", wantUnknown: true},
+		// …and a bound one stays clean.
+		{name: "bound_path_operand", predicate: "= e/ehr_id/value"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := lint.LintString(head+tc.predicate, nil)
+			if got := has(r, "aql_unknown_alias"); got != tc.wantUnknown {
+				t.Fatalf("aql_unknown_alias = %v, want %v (codes %v)", got, tc.wantUnknown, codes(r))
+			}
+		})
+	}
+}
+
 func TestLintFromArchetypeWarning(t *testing.T) {
 	r := lint.LintString("SELECT c FROM COMPOSITION c", nil)
 	if !has(r, "aql_from_archetype") {

@@ -773,17 +773,8 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 		return v, ""
 	}
 	if ip := c.IdentifiedPath(); ip != nil {
-		// Boolean keyword lexed as IDENTIFIER (lexer rule order:
-		// IDENTIFIER precedes BOOLEAN, so `true` / `false` parse as
-		// an IDENTIFIER-only IdentifiedPath).
-		txt := ip.GetText()
-		switch strings.ToLower(txt) {
-		case "true":
-			return aql.BoolValue{B: true}, ""
-		case "false":
-			return aql.BoolValue{B: false}, ""
-		case "null":
-			return aql.NullValue{}, ""
+		if v, ok := keywordLiteralValue(ip.GetText()); ok {
+			return v, ""
 		}
 		// REQ-117: an identified path in a value position — carried as
 		// structured alias + segments, not raw text.
@@ -794,6 +785,28 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 		return ex.functionCallAsValue(fc)
 	}
 	return nil, ""
+}
+
+// keywordLiteralValue maps a bare literal keyword occupying a comparison
+// `terminal` position to its typed [aql.Value]. The SDK lexer lexes `true` /
+// `false` as IDENTIFIER (the IDENTIFIER rule precedes BOOLEAN in AqlLexer.g4),
+// so they arrive as an IDENTIFIER-only identifiedPath rather than a primitive;
+// `null` is included because the same rule order could shift. Reports
+// ok=false for any other text.
+//
+// Shared by the structured extractor ([astExtractor.terminalAsValue]) and the
+// flat lint view ([extractor.EnterIdentifiedPath]) so both agree these are
+// literals, not paths (REQ-117).
+func keywordLiteralValue(text string) (aql.Value, bool) {
+	switch strings.ToLower(text) {
+	case "true":
+		return aql.BoolValue{B: true}, true
+	case "false":
+		return aql.BoolValue{B: false}, true
+	case "null":
+		return aql.NullValue{}, true
+	}
+	return nil, false
 }
 
 // primitiveAsValue lifts a Primitive to an [aql.Value] — STRING /

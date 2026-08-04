@@ -178,6 +178,15 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 }
 
 func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
+	// REQ-117: a bare `true` / `false` in a comparison-terminal position is a
+	// literal operand, not a path — the SDK lexer hands it to this listener
+	// as an IDENTIFIER-only identifiedPath. Skipping it keeps the flat lint
+	// view from reporting a spurious aql_unknown_alias for a grammar-admitted,
+	// server-executable shape, and keeps it in lockstep with
+	// terminalAsValue, which lifts the same shape to a typed [aql.Value].
+	if isKeywordTerminal(c) {
+		return
+	}
 	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clauseOf(c)}
 	ip.Raw = c.GetText()
 	if id := c.IDENTIFIER(); id != nil {
@@ -199,6 +208,23 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 		}
 	}
 	e.paths = append(e.paths, ip)
+}
+
+// isKeywordTerminal reports whether c is a bare literal keyword occupying a
+// comparison `terminal` (right-hand operand) position — the one place the
+// grammar admits a literal where the lexer yields an IDENTIFIER. Anything
+// qualified by a path predicate or an object path (`true/nested`) is a real
+// path whatever it is rooted at, and a keyword anywhere else (a SELECT
+// projection, an ORDER BY key) is left alone.
+func isKeywordTerminal(c *gen.IdentifiedPathContext) bool {
+	if c.PathPredicate() != nil || c.ObjectPath() != nil {
+		return false
+	}
+	if _, ok := c.GetParent().(*gen.TerminalContext); !ok {
+		return false
+	}
+	_, ok := keywordLiteralValue(c.GetText())
+	return ok
 }
 
 // VisitTerminal collects $parameter references from anywhere in the tree,

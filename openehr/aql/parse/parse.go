@@ -76,7 +76,9 @@ type Document struct {
 	// flattened to document order.
 	Classes []ClassExpr
 	// Paths are every alias-qualified identified path across the SELECT,
-	// WHERE, and ORDER BY clauses, in document order.
+	// WHERE, and ORDER BY clauses, in document order. A bare `true` /
+	// `false` comparison operand is a literal, not a path, and is absent
+	// even though the lexer yields it as an IDENTIFIER (REQ-117).
 	Paths []IdentifiedPath
 	// Params are the distinct $parameter names referenced anywhere in the
 	// query, in first-seen order, with the leading `$` stripped.

@@ -80,6 +80,44 @@ func TestExtractPaths(t *testing.T) {
 	}
 }
 
+// TestExtractPathsSkipsBooleanKeywordOperand pins REQ-117: a bare
+// `true` / `false` in a comparison-terminal position is a boolean literal, not
+// a path, even though the SDK lexer hands it to the flat extractor as an
+// IDENTIFIER-only identifiedPath (the IDENTIFIER rule precedes BOOLEAN in
+// AqlLexer.g4). The flat view must agree with the structured extractor, which
+// lifts the same shape to an aql.BoolValue.
+func TestExtractPathsSkipsBooleanKeywordOperand(t *testing.T) {
+	for _, q := range []string{
+		"SELECT s/is_queryable FROM COMPOSITION s WHERE s/is_queryable = true",
+		"SELECT s/is_queryable FROM COMPOSITION s WHERE s/is_queryable != FALSE",
+	} {
+		doc, err := parse.Parse(q)
+		if err != nil {
+			t.Fatalf("parse %q: %v", q, err)
+		}
+		// The two real paths are the SELECT and WHERE `s/is_queryable`.
+		if len(doc.Paths) != 2 {
+			t.Errorf("%q: Paths = %d, want 2: %+v", q, len(doc.Paths), doc.Paths)
+		}
+		for _, p := range doc.Paths {
+			if p.Alias != "s" {
+				t.Errorf("%q: unexpected path alias %q (%+v)", q, p.Alias, p)
+			}
+		}
+	}
+
+	// A path rooted at an identifier that merely CONTAINS a keyword, or a
+	// keyword carrying a path tail, is a real path and stays recorded.
+	doc, err := parse.Parse("SELECT s/x FROM COMPOSITION s WHERE s/x = true/nested")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Paths) != 3 {
+		t.Errorf("keyword with a path tail must stay a path: Paths = %d, want 3: %+v",
+			len(doc.Paths), doc.Paths)
+	}
+}
+
 func TestExtractParams(t *testing.T) {
 	doc, err := parse.Parse(representativeQuery)
 	if err != nil {
