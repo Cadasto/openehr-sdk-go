@@ -95,6 +95,29 @@ func builderRoundTripCases() []struct {
 				aql.ContainsAnd(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev")),
 			)).Build()
 		}},
+		// A junction may only END a containment chain (the grammar cannot
+		// chain CONTAINS after a parenthesised group), so the three legal
+		// neighbours of that boundary are pinned here: the junction closing a
+		// longer chain, closing the Builder-level chain, and the rewrite the
+		// Build refusal points the caller at — the tail written INSIDE the
+		// junction's operands. The refusals themselves are in
+		// containment_test.go; this corpus is the "every accepted build
+		// re-parses" half of the same invariant.
+		{"junction_ends_longer_chain", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(aql.Class("SECTION", "s")).
+				Contains(aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev")))).Build()
+		}},
+		{"junction_ends_builder_chain", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c")).
+				Contains(aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))).Build()
+		}},
+		{"tail_inside_junction_operands", func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").Contains(aql.ContainsOr(
+				aql.Class("OBSERVATION", "o").NotContains(aql.Class("ACTION", "a")),
+				aql.Class("EVALUATION", "ev"),
+			))).Build()
+		}},
 		{"negated_junction_at_root", func() (aql.Query, error) {
 			return sel().NotContains(aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))).Build()
 		}},

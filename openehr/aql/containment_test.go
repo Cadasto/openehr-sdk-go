@@ -229,6 +229,97 @@ func TestContainmentBuildRefusals(t *testing.T) {
 	}
 }
 
+// TestContainmentJunctionMustTerminateChain locks the grammar limit REQ-117
+// works within: `containsExpr` admits a parenthesised group only as a WHOLE
+// alternative (`'(' containsExpr ')'`), which no `CONTAINS` may follow. A
+// junction therefore has to END the containment chain it sits in; a junction
+// with a further term after it in the same chain is inexpressible and MUST be
+// refused at Build rather than emitted as AQL the parser rejects
+// (`… CONTAINS (OBSERVATION o OR EVALUATION ev) NOT CONTAINS ACTION a`).
+// Re-shaping the tree instead — distributing the tail under the junction's
+// operands — would silently change what the query means, so the builder fails
+// closed and the caller writes the nesting they meant.
+// REQ-117
+func TestContainmentJunctionMustTerminateChain(t *testing.T) {
+	junction := func() aql.Containment {
+		return aql.ContainsOr(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev"))
+	}
+	sel := func() *aql.Builder {
+		return aql.NewBuilder().Select(aql.Col("x")).From("EHR", "e")
+	}
+
+	refused := map[string]func() (aql.Query, error){
+		// The chain continues with a NOT CONTAINS connector.
+		"junction then negated term in one expression": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(junction()).
+				NotContains(aql.Class("ACTION", "a"))).Build()
+		},
+		// … and with a plain CONTAINS connector.
+		"junction then plain term in one expression": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(junction()).
+				Contains(aql.Class("SECTION", "s"))).Build()
+		},
+		// Repeated Builder.Contains calls are one chain, so the rule spans them.
+		"junction then term across builder calls": func() (aql.Query, error) {
+			return sel().Contains(junction()).Contains(aql.Class("ACTION", "a")).Build()
+		},
+		"junction then negated term across builder calls": func() (aql.Query, error) {
+			return sel().Contains(junction()).NotContains(aql.Class("ACTION", "a")).Build()
+		},
+		// The offending chain is itself an operand of an outer junction.
+		"junction mid-chain inside an and operand": func() (aql.Query, error) {
+			return sel().Contains(aql.ContainsAnd(
+				aql.Class("COMPOSITION", "c").Contains(junction()).Contains(aql.Class("SECTION", "s")),
+				aql.Class("ACTION", "a"),
+			)).Build()
+		},
+	}
+	for name, build := range refused {
+		t.Run(name, func(t *testing.T) {
+			q, err := build()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v (query %q), want ErrInvalidQuery", err, q.String())
+			}
+		})
+	}
+
+	// Positive controls: a junction that ENDS its chain stays buildable, in
+	// every position the refusals cover, and so does the rewrite the error
+	// message points the caller at (the tail written inside the operands).
+	// containment_roundtrip_test.go additionally re-parses these.
+	accepted := map[string]func() (aql.Query, error){
+		"junction ends a longer chain": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").
+				Contains(aql.Class("SECTION", "s")).
+				Contains(junction())).Build()
+		},
+		"junction ends the builder chain": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c")).Contains(junction()).Build()
+		},
+		"junction operand of a junction is unordered": func() (aql.Query, error) {
+			return sel().Contains(aql.ContainsOr(
+				aql.ContainsAnd(aql.Class("OBSERVATION", "o"), aql.Class("EVALUATION", "ev")),
+				aql.ContainsAnd(aql.Class("INSTRUCTION", "i"), aql.Class("ACTION", "a")),
+			)).Build()
+		},
+		"tail written inside the junction operands": func() (aql.Query, error) {
+			return sel().Contains(aql.Class("COMPOSITION", "c").Contains(aql.ContainsOr(
+				aql.Class("OBSERVATION", "o").NotContains(aql.Class("ACTION", "a")),
+				aql.Class("EVALUATION", "ev"),
+			))).Build()
+		},
+	}
+	for name, build := range accepted {
+		t.Run(name, func(t *testing.T) {
+			if _, err := build(); err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+		})
+	}
+}
+
 // TestContainmentNoStrayKeywords guards the whitespace rule of the
 // canonical form: exactly one space around every keyword, no doubled
 // spaces, no space inside the parentheses.

@@ -237,7 +237,11 @@ func (a *ast) build() (Query, error) {
 	}
 	// REQ-117: a containment term is a whole expression (chain, negation,
 	// junction), so alias uniqueness and the class-completeness rule are
-	// checked over the entire tree.
+	// checked over the entire tree. Repeated Contains / NotContains calls emit
+	// as ONE chain, so the junction-placement rule spans them as well.
+	if err := validateContainsChain(a.contains); err != nil {
+		return Query{}, err
+	}
 	seen := map[string]bool{a.from.alias: true}
 	for _, c := range a.contains {
 		if err := c.validateTree(seen); err != nil {

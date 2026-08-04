@@ -22,6 +22,12 @@ import (
 // with neither a class nor operands is unrepresentable) rather than silently
 // dropping it.
 //
+// A junction may only END a containment chain. The grammar's `containsExpr`
+// admits a parenthesised group as a whole alternative, which no CONTAINS may
+// follow, so a junction with a further term after it in the same chain — from
+// either [Containment.Contains] or [Builder.Contains] — is refused by
+// [Builder.Build]. Write the deeper nesting inside the junction's operands.
+//
 // A junction always sits below a CONTAINS keyword here. A junction at the FROM
 // ROOT (`FROM COMPOSITION c1 OR COMPOSITION c2`) is grammar-admitted and the
 // parse side models it, but it has no builder entry point — the write side
@@ -217,10 +223,11 @@ func (c Containment) emitOperands() string {
 }
 
 // validateTree walks the containment tree and reports the first structural
-// defect: a class node missing its RM type or alias, and any alias already
+// defect: a class node missing its RM type or alias, any alias already
 // recorded in seen (aliases are query-scoped, so two branches of a junction
-// may not reuse one). Mirrors parse's duplicateAlias walk so the read and
-// write sides refuse the same trees.
+// may not reuse one), and a junction in a non-final chain position. Mirrors
+// parse's duplicateAlias walk so the read and write sides refuse the same
+// trees.
 func (c Containment) validateTree(seen map[string]bool) error {
 	if !c.isJunction() {
 		if c.rmType == "" || c.alias == "" {
@@ -230,10 +237,38 @@ func (c Containment) validateTree(seen map[string]bool) error {
 			return fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
 		}
 		seen[c.alias] = true
+		// REQ-117: a class node's children are a CONTAINS chain, so the
+		// junction-placement rule applies. A junction node's children are
+		// unordered operands — no CONTAINS keyword separates them — so the
+		// rule deliberately does NOT apply there.
+		if err := validateContainsChain(c.children); err != nil {
+			return err
+		}
 	}
 	for _, ch := range c.children {
 		if err := ch.validateTree(seen); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// validateContainsChain refuses a junction anywhere but the END of a CONTAINS
+// chain (REQ-117). The grammar takes a parenthesised group as a whole
+// alternative — `containsExpr : classExprOperand (NOT? CONTAINS containsExpr)?
+// | '(' containsExpr ')' | …` — so nothing may follow one with a CONTAINS
+// keyword, and a junction with a further term after it emits AQL the parser
+// rejects (`… CONTAINS (OBSERVATION o OR EVALUATION ev) NOT CONTAINS ACTION
+// a`). Build fails closed here to keep the REQ-055 structural guarantee that
+// the typed builders cannot emit syntactically invalid AQL; re-shaping the
+// tree instead (distributing the tail under the junction's operands) would
+// silently change what the query means, so the caller writes the nesting
+// they meant.
+func validateContainsChain(chain []Containment) error {
+	for _, c := range chain[:max(len(chain)-1, 0)] {
+		if c.isJunction() {
+			return fmt.Errorf("%w: containment junction followed by a further CONTAINS term — a junction may "+
+				"only end a containment chain; write the deeper nesting inside its operands", ErrInvalidQuery)
 		}
 	}
 	return nil
