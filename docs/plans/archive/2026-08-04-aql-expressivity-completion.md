@@ -33,7 +33,7 @@ Close the declared expressivity gaps that force AQL-consuming engines and corpus
 | Step | Status |
 |---|---|
 | Spec / registry updated (`traceability.yaml`, REQ.md row, § REQ-117, PROBE-087/088) | done (Phase 0) |
-| Phase 1 — vocabulary + extractor + emitter | done — all eight closures; residual = the unrepresentable-integer guard |
+| Phase 1 — vocabulary + extractor + emitter | done — all eight closures; residual = the unrepresentable-numeric and `SELECT TOP` guards |
 | Phase 2 — lint acceptance | done — ORDER BY on a SELECT `AS` alias; boolean literal comparison operand |
 | Phase 3 — builder algebra + in-text paging | done — `Class`/`Contains`/`NotContains`/`ContainsAnd`/`ContainsOr` + `LimitInline`/`OffsetInline`; PROBE-088 goldens |
 | Phase 4 — close-out (spec status, examples, CHANGELOG, archive) | done — REQ-117 `landed`, PROBE-087/088 Implemented, both AQL examples extended, plan archived |

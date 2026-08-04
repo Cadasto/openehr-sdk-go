@@ -938,9 +938,10 @@ requirements:
     # across the catalogue, plus the residual-gap suite asserting
     # ParseQuery and Emit both surface aql.ErrIncompleteAST. The corpus
     # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04):
-    # the extractor now covers the whole SDK grammar profile and the lone
-    # residual refusal is an unrepresentable integer literal — see the
-    # REQ-117 row and PROBE-087, which own that closure.
+    # the extractor now covers the whole SDK grammar profile and the
+    # residual refusals are an unrepresentable numeric literal and a
+    # SELECT TOP clause — see the REQ-117 row and PROBE-087, which own
+    # that closure.
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
@@ -1056,8 +1057,9 @@ requirements:
     status: draft
     # Closes the REQ-113 v1 structured-AST catalogue gaps (all grammar-admitted
     # already — no grammar-profile change), widens the REQ-109 lint gate's two
-    # documented over-rejections (ORDER BY on a SELECT alias; boolean literal
-    # comparison operands), and gives the REQ-055 builder the containment
+    # documented over-rejections (ORDER BY on a SELECT alias; bare boolean
+    # literals in comparison-operand and SELECT positions), and gives the
+    # REQ-055 builder the containment
     # algebra (NOT CONTAINS, sibling AND/OR) plus opt-in in-text LIMIT/OFFSET
     # that the parse side already models. Driven by consumers building AQL
     # execution engines and conformance corpora on the structured AST, where
@@ -1070,10 +1072,12 @@ requirements:
     # arguments, path-valued operands (aql.PathValue), structured MATCHES
     # TERMINOLOGY / {URI} operands, the FROM-root containment junction
     # (parse.FromClause.Junction), and junctions over any in-catalogue operand.
-    # The single residual ErrIncompleteAST class is an INTEGER literal the AST
-    # cannot represent — LIMIT/OFFSET beyond Go `int`, or a primitive beyond
-    # int64 in a value position (aql.IntValue is an int64; degrading to a float
-    # would be silent loss) — pinned by TestParseQuerySurfacesIncompleteAST,
+    # The complete residual ErrIncompleteAST list is two classes: a numeric
+    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, an
+    # INTEGER beyond int64, or a REAL beyond float64, in any value position;
+    # degrading would be silent precision loss), pinned by
+    # TestParseQuerySurfacesIncompleteAST, and a SELECT TOP clause, pinned
+    # by TestParseQuerySurfacesTopClauseGap —
     # with TestFormerCatalogueGapsModelled asserting the nine round-trip cases covering the eight closed gap shapes
     # now parse, emit, and round-trip (PROBE-087).
     #

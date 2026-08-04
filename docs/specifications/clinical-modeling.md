@@ -999,7 +999,7 @@ All additions are **additive to the canonical write form** ([wire.md § REQ-055]
 
 ### Acceptance
 
-- **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; the overflow guard still fires.
+- **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; both residual guards — the unrepresentable numeric literal and `SELECT TOP` — still fire (`TestParseQuerySurfacesIncompleteAST`, `TestParseQuerySurfacesTopClauseGap`).
 - **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** — canonical-string stability goldens for the new builder constructs (the PROBE-020 property extended).
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
 - **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) — REQ-117 (archived after Phase 4).
