@@ -69,6 +69,18 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"version_latest", "SELECT v FROM EHR e CONTAINS VERSION v[latest_version]"},
 		{"limit_param", "SELECT e FROM EHR e LIMIT $rows"},
 		{"limit_offset_param", "SELECT e FROM EHR e LIMIT $rows OFFSET $skip"},
+
+		// REQ-117 catalogue closures (PROBE-087): shapes that used to
+		// surface aql.ErrIncompleteAST now round-trip.
+		{"select_literal_int", "SELECT 1, e/ehr_id/value FROM EHR e"},
+		{"select_literal_string_alias", "SELECT 'urgent' AS label FROM EHR e"},
+		{"select_literal_real", "SELECT 1.5 FROM EHR e"},
+		{"select_literal_bool", "SELECT true FROM EHR e"},
+		{"select_star_mixed", "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"},
+		{"select_star_after_column", "SELECT c/uid/value, * FROM EHR e CONTAINS COMPOSITION c"},
+		{"select_count_star_literal_alias", "SELECT COUNT(*), 1, e/x AS a FROM EHR e"},
+		{"select_function_args", "SELECT CONCAT('hello', $p, LENGTH(p/name)) FROM EHR e CONTAINS PERSON p"},
+		{"select_terminology_lowercase", "SELECT terminology('SNOMED-CT','near','12345') FROM EHR e"},
 	}
 
 	for _, tc := range cases {
@@ -117,6 +129,14 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT c FROM EHR e CONTAINS COMPOSITION c[$template]",
 		"SELECT v FROM EHR e CONTAINS VERSION v[all_versions]",
 		"SELECT e FROM EHR e LIMIT $rows OFFSET $skip",
+
+		// REQ-117 catalogue closures (PROBE-087).
+		"SELECT 1, e/ehr_id/value FROM EHR e",
+		"SELECT 'urgent' AS label FROM EHR e",
+		"SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c",
+		"SELECT COUNT(*), 1, e/x AS a FROM EHR e",
+		"SELECT CONCAT('hello', $p, LENGTH(p/name)) FROM EHR e CONTAINS PERSON p",
+		"SELECT TERMINOLOGY('SNOMED-CT', 'near', '12345') FROM EHR e",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {
@@ -135,24 +155,60 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 	}
 }
 
-// TestParseQuerySurfacesIncompleteAST pins that catalogue gaps surface
-// as aql.ErrIncompleteAST on ParseQuery rather than silently dropping
-// the dropped clause / argument / projection — the structural
-// recommendation from the REQ-113 review.
+// TestFormerCatalogueGapsModelled pins the REQ-117 catalogue closures:
+// every input below used to surface aql.ErrIncompleteAST from the v1
+// extractor. ParseQuery MUST now model it without a gap, Emit MUST render
+// it, and the emission MUST be a fixed point (the PROBE-080 property
+// extended to the closed shapes).
+// PROBE-087
+func TestFormerCatalogueGapsModelled(t *testing.T) {
+	cases := []struct {
+		name, in string
+	}{
+		{"primitive_in_select", "SELECT 1 FROM EHR e"},
+		{"select_star_mix", "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"},
+		{"concat_primitive_arg", "SELECT CONCAT('hello', p/name) FROM EHR e CONTAINS PERSON p"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc, err := parse.Parse(tc.in)
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", tc.in, err)
+			}
+			if qerr := doc.QueryErr(); qerr != nil {
+				t.Fatalf("QueryErr(%q) = %v, want nil (shape is in catalogue per REQ-117)", tc.in, qerr)
+			}
+			emit1, err := doc.Query().Emit()
+			if err != nil {
+				t.Fatalf("Emit(%q): %v", tc.in, err)
+			}
+			q2, err := parse.ParseQuery(emit1)
+			if err != nil {
+				t.Fatalf("ParseQuery(canonical %q): %v", emit1, err)
+			}
+			emit2, err := q2.Emit()
+			if err != nil {
+				t.Fatalf("second Emit: %v", err)
+			}
+			if emit1 != emit2 {
+				t.Errorf("emission not a fixed point\n  input: %s\n  emit1: %s\n  emit2: %s", tc.in, emit1, emit2)
+			}
+		})
+	}
+}
+
+// TestParseQuerySurfacesIncompleteAST pins the RESIDUAL catalogue gap after
+// REQ-117: an integer literal that cannot be represented in the AST
+// (LIMIT / OFFSET beyond Go `int`) still surfaces aql.ErrIncompleteAST on
+// ParseQuery and still refuses to render on Emit, rather than silently
+// dropping the clause.
+// PROBE-087
 func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 	cases := []struct {
 		name, in, reason string
 	}{
-		{"primitive_in_select", "SELECT 1 FROM EHR e", "Primitive literal in SELECT"},
-		{"select_star_mix", "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c", "SELECT mixes `*`"},
-		{"function_call_where_lhs", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE LENGTH(o/name) > 5", "function-call WHERE LHS"},
-		{"path_vs_path", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = o/y", "identifiedPath RHS"},
-		{"from_junction", "SELECT e FROM EHR e OR EHR f", "FROM top-level boolean junction"},
-		{"matches_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')", "MATCHES terminology"},
-		{"matches_uri", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}", "MATCHES terminology"},
-		{"and_junction_dropped_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5", "AND/OR junction dropped"},
-		{"concat_primitive_arg", "SELECT CONCAT('hello', p/name) FROM EHR e CONTAINS PERSON p", "Parameter or Primitive argument"},
 		{"limit_overflow", "SELECT e FROM EHR e LIMIT 9223372036854775808", "out of range"},
+		{"offset_overflow", "SELECT e FROM EHR e LIMIT 10 OFFSET 9223372036854775808", "out of range"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

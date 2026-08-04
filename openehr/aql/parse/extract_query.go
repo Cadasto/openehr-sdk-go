@@ -85,18 +85,22 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 
 func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectClause {
 	out := SelectClause{Distinct: c.DISTINCT() != nil}
+	columns := 0
 	for _, item := range c.AllSelectExpr() {
 		if item.SYM_ASTERISK() != nil {
 			out.Star = true
+			// REQ-117: record the star's POSITION as an item so a mixed
+			// `SELECT *, col` projection stays order-preserving.
+			out.Items = append(out.Items, SelectItem{Expr: StarExpr{}})
 			continue
 		}
+		columns++
 		out.Items = append(out.Items, ex.extractSelectItem(item))
 	}
-	// Star + columns mix: grammar permits it but the structured Query
-	// has no carrier for both. Surface so emit doesn't silently drop
-	// the column list.
-	if out.Star && len(out.Items) > 0 {
-		ex.incomplete("SELECT mixes `*` with column projections — only one form is supported per query")
+	// A bare `SELECT *` keeps its pre-REQ-117 shape — Star set, Items
+	// empty — so consumers reading only the flag are unaffected.
+	if out.Star && columns == 0 {
+		out.Items = nil
 	}
 	return out
 }
@@ -123,10 +127,24 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 		return ex.extractFunctionCall(fc)
 	}
 	if p := c.Primitive(); p != nil {
-		ex.incomplete("Primitive literal in SELECT projection (`%s`) is outside the v1 catalogue", p.GetText())
-		return nil
+		// REQ-117: a primitive literal projection carries the shared
+		// value vocabulary.
+		return ex.primitiveAsSelectExpr(p)
 	}
 	return nil
+}
+
+// primitiveAsSelectExpr lifts a Primitive into a [LiteralExpr] (REQ-117).
+// A primitive the value vocabulary cannot represent — an integer literal
+// beyond int64 — records a gap rather than degrading the literal to a
+// float, so the loss is never silently emitted.
+func (ex *astExtractor) primitiveAsSelectExpr(p gen.IPrimitiveContext) SelectExpr {
+	v := primitiveAsValue(p)
+	if v == nil {
+		ex.incomplete("primitive literal %q is out of range for the value vocabulary", p.GetText())
+		return nil
+	}
+	return LiteralExpr{Value: v}
 }
 
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
@@ -145,6 +163,16 @@ func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCal
 }
 
 func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) FunctionCall {
+	// Grammar alternative `functionCall : terminologyFunction` — the
+	// TERMINOLOGY call has no `name` token and no Terminal children; its
+	// three STRING arguments are modelled as literal operands (REQ-117).
+	if tf := c.TerminologyFunction(); tf != nil {
+		out := FunctionCall{Name: terminologyName}
+		for _, s := range terminologyArgs(tf) {
+			out.Args = append(out.Args, LiteralExpr{Value: s})
+		}
+		return out
+	}
 	out := FunctionCall{Name: functionName(c)}
 	for _, t := range c.AllTerminal() {
 		if expr := ex.terminalAsSelectExpr(t); expr != nil {
@@ -154,11 +182,11 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	return out
 }
 
-// terminalAsSelectExpr lifts a Terminal context into a SelectExpr —
-// either a PathExpr (when the terminal carries an identifiedPath) or
-// a nested FunctionCall. Parameter and Primitive terminals (e.g.
-// `MAX(42)`, `COUNT($id)`) are outside the SELECT vocabulary today;
-// the caller decides whether to record a catalogue gap.
+// terminalAsSelectExpr lifts a Terminal context into a SelectExpr — a
+// PathExpr (identifiedPath), a nested FunctionCall, or a LiteralExpr for
+// a parameter / primitive argument (`CONCAT('a', $p, LENGTH(x/y))` —
+// REQ-117). Returns nil only when the terminal carries a primitive the
+// value vocabulary cannot represent, in which case a gap is recorded.
 func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr {
 	if ip := t.IdentifiedPath(); ip != nil {
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
@@ -166,10 +194,30 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 	if fc := t.FunctionCall(); fc != nil {
 		return ex.extractFunctionCall(fc)
 	}
-	if t.PARAMETER() != nil || t.Primitive() != nil {
-		ex.incomplete("Parameter or Primitive argument in function call (`%s`) is outside the v1 SELECT catalogue", t.GetText())
+	if p := t.PARAMETER(); p != nil {
+		return LiteralExpr{Value: aql.ParamValue{Name: strings.TrimPrefix(p.GetText(), "$")}}
+	}
+	if p := t.Primitive(); p != nil {
+		return ex.primitiveAsSelectExpr(p)
 	}
 	return nil
+}
+
+// terminologyName is the canonical (upper-case) name of the AQL
+// `TERMINOLOGY(op, api, params)` function, emitted for every
+// terminologyFunction position regardless of source casing.
+const terminologyName = "TERMINOLOGY"
+
+// terminologyArgs lifts a terminologyFunction's three STRING arguments
+// into the shared value vocabulary, in grammar order (operation, api,
+// params) — REQ-117.
+func terminologyArgs(c gen.ITerminologyFunctionContext) []aql.Value {
+	strs := c.AllSTRING()
+	out := make([]aql.Value, 0, len(strs))
+	for _, s := range strs {
+		out = append(out, unquoteAQLString(s.GetText()))
+	}
+	return out
 }
 
 func aggregateName(c gen.IAggregateFunctionCallContext) string {

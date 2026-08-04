@@ -199,6 +199,185 @@ func TestParseQueryStarSelect(t *testing.T) {
 	}
 }
 
+// TestParseQuerySelectPrimitiveLiteral pins REQ-117 catalogue shape 1: a
+// primitive literal projected from SELECT is a [parse.LiteralExpr] carrying
+// the shared [aql.Value] vocabulary, in source order alongside path items.
+// PROBE-087
+func TestParseQuerySelectPrimitiveLiteral(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT 1, e/ehr_id/value FROM EHR e")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if len(q.Select.Items) != 2 {
+		t.Fatalf("Select.Items len = %d, want 2", len(q.Select.Items))
+	}
+	lit, ok := q.Select.Items[0].Expr.(parse.LiteralExpr)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.LiteralExpr", q.Select.Items[0].Expr)
+	}
+	iv, ok := lit.Value.(aql.IntValue)
+	if !ok || iv.N != 1 {
+		t.Errorf("LiteralExpr.Value = %#v, want aql.IntValue{1}", lit.Value)
+	}
+	if _, ok := q.Select.Items[1].Expr.(parse.PathExpr); !ok {
+		t.Errorf("Select.Items[1].Expr = %T, want parse.PathExpr", q.Select.Items[1].Expr)
+	}
+	if out, err := q.Emit(); err != nil || out != "SELECT 1, e/ehr_id/value FROM EHR e" {
+		t.Errorf("Emit = %q, %v; want the canonical input", out, err)
+	}
+}
+
+// TestParseQuerySelectLiteralAlias covers an aliased string literal
+// projection (`SELECT 'x' AS label`) — the literal carries the shared
+// StringValue and the AS alias survives on the item (REQ-117).
+// PROBE-087
+func TestParseQuerySelectLiteralAlias(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT 'urgent' AS label FROM EHR e")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	item := q.Select.Items[0]
+	if item.Alias != "label" {
+		t.Errorf("SelectItem.Alias = %q, want label", item.Alias)
+	}
+	lit, ok := item.Expr.(parse.LiteralExpr)
+	if !ok {
+		t.Fatalf("Expr = %T, want parse.LiteralExpr", item.Expr)
+	}
+	if sv, ok := lit.Value.(aql.StringValue); !ok || sv.S != "urgent" {
+		t.Errorf("LiteralExpr.Value = %#v, want aql.StringValue{urgent}", lit.Value)
+	}
+}
+
+// TestParseQuerySelectStarWithColumns pins REQ-117 catalogue shape 2: a
+// star mixed with column projections is an ORDER-PRESERVING item list
+// carrying a [parse.StarExpr] at the star's position, while the
+// query-level Star flag keeps its pre-REQ-117 meaning.
+// PROBE-087
+func TestParseQuerySelectStarWithColumns(t *testing.T) {
+	const src = "SELECT *, c/uid/value FROM EHR e CONTAINS COMPOSITION c"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if !q.Select.Star {
+		t.Errorf("Select.Star = false; want true (compatibility flag stays set)")
+	}
+	if len(q.Select.Items) != 2 {
+		t.Fatalf("Select.Items len = %d, want 2 (star + column)", len(q.Select.Items))
+	}
+	if _, ok := q.Select.Items[0].Expr.(parse.StarExpr); !ok {
+		t.Errorf("Select.Items[0].Expr = %T, want parse.StarExpr", q.Select.Items[0].Expr)
+	}
+	pe, ok := q.Select.Items[1].Expr.(parse.PathExpr)
+	if !ok {
+		t.Fatalf("Select.Items[1].Expr = %T, want parse.PathExpr", q.Select.Items[1].Expr)
+	}
+	if pe.Raw != "c/uid/value" {
+		t.Errorf("Select.Items[1] path Raw = %q, want c/uid/value", pe.Raw)
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out != src {
+		t.Errorf("Emit\n  in:  %s\n  out: %s", src, out)
+	}
+}
+
+// TestParseQuerySelectColumnAfterStarOrder pins that the star's POSITION
+// is preserved — `SELECT col, *` keeps the column first (REQ-117).
+// PROBE-087
+func TestParseQuerySelectColumnAfterStarOrder(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c/uid/value, * FROM EHR e CONTAINS COMPOSITION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if len(q.Select.Items) != 2 {
+		t.Fatalf("Select.Items len = %d, want 2", len(q.Select.Items))
+	}
+	if _, ok := q.Select.Items[0].Expr.(parse.PathExpr); !ok {
+		t.Errorf("Select.Items[0].Expr = %T, want parse.PathExpr", q.Select.Items[0].Expr)
+	}
+	if _, ok := q.Select.Items[1].Expr.(parse.StarExpr); !ok {
+		t.Errorf("Select.Items[1].Expr = %T, want parse.StarExpr", q.Select.Items[1].Expr)
+	}
+}
+
+// TestParseQuerySelectFunctionArguments pins REQ-117 catalogue shape 7 on
+// the SELECT side: primitive, parameter, and nested-function arguments in a
+// function call all model structurally, in argument order.
+// PROBE-087
+func TestParseQuerySelectFunctionArguments(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT CONCAT('hello', $p, LENGTH(p/name)) FROM EHR e CONTAINS PERSON p")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+	}
+	if fc.Name != "CONCAT" {
+		t.Errorf("FunctionCall.Name = %q, want CONCAT", fc.Name)
+	}
+	if len(fc.Args) != 3 {
+		t.Fatalf("FunctionCall.Args len = %d, want 3", len(fc.Args))
+	}
+	lit, ok := fc.Args[0].(parse.LiteralExpr)
+	if !ok {
+		t.Fatalf("Args[0] = %T, want parse.LiteralExpr", fc.Args[0])
+	}
+	if sv, ok := lit.Value.(aql.StringValue); !ok || sv.S != "hello" {
+		t.Errorf("Args[0].Value = %#v, want aql.StringValue{hello}", lit.Value)
+	}
+	param, ok := fc.Args[1].(parse.LiteralExpr)
+	if !ok {
+		t.Fatalf("Args[1] = %T, want parse.LiteralExpr", fc.Args[1])
+	}
+	if pv, ok := param.Value.(aql.ParamValue); !ok || pv.Name != "p" {
+		t.Errorf("Args[1].Value = %#v, want aql.ParamValue{p}", param.Value)
+	}
+	nested, ok := fc.Args[2].(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Args[2] = %T, want parse.FunctionCall", fc.Args[2])
+	}
+	if nested.Name != "LENGTH" || len(nested.Args) != 1 {
+		t.Errorf("nested call = %+v, want LENGTH with one argument", nested)
+	}
+	if _, ok := nested.Args[0].(parse.PathExpr); !ok {
+		t.Errorf("nested Args[0] = %T, want parse.PathExpr", nested.Args[0])
+	}
+}
+
+// TestParseQuerySelectTerminologyFunction pins the grammar's
+// `functionCall : terminologyFunction` alternative in a SELECT column: the
+// TERMINOLOGY call models as a named FunctionCall with its three string
+// arguments, upper-cased canonically (REQ-117).
+// PROBE-087
+func TestParseQuerySelectTerminologyFunction(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT terminology('SNOMED-CT','near','12345') FROM EHR e")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+	}
+	if fc.Name != "TERMINOLOGY" {
+		t.Errorf("FunctionCall.Name = %q, want TERMINOLOGY", fc.Name)
+	}
+	if len(fc.Args) != 3 {
+		t.Fatalf("FunctionCall.Args len = %d, want 3", len(fc.Args))
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if want := "SELECT TERMINOLOGY('SNOMED-CT', 'near', '12345') FROM EHR e"; out != want {
+		t.Errorf("Emit = %q, want %q", out, want)
+	}
+}
+
 // TestParseQueryAggregateCountStar pins extraction shape for COUNT(*):
 // FunctionCall with Star=true and empty Args.
 func TestParseQueryAggregateCountStar(t *testing.T) {
@@ -471,8 +650,9 @@ func TestDocumentQueryErrContract(t *testing.T) {
 	if qerr := doc.QueryErr(); qerr != nil {
 		t.Errorf("QueryErr on clean parse = %v, want nil", qerr)
 	}
-	// Same accessor on a catalogue-gap query returns the gap error.
-	gapDoc, err := parse.Parse("SELECT 1 FROM EHR e")
+	// Same accessor on a catalogue-gap query returns the gap error. The
+	// residual gap after REQ-117 is the LIMIT/OFFSET int-overflow guard.
+	gapDoc, err := parse.Parse("SELECT e FROM EHR e LIMIT 9223372036854775808")
 	if err != nil {
 		t.Fatal(err)
 	}

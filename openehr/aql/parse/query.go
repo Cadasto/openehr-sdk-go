@@ -99,20 +99,24 @@ func (l ParamLimit) token() string { return "$" + l.Name }
 
 // SelectClause is the SELECT projection list.
 //
-// `Distinct` mirrors the `SELECT DISTINCT` keyword; `Star` is true for
-// the bare `SELECT *` form (SDK-AQL-002 relaxation), in which case
-// `Items` is empty. Otherwise `Items` carries one entry per projected
-// expression in source order.
+// `Distinct` mirrors the `SELECT DISTINCT` keyword; `Star` is true when
+// the projection carries a `*` (SDK-AQL-002 relaxation). For the BARE
+// `SELECT *` form `Items` is empty — the flag alone carries the
+// projection. Otherwise `Items` carries one entry per projected
+// expression in source order, including a [StarExpr] at the star's
+// position when a star is mixed with column projections
+// (`SELECT *, c/uid/value` — REQ-117).
 type SelectClause struct {
 	Distinct bool
 	Star     bool
 	Items    []SelectItem
 }
 
-// SelectItem is one projected expression in a SELECT list. `Expr` is
-// either a [PathExpr] (a bare alias-qualified path) or a [FunctionCall]
-// (an aggregate or function wrapper around one or more paths). `Alias`
-// is the AS alias when the source used `<expr> AS <name>`; empty
+// SelectItem is one projected expression in a SELECT list. `Expr` is one
+// of the [SelectExpr] shapes — a [PathExpr] (a bare alias-qualified
+// path), a [FunctionCall] (an aggregate or function wrapper), a
+// [LiteralExpr] (a primitive or parameter literal), or a [StarExpr].
+// `Alias` is the AS alias when the source used `<expr> AS <name>`; empty
 // otherwise.
 type SelectItem struct {
 	Expr  SelectExpr
@@ -120,9 +124,14 @@ type SelectItem struct {
 }
 
 // SelectExpr is the sealed type of a SELECT operand. The concrete
-// shapes are [PathExpr] and [FunctionCall]; consumers dispatch via
-// type assertion. Adding a new shape (e.g. arithmetic, literal
-// projection) MUST land here and in the extractor at the same time.
+// shapes are [PathExpr], [FunctionCall], [LiteralExpr], and [StarExpr];
+// consumers dispatch via type assertion.
+//
+// The set grows ADDITIVELY as the catalogue closes further grammar
+// positions (REQ-117), so a consumer type-switching over it MUST treat
+// an unrecognised case as out-of-catalogue — refuse, skip, or report —
+// and MUST NOT panic on it. Adding a new shape lands here, in the
+// extractor, and in the emitter at the same time.
 type SelectExpr interface {
 	isSelectExpr()
 }
@@ -133,6 +142,28 @@ type PathExpr struct {
 }
 
 func (PathExpr) isSelectExpr() {}
+
+// LiteralExpr is a primitive or parameter literal projected from a
+// SELECT — `SELECT 1, e/ehr_id/value FROM …` — or supplied as a
+// function-call argument (`CONCAT('a', $p, …)`). Value carries the
+// shared [aql.Value] vocabulary the WHERE side uses, so a consumer
+// reads a projected literal and a compared literal through one model
+// (REQ-117).
+type LiteralExpr struct {
+	Value aql.Value
+}
+
+func (LiteralExpr) isSelectExpr() {}
+
+// StarExpr is an explicit `*` projection item. It appears in
+// [SelectClause.Items] only when the star is mixed with column
+// projections (`SELECT *, c/uid/value`), so the item list stays
+// order-preserving; the bare `SELECT *` form leaves Items empty and is
+// carried by [SelectClause.Star] alone (REQ-117). Star is true in both
+// cases.
+type StarExpr struct{}
+
+func (StarExpr) isSelectExpr() {}
 
 // FunctionCall is an aggregate or function wrapping one or more SELECT
 // operands — `COUNT(o)`, `MAX(o/data[at0001]/value/magnitude)`,
@@ -286,7 +317,10 @@ func (q *Query) Emit() (string, error) {
 		sb.WriteString("DISTINCT ")
 	}
 	switch {
-	case q.Select.Star:
+	// Items lead: a mixed `SELECT *, col` carries the star as a
+	// [StarExpr] item, so the list is authoritative whenever it is
+	// populated (REQ-117). The bare `SELECT *` form has no items.
+	case len(q.Select.Items) == 0 && q.Select.Star:
 		sb.WriteByte('*')
 	case len(q.Select.Items) == 0:
 		return "", fmt.Errorf("%w: empty SELECT projection", aql.ErrInvalidQuery)
@@ -380,6 +414,16 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 	switch v := e.(type) {
 	case PathExpr:
 		return v.Raw, nil
+	case StarExpr:
+		// REQ-117: an explicit star item inside a mixed projection list.
+		return "*", nil
+	case LiteralExpr:
+		// REQ-117: a primitive / parameter literal projection, rendered
+		// through the shared value emitter so escaping matches WHERE.
+		if v.Value == nil {
+			return "", fmt.Errorf("%w: SELECT literal with nil value", aql.ErrInvalidQuery)
+		}
+		return aql.FormatValue(v.Value), nil
 	case FunctionCall:
 		var body string
 		switch {
