@@ -221,6 +221,8 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 6. **FROM / CONTAINS** — every class carries an alias (`EHR e`, `OBSERVATION o`); archetype predicates attach in square brackets (`OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2]`); consecutive `CONTAINS` express nested containment. The builders emit EHR scoping as a `WHERE <alias>/ehr_id/value = $param` condition so it composes with other conditions in one clause; the standing-predicate form (`EHR e[ehr_id/value=$param]`) is equally valid AQL but is not what the builders emit.
 7. **Clause order** — the AQL string emits `SELECT … FROM … WHERE … ORDER BY`; the builder is the sole author of `Query.Q` for built queries. Paging (OFFSET / LIMIT) is carried in the request envelope (`Query.Offset` / `Query.Fetch`), not the string, so paging has a single channel.
 
+Additively since REQ-117, the canonical forms for negated containment (`NOT CONTAINS`), sibling containment junctions (`AND` / `OR`, parenthesised only where precedence requires), and the **opt-in in-text `LIMIT` / `OFFSET`** — which relaxes rules 1 and 7 only for callers who explicitly request it, the envelope staying the default and combining the two channels being a build-time error — are specified by [clinical-modeling.md § REQ-117](clinical-modeling.md#req-117--aql-expression-catalogue-completion) and asserted by PROBE-088.
+
 The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) and is asserted by PROBE-020.
 
 ### AQL executor
