@@ -257,6 +257,12 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 	}{
 		{"limit_overflow", "SELECT e FROM EHR e LIMIT 9223372036854775808", "out of range"},
 		{"offset_overflow", "SELECT e FROM EHR e LIMIT 10 OFFSET 9223372036854775808", "out of range"},
+		// The same unrepresentable-integer class in a VALUE position: the
+		// shared vocabulary's IntValue is an int64, so a wider literal is
+		// refused rather than degraded to a float.
+		{"select_literal_overflow", "SELECT 99999999999999999999 FROM EHR e", "out of range"},
+		{"comparison_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x > 99999999999999999999", "out of range"},
+		{"matches_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {99999999999999999999}", "out of range"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

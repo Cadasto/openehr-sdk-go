@@ -73,6 +73,10 @@ type Query struct {
 // LimitExpr is the sealed type of a LIMIT / OFFSET value. Concrete shapes
 // are [IntLimit] (integer literal) and [ParamLimit] (parameter-bound limit
 // — the AQL `LIMIT $n` form). Consumers dispatch via type assertion.
+//
+// The set grows ADDITIVELY (REQ-117), so a consumer type-switching over it
+// MUST treat an unrecognised case as out-of-catalogue — refuse, skip, or
+// report — and MUST NOT panic on it.
 type LimitExpr interface {
 	isLimitExpr()
 	// token is the canonical wire form: an integer literal for [IntLimit],
@@ -294,15 +298,20 @@ func (d OrderDir) String() string {
 // (Builder) and the round-trip suites here (parse).
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
-// q produced by [ParseQuery] — the v1 catalogue is the buildable
-// grammar plus the parser-only shapes (NotExpr / ExistsExpr / LikeExpr
-// / MatchesExpr) and the typed LIMIT / OFFSET forms ([IntLimit] +
-// [ParamLimit]). Source shapes outside the v1 extractor catalogue
-// produce a PARTIAL Query — clauses that extracted cleanly are
+// q produced by [ParseQuery] — since REQ-117 the catalogue is the whole
+// SDK grammar profile (see [aql.ErrIncompleteAST] for the residual
+// integer-literal refusal). A source shape the extractor cannot model
+// produces a PARTIAL Query — clauses that extracted cleanly are
 // populated, dropped clauses are left zero-value — plus an
 // [aql.ErrIncompleteAST] error from [ParseQuery]. Emit on a partial
 // AST refuses with the same error so a caller who ignored the parse
 // return cannot accidentally emit semantically wrong AQL.
+//
+// Canonical form for the constructs REQ-117 added: function names
+// upper-cased, arguments joined by `, `, `TERMINOLOGY(a, b, c)` as a bare
+// MATCHES operand (no braces) and `{uri}` for the URI form, and
+// containment junctions parenthesised only where the grouping is
+// load-bearing (see [emitContainmentOperands]).
 //
 // Returns an error wrapping [aql.ErrInvalidQuery] when the AST carries
 // a malformed sub-expression (a nil WHERE comparison value, an empty

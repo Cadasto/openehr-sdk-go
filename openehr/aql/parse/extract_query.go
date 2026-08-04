@@ -5,11 +5,16 @@ package parse
 // type-free [Query] AST. Pure recursive descent — no
 // listeners, no shared mutable state between calls.
 //
-// Catalogue: the v1 supported shapes are the buildable grammar plus the
-// parser-only shapes (Not / Exists / Like / Matches). Inputs that parse
-// cleanly but contain an out-of-catalogue shape surface as
-// [aql.ErrIncompleteAST] from [ParseQuery] / [Document.QueryErr] so the
-// loss is visible at parse time, not silently dropped at emit.
+// Catalogue: since REQ-117 the supported shapes are the whole SDK grammar
+// profile — the buildable grammar, the parser-only predicates (Not /
+// Exists / Like / Matches incl. its TERMINOLOGY and {URI} operands),
+// literal and star SELECT items, function calls on either side of a
+// comparison, path-valued operands, and boolean junctions at the FROM root
+// and in WHERE. The residual refusal is an INTEGER literal the AST cannot
+// represent (see [aql.ErrIncompleteAST]); it — and any defensive gap a
+// widened grammar would trip — surfaces as [aql.ErrIncompleteAST] from
+// [ParseQuery] / [Document.QueryErr] so the loss is visible at parse time,
+// not silently dropped at emit.
 
 import (
 	"fmt"
@@ -131,6 +136,10 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 		// value vocabulary.
 		return ex.primitiveAsSelectExpr(p)
 	}
+	// Defensive: every columnExpr alternative in the SDK grammar profile is
+	// handled above, so this is unreachable today — record a gap rather
+	// than drop a projection silently if the grammar ever widens.
+	ex.incomplete("SELECT projection %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -502,6 +511,8 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			path := pathRaw(ip)
 			return aql.Exists(path)
 		}
+		ex.incomplete("EXISTS operand %q is outside the catalogue", c.GetText())
+		return nil
 	}
 	// Parenthesised inner identifiedExpr.
 	if c.SYM_LEFT_PAREN() != nil {
@@ -518,12 +529,16 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return aql.Like(path, v)
 				}
 			}
+			// Defensive: likeOperand is `STRING | PARAMETER`, both
+			// modelled — a gap here can only mean a widened grammar.
+			ex.incomplete("LIKE operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		if c.MATCHES() != nil {
 			if op := c.MatchesOperand(); op != nil {
 				return ex.matchesExpr(path, op)
 			}
+			ex.incomplete("MATCHES operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		// path <op> terminal — the comparison form.
@@ -543,6 +558,8 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: &parsed.IdentifiedPath}
 				}
 			}
+			ex.incomplete("comparison %q is outside the catalogue", c.GetText())
+			return nil
 		}
 	}
 	// Function-call LHS in WHERE (e.g. `LENGTH(x) > 5`) — grammar
@@ -756,7 +773,7 @@ func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, stri
 	if p := c.Primitive(); p != nil {
 		v := primitiveAsValue(p)
 		if v == nil {
-			return nil, "unsupported primitive form"
+			return nil, fmt.Sprintf("literal %q is out of range for the value vocabulary", p.GetText())
 		}
 		return v, ""
 	}
@@ -926,6 +943,9 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		}
 	}
 	if len(out) == 0 {
+		// The grammar requires at least one valueListItem, so an empty
+		// list means every member was refused above (each recorded a gap)
+		// — never a silent drop.
 		return nil
 	}
 	return aql.Matches(path, out...)
