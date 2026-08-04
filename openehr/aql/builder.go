@@ -57,8 +57,25 @@ func (b *Builder) FromEHR(alias string, id Value) *Builder {
 	return b
 }
 
-// Contains appends a CONTAINS containment to the FROM clause.
+// Contains appends a CONTAINS containment to the FROM clause. Repeated calls
+// chain (`… CONTAINS A CONTAINS B`), matching the grammar's right-greedy
+// `CONTAINS containsExpr`.
+//
+// Since REQ-117 the argument may be a whole containment expression — a nested
+// chain ([Containment.Contains] / [Containment.NotContains]) or a sibling
+// junction ([ContainsAnd] / [ContainsOr]) — not only a single class. A single
+// class emits exactly as it did before.
 func (b *Builder) Contains(c Containment) *Builder {
+	c.negated = false
+	b.ast.contains = append(b.ast.contains, c)
+	return b
+}
+
+// NotContains appends a containment connected by NOT CONTAINS — the grammar's
+// `classExprOperand NOT CONTAINS containsExpr` (REQ-117), i.e. the absence of
+// c below the preceding term. Otherwise identical to [Builder.Contains].
+func (b *Builder) NotContains(c Containment) *Builder {
+	c.negated = true
 	b.ast.contains = append(b.ast.contains, c)
 	return b
 }
@@ -110,19 +127,6 @@ type SelectField struct{ path string }
 
 // Col is a projected path or alias, e.g. Col("o") or Col("o/data[at0001]").
 func Col(path string) SelectField { return SelectField{path: strings.TrimSpace(path)} }
-
-// Containment is a CONTAINS term in the FROM clause. Construct with [Archetype].
-type Containment struct {
-	rmType      string
-	alias       string
-	archetypeID string
-}
-
-// Archetype is a containment constraint: `<rmType> <alias>[<archetypeID>]`. An
-// empty archetypeID emits `<rmType> <alias>` with no predicate.
-func Archetype(rmType, alias, archetypeID string) Containment {
-	return Containment{rmType: rmType, alias: alias, archetypeID: archetypeID}
-}
 
 // Direction is an ORDER BY sort direction.
 type Direction int
@@ -180,15 +184,14 @@ func (a *ast) build() (Query, error) {
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
 	}
+	// REQ-117: a containment term is a whole expression (chain, negation,
+	// junction), so alias uniqueness and the class-completeness rule are
+	// checked over the entire tree.
 	seen := map[string]bool{a.from.alias: true}
 	for _, c := range a.contains {
-		if c.rmType == "" || c.alias == "" {
-			return Query{}, fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
+		if err := c.validateTree(seen); err != nil {
+			return Query{}, err
 		}
-		if seen[c.alias] {
-			return Query{}, fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
-		}
-		seen[c.alias] = true
 	}
 
 	var sb strings.Builder
@@ -206,15 +209,11 @@ func (a *ast) build() (Query, error) {
 	sb.WriteString(a.from.alias)
 
 	for _, c := range a.contains {
-		sb.WriteString(" CONTAINS ")
-		sb.WriteString(c.rmType)
-		sb.WriteByte(' ')
-		sb.WriteString(c.alias)
-		if c.archetypeID != "" {
-			sb.WriteByte('[')
-			sb.WriteString(c.archetypeID)
-			sb.WriteByte(']')
-		}
+		// REQ-117: the connector carries the term's negation, and emit
+		// renders the whole containment expression (chain / junction) —
+		// a single class emits the pre-REQ-117 bytes unchanged.
+		sb.WriteString(c.connector())
+		sb.WriteString(c.emit())
 	}
 
 	// The implicit ehr_id filter from FromEHR AND-combines with any explicit
