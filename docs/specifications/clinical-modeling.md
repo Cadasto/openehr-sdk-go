@@ -556,7 +556,7 @@ The parse layer **MUST** validate against the **SDK-maintained grammar profile**
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
 
-Two grammar-admitted, server-executable shapes are explicit **acceptances** of the alias-binding check, specified by [§ REQ-117](#req-117--aql-expression-catalogue-completion): an `ORDER BY` key that binds no FROM / CONTAINS alias is resolved against the SELECT `AS` aliases before `aql_unknown_alias` is raised (FROM / CONTAINS is consulted first, and an `AS` alias labels a projected column, so it never binds a class for Layer 3 nor admits a path tail); and a bare boolean literal in a comparison-operand position (`WHERE s/is_queryable = true`) is a literal, not a path root, so it raises no alias issue. Codes, severities, and the collect-all contract are unchanged.
+Two grammar-admitted, server-executable shapes are explicit **acceptances** of the alias-binding check; the resolution rules are specified normatively by [§ REQ-117 — Lint acceptance](#req-117--aql-expression-catalogue-completion). Codes, severities, and the collect-all contract are unchanged.
 
 ### Layer 3 — Path & template (only when a compiled OPT is supplied)
 
@@ -953,8 +953,6 @@ Both are refused loudly rather than degraded. Beyond that class the extractor ke
 
 ## REQ-117 — AQL expression-catalogue completion
 
-**Status:** Draft · **Implementation:** landed · **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) (archived after Phase 4)
-
 Consumers building AQL execution engines and conformance tooling on the structured AST ([§ REQ-113](#req-113--execution-oriented-parsed-aql-ast)) need the catalogue to cover the **whole SDK grammar profile**, not a subset: every v1 catalogue gap forces a consumer to refuse the statement wholesale (`aql.ErrIncompleteAST` is fail-closed by design), so each gap is a query shape no downstream engine can accept even when its own execution layer could. The same consumers author benchmark and conformance corpora through the builder, which could not express containment shapes the grammar (and the parse side) already admit.
 
 ### Structured-AST catalogue (extends REQ-113)
@@ -981,7 +979,7 @@ New vocabulary MUST live in [`openehr/aql`](../../openehr/aql/) and be introspec
 The static lint gate MUST NOT reject these grammar-admitted, server-executable shapes:
 
 - **`ORDER BY` referencing a SELECT alias** (`SELECT x/y AS score … ORDER BY score`): an ORDER BY identifier that names no FROM alias MUST be resolved against the SELECT `AS` aliases before `aql_unknown_alias` is raised. An identifier matching neither remains `aql_unknown_alias`.
-- **Boolean literal comparison operands** (`WHERE s/is_queryable = true`).
+- **Boolean literal operands** — a bare `true` / `false` keyword in a value position, whether a comparison operand (`WHERE s/is_queryable = true`) or a SELECT projection item (`SELECT true`), is a literal and MUST NOT be treated as a path root. A keyword carrying a path predicate or a path tail (`true/nested`) stays a path and keeps its alias check, and so does an `ORDER BY` key (the grammar's `orderByExpr` admits no literal).
 
 Existing REQ-109 codes, their meanings, and the collect-all/deterministic-order contract are unchanged; lint-clean remains neither spec-conformance nor execute-success (the CDR stays the execute-time authority, [PROBE-021](conformance.md#probe-021--aql-parse-error-mapping)).
 
@@ -997,10 +995,11 @@ A containment junction MUST be the **final** child of the chain it sits in: the 
 
 A builder entry point for a **containment junction at the FROM root** (`FROM COMPOSITION c1 OR COMPOSITION c2`, which the read side models via `parse.FromClause.Junction`) is **deferred** until a consumer needs write-side root junctions: the builder keeps a single root class, so `Builder.From` / `Builder.FromEHR` are unchanged and a builder-emitted FROM root is never parenthesised.
 
-All additions are **additive to the canonical write form** ([wire.md § REQ-055](wire.md#req-055--wire-boundary)): a builder program that uses none of the new API MUST produce byte-identical output to today (semver-minor). Canonical forms for the new constructs: single space around `AND`/`OR`/`NOT CONTAINS` keywords; parentheses only where required by precedence; `LIMIT`/`OFFSET` emitted after ORDER BY in clause order.
+All additions are **additive to the canonical write form** ([wire.md § REQ-055](wire.md#req-055--wire-boundary)): a builder program that uses none of the new API MUST produce byte-identical output to today (semver-minor). The canonical form for the new constructs MUST be: a single space around the `AND` / `OR` / `NOT CONTAINS` keywords; parentheses only where required by precedence; `LIMIT` / `OFFSET` emitted after ORDER BY in clause order.
 
 ### Acceptance
 
 - **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; the overflow guard still fires.
 - **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** — canonical-string stability goldens for the new builder constructs (the PROBE-020 property extended).
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
+- **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) — REQ-117 (archived after Phase 4).

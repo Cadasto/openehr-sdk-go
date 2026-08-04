@@ -1080,9 +1080,15 @@ requirements:
     # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
     # SelectAliases so an ORDER BY key resolves FROM/CONTAINS first, then the
     # SELECT `AS` aliases (TestLintOrderBySelectAlias,
-    # TestLintSelectAliasDoesNotBindClass); a bare boolean comparison operand
-    # is no longer collected as a pseudo-path (TestLintBooleanComparisonOperand,
-    # TestExtractPathsSkipsBooleanKeywordOperand).
+    # TestLintSelectAliasDoesNotBindClass); a bare boolean keyword in a value
+    # position — a comparison operand OR a SELECT projection item — is no longer
+    # collected as a pseudo-path, and the structured AST carries it as a typed
+    # literal on both sides (TestLintBooleanComparisonOperand,
+    # TestLintSelectBooleanKeywordLiteral,
+    # TestExtractPathsSkipsBooleanKeywordOperand,
+    # TestExtractPathsSkipsBooleanKeywordSelectItem,
+    # TestParseQuerySelectKeywordLiteral). An ORDER BY key is excluded: the
+    # grammar's orderByExpr admits no literal, so it stays a path.
     #
     # Builder (PROBE-088): aql.Containment became a whole expression —
     # Class/Archetype leaves, Contains/NotContains nesting, ContainsAnd/
@@ -1116,6 +1122,7 @@ requirements:
       - openehr/aql/containment_test.go
       - openehr/aql/containment_roundtrip_test.go
       - openehr/aql/paging_test.go
+      - openehr/aql/builder_internal_test.go
       - testkit/probes/aql/probes_test.go
     plans:
       - docs/plans/archive/2026-08-04-aql-expressivity-completion.md

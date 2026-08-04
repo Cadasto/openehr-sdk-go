@@ -334,7 +334,7 @@ client scenarios to SDK coverage:
 - **Title:** The builder's negated containment (`NOT CONTAINS`), sibling containment junctions (`AND`/`OR` with precedence-driven parenthesisation), and opt-in in-text `LIMIT`/`OFFSET` emit byte-stable canonical AQL, and a builder program using none of the new API produces byte-identical output to the pre-REQ-117 golden.
 - **Preconditions:** Golden fixtures under [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) covering the new constructs plus the untouched PROBE-020 golden.
 - **Wire assertion:** In-repo golden comparison — built query strings MUST match the committed goldens byte-for-byte; requesting both in-text and envelope paging MUST be a build-time error, never a silently combined emission.
-- **Modes:** In-repo (golden comparison; no backend).
+- **Modes:** Sandbox.
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/aql/probe_088_builder_containment_paging.go`](../../testkit/probes/aql/probe_088_builder_containment_paging.go), run by `TestProbe088BuilderContainmentAndPaging`; goldens in [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/). Every golden is additionally re-parsed and re-emitted (`TestProbe088GoldensRoundTripThroughParse`), which ties the write-side canonicaliser to PROBE-087; the paging channel-exclusivity refusals are pinned in [`openehr/aql/paging_test.go`](../../openehr/aql/paging_test.go).
 - **Satisfies:** REQ-117.
 
