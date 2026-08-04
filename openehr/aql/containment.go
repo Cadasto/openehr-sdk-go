@@ -21,6 +21,12 @@ import (
 // The zero value is not a valid term: [Builder.Build] refuses it (an operand
 // with neither a class nor operands is unrepresentable) rather than silently
 // dropping it.
+//
+// A junction always sits below a CONTAINS keyword here. A junction at the FROM
+// ROOT (`FROM COMPOSITION c1 OR COMPOSITION c2`) is grammar-admitted and the
+// parse side models it, but it has no builder entry point — the write side
+// keeps a single root class, so the FROM root is never parenthesised and
+// [Builder.From] / [Builder.FromEHR] stay unchanged.
 type Containment struct {
 	rmType      string
 	alias       string
