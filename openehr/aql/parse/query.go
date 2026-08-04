@@ -183,15 +183,26 @@ type FunctionCall struct {
 
 func (FunctionCall) isSelectExpr() {}
 
-// FromClause is the FROM clause: a root class plus the optional
-// containment tree below it.
+// FromClause is the FROM clause: either a root class plus the optional
+// containment tree below it, or a boolean junction of containment
+// operands.
 //
 // `Root` is the leftmost class expression (e.g. `EHR e`, `COMPOSITION c`,
 // `EHR e[ehr_id/value=$x]`). `Contains` is the optional CONTAINS
 // expression rooted at the FROM root; nil when no CONTAINS appears.
+//
+// `Junction` carries a boolean junction AT the FROM root
+// (`FROM COMPOSITION c1 OR COMPOSITION c2`, incl. AND and grouping) —
+// the same [Containment] tree the nested side already uses (REQ-117).
+// It is nil for the ordinary single-root FROM, so `Root` keeps working
+// unchanged there. When Junction is non-nil the clause has NO single
+// root class, so `Root` and `Contains` are left ZERO: a consumer that
+// only reads `Root` sees an empty FROM (and its own validation refuses)
+// rather than a silently truncated one.
 type FromClause struct {
 	Root     ClassExpr
 	Contains *Containment
+	Junction *Containment
 }
 
 // Containment is one node in the CONTAINS tree.
@@ -338,14 +349,21 @@ func (q *Query) Emit() (string, error) {
 	}
 
 	// FROM
-	if q.From.Root.RMType == "" {
+	if q.From.Junction == nil && q.From.Root.RMType == "" {
 		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
 	}
 	if dup := duplicateAlias(q.From); dup != "" {
 		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
 	}
 	sb.WriteString(" FROM ")
-	sb.WriteString(emitClassExpr(q.From.Root))
+	if q.From.Junction != nil {
+		// REQ-117: a junction AT the root needs no grouping parentheses —
+		// nothing encloses it. Nested junctions keep the parentheses
+		// emitContainment writes for them.
+		sb.WriteString(emitContainmentOperands(*q.From.Junction))
+	} else {
+		sb.WriteString(emitClassExpr(q.From.Root))
+	}
 	if q.From.Contains != nil {
 		// Containment.Negated belongs to the connector: the parent of a
 		// negated subtree writes `NOT CONTAINS` instead of `CONTAINS`.
@@ -519,7 +537,48 @@ func duplicateAlias(from FromClause) string {
 		}
 		return ""
 	}
+	// REQ-117: a FROM-root junction binds its aliases too.
+	if dup := walk(from.Junction); dup != "" {
+		return dup
+	}
 	return walk(from.Contains)
+}
+
+// isContainmentJunction reports whether a node is a pure boolean
+// grouping — operands only, no class of its own (REQ-117).
+func isContainmentJunction(c Containment) bool {
+	return c.Class.RMType == "" && len(c.Children) > 0
+}
+
+// emitContainmentOperands renders a junction node's operands joined by its
+// keyword, WITHOUT enclosing parentheses (REQ-117). The FROM root uses it
+// directly; [emitContainment] wraps the result for a nested junction.
+//
+// An operand is parenthesised only where the grouping is load-bearing:
+//   - an OR junction inside an AND junction (precedence: AND binds tighter);
+//   - a CONTAINS chain, because the grammar's `CONTAINS containsExpr` right
+//     operand is greedy — without the parentheses the following AND / OR
+//     operand would re-parse INTO the chain.
+//
+// A same- or tighter-binding junction operand needs no grouping, mirroring
+// [aql.Junction]'s WHERE-side rule.
+func emitContainmentOperands(c Containment) string {
+	parts := make([]string, len(c.Children))
+	for i, ch := range c.Children {
+		switch {
+		case isContainmentJunction(ch):
+			inner := emitContainmentOperands(ch)
+			if c.ChildJoin == ContainsAnd && ch.ChildJoin == ContainsOr {
+				inner = "(" + inner + ")"
+			}
+			parts[i] = inner
+		case len(ch.Children) > 0:
+			parts[i] = "(" + emitContainment(ch) + ")"
+		default:
+			parts[i] = emitContainment(ch)
+		}
+	}
+	return strings.Join(parts, " "+c.ChildJoin.String()+" ")
 }
 
 // emitContainment renders a Containment node. The Negated flag is
@@ -527,14 +586,12 @@ func duplicateAlias(from FromClause) string {
 // `CONTAINS`) — emitContainment itself ignores it and just renders
 // the class + chained children.
 func emitContainment(c Containment) string {
-	// Boolean junction: render each child and join with the operator.
-	if len(c.Children) > 0 && c.Class.RMType == "" {
-		parts := make([]string, len(c.Children))
-		for i, ch := range c.Children {
-			parts[i] = emitContainment(ch)
-		}
-		joiner := " " + c.ChildJoin.String() + " "
-		return "(" + strings.Join(parts, joiner) + ")"
+	// Boolean junction: render the operands and group them. A junction
+	// nested under a CONTAINS keyword or inside another junction keeps
+	// its parentheses so the grouping survives a re-parse; only the FROM
+	// root drops them (see [Query.Emit]).
+	if isContainmentJunction(c) {
+		return "(" + emitContainmentOperands(c) + ")"
 	}
 	// Class + optional inner chain. A child's Negated flag selects
 	// `NOT CONTAINS` over `CONTAINS` for the connector to that child.

@@ -445,6 +445,112 @@ func TestParseQueryNotContains(t *testing.T) {
 	}
 }
 
+// TestParseQueryFromRootJunction pins REQ-117 catalogue shape 6: a boolean
+// junction at the FROM root is carried by [parse.FromClause.Junction] — the
+// same containment tree the nested side uses — with Root left zero because
+// the clause has no single root class.
+// PROBE-087
+func TestParseQueryFromRootJunction(t *testing.T) {
+	const src = "SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2"
+	q, err := parse.ParseQuery(src)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if q.From.Junction == nil {
+		t.Fatalf("From.Junction is nil; want the containment junction (Root=%+v)", q.From.Root)
+	}
+	if q.From.Root.RMType != "" {
+		t.Errorf("From.Root.RMType = %q, want empty — a junction has no single root", q.From.Root.RMType)
+	}
+	if q.From.Contains != nil {
+		t.Errorf("From.Contains = %+v, want nil for a junction root", q.From.Contains)
+	}
+	j := q.From.Junction
+	if j.ChildJoin != parse.ContainsOr {
+		t.Errorf("Junction.ChildJoin = %v, want ContainsOr", j.ChildJoin)
+	}
+	if len(j.Children) != 2 {
+		t.Fatalf("Junction.Children len = %d, want 2", len(j.Children))
+	}
+	if j.Children[0].Class.RMType != "COMPOSITION" || j.Children[0].Class.Alias != "c1" {
+		t.Errorf("Children[0].Class = %+v, want COMPOSITION c1", j.Children[0].Class)
+	}
+	if j.Children[1].Class.Alias != "c2" {
+		t.Errorf("Children[1].Class = %+v, want COMPOSITION c2", j.Children[1].Class)
+	}
+	if out, err := q.Emit(); err != nil || out != src {
+		t.Errorf("Emit = %q, %v; want the canonical input (no redundant parentheses)", out, err)
+	}
+}
+
+// TestParseQueryFromRootJunctionFlattened pins that a same-operator FROM
+// junction chain is ONE node with three operands (the parser's left-nesting
+// is flattened), and that a nested junction of the OTHER operator keeps its
+// grouping parentheses on emit (REQ-117).
+// PROBE-087
+func TestParseQueryFromRootJunctionFlattened(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 OR EHR e")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if q.From.Junction == nil {
+		t.Fatal("From.Junction is nil")
+	}
+	if got := len(q.From.Junction.Children); got != 3 {
+		t.Errorf("Junction.Children len = %d, want 3 (flattened OR chain)", got)
+	}
+
+	const grouped = "SELECT c1 FROM (COMPOSITION c1 OR COMPOSITION c2) AND EHR e"
+	q2, err := parse.ParseQuery(grouped)
+	if err != nil {
+		t.Fatalf("ParseQuery(grouped): %v", err)
+	}
+	if q2.From.Junction == nil {
+		t.Fatal("From.Junction is nil for the grouped junction")
+	}
+	if q2.From.Junction.ChildJoin != parse.ContainsAnd {
+		t.Errorf("outer ChildJoin = %v, want ContainsAnd", q2.From.Junction.ChildJoin)
+	}
+	inner := q2.From.Junction.Children[0]
+	if inner.Class.RMType != "" || inner.ChildJoin != parse.ContainsOr || len(inner.Children) != 2 {
+		t.Errorf("Children[0] = %+v, want the nested OR junction", inner)
+	}
+	if out, err := q2.Emit(); err != nil || out != grouped {
+		t.Errorf("Emit = %q, %v; want the canonical input (precedence parentheses kept)", out, err)
+	}
+}
+
+// TestParseQueryFromRootJunctionDuplicateAlias pins that the emitter's
+// alias-uniqueness guard also walks a FROM-root junction (REQ-117).
+// PROBE-087
+func TestParseQueryFromRootJunctionDuplicateAlias(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c FROM COMPOSITION c OR OBSERVATION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	_, eerr := q.Emit()
+	if !errors.Is(eerr, aql.ErrInvalidQuery) {
+		t.Fatalf("Emit duplicate alias in junction: want ErrInvalidQuery, got %v", eerr)
+	}
+}
+
+// TestParseQuerySingleRootUnaffectedByJunctionField pins the compatibility
+// half of shape 6: an ordinary single-root FROM still populates Root (and
+// Contains) with Junction nil (REQ-117).
+// PROBE-087
+func TestParseQuerySingleRootUnaffectedByJunctionField(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c FROM EHR e CONTAINS COMPOSITION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if q.From.Junction != nil {
+		t.Errorf("From.Junction = %+v, want nil for a single-root FROM", q.From.Junction)
+	}
+	if q.From.Root.RMType != "EHR" || q.From.Contains == nil {
+		t.Errorf("From = %+v, want EHR root with a CONTAINS child", q.From)
+	}
+}
+
 // TestParseQueryBoolValue pins boolean WHERE extraction: the source
 // keyword `true` / `false` (lexed as IDENTIFIER per lexer rule order)
 // surfaces in Comparison.Val as aql.BoolValue.

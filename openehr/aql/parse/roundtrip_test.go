@@ -95,6 +95,20 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"matches_uri_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}"},
 		{"matches_value_list_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {terminology('SNOMED-CT','near','12345'), 'other'}"},
 		{"matches_param_and_literal", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {$code, 'other'}"},
+		{"from_root_or_junction", "SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2"},
+		{"from_root_and_junction", "SELECT c1 FROM COMPOSITION c1 AND COMPOSITION c2"},
+		{"from_root_or_chain", "SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 OR EHR e"},
+		{"from_root_grouped_junction", "SELECT c1 FROM (COMPOSITION c1 OR COMPOSITION c2) AND EHR e"},
+		{"from_root_junction_with_contains", "SELECT o FROM COMPOSITION c1 CONTAINS OBSERVATION o OR EHR e"},
+		{"from_root_junction_with_predicates", "SELECT c1 FROM COMPOSITION c1[openEHR-EHR-COMPOSITION.report.v1] OR EHR e[ehr_id/value=$id]"},
+		{"contains_nested_junction", "SELECT c FROM EHR e CONTAINS (COMPOSITION c OR SECTION s)"},
+		{"from_root_junction_where", "SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 WHERE c1/uid/value = $id"},
+		{"from_root_junction_chain_operand", "SELECT o FROM (COMPOSITION c1 CONTAINS OBSERVATION o) OR EHR e"},
+		{"from_root_junction_two_chains", "SELECT o FROM (COMPOSITION c1 CONTAINS OBSERVATION o) AND (EHR e CONTAINS SECTION s)"},
+		{"from_root_junction_and_under_or", "SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 AND EHR e"},
+		{"from_root_junction_grouped_and_under_or", "SELECT c1 FROM (COMPOSITION c1 AND COMPOSITION c2) OR EHR e"},
+		{"from_root_junction_negated_chain", "SELECT c1 FROM COMPOSITION c1 OR (COMPOSITION c2 NOT CONTAINS SECTION s)"},
+		{"contains_nested_junction_grouped", "SELECT c FROM EHR e CONTAINS ((COMPOSITION c OR SECTION s) AND OBSERVATION o)"},
 	}
 
 	for _, tc := range cases {
@@ -158,6 +172,13 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/a = 1 AND (o/b = o/c OR LENGTH(o/d) > 2)",
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES TERMINOLOGY('SNOMED-CT', 'near', '12345')",
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}",
+		"SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2",
+		"SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 OR EHR e",
+		"SELECT c1 FROM (COMPOSITION c1 OR COMPOSITION c2) AND EHR e",
+		"SELECT c FROM EHR e CONTAINS (COMPOSITION c OR SECTION s)",
+		"SELECT o FROM (COMPOSITION c1 CONTAINS OBSERVATION o) OR EHR e",
+		"SELECT c1 FROM COMPOSITION c1 OR COMPOSITION c2 AND EHR e",
+		"SELECT c FROM EHR e CONTAINS ((COMPOSITION c OR SECTION s) AND OBSERVATION o)",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {
@@ -194,6 +215,7 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 		{"and_junction_with_function_operand", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x = $a AND LENGTH(o/name) > 5"},
 		{"matches_terminology", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES terminology('SNOMED-CT','near','12345')"},
 		{"matches_uri", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/code MATCHES {uri://terminology.hl7.org/CodeSystem/v3-ActCode}"},
+		{"from_junction", "SELECT e FROM EHR e OR EHR f"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

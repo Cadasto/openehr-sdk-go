@@ -273,17 +273,11 @@ func (ex *astExtractor) extractFromClause(c gen.IFromClauseContext) FromClause {
 	}
 	// FromClause.Root captures the class at the FROM root; Contains
 	// captures the chain BELOW it. A junction at the very root has no
-	// single class — the emitter requires one, so surface the gap
-	// rather than silently emit `missing FROM root` at emit time.
+	// single class, so it lands on FromClause.Junction instead — the
+	// same containment tree the nested side uses (REQ-117) — and Root /
+	// Contains stay zero.
 	if root.Class.RMType == "" && len(root.Children) > 0 {
-		ex.incomplete("FROM top-level boolean junction (`FROM A %s B`) is outside the v1 catalogue", root.ChildJoin.String())
-		// Best-effort: hoist the first child's class as Root so a
-		// caller inspecting the AST gets something rather than zero.
-		first := root.Children[0]
-		out.Root = first.Class
-		if rest := root.Children[1:]; len(rest) > 0 {
-			out.Contains = &Containment{Children: rest, ChildJoin: root.ChildJoin}
-		}
+		out.Junction = root
 		return out
 	}
 	out.Root = root.Class
@@ -331,9 +325,18 @@ func (ex *astExtractor) extractContainment(c gen.IContainsExprContext) *Containm
 		out := &Containment{ChildJoin: join}
 		for _, op := range operands {
 			child := ex.extractContainment(op)
-			if child != nil {
-				out.Children = append(out.Children, *child)
+			if child == nil {
+				continue
 			}
+			// REQ-117: flatten a same-operator operand so `A OR B OR C`
+			// is ONE junction with three operands rather than the
+			// parser's left-nested pair-of-pairs. Emission is unaffected
+			// (a same-operator group needs no parentheses).
+			if child.Class.RMType == "" && len(child.Children) > 0 && child.ChildJoin == join && !child.Negated {
+				out.Children = append(out.Children, child.Children...)
+				continue
+			}
+			out.Children = append(out.Children, *child)
 		}
 		return out
 	}
