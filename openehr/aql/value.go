@@ -143,6 +143,11 @@ type FuncCall struct {
 	Args []Value
 }
 
+// token renders `NAME(arg, …)`. It cannot report an error, so it stays
+// TOLERANT of a nil argument and skips it; refusing a nil arg is
+// [validateValue]'s job, and every public emission path ([Builder.Build],
+// [FormatWhere]) validates before emitting — a nil argument never reaches this
+// method through a supported entry point.
 func (f FuncCall) token() string {
 	parts := make([]string, 0, len(f.Args))
 	for _, a := range f.Args {

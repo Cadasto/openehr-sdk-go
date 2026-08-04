@@ -312,7 +312,9 @@ func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 //   - Terminology — a BARE `TERMINOLOGY('op','api','params')` operand,
 //     with no braces (REQ-117); construct with [MatchesTerminology].
 //   - URI — a braced URI operand (`{uri://…}`), carried verbatim
-//     (REQ-117); construct with [MatchesURI].
+//     (REQ-117); construct with [MatchesURI]. A whitespace-only URI counts as
+//     ABSENT — for both validation and emission — so it never shadows a
+//     populated Values list.
 type MatchesExpr struct {
 	Path        string
 	Values      []Value
@@ -321,13 +323,19 @@ type MatchesExpr struct {
 }
 
 func (m MatchesExpr) expr() string {
+	// The URI-operand test MUST use the same emptiness rule as validate() —
+	// TrimSpace, not `!= ""`. A whitespace-only URI is not an operand there, so
+	// treating it as one here would emit `MATCHES {   }` and silently drop a
+	// validated value list.
+	uri := strings.TrimSpace(m.URI)
 	switch {
 	case m.Terminology != nil:
 		// Bare terminology operand — the grammar's `matchesOperand :
 		// terminologyFunction` alternative takes no braces.
 		return m.Path + " MATCHES " + m.Terminology.token()
-	case m.URI != "":
-		return m.Path + " MATCHES {" + m.URI + "}"
+	case uri != "":
+		// Emitted trimmed, consistent with the [MatchesURI] constructor.
+		return m.Path + " MATCHES {" + uri + "}"
 	}
 	parts := make([]string, len(m.Values))
 	for i, v := range m.Values {

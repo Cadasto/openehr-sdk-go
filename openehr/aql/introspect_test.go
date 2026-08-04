@@ -11,6 +11,7 @@ package aql_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -234,6 +235,68 @@ func TestMatchesRejectsAmbiguousOperands(t *testing.T) {
 	} {
 		if _, err := aql.FormatWhere(w); !errors.Is(err, aql.ErrInvalidQuery) {
 			t.Errorf("%s: FormatWhere error = %v, want ErrInvalidQuery", name, err)
+		}
+	}
+}
+
+// TestMatchesEmptinessRuleAgreesAcrossValidateAndEmit pins that validate() and
+// the emitter apply the SAME emptiness rule to MatchesExpr.URI. A
+// whitespace-only URI is NOT an operand for validate (it counts the expression
+// as the value-list form), so the emitter must not treat it as one either —
+// otherwise a validated expression emits `MATCHES {   }` and silently drops the
+// value list.
+func TestMatchesEmptinessRuleAgreesAcrossValidateAndEmit(t *testing.T) {
+	// A hand-built value-list MATCHES whose URI is whitespace only: validate
+	// accepts it as the Values form, so emission must render the value list.
+	blank := aql.MatchesExpr{
+		Path:   "o/code",
+		Values: []aql.Value{aql.String("active"), aql.String("archived")},
+		URI:    "   ",
+	}
+	if got := mustFormat(t, blank); got != "o/code MATCHES {'active', 'archived'}" {
+		t.Errorf("FormatWhere = %q, want the value list (a blank URI is not an operand)", got)
+	}
+
+	// A padded, non-empty URI IS the operand form and emits trimmed —
+	// consistent with the MatchesURI constructor, which trims on construction.
+	padded := aql.MatchesExpr{Path: "o/code", URI: "  uri://x/y  "}
+	if got := mustFormat(t, padded); got != "o/code MATCHES {uri://x/y}" {
+		t.Errorf("FormatWhere = %q, want the trimmed URI operand", got)
+	}
+}
+
+// TestFuncCallNilArgRefusedBeforeEmission pins that a nil argument inside a
+// FuncCall is refused by validation on every public emission path rather than
+// silently skipped by FuncCall.token() (which cannot report an error).
+func TestFuncCallNilArgRefusedBeforeEmission(t *testing.T) {
+	bad := aql.FuncCall{Name: "F", Args: []aql.Value{nil}}
+
+	// Builder.Build — the primary write-side entry point.
+	_, err := aql.NewBuilder().
+		Select(aql.Col("o/x")).
+		From("OBSERVATION", "o").
+		Where(aql.Compare(bad, aql.OpEq, aql.Int(1))).
+		Build()
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("Build with a nil FuncCall arg: error = %v, want ErrInvalidQuery", err)
+	}
+	if err == nil || !strings.Contains(err.Error(), "nil argument") {
+		t.Errorf("Build error should name the nil argument: %v", err)
+	}
+
+	// FormatWhere — the public read-side emitter, on both operand sides and
+	// nested inside another call.
+	for name, w := range map[string]aql.WhereExpr{
+		"comparison_lhs": aql.Compare(bad, aql.OpEq, aql.Int(1)),
+		"comparison_rhs": aql.Eq("o/x", bad),
+		"nested_arg":     aql.Eq("o/x", aql.Func("OUTER", bad)),
+		"like_pattern":   aql.Like("o/x", bad),
+		"matches_member": aql.Matches("o/x", bad),
+		"matches_termin": aql.MatchesExpr{Path: "o/x", Terminology: &bad},
+	} {
+		got, err := aql.FormatWhere(w)
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("%s: FormatWhere = %q, error = %v, want ErrInvalidQuery", name, got, err)
 		}
 	}
 }

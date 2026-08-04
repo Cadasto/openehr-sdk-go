@@ -193,6 +193,10 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	}
 	out := FunctionCall{Name: functionName(c)}
 	for _, t := range c.AllTerminal() {
+		// INVARIANT: terminalAsSelectExpr returns nil only after recording a
+		// gap (an unrepresentable primitive, or a defensively-unhandled
+		// alternative), so skipping the argument here can never be a silent
+		// drop — [Query.Emit] refuses the resulting partial AST.
 		if expr := ex.terminalAsSelectExpr(t); expr != nil {
 			out.Args = append(out.Args, expr)
 		}
@@ -203,8 +207,9 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 // terminalAsSelectExpr lifts a Terminal context into a SelectExpr — a
 // PathExpr (identifiedPath), a nested FunctionCall, or a LiteralExpr for
 // a parameter / primitive argument (`CONCAT('a', $p, LENGTH(x/y))` —
-// REQ-117). Returns nil only when the terminal carries a primitive the
-// value vocabulary cannot represent, in which case a gap is recorded.
+// REQ-117). It returns nil ONLY after recording a gap: either the terminal
+// carries a primitive the value vocabulary cannot represent, or (defensively)
+// it matches no grammar alternative at all.
 func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr {
 	if ip := t.IdentifiedPath(); ip != nil {
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
@@ -218,6 +223,11 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 	if p := t.Primitive(); p != nil {
 		return ex.primitiveAsSelectExpr(p)
 	}
+	// Defensive: `terminal : primitive | PARAMETER | identifiedPath |
+	// functionCall` is fully covered above, so this is unreachable today —
+	// record a gap rather than drop a function argument silently if the grammar
+	// ever widens.
+	ex.incomplete("function argument %q is outside the catalogue", t.GetText())
 	return nil
 }
 
@@ -572,6 +582,11 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 	if fc := c.FunctionCall(); fc != nil {
 		cmp, t := c.COMPARISON_OPERATOR(), c.Terminal()
 		if cmp == nil || t == nil {
+			// Defensive: the grammar's only functionCall alternative is
+			// `functionCall COMPARISON_OPERATOR terminal`, so both are present
+			// after a successful parse — record a gap rather than drop the
+			// predicate silently if the grammar ever widens.
+			ex.incomplete("function-call comparison %q is outside the catalogue (incomplete operator or right operand)", c.GetText())
 			return nil
 		}
 		v, gap := ex.terminalAsValue(t)
@@ -585,10 +600,18 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			return nil
 		}
 		if left == nil || v == nil {
+			// Defensive: both lifts return a non-empty gap for anything they
+			// cannot model, so a nil-without-gap can only mean a widened
+			// grammar handed us an operand shape neither recognises.
+			ex.incomplete("function-call comparison %q is outside the catalogue (unrecognised operand)", c.GetText())
 			return nil
 		}
 		return aql.Comparison{Op: aql.Operator(cmp.GetText()), Val: v, Left: left}
 	}
+	// Defensive: every identifiedExpr alternative in the SDK grammar profile is
+	// handled above, so this is unreachable today — record a gap rather than
+	// drop the predicate silently if the grammar ever widens.
+	ex.incomplete("WHERE predicate %q is outside the catalogue", c.GetText())
 	return nil
 }
 

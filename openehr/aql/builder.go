@@ -343,9 +343,19 @@ func (a *ast) validatePaging() error {
 }
 
 // validateLimitValue rejects an in-text paging operand the grammar's
-// `limitValue` cannot carry. A nil operand means the clause is absent.
+// `limitValue : INTEGER | PARAMETER` cannot carry. A nil operand means the
+// clause is absent.
+//
+// The default arm is fail-closed: the [Builder.LimitInline] /
+// [Builder.LimitInlineParam] / [Builder.OffsetInline] /
+// [Builder.OffsetInlineParam] setters only ever store an [IntValue] or a
+// [ParamValue], so no public route reaches it today — it is here so a widened
+// setter (or a new [Value] shape) refuses loudly instead of emitting AQL the
+// grammar rejects.
 func validateLimitValue(keyword string, v Value) error {
 	switch t := v.(type) {
+	case nil:
+		return nil // clause absent
 	case IntValue:
 		if t.N < 0 {
 			return fmt.Errorf("%w: negative in-text %s (%d)", ErrInvalidQuery, keyword, t.N)
@@ -354,6 +364,9 @@ func validateLimitValue(keyword string, v Value) error {
 		if strings.TrimSpace(t.Name) == "" {
 			return fmt.Errorf("%w: in-text %s parameter with an empty name", ErrInvalidQuery, keyword)
 		}
+	default:
+		return fmt.Errorf("%w: in-text %s must be an integer or a $parameter, got %T",
+			ErrInvalidQuery, keyword, v)
 	}
 	return nil
 }
