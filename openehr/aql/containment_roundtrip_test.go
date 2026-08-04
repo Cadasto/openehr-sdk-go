@@ -114,6 +114,22 @@ func builderRoundTripCases() []struct {
 				),
 			).Build()
 		}},
+		{"inline_limit", func() (aql.Query, error) {
+			return sel().LimitInline(50).Build()
+		}},
+		{"inline_limit_offset", func() (aql.Query, error) {
+			return sel().LimitInline(50).OffsetInline(100).Build()
+		}},
+		{"inline_limit_offset_param", func() (aql.Query, error) {
+			return sel().LimitInlineParam("rows").OffsetInlineParam("skip").Build()
+		}},
+		{"inline_limit_zero", func() (aql.Query, error) {
+			return sel().LimitInline(0).Build()
+		}},
+		{"inline_paging_after_order_by", func() (aql.Query, error) {
+			return sel().OrderBy("e/time_created/value", aql.Descending).
+				LimitInline(10).OffsetInline(20).Build()
+		}},
 		{"containment_with_where_and_order_by", func() (aql.Query, error) {
 			return aql.Select(aql.Col("o")).
 				FromEHR("e", aql.Param("ehr_id")).
@@ -125,6 +141,18 @@ func builderRoundTripCases() []struct {
 				)).
 				Where(aql.Gt("o/data/events/data/items/value/magnitude", aql.Real(37.5))).
 				OrderBy("o/name/value", aql.Descending).
+				Build()
+		}},
+		{"all_clauses_with_inline_paging", func() (aql.Query, error) {
+			return aql.Select(aql.Col("o"), aql.Col("ev")).
+				FromEHR("e", aql.Param("ehr_id")).
+				NotContains(aql.ContainsOr(
+					aql.Class("COMPOSITION", "c").Contains(aql.Class("OBSERVATION", "o")),
+					aql.Class("EVALUATION", "ev"),
+				)).
+				Where(aql.Eq("o/name/value", aql.String("Temperature"))).
+				OrderBy("o/name/value", aql.Ascending).
+				LimitInline(25).OffsetInlineParam("skip").
 				Build()
 		}},
 	}
