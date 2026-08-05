@@ -13,6 +13,7 @@ package simplified
 
 import (
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -263,9 +264,7 @@ func TestFeederAuditTypeSuffixBounds(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			body := map[string]any{audit + "|system_id": "orig"}
-			for k, v := range extra {
-				body[k] = v
-			}
+			maps.Copy(body, extra)
 			if err := decodeRMAttrErr(t, wt, rmattrBody(body)); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
 			}
@@ -338,9 +337,7 @@ func TestFeederAuditGrammarBounds(t *testing.T) {
 			if name != "missing system_id" && name != "missing originating audit" && name != "indexed audit" {
 				body[audit+"|system_id"] = "orig"
 			}
-			for k, v := range tc.extra {
-				body[k] = v
-			}
+			maps.Copy(body, tc.extra)
 			err := decodeRMAttrErr(t, wt, rmattrBody(body))
 			if !errors.Is(err, ErrUnsupportedDatatype) && !errors.Is(err, ErrUnknownPath) {
 				t.Fatalf("err = %v, want a typed refusal", err)
