@@ -50,6 +50,19 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 			return nil, err
 		}
 	}
+	// REQ-140 — the root COMPOSITION's own underscore attributes (it is a
+	// LOCATABLE the node walk never visits, because the walk starts at its
+	// children), and the EVENT_CONTEXT optionals under the real `context`
+	// segment (ADR 0016). The context prefix is spelled here rather than taken
+	// from a Web Template node because those attributes are RM-optional and a
+	// template need not constrain `context` at all — decode resolves the same
+	// prefix the same way (rmattrOwnerAt).
+	if err := rmattrEncode(comp, root.ID, out); err != nil {
+		return nil, err
+	}
+	if err := rmattrEncode(comp.Context, root.ID+"/context", out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -262,7 +275,8 @@ func skipNotFound(err error, relPath string) error {
 func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, ambiguous map[string]bool) error {
 	if isContainer {
 		root, rootAql := ancestorRoot, ancestorAql
-		if loc, ok := v.(rm.Locatable); ok {
+		loc, isLocatable := v.(rm.Locatable)
+		if isLocatable {
 			// A Locatable container becomes the new resolution root for its
 			// children (each repeatable instance is resolved independently).
 			root, rootAql = loc, node.AQLPath
@@ -272,7 +286,45 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 				return err
 			}
 		}
+		// REQ-140 — after the node's own emission, its underscore attributes.
+		// Only a LOCATABLE owns any: EVENT_CONTEXT is handled from the root (its
+		// FLAT prefix is fixed, template node or not), and a non-Locatable
+		// container (ISM_TRANSITION) has no underscore attribute in the grammar.
+		if isLocatable {
+			return rmattrEncode(loc, flatPath, out)
+		}
 		return nil
 	}
-	return leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node))
+	if err := leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node)); err != nil {
+		return err
+	}
+	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql)
+}
+
+// emitLeafOwnerRMAttrs writes the REQ-140 underscore attributes of the LOCATABLE
+// a collapsed leaf hides. The Web Template folds ELEMENT.value into its leaf
+// node, so `<leaf>/_uid` and `<leaf>/_link:N` belong to the ELEMENT one
+// attribute up — the one owner the node walk cannot reach, since the walk
+// resolves the leaf's own `…/value` path.
+//
+// Keyed on the canonical trailing `/value` attribute *and* on the resolved
+// parent actually being an ELEMENT. Every other childless leaf sits directly on
+// a non-LOCATABLE attribute of an enclosing node (`context/start_time`, ENTRY
+// `language`, an ISM_TRANSITION member, ACTIVITY `timing`), and that enclosing
+// node emits its own attributes at its own FLAT path — so emitting here too
+// would double-spell them.
+func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ancestorRoot rm.Locatable, ancestorAql string) error {
+	rel := bareAQLPath(strings.TrimPrefix(node.AQLPath, ancestorAql))
+	ownerRel, isElementValue := strings.CutSuffix(rel, "/value")
+	if !isElementValue || ownerRel == "" {
+		return nil
+	}
+	owner, err := rmpath.ItemAtPath(ancestorRoot, ownerRel)
+	if err != nil {
+		return skipNotFound(err, ownerRel)
+	}
+	if _, isElement := as[rm.Element](owner); !isElement {
+		return nil
+	}
+	return rmattrEncode(owner, flatPath, out)
 }

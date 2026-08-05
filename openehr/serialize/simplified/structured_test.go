@@ -4,6 +4,7 @@ package simplified_test
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
@@ -77,6 +78,156 @@ func TestStructuredFlatRoundTrip(t *testing.T) {
 	}
 	if !reflect.DeepEqual(back, structured) {
 		t.Errorf("round-trip mismatch:\n got  %#v\n want %#v", back, structured)
+	}
+}
+
+// TestUnderscoreKeysThroughStructured — REQ-140. The underscore RM attribute
+// grammar must survive OPT-free FLAT ↔ STRUCTURED interconversion in both
+// directions. It needs no special handling in `structured.go`: an `_`-prefixed
+// path segment restructures like any other segment, so `_link:N` becomes an
+// array member and a family's suffixed keys become `|`-prefixed members of the
+// element object. This test pins that shape — and the one asymmetry it creates,
+// which the decoder has to tolerate.
+func TestUnderscoreKeysThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/_uid":                   "6e3a9506-b81c-4d74-a37f-1464fb7106b2::ehrbase.org::1",
+		"t/_link:0|meaning":        "problem related note",
+		"t/_link:0|type":           "problem",
+		"t/_link:0|target":         "ehr://ehr.network/1",
+		"t/_link:1|meaning":        "follow-up to",
+		"t/_link:1|type":           "issue",
+		"t/_link:1|target":         "ehr://ehr.network/2",
+		"t/context/_end_time":      "2021-12-21T15:19:31.649613+01:00",
+		"t/context/_location":      "microbiology lab 2",
+		"t/obs/_work_flow_id|id":   "335645",
+		"t/obs/_work_flow_id|type": "WORKFLOW",
+		"t/e/_uid":                 "9fcc1c70-9349-444d-b9cb-8fa817697f5e",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	root, ok := s["t"].(map[string]any)
+	if !ok {
+		t.Fatalf("no root object; got %#v", s)
+	}
+	// A scalar family is a one-element array of its bare value.
+	uid, ok := root["_uid"].([]any)
+	if !ok || len(uid) != 1 || uid[0] != flat["t/_uid"] {
+		t.Errorf("_uid = %#v, want a 1-element array of the bare value", root["_uid"])
+	}
+	// An indexed family is an array member per instance, suffixes as
+	// |-prefixed members.
+	links, ok := root["_link"].([]any)
+	if !ok || len(links) != 2 {
+		t.Fatalf("_link = %#v, want a 2-element array", root["_link"])
+	}
+	first, ok := links[0].(map[string]any)
+	if !ok || first["|meaning"] != "problem related note" || first["|target"] != "ehr://ehr.network/1" {
+		t.Errorf("_link[0] = %#v", links[0])
+	}
+	// A family under a nested segment nests with it.
+	ctx, ok := root["context"].([]any)
+	if !ok || len(ctx) != 1 {
+		t.Fatalf("context = %#v, want a 1-element array", root["context"])
+	}
+	ctxEl, _ := ctx[0].(map[string]any)
+	if end, ok := ctxEl["_end_time"].([]any); !ok || len(end) != 1 || end[0] != flat["t/context/_end_time"] {
+		t.Errorf("context[0]._end_time = %#v", ctxEl["_end_time"])
+	}
+
+	// Back to FLAT: every key returns, with the interconversion's usual
+	// index normalisation — it re-spells *every* segment with an explicit
+	// `:index`, so `t/_uid` comes back as `t/_uid:0` and `t/context/…` as
+	// `t/context:0/…`. That is pre-existing behaviour for clinical segments and
+	// the FLAT decoder treats `:0` and no index as one slot, which is why the
+	// REQ-140 router admits `:0` on a single-valued family.
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatalf("unmarshal flat: %v", err)
+	}
+	want := map[string]any{
+		"t/_uid:0":                     flat["t/_uid"],
+		"t/_link:0|meaning":            flat["t/_link:0|meaning"],
+		"t/_link:0|type":               flat["t/_link:0|type"],
+		"t/_link:0|target":             flat["t/_link:0|target"],
+		"t/_link:1|meaning":            flat["t/_link:1|meaning"],
+		"t/_link:1|type":               flat["t/_link:1|type"],
+		"t/_link:1|target":             flat["t/_link:1|target"],
+		"t/context:0/_end_time:0":      flat["t/context/_end_time"],
+		"t/context:0/_location:0":      flat["t/context/_location"],
+		"t/obs:0/_work_flow_id:0|id":   flat["t/obs/_work_flow_id|id"],
+		"t/obs:0/_work_flow_id:0|type": flat["t/obs/_work_flow_id|type"],
+		"t/e:0/_uid:0":                 flat["t/e/_uid"],
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v", back, want)
+	}
+
+	// STRUCTURED -> FLAT -> STRUCTURED is the identity leg, and it holds for the
+	// underscore grammar too.
+	sb2, err := simplified.FlatToStructured(fb)
+	if err != nil {
+		t.Fatalf("FlatToStructured #2: %v", err)
+	}
+	var s2 map[string]any
+	if err := json.Unmarshal(sb2, &s2); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s2, s) {
+		t.Errorf("STRUCTURED round-trip mismatch:\n got  %#v\n want %#v", s2, s)
+	}
+}
+
+// TestUnderscoreKeysStructuredDecode — REQ-140. The index normalisation the
+// interconversion applies must not break the codec: a STRUCTURED body carrying
+// underscore families decodes through UnmarshalStructured to the same
+// composition the FLAT spelling gives.
+func TestUnderscoreKeysStructuredDecode(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	flat, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var flatMap map[string]any
+	if err := json.Unmarshal(flat, &flatMap); err != nil {
+		t.Fatal(err)
+	}
+	// The fixture generator stamps a `uid` on every archetyped node, so the
+	// baseline FLAT already carries the family under test.
+	var sawUID bool
+	for k := range flatMap {
+		sawUID = sawUID || strings.HasSuffix(k, "/_uid")
+	}
+	if !sawUID {
+		t.Fatal("fixture carries no `_uid` key — nothing under test")
+	}
+	structured, err := simplified.FlatToStructured(flat)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	back, err := simplified.UnmarshalStructured(structured, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalStructured: %v", err)
+	}
+	again, err := simplified.MarshalFlat(back, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat #2: %v", err)
+	}
+	var againMap map[string]any
+	if err := json.Unmarshal(again, &againMap); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(againMap, flatMap) {
+		t.Errorf("FLAT -> STRUCTURED -> RM -> FLAT is not byte-idempotent:\n got  %#v\n want %#v", againMap, flatMap)
 	}
 }
 

@@ -131,19 +131,26 @@ func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
 	if len(comp.Content) != 1 {
 		t.Fatalf("fixture: want 1 content item, got %d", len(comp.Content))
 	}
-	// "Carries no representable leaf data" has to include the ENTRY in-context
-	// CODE_PHRASE pair: language and encoding are RM-mandatory and now emit as
-	// FLAT leaves, so clearing the events alone would leave four keys behind and
-	// the instance would legitimately occupy an index — testing coverage rather
-	// than compaction.
+	// "Carries no representable leaf data" has to include every attribute that
+	// emits without a Web Template leaf of its own, or the instance would
+	// legitimately occupy an index and the test would measure coverage rather
+	// than compaction:
+	//
+	//   - the ENTRY in-context CODE_PHRASE pair — language and encoding are
+	//     RM-mandatory and emit as FLAT leaves;
+	//   - the LOCATABLE identity attributes the REQ-140 underscore grammar
+	//     carries — instance.Generate stamps a `uid` on every archetyped node,
+	//     which now emits as `<path>/_uid`.
 	middle := deepCopyComposition(t, comp)
 	switch o := middle.Content[0].(type) {
 	case *rm.Observation:
 		o.Data.Events = nil
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
+		o.UID, o.Links = nil, nil
 	case rm.Observation:
 		o.Data.Events = nil
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
+		o.UID, o.Links = nil, nil
 		middle.Content[0] = o
 	default:
 		t.Fatalf("fixture: content[0] is %T, want an Observation", middle.Content[0])

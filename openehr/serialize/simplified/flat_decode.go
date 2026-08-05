@@ -98,8 +98,17 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	// Group FLAT keys by leaf instance (key minus the |suffix); each group's
-	// suffix->value pairs build one DataValue.
+	// Siphon off the underscore-prefixed RM attributes (REQ-140): a path
+	// segment starting with `_` ends Web Template resolution at the segment
+	// before it, so those keys are grouped per (owner path, family, :index) and
+	// routed by the owner's RM class instead of resolving to a leaf. What stays
+	// in content is ordinary template-constrained leaf data.
+	attrGroups, attrIndexes, err := rmattrGroups(content)
+	if err != nil {
+		return nil, err
+	}
+	// Group the remaining FLAT keys by leaf instance (key minus the |suffix);
+	// each group's suffix->value pairs build one DataValue.
 	groups := make(map[string]map[string]any)
 	for key, val := range content {
 		base, suffix := splitSuffix(key)
@@ -137,6 +146,21 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		}
 		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
+		}
+	}
+	// Underscore RM attributes come after the clinical leaves, so their owners
+	// are decorated onto nodes the content walk has already materialised rather
+	// than gap-filling their own (REQ-140).
+	for _, g := range attrGroups {
+		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
+		if errors.Is(err, errSegNotFound) {
+			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, g.prefix())
+		}
+		if err != nil {
+			return nil, fmt.Errorf("simplified: %q: %w", g.prefix(), err)
+		}
+		if err := rmattrDecode(owner, g, attrIndexes[g.base+"\x00"+g.family], budget); err != nil {
+			return nil, err
 		}
 	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
@@ -778,7 +802,31 @@ func parseAQL(p string) []aqlSeg {
 // depend on it — but the result is then format-idempotent, not canonically
 // complete; see deviations.md).
 func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget, names map[string]string) error {
+	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, names)
+	if err != nil {
+		return err
+	}
+	if _, exists := cur[attr]; exists {
+		// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
+		// "a:0" on a repeatable) — overwriting would silently drop one.
+		return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
+	}
+	cur[attr] = dv
+	return nil
+}
+
+// walkAQL materialises the intermediate RM nodes along aqlPath and returns the
+// object that holds its **final** segment, together with that segment's
+// attribute name — the seam [placeLeaf] and the REQ-140 attribute router share.
+// A leaf's terminal attribute is the datatype slot (`…/items[at0008]/value`); an
+// underscore family's is the RM attribute it addresses
+// (`…/items[at0008]/uid`), which is also the lookahead [concreteType] needs to
+// resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
+func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, names map[string]string) (map[string]any, string, error) {
 	segs := parseAQL(aqlPath)
+	if len(segs) == 0 {
+		return nil, "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
+	}
 	cur := compJSON
 	curType := "COMPOSITION"
 	// Two path keys are rebuilt in lockstep, both in the BARE spelling
@@ -791,13 +839,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
-			if _, exists := cur[seg.attr]; exists {
-				// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
-				// "a:0" on a repeatable) — overwriting would silently drop one.
-				return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
-			}
-			cur[seg.attr] = dv
-			return nil
+			return cur, seg.attr, nil
 		}
 		aqlPrefix.WriteString("/")
 		aqlPrefix.WriteString(seg.attr)
@@ -810,7 +852,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		nextAttr := segs[i+1].attr
 		childType := concreteType(curType, seg.attr, wtType, nextAttr)
 		if childType == "" {
-			return fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
+			return nil, "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
 		namePrefix.WriteString("/")
@@ -823,7 +865,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		if container {
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[aqlPrefix.String()], budget)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 			cur = next
 		} else {
@@ -844,7 +886,72 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		}
 		curType = childType
 	}
-	return nil
+	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
+	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+}
+
+// rmattrOwnerAt resolves the owner of an underscore-family group whose base
+// FLAT path is base (REQ-140): the RM class the family is judged against, plus a
+// deferred accessor that materialises the canonical-JSON node to decorate.
+//
+// Three shapes of owner, in the order they are tested:
+//
+//   - `<root>/context` is the composition's EVENT_CONTEXT, resolved *without*
+//     consulting the Web Template. ADR 0016 puts the EVENT_CONTEXT optionals
+//     under the real `context` segment, and they are RM-optional attributes a
+//     template need not constrain at all — so a template carrying no `context`
+//     node must behave exactly like one that does (the PROBE-086 corpus
+//     template carries one, with `start_time` and `setting` under it).
+//   - the template root is the COMPOSITION itself.
+//   - anything else resolves through the Web Template. A node with children owns
+//     the family directly; a **childless leaf** is a collapsed ELEMENT — the Web
+//     Template folds ELEMENT.value into the leaf node, so the LOCATABLE that
+//     owns `<leaf>/_uid` is the ELEMENT one attribute up (the corpus spells it
+//     that way on `…/any_event:0/dv_quantity`). A childless leaf whose canonical
+//     path does not end in `/value` hides no LOCATABLE (an in-context
+//     `context/start_time`, an ENTRY `language`, an ISM_TRANSITION member), so
+//     it has no underscore owner and the key is unresolvable.
+func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base string,
+	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+) (rmattrOwner, error) {
+	pk, err := parseFlatKey(base)
+	if err != nil {
+		return rmattrOwner{}, err
+	}
+	segs := pk.segs
+	if len(segs) == 0 || segs[0].id != wt.Tree.ID {
+		return rmattrOwner{}, errSegNotFound
+	}
+	walk := func(ownerAql string, predIndex map[string]int, predType map[string]string) func(string) (map[string]any, error) {
+		return func(attr string) (map[string]any, error) {
+			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, predIndex, predType, budget, names)
+			return node, err
+		}
+	}
+	// segs[1].idx <= 0: the OPT-free STRUCTURED interconversion re-spells every
+	// segment with an explicit index, so `context` and `context:0` are one node.
+	if len(segs) == 2 && segs[1].id == "context" && segs[1].idx <= 0 {
+		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", nil, nil)}, nil
+	}
+	if len(segs) == 1 {
+		return rmattrOwner{
+			kind:    wt.Tree.RMType,
+			resolve: func(string) (map[string]any, error) { return compJSON, nil },
+		}, nil
+	}
+	node, predIndex, predType, err := resolveLeaf(wt, segs, ambiguous)
+	if err != nil {
+		return rmattrOwner{}, err
+	}
+	ownerAql, kind := bareAQLPath(node.AQLPath), node.RMType
+	if len(node.Children) == 0 {
+		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
+		if !isElementValue {
+			return rmattrOwner{}, errSegNotFound
+		}
+		ownerAql, kind = trimmed, "ELEMENT"
+	}
+	return rmattrOwner{kind: kind, resolve: walk(ownerAql, predIndex, predType)}, nil
 }
 
 // bareAQLPath strips REQ-116 name predicates from a compiled AQL path,
