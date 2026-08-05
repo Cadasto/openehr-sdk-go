@@ -427,5 +427,5 @@ func (ts rmattrTails) matchCode(g rmattrGroup) (int32, error) {
 		return 0, fmt.Errorf("%w: %q is %q, but TERM_MAPPING.match is one of %s (REQ-140)",
 			ErrUnsupportedDatatype, key, s, matchCodes)
 	}
-	return int32(runes[0]), nil
+	return runes[0], nil
 }
