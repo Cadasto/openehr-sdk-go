@@ -24,7 +24,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 
 - **Covers** lists REQ-140 + the REQ-053 amendments; canonical prose exists for REQ-140 (wire.md § REQ-140; registry row + band row in REQ.md) and for the Phase A/B REQ-053 amendments (DV_TEXT substitution, `ctx/setting`). ✔ (Phase 0, this branch)
 - **Not yet authored:** the Phase C3 REQ-053 leaf-closure prose (DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL suffix sets, ENTRY `subject`). Its grammar currently lives only in this plan's Phase C tables — a plan is not a canonical home, and wire.md § REQ-140 already dangles a reference to the DV_MULTIMEDIA suffix set it does not define. Authoring it into wire.md § REQ-053 is a **precondition of Phase C3**, not a side effect of it.
-- ADR 0016 Accepted; ADR 0015 untouched. ✔
+- ADR 0016 Accepted. ADR 0015's decision text stands unchanged; its Consequences carry a dated forward note that the `context/setting` waiver closed on 2026-08-05 (the decision itself is not reopened). ✔
 - PROBE-089 catalogued Draft in conformance.md; PROBE-086 prose updated for the setting respelling. ✔
 - traceability.yaml carries REQ-140 → this plan. ✔
 - Phases below name tasks, files, and verification commands. ✔
