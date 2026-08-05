@@ -1184,3 +1184,209 @@ func TestSelectFunctionArgLiftsBareKeyword(t *testing.T) {
 		})
 	}
 }
+
+// TestParseQueryTopClause pins the deprecated `SELECT TOP n [FORWARD|BACKWARD]`
+// clause as an IN-CATALOGUE shape (REQ-118): the count and the direction are
+// both carried, an absent clause stays nil (so `TOP 0` is distinguishable from
+// no bound at all), and emission is the canonical upper-cased form. The clause
+// is deprecated upstream (QUERY Release-1.1.0 §4.4.3) but must still be
+// readable — the SDK does not author the queries it is handed.
+// REQ-118 · PROBE-087
+func TestParseQueryTopClause(t *testing.T) {
+	cases := map[string]struct {
+		in       string
+		want     *aql.TopClause
+		wantEmit string
+	}{
+		"bare": {
+			in:       "SELECT TOP 5 c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 5},
+			wantEmit: "SELECT TOP 5 c/uid/value FROM COMPOSITION c",
+		},
+		"forward": {
+			in:       "SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 5, Dir: aql.TopForward},
+			wantEmit: "SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c",
+		},
+		"backward": {
+			in:       "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 5, Dir: aql.TopBackward},
+			wantEmit: "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c",
+		},
+		"lower_case_source_emits_canonical": {
+			in:       "SELECT top 5 backward c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 5, Dir: aql.TopBackward},
+			wantEmit: "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c",
+		},
+		"with_distinct": {
+			in:       "SELECT DISTINCT TOP 3 c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 3},
+			wantEmit: "SELECT DISTINCT TOP 3 c/uid/value FROM COMPOSITION c",
+		},
+		"with_star": {
+			in:       "SELECT TOP 3 * FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 3},
+			wantEmit: "SELECT TOP 3 * FROM COMPOSITION c",
+		},
+		// Zero is a real bound, distinct from an absent clause: the carrier is
+		// a pointer precisely so the two never collapse.
+		"zero": {
+			in:       "SELECT TOP 0 c/uid/value FROM COMPOSITION c",
+			want:     &aql.TopClause{N: 0},
+			wantEmit: "SELECT TOP 0 c/uid/value FROM COMPOSITION c",
+		},
+		// Spec-invalid (§4.4.3 forbids TOP with LIMIT) but grammatically
+		// admitted: the parser reports BOTH as written and leaves the
+		// diagnosis to the lint gate.
+		"with_limit_offset_reported_independently": {
+			in:       "SELECT TOP 5 c/uid/value FROM COMPOSITION c LIMIT 10 OFFSET 2",
+			want:     &aql.TopClause{N: 5},
+			wantEmit: "SELECT TOP 5 c/uid/value FROM COMPOSITION c LIMIT 10 OFFSET 2",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", tc.in, err)
+			}
+			if q.Select.Top == nil {
+				t.Fatalf("Select.Top = nil, want %+v", tc.want)
+			}
+			if *q.Select.Top != *tc.want {
+				t.Errorf("Select.Top = %+v, want %+v", *q.Select.Top, *tc.want)
+			}
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out != tc.wantEmit {
+				t.Errorf("Emit = %q, want %q", out, tc.wantEmit)
+			}
+		})
+	}
+}
+
+// TestParseQueryNoTopClauseIsNil asserts the absent clause stays nil, so a
+// consumer reading Select.Top can never mistake "no bound" for `TOP 0`.
+// REQ-118 · PROBE-087
+func TestParseQueryNoTopClauseIsNil(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c LIMIT 5")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	if q.Select.Top != nil {
+		t.Errorf("Select.Top = %+v, want nil for a query with no TOP clause", *q.Select.Top)
+	}
+}
+
+// TestParseQueryLiteralSourceText pins the literal's SOURCE TEXT as written
+// (REQ-118). The openEHR result schema names a projected column with no AS
+// alias by its expression text; a path falls back on IdentifiedPath.Raw and a
+// literal had nothing, so re-rendering the typed value was the only option —
+// and that yields the CANONICAL form, which differs from the source in every
+// case below. Emission stays canonical: Raw is read-side fidelity only.
+// REQ-118 · PROBE-087
+func TestParseQueryLiteralSourceText(t *testing.T) {
+	cases := map[string]struct {
+		in       string
+		wantRaw  string
+		wantVal  aql.Value
+		wantEmit string
+	}{
+		// Trailing zeros: RealValue normalises 1.50 to 1.5.
+		"real_trailing_zero":   {"SELECT 1.50 FROM EHR e", "1.50", aql.RealValue{F: 1.5}, "SELECT 1.5 FROM EHR e"},
+		"integer_leading_zero": {"SELECT 001 FROM EHR e", "001", aql.IntValue{N: 1}, "SELECT 1 FROM EHR e"},
+		"negative_zero":        {"SELECT -0 FROM EHR e", "-0", aql.IntValue{N: 0}, "SELECT 0 FROM EHR e"},
+		// The AQL lexer admits both quoting forms; the canonical emission is
+		// single-quoted, so a double-quoted source literal only survives in Raw.
+		"double_quoted_string": {`SELECT "dq" FROM EHR e`, `"dq"`, aql.StringValue{S: "dq"}, "SELECT 'dq' FROM EHR e"},
+		"single_quoted_string": {"SELECT 'sq' FROM EHR e", "'sq'", aql.StringValue{S: "sq"}, "SELECT 'sq' FROM EHR e"},
+		"boolean_keyword":      {"SELECT TRUE FROM EHR e", "TRUE", aql.BoolValue{B: true}, "SELECT true FROM EHR e"},
+		// Interior whitespace: `numericPrimitive : … | SYM_MINUS
+		// numericPrimitive` admits a space after the sign, and GetText() would
+		// concatenate the tokens to `-5` — a canonicalisation, which is what
+		// this field exists to avoid. The span is read from the character
+		// stream instead, so `- 5` survives verbatim.
+		"negative_with_space": {"SELECT - 5 FROM EHR e", "- 5", aql.IntValue{N: -5}, "SELECT -5 FROM EHR e"},
+		"null_keyword":        {"SELECT null FROM EHR e", "null", aql.NullValue{}, "SELECT NULL FROM EHR e"},
+		// A bare `$p` is NOT a projection: `columnExpr : identifiedPath |
+		// primitive | aggregateFunctionCall | functionCall` admits no
+		// PARAMETER, so a parameter literal only reaches LiteralExpr as a
+		// function-call argument — covered by the nested-argument test below.
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", tc.in, err)
+			}
+			lit, ok := q.Select.Items[0].Expr.(parse.LiteralExpr)
+			if !ok {
+				t.Fatalf("Select.Items[0].Expr = %T, want parse.LiteralExpr", q.Select.Items[0].Expr)
+			}
+			if lit.Raw != tc.wantRaw {
+				t.Errorf("LiteralExpr.Raw = %q, want %q (source text as written)", lit.Raw, tc.wantRaw)
+			}
+			if lit.Value != tc.wantVal {
+				t.Errorf("LiteralExpr.Value = %#v, want %#v", lit.Value, tc.wantVal)
+			}
+			// Emission MUST stay canonical — the canonical write form is
+			// normative (REQ-055), and a constructed LiteralExpr has no Raw.
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out != tc.wantEmit {
+				t.Errorf("Emit = %q, want the canonical %q", out, tc.wantEmit)
+			}
+		})
+	}
+}
+
+// TestParseQueryLiteralSourceTextInFunctionArgument asserts the source text
+// reaches a literal nested in a function-call argument too, so a consumer
+// walking a projected CONCAT sees the same fidelity as a bare literal.
+// REQ-118 · PROBE-087
+func TestParseQueryLiteralSourceTextInFunctionArgument(t *testing.T) {
+	q, err := parse.ParseQuery(`SELECT CONCAT("a", 1.50, $p) FROM EHR e`)
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	fc, ok := q.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok {
+		t.Fatalf("Select.Items[0].Expr = %T, want parse.FunctionCall", q.Select.Items[0].Expr)
+	}
+	want := []string{`"a"`, "1.50", "$p"}
+	if len(fc.Args) != len(want) {
+		t.Fatalf("FunctionCall.Args len = %d, want %d", len(fc.Args), len(want))
+	}
+	for i, w := range want {
+		lit, ok := fc.Args[i].(parse.LiteralExpr)
+		if !ok {
+			t.Fatalf("Args[%d] = %T, want parse.LiteralExpr", i, fc.Args[i])
+		}
+		if lit.Raw != w {
+			t.Errorf("Args[%d].Raw = %q, want %q", i, lit.Raw, w)
+		}
+	}
+}
+
+// TestParseQueryConstructedLiteralHasNoSourceText documents the contract's
+// other half: Raw is populated by the PARSER only. A directly-constructed AST
+// has no source, so Raw is empty there and emission still works — a consumer
+// MUST NOT treat it as a required field.
+// REQ-118
+func TestParseQueryConstructedLiteralHasNoSourceText(t *testing.T) {
+	q := &parse.Query{
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.LiteralExpr{Value: aql.Int(1)}}}},
+		From:   parse.FromClause{Root: parse.ClassExpr{RMType: "EHR", Alias: "e"}},
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if out != "SELECT 1 FROM EHR e" {
+		t.Errorf("Emit = %q, want SELECT 1 FROM EHR e", out)
+	}
+}

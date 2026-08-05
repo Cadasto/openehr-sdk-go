@@ -1,0 +1,1 @@
+SELECT TOP 5 BACKWARD c/uid/value FROM EHR e CONTAINS COMPOSITION c WHERE e/ehr_id/value = $ehr_id ORDER BY c/context/start_time/value DESC

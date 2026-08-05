@@ -25,7 +25,7 @@ make build
 | [validate-from-json](#validate-from-json) | No | `canjson`, `template`, `validation` | Wire bytes → validate |
 | [generate-example](#generate-example) | No | `template`, `instance`, `canjson` | OPT → synthesised RM instance → JSON |
 | [aql-build](#aql-build) | No | `aql` | Struct + verb builders → byte-identical AQL (REQ-055); containment algebra + in-text paging (REQ-117) |
-| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113), incl. the REQ-117 catalogue closures |
+| [aql-parse-structured](#aql-parse-structured) | No | `aql`, `aql/parse` | Parse AQL → structured `parse.Query` AST + round-trip emit (REQ-113), incl. the REQ-117 catalogue closures and the REQ-118 `SELECT TOP` carrier + literal source text |
 | [lint-aql](#lint-aql) | No | `aql/parse`, `aql/lint`, `validation` | AQL static lint + `ValidateAQL` (REQ-109) |
 | [compile-build-validate](#compile-build-validate) | No | `template`, `templatecompile`, `composition`, `validation`, `canjson` | Public compile → build → validate, public-only imports (REQ-111) |
 | [template-explore](#template-explore) | No | `template`, `templatecompile` | Introspect a compiled OPT: structure tree + leaf paths (REQ-111) |
@@ -211,7 +211,7 @@ containment algebra + in-text paging (REQ-117):
 
 ### aql-parse-structured
 
-**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile; the residual `aql.ErrIncompleteAST` is an integer literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. With no argument the program walks two queries: the representative one below, then a REQ-117 query exercising the closed shapes. Pure building block: no transport, no auth.
+**Purpose:** Parse an AQL string into the structured `parse.Query` AST (Tier 2, REQ-113) — the read-side mirror of `aql.Builder` — and emit it back to canonical text via `Query.Emit()`. Since REQ-117 the catalogue covers the whole SDK grammar profile, and since REQ-118 that includes the deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause; the residual `aql.ErrIncompleteAST` is a numeric literal the AST cannot represent, surfaced by `ParseQuery` rather than silently dropping a clause. With no argument the program walks three queries: the representative one below, a REQ-117 query exercising the closed shapes, and a REQ-118 query showing the `TOP` carrier alongside two literals whose **source text** differs from their canonical rendering (`1.50` → `1.5`, `"quoted"` → `'quoted'`) — the openEHR result schema names an unaliased column by its expression text, so `parse.LiteralExpr.Raw` keeps what was written while emission stays canonical. Pure building block: no transport, no auth.
 
 ```bash
 go run ./cmd/examples/aql-parse-structured
@@ -272,6 +272,25 @@ structured AST:
 
 canonical emission:
   SELECT *, 1 AS rank, LENGTH(c/name/value) FROM COMPOSITION c OR EHR e WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value
+
+--- REQ-118 deprecated SELECT TOP + literal source text ---
+
+input AQL:
+  SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted"
+  FROM COMPOSITION c
+  ORDER BY c/uid/value DESC
+
+structured AST:
+  SELECT TOP 5 BACKWARD:
+    [0] c/uid/value
+    [1] 1.5 (real) (source text: 1.50)
+    [2] 'quoted' (string) (source text: "quoted")
+  FROM COMPOSITION c
+  ORDER BY:
+    [0] c/uid/value DESC
+
+canonical emission:
+  SELECT TOP 5 BACKWARD c/uid/value, 1.5, 'quoted' FROM COMPOSITION c ORDER BY c/uid/value DESC
 ```
 
 **What to copy into your app:** type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue — the sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.

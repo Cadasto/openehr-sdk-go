@@ -25,17 +25,16 @@ var ErrSyntax = errors.New("aql: syntax error")
 // parse.Document.QueryErr) so callers can branch on errors.Is.
 //
 // Since REQ-117 the catalogue models every SELECT / FROM / WHERE / ORDER BY
-// / LIMIT construct the SDK grammar profile admits, and two residual
-// conditions remain:
+// / LIMIT construct the SDK grammar profile admits, and since REQ-118 (which
+// added the [TopClause] carrier for the deprecated `SELECT TOP` clause) ONE
+// residual condition remains:
 //
 //   - A numeric literal the value vocabulary cannot represent — a `LIMIT` /
-//     `OFFSET` value beyond Go `int`, an INTEGER beyond `int64`, or a REAL
-//     beyond `float64`, in any value position (a SELECT literal, a
-//     comparison operand, a MATCHES member). Refused loudly rather than
-//     degraded, so the precision loss is never emitted as canonical text.
-//   - A `SELECT TOP n` clause. The profile retains the deprecated `top`
-//     production but the AST carries no equivalent, and dropping it would
-//     turn a bounded query into an unbounded one.
+//     `OFFSET` value beyond Go `int`, a `SELECT TOP` count beyond `int`, an
+//     INTEGER beyond `int64`, or a REAL beyond `float64`, in any value
+//     position (a SELECT literal, a comparison operand, a MATCHES member).
+//     Refused loudly rather than degraded, so the precision loss is never
+//     emitted as canonical text.
 //
 // Every other extractor branch is defensive: it is unreachable against the
 // current profile and records a gap if a widened grammar ever reaches it.

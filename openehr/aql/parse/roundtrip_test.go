@@ -119,6 +119,24 @@ func TestRoundTripIdempotent(t *testing.T) {
 		{"from_root_junction_grouped_and_under_or", "SELECT c1 FROM (COMPOSITION c1 AND COMPOSITION c2) OR EHR e"},
 		{"from_root_junction_negated_chain", "SELECT c1 FROM COMPOSITION c1 OR (COMPOSITION c2 NOT CONTAINS SECTION s)"},
 		{"contains_nested_junction_grouped", "SELECT c FROM EHR e CONTAINS ((COMPOSITION c OR SECTION s) AND OBSERVATION o)"},
+
+		// REQ-118: the deprecated `SELECT TOP` row limit, in every shape the
+		// `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` production admits,
+		// including the §4.4.3-forbidden TOP+LIMIT combination — which the
+		// parser and emitter carry faithfully and the lint gate diagnoses.
+		{"select_top", "SELECT TOP 5 c/uid/value FROM COMPOSITION c"},
+		{"select_top_forward", "SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c"},
+		{"select_top_backward", "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c"},
+		{"select_top_lower_case", "SELECT top 5 backward c/uid/value FROM COMPOSITION c"},
+		{"select_distinct_top", "SELECT DISTINCT TOP 3 c/uid/value FROM COMPOSITION c"},
+		{"select_top_star", "SELECT TOP 3 * FROM COMPOSITION c"},
+		{"select_top_zero", "SELECT TOP 0 c/uid/value FROM COMPOSITION c"},
+		{"select_top_with_limit", "SELECT TOP 5 c/uid/value FROM COMPOSITION c LIMIT 10 OFFSET 2"},
+		{"select_top_order_by", "SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c ORDER BY c/uid/value DESC"},
+		// REQ-118: a non-canonical literal — the AST carries the canonical
+		// value AND the source text, and emission renders the canonical form,
+		// so the SECOND emit is the fixed point (emit1 != input here).
+		{"select_literal_non_canonical", `SELECT 1.50, "dq", 001 FROM EHR e`},
 	}
 
 	for _, tc := range cases {
@@ -200,6 +218,17 @@ func TestRoundTripPreservesCanonicalInput(t *testing.T) {
 		// key and survives the round trip unchanged).
 		"SELECT e/time_created AS score FROM EHR e ORDER BY score DESC",
 		"SELECT o/data[at0001]/value/magnitude AS score FROM EHR e CONTAINS OBSERVATION o ORDER BY score ASC",
+
+		// REQ-118: canonical `TOP` forms — upper-cased keywords, direction
+		// present only when written, emitted between DISTINCT and the
+		// projection list.
+		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",
+		"SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c",
+		"SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c",
+		"SELECT DISTINCT TOP 3 c/uid/value FROM COMPOSITION c",
+		"SELECT TOP 3 * FROM COMPOSITION c",
+		"SELECT TOP 5 c/uid/value FROM COMPOSITION c LIMIT 10 OFFSET 2",
+		"SELECT TOP 5 BACKWARD c/uid/value FROM COMPOSITION c ORDER BY c/uid/value DESC",
 	}
 	for _, in := range canonical {
 		t.Run(in, func(t *testing.T) {
@@ -266,14 +295,14 @@ func TestFormerCatalogueGapsModelled(t *testing.T) {
 	}
 }
 
-// TestParseQuerySurfacesTopClauseGap pins the second residual catalogue gap
-// after REQ-117: the grammar profile retains the deprecated `top` production
-// (`selectClause : SELECT DISTINCT? top? selectExpr …`) but the AST has no
-// carrier for it. A source that sets TOP MUST surface aql.ErrIncompleteAST
-// rather than parse cleanly and re-emit without the clause — dropping it
-// silently turns a bounded query into an unbounded one.
-// PROBE-087
-func TestParseQuerySurfacesTopClauseGap(t *testing.T) {
+// TestTopClauseGapClosed is the REPLACEMENT for the retired
+// TestParseQuerySurfacesTopClauseGap: REQ-118 moved the deprecated `top`
+// production INTO the catalogue, so each input below — every one of which used
+// to surface aql.ErrIncompleteAST — must now parse clean, carry the bound, and
+// emit as a fixed point. The retired test asserted the opposite; the row limit
+// is still never dropped, it is now carried instead of refused.
+// REQ-118 · PROBE-087
+func TestTopClauseGapClosed(t *testing.T) {
 	for _, in := range []string{
 		"SELECT TOP 5 c/uid/value FROM COMPOSITION c",
 		"SELECT TOP 5 FORWARD c/uid/value FROM COMPOSITION c",
@@ -281,18 +310,81 @@ func TestParseQuerySurfacesTopClauseGap(t *testing.T) {
 		"SELECT DISTINCT TOP 5 c/uid/value FROM COMPOSITION c",
 	} {
 		t.Run(in, func(t *testing.T) {
-			q, err := parse.ParseQuery(in)
-			if !errors.Is(err, aql.ErrIncompleteAST) {
-				t.Fatalf("ParseQuery(%q) error = %v, want ErrIncompleteAST", in, err)
+			doc, err := parse.Parse(in)
+			if err != nil {
+				t.Fatalf("Parse(%q): %v", in, err)
 			}
-			if q == nil {
-				t.Fatal("partial AST should be non-nil on a gap")
+			if qerr := doc.QueryErr(); qerr != nil {
+				t.Fatalf("QueryErr(%q) = %v, want nil (the top clause is in catalogue per REQ-118)", in, qerr)
 			}
-			// Emit must refuse the partial AST with the same error, so a
-			// caller who ignored the parse error cannot emit the weaker
-			// query.
-			if _, eerr := q.Emit(); !errors.Is(eerr, aql.ErrIncompleteAST) {
-				t.Fatalf("Emit error = %v, want ErrIncompleteAST", eerr)
+			q := doc.Query()
+			if q.Select.Top == nil {
+				t.Fatal("Select.Top = nil; the bound must be carried, never dropped")
+			}
+			emit1, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			q2, err := parse.ParseQuery(emit1)
+			if err != nil {
+				t.Fatalf("ParseQuery(canonical %q): %v", emit1, err)
+			}
+			emit2, err := q2.Emit()
+			if err != nil {
+				t.Fatalf("second Emit: %v", err)
+			}
+			if emit1 != emit2 {
+				t.Errorf("emission not a fixed point\n  input: %s\n  emit1: %s\n  emit2: %s", in, emit1, emit2)
+			}
+		})
+	}
+}
+
+// TestParseQueryTopClauseOutOfRange pins a TOP count outside Go `int` as the
+// RESIDUAL unrepresentable-numeric refusal rather than a top-specific one
+// (REQ-118): the bound is refused loudly at parse and on Emit, never truncated
+// — a truncated row limit is silent data loss whichever clause carries it.
+// REQ-118 · PROBE-087
+func TestParseQueryTopClauseOutOfRange(t *testing.T) {
+	const in = "SELECT TOP 99999999999999999999 c/uid/value FROM COMPOSITION c"
+	q, err := parse.ParseQuery(in)
+	if !errors.Is(err, aql.ErrIncompleteAST) {
+		t.Fatalf("ParseQuery(%q) error = %v, want ErrIncompleteAST", in, err)
+	}
+	if !strings.Contains(err.Error(), "out of range") {
+		t.Errorf("error message does not mention %q: %v", "out of range", err)
+	}
+	if q == nil {
+		t.Fatal("partial AST should be non-nil on a gap")
+	}
+	if q.Select.Top != nil {
+		t.Errorf("Select.Top = %+v, want nil — a refused count must not leave a truncated bound", *q.Select.Top)
+	}
+	if _, eerr := q.Emit(); !errors.Is(eerr, aql.ErrIncompleteAST) {
+		t.Fatalf("Emit error = %v, want ErrIncompleteAST", eerr)
+	}
+}
+
+// TestEmitUnrenderableTopClause pins the emitter's guards on a hand-built AST
+// (REQ-118): the `top` production admits no sign, and a direction outside the
+// vocabulary renders as nothing at all — which would emit an UNDIRECTED bound,
+// a silent loss. Both refuse, mirroring [aql.Builder]'s build-time guards.
+// REQ-118
+func TestEmitUnrenderableTopClause(t *testing.T) {
+	for name, top := range map[string]*aql.TopClause{
+		"negative count":    {N: -1},
+		"unknown direction": {N: 5, Dir: aql.TopDir(99)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			q := &parse.Query{
+				Select: parse.SelectClause{
+					Items: []parse.SelectItem{{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "e/ehr_id/value"}}}}},
+					Top:   top,
+				},
+				From: parse.FromClause{Root: parse.ClassExpr{RMType: "EHR", Alias: "e"}},
+			}
+			if _, err := q.Emit(); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("Emit error = %v, want ErrInvalidQuery", err)
 			}
 		})
 	}

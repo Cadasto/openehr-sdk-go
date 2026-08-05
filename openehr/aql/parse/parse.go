@@ -66,6 +66,25 @@ type Document struct {
 	HasOrderBy bool
 	HasLimit   bool
 
+	// HasTop reports that the source carried a `SELECT TOP` clause, read
+	// from the parse tree — so it is true even when the clause's count is
+	// unrepresentable and [Document.Top] is therefore nil (REQ-118).
+	// PRESENCE and REPRESENTABILITY are separate questions: a check about
+	// whether the deprecated construct was used at all (the lint gate's) MUST
+	// key on this flag, or an out-of-range count would silence it.
+	HasTop bool
+
+	// Top is the decoded `SELECT TOP n [FORWARD|BACKWARD]` row limit — the
+	// flat-view mirror of [SelectClause.Top], so the lint gate reads the
+	// clause without paying for the structured extraction (REQ-118).
+	//
+	// It is nil both when no clause was written and when the clause's count
+	// is outside Go `int`: nothing is ever truncated into a bound. Use
+	// [Document.HasTop] to tell those two cases apart. The unrepresentable
+	// source is refused by the structured extractor, which is the layer that
+	// owns representability.
+	Top *aql.TopClause
+
 	// SelectAliases are the `AS` aliases declared on SELECT projection
 	// items, in document order; a projection without an AS clause
 	// contributes nothing. They are a namespace of their own — an ORDER BY
@@ -210,6 +229,17 @@ func (d *Document) QueryErr() error {
 func (d *Document) populate() {
 	if sc := d.tree.SelectClause(); sc != nil {
 		d.Distinct = sc.DISTINCT() != nil
+		// REQ-118: the deprecated TOP clause, mirrored into the flat view for
+		// the lint gate. HasTop records PRESENCE from the tree; Top records
+		// the DECODED bound and stays nil when the count is unrepresentable,
+		// in lockstep with the structured extractor's topClause — nothing is
+		// truncated into a bound. Keeping the two separate is what lets a
+		// presence check survive an out-of-range count.
+		if top := sc.Top(); top != nil {
+			d.HasTop = true
+			var ex astExtractor
+			d.Top = ex.topClause(top)
+		}
 		exprs := sc.AllSelectExpr()
 		d.NumSelect = len(exprs)
 		for _, e := range exprs {

@@ -26,6 +26,18 @@ func mustCompile(t *testing.T, fixture string) *templatecompile.Compiled {
 	return c
 }
 
+// count reports how many issues carry the given code (a code that must fire
+// exactly once needs a count, not just presence).
+func count(r lint.Result, code string) int {
+	n := 0
+	for _, i := range r.Issues {
+		if i.Code == code {
+			n++
+		}
+	}
+	return n
+}
+
 func codes(r lint.Result) []string {
 	out := make([]string, len(r.Issues))
 	for i, is := range r.Issues {
@@ -432,5 +444,109 @@ func TestLintNilDocument(t *testing.T) {
 	r := lint.Lint(nil, nil)
 	if r.OK() || !has(r, "aql_syntax") {
 		t.Fatalf("Lint(nil) want aql_syntax, got %v", codes(r))
+	}
+}
+
+// TestLintDeprecatedTop pins the advisory for the deprecated `SELECT TOP`
+// modifier: openEHR QUERY Release-1.1.0 §4.4.3 deprecates it in favour of
+// `LIMIT` with `ORDER BY` and announces its removal, so a query carrying one
+// gets a Warning — advisory, not a rejection, because the construct is still
+// legal AQL and the SDK parses and emits it faithfully (REQ-118).
+// REQ-118 · REQ-109
+func TestLintDeprecatedTop(t *testing.T) {
+	for _, in := range []string{
+		"SELECT TOP 5 e/ehr_id/value FROM EHR e",
+		"SELECT TOP 5 BACKWARD e/ehr_id/value FROM EHR e",
+		"SELECT DISTINCT TOP 5 e/ehr_id/value FROM EHR e",
+	} {
+		t.Run(in, func(t *testing.T) {
+			res := lint.LintString(in, nil)
+			if !has(res, "aql_deprecated_top") {
+				t.Errorf("aql_deprecated_top not raised for %q: %+v", in, res.Issues)
+			}
+			if count(res, "aql_deprecated_top") != 1 {
+				t.Errorf("aql_deprecated_top raised %d times, want exactly 1", count(res, "aql_deprecated_top"))
+			}
+			if has(res, "aql_top_with_limit") {
+				t.Errorf("aql_top_with_limit raised without a LIMIT clause: %+v", res.Issues)
+			}
+			// A deprecation is advisory: Warnings do not make a result not-OK.
+			if !res.OK() {
+				t.Errorf("Result.OK() = false, want true (deprecation is a Warning): %+v", res.Issues)
+			}
+		})
+	}
+}
+
+// TestLintTopWithLimit pins the Error for the combination the spec forbids
+// outright — "It is not allowed to use TOP while also using LIMIT clause in the
+// same query" (QUERY Release-1.1.0 §4.4.3). The parser and the emitter carry
+// both faithfully; the lint gate is where the prohibition is reported, and it
+// makes the result not-OK (REQ-118).
+// REQ-118 · REQ-109
+func TestLintTopWithLimit(t *testing.T) {
+	const in = "SELECT TOP 5 e/ehr_id/value FROM EHR e LIMIT 10 OFFSET 2"
+	res := lint.LintString(in, nil)
+	if !has(res, "aql_top_with_limit") {
+		t.Errorf("aql_top_with_limit not raised for %q: %+v", in, res.Issues)
+	}
+	// The deprecation still applies — the two codes are independent findings,
+	// and lint is collect-all.
+	if !has(res, "aql_deprecated_top") {
+		t.Errorf("aql_deprecated_top not raised alongside the combination: %+v", res.Issues)
+	}
+	if res.OK() {
+		t.Error("Result.OK() = true, want false (the combination is an Error)")
+	}
+}
+
+// TestLintNoTopClauseRaisesNeitherCode is the negative control: neither code
+// may fire on a query that carries no TOP, including one using the LIMIT
+// channel the spec recommends instead.
+// REQ-118 · REQ-109
+func TestLintNoTopClauseRaisesNeitherCode(t *testing.T) {
+	for _, in := range []string{
+		"SELECT e/ehr_id/value FROM EHR e",
+		"SELECT e/ehr_id/value FROM EHR e ORDER BY e/time_created DESC LIMIT 10",
+	} {
+		t.Run(in, func(t *testing.T) {
+			res := lint.LintString(in, nil)
+			if has(res, "aql_deprecated_top") || has(res, "aql_top_with_limit") {
+				t.Errorf("a TOP code fired on a query with no TOP clause: %+v", res.Issues)
+			}
+		})
+	}
+}
+
+// TestLintTopWithUnrepresentableCount pins the split between PRESENCE and
+// REPRESENTABILITY (REQ-118). A `TOP` count outside Go `int` leaves
+// parse.Document.Top nil — nothing is truncated into a bound — but the query
+// still USED the deprecated construct, and still pairs it with a LIMIT the spec
+// forbids. Keying the checks on the decoded bound silenced both findings for
+// exactly this query; they key on Document.HasTop instead.
+// REQ-118 · REQ-109
+func TestLintTopWithUnrepresentableCount(t *testing.T) {
+	const oor = "SELECT TOP 99999999999999999999 e/ehr_id/value FROM EHR e LIMIT 10"
+	res := lint.LintString(oor, nil)
+	if !has(res, "aql_deprecated_top") {
+		t.Errorf("aql_deprecated_top not raised for an out-of-range TOP: %v", codes(res))
+	}
+	if !has(res, "aql_top_with_limit") {
+		t.Errorf("aql_top_with_limit not raised for an out-of-range TOP beside a LIMIT: %v", codes(res))
+	}
+	if res.OK() {
+		t.Error("Result.OK() = true, want false (the TOP+LIMIT combination is an Error)")
+	}
+	// The flat view must still refuse to invent a bound: presence is known,
+	// the count is not.
+	doc, err := parse.Parse(oor)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !doc.HasTop {
+		t.Error("Document.HasTop = false, want true (the clause is present in the source)")
+	}
+	if doc.Top != nil {
+		t.Errorf("Document.Top = %+v, want nil (an unrepresentable count must not become a bound)", *doc.Top)
 	}
 }

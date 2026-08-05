@@ -948,14 +948,14 @@ requirements:
     # BoolValue/NullValue the Builder constructs. (*Query).Emit +
     # aql.FormatWhere close the round-trip loop. PROBE-080 (round-trip
     # property) is carried inline by openehr/aql/parse/roundtrip_test.go
-    # — 77 idempotence cases plus 36 canonical-input preservation cases
+    # — 87 idempotence cases plus 43 canonical-input preservation cases
     # across the catalogue, plus the residual-gap suite asserting
     # ParseQuery and Emit both surface aql.ErrIncompleteAST. The corpus
-    # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04):
-    # the extractor now covers the whole SDK grammar profile and the
-    # residual refusals are an unrepresentable numeric literal and a
-    # SELECT TOP clause — see the REQ-117 row and PROBE-087, which own
-    # that closure.
+    # grew when REQ-117 closed this REQ's v1 catalogue gaps (2026-08-04)
+    # and again when REQ-118 landed the SELECT TOP carrier (2026-08-05):
+    # the extractor now covers the whole SDK grammar profile and the only
+    # residual refusal is an unrepresentable numeric literal — see the
+    # REQ-117 / REQ-118 rows and PROBE-087, which own that closure.
     # Out-of-catalogue shapes never silently emit: ErrIncompleteAST is
     # the trust-model surface. Tier 1 — Document.Tree — exposes the
     # validated ANTLR tree as a cheap interim (unstable consumer
@@ -1086,13 +1086,15 @@ requirements:
     # arguments, path-valued operands (aql.PathValue), structured MATCHES
     # TERMINOLOGY / {URI} operands, the FROM-root containment junction
     # (parse.FromClause.Junction), and junctions over any in-catalogue operand.
-    # The complete residual ErrIncompleteAST list is two classes: a numeric
-    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, an
-    # INTEGER beyond int64, or a REAL beyond float64, in any value position;
-    # degrading would be silent precision loss), pinned by
-    # TestParseQuerySurfacesIncompleteAST, and a SELECT TOP clause, pinned
-    # by TestParseQuerySurfacesTopClauseGap —
-    # with TestFormerCatalogueGapsModelled asserting the nine round-trip cases covering the eight closed gap shapes
+    # The complete residual ErrIncompleteAST list is ONE class: a numeric
+    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, a SELECT
+    # TOP count beyond `int`, an INTEGER beyond int64, or a REAL beyond
+    # float64, in any value position; degrading would be silent precision
+    # loss), pinned by TestParseQuerySurfacesIncompleteAST. As first published
+    # this REQ listed a second residual — a SELECT TOP clause — which REQ-118
+    # CLOSED by adding the carrier; that history is informative only and no
+    # requirement to refuse a top clause is in force.
+    # TestFormerCatalogueGapsModelled asserts the nine round-trip cases covering the eight closed gap shapes
     # now parse, emit, and round-trip (PROBE-087).
     #
     # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
@@ -1144,6 +1146,67 @@ requirements:
       - testkit/probes/aql/probes_test.go
     plans:
       - docs/plans/archive/2026-08-04-aql-expressivity-completion.md
+
+  - id: REQ-118
+    title: Deprecated SELECT TOP clause and literal source text
+    canonical: docs/specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text
+    status: draft
+    # AMENDS REQ-117's residual ErrIncompleteAST list: the SELECT TOP clause
+    # moves INTO the catalogue, leaving one residual (a numeric literal the
+    # value vocabulary cannot represent — an out-of-range TOP count folds into
+    # it). TOP is deprecated upstream (QUERY Release-1.1.0 §4.4.3, removal
+    # announced) and therefore must still be READ and BUILT: the SDK does not
+    # author the queries it is handed, and §4.4.3 additionally forbids TOP
+    # together with LIMIT, which nothing in the SDK could report while the
+    # clause was dropped at extraction.
+    #
+    # Two carriers: SelectClause.Top (count + FORWARD/BACKWARD direction,
+    # deliberately NOT the LimitExpr vocabulary — the `top` production admits
+    # no PARAMETER and LIMIT carries no direction, so reuse would model a shape
+    # whose emission the parser rejects) and LiteralExpr source text (read-side
+    # fidelity only: emission stays canonical, since the canonical write form
+    # is normative and a constructed literal has no source text). The
+    # canonical renderer a consumer needs for a constructed value already
+    # exists as the public aql.FormatValue — no second escaping copy.
+    #
+    # Layer split for the spec-invalid TOP+LIMIT combination: parse models
+    # both as written, Emit renders both (refusing would break the round-trip
+    # property for text the profile accepts), lint diagnoses it
+    # (aql_deprecated_top Warning / aql_top_with_limit Error — catalogue home
+    # is the REQ-109 Layer-2 table), and the builder refuses at Build() with
+    # TOP joined to the in-text paging channel's exclusivity rule.
+    # PROBE-028's multiset is unaffected: no lint cassette carries a TOP.
+    #
+    # LANDED. parse.SelectClause.Top + Document.Top (the flat mirror the lint
+    # gate reads), parse.LiteralExpr.Raw taken from the character-stream span
+    # (GetText would drop interior whitespace, which is itself a
+    # canonicalisation), aql.TopClause/TopDir/FormatTop as shared vocabulary,
+    # Builder.Top / Builder.TopDirected with the exclusivity + non-negative +
+    # known-direction refusals in validateTop, and the two lint codes. The
+    # retired TestParseQuerySurfacesTopClauseGap is REPLACED by
+    # TestTopClauseGapClosed (the positive assertion) — not deleted.
+    # NOTE: `TOP $n` is NOT modelled: the profile's `top` production admits
+    # INTEGER only, so the SDK-AQL-003 parameter relaxation is deliberately
+    # not extended to a construct the spec is removing.
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/parse
+      - openehr/aql/lint
+      - testkit/probes/aql
+    probes: [PROBE-087, PROBE-088]
+    tests:
+      # PROBE-087 (extended) — TOP shapes in-catalogue + round-trip, literal
+      # source text per literal kind, out-of-range TOP under the residual.
+      - openehr/aql/parse/query_test.go
+      - openehr/aql/parse/roundtrip_test.go
+      # Lint diagnosis for the deprecated clause and the forbidden combination.
+      - openehr/aql/lint/lint_test.go
+      # PROBE-088 (extended) — builder TOP goldens + refusal matrix.
+      - openehr/aql/paging_test.go
+      - testkit/probes/aql/probes_test.go
+    plans:
+      - docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md
 
   - id: REQ-120
     title: RM identifier parsing and derivation

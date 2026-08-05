@@ -106,6 +106,22 @@ var probe088Constructs = []struct {
 			return inlinePagingQuery().LimitInlineParam("rows").OffsetInlineParam("skip").Build()
 		},
 	},
+	{
+		// REQ-118: the DEPRECATED `SELECT TOP n` row limit — deprecated by
+		// openEHR QUERY Release-1.1.0 §4.4.3, still buildable because the SDK
+		// must be able to author a shape a client may legitimately send until
+		// the announced removal.
+		name:  "select_top",
+		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Build() },
+	},
+	{
+		// REQ-118: `TOP n BACKWARD` — the direction is part of the bound, so
+		// dropping it would select the opposite end of the ordered result.
+		name: "select_top_backward",
+		build: func() (aql.Query, error) {
+			return inlinePagingQuery().TopDirected(5, aql.TopBackward).Build()
+		},
+	},
 }
 
 // inlinePagingQuery is the shared body of the paging constructs: the most
@@ -136,6 +152,23 @@ var probe088Refusals = []struct {
 		name:  "in_text_offset_without_limit",
 		build: func() (aql.Query, error) { return inlinePagingQuery().OffsetInline(100).Build() },
 	},
+	{
+		// REQ-118: openEHR QUERY Release-1.1.0 §4.4.3 — "It is not allowed to
+		// use TOP while also using LIMIT clause in the same query."
+		name:  "top_with_in_text_limit",
+		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).LimitInline(50).Build() },
+	},
+	{
+		// REQ-118: a TOP is an in-text row bound, so it is exclusive with the
+		// request envelope's bound too — two bounds on one query.
+		name:  "top_with_envelope_limit",
+		build: func() (aql.Query, error) { return inlinePagingQuery().Top(5).Limit(20).Build() },
+	},
+	{
+		// REQ-118: the `top` production admits no sign.
+		name:  "negative_top_count",
+		build: func() (aql.Query, error) { return inlinePagingQuery().Top(-1).Build() },
+	},
 }
 
 // Probe088Constructs returns the construct names PROBE-088 asserts, in
@@ -150,8 +183,8 @@ func Probe088Constructs() []string {
 }
 
 // Probe088BuilderContainmentAndPaging asserts the canonical-string stability
-// of the builder constructs REQ-117 adds (REQ-055's PROBE-020 property
-// extended, PROBE-088):
+// of the builder constructs REQ-117 adds, plus the REQ-118 `SELECT TOP` clause
+// (REQ-055's PROBE-020 property extended, PROBE-088):
 //
 //   - each construct in [Probe088Constructs] emits its committed golden
 //     byte-for-byte;

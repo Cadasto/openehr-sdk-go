@@ -15,12 +15,14 @@
 //	go run ./cmd/examples/aql-parse-structured
 //	go run ./cmd/examples/aql-parse-structured "SELECT c FROM EHR e CONTAINS COMPOSITION c WHERE c/uid/value = \$id"
 //
-// With no argument it walks two built-in queries: a representative one
+// With no argument it walks three built-in queries: a representative one
 // exercising SELECT projection, CONTAINS chain, WHERE comparison, ORDER BY
-// DESC and LIMIT/OFFSET, then a REQ-117 query exercising the catalogue
-// closures the v1 extractor refused — a mixed `SELECT *, col` list with a
-// primitive literal, a function-call WHERE left operand, a path-vs-path
-// comparison, and a containment junction at the FROM root.
+// DESC and LIMIT/OFFSET; a REQ-117 query exercising the catalogue closures the
+// v1 extractor refused — a mixed `SELECT *, col` list with a primitive
+// literal, a function-call WHERE left operand, a path-vs-path comparison, and
+// a containment junction at the FROM root; and a REQ-118 query exercising the
+// deprecated `SELECT TOP` carrier plus a projected literal whose source text
+// differs from its canonical rendering.
 package main
 
 import (
@@ -55,6 +57,22 @@ const req117Query = `SELECT *, 1 AS rank, LENGTH(c/name/value)
 FROM COMPOSITION c OR EHR e
 WHERE LENGTH(c/name/value) > $min AND c/uid/value = c/name/value`
 
+// req118Query exercises what REQ-118 added to the read side:
+//
+//   - `TOP 5 BACKWARD` — the DEPRECATED row limit (openEHR QUERY
+//     Release-1.1.0 §4.4.3 replaces it with LIMIT + ORDER BY, and announces
+//     its removal). It parses and re-emits rather than being refused, because
+//     an SDK does not author the queries it is handed; the lint gate is what
+//     reports the deprecation (`aql_deprecated_top`).
+//   - `1.50` and `"quoted"` — projected literals whose SOURCE TEXT differs
+//     from the canonical rendering (`1.5`, `'quoted'`). The openEHR result
+//     schema names an unaliased column by its expression text, so
+//     parse.LiteralExpr.Raw carries what was written while emission stays
+//     canonical.
+const req118Query = `SELECT TOP 5 BACKWARD c/uid/value, 1.50, "quoted"
+FROM COMPOSITION c
+ORDER BY c/uid/value DESC`
+
 func main() {
 	if args := os.Args[1:]; len(args) > 0 {
 		walk(strings.Join(args, " "))
@@ -65,6 +83,10 @@ func main() {
 	fmt.Println("--- REQ-117 catalogue closures ---")
 	fmt.Println()
 	walk(req117Query)
+	fmt.Println()
+	fmt.Println("--- REQ-118 deprecated SELECT TOP + literal source text ---")
+	fmt.Println()
+	walk(req118Query)
 }
 
 // walk parses one query and prints its structured AST plus the canonical
@@ -102,6 +124,12 @@ func printSelect(s parse.SelectClause) {
 	if s.Distinct {
 		head += " DISTINCT"
 	}
+	// REQ-118: the deprecated `TOP n [FORWARD|BACKWARD]` row limit sits between
+	// DISTINCT and the projection list. A consumer that ignored it would run
+	// unbounded where the source asked for n rows.
+	if s.Top != nil {
+		head += " " + aql.FormatTop(s.Top)
+	}
 	// Items lead: since REQ-117 a mixed `SELECT *, col` carries the star as a
 	// parse.StarExpr item, so the list is authoritative whenever it is
 	// populated. The bare `SELECT *` form leaves Items empty and is carried by
@@ -134,6 +162,20 @@ func describeSelectExpr(e parse.SelectExpr) string {
 	case parse.LiteralExpr:
 		// REQ-117: a primitive or parameter literal projection — same
 		// aql.Value vocabulary the WHERE side uses.
+		//
+		// REQ-118: Raw is the source text as written, which the openEHR result
+		// schema needs as the column name when a projection carries neither an
+		// AS alias nor a path. Show it only when it DIFFERS from the canonical
+		// rendering — `1.50` vs `1.5`, `"x"` vs `'x'` — since that difference is
+		// the whole reason the field exists.
+		//
+		// Compare against aql.FormatValue, the canonical AQL text, NOT against
+		// describeValue: the latter appends a type tag for this demo, so `1`
+		// would never equal `1 (int)` and every literal would claim a source
+		// text that differs when it does not.
+		if v.Raw != "" && v.Raw != aql.FormatValue(v.Value) {
+			return fmt.Sprintf("%s (source text: %s)", describeValue(v.Value), v.Raw)
+		}
 		return describeValue(v.Value)
 	case parse.FunctionCall:
 		var body string

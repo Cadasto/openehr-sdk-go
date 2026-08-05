@@ -553,6 +553,8 @@ The parse layer **MUST** validate against the **SDK-maintained grammar profile**
 | Identifiable scope | `aql_from_archetype` | Warning | FROM/CONTAINS **SHOULD** name ≥1 archetype HRID, `$param` archetype predicate, `VERSION` operand, or `EHR` root; otherwise the query scans broadly. |
 | Bound parameters | `aql_unbound_param` | Error | When linting an `aql.Query`, every `$name` referenced **MUST** have a key in `Query.Parameters`. |
 | Unused parameters | `aql_unused_param` | Warning | A `Query.Parameters` key never referenced is advisory. |
+| Deprecated `TOP` | `aql_deprecated_top` | Warning | A `SELECT TOP` clause **SHOULD** be replaced by `LIMIT` with `ORDER BY` — the modifier is deprecated from QUERY Release-1.1.0 and slated for removal ([§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text)). Fires once per query carrying a `TOP`. |
+| `TOP` with `LIMIT` | `aql_top_with_limit` | Error | A query **MUST NOT** use `TOP` and the `LIMIT` clause together (QUERY Release-1.1.0 § 4.4.3). Fires in addition to `aql_deprecated_top`. |
 
 SELECT-present-with-≥1-projection and FROM-present are guaranteed by a successful parse (the grammar requires both), so they raise no Layer-2 issue.
 
@@ -945,14 +947,14 @@ The structured AST is **syntax-faithful for the catalogue**: across the buildabl
 
 **Catalogue gaps** (shapes the grammar accepts but the structured extractor does not model) surface as [`aql.ErrIncompleteAST`](../../openehr/aql/errors.go) from [`parse.ParseQuery`](../../openehr/aql/parse/parse.go) / [`Document.QueryErr`](../../openehr/aql/parse/parse.go), and a partial AST refuses to render through [`(*Query).Emit`](../../openehr/aql/parse/query.go) (same error) so the loss is never silently emitted as canonical text.
 
-The v1 gap list is closed by [§ REQ-117](#req-117--aql-expression-catalogue-completion), which also specifies the residual gaps and the defensive-branch rule normatively — see that section rather than restating them here. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
+The v1 gap list is closed by [§ REQ-117](#req-117--aql-expression-catalogue-completion), which also specifies the residual gaps and the defensive-branch rule normatively, as narrowed by [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text) (the `top` clause is in-catalogue; one residual remains) — see those sections rather than restating them here. The buildable grammar (everything `aql.Builder` constructs) is in-catalogue by construction.
 
 ### Building-block independence (REQ-013)
 
 `openehr/aql/parse/` MUST stay importable without `transport/`, `auth/`, `openehr/client/*`, or `openehr/serialize/` — unchanged from REQ-109. The forbidden-import set is enforced by `TestAQLParseForbiddenImports`. `Query.Emit` reaches `openehr/aql` (the shared vocabulary) which is itself a building block.
 
 - **Lives in:** [`openehr/aql/parse/parse.go`](../../openehr/aql/parse/parse.go) (entry), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (translator from the validated tree). Construction vocabulary in [`openehr/aql/where.go`](../../openehr/aql/where.go) and [`openehr/aql/value.go`](../../openehr/aql/value.go).
-- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (77 idempotence cases + 36 canonical-input preservation cases across the catalogue, plus the residual-gap suite asserting ParseQuery and Emit both surface `aql.ErrIncompleteAST` for the residual gaps (an unrepresentable numeric literal; a `SELECT TOP` clause) — the corpus grew under [§ REQ-117](#req-117--aql-expression-catalogue-completion), which pins the closed shapes as PROBE-087). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
+- **Verification:** structural pins in [`openehr/aql/parse/query_test.go`](../../openehr/aql/parse/query_test.go) (extraction shape across SELECT / FROM / CONTAINS / WHERE / ORDER BY / LIMIT, including COUNT(*), COUNT(DISTINCT), NOT CONTAINS, BoolValue, NullValue, ParamLimit, standing predicate, ParamArchetype, VERSION predicate) and the round-trip property in [`openehr/aql/parse/roundtrip_test.go`](../../openehr/aql/parse/roundtrip_test.go) (87 idempotence cases + 43 canonical-input preservation cases across the catalogue, plus the residual-gap suite asserting ParseQuery and Emit both surface `aql.ErrIncompleteAST` for the residual gap (an unrepresentable numeric literal, including an out-of-range `TOP` count) — the corpus grew under [§ REQ-117](#req-117--aql-expression-catalogue-completion), which pins the closed shapes as PROBE-087, and again under [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text), which moved the `top` clause into the catalogue). Vocabulary introspection in [`openehr/aql/introspect_test.go`](../../openehr/aql/introspect_test.go). Structured standing-predicate + WHERE-path access (REQ-113) is pinned by **PROBE-082** in [`openehr/aql/parse/structured_test.go`](../../openehr/aql/parse/structured_test.go). The runnable [`cmd/examples/aql-parse-structured`](../../cmd/examples/aql-parse-structured/) demonstrates a consumer walk over the structured AST without any `parse/gen` or `internal/` imports.
 - **Plan:** [`docs/plans/archive/2026-06-29-aql-execution-ast.md`](../plans/archive/2026-06-29-aql-execution-ast.md) — REQ-113 (archived after PR #58).
 
 
@@ -973,10 +975,11 @@ Consumers building AQL execution engines and conformance tooling on the structur
 7. **Parameter, primitive, or nested-function argument inside a function call** (`SELECT CONCAT('a', $p, LENGTH(x/y)) …`), in SELECT and in WHERE.
 8. **AND/OR junctions over any in-catalogue operand** — a junction is in-catalogue exactly when all its operands are.
 
-Two `ErrIncompleteAST` conditions remain after this REQ, and they are the complete residual list:
+**One** `ErrIncompleteAST` condition remains, and it is the complete residual list (narrowed from two by [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text) — see the amendment note below):
 
-1. **A numeric literal the value vocabulary cannot represent** — a `LIMIT`/`OFFSET` value beyond Go `int`, an INTEGER beyond `int64` (`aql.IntValue` carries an `int64`), or a REAL beyond `float64`, in any value position (a SELECT literal, a comparison operand, a `MATCHES` member). Such a literal MUST be refused loudly, never degraded, because degrading it would be silent precision loss.
-2. **A `SELECT TOP n` clause.** The grammar profile retains the deprecated `top` production (`selectClause : SELECT DISTINCT? top? selectExpr …`) but the structured AST carries no equivalent. It MUST be refused loudly rather than dropped: a dropped `TOP` silently turns a bounded query into an unbounded one, which is the no-silent-loss rule's worst case.
+1. **A numeric literal the value vocabulary cannot represent** — a `LIMIT`/`OFFSET` value beyond Go `int`, a `SELECT TOP` count beyond `int`, an INTEGER beyond `int64` (`aql.IntValue` carries an `int64`), or a REAL beyond `float64`, in any value position (a SELECT literal, a comparison operand, a `MATCHES` member). Such a literal MUST be refused loudly, never degraded, because degrading it would be silent precision loss.
+
+> **Amendment history (informative, not normative).** As first published, this REQ listed a second residual: a `SELECT TOP n` clause, which the grammar profile admitted but the structured AST could not carry, and which the extractor therefore refused. [§ REQ-118](#req-118--deprecated-select-top-clause-and-literal-source-text) closed that condition by adding the carrier — the clause is now in-catalogue, carried with its direction — and folded an out-of-range `TOP` count into residual 1 above. **No requirement to refuse a `top` clause is in force**; the reason the old one existed (a dropped `TOP` turns a bounded query into an unbounded one) is now met by carrying the bound instead of refusing it.
 
 Every other extractor branch MUST remain **defensive** — unreachable against the current profile, and recording a gap rather than returning a zero value if a widened grammar ever reaches it.
 
@@ -1009,7 +1012,83 @@ All additions are **additive to the canonical write form** ([wire.md § REQ-055]
 
 ### Acceptance
 
-- **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; both residual guards — the unrepresentable numeric literal and `SELECT TOP` — still fire (`TestParseQuerySurfacesIncompleteAST`, `TestParseQuerySurfacesTopClauseGap`).
+- **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** — every shape in the catalogue list parses → models → emits round-trip, pinned per shape; the former gap corpus asserts `ErrIncompleteAST` is gone; the residual guard — the unrepresentable numeric literal — still fires (`TestParseQuerySurfacesIncompleteAST`).
 - **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** — canonical-string stability goldens for the new builder constructs (the PROBE-020 property extended).
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
 - **Plan:** [`docs/plans/archive/2026-08-04-aql-expressivity-completion.md`](../plans/archive/2026-08-04-aql-expressivity-completion.md) — REQ-117 (archived after Phase 4).
+
+
+## REQ-118 — Deprecated `SELECT TOP` clause and literal source text
+
+Two carriers the structured AST lacked after [§ REQ-117](#req-117--aql-expression-catalogue-completion), both observable by a consumer that reads or re-emits third-party AQL rather than only building its own:
+
+1. **The `SELECT TOP` clause** was the last shape the extractor dropped. A consumer therefore reported a *bounded* query as an extraction defect naming the toolchain, not as the deprecated row-limit spelling the client actually sent — and could not tell a dropped `TOP` from any other dropped construct without keying on prose.
+2. **A projected literal's source text.** `parse.LiteralExpr` carried the typed value but not the text it came from, and the openEHR result schema names a projected column with no `AS` alias by its expression text; a path has `IdentifiedPath.Raw` to fall back on and a literal had nothing. Re-rendering the typed value gives the *canonical* form, not the source form — `1.50` → `1.5`, `001` → `1`, `"x"` → `'x'` — so a column name derived that way differs from the query the client sent.
+
+The normative statements below are what this REQ requires of the SDK; both carriers are in force.
+
+### Ground truth
+
+openEHR **QUERY Release-1.1.0 § 4.4.3** governs the clause and is quoted here because every rule below follows from it:
+
+- Syntax: `SELECT TOP integer [FORWARD|BACKWARD]` — "It starts with keyword `TOP`, followed by an integer number and/or the direction (i.e. `BACKWARD`, `FORWARD`)".
+- Status: "*Deprecated*: Starting with Release 1.1.0, the use of `TOP` modifier is deprecated in favour of the `LIMIT` clause combined with `ORDER BY`", and "The `TOP` will be removed in a future major release of AQL specification."
+- Prohibition: "It is not allowed to use `TOP` while also using `LIMIT` clause in the same query."
+
+**Deprecated upstream is not out of scope here.** A deprecated-but-legal construct is exactly what an SDK must still read: the SDK does not author the queries it is handed, and until the removal release a client, a stored query, or a conformance corpus may legitimately carry `TOP`. So the SDK **MUST** be able to parse it, model it, emit it, build it, and diagnose it — and **MUST NOT** encourage it.
+
+### The `TOP` carrier (read side)
+
+[`parse.ParseQuery`](../../openehr/aql/parse/parse.go) **MUST** model a `top` clause without `aql.ErrIncompleteAST`:
+
+- The `SELECT` clause **MUST** carry the clause as an optional value, so "no `TOP`" stays distinguishable from `TOP 0` — a dropped `TOP` turns a bounded query into an unbounded one, and an absent one that reads as `0` inverts it.
+- The carrier **MUST** model the row count **and** the direction. Dropping `BACKWARD` would silently select the opposite end of the result set, which is the no-silent-loss rule's worst case in the same way a dropped bound is. The direction vocabulary **MUST** have an unspecified zero value so a bare `TOP n` round-trips without acquiring a direction the source did not write.
+- The carrier **MUST NOT** reuse the `LIMIT` value vocabulary (`parse.LimitExpr` / `IntLimit` / `ParamLimit`): the profile's `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` admits no `PARAMETER`, and `LimitExpr` carries no direction. Modelling `TOP $n` would create an AST shape whose emission the parser rejects, and the [`SDK-AQL-003`](../../resources/aql/grammar/DIVERGENCES.md) parameter relaxation **MUST NOT** be extended to `top` — the SDK does not widen a construct the spec is removing. No grammar change is licensed by this REQ.
+- A `TOP` integer the carrier cannot represent **MUST** be refused loudly under the residual unrepresentable-numeric rule below, never truncated or degraded.
+- `TOP` and the `LIMIT` / `OFFSET` clause **MUST** each report what the source wrote, independently. The parser **MUST NOT** normalise one into the other, and **MUST NOT** choose between them when a query carries both: that query is spec-invalid (§ 4.4.3), and reporting it as written is what lets the diagnosis name it.
+
+Emission through [`(*Query).Emit`](../../openehr/aql/parse/query.go) **MUST** round-trip the clause under the existing fixed-point property. The canonical form **MUST** be `SELECT [DISTINCT ]TOP <n>[ FORWARD| BACKWARD] <items>` — keywords upper-cased regardless of source casing, single spaces, direction omitted when the source omitted it.
+
+### Literal source text (read side)
+
+- `parse.LiteralExpr` **MUST** carry the literal's **source text as written** alongside its typed `aql.Value`, for a literal in a `SELECT` projection and for a literal in a function-call argument.
+- The field is **read-side fidelity only**: emission **MUST** keep rendering the typed value in canonical form, not the source text, because the canonical write form is normative ([wire.md § REQ-055](wire.md#req-055--wire-boundary)) and a directly-constructed AST has no source text. It **MUST** therefore be empty on a `LiteralExpr` the caller built rather than parsed, and a consumer **MUST NOT** treat it as a required field.
+- A consumer that needs a deterministic rendering of any `aql.Value` it holds — parsed or constructed — uses the already-public `aql.FormatValue`; no second escaping implementation is warranted, and none **MUST** be added.
+
+### Prohibited `TOP` + `LIMIT` combination
+
+The four layers treat the spec-invalid combination differently, and deliberately:
+
+- **Parse MUST accept and model both.** Nothing is dropped, so no `ErrIncompleteAST`; the parser reports what the source wrote.
+- **Emit MUST render both faithfully.** The profile accepts the text, so refusing here would break the round-trip property for a query the parser admits, and the emitter is not the diagnosis layer.
+- **Lint owns the diagnosis** — codes `aql_deprecated_top` (Warning, whenever `TOP` is present) and `aql_top_with_limit` (Error). Both are Layer-2 checks whose canonical catalogue home is [§ REQ-109 — Layer 2](#layer-2--shape-ast-walk-no-cdr); this section adds no second copy of them. Both MUST key on the clause's **presence in the source**, not on a successfully decoded bound: an out-of-range count is refused by the extractor and leaves no bound to read, and a query pairing that count with a `LIMIT` is precisely one that must not lint clean.
+- **The builder MUST refuse to construct it.** `TOP` counts as an in-text row bound, so setting it together with the in-text `LIMIT`/`OFFSET` channel or with the request-envelope channel **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` — the same channel-exclusivity rule REQ-117 set for envelope-versus-in-text paging, and here additionally required by § 4.4.3.
+
+### The `TOP` carrier (write side)
+
+[`aql.Builder`](../../openehr/aql/builder.go) **MUST** be able to construct `SELECT TOP n [FORWARD|BACKWARD]`, in both the plain and directed forms, so a consumer can author the deprecated shape for a corpus, a migration, or a round-trip fixture without hand-assembling AQL text.
+
+- The row count **MUST** be a non-negative integer; a negative count **MUST** fail at `Build()` with an error wrapping `aql.ErrInvalidQuery` (the profile's `top` production admits no sign, so a negative count could only emit text the parser rejects).
+- The API's documentation **MUST** state the upstream deprecation and name the in-text `LIMIT` channel as the replacement. The vocabulary **MUST** live in [`openehr/aql`](../../openehr/aql/) and be shared by both sides (the REQ-113 "one model, read and write" rule), not duplicated per package.
+- The addition is **additive to the canonical write form**: a builder program that does not use it **MUST** produce byte-identical output to today (semver-minor).
+
+### Amends REQ-117 — the residual list
+
+[§ REQ-117](#req-117--aql-expression-catalogue-completion) enumerated two remaining `ErrIncompleteAST` conditions. With this REQ landed the complete residual list is **one** condition: a numeric literal the value vocabulary cannot represent. A `TOP` clause is in-catalogue; a `TOP` integer outside the carrier's range folds into that one residual, as any other unrepresentable numeric literal does. Every other extractor branch **MUST** remain defensive, unchanged from REQ-117.
+
+### Out of scope
+
+- **Deciding what `TOP` means alongside `LIMIT`.** The spec forbids the combination, so the SDK reports and diagnoses it; execution semantics for a CDR that tolerates it are the consumer's.
+- **`TOP n PERCENT` / `WITH TIES`.** Not in the openEHR grammar profile — an SQL-ism, not an AQL shape.
+- **Source text for arbitrary `SELECT` expressions.** A path already carries `IdentifiedPath.Raw` and a function call renders canonically; widening a verbatim-span carrier to every expression is a separate ask with its own trust-model consequences.
+- **Source text on WHERE-side values.** A comparison operand is not a result column, so it has no result-schema naming rule to satisfy.
+- **A `TOP` entry point in the verb-function style.** `TOP` never starts a query; the method on the builder is the whole surface.
+
+### Acceptance
+
+- **[PROBE-087](conformance.md#probe-087--aql-structured-ast-catalogue-completeness)** (extended) — the `TOP` shapes (bare, `FORWARD`, `BACKWARD`, with `DISTINCT`, with `*`, and alongside `LIMIT`/`OFFSET`) parse without `aql.ErrIncompleteAST`, model the count and direction, and round-trip under the PROBE-080 fixed-point property; literal source text is pinned per literal kind, including the cases where it diverges from the canonical rendering; the unrepresentable-numeric guard still fires, now including an out-of-range `TOP`.
+- **[PROBE-088](conformance.md#probe-088--aql-builder-containment-and-paging-stability)** (extended) — canonical-string goldens for the builder's plain and directed `TOP`, plus the refusal matrix (negative count; `TOP` with in-text `LIMIT`; `TOP` with envelope paging).
+- **[PROBE-028](conformance.md#probe-028--aql-lint-stability)** unchanged: the new codes fire only on a query carrying a `TOP`, and no lint cassette carries one. This is *pinned*, not assumed — the probe asserts exact issue-code multisets per cassette (`valid.aql` → none), so a code that fired spuriously fails `TestProbe028AQLLint`.
+- Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
+- **Lives in:** [`openehr/aql/top.go`](../../openehr/aql/top.go) (shared vocabulary), [`openehr/aql/builder.go`](../../openehr/aql/builder.go) (write side), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (extraction), [`openehr/aql/lint/lint.go`](../../openehr/aql/lint/lint.go) (diagnosis).
+- **Plan:** [`docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md`](../plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md) — REQ-118 (archived after Phase 5).
