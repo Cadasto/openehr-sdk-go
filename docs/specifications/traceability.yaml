@@ -434,11 +434,21 @@ requirements:
     # normalised onto them; ctx/ stays the only EMITTED spelling, so this is
     # additive and moves no PROBE-086 number (the probe re-encodes, so a real-path
     # key still returns respelled). The composer external_ref suffixes are NOT
-    # aliases and stay refused (visible in the census); context/setting is not
-    # aliased either — it decodes via its real path where the template carries
-    # the node and is dropped on encode, the harness's one documented waiver.
+    # aliases and stay refused (visible in the census).
+    #
+    # Amended 2026-08-05 (plan 2026-08-05-flat-rm-attributes.md, PR 1):
+    # context/setting joins the respellings — ctx/setting|code + |value are
+    # emitted when EVENT_CONTEXT.setting is populated and accepted on decode,
+    # closing the emission gap ADR 0015 left open (the census's one waiver).
+    # The DV_CODED_TEXT-at-DV_TEXT substitution is carried in suffix form
+    # (|code + |terminology beside the bare value) instead of |raw — the one
+    # suffix-form substitution; the ctx-only emission rule is scoped to the six
+    # respelled scalar fields (ADR 0016), the EVENT_CONTEXT optionals riding
+    # the REQ-140 underscore grammar instead.
     implementation: landed
-    adrs: [docs/adr/0015-flat-metadata-spelling.md]
+    adrs:
+      - docs/adr/0015-flat-metadata-spelling.md
+      - docs/adr/0016-event-context-optionals-underscore-spelling.md
     packages:
       - openehr/serialize/simplified
     probes:
@@ -446,6 +456,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
+      - docs/plans/2026-08-05-flat-rm-attributes.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -1206,6 +1217,34 @@ requirements:
       - openehr/rm/temporal_funcs_test.go
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
+
+  - id: REQ-140
+    title: Underscore-prefixed RM attributes (simplified formats)
+    canonical: docs/specifications/wire.md#req-140--underscore-prefixed-rm-attributes
+    status: draft
+    implementation: planned
+    # The Simplified Formats "RM Attributes prefix" grammar for the REQ-053
+    # codecs: optional RM attributes the template does not constrain, addressed
+    # as `_`-prefixed segments (_uid, _link:N, _feeder_audit, _work_flow_id,
+    # _guideline_id, _other_participation:N, context/_health_care_facility,
+    # context/_participation:N, context/_end_time, context/_location,
+    # _normal_range, _other_reference_ranges:N, _mapping:N, _null_flavour,
+    # _null_reason, DV_MULTIMEDIA _charset/_language/_thumbnail, and nested
+    # _identifier:N). Recursive, RM-type-keyed, both directions, REQ-053's
+    # fail-loud posture. Suffix vocabulary is the reference implementation's
+    # (ADR 0014), pinned by the PROBE-086 corpus (1092 of 1824 keys carry an
+    # `_` segment). EVENT_CONTEXT optionals ride this grammar per ADR 0016
+    # (no new ctx/ short forms). Deliberate exclusions: composer external_ref
+    # + composer/_identifier (ADR 0015 boundary); _instruction_details and
+    # _wf_definition deferred as typed refusals (no pinnable fixture yet).
+    adrs:
+      - docs/adr/0015-flat-metadata-spelling.md
+      - docs/adr/0016-event-context-optionals-underscore-spelling.md
+    probes: [PROBE-089]
+    packages:
+      - openehr/serialize/simplified
+    plans:
+      - docs/plans/2026-08-05-flat-rm-attributes.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.

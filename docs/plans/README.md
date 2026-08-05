@@ -24,7 +24,8 @@ The AQL expressivity plan **landed 2026-08-04 and was archived** ([archive/2026-
 
 | Plan | Scope | Covers REQs / probes |
 |---|---|---|
-| [2026-06-23-simplified-formats.md](2026-06-23-simplified-formats.md) | Umbrella — FLAT/STRUCTURED codecs (WebTemplate export Phase 2 **landed**; Phase 3 codecs **landed**); now carries the residual REQ-053 edge deferrals + the shared simplified-template model. The datatype-coverage residue moved to the [coverage ratchet](archive/2026-08-03-flat-coverage-ratchet.md) (landed): what remains is DV_TEXT subtype substitution as suffixes, `ctx/setting` emission, and the `_`-prefixed RM attributes (their own REQ) | REQ-053; PROBE-076 |
+| [2026-06-23-simplified-formats.md](2026-06-23-simplified-formats.md) | Umbrella — FLAT/STRUCTURED codecs (WebTemplate export Phase 2 **landed**; Phase 3 codecs **landed**); now carries the residual REQ-053 edge deferrals + the shared simplified-template model. The datatype-coverage residue moved to the [coverage ratchet](archive/2026-08-03-flat-coverage-ratchet.md) (landed); the three residuals it then named are sequenced by the closure plan on the next row | REQ-053; PROBE-076 |
+| [2026-08-05-flat-rm-attributes.md](2026-08-05-flat-rm-attributes.md) | FLAT residual closure — DV_TEXT substitution carve-out + `ctx/setting` emission (PR 1), then the full underscore-prefixed RM attribute grammar and the DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closures (PR 2). Two PRs, one plan; opens the wire-extension band 140–149 | REQ-140 (new), REQ-053 amendments, [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md); PROBE-089 (new), PROBE-086 census, PROBE-076 |
 
 WebTemplate JSON export (**REQ-106**) landed as a direct slice and was archived ([archive/2026-05-22-webtemplate-export.md](archive/2026-05-22-webtemplate-export.md)); the umbrella's shared simplified-template model is deferred until REQ-053 (FLAT/STRUCTURED) gives it a second consumer.
 
