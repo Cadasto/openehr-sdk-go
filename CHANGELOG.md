@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-08-05
+
+Eighteenth `v0.x` minor — the upstream FLAT conformance ratchet nearly doubles PROBE-086 coverage (10.5% → 19.5%) and the AQL expression catalogue closes to the full SDK grammar profile. **Breaking:** `aql.Containment` is no longer `==`-comparable (REQ-117).
+
 ### Added
 
 - **CODE_PHRASE FLAT leaves (REQ-053, REQ-121, PROBE-086).** `openehr/serialize/simplified` round-trips standalone `CODE_PHRASE` leaves as `|code` + `|terminology` — the larger half of the 10.5% → 19.5% PROBE-086 coverage ratchet, and **encode emits four new keys per ENTRY**.
