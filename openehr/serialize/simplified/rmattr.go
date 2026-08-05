@@ -417,7 +417,14 @@ func checkRMAttrIndexes(g rmattrGroup, fam rmattrFamily, indexes map[int]bool) e
 // sequence is dense, so every slot the growth creates is filled by its own
 // group; a collision is still refused rather than overwritten.
 func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, budget *allocBudget) error {
-	arr, _ := node[attr].([]any)
+	arr, isList := node[attr].([]any)
+	if existing, taken := node[attr]; taken && !isList {
+		// Something already claimed this attribute as a non-list — a clinical
+		// leaf or another family reaching the same canonical slot. Growing an
+		// empty array over it would drop that value without a word.
+		return fmt.Errorf("%w: %s writes the list attribute %q, which already holds a %T",
+			ErrUnsupportedDatatype, g.prefix(), attr, existing)
+	}
 	slot := g.slot()
 	if need := slot + 1 - len(arr); need > 0 {
 		if err := budget.add(need); err != nil {

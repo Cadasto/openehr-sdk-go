@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
 )
 
 // valueDecorationAttrs maps each canonical DataValue attribute the underscore
@@ -277,11 +278,10 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // and its Go zero value puts a *fabricated* bound on the wire (`|magnitude` 0
 // under an empty, RM-mandatory `|unit`). Refuse both (REQ-140).
 //
-// The empty-suffix test is what separates the fabricated zero from a legitimate
-// one: every suffix an interval bound spells is RM-mandatory for its datatype —
-// the optional decorations are written only when set — so an empty string means
-// a mandatory field was never populated. A genuine zero magnitude (`DV_COUNT`'s
-// `0` lower bound) carries no empty suffix and passes.
+// An empty **RM-mandatory** suffix is what separates the fabricated zero from a
+// legitimate one: a genuine zero magnitude (`DV_COUNT`'s `0` lower bound) leaves
+// no mandatory suffix empty and passes, while the Go zero `DV_QUANTITY` spells
+// its mandatory `|unit` as "".
 func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded bool) error {
 	if unbounded {
 		return nil
@@ -295,14 +295,42 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so decode would read a bounded end that no key spells",
 			ErrUnsupportedDatatype, path, end, end, end, end)
 	}
-	for key, v := range sub {
-		if s, isString := v.(string); isString && s == "" {
-			return fmt.Errorf("%w: %q is RM-mandatory on the %s bound but empty — an unpopulated %s is not an unbounded end, which is spelled `%s|%s_unbounded`",
-				ErrUnsupportedDatatype, key, anchor, anchor, base, end)
-		}
+	if key, empty := emptyMandatorySuffix(sub, path, anchor); empty {
+		return fmt.Errorf("%w: %q is RM-mandatory on a %s bound but empty — an unpopulated bound is not an unbounded end, which is spelled `%s|%s_unbounded`",
+			ErrUnsupportedDatatype, key, anchor, base, end)
 	}
 	maps.Copy(out, sub)
 	return nil
+}
+
+// emptyMandatorySuffix reports the first suffix a bound leaves empty that its
+// datatype declares RM-mandatory.
+//
+// Which suffixes those are is read off the datatype rather than enumerated
+// here: an RM-optional field is a pointer, nil in a freshly constructed
+// instance, and emits no key at all — so precisely the keys a **zero** instance
+// of the anchor spells as an empty string are the mandatory string-valued ones
+// (`DV_QUANTITY`'s `|unit`, a bare-keyed temporal's own value). An *optional*
+// suffix explicitly set to "" is odd but not invalid, and it encodes at a plain
+// Web Template leaf, so it must encode at a bound too.
+func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool) {
+	ctor, known := typereg.Default.Lookup(anchor)
+	if !known {
+		return "", false
+	}
+	zero := make(map[string]any)
+	if _, err := emitLeafValue(zero, path, ctor(), anchor, false, false); err != nil {
+		return "", false
+	}
+	for key, v := range zero {
+		if s, isString := v.(string); !isString || s != "" {
+			continue
+		}
+		if s, isString := sub[key].(string); isString && s == "" {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 // mappingsRMAttr writes one `_mapping:N` per TERM_MAPPING, indexed by list

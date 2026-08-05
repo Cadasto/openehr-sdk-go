@@ -3,6 +3,7 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -239,5 +240,175 @@ func TestObjectRefTypedNilIDDoesNotPanic(t *testing.T) {
 				t.Fatalf("err = %v, want nil or ErrUnsupportedDatatype", err)
 			}
 		})
+	}
+}
+
+// --- interval decode symmetry --------------------------------------------
+
+// Decode must refuse exactly what encode refuses. A bounded end with no bound
+// used to decode fine and then fail to re-encode, and a bound spelled beside
+// `|*_unbounded: true` contradicts the RM equivalence outright.
+func TestIntervalDecodeMirrorsEncodeRefusals(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, extra := range map[string]map[string]any{
+		"bounded end with no bound": {
+			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
+			rmattrElement + "/_normal_range/lower|unit":      "unit",
+		},
+		"bound beside an unbounded flag": {
+			rmattrElement + "/_normal_range/lower|magnitude": 20.5,
+			rmattrElement + "/_normal_range/lower|unit":      "unit",
+			rmattrElement + "/_normal_range|lower_unbounded": true,
+			rmattrElement + "/_normal_range|upper_unbounded": true,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := decodeRMAttrErr(t, wt, rmattrBody(extra))
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// The half-open interval the corpus actually writes must still decode: a lower
+// bound plus an explicit `|upper_unbounded`.
+func TestIntervalHalfOpenDecodes(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+		rmattrElement + "/_normal_range/lower|magnitude": 20.5,
+		rmattrElement + "/_normal_range/lower|unit":      "unit",
+		rmattrElement + "/_normal_range|upper_unbounded": true,
+	}))
+	q := elementValue[rm.DVQuantity](t, comp)
+	if q.NormalRange == nil {
+		t.Fatal("no normal range decoded")
+	}
+	if !q.NormalRange.UpperUnbounded {
+		t.Error("upper_unbounded = false, want true")
+	}
+	if q.NormalRange.Lower.Magnitude != 20.5 {
+		t.Errorf("lower magnitude = %v, want 20.5", q.NormalRange.Lower.Magnitude)
+	}
+}
+
+// --- composer projection --------------------------------------------------
+
+// The composer's `external_ref` and `identifiers` are dropped on encode by
+// design (ADR 0015 — the ctx/ short form carries the name alone; registered in
+// deviations.md). Prose alone left that untested, so a regression either way —
+// a silent widening or an accidental refusal — would have gone unnoticed.
+func TestComposerExtrasProjectedToNameOnly(t *testing.T) {
+	name := "Dr Test"
+	comp := repeatingLeafComp(
+		&rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"}, Value: &rm.DVText{Value: "one"}},
+	)
+	comp.Composer = &rm.PartyIdentified{
+		Name:        &name,
+		ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: &rm.GenericID{Value: "p-1", Scheme: "local"}, Namespace: "demographic", Type: "PERSON"}},
+		Identifiers: []rm.DVIdentifier{{ID: "id-0"}},
+	}
+	b, err := MarshalFlat(comp, repeatingLeafWT())
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	flat := flatMap(t, b)
+	if got := flat["ctx/composer_name"]; got != name {
+		t.Errorf("ctx/composer_name = %v, want %q", got, name)
+	}
+	for key := range flat {
+		if strings.HasPrefix(key, "ctx/composer") && key != "ctx/composer_name" {
+			t.Errorf("the ctx/ projection emitted %q; it carries the name alone", key)
+		}
+		if strings.Contains(key, "composer/") {
+			t.Errorf("emitted a real-path composer key %q, which decode refuses", key)
+		}
+	}
+}
+
+// --- decode-side party parity ---------------------------------------------
+
+// Decode must refuse the party shapes encode refuses, or a body decodes and
+// then fails to re-encode.
+func TestPartyDecodeMirrorsEncodeRefusals(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, extra := range map[string]map[string]any{
+		"present but empty name": {
+			rmattrRoot + "/context/_health_care_facility|name": "",
+		},
+		"relationship without an identified half": {
+			rmattrObs + "/subject/relationship|code":        "10",
+			rmattrObs + "/subject/relationship|value":       "mother",
+			rmattrObs + "/subject/relationship|terminology": "openehr",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := decodeRMAttrErr(t, wt, rmattrBody(extra)); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// partyRefToFlat carries the same typed-nil ObjectID hazard objectRefRMAttr
+// does, on its own switch — pinned so a future arm cannot reintroduce it.
+func TestPartyRefTypedNilIDDoesNotPanic(t *testing.T) {
+	name := "Dr Test"
+	for label, id := range map[string]rm.ObjectID{
+		"generic": (*rm.GenericID)(nil),
+		"hier":    (*rm.HierObjectID)(nil),
+	} {
+		t.Run(label, func(t *testing.T) {
+			out := map[string]any{}
+			party := &rm.PartyIdentified{
+				Name:        &name,
+				ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{ID: id, Namespace: "demographic", Type: "PERSON"}},
+			}
+			err := partyRMAttr(out, "x/_provider", party)
+			if err != nil && !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want nil or ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// The null-flavour-only repeating instance must survive the *decode* leg too,
+// not just encode: it is the one instance the value walk cannot see, so a
+// regression would silently renumber the surviving instances.
+func TestRepeatingNullFlavourOnlyInstanceRoundTrips(t *testing.T) {
+	wt := repeatingLeafWT()
+	comp := repeatingLeafComp(
+		&rm.Element{ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"}, Value: &rm.DVText{Value: "one"}},
+		&rm.Element{
+			ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"},
+			NullFlavour: &rm.DVCodedText{
+				DVText:       rm.DVText{Value: "unknown"},
+				DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+			},
+		},
+	)
+	b, err := MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	back, err := UnmarshalFlat(b, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	again, err := MarshalFlat(back, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat (second pass): %v", err)
+	}
+	first, second := flatMap(t, b), flatMap(t, again)
+	if len(first) != len(second) {
+		t.Errorf("key count %d -> %d across the round trip", len(first), len(second))
+	}
+	for key, want := range first {
+		if got := second[key]; got != want {
+			t.Errorf("round trip lost %s: %v, want %v", key, got, want)
+		}
+	}
+	if got := second["root/ev/x:1/_null_flavour|code"]; got != "253" {
+		t.Errorf("the null-flavour-only instance did not survive decode: %v", got)
 	}
 }

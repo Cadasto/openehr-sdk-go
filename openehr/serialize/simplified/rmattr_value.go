@@ -335,16 +335,31 @@ var (
 func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]any, error) {
 	iv := map[string]any{"_type": "DV_INTERVAL"}
 	for _, end := range []string{"lower", "upper"} {
-		if _, bounded := ts.sub[end]; bounded {
+		_, bounded := ts.sub[end]
+		unbounded, err := ts.boolTail(g, end+"_unbounded", false)
+		if err != nil {
+			return nil, err
+		}
+		// The RM ties flag and bound together — `lower_unbounded = (lower =
+		// Void)` — so each end must spell exactly one of them. Both, or
+		// neither, is a contradiction the codec must not resolve by guessing:
+		// accepting a flagless boundless end would build the very interval
+		// [intervalBoundToFlat] refuses on the way out, so the same payload
+		// would decode and then fail to re-encode.
+		switch {
+		case bounded && unbounded:
+			return nil, fmt.Errorf("%w: %s spells a /%s bound beside `|%s_unbounded: true`; the RM ties the two (`%s_unbounded = (%s = Void)`), so the pair contradicts itself",
+				ErrUnsupportedDatatype, g.prefix(), end, end, end, end)
+		case !bounded && !unbounded:
+			return nil, fmt.Errorf("%w: %s carries no /%s bound and no `|%s_unbounded: true`; an absent bound is the unbounded end and must say so",
+				ErrUnsupportedDatatype, g.prefix(), end, end)
+		}
+		if bounded {
 			dv, err := ts.value(g, end, anchor)
 			if err != nil {
 				return nil, err
 			}
 			iv[end] = dv
-		}
-		unbounded, err := ts.boolTail(g, end+"_unbounded", false)
-		if err != nil {
-			return nil, err
 		}
 		included, err := ts.boolTail(g, end+"_included", true)
 		if err != nil {

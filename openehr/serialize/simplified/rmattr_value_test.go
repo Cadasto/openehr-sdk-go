@@ -229,6 +229,7 @@ func TestRMAttrReferenceRangeMissingMeaning(t *testing.T) {
 	err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
 		rmattrElement + "/_other_reference_ranges:0/lower|magnitude": 70.5,
 		rmattrElement + "/_other_reference_ranges:0/lower|unit":      "unit",
+		rmattrElement + "/_other_reference_ranges:0|upper_unbounded": true,
 	}))
 	if !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
@@ -622,8 +623,10 @@ func TestRMAttrIntervalBadTails(t *testing.T) {
 			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
 				rmattrElement + "/_normal_range/lower|magnitude":             20.5,
 				rmattrElement + "/_normal_range/lower|unit":                  "unit",
+				rmattrElement + "/_normal_range|upper_unbounded":             true,
 				rmattrElement + "/_other_reference_ranges:0/lower|magnitude": 70.5,
 				rmattrElement + "/_other_reference_ranges:0/lower|unit":      "unit",
+				rmattrElement + "/_other_reference_ranges:0|upper_unbounded": true,
 				rmattrElement + "/_other_reference_ranges:0/meaning":         "high",
 				tc.key: "boom",
 			}))
@@ -696,6 +699,7 @@ func TestRMAttrSubPathIndexNormalisation(t *testing.T) {
 	comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
 		rmattrElement + "/_normal_range:0/lower:0|magnitude": 20.5,
 		rmattrElement + "/_normal_range:0/lower:0|unit":      "unit",
+		rmattrElement + "/_normal_range:0|upper_unbounded":   true,
 	}))
 	q := elementValue[rm.DVQuantity](t, comp)
 	if q.NormalRange == nil || q.NormalRange.Lower.Magnitude != 20.5 {

@@ -229,6 +229,13 @@ func partySuffixes(g rmattrGroup, ts rmattrTails, identifiers []any) (party map[
 		return nil, false, err
 	}
 	if haveName {
+		// `Name_valid` — a present-but-empty name is not a party without one,
+		// and encode refuses it. Accepting it here would decode a body that
+		// then fails to re-encode.
+		if name == "" {
+			return nil, false, fmt.Errorf("%w: %s is present but empty (RM invariant `Name_valid`); a party carrying no name is spelled by the key's absence",
+				ErrUnsupportedDatatype, g.key("|name"))
+		}
 		party["name"] = name
 		populated = true
 	}
@@ -245,9 +252,16 @@ func partySuffixes(g rmattrGroup, ts rmattrTails, identifiers []any) (party map[
 		if err != nil {
 			return nil, false, err
 		}
+		// `relationship` is PARTY_RELATED's own attribute and does not satisfy
+		// the PARTY_IDENTIFIED half it inherits: `Basic_validity` still wants
+		// one of name / identifiers / external_ref, and encode refuses a party
+		// carrying none of them.
+		if !populated {
+			return nil, false, fmt.Errorf("%w: %s carries a /relationship but neither a name, an identifier nor an external_ref (RM invariant `Basic_validity`)",
+				ErrUnsupportedDatatype, g.prefix())
+		}
 		party["_type"] = "PARTY_RELATED"
 		party["relationship"] = rel
-		populated = true
 	}
 	if !populated {
 		return nil, false, nil
