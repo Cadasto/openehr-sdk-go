@@ -283,7 +283,7 @@ func rmattrDecode(owner rmattrOwner, g rmattrGroup, indexes map[int]bool, budget
 	if err != nil {
 		return err
 	}
-	node, err := owner.resolve(cmp.Or(fam.host(), fam.attr))
+	node, err := owner.resolve(fam.host())
 	if err != nil {
 		return err
 	}

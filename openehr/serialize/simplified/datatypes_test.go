@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
 // suffixesOf reconstructs the decode-side suffix map from encoded FLAT entries
@@ -849,6 +850,47 @@ func TestFormattedTextAtOpenCodedLeafRidesRaw(t *testing.T) {
 	}
 	if plain["p/x|other"] != "free text" || len(plain) != 1 {
 		t.Errorf("undecorated DV_TEXT at open coded leaf = %#v, want just |other", plain)
+	}
+}
+
+// TestMappingBesideOtherFreeText — REQ-140. The fourth DV_TEXT shape the codec
+// carries at a leaf: a DV_TEXT at an *open* DV_CODED_TEXT leaf rides `|other`,
+// which carries the value alone — but `_mapping:N` is a key of its own, not a
+// companion suffix, so the two compose. Unit-level because the PROBE-086 corpus
+// template constrains no open value-set leaf.
+func TestMappingBesideOtherFreeText(t *testing.T) {
+	out := map[string]any{}
+	v := rm.DVText{
+		Value: "free text",
+		Mappings: []rm.TermMapping{{
+			Match:  '=',
+			Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+		}},
+	}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if out["p/x|other"] != "free text" {
+		t.Errorf("|other = %#v, want the free text", out["p/x|other"])
+	}
+	if out["p/x/_mapping:0|match"] != "=" {
+		t.Errorf("the mapping was dropped beside |other: %#v", out)
+	}
+	if _, rode := out["p/x|raw"]; rode {
+		t.Errorf("|other + _mapping is expressible and must not ride |raw: %#v", out)
+	}
+	// Decode is the inverse at both positions: |other alone rebuilds the DV_TEXT…
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"})
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["_type"] != "DV_TEXT" {
+		t.Errorf("|other rebuilt a %v, want DV_TEXT", dv["_type"])
+	}
+	// …and the family lands on it, judged against the leaf type, which inherits
+	// `mappings` from DV_TEXT.
+	if _, declared := rminfo.Default.AttributeRMType("DV_CODED_TEXT", "mappings"); !declared {
+		t.Error("DV_CODED_TEXT no longer declares mappings — the router would refuse the family")
 	}
 }
 
