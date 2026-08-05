@@ -413,9 +413,12 @@ requirements:
     # not carry (HISTORY.origin, EVENT.time, ENTRY language/encoding/subject,
     # EVENT_CONTEXT.setting, COMPOSITION category/composer) from ctx + RM defaults;
     # names/defaults never leak into FLAT. Deferred (documented, deviations.md):
-    # exotic ctx/ fields not emitted on encode (participations/facility/workflow/
+    # the remaining ctx/ short forms not emitted on encode (workflow ids /
     # composer external_ref — optional, no validity impact; non-default source
-    # values for the defaulted attributes are not round-tripped); first-class
+    # values for the defaulted attributes are not round-tripped; the
+    # EVENT_CONTEXT optionals participations / health_care_facility / end_time /
+    # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
+    # REQ-140 underscore grammar); first-class
     # _-attr suffix decomposition (covered losslessly via |raw); .schema media
     # types on input. The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this

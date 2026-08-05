@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A fully-captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form instead of `|raw`, and a populated `EVENT_CONTEXT.setting` round-trips as `ctx/setting|code` + `|value` — PROBE-086 coverage 19.5% → 19.7%. **Encode now refuses a setting it cannot carry** (non-`openehr` terminology, extras) rather than dropping it.
+- **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A fully-captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form instead of `|raw`, and a populated `EVENT_CONTEXT.setting` round-trips as `ctx/setting|code` + `|value` (nested as `ctx.setting` in STRUCTURED) — PROBE-086 coverage 19.5% → 19.7%. **Encode now refuses a setting it cannot carry** (non-`openehr` terminology, extras) rather than dropping it.
 - **Generated compositions satisfy `Setting_valid` (REQ-107).** `instance.Generate` pins the openEHR-coded `238 other care` default whenever the template leaves `EVENT_CONTEXT.setting` unconstrained, instead of letting the example synthesiser invent an archetype-local code the RM invariant forbids and FLAT cannot carry.
 - **Underscore-prefixed RM attributes specified (REQ-140, ADR 0016, PROBE-089 Draft).** New `wire.md` § REQ-140 opens the wire-extension band 140–149 and pins the `_`-prefixed grammar; specification only, no codec support yet.
 

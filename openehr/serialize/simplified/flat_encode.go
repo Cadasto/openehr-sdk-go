@@ -140,6 +140,14 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 	if extras {
 		return fmt.Errorf("%w: ctx/setting carries only code and value, but EVENT_CONTEXT.setting has extras (mappings, formatting, a preferred term, …)", ErrUnsupportedDatatype)
 	}
+	// A code with no rubric is refused rather than emitted with an empty
+	// |value: parseCtx refuses that pair on the way back in, so emitting it
+	// would produce a body this codec's own decode rejects. DV_TEXT.value is
+	// RM-mandatory anyway, so the value is a defect at the source — the mirror
+	// of the decode-side rule, and the same stance as value-without-code above.
+	if s.Value == "" {
+		return fmt.Errorf("%w: ctx/setting requires the code's rubric, but EVENT_CONTEXT.setting carries code %q with an empty value", ErrUnsupportedDatatype, s.DefiningCode.CodeString)
+	}
 	out["ctx/setting|code"] = s.DefiningCode.CodeString
 	out["ctx/setting|value"] = s.Value
 	return nil

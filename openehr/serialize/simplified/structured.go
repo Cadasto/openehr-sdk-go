@@ -220,6 +220,16 @@ func structuredToFlat(s map[string]any) (map[string]any, error) {
 				// nested structure no ctx/ field can hold, and silently dropping it
 				// is what the REQ-053 fail-loud contract forbids.
 				if leaf, nested := cv.(map[string]any); nested {
+					// An empty leaf object is refused, not skipped: flattening it to
+					// nothing turns an explicit `"setting": {}` into an absent field,
+					// which a WithTemplate decode then completes with the
+					// 238|other care default the body plainly did not ask for — the
+					// same "explicit empty is not absent" rule parseCtx enforces for
+					// the FLAT pair (REQ-053).
+					if len(leaf) == 0 {
+						return nil, fmt.Errorf("%w: ctx/%s is an empty object; omit the field for an absent value",
+							ErrUnsupportedDatatype, k)
+					}
 					for _, sk := range slices.Sorted(maps.Keys(leaf)) {
 						if !strings.HasPrefix(sk, "|") {
 							return nil, fmt.Errorf("%w: ctx/%s carries member %q; a suffixed ctx leaf holds only |suffix members",

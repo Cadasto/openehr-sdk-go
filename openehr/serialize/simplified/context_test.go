@@ -1161,3 +1161,64 @@ func TestContextStructuredSuffixNesting(t *testing.T) {
 			fm["ctx/setting|code"], fm["ctx/setting|value"])
 	}
 }
+
+// TestSettingEncodeDecodeSymmetry — REQ-053. Whatever emitContextSetting emits,
+// parseCtx must accept, and whatever parseCtx refuses, emitContextSetting must
+// refuse too. The pair is the codec's only setting surface, so an asymmetry
+// means MarshalFlat can produce a body UnmarshalFlat rejects (PR #88 re-review:
+// a populated code with an empty rubric was emitted as |value:"" and then
+// refused on the way back in).
+func TestSettingEncodeDecodeSymmetry(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	for _, tc := range []struct {
+		name    string
+		setting rm.DVCodedText
+		encodes bool
+	}{
+		{"code and rubric", rm.DVCodedText{
+			DVText:       rm.DVText{Value: "home"},
+			DefiningCode: rm.CodePhrase{CodeString: "225", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}, true},
+		{"code with empty rubric", rm.DVCodedText{
+			DefiningCode: rm.CodePhrase{CodeString: "238", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}, false},
+		{"all zero writes nothing", rm.DVCodedText{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp.Context.Setting = tc.setting
+			f, err := simplified.MarshalFlat(comp, wt)
+			if !tc.encodes {
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+					t.Fatalf("MarshalFlat err = %v, want ErrUnsupportedDatatype (decode refuses this shape)", err)
+				}
+				if !strings.Contains(err.Error(), "ctx/setting") {
+					t.Errorf("error %q does not name ctx/setting", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
+			}
+			// The symmetry assertion: our own output must survive our own decode.
+			if _, err := simplified.UnmarshalFlat(f, wt); err != nil {
+				t.Fatalf("encode produced a body decode refuses: %v", err)
+			}
+		})
+	}
+}
+
+// TestStructuredEmptyCtxLeafRefused — REQ-053. An explicit empty ctx leaf object
+// is refused rather than flattened to nothing: silently dropping it turns
+// "explicitly empty" into "absent", which a WithTemplate decode then completes
+// with the 238|other care default — the same class parseCtx closed for the FLAT
+// pair (PR #88 re-review).
+func TestStructuredEmptyCtxLeafRefused(t *testing.T) {
+	body := []byte(`{"minimal":{},"ctx":{"language":"en","territory":"NL","setting":{}}}`)
+	_, err := simplified.StructuredToFlat(body)
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Fatalf("StructuredToFlat err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "ctx/setting") {
+		t.Errorf("error %q does not name ctx/setting", err)
+	}
+}
