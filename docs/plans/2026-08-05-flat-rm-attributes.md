@@ -42,7 +42,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 |---|---|
 | Phase 0 — SDD artefacts (wire.md § REQ-140 + REQ-053 amendments, REQ.md row + band, conformance.md PROBE-089 + PROBE-086 prose, traceability.yaml, ADR 0016, this plan) | done |
 | Phase A — DV_TEXT substitution carve-out | done |
-| Phase B — `ctx/setting` emission + alias + harness waiver removal | |
+| Phase B — `ctx/setting` emission + alias + harness waiver removal | done |
 | PR 1 opened (A + B + Phase 0) | |
 | Phase C0 — underscore router (decode) + emission hook (encode) + simple families | |
 | Phase C1 — value-decoration families (`_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`, `_null_reason`) | |
@@ -87,12 +87,12 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 **Interfaces — produces:** encode: `ctx/setting|code` + `ctx/setting|value` when `comp.Context != nil` and `Setting` non-zero (`defining_code.code_string` non-empty); all-zero writes nothing; a setting whose `defining_code.terminology_id` ≠ `openehr`, or carrying extras beyond code+value (mappings, formatting…), is `ErrUnsupportedDatatype` naming `ctx/setting`. Decode: `ctx/setting|code`+`|value` build `DvCodedText{DefiningCode: CodePhrase{openehr, code}, Value: value}`; one of the pair alone is an error naming the missing key; real-path `context/setting|code`/`|value` normalise onto the `ctx/` keys via the alias table with `context/setting|terminology` as an `openehr` witness; disagreement between spellings is an error (existing machinery). `WithTemplate` default (`238 other care`) when absent — unchanged.
 
 **Tasks:**
-- [ ] Failing tests: emit pair for populated setting; all-zero emits nothing; non-`openehr` setting errors; decode pair → exact `DvCodedText`; code-only / value-only errors; real-path spelling normalises; disagreement errors; witness mismatch errors.
-- [ ] Implement `emitContext` + ctx decode + alias entries (extend `MetadataAliasSpellings` / `MetadataWitnessSpellings` — the exported accessors the harness derives from).
-- [ ] **Round-trip interaction task:** determine whether PROBE-076's byte-idempotence legs decode `WithTemplate`. If yes, the synthesised default setting now re-emits — pin the resolved behaviour with an explicit test and record it in `deviations.md` (the added `ctx/setting` keys are a *faithful* encoding of the completed composition, not drift). If the idempotence legs are OPT-free, add the pinning test to `context_test.go` anyway (WithTemplate decode → re-encode gains exactly the two default keys).
-- [ ] Harness: setting leaves the named-waiver path — the hold-out derives it from the alias accessors; `TestHoldOutMatchesCodecAliases` reverse direction must fail if a waiver reappears. Delete the waiver code path.
-- [ ] Guard test: re-class the `setting` exemption in `TestInContextLeavesResolveViaRmpath` to the permanent double-spell class (like `start_time`) — `rmpath` still does not resolve `…/context/setting` (emission is via `ctx/`), the *reason* changes.
-- [ ] Docs: `deviations.md` (drop the "`EVENT_CONTEXT.setting` is dropped on encode" deviation; move `setting` out of the deferred-`ctx/` row), `SKIPPED.md` § metadata (waiver → respelling; hold-out stays 306, census unchanged). Commit `feat(serialize/simplified): emit and accept ctx/setting (REQ-053, ADR 0015 gap closed)`.
+- [x] Failing tests: emit pair for populated setting; all-zero emits nothing; non-`openehr` setting errors; decode pair → exact `DvCodedText`; code-only / value-only errors; real-path spelling normalises; disagreement errors; witness mismatch errors.
+- [x] Implement `emitContext` + ctx decode + alias entries (extend `MetadataAliasSpellings` / `MetadataWitnessSpellings` — the exported accessors the harness derives from).
+- [x] **Round-trip interaction task:** determine whether PROBE-076's byte-idempotence legs decode `WithTemplate`. *(Resolved: the idempotence and interconversion legs are OPT-free; the conformance leg decodes `WithTemplate` but never re-encodes, and `names_test.go` compares only the key count — which the fixture's carried setting keeps stable.)* Pinned in `context_test.go` (`TestSettingWithTemplateDefaultRoundTrip`): WithTemplate decode → re-encode gains exactly the two default keys; OPT-free stays byte-identical. Recorded in `deviations.md` (§ RM-mandatory attributes — the one completion visible on re-encode).
+- [x] Harness: setting leaves the named-waiver path — the hold-out derives it from the alias accessors; `TestHoldOutMatchesCodecAliases` reverse direction must fail if a waiver reappears (verified by mutation). Waiver code path deleted.
+- [x] Guard test: re-class the `setting` exemption in `TestInContextLeavesResolveViaRmpath` to the permanent double-spell class (like `start_time`) — `rmpath` still does not resolve `…/context/setting` (emission is via `ctx/`), the *reason* changes.
+- [x] Docs: `deviations.md` (drop the "`EVENT_CONTEXT.setting` is dropped on encode" deviation; move `setting` out of the deferred-`ctx/` row), `SKIPPED.md` § metadata (waiver → respelling; hold-out stays 306, census unchanged at 360/1158/306). Commit `feat(serialize/simplified): emit and accept ctx/setting (REQ-053, ADR 0015 gap closed)`.
 
 **Verify:** as Phase A, plus `go test ./openehr/template/webtemplate/...`.
 
