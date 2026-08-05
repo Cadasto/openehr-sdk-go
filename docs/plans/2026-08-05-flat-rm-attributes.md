@@ -46,7 +46,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 | Phase B — `ctx/setting` emission + alias + harness waiver removal | done |
 | PR 1 opened (A + B + Phase 0) | |
 | Phase C0 — underscore router (decode) + emission hook (encode) + simple families | |
-| Phase C1 — value-decoration families (`_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`, `_null_reason`) | |
+| Phase C1 — value-decoration families (`_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`, `_null_reason`) | done |
 | Phase C2 — party grammar (`_health_care_facility`, participations, `_identifier`, ENTRY `subject`) | |
 | Phase C3 — DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL leaves + `_feeder_audit` | |
 | Phase C4 — PROBE-089, census re-baseline, docs, status flips | |
@@ -122,7 +122,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 
 ## Phase C1 — value-decoration families *(PR 2)*
 
-**Files:** `rmattr.go` (+`rmattr_interval.go` if it grows), `datatypes.go` (captured-set interplay), tests; `deviations.md`.
+**Files:** `rmattr_value.go` + `rmattr_value_encode.go` (new), `rmattr.go` (registry + router), `flat_decode.go` (the owner's anchor type), `flat_encode.go` (the absent-value leaf walk), `datatypes.go` (captured-set interplay), `rmattr_value_test.go` (new) + `datatypes_test.go` + `structured_test.go`; `deviations.md`, `SKIPPED.md`, `runner_test.go` pins.
 
 **Read first:** `datatypes.go` capturedKeys + the decorated-value `|raw` test; `rm.DvInterval` / `rm.ReferenceRange` / `rm.TermMapping` / `rm.Element` (null flavour) generated shapes; corpus shapes: `_normal_range/lower|magnitude`, `_normal_range|lower_included`, `_other_reference_ranges:0/meaning|code`, `_mapping:0|match`, `_mapping:0/target|terminology`, `_mapping:0/purpose|value`.
 
@@ -137,7 +137,13 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 
 **The captured-set change:** a `DV_*` value whose only extras are `normal_range` / `other_reference_ranges` / `mappings` no longer rides `|raw` — the "fully captured" test consults the rmattr grammar. A value with extras *still* outside the grammar (e.g. non-`openehr` `normal_status` — unchanged rule) keeps riding `|raw`. Pin both directions in `datatypes_test.go`.
 
-**Tasks:** failing round-trip test per family (fixture-shaped keys above) → implement → census pins → commit per family. The corpus's `_normal_range/lower|type` / `|ordinal` / `|denominator` shapes come from DV_PROPORTION / DV_ORDINAL anchors — cover at least QUANTITY, PROPORTION, ORDINAL anchors in tests.
+**Tasks:**
+- [x] `_normal_range` + `_other_reference_ranges:N` (they share the interval grammar): failing round-trip tests over the QUANTITY / COUNT / DATE_TIME / ORDINAL / PROPORTION anchors → implement → pins for the eight `data_types_dv_*` fixtures. Census 494 → 564 compared.
+- [x] `_mapping:N`, composed with all three DV_TEXT shapes (plain, genuinely coded, Phase A substituted coded-at-text). Census 564 → 591.
+- [x] `_null_flavour` + `_null_reason`, including the absent-value case in **both** directions (`emitNode` now runs the owner walk on a leaf whose value resolves to nothing). Census 591 → 595 (32.6%).
+- [x] `|raw` boundary pinned both ways in `datatypes_test.go` (`TestNormalRangeNarrowsRawBoundary`, `TestDecoratedCodedTextAtTextLeaf`); STRUCTURED interconversion cases in `structured_test.go` for the nested-object and array shapes.
+
+**Residue this phase leaves** (all recorded in `deviations.md` / `SKIPPED.md`): the DV_PROPORTION interval's four **derived** bare magnitudes join the leaf-level `unsupported bare value for DV_PROPORTION` refusal (1 → 5 keys) — 101 of the families' 105 corpus keys are compared; a bare-spelled leaf carrying an underscore family has no STRUCTURED representation (pre-existing, C0's `_uid` collides identically, now reachable from corpus bodies); and a null-flavoured instance of a *repeating* collapsed ELEMENT is not emitted, because the `:index` comes from the value-list enumeration.
 
 ## Phase C2 — party grammar + ENTRY `subject` *(PR 2)*
 
