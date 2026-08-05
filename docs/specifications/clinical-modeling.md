@@ -814,6 +814,16 @@ The catalogue is intentionally small; the value is in the structural required-se
 - **DV_INTERVAL** — `lower` ≤ `upper` when both bounds are numerically comparable (DV_QUANTITY / DV_COUNT) and neither side is unbounded. Other DVOrdered bound types (DV_DATE, DV_TIME, …) carry richer comparison semantics that integrate with the REQ-123 temporal helpers in a follow-up cycle.
 - **OBJECT_REF / PARTY_REF / ACCESS_GROUP_REF / LOCATABLE_REF** — `type` and `namespace` non-empty. The `id` floor is covered by the required-set walk (the field is RM-mandatory).
 
+**Known gap — `EVENT_CONTEXT.setting` (`Setting_valid`).** The RM constrains `setting.defining_code` to a member of the
+openEHR terminology's `setting` group (`Terminology(Terminology_id_openehr).has_code_for_group_id(Group_id_setting, …)`).
+The floor does **not** evaluate it, because doing so needs the openEHR terminology group tables, which the floor
+deliberately does not carry (see *Trust model* below — terminology binding is out of scope). The consequence is real and
+was observed: an RM-invalid, archetype-locally-coded setting passed the floor clean and was caught only downstream, by
+the REQ-053 FLAT encoder refusing to represent it. Closing this needs the terminology tables as an input to the floor
+and is deferred to a follow-up cycle; until then `Setting_valid` is enforced only at the wire boundary
+([wire.md § REQ-053](wire.md#req-053)), and REQ-107's generator pins an `openehr`-coded default so the SDK cannot
+originate the invalid shape.
+
 Catalogue additions follow [ADR 0001](../adr/0001-bmm-version-bump-runbook.md) — adding a new BMM concrete that needs a leaf invariant requires editing the closed switch in `rmfloor_adapters.go` and adding the evaluator. Each invariant emits `Issue.Code = "rm_invariant"`; consumers dispatch on the code as with the rest of the issue taxonomy.
 
 ### Trust model
