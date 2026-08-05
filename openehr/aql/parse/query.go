@@ -114,7 +114,31 @@ type SelectClause struct {
 	Distinct bool
 	Star     bool
 	Items    []SelectItem
+
+	// Top is the row limit from a `SELECT TOP n [FORWARD|BACKWARD]` clause,
+	// nil when the source declared none — so `TOP 0` (a real bound) never
+	// collapses into "unbounded" (REQ-118).
+	//
+	// The clause is DEPRECATED upstream (openEHR QUERY Release-1.1.0
+	// § 4.4.3, in favour of `LIMIT` with `ORDER BY`) and is modelled so a
+	// consumer can read and re-emit a query it did not author; see
+	// [aql.TopClause].
+	//
+	// Top and [Query.Limit] are reported INDEPENDENTLY, exactly as the
+	// source wrote them: § 4.4.3 forbids the combination, so the parser
+	// neither normalises one into the other nor picks a winner — the lint
+	// gate diagnoses it (`aql_top_with_limit`) and [aql.Builder] refuses to
+	// construct it.
+	Top *aql.TopClause
 }
+
+// TopClause is the deprecated `SELECT TOP` row limit — re-exported from
+// [aql.TopClause], the shared SELECT-clause vocabulary (REQ-118).
+type TopClause = aql.TopClause
+
+// TopDir is a [TopClause] direction — re-exported from [aql.TopDir]
+// (REQ-118). Use [aql.TopForward] / [aql.TopBackward].
+type TopDir = aql.TopDir
 
 // SelectItem is one projected expression in a SELECT list. `Expr` is one
 // of the [SelectExpr] shapes — a [PathExpr] (a bare alias-qualified
@@ -153,8 +177,24 @@ func (PathExpr) isSelectExpr() {}
 // shared [aql.Value] vocabulary the WHERE side uses, so a consumer
 // reads a projected literal and a compared literal through one model
 // (REQ-117).
+//
+// Raw is the literal's SOURCE TEXT as written, which the openEHR result
+// schema needs as the column name when a projection carries neither an
+// `AS` alias nor a path to fall back on (REQ-118). It is read-side
+// fidelity only:
+//
+//   - it is populated by [ParseQuery], and is EMPTY on a LiteralExpr a
+//     caller constructed, so it MUST NOT be treated as required;
+//   - emission renders Value in canonical form, never Raw — the canonical
+//     write form is normative (REQ-055).
+//
+// The two therefore differ whenever the source was not already canonical:
+// `1.50` yields Value `aql.RealValue{1.5}` with Raw `1.50`, and a
+// double-quoted `"x"` yields `aql.StringValue{x}` with Raw `"x"`. Use
+// [aql.FormatValue] to render a Value that has no Raw.
 type LiteralExpr struct {
 	Value aql.Value
+	Raw   string
 }
 
 func (LiteralExpr) isSelectExpr() {}
@@ -298,9 +338,10 @@ func (d OrderDir) String() string {
 // (Builder) and the round-trip suites here (parse).
 //
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
-// q produced by [ParseQuery] — since REQ-117 the catalogue is the whole
-// SDK grammar profile (see [aql.ErrIncompleteAST] for the residual
-// integer-literal refusal). A source shape the extractor cannot model
+// q produced by [ParseQuery] — since REQ-117 (and REQ-118, which added the
+// deprecated `SELECT TOP` carrier) the catalogue is the whole SDK grammar
+// profile (see [aql.ErrIncompleteAST] for the residual numeric-literal
+// refusal). A source shape the extractor cannot model
 // produces a PARTIAL Query — clauses that extracted cleanly are
 // populated, dropped clauses are left zero-value — plus an
 // [aql.ErrIncompleteAST] error from [ParseQuery]. Emit on a partial
@@ -335,6 +376,25 @@ func (q *Query) Emit() (string, error) {
 	sb.WriteString("SELECT ")
 	if q.Select.Distinct {
 		sb.WriteString("DISTINCT ")
+	}
+	// REQ-118: the deprecated `TOP n [FORWARD|BACKWARD]` row limit sits
+	// between DISTINCT and the projection list (grammar: `SELECT DISTINCT?
+	// top? selectExpr …`). A negative count could only emit text the parser
+	// rejects — the `top` production admits no sign.
+	if t := q.Select.Top; t != nil {
+		if t.N < 0 {
+			return "", fmt.Errorf("%w: negative SELECT TOP count %d", aql.ErrInvalidQuery, t.N)
+		}
+		// A direction outside the vocabulary renders as nothing at all, which
+		// would silently emit an undirected bound — refuse instead, mirroring
+		// [aql.Builder]'s build-time guard.
+		switch t.Dir {
+		case aql.TopDirUnspecified, aql.TopForward, aql.TopBackward:
+		default:
+			return "", fmt.Errorf("%w: unknown SELECT TOP direction %d", aql.ErrInvalidQuery, int(t.Dir))
+		}
+		sb.WriteString(aql.FormatTop(t))
+		sb.WriteByte(' ')
 	}
 	switch {
 	// Items lead: a mixed `SELECT *, col` carries the star as a

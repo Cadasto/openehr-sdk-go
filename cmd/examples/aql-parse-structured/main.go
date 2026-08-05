@@ -102,6 +102,12 @@ func printSelect(s parse.SelectClause) {
 	if s.Distinct {
 		head += " DISTINCT"
 	}
+	// REQ-118: the deprecated `TOP n [FORWARD|BACKWARD]` row limit sits between
+	// DISTINCT and the projection list. A consumer that ignored it would run
+	// unbounded where the source asked for n rows.
+	if s.Top != nil {
+		head += " " + aql.FormatTop(s.Top)
+	}
 	// Items lead: since REQ-117 a mixed `SELECT *, col` carries the star as a
 	// parse.StarExpr item, so the list is authoritative whenever it is
 	// populated. The bare `SELECT *` form leaves Items empty and is carried by

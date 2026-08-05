@@ -151,6 +151,36 @@ func (b *Builder) OffsetInlineParam(name string) *Builder {
 	return b
 }
 
+// Top sets the DEPRECATED in-text `SELECT TOP n` row limit (REQ-118),
+// emitted between `SELECT`/`DISTINCT` and the projection list.
+//
+// Prefer [Builder.LimitInline] or the envelope [Builder.Limit]: openEHR QUERY
+// Release-1.1.0 § 4.4.3 deprecates `TOP` in favour of `LIMIT` with `ORDER BY`
+// and announces its removal in a future major release. It is offered so the
+// SDK can author the deprecated shape a client, a stored query, or a
+// conformance corpus may still legitimately carry.
+//
+// § 4.4.3 also forbids `TOP` and `LIMIT` in one query, and a `TOP` is itself
+// an in-text row bound — so setting it alongside EITHER row-limit channel
+// (in-text or envelope) makes [Builder.Build] return an error wrapping
+// [ErrInvalidQuery], never a silently combined emission. A negative n is
+// likewise refused (the grammar's `top` production admits no sign). Later
+// calls replace earlier ones.
+func (b *Builder) Top(n int) *Builder {
+	b.ast.top = &TopClause{N: n}
+	return b
+}
+
+// TopDirected sets the deprecated `SELECT TOP n FORWARD|BACKWARD` row limit
+// (REQ-118). [TopDirUnspecified] emits no direction keyword, making it
+// equivalent to [Builder.Top]; a direction outside the vocabulary is refused
+// at [Builder.Build] rather than emitted as text the parser would reject. Same
+// deprecation notice and channel-exclusivity rule as [Builder.Top].
+func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
+	b.ast.top = &TopClause{N: n, Dir: dir}
+	return b
+}
+
 // Bind supplies a value for a named placeholder introduced via [Param]; it
 // populates [Query.Parameters] on the built query. Binding is optional — the
 // emitted string carries `$name` regardless.
@@ -217,7 +247,12 @@ type ast struct {
 	// `limitValue : INTEGER | PARAMETER`.
 	limitInline  Value
 	offsetInline Value
-	params       map[string]any
+	// top is the opt-in DEPRECATED `SELECT TOP n` row limit (REQ-118). Nil
+	// means the clause is absent — distinct from `TOP 0`, which is a real
+	// bound. It joins the in-text row-limit channel for the exclusivity
+	// rule in validatePaging.
+	top    *TopClause
+	params map[string]any
 }
 
 func (a *ast) build() (Query, error) {
@@ -254,6 +289,14 @@ func (a *ast) build() (Query, error) {
 
 	var sb strings.Builder
 	sb.WriteString("SELECT ")
+	// REQ-118: the deprecated TOP row limit precedes the projection list
+	// (grammar: `SELECT DISTINCT? top? selectExpr …`). validatePaging has
+	// already refused a negative count, an unknown direction, and any
+	// combination with the other row-limit channels.
+	if a.top != nil {
+		sb.WriteString(FormatTop(a.top))
+		sb.WriteByte(' ')
+	}
 	for i, c := range a.sel {
 		if i > 0 {
 			sb.WriteString(", ")
@@ -329,6 +372,9 @@ func (a *ast) build() (Query, error) {
 // a named parameter (`limitValue : INTEGER | PARAMETER`).
 func (a *ast) validatePaging() error {
 	inline := a.limitInline != nil || a.offsetInline != nil
+	if err := a.validateTop(inline); err != nil {
+		return err
+	}
 	if inline && (a.limit != 0 || a.offset != 0) {
 		return fmt.Errorf("%w: paging set on both channels — in-text LIMIT/OFFSET and the request envelope "+
 			"(Limit/Offset); pick one", ErrInvalidQuery)
@@ -340,6 +386,35 @@ func (a *ast) validatePaging() error {
 		return err
 	}
 	return validateLimitValue("OFFSET", a.offsetInline)
+}
+
+// validateTop enforces the REQ-118 rules for the deprecated `SELECT TOP`
+// clause: openEHR QUERY Release-1.1.0 § 4.4.3 forbids `TOP` together with
+// `LIMIT`, and a TOP is itself an in-text row bound, so it is exclusive with
+// BOTH row-limit channels. The count must be representable in the grammar's
+// unsigned `top : TOP INTEGER …`, and a direction outside the vocabulary
+// would render as nothing at all — a silently undirected bound.
+func (a *ast) validateTop(inline bool) error {
+	if a.top == nil {
+		return nil
+	}
+	if inline {
+		return fmt.Errorf("%w: SELECT TOP set together with an in-text LIMIT/OFFSET — openEHR QUERY "+
+			"Release-1.1.0 §4.4.3 forbids TOP with LIMIT; pick one", ErrInvalidQuery)
+	}
+	if a.limit != 0 || a.offset != 0 {
+		return fmt.Errorf("%w: SELECT TOP set together with the request envelope's row limit "+
+			"(Limit/Offset) — two row bounds on one query; pick one", ErrInvalidQuery)
+	}
+	if a.top.N < 0 {
+		return fmt.Errorf("%w: negative SELECT TOP count %d", ErrInvalidQuery, a.top.N)
+	}
+	switch a.top.Dir {
+	case TopDirUnspecified, TopForward, TopBackward:
+	default:
+		return fmt.Errorf("%w: unknown SELECT TOP direction %d", ErrInvalidQuery, int(a.top.Dir))
+	}
+	return nil
 }
 
 // validateLimitValue rejects an in-text paging operand the grammar's

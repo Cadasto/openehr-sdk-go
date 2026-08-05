@@ -187,6 +187,34 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 			Severity: Warning,
 		})
 	}
+
+	issues = append(issues, topIssues(doc)...)
+	return issues
+}
+
+// topIssues reports the deprecated `SELECT TOP` modifier and the combination
+// openEHR QUERY Release-1.1.0 § 4.4.3 forbids outright (REQ-118).
+//
+// The SDK parses and emits `TOP` faithfully — a query it did not author may
+// legitimately carry one until the announced removal — so this is where the
+// spec's judgement on the construct is reported, rather than in the parser or
+// the emitter. The builder refuses to CONSTRUCT either shape.
+func topIssues(doc *parse.Document) []Issue {
+	if doc.Top == nil {
+		return nil
+	}
+	issues := []Issue{{
+		Code:     "aql_deprecated_top",
+		Detail:   fmt.Sprintf("SELECT %s is deprecated from openEHR QUERY Release-1.1.0 and slated for removal; use LIMIT with ORDER BY", aql.FormatTop(doc.Top)),
+		Severity: Warning,
+	}}
+	if doc.HasLimit {
+		issues = append(issues, Issue{
+			Code:     "aql_top_with_limit",
+			Detail:   "SELECT TOP is used together with a LIMIT clause, which openEHR QUERY Release-1.1.0 §4.4.3 does not allow",
+			Severity: Error,
+		})
+	}
 	return issues
 }
 

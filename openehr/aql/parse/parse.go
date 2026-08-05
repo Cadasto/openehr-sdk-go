@@ -66,6 +66,14 @@ type Document struct {
 	HasOrderBy bool
 	HasLimit   bool
 
+	// Top is the deprecated `SELECT TOP n [FORWARD|BACKWARD]` row limit when
+	// the source carried one, nil otherwise — the flat-view mirror of
+	// [SelectClause.Top], so the lint gate reads the clause without paying
+	// for the structured extraction (REQ-118). A count outside Go `int`
+	// leaves it nil; that source is refused by the structured extractor,
+	// which is the layer that owns representability.
+	Top *aql.TopClause
+
 	// SelectAliases are the `AS` aliases declared on SELECT projection
 	// items, in document order; a projection without an AS clause
 	// contributes nothing. They are a namespace of their own — an ORDER BY
@@ -210,6 +218,14 @@ func (d *Document) QueryErr() error {
 func (d *Document) populate() {
 	if sc := d.tree.SelectClause(); sc != nil {
 		d.Distinct = sc.DISTINCT() != nil
+		// REQ-118: the deprecated TOP clause, mirrored into the flat view for
+		// the lint gate. Kept in lockstep with the structured extractor's
+		// topClause — including its representability rule: an unparseable
+		// count leaves this nil rather than a truncated bound.
+		if top := sc.Top(); top != nil {
+			var ex astExtractor
+			d.Top = ex.topClause(top)
+		}
 		exprs := sc.AllSelectExpr()
 		d.NumSelect = len(exprs)
 		for _, e := range exprs {

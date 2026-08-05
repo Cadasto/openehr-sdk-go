@@ -20,6 +20,12 @@ The fourth plan in this set — the upstream FLAT parity harness — **landed 20
 
 The AQL expressivity plan **landed 2026-08-04 and was archived** ([archive/2026-08-04-aql-expressivity-completion.md](archive/2026-08-04-aql-expressivity-completion.md)): REQ-117 is `landed`, PROBE-087 (structured-AST catalogue completeness) and PROBE-088 (builder containment + in-text paging stability) are Implemented, and the only surviving `aql.ErrIncompleteAST` class is an integer literal the AST cannot represent. A builder entry point for a FROM-root containment junction stays deferred.
 
+### AQL read-side fidelity (2026-08-05)
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-05-aql-top-carrier-literal-source-text.md](2026-08-05-aql-top-carrier-literal-source-text.md) | The deprecated `SELECT TOP n [FORWARD\|BACKWARD]` clause as a parse **and** build carrier, a projected literal's source text, and the lint diagnosis for the spec-forbidden `TOP` + `LIMIT` combination | REQ-118 (amends REQ-117's residual list; extends the REQ-109 Layer-2 codes) | PROBE-087 / PROBE-088 (extended) |
+
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
 | Plan | Scope | Covers REQs / probes |

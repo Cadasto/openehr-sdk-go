@@ -9,9 +9,10 @@ package parse
 // profile — the buildable grammar, the parser-only predicates (Not /
 // Exists / Like / Matches incl. its TERMINOLOGY and {URI} operands),
 // literal and star SELECT items, function calls on either side of a
-// comparison, path-valued operands, and boolean junctions at the FROM root
-// and in WHERE. The residual refusal is an INTEGER literal the AST cannot
-// represent (see [aql.ErrIncompleteAST]); it — and any defensive gap a
+// comparison, path-valued operands, boolean junctions at the FROM root
+// and in WHERE, and — since REQ-118 — the deprecated `SELECT TOP` clause
+// with its direction. The residual refusal is a numeric literal the AST
+// cannot represent (see [aql.ErrIncompleteAST]); it — and any defensive gap a
 // widened grammar would trip — surfaces as [aql.ErrIncompleteAST] from
 // [ParseQuery] / [Document.QueryErr] so the loss is visible at parse time,
 // not silently dropped at emit.
@@ -90,19 +91,13 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 
 func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectClause {
 	out := SelectClause{Distinct: c.DISTINCT() != nil}
-	// The grammar profile keeps the deprecated `top` production
-	// (`selectClause : SELECT DISTINCT? top? selectExpr …`), but the AST has
-	// no carrier for it. Record a gap rather than drop it: a dropped TOP
-	// silently turns a bounded query into an unbounded one, which is exactly
-	// the no-silent-loss rule (REQ-117).
+	// REQ-118: the deprecated `top` production
+	// (`selectClause : SELECT DISTINCT? top? selectExpr …`) is IN-catalogue —
+	// count and direction are both carried, since dropping the count turns a
+	// bounded query into an unbounded one and dropping the direction selects
+	// the opposite end of the result set.
 	if top := c.Top(); top != nil {
-		// GetText concatenates tokens without separators, so report the
-		// INTEGER on its own rather than a mangled "TOP5".
-		n := "?"
-		if i := top.INTEGER(); i != nil {
-			n = i.GetText()
-		}
-		ex.incomplete("SELECT TOP %s is outside the catalogue — the structured AST has no carrier for a top clause", n)
+		out.Top = ex.topClause(top)
 	}
 	columns := 0
 	for _, item := range c.AllSelectExpr() {
@@ -127,6 +122,46 @@ func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectCl
 	return out
 }
 
+// topClause lifts the deprecated `top` production into the shared
+// [aql.TopClause] vocabulary (REQ-118). A count outside Go `int` records the
+// residual unrepresentable-numeric gap — the same treatment a `LIMIT` operand
+// of that size already gets — rather than a top-specific one: truncating a
+// row bound is silent data loss either way.
+//
+// Returns nil only after recording a gap, so a nil Top can never be read as
+// "the source declared no bound": [Query.Emit] refuses the partial AST.
+func (ex *astExtractor) topClause(c gen.ITopContext) *aql.TopClause {
+	out := &aql.TopClause{}
+	i := c.INTEGER()
+	if i == nil {
+		// Defensive: `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` makes
+		// the count mandatory, so this is unreachable against the current
+		// profile.
+		ex.incomplete("SELECT TOP %q carries no row count", c.GetText())
+		return nil
+	}
+	n, err := strconv.Atoi(i.GetText())
+	if err != nil {
+		ex.incomplete("SELECT TOP integer literal %q out of range for int (%v)", i.GetText(), err)
+		return nil
+	}
+	out.N = n
+	if d := c.GetDirection(); d != nil {
+		switch d.GetTokenType() {
+		case gen.AqlParserFORWARD:
+			out.Dir = aql.TopForward
+		case gen.AqlParserBACKWARD:
+			out.Dir = aql.TopBackward
+		default:
+			// Defensive: the label admits FORWARD | BACKWARD only. Record a
+			// gap rather than emit a bound whose direction we dropped.
+			ex.incomplete("SELECT TOP direction %q is outside the catalogue", d.GetText())
+			return nil
+		}
+	}
+	return out
+}
+
 func (ex *astExtractor) extractSelectItem(c gen.ISelectExprContext) SelectItem {
 	item := SelectItem{}
 	if id := c.IDENTIFIER(); id != nil {
@@ -147,7 +182,7 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 		// the WHERE-side lift in [astExtractor.terminalAsValue]; the flat lint
 		// view skips the identical shape via isKeywordLiteral.
 		if v, ok := bareKeywordLiteral(ip); ok {
-			return LiteralExpr{Value: v}
+			return LiteralExpr{Value: v, Raw: sourceText(ip)}
 		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
@@ -179,7 +214,26 @@ func (ex *astExtractor) primitiveAsSelectExpr(p gen.IPrimitiveContext) SelectExp
 		ex.incomplete("primitive literal %q is out of range for the value vocabulary", p.GetText())
 		return nil
 	}
-	return LiteralExpr{Value: v}
+	// REQ-118: keep the source text — the typed value is canonical, and the
+	// result schema names an unaliased literal column by what was written.
+	return LiteralExpr{Value: v, Raw: sourceText(p)}
+}
+
+// sourceText returns a rule context's VERBATIM source span, taken from the
+// character stream rather than from GetText() (REQ-118). GetText concatenates
+// tokens and so drops interior whitespace — `- 5` would come back `-5`, which
+// is a canonicalisation, exactly what the source-text field exists to avoid.
+// Falls back to GetText when the context carries no usable stream (a
+// hand-built tree in a test).
+func sourceText(c antlr.ParserRuleContext) string {
+	start, stop := c.GetStart(), c.GetStop()
+	if start == nil || stop == nil {
+		return c.GetText()
+	}
+	if in := start.GetInputStream(); in != nil {
+		return in.GetTextFromInterval(antlr.NewInterval(start.GetStart(), stop.GetStop()))
+	}
+	return c.GetText()
 }
 
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
@@ -203,8 +257,14 @@ func (ex *astExtractor) extractFunctionCall(c gen.IFunctionCallContext) Function
 	// three STRING arguments are modelled as literal operands (REQ-117).
 	if tf := c.TerminologyFunction(); tf != nil {
 		out := FunctionCall{Name: aql.TerminologyFunc}
-		for _, s := range terminologyArgs(tf) {
-			out.Args = append(out.Args, LiteralExpr{Value: s})
+		// REQ-118: each argument keeps its source text (the STRING token as
+		// written, quotes included) alongside the unquoted typed value.
+		for i, s := range terminologyArgs(tf) {
+			lit := LiteralExpr{Value: s}
+			if strs := tf.AllSTRING(); i < len(strs) {
+				lit.Raw = strs[i].GetText()
+			}
+			out.Args = append(out.Args, lit)
 		}
 		return out
 	}
@@ -234,7 +294,7 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 		// WHERE-side terminalAsValue does, or the same construct would model
 		// as a path in SELECT and as a literal in WHERE (REQ-117).
 		if v, ok := bareKeywordLiteral(ip); ok {
-			return LiteralExpr{Value: v}
+			return LiteralExpr{Value: v, Raw: sourceText(ip)}
 		}
 		return PathExpr{IdentifiedPath: extractIdentifiedPath(ip, ClauseSelect)}
 	}
@@ -242,7 +302,7 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 		return ex.extractFunctionCall(fc)
 	}
 	if p := t.PARAMETER(); p != nil {
-		return LiteralExpr{Value: aql.ParamValue{Name: strings.TrimPrefix(p.GetText(), "$")}}
+		return LiteralExpr{Value: aql.ParamValue{Name: strings.TrimPrefix(p.GetText(), "$")}, Raw: p.GetText()}
 	}
 	if p := t.Primitive(); p != nil {
 		return ex.primitiveAsSelectExpr(p)
