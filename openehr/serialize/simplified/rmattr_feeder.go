@@ -148,14 +148,14 @@ func rmattrChildGroups(g rmattrGroup) (map[string]any, map[string][]rmattrGroup,
 // A `:index` above 0 addresses a list slot the RM attribute does not have; the
 // index-less spelling and `:0` are one instance, since the OPT-free FLAT ↔
 // STRUCTURED interconversion re-spells every segment with an explicit index.
-func rmattrChildSingle(insts []rmattrGroup) (rmattrGroup, error) {
+func rmattrChildSingle(g rmattrGroup, seg string, insts []rmattrGroup) (rmattrGroup, error) {
+	notSingle := fmt.Errorf("%w: %q addresses a single-valued RM attribute, not an indexed list",
+		ErrUnknownPath, g.prefix()+"/"+seg)
 	if len(insts) != 1 {
-		return rmattrGroup{}, fmt.Errorf("%w: %q addresses a single-valued RM attribute, not an indexed list",
-			ErrUnknownPath, insts[len(insts)-1].prefix())
+		return rmattrGroup{}, notSingle
 	}
 	if insts[0].index > 0 {
-		return rmattrGroup{}, fmt.Errorf("%w: %q addresses a single-valued RM attribute, not an indexed list",
-			ErrUnknownPath, insts[0].prefix())
+		return rmattrGroup{}, notSingle
 	}
 	return insts[0], nil
 }
@@ -193,7 +193,7 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 			}
 			fa[feederAuditItemIDLists[seg]] = ids
 		case feederAuditDetailSegs[seg]:
-			in, err := rmattrChildSingle(insts)
+			in, err := rmattrChildSingle(g, seg, insts)
 			if err != nil {
 				return nil, err
 			}
@@ -208,7 +208,7 @@ func decodeRMAttrFeederAudit(g rmattrGroup, _ string) (any, error) {
 					ErrUnsupportedDatatype, g.prefix()+"/"+contentSeg, g.prefix()+"/"+seg)
 			}
 			contentSeg = seg
-			in, err := rmattrChildSingle(insts)
+			in, err := rmattrChildSingle(g, seg, insts)
 			if err != nil {
 				return nil, err
 			}
@@ -265,7 +265,7 @@ func decodeFeederAuditDetails(g rmattrGroup) (any, error) {
 		if !feederAuditDetailsParties[seg] {
 			return nil, feederUnknownSegment(g, children[seg][0], seg, "FEEDER_AUDIT_DETAILS")
 		}
-		in, err := rmattrChildSingle(children[seg])
+		in, err := rmattrChildSingle(g, seg, children[seg])
 		if err != nil {
 			return nil, err
 		}

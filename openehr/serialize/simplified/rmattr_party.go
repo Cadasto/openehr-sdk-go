@@ -185,7 +185,8 @@ func partyProxyLeafSuffixes(g rmattrGroup) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	delete(ts.own, partyProxyTypeSuffix)
+	// partySuffixes reads its four own suffixes by name and never iterates, so the
+	// `_type` left in ts is invisible to it — `_type` and `type` are distinct keys.
 	party, populated, err := partySuffixes(g, ts, ids)
 	if err != nil {
 		return nil, err
