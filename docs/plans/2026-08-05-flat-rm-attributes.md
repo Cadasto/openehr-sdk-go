@@ -7,13 +7,13 @@
 **Owner:** SDK maintainers
 **Covers:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (new — underscore-prefixed RM attributes; opens the wire-extension band 140–149); amendments to [REQ-053](../specifications/wire.md#req-053) (DV_TEXT substitution carve-out; `ctx/setting` as the sixth respelled field; DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closure); [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md) (EVENT_CONTEXT optionals ride the underscore grammar)
 **Probes:** [PROBE-089](../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Draft — reserved); [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
-**Implementation:** planned
+**Implementation:** partial — Phases A and B landed (PR 1); Phases C0–C4 open (PR 2)
 **Depends on:** landed REQ-053 codec (`openehr/serialize/simplified/`), REQ-106/111 (WebTemplate + compiled-template bridge), REQ-121 (`rmpath`), ADR 0014/0015; the PROBE-086 harness (`testkit/conformance/webtemplate/`) and pinned corpus (`testkit/cassettes/flat-conformance/`)
 **Defers:** `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — spec-named, corpus-unexercised, stay typed refusals; the composer `external_ref` / `composer/_identifier:N` surface (ADR 0015 boundary); accepting the ITS `ctx/` sketches for EVENT_CONTEXT optionals (ADR 0016 § Decision 3); FEEDER_AUDIT_DETAILS `other_details` (ITEM_STRUCTURE — no corpus fixture); `.schema` media types; reused-sibling FLAT (owned by the REQ-116 residual)
 
 ## Goal
 
-Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT subtype-substitution carve-out, (B) `ctx/setting` emission, and (C) the full REQ-140 underscore-prefixed RM attribute grammar plus the leaf-datatype closures its machinery enables (DV_MULTIMEDIA, DV_PARSABLE, DV_INTERVAL, ENTRY `subject`). Consumers: every FLAT/STRUCTURED integrator round-tripping real EHRbase-authored payloads — at HEAD, **0 of 34** upstream corpus bodies decode end-to-end because all refuse on `_`-prefixed keys; after this plan all 34 decode and PROBE-086 coverage rises from **19.5% to ~80%** of upstream keys.
+Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT subtype-substitution carve-out, (B) `ctx/setting` emission, and (C) the full REQ-140 underscore-prefixed RM attribute grammar plus the leaf-datatype closures its machinery enables (DV_MULTIMEDIA, DV_PARSABLE, DV_INTERVAL, ENTRY `subject`). Consumers: every FLAT/STRUCTURED integrator round-tripping real EHRbase-authored payloads — at HEAD, **0 of 34** upstream corpus bodies decode end-to-end because all refuse on `_`-prefixed keys; after this plan all 34 decode and PROBE-086 coverage rises from **19.7% (after Phase A) to ~80%** of upstream keys.
 
 ## Delivery shape — two PRs, one plan
 
@@ -22,7 +22,8 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 
 ## Definition of Ready
 
-- **Covers** lists REQ-140 + the REQ-053 amendments; canonical prose exists (wire.md § REQ-140, amended § REQ-053; registry row + band row in REQ.md). ✔ (Phase 0, this branch)
+- **Covers** lists REQ-140 + the REQ-053 amendments; canonical prose exists for REQ-140 (wire.md § REQ-140; registry row + band row in REQ.md) and for the Phase A/B REQ-053 amendments (DV_TEXT substitution, `ctx/setting`). ✔ (Phase 0, this branch)
+- **Not yet authored:** the Phase C3 REQ-053 leaf-closure prose (DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL suffix sets, ENTRY `subject`). Its grammar currently lives only in this plan's Phase C tables — a plan is not a canonical home, and wire.md § REQ-140 already dangles a reference to the DV_MULTIMEDIA suffix set it does not define. Authoring it into wire.md § REQ-053 is a **precondition of Phase C3**, not a side effect of it.
 - ADR 0016 Accepted; ADR 0015 untouched. ✔
 - PROBE-089 catalogued Draft in conformance.md; PROBE-086 prose updated for the setting respelling. ✔
 - traceability.yaml carries REQ-140 → this plan. ✔

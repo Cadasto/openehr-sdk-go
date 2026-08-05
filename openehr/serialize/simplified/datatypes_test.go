@@ -982,3 +982,27 @@ func TestDateAccuracyRidesRaw(t *testing.T) {
 		t.Error("emitted a scalar |accuracy for a DV_DURATION-typed accuracy")
 	}
 }
+
+// TestEmptyCodeDoesNotPromoteTextLeaf — REQ-053. The DV_CODED_TEXT-at-DV_TEXT
+// discriminator is a non-empty string |code, not the key's mere presence.
+// `|code: ""` / `|code: null` is what a form emits for "free text, no code
+// selected"; promoting those would mint a DV_CODED_TEXT whose
+// CODE_PHRASE.code_string is empty — RM-invalid, stable enough on re-encode that
+// nothing downstream flags it, and matched by any AQL predicate testing
+// defining_code/code_string against ”. They stay a plain DV_TEXT, so the stray
+// |code is refused by the allowlist exactly as it was before the carve-out
+// (PR #88 review).
+func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
+	for name, sfx := range map[string]map[string]any{
+		"empty string code":              {"code": "", "value": "free text"},
+		"null code":                      {"code": nil, "value": "free text"},
+		"empty code beside a bare value": {"code": "", "": "free text"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dv, err := dvFromSuffixes("DV_TEXT", false, sfx)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("dvFromSuffixes(DV_TEXT, %v) = %#v, err = %v; want ErrUnsupportedDatatype (must not promote to DV_CODED_TEXT)", sfx, dv, err)
+			}
+		})
+	}
+}

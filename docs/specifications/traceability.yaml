@@ -441,7 +441,7 @@ requirements:
     # emitted when EVENT_CONTEXT.setting is populated and accepted on decode,
     # closing the emission gap ADR 0015 left open (the census's one waiver).
     # The DV_CODED_TEXT-at-DV_TEXT substitution is carried in suffix form
-    # (|code + |terminology beside the bare value) instead of |raw — the one
+    # (|code + |value + |terminology, with no bare key) instead of |raw — the one
     # suffix-form substitution; the ctx-only emission rule is scoped to the six
     # respelled scalar fields (ADR 0016), the EVENT_CONTEXT optionals riding
     # the REQ-140 underscore grammar instead.
@@ -1436,16 +1436,17 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 356 of the corpus's 1824 keys are in the modelled
-    # subset today (19.5%) — 1162 refused by the REQ-053 codec, 306 held out as
-    # composition metadata. That hold-out is suffix-aware respellings (language,
-    # territory, composer|name, composer_self, context/start_time, which REQ-053
-    # reads and writes as the ctx/ short forms; the composer external_ref
-    # suffixes are deliberately NOT held out — they are refused and visible in
-    # the census) plus ONE waiver: context/setting decodes and then re-encodes
-    # to nothing, so holding it out waives a real encode-side drop. ADR 0015
-    # settled the spelling without clearing that: it is an emission gap
-    # (ctx/setting is not written), so it clears when that emission lands.
+    # Scope, stated plainly: 360 of the corpus's 1824 keys are in the modelled
+    # subset today (19.7%) — 1158 refused by the REQ-053 codec, 306 held out as
+    # composition metadata. That hold-out is suffix-aware respellings only
+    # (language, territory, composer|name, composer_self, context/start_time and
+    # context/setting, which REQ-053 reads and writes as the ctx/ short forms;
+    # the composer external_ref suffixes are deliberately NOT held out — they are
+    # refused and visible in the census). The waiver class is empty: context/setting
+    # was the one waiver — it decoded and then re-encoded to nothing while
+    # ctx/setting emission was deferred — until the amended REQ-053 closed that
+    # emission gap on 2026-08-05 and its keys became ordinary respellings.
+    # TestHoldOutMatchesCodecAliases fails if an unbacked hold-out reappears.
     #
     # The earlier figure (90 / 4.9%) was a measurement error, not a smaller
     # codec: `category` was held out as metadata although it is a
@@ -1459,7 +1460,9 @@ requirements:
     # refusals) removed that family from the census entirely, then the optional
     # DV_ORDERED/QUANTIFIED/AMOUNT suffixes added 28 more and removed every
     # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
-    # an optional attribute). See
+    # an optional attribute). 356 → 360 (2026-08-05) closed that last row too:
+    # the DV_CODED_TEXT-at-DV_TEXT carve-out took the dv_coded_text_as_dv_text
+    # fixture from 8 compared to 12. See
     # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
     # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #

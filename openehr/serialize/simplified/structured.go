@@ -96,6 +96,29 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 				ctxObj = make(map[string]any)
 				root["ctx"] = ctxObj
 			}
+			// A suffixed ctx field nests its |suffix members under the field name,
+			// the same shape a clinical leaf takes — `ctx/setting|code` becomes
+			// ctx.setting["|code"], not a literal "setting|code" member. ctx/setting
+			// (REQ-053, 2026-08-05) is the first suffixed ctx field, so this is the
+			// first time the distinction is observable; a flat piped member would
+			// not round-trip through a reference-shaped STRUCTURED body.
+			if base, suffix, piped := strings.Cut(rest, "|"); piped {
+				leaf, isObj := ctxObj[base].(map[string]any)
+				if !isObj {
+					if prev, taken := ctxObj[base]; taken {
+						return nil, fmt.Errorf("%w: ctx/%s is both a direct value (%#v) and a suffixed leaf (%q)",
+							ErrUnknownPath, base, prev, key)
+					}
+					leaf = make(map[string]any)
+					ctxObj[base] = leaf
+				}
+				leaf["|"+suffix] = val
+				continue
+			}
+			if prev, taken := ctxObj[rest].(map[string]any); taken {
+				return nil, fmt.Errorf("%w: ctx/%s is both a suffixed leaf (%#v) and a direct value (%q)",
+					ErrUnknownPath, rest, prev, key)
+			}
 			ctxObj[rest] = val
 			continue
 		}
@@ -189,7 +212,23 @@ func structuredToFlat(s map[string]any) (map[string]any, error) {
 		// The ctx object holds direct values (no arrays / :index), inverse of
 		// the ctx grouping in flatToStructured.
 		if rootID == "ctx" {
-			for k, cv := range obj {
+			for _, k := range slices.Sorted(maps.Keys(obj)) {
+				cv := obj[k]
+				// Inverse of the suffix nesting above: a ctx field carrying |suffix
+				// members flattens back to one piped FLAT key per member. Only
+				// |-prefixed members are legal there — anything else would be a
+				// nested structure no ctx/ field can hold, and silently dropping it
+				// is what the REQ-053 fail-loud contract forbids.
+				if leaf, nested := cv.(map[string]any); nested {
+					for _, sk := range slices.Sorted(maps.Keys(leaf)) {
+						if !strings.HasPrefix(sk, "|") {
+							return nil, fmt.Errorf("%w: ctx/%s carries member %q; a suffixed ctx leaf holds only |suffix members",
+								ErrUnknownPath, k, sk)
+						}
+						out["ctx/"+k+sk] = leaf[sk]
+					}
+					continue
+				}
 				out["ctx/"+k] = cv
 			}
 			continue

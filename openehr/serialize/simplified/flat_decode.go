@@ -222,6 +222,28 @@ var metadataAliasTerminology = map[string]string{
 	"context/setting|terminology": "openehr",
 }
 
+// contextMetaOwnedBases are the EVENT_CONTEXT leaves the ctx/ short forms own
+// outright: the Web Template carries a node for them, so an unaccepted spelling
+// would resolve as an ordinary leaf and then be silently overwritten by
+// [applyContext], which writes the ctx/ values last. Refusing every other
+// spelling of these two bases in [siphonContext] is what keeps that unreachable.
+//
+// Only these two. `language`, `territory` and `composer` are deliberately absent:
+// the composer external_ref suffixes (`composer|id` / `|id_scheme` /
+// `|id_namespace`) must keep flowing through to decode so they are refused there
+// and counted in the PROBE-086 census as the real PARTY_PROXY data loss they are
+// (ADR 0015). Both bases here are held out of that census by the harness
+// (`IsCompositionMeta`), so refusing extra suffixes early moves no count.
+var contextMetaOwnedBases = map[string]bool{
+	"context/setting": true, "context/start_time": true,
+}
+
+// metadataOwnedBaseCtx names the ctx/ short form that owns each base, so the
+// refusal points at the spelling the payload should have used.
+var metadataOwnedBaseCtx = map[string]string{
+	"context/setting": "ctx/setting|code + ctx/setting|value", "context/start_time": "ctx/time",
+}
+
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
 // accepts as aliases of the ctx/ composition-metadata short forms (ADR 0015),
 // sorted. `"language|code"`, for instance, is accepted at
@@ -294,6 +316,17 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 				return nil, nil, nil, err
 			}
 			continue
+		}
+		// An EVENT_CONTEXT leaf the ctx/ short form owns outright cannot also
+		// travel as an ordinary Web Template leaf: the ctx/ entry is written last
+		// and would overwrite whatever the leaf placed, dropping it with no error.
+		// Every spelling of such a leaf is therefore either an accepted alias, a
+		// checked witness, or refused here naming the key (REQ-053) — the
+		// composer external_ref suffixes stay out of this set deliberately, so
+		// they keep flowing to decode and stay visible in the PROBE-086 census.
+		if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
+			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
+				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
 		}
 		content[key] = val
 	}
@@ -430,8 +463,29 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 		if !ci.haveSettingCode {
 			present, missing = "ctx/setting|value", "ctx/setting|code"
 		}
+		// Both halves are named in the spelling the payload used: telling a
+		// real-path author to add a `ctx/`-spelled key they never wrote sends them
+		// to the wrong place. ctxSpelling falls back to the ctx/ form when the
+		// missing key has no origin, which is exactly right — it was not written.
 		return ci, fmt.Errorf("%w: %s without %s — the ctx/setting pair travels together",
-			ErrUnsupportedDatatype, ctxSpelling(origin, present), missing)
+			ErrUnsupportedDatatype, ctxSpelling(origin, present), ctxSpelling(origin, missing))
+	}
+	// Neither half may be empty. An empty code would rebuild a CODE_PHRASE with no
+	// code_string — RM-invalid, and refused by emitContextSetting on the way back
+	// out, so accepting it here would mint a composition this codec cannot
+	// re-encode (REQ-053 fail-loud). An all-empty pair is refused for the same
+	// reason rather than read as "absent": absent is the key not being there, and
+	// silently treating an explicit empty pair as absent would hand it the
+	// WithTemplate `238|other care` default the payload plainly did not ask for.
+	if ci.haveSettingCode {
+		if ci.settingCode == "" {
+			return ci, fmt.Errorf("%w: %s is empty — ctx/setting requires a defining code (omit the pair for an absent setting)",
+				ErrUnsupportedDatatype, ctxSpelling(origin, "ctx/setting|code"))
+		}
+		if ci.settingValue == "" {
+			return ci, fmt.Errorf("%w: %s is empty — ctx/setting requires the code's rubric (omit the pair for an absent setting)",
+				ErrUnsupportedDatatype, ctxSpelling(origin, "ctx/setting|value"))
+		}
 	}
 	// composer_self and a composer name are two mutually exclusive
 	// representations of one RM attribute: PARTY_SELF carries no name, and
@@ -1060,8 +1114,15 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 	// |terminology is refused by the allowlist below, as before. The encoder is
 	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
 	// DV_TEXT leaf to the coded suffix set instead of |raw.
+	// The discriminator is a non-empty string |code, not the key's mere presence:
+	// `|code: ""` and `|code: null` are what a form emits for "free text, no code
+	// selected", and promoting those would mint a DV_CODED_TEXT whose
+	// CODE_PHRASE.code_string is empty — RM-invalid, yet stable enough on
+	// re-encode that nothing downstream flags it, and matched by any AQL predicate
+	// testing defining_code/code_string against ''. They stay a plain DV_TEXT, so
+	// the allowlist below refuses the stray |code as it did before this carve-out.
 	if rmType == "DV_TEXT" {
-		if _, coded := sfx["code"]; coded {
+		if code, coded := sfx["code"].(string); coded && code != "" {
 			rmType = "DV_CODED_TEXT"
 		}
 	}
