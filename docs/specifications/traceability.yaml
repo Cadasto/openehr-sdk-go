@@ -1365,14 +1365,19 @@ requirements:
     # the uri, and the explicit subject|_type: PARTY_SELF at an RM-optional
     # PARTY_PROXY.
     #
-    # STILL DEFERRED (all refused loudly, none dropped): _instruction_details
+    # STILL DEFERRED (refused loudly and none dropped, except the composer
+    # boundary noted below, which encode projects rather than refuses):
+    # _instruction_details
     # (ACTION) and _wf_definition (INSTRUCTION) — spec-named, corpus-unexercised
     # as a decodable grammar, so no fixture can pin them yet; FEEDER_AUDIT_DETAILS
     # other_details (an ITEM_STRUCTURE with no channel in the reference's suffix
     # set); PARTICIPATION time (same); the composer boundary — external_ref,
-    # composer/_identifier:N and composer/relationship, refused because encode is
-    # ctx/-only and ADR 0015 gives them no carrier, which is an ADR decision, not
-    # a codec one; and the ctx/ short forms ADR 0016 decision 3 declines for the
+    # composer/_identifier:N and composer/relationship, which ADR 0015 gives no
+    # carrier, an ADR decision rather than a codec one. That boundary is
+    # asymmetric and deliberately so: decode refuses those spellings (census-
+    # visible), while encode projects the composer onto ctx/composer_name and
+    # DROPS its external_ref / identifiers rather than refuse every composition
+    # whose composer is properly referenced — one vendored corpus body is; and the ctx/ short forms ADR 0016 decision 3 declines for the
     # EVENT_CONTEXT optionals, which ride this grammar at their real paths
     # instead. Not an underscore question at all: the 19 keys this SDK's
     # WebTemplate projection does not carry (ism_transition/*, INTERVAL_EVENT
@@ -1393,6 +1398,9 @@ requirements:
       - openehr/serialize/simplified/rmattr_value_test.go
       # The party grammar, the participations and the ENTRY subject leaf.
       - openehr/serialize/simplified/rmattr_party_test.go
+      # Repeating collapsed ELEMENTs (owner walk + per-instance :index), the
+      # interval encode/decode refusal symmetry and the composer projection.
+      - openehr/serialize/simplified/rmattr_repeating_test.go
       # The encapsulated / interval leaves and the DataValue members.
       - openehr/serialize/simplified/rmattr_encapsulated_test.go
       # _feeder_audit (three tail levels), _provider, the |_type discriminator
