@@ -129,6 +129,7 @@ var rmattrFamilies = map[string]rmattrFamily{
 		attr: "other_reference_ranges", list: true, value: true,
 		decode: decodeRMAttrReferenceRange,
 	},
+	"_mapping": {attr: "mappings", list: true, value: true, decode: decodeRMAttrTermMapping},
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name

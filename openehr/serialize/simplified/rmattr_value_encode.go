@@ -19,6 +19,7 @@ package simplified
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -37,6 +38,7 @@ import (
 var valueDecorationAttrs = map[string]string{
 	"normal_range":           "_normal_range",
 	"other_reference_ranges": "_other_reference_ranges",
+	"mappings":               "_mapping",
 }
 
 // valueRMAttrs writes the underscore-carried decorations of a leaf value at its
@@ -75,6 +77,16 @@ func valueRMAttrs(out map[string]any, base string, v any, anchor string) error {
 		}
 		if dv, ok := as[rm.DVDuration](v); ok {
 			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+		}
+	case anchorCarries(anchor, "mappings"):
+		// DV_TEXT and its coded subtype: `mappings`. Both cases are needed — [as]
+		// matches the exact type, and DV_CODED_TEXT reaches the attribute through
+		// its embedded DV_TEXT.
+		if dv, ok := as[rm.DVCodedText](v); ok {
+			return mappingsRMAttr(out, base, dv.Mappings)
+		}
+		if dv, ok := as[rm.DVText](v); ok {
+			return mappingsRMAttr(out, base, dv.Mappings)
 		}
 	}
 	if !decoratedAnchor(anchor) {
@@ -157,6 +169,41 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 	}
 	if !iv.UpperIncluded {
 		out[base+"|upper_included"] = false
+	}
+	return nil
+}
+
+// mappingsRMAttr writes one `_mapping:N` per TERM_MAPPING, indexed by list
+// position: `|match` as the one-character string the wire carries, `/target` as
+// a CODE_PHRASE and the optional `/purpose` as a DV_CODED_TEXT, both through
+// their own leaf emitters.
+//
+// A `match` outside TERM_MAPPING's set is a typed error, not a narrowed emit: the
+// RM types it as a bare Character with no invariant the compiler can hold, so a
+// zero or stray rune would otherwise be written as an unreadable `|match` (decode
+// refuses it — [rmattrTails.matchCode]) or, worse, as a mapping claiming a
+// relation nobody asserted.
+func mappingsRMAttr(out map[string]any, base string, mappings []rm.TermMapping) error {
+	for i, tm := range mappings {
+		prefix := base + "/_mapping:" + strconv.Itoa(i)
+		if !strings.ContainsRune(matchCodes, tm.Match) {
+			return fmt.Errorf("%w: %q cannot carry TERM_MAPPING.match %q; it is one of %s (REQ-140)",
+				ErrUnsupportedDatatype, prefix+"|match", tm.Match, matchCodes)
+		}
+		out[prefix+"|match"] = string(tm.Match)
+		if _, err := emitLeafValue(out, prefix+"/target", tm.Target, "CODE_PHRASE", false, false); err != nil {
+			return err
+		}
+		if tm.Target.CodeString == "" {
+			return fmt.Errorf("%w: %q is RM-mandatory on TERM_MAPPING but carries no code",
+				ErrUnsupportedDatatype, prefix+"/target|code")
+		}
+		if tm.Purpose == nil {
+			continue
+		}
+		if _, err := emitLeafValue(out, prefix+"/purpose", *tm.Purpose, "DV_CODED_TEXT", false, false); err != nil {
+			return err
+		}
 	}
 	return nil
 }

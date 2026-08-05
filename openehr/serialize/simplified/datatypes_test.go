@@ -277,11 +277,14 @@ func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
 	}
 }
 
-// TestDecoratedCodedTextAtTextLeafRidesRaw: the carve-out admits only a fully
-// captured value. Extras the DV_CODED_TEXT suffix set cannot carry (mappings —
-// not modelled yet) keep the substituted value on |raw, stamped with its
-// dynamic type, exactly as before (REQ-053: never drop silently).
-func TestDecoratedCodedTextAtTextLeafRidesRaw(t *testing.T) {
+// TestDecoratedCodedTextAtTextLeaf: the carve-out admits only a value the wire
+// can carry whole, and REQ-140 moved that line. `mappings` is now expressible as
+// `_mapping:N` keys beside the coded suffixes — the shape the corpus's
+// `dv_coded_text_as_dv_text` fixture actually carries — while an extra still
+// outside the grammar (`language`, which the reference spells `_language` and a
+// later phase owns) keeps the substituted value on `|raw`, stamped with its
+// dynamic type (REQ-053: never drop silently).
+func TestDecoratedCodedTextAtTextLeaf(t *testing.T) {
 	v := rm.DVCodedText{
 		DVText: rm.DVText{
 			Value: "Radial styloid tenosynovitis",
@@ -296,18 +299,38 @@ func TestDecoratedCodedTextAtTextLeafRidesRaw(t *testing.T) {
 	if err := leafToFlat(out, "p/x", v, "DV_TEXT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	raw, ok := out["p/x|raw"].(map[string]any)
+	if _, rode := out["p/x|raw"]; rode {
+		t.Errorf("a mapping is now expressible and must not ride |raw: %#v", out)
+	}
+	for key, want := range map[string]any{
+		"p/x|code":                          "21794005",
+		"p/x|value":                         "Radial styloid tenosynovitis",
+		"p/x/_mapping:0|match":              "=",
+		"p/x/_mapping:0/target|code":        "21794005",
+		"p/x/_mapping:0/target|terminology": "SNOMED-CT",
+	} {
+		if got := out[key]; got != want {
+			t.Errorf("%s = %#v, want %#v (all keys: %#v)", key, got, want, out)
+		}
+	}
+
+	raw := map[string]any{}
+	v.Language = &rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+	if err := leafToFlat(raw, "p/x", v, "DV_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	frag, ok := raw["p/x|raw"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected |raw for a mapping-decorated coded text, got %#v", out)
+		t.Fatalf("expected |raw for a language-decorated coded text, got %#v", raw)
 	}
-	if raw["_type"] != "DV_CODED_TEXT" {
-		t.Errorf("|raw _type = %v, want DV_CODED_TEXT (dynamic type)", raw["_type"])
+	if frag["_type"] != "DV_CODED_TEXT" {
+		t.Errorf("|raw _type = %v, want DV_CODED_TEXT (dynamic type)", frag["_type"])
 	}
-	if _, has := raw["mappings"]; !has {
-		t.Errorf("|raw fragment lost the mappings: %#v", raw)
+	if _, has := frag["mappings"]; !has {
+		t.Errorf("|raw fragment lost the mappings: %#v", frag)
 	}
-	if len(out) != 1 {
-		t.Errorf("|raw must ride alone, got %#v", out)
+	if len(raw) != 1 {
+		t.Errorf("|raw must ride alone — no `_` keys beside it, got %#v", raw)
 	}
 }
 

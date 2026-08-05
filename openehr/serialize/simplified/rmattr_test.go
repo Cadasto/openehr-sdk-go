@@ -530,7 +530,6 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	for _, key := range []string{
 		rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
 		rmattrElement + "/_feeder_audit/original_content",
-		rmattrElement + "/_mapping:0|match",
 		rmattrElement + "/_null_flavour|code",
 		rmattrElement + "/_null_reason",
 		rmattrRoot + "/context/_health_care_facility|id",

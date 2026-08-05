@@ -298,3 +298,85 @@ func decodeRMAttrReferenceRange(g rmattrGroup, anchor string) (any, error) {
 	}
 	return map[string]any{"_type": "REFERENCE_RANGE", "meaning": meaning, "range": iv}, nil
 }
+
+// --- TERM_MAPPING -------------------------------------------------------
+
+// mappingOwnTails / mappingSubTails are TERM_MAPPING's grammar: `|match` on the
+// instance, the mandatory `/target` CODE_PHRASE and the optional `/purpose`
+// DV_CODED_TEXT as sub-objects.
+var (
+	mappingOwnTails = map[string]bool{"match": true}
+	mappingSubTails = map[string]bool{"target": true, "purpose": true}
+)
+
+// matchCodes is the set TERM_MAPPING.match admits — `>` broader, `=` equivalent,
+// `<` narrower, `?` unknown (the first three from ISO 2788 / 5964). The RM types
+// the attribute as a bare Character, so this lexical check is the only thing
+// between a defective value and the wire; the codes' *meaning* is the validation
+// package's business, as everywhere else.
+const matchCodes = "=<>?"
+
+// decodeRMAttrTermMapping decodes one `_mapping:N` instance on a DV_TEXT or
+// DV_CODED_TEXT leaf.
+//
+// `match` is a single character and lands in the canonical form as its code
+// point, because that is what the generated TERM_MAPPING marshals a Go rune to
+// (`"match": 61`); encode spells it back as the one-character string the wire
+// carries. `/target` is decoded by the CODE_PHRASE leaf builder — `|code`
+// required, `|terminology` optional exactly as at an ENTRY `language` leaf, which
+// is what keeps the two spellings of a CODE_PHRASE from diverging — and
+// `/purpose` by the DV_CODED_TEXT one, which requires `|code`+`|value` and takes
+// `|terminology` when present.
+func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
+	ts, err := splitRMAttrTails(g)
+	if err != nil {
+		return nil, err
+	}
+	if err := ts.check(g, mappingOwnTails, mappingSubTails); err != nil {
+		return nil, err
+	}
+	match, err := ts.matchCode(g)
+	if err != nil {
+		return nil, err
+	}
+	if _, ok := ts.sub["target"]; !ok {
+		return nil, fmt.Errorf("%w: %s is missing the required /target (RM-mandatory on TERM_MAPPING)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	target, err := ts.value(g, "target", "CODE_PHRASE")
+	if err != nil {
+		return nil, err
+	}
+	tm := map[string]any{"_type": "TERM_MAPPING", "match": match, "target": target}
+	if _, ok := ts.sub["purpose"]; ok {
+		purpose, err := ts.value(g, "purpose", "DV_CODED_TEXT")
+		if err != nil {
+			return nil, err
+		}
+		tm["purpose"] = purpose
+	}
+	return tm, nil
+}
+
+// matchCode reads `|match` as the single character TERM_MAPPING admits, returning
+// its code point. Anything else — absent, empty, longer than one rune, or a
+// character outside the set — is a typed error rather than a truncated or zero
+// rune, which would be a mapping whose relation to its target is a fabrication.
+func (ts rmattrTails) matchCode(g rmattrGroup) (int32, error) {
+	key := ts.key(g, ownTail("match"))
+	v, present := ts.own["match"]
+	if !present {
+		return 0, fmt.Errorf("%w: %s is missing the required |match (RM-mandatory on TERM_MAPPING)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	s, ok := v.(string)
+	if !ok {
+		return 0, fmt.Errorf("%w: %q must be a string, got %T", ErrUnsupportedDatatype, key, v)
+	}
+	runes := []rune(s)
+	if len(runes) != 1 || !strings.ContainsRune(matchCodes, runes[0]) {
+		return 0, fmt.Errorf("%w: %q is %q, but TERM_MAPPING.match is one of %s (REQ-140)",
+			ErrUnsupportedDatatype, key, s, matchCodes)
+	}
+	return int32(runes[0]), nil
+}

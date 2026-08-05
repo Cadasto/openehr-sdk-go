@@ -238,6 +238,207 @@ func TestRMAttrReferenceRangeMissingMeaning(t *testing.T) {
 	}
 }
 
+// --- _mapping:N ---------------------------------------------------------
+
+// TestRMAttrMappingRoundTrip — REQ-140. TERM_MAPPING on a DV_CODED_TEXT leaf,
+// exactly as `ehrbase_conformance_data_types_dv_coded_text.json` spells it:
+// `|match`, `/target` as a CODE_PHRASE, and an optional `/purpose`
+// DV_CODED_TEXT — the second instance carries none.
+func TestRMAttrMappingRoundTrip(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
+		rmattrCodedText + "|code":                           "at0022",
+		rmattrCodedText + "|value":                          "value3",
+		rmattrCodedText + "/_mapping:0|match":               "=",
+		rmattrCodedText + "/_mapping:0/target|code":         "21794005",
+		rmattrCodedText + "/_mapping:0/target|terminology":  "SNOMED-CT",
+		rmattrCodedText + "/_mapping:0/purpose|code":        "671",
+		rmattrCodedText + "/_mapping:0/purpose|terminology": "openehr",
+		rmattrCodedText + "/_mapping:0/purpose|value":       "research study",
+		rmattrCodedText + "/_mapping:1|match":               "=",
+		rmattrCodedText + "/_mapping:1/target|code":         "W.11.7",
+		rmattrCodedText + "/_mapping:1/target|terminology":  "RTX",
+	})
+	dv := elementValue[rm.DVCodedText](t, comp)
+	if len(dv.Mappings) != 2 {
+		t.Fatalf("mappings = %d, want 2", len(dv.Mappings))
+	}
+	if dv.Mappings[0].Match != '=' {
+		t.Errorf("mappings[0].match = %q, want '='", dv.Mappings[0].Match)
+	}
+	if got := dv.Mappings[0].Target.CodeString; got != "21794005" {
+		t.Errorf("mappings[0].target.code_string = %q", got)
+	}
+	if got := dv.Mappings[0].Target.TerminologyID.Value; got != "SNOMED-CT" {
+		t.Errorf("mappings[0].target.terminology_id = %q", got)
+	}
+	if dv.Mappings[0].Purpose == nil || dv.Mappings[0].Purpose.Value != "research study" {
+		t.Errorf("mappings[0].purpose = %+v", dv.Mappings[0].Purpose)
+	}
+	if dv.Mappings[1].Purpose != nil {
+		t.Errorf("mappings[1].purpose = %+v, want nil (no /purpose spelled)", dv.Mappings[1].Purpose)
+	}
+}
+
+// TestRMAttrMappingComposesWithTextForms — REQ-140. `mappings` is declared on
+// DV_TEXT, so the family reaches a leaf whose value is genuinely plain text, a
+// genuine DV_CODED_TEXT, **and** the Phase A substituted coded-at-text (a
+// DV_CODED_TEXT stored at a DV_TEXT leaf, which the corpus's
+// `dv_coded_text_as_dv_text` fixture pairs with these very mapping keys). All
+// three must carry the decoration, since it lands on the value the leaf holds
+// rather than on the leaf type.
+func TestRMAttrMappingComposesWithTextForms(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	mapping := func(leaf string) map[string]any {
+		return map[string]any{
+			leaf + "/_mapping:0|match":              "=",
+			leaf + "/_mapping:0/target|code":        "21794005",
+			leaf + "/_mapping:0/target|terminology": "SNOMED-CT",
+		}
+	}
+	for name, keys := range map[string]map[string]any{
+		"plain DV_TEXT": mergeRMAttr(map[string]any{
+			rmattrText: "DV_TEXT value",
+		}, mapping(rmattrText)),
+		"genuine DV_CODED_TEXT": mergeRMAttr(map[string]any{
+			rmattrCodedText + "|code":  "at0022",
+			rmattrCodedText + "|value": "value3",
+		}, mapping(rmattrCodedText)),
+		"substituted coded-at-text": mergeRMAttr(map[string]any{
+			rmattrText + "|code":        "at0022",
+			rmattrText + "|value":       "value3",
+			rmattrText + "|terminology": "local",
+		}, mapping(rmattrText)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp := assertRMAttrRoundTrip(t, wt, keys)
+			// Whichever DV_TEXT subtype the leaf holds, the mapping is on it.
+			var mappings []rm.TermMapping
+			switch dv := elementText(t, comp).(type) {
+			case *rm.DVText:
+				mappings = dv.Mappings
+			case *rm.DVCodedText:
+				mappings = dv.Mappings
+			default:
+				t.Fatalf("dv value is a %T", dv)
+			}
+			if len(mappings) != 1 {
+				t.Fatalf("mappings = %d, want 1", len(mappings))
+			}
+		})
+	}
+}
+
+// TestRMAttrMappingMatchValidated — REQ-140. `|match` is the single character
+// TERM_MAPPING's `match` admits (`=`, `<`, `>`, `?` — ISO 2788 / 5964). Anything
+// else is a typed error rather than a silently truncated or zero rune, in both
+// directions.
+func TestRMAttrMappingMatchValidated(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, match := range map[string]any{
+		"empty":        "",
+		"two chars":    "==",
+		"outside set":  "~",
+		"not a string": 61,
+		"multi-byte":   "≈",
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+				rmattrText:                             "DV_TEXT value",
+				rmattrText + "/_mapping:0|match":       match,
+				rmattrText + "/_mapping:0/target|code": "21794005",
+			}))
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+	// …and every legal code round-trips.
+	for _, match := range []string{"=", "<", ">", "?"} {
+		t.Run("legal "+match, func(t *testing.T) {
+			assertRMAttrRoundTrip(t, wt, map[string]any{
+				rmattrText:                                    "DV_TEXT value",
+				rmattrText + "/_mapping:0|match":              match,
+				rmattrText + "/_mapping:0/target|code":        "21794005",
+				rmattrText + "/_mapping:0/target|terminology": "SNOMED-CT",
+			})
+		})
+	}
+	// Encode refuses a rune outside the set too — the RM type is a bare rune, so
+	// nothing but this check stands between a defective value and the wire.
+	comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+		rmattrText:                                    "DV_TEXT value",
+		rmattrText + "/_mapping:0|match":              "=",
+		rmattrText + "/_mapping:0/target|code":        "21794005",
+		rmattrText + "/_mapping:0/target|terminology": "SNOMED-CT",
+	}))
+	text, ok := elementText(t, comp).(*rm.DVText)
+	if !ok {
+		t.Fatalf("dv_text leaf decoded as %T", elementText(t, comp))
+	}
+	text.Mappings[0].Match = '~'
+	if _, err := MarshalFlat(comp, wt); !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Errorf("MarshalFlat with match '~' err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// TestRMAttrMappingTargetRequired — REQ-140. `target` is RM-mandatory on
+// TERM_MAPPING and a CODE_PHRASE without a code is not a code, so a mapping
+// spelled without either is refused rather than decoded to an empty term.
+func TestRMAttrMappingTargetRequired(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, keys := range map[string]map[string]any{
+		"no /target": {
+			rmattrText:                       "DV_TEXT value",
+			rmattrText + "/_mapping:0|match": "=",
+		},
+		"no |match": {
+			rmattrText:                             "DV_TEXT value",
+			rmattrText + "/_mapping:0/target|code": "21794005",
+		},
+		"/target without |code": {
+			rmattrText:                       "DV_TEXT value",
+			rmattrText + "/_mapping:0|match": "=",
+			rmattrText + "/_mapping:0/target|terminology": "SNOMED-CT",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := decodeRMAttrErr(t, wt, rmattrBody(keys)); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// elementText digs out the DV_TEXT-family value of the corpus template's
+// dv_text / dv_coded_text leaf, whichever subtype it holds.
+func elementText(t *testing.T, comp *rm.Composition) rm.DataValue {
+	t.Helper()
+	obs := firstObservation(t, comp)
+	for _, ev := range obs.Data.Events {
+		pe, ok := ev.(*rm.PointEvent[rm.ItemStructure])
+		if !ok {
+			continue
+		}
+		tree, ok := pe.Data.(*rm.ItemTree)
+		if !ok {
+			continue
+		}
+		for _, it := range tree.Items {
+			el, ok := it.(*rm.Element)
+			if !ok {
+				continue
+			}
+			switch el.Value.(type) {
+			case *rm.DVText, *rm.DVCodedText:
+				return el.Value
+			}
+		}
+	}
+	t.Fatal("no DV_TEXT-family ELEMENT found under the observation")
+	return nil
+}
+
 // --- the anchor rule ----------------------------------------------------
 
 // TestRMAttrValueFamilyOwnerRule — REQ-140. A value-decoration family is judged

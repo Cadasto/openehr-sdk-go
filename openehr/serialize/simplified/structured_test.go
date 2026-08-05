@@ -286,6 +286,113 @@ func TestValueDecorationsThroughStructured(t *testing.T) {
 	}
 }
 
+// TestMappingsThroughStructured — REQ-140. `_mapping:N` is an indexed family
+// *with* sub-objects, so STRUCTURED carries it as an array whose members nest
+// `target` and `purpose` arrays. OPT-free, both directions.
+func TestMappingsThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/e|code":                           "at0022",
+		"t/e|value":                          "value3",
+		"t/e/_mapping:0|match":               "=",
+		"t/e/_mapping:0/target|code":         "21794005",
+		"t/e/_mapping:0/target|terminology":  "SNOMED-CT",
+		"t/e/_mapping:0/purpose|code":        "671",
+		"t/e/_mapping:0/purpose|terminology": "openehr",
+		"t/e/_mapping:0/purpose|value":       "research study",
+		"t/e/_mapping:1|match":               "=",
+		"t/e/_mapping:1/target|code":         "W.11.7",
+		"t/e/_mapping:1/target|terminology":  "RTX",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	root, _ := s["t"].(map[string]any)
+	el, _ := root["e"].([]any)
+	if len(el) != 1 {
+		t.Fatalf("e = %#v, want a 1-element array", root["e"])
+	}
+	leaf, ok := el[0].(map[string]any)
+	if !ok {
+		t.Fatalf("e[0] = %#v, want an object (the family lives on it)", el[0])
+	}
+	maps, ok := leaf["_mapping"].([]any)
+	if !ok || len(maps) != 2 {
+		t.Fatalf("_mapping = %#v, want a 2-element array", leaf["_mapping"])
+	}
+	first, _ := maps[0].(map[string]any)
+	if first["|match"] != "=" {
+		t.Errorf("_mapping[0].|match = %#v", first["|match"])
+	}
+	target, ok := first["target"].([]any)
+	if !ok || len(target) != 1 {
+		t.Fatalf("_mapping[0].target = %#v, want a 1-element array", first["target"])
+	}
+	if tgt, _ := target[0].(map[string]any); tgt["|code"] != "21794005" {
+		t.Errorf("_mapping[0].target[0] = %#v", target[0])
+	}
+	if second, _ := maps[1].(map[string]any); second["purpose"] != nil {
+		t.Errorf("_mapping[1] invented a purpose: %#v", maps[1])
+	}
+
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatalf("unmarshal flat: %v", err)
+	}
+	want := map[string]any{
+		"t/e:0|code":                             "at0022",
+		"t/e:0|value":                            "value3",
+		"t/e:0/_mapping:0|match":                 "=",
+		"t/e:0/_mapping:0/target:0|code":         "21794005",
+		"t/e:0/_mapping:0/target:0|terminology":  "SNOMED-CT",
+		"t/e:0/_mapping:0/purpose:0|code":        "671",
+		"t/e:0/_mapping:0/purpose:0|terminology": "openehr",
+		"t/e:0/_mapping:0/purpose:0|value":       "research study",
+		"t/e:0/_mapping:1|match":                 "=",
+		"t/e:0/_mapping:1/target:0|code":         "W.11.7",
+		"t/e:0/_mapping:1/target:0|terminology":  "RTX",
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v", back, want)
+	}
+}
+
+// TestUnderscoreFamilyBesideBareLeafRefused — REQ-053 / REQ-140. STRUCTURED
+// gives one array element per FLAT segment, and that element is *either* the
+// bare leaf value or an object holding the segment's members: a leaf spelled
+// bare (`t/e`) that also carries an underscore family (`t/e/_uid`,
+// `t/e/_mapping:0|match`) needs both at once, and the format as this codec
+// implements it has no spelling for that.
+//
+// The conversion refuses rather than dropping either side, which is the REQ-053
+// posture — but it *is* a residual, reachable from real corpus bodies
+// (`…/dv_count` = 7 beside `…/dv_count/_normal_range/lower`), and it predates the
+// underscore families: C0's `_uid` collides identically, as the second case
+// pins. Recorded in deviations.md § Conformance; closing it needs a reference
+// spelling for the bare value as an object member, which no vendored STRUCTURED
+// fixture supplies yet.
+func TestUnderscoreFamilyBesideBareLeafRefused(t *testing.T) {
+	for name, flat := range map[string]map[string]any{
+		"C1 _mapping": {"t/e": "DV_TEXT value", "t/e/_mapping:0|match": "="},
+		"C0 _uid":     {"t/e": "DV_TEXT value", "t/e/_uid": "9fcc1c70-9349-444d-b9cb-8fa817697f5e"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := simplified.FlatToStructured(mustJSON(t, flat)); err == nil {
+				t.Error("FlatToStructured accepted a bare leaf beside an underscore family — " +
+					"if a spelling was added, replace this pin with a round-trip")
+			}
+		})
+	}
+}
+
 // TestUnderscoreKeysStructuredDecode — REQ-140. The index normalisation the
 // interconversion applies must not break the codec: a STRUCTURED body carrying
 // underscore families decodes through UnmarshalStructured to the same
