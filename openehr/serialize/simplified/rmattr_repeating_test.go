@@ -479,3 +479,84 @@ func TestRepeatingElementThroughStructured(t *testing.T) {
 		}
 	}
 }
+
+// --- underscore attrs on a composite leaf ---------------------------------
+
+// intervalLeafOwnerWT models a collapsed ELEMENT whose value is a
+// DV_INTERVAL leaf — a composite leaf that also owns REQ-140 underscore
+// attributes one attribute up.
+func intervalLeafOwnerWT() *webtemplate.WebTemplate {
+	return &webtemplate.WebTemplate{
+		Tree: &webtemplate.Node{
+			ID: "root", RMType: "COMPOSITION", NodeID: "openEHR-EHR-COMPOSITION.t.v1",
+			Children: []*webtemplate.Node{{
+				ID: "ev", RMType: "EVALUATION", NodeID: "openEHR-EHR-EVALUATION.test.v1", Max: 1,
+				AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1]",
+				Children: []*webtemplate.Node{{
+					ID: "iv", RMType: "DV_INTERVAL<DV_COUNT>", NodeID: "at0002", Max: 1,
+					AQLPath: "/content[openEHR-EHR-EVALUATION.test.v1]/data[at0001]/items[at0002]/value",
+				}},
+			}},
+		},
+	}
+}
+
+// A composite leaf's key splitter used to fold *everything* after the leaf into
+// that leaf's own tails — including the underscore attributes of the ELEMENT
+// the Web Template collapsed it into. Those keys were then deleted from the
+// `_` router's view and refused by the leaf grammar, so `MarshalFlat` emitted a
+// body `UnmarshalFlat` rejected: a round-trip break on a shape this codec
+// writes itself, and on the `<leaf>/_uid` the upstream corpus writes too.
+func TestCompositeLeafKeepsItsOwnerUnderscoreAttrs(t *testing.T) {
+	wt := intervalLeafOwnerWT()
+	comp := &rm.Composition{
+		Name:      rm.DVText{Value: "t"},
+		Language:  rm.CodePhrase{CodeString: "en"},
+		Territory: rm.CodePhrase{CodeString: "NL"},
+		Content: []rm.ContentItem{&rm.Evaluation{
+			ArchetypeNodeID: "openEHR-EHR-EVALUATION.test.v1", Name: rm.DVText{Value: "ev"},
+			Data: &rm.ItemTree{
+				ArchetypeNodeID: "at0001", Name: rm.DVText{Value: "tree"},
+				Items: []rm.Item{&rm.Element{
+					ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "iv"},
+					UID: &rm.HierObjectID{Value: "9fcc1c70-9349-444d-b9cb-8fa817697f50"},
+					Links: []rm.Link{{
+						Meaning: rm.DVText{Value: "m"}, Type: rm.DVText{Value: "t"},
+						Target: rm.DVEHRURI{DVURI: rm.DVURI{Value: "ehr://x"}},
+					}},
+					Value: &rm.DVInterval[rm.DVCount]{Interval: rm.Interval[rm.DVCount]{
+						Lower: rm.DVCount{Magnitude: 1}, Upper: rm.DVCount{Magnitude: 8},
+						LowerIncluded: true, UpperIncluded: true,
+					}},
+				}},
+			},
+		}},
+	}
+	b, err := MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	first := flatMap(t, b)
+	for _, key := range []string{"root/ev/iv/_uid", "root/ev/iv/_link:0|meaning", "root/ev/iv/lower"} {
+		if _, ok := first[key]; !ok {
+			t.Errorf("encode did not write %q", key)
+		}
+	}
+	back, err := UnmarshalFlat(b, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat rejected a body MarshalFlat wrote: %v", err)
+	}
+	again, err := MarshalFlat(back, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat (second pass): %v", err)
+	}
+	second := flatMap(t, again)
+	if len(first) != len(second) {
+		t.Errorf("key count %d -> %d across the round trip", len(first), len(second))
+	}
+	for key, want := range first {
+		if got := second[key]; got != want {
+			t.Errorf("round trip lost %s: %v, want %v", key, got, want)
+		}
+	}
+}

@@ -1019,6 +1019,19 @@ func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, fam
 		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
 			return "", "", 0, "", false
 		}
+		// A `_`-prefixed segment after the leaf belongs to the leaf's own
+		// grammar only where that grammar declares it: a party leaf carries a
+		// nested `_identifier:N`. Every other one addresses an underscore RM
+		// attribute of the LOCATABLE the Web Template folded the leaf into —
+		// `<leaf>/_uid`, `<leaf>/_link:N`, `<leaf>/_feeder_audit` — which the
+		// `_` router owns and resolves to that ELEMENT. Folding those into the
+		// leaf's tails instead deletes them from the router's view, and the
+		// leaf grammar then refuses them: a body MarshalFlat itself writes
+		// (REQ-140), and the `<leaf>/_uid` the upstream corpus writes too.
+		if i+1 < len(pk.segs) && strings.HasPrefix(pk.segs[i+1].id, "_") &&
+			!compositeLeafOwnsSub(node.RMType, pk.segs[i+1].id) {
+			return "", "", 0, "", false
+		}
 		var b, t strings.Builder
 		for j, s := range pk.segs[:i] {
 			if j > 0 {
@@ -1054,6 +1067,18 @@ func childByID(node *webtemplate.Node, id string) *webtemplate.Node {
 // therefore has to be siphoned by [compositeLeafGroups] before the leaf loop.
 func isCompositeLeafType(rmType string) bool {
 	return isPartyLeafType(rmType) || isIntervalLeafType(rmType)
+}
+
+// compositeLeafOwnsSub reports whether an `_`-prefixed sub-path segment under a
+// composite leaf belongs to that leaf's own grammar rather than to the LOCATABLE
+// the Web Template collapsed the leaf into.
+//
+// Only the party grammar declares one — the nested `_identifier:N` every party
+// position carries ([partyListTails]). A DV_INTERVAL leaf declares none, so
+// every `_` segment beneath one is an owner attribute.
+func compositeLeafOwnsSub(rmType, seg string) bool {
+	id, _, _ := strings.Cut(seg, ":")
+	return isPartyLeafType(rmType) && partyListTails[id]
 }
 
 // placeCompositeLeaf decodes one composite-leaf group and places the value at the
