@@ -82,12 +82,37 @@ const partyRefType = "PARTY"
 // flat_decode.go's siphonContext.)
 const partyIdentifierSeg = "_identifier"
 
+// partyProxyTypeSuffix is the PARTY_PROXY subtype discriminator, and
+// partySelfType the one value it carries.
+//
+// It is **not** a general party suffix: a PARTY_IDENTIFIED needs no discriminator
+// (any party key implies it) and a PARTY_RELATED is discriminated by
+// `/relationship`, so the only subtype that needs spelling is PARTY_SELF — and
+// only where its absence would be ambiguous. That is exactly one position in the
+// reference's grammar: a FEEDER_AUDIT_DETAILS `subject`, whose attribute is
+// RM-optional, so the absence of every party key already means *absent*.
+// `ehrbase_conformance_party_self.json` writes
+// `originating_system_audit/subject|_type: "PARTY_SELF"` and nothing else there.
+// (A PARTICIPATION performer and an ENTRY `subject` are RM-mandatory, so absence
+// is unambiguous and *is* the PARTY_SELF spelling — see [partySuffixes].)
+const (
+	partyProxyTypeSuffix = "_type"
+	partySelfType        = "PARTY_SELF"
+)
+
 // partyOwnTails / partySubTails / partyListTails are the party grammar's three
-// tail positions.
+// tail positions. partyProxyOwnTails adds the PARTY_PROXY discriminator, for the
+// one position that spells it.
 var (
 	partyOwnTails  = map[string]bool{"id": true, "id_scheme": true, "id_namespace": true, "type": true, "name": true}
 	partySubTails  = map[string]bool{"relationship": true}
 	partyListTails = map[string]bool{partyIdentifierSeg: true}
+
+	partyProxyOwnTails = func() map[string]bool {
+		out := map[string]bool{partyProxyTypeSuffix: true}
+		maps.Copy(out, partyOwnTails)
+		return out
+	}()
 )
 
 // decodeRMAttrHealthCareFacility decodes `context/_health_care_facility` — a
@@ -125,6 +150,63 @@ func partyLeafSuffixes(g rmattrGroup) (map[string]any, bool, error) {
 		return nil, false, err
 	}
 	return partySuffixes(g, ts, ids)
+}
+
+// decodeRMAttrProvider decodes `_provider` on an ENTRY — ENTRY.provider, an
+// RM-optional PARTY_PROXY, which is therefore the `|_type` spelling of PARTY_SELF
+// rather than the by-absence one (see [partyProxyTypeSuffix]). The corpus writes it
+// as a bare `|name` on `ehrbase_conformance_observation`'s OBSERVATION.
+func decodeRMAttrProvider(g rmattrGroup, _ string) (any, error) {
+	return partyProxyLeafSuffixes(g)
+}
+
+// partyProxyLeafSuffixes decodes a **PARTY_PROXY-typed** standalone party at an
+// RM-optional position — the FEEDER_AUDIT_DETAILS `subject` and the ENTRY
+// `_provider`, where PARTY_SELF is spelled by an explicit `|_type` rather than by
+// absence (see [partyProxyTypeSuffix]).
+//
+// The discriminator is exclusive: it names PARTY_SELF and nothing else (a subtype
+// the party keys already imply would be redundant, and re-emitting it would put a
+// key on the wire the reference never writes), and it may not stand beside a party
+// key it would contradict. Both are typed errors naming the key.
+func partyProxyLeafSuffixes(g rmattrGroup) (map[string]any, error) {
+	ts, err := splitRMAttrTails(g, partyListTails)
+	if err != nil {
+		return nil, err
+	}
+	if err := ts.check(g, partyProxyOwnTails, partySubTails); err != nil {
+		return nil, err
+	}
+	subtype, spelled, err := ts.ownString(g, partyProxyTypeSuffix)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := partyIdentifiers(g, ts)
+	if err != nil {
+		return nil, err
+	}
+	delete(ts.own, partyProxyTypeSuffix)
+	party, populated, err := partySuffixes(g, ts, ids)
+	if err != nil {
+		return nil, err
+	}
+	if spelled {
+		key := ts.key(g, ownTail(partyProxyTypeSuffix))
+		if subtype != partySelfType {
+			return nil, fmt.Errorf("%w: %q is %q, but the discriminator spells only %q — every other PARTY_PROXY subtype is implied by the party keys themselves (REQ-140)",
+				ErrUnsupportedDatatype, key, subtype, partySelfType)
+		}
+		if populated {
+			return nil, fmt.Errorf("%w: %q says %s, but the position also carries party keys, which contradict it",
+				ErrUnsupportedDatatype, key, partySelfType)
+		}
+		return map[string]any{"_type": partySelfType}, nil
+	}
+	if !populated {
+		return nil, fmt.Errorf("%w: %s carries no party key and no %s discriminator (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+			ErrUnsupportedDatatype, g.prefix(), "|"+partyProxyTypeSuffix)
+	}
+	return party, nil
 }
 
 // partySuffixes assembles the canonical party carried by one grammar position's

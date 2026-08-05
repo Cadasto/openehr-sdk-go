@@ -157,6 +157,8 @@ var rmattrFamilies = map[string]rmattrFamily{
 		attr: "accuracy", attrType: "DV_DURATION", value: true,
 		decode: decodeRMAttrTemporalAccuracy,
 	},
+	"_feeder_audit": {attr: "feeder_audit", decode: decodeRMAttrFeederAudit},
+	"_provider":     {attr: "provider", decode: decodeRMAttrProvider},
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name

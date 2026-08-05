@@ -33,6 +33,33 @@ func partyRMAttr(out map[string]any, path string, p any) error {
 	return nil
 }
 
+// partyProxyRMAttr writes a party at an **RM-optional PARTY_PROXY** position —
+// the FEEDER_AUDIT_DETAILS `subject` and the ENTRY `_provider`, the two the corpus
+// spells.
+//
+// PARTY_SELF is written **explicitly** there, as `|_type: "PARTY_SELF"` (corpus:
+// `ehrbase_conformance_party_self.json`). It cannot be spelled by absence the way a
+// PARTICIPATION performer's or an ENTRY `subject`'s is: those attributes are
+// RM-mandatory, so no-keys can only mean PARTY_SELF, while here absence already
+// means *absent* and writing nothing would drop the party. Every other subtype
+// falls through to the ordinary party grammar, which never writes `|_type` — a
+// PARTY_IDENTIFIED needs no discriminator, since any party key implies it, and a
+// PARTY_RELATED is discriminated by `/relationship`.
+func partyProxyRMAttr(out map[string]any, path string, p rm.PartyProxy) error {
+	if p == nil || rm.IsTypedNil(p) {
+		return nil
+	}
+	if self, ok := as[rm.PartySelf](p); ok {
+		if self.ExternalRef != nil {
+			return fmt.Errorf("%w: %q is a PARTY_SELF carrying an external_ref, which the party suffix set cannot spell beside the |%s discriminator",
+				ErrUnsupportedDatatype, path, partyProxyTypeSuffix)
+		}
+		out[path+"|"+partyProxyTypeSuffix] = partySelfType
+		return nil
+	}
+	return partyRMAttr(out, path, p)
+}
+
 // partySuffixesToFlat writes a party's own suffixes — `|name`, the `external_ref`
 // decomposition, and PARTY_RELATED's `/relationship` — and returns its
 // DV_IDENTIFIER list for the caller to spell in its own position's form.

@@ -529,8 +529,6 @@ func TestRMAttrEndTimeDecoratedRefusedOnEncode(t *testing.T) {
 func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	wt, _ := conformanceWT(t)
 	for _, key := range []string{
-		rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
-		rmattrElement + "/_feeder_audit/original_content",
 		// `_identifier` is not a router family at all: every position that
 		// reaches a party reaches its identifier list through the party grammar
 		// (rmattr_party.go), so an ENTRY owner is a path that names no family.

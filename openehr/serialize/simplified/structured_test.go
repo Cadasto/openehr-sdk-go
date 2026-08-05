@@ -10,6 +10,24 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
 )
 
+// indexEverySegment re-spells a FLAT key the way the OPT-free interconversion
+// does: every non-root path segment gains an explicit `:0` where it carried no
+// index (STRUCTURED arrays have positions, so the inverse always writes one). The
+// FLAT decoder folds `:0` back onto the index-less spelling.
+func indexEverySegment(key string) string {
+	path, suffix := key, ""
+	if i := strings.LastIndex(key, "|"); i >= 0 {
+		path, suffix = key[:i], key[i:]
+	}
+	segs := strings.Split(path, "/")
+	for i := 1; i < len(segs); i++ {
+		if !strings.Contains(segs[i], ":") {
+			segs[i] += ":0"
+		}
+	}
+	return strings.Join(segs, "/") + suffix
+}
+
 func mustJSON(t *testing.T, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -638,5 +656,123 @@ func TestMarshalStructuredMinimalObs(t *testing.T) {
 	}
 	if _, ok := root["minimal"].([]any); !ok {
 		t.Errorf("observation 'minimal' not an array; root=%#v", root)
+	}
+}
+
+// TestFeederAuditThroughStructured — REQ-140. `_feeder_audit` is the deepest
+// family in the grammar and the first to combine every STRUCTURED shape at once:
+// nested objects three levels down (`originating_system_audit` → `subject` →
+// `_identifier`), an indexed **sub-path list** (`originating_system_item_id:N`,
+// which becomes a multi-element array), a bare value beside its suffixes
+// (`original_content` + `|formalism`) and plain own suffixes. None of them needs a
+// STRUCTURED rule of its own — the nesting is mechanical — and this pins that,
+// OPT-free, in both directions.
+func TestFeederAuditThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/obs/_feeder_audit/originating_system_audit|system_id":                 "orig",
+		"t/obs/_feeder_audit/originating_system_audit|time":                      "2021-12-21T16:02:58.0094262+01:00",
+		"t/obs/_feeder_audit/originating_system_audit/location|name":             "Org 1",
+		"t/obs/_feeder_audit/originating_system_audit/subject|_type":             "PARTY_SELF",
+		"t/obs/_feeder_audit/originating_system_audit/provider|name":             "Per 1",
+		"t/obs/_feeder_audit/originating_system_audit/provider/_identifier:0|id": "55175056",
+		"t/obs/_feeder_audit/originating_system_item_id:0|id":                    "id1",
+		"t/obs/_feeder_audit/originating_system_item_id:1|id":                    "id2",
+		"t/obs/_feeder_audit/original_content":                                   "Hello world!",
+		"t/obs/_feeder_audit/original_content|formalism":                         "text/plain",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	obs := s["t"].(map[string]any)["obs"].([]any)[0].(map[string]any)
+	fa, ok := obs["_feeder_audit"].([]any)
+	if !ok || len(fa) != 1 {
+		t.Fatalf("_feeder_audit = %#v, want a 1-element array", obs["_feeder_audit"])
+	}
+	audit, _ := fa[0].(map[string]any)
+	// The two item-id slots are one array of two elements.
+	ids, ok := audit["originating_system_item_id"].([]any)
+	if !ok || len(ids) != 2 {
+		t.Fatalf("originating_system_item_id = %#v, want a 2-element array", audit["originating_system_item_id"])
+	}
+	// The bare `original_content` sits beside its `|formalism` as the "|" member.
+	content, ok := audit["original_content"].([]any)
+	if !ok || len(content) != 1 {
+		t.Fatalf("original_content = %#v, want a 1-element array", audit["original_content"])
+	}
+	if el, _ := content[0].(map[string]any); el["|"] != "Hello world!" || el["|formalism"] != "text/plain" {
+		t.Errorf("original_content[0] = %#v, want the \"|\" member beside |formalism", content[0])
+	}
+	// Three levels of nesting, each an array of objects.
+	osa, _ := audit["originating_system_audit"].([]any)[0].(map[string]any)
+	if osa["|system_id"] != "orig" {
+		t.Errorf("originating_system_audit[0].|system_id = %#v", osa["|system_id"])
+	}
+	prov, _ := osa["provider"].([]any)[0].(map[string]any)
+	if _, ok := prov["_identifier"].([]any); !ok {
+		t.Fatalf("provider._identifier = %#v, want an array", prov["_identifier"])
+	}
+
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatal(err)
+	}
+	// Every *segment* comes back with the interconversion's explicit `:index`.
+	want := map[string]any{}
+	for k, v := range flat {
+		want[indexEverySegment(k)] = v
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
+	}
+}
+
+// TestMultimediaLeafThroughStructured — REQ-053/REQ-140. The DV_MULTIMEDIA leaf is
+// the case that forced the `"|"` member: its bare key is the uri and its
+// `|mediatype` + `|size` are RM-mandatory, so the element is always an object *and*
+// always carries a bare value. Its `_charset` / `_language` / `_thumbnail` members
+// nest as arrays beside them.
+func TestMultimediaLeafThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/obs:0/mm:0":                   "http://med.tube.com/sample",
+		"t/obs:0/mm:0|mediatype":         "video/H261",
+		"t/obs:0/mm:0|size":              float64(504903212),
+		"t/obs:0/mm:0/_charset:0|code":   "UTF-8",
+		"t/obs:0/mm:0/_thumbnail:0|data": "Z2hnZ2pnamdnag==",
+		"t/obs:0/mm:0/_thumbnail:0|size": float64(504),
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	mm, _ := s["t"].(map[string]any)["obs"].([]any)[0].(map[string]any)["mm"].([]any)[0].(map[string]any)
+	if mm["|"] != "http://med.tube.com/sample" || mm["|mediatype"] != "video/H261" {
+		t.Errorf("mm[0] = %#v, want the uri under \"|\" beside |mediatype", mm)
+	}
+	if _, ok := mm["_thumbnail"].([]any); !ok {
+		t.Fatalf("_thumbnail = %#v, want an array", mm["_thumbnail"])
+	}
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(back, flat) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, flat)
 	}
 }

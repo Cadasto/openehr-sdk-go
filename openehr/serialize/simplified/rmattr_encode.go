@@ -40,7 +40,7 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if ec, ok := as[rm.EventContext](owner); ok {
 		return eventContextRMAttrs(out, base, ec)
 	}
-	links, modelled := rmattrLinksOf(owner)
+	links, feederAudit, modelled := rmattrLocatableAttrs(owner)
 	if !modelled {
 		return fmt.Errorf("%w: %q owns a %T, which the underscore RM attribute grammar does not model (REQ-140)",
 			ErrUnsupportedDatatype, base, owner)
@@ -53,6 +53,9 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if err := linksRMAttr(out, base, links); err != nil {
 		return err
 	}
+	if err := feederAuditRMAttr(out, base+"/_feeder_audit", feederAudit); err != nil {
+		return err
+	}
 	if el, isElement := as[rm.Element](owner); isElement {
 		if err := nullRMAttrs(out, base, el); err != nil {
 			return err
@@ -62,6 +65,9 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 		return err
 	}
 	if err := objectRefRMAttr(out, base+"/_guideline_id", careEntryGuidelineIDOf(owner)); err != nil {
+		return err
+	}
+	if err := partyProxyRMAttr(out, base+"/_provider", entryProviderOf(owner)); err != nil {
 		return err
 	}
 	return participationsRMAttr(out, base, "_other_participation", entryOtherParticipationsOf(owner))
@@ -89,71 +95,72 @@ func nullRMAttrs(out map[string]any, base string, el rm.Element) error {
 	return nil
 }
 
-// rmattrLinksOf returns the LINK list carried by a LOCATABLE, and whether owner
-// is a LOCATABLE the underscore grammar models at all.
+// rmattrLocatableAttrs returns the two LOCATABLE-wide attributes the underscore
+// grammar carries — the LINK list and the FEEDER_AUDIT — and whether owner is a
+// LOCATABLE the grammar models at all.
 //
 // `uid` rides the generated rm.Locatable.GetUID accessor (ADR 0013), but
-// LOCATABLE.links has none, and reflection is forbidden (REQ-024) — so the
-// composition-tree LOCATABLE set is enumerated here. Demographic LOCATABLEs
-// (PERSON, ROLE, PARTY_IDENTITY, …) are deliberately absent: no COMPOSITION
-// attribute reaches one, and admitting a type the walk cannot produce would
-// weaken the fail-loud report [rmattrEncode] makes of a miss.
-func rmattrLinksOf(owner any) ([]rm.Link, bool) {
+// LOCATABLE.links and LOCATABLE.feeder_audit have none, and reflection is
+// forbidden (REQ-024) — so the composition-tree LOCATABLE set is enumerated here.
+// Demographic LOCATABLEs (PERSON, ROLE, PARTY_IDENTITY, …) are deliberately absent:
+// no COMPOSITION attribute reaches one, and admitting a type the walk cannot
+// produce would weaken the fail-loud report [rmattrEncode] makes of a miss.
+func rmattrLocatableAttrs(owner any) ([]rm.Link, *rm.FeederAudit, bool) {
 	if v, ok := as[rm.Composition](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Section](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Observation](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Evaluation](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Instruction](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Action](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.AdminEntry](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.GenericEntry](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Activity](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Cluster](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.Element](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.ItemTree](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.ItemList](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.ItemTable](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.ItemSingle](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.History[rm.ItemStructure]](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.PointEvent[rm.ItemStructure]](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
 	if v, ok := as[rm.IntervalEvent[rm.ItemStructure]](owner); ok {
-		return v.Links, true
+		return v.Links, v.FeederAudit, true
 	}
-	return nil, false
+	return nil, nil, false
 }
 
 // entryWorkflowIDOf returns ENTRY.workflow_id, or nil when owner is not an
@@ -199,6 +206,29 @@ func entryOtherParticipationsOf(owner any) []rm.Participation {
 	}
 	if v, ok := as[rm.AdminEntry](owner); ok {
 		return v.OtherParticipations
+	}
+	return nil
+}
+
+// entryProviderOf returns ENTRY.provider, or nil when owner is not an ENTRY. Same
+// owner set as `workflow_id`; neither `rmpath` nor the Web Template builder
+// projects the attribute, so `_provider` is its only FLAT spelling and there is no
+// double-spelling hazard of the kind the composer has.
+func entryProviderOf(owner any) rm.PartyProxy {
+	if v, ok := as[rm.Observation](owner); ok {
+		return v.Provider
+	}
+	if v, ok := as[rm.Evaluation](owner); ok {
+		return v.Provider
+	}
+	if v, ok := as[rm.Instruction](owner); ok {
+		return v.Provider
+	}
+	if v, ok := as[rm.Action](owner); ok {
+		return v.Provider
+	}
+	if v, ok := as[rm.AdminEntry](owner); ok {
+		return v.Provider
 	}
 	return nil
 }
@@ -378,20 +408,27 @@ func eventContextRMAttrs(out map[string]any, base string, ec rm.EventContext) er
 	return participationsRMAttr(out, base, "_participation", ec.Participations)
 }
 
-// endTimeRMAttr writes `<base>/_end_time`. The key is a bare value, so a
-// decorated DV_DATE_TIME (a magnitude_status, an accuracy, a normal status or
-// range) has no carrier — and unlike a template-constrained leaf there is no
-// `|raw` to fall back on — so it is a typed error. An empty value writes
-// nothing, matching [uidRMAttr].
+// endTimeRMAttr writes `<base>/_end_time`.
 func endTimeRMAttr(out map[string]any, base string, t rm.DVDateTime) error {
+	return bareDateTimeRMAttr(out, base+"/_end_time", t)
+}
+
+// bareDateTimeRMAttr writes a DV_DATE_TIME the grammar spells as a bare value at
+// key — EVENT_CONTEXT's `_end_time` and FEEDER_AUDIT_DETAILS' `|time`.
+//
+// A decorated DV_DATE_TIME (a magnitude_status, an accuracy, a normal status or
+// range) has no carrier there — and unlike a template-constrained leaf there is no
+// `|raw` to fall back on, since the key is one scalar inside a family's grammar —
+// so it is a typed error. An empty value writes nothing, matching [uidRMAttr].
+func bareDateTimeRMAttr(out map[string]any, key string, t rm.DVDateTime) error {
 	if t.MagnitudeStatus != nil || t.Accuracy != nil || t.NormalStatus != nil ||
 		t.NormalRange != nil || len(t.OtherReferenceRanges) > 0 {
 		return fmt.Errorf("%w: %q is a bare value and cannot carry a decorated DV_DATE_TIME (magnitude_status, accuracy, normal status or range)",
-			ErrUnsupportedDatatype, base+"/_end_time")
+			ErrUnsupportedDatatype, key)
 	}
 	if t.Value == "" {
 		return nil
 	}
-	out[base+"/_end_time"] = t.Value
+	out[key] = t.Value
 	return nil
 }
