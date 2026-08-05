@@ -120,6 +120,63 @@ func TestFlatRoundTrip(t *testing.T) {
 	}
 }
 
+// TestFlatRoundTripCodedTextAtTextLeaf — REQ-053: the one substitution carried
+// in suffix form survives a full FLAT -> RM -> FLAT cycle byte-identically. The
+// key shape is the corpus's dv_coded_text_as_dv_text leaf: a DV_CODED_TEXT at a
+// DV_TEXT-typed leaf rides the DV_CODED_TEXT suffix set (|code + |value +
+// |terminology + |formatting), with no bare key — and decode rebuilds the
+// coded value, not a demoted DV_TEXT.
+func TestFlatRoundTripCodedTextAtTextLeaf(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+
+	in := map[string]any{
+		"ctx/language":                       "en",
+		"ctx/territory":                      "NL",
+		"ctx/composer_name":                  "Dr Test",
+		"minimal/category|code":              "433",
+		"minimal/category|value":             "event",
+		"minimal/category|terminology":       "openehr",
+		"minimal/minimal:0/time":             "2021-12-21T16:02:58",
+		"minimal/minimal:0/text|code":        "21794005",
+		"minimal/minimal:0/text|value":       "Radial styloid tenosynovitis",
+		"minimal/minimal:0/text|terminology": "SNOMED-CT",
+		"minimal/minimal:0/text|formatting":  "plain",
+	}
+	f1, err := json.Marshal(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	comp, err := simplified.UnmarshalFlat(f1, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	// The substituted value must decode as a DV_CODED_TEXT carrying its
+	// defining_code — a silent demotion to the leaf's declared DV_TEXT would
+	// round-trip the bytes while corrupting the RM.
+	b, err := canjson.Marshal(comp)
+	if err != nil {
+		t.Fatalf("canjson.Marshal: %v", err)
+	}
+	for _, want := range []string{`"_type":"DV_CODED_TEXT"`, `"code_string":"21794005"`, `"SNOMED-CT"`, `"formatting":"plain"`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("decoded composition lacks %s:\n%s", want, b)
+		}
+	}
+
+	f2, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m2 map[string]any
+	if err := json.Unmarshal(f2, &m2); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(in, m2) {
+		t.Errorf("FLAT round-trip not byte-identical:\n in  (%d keys) = %v\n out (%d keys) = %v",
+			len(in), sortedKeys(in), len(m2), sortedKeys(m2))
+	}
+}
+
 // TestStructuredRoundTrip exercises the STRUCTURED decode path
 // (UnmarshalStructured -> structuredToFlat -> UnmarshalFlat): a composition
 // encoded to STRUCTURED and decoded back re-encodes to the same FLAT.

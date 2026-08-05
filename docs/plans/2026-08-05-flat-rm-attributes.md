@@ -41,7 +41,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 | Step | Status |
 |---|---|
 | Phase 0 — SDD artefacts (wire.md § REQ-140 + REQ-053 amendments, REQ.md row + band, conformance.md PROBE-089 + PROBE-086 prose, traceability.yaml, ADR 0016, this plan) | done |
-| Phase A — DV_TEXT substitution carve-out | |
+| Phase A — DV_TEXT substitution carve-out | done |
 | Phase B — `ctx/setting` emission + alias + harness waiver removal | |
 | PR 1 opened (A + B + Phase 0) | |
 | Phase C0 — underscore router (decode) + emission hook (encode) + simple families | |
@@ -68,13 +68,13 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 
 **Read first:** `datatypes.go` lines ~55–90 (the substitution → `|raw` rule and its godoc; the one sanctioned substitution today is `|other`), the census rows in `SKIPPED.md` (`unsupported |suffix for DV_TEXT`, 3 keys + 1 consequential), fixture `ehrbase_conformance_data_types_dv_coded_text_as_dv_text.json`.
 
-**Interfaces — produces:** encode: a `*rm.DvCodedText` at a `DV_TEXT`-typed WT leaf whose populated fields are within DV_CODED_TEXT's captured-key set emits `<path>` (bare value), `<path>|code`, `<path>|terminology` (and `|formatting` etc. where populated). Decode: at a `DV_TEXT` leaf, presence of `|code` selects the DV_CODED_TEXT builder; `|code` without the bare value is an error (missing required); `|terminology` defaulting follows the existing DV_CODED_TEXT rules.
+**Interfaces — produces:** encode: a `*rm.DvCodedText` at a `DV_TEXT`-typed WT leaf whose populated fields are within DV_CODED_TEXT's captured-key set emits the DV_CODED_TEXT suffix form — `<path>|code`, `<path>|value`, `<path>|terminology` (and `|formatting` etc. where populated), with **no bare key**. *(Corpus correction, 2026-08-05: the plan originally said "bare value + `|code` + `|terminology`", but the fixture carries the rubric under `|value` and no bare key — constraint 6, corpus wins; wire.md § REQ-053 amended in the same commit.)* Decode: at a `DV_TEXT` leaf, presence of `|code` selects the DV_CODED_TEXT builder, which then follows that type's own rules — `|code` without `|value` is an error (missing required), a bare value beside `|code` is refused, `|terminology` optional as for a genuine coded leaf.
 
 **Tasks:**
-- [ ] Failing tests: encode `DvCodedText{value, defining_code}` at DV_TEXT leaf → suffix form (not `|raw`); decode those keys → `*rm.DvCodedText`; byte-exact round-trip; a *decorated* coded text (e.g. carrying `mappings` before Phase C1 lands) still rides `|raw`; `|other` behaviour unchanged.
-- [ ] Minimal implementation: extend the substitution rule in `datatypes.go` with the single DV_CODED_TEXT-at-DV_TEXT carve-out; extend the DV_TEXT leaf decoder.
-- [ ] Re-baseline the `dv_coded_text_as_dv_text` fixture pins (+4 compared: the 3 refused suffixes and the consequential `DV_TEXT missing required bare value`); regenerate census figures.
-- [ ] Update `deviations.md` datatype row (substitution sentence); commit `fix(serialize/simplified): carry DV_CODED_TEXT at a DV_TEXT leaf in suffix form (REQ-053)`.
+- [x] Failing tests: encode `DvCodedText{value, defining_code}` at DV_TEXT leaf → suffix form (not `|raw`); decode those keys → `*rm.DvCodedText`; byte-exact round-trip; a *decorated* coded text (e.g. carrying `mappings` before Phase C1 lands) still rides `|raw`; `|other` behaviour unchanged.
+- [x] Minimal implementation: extend the substitution rule in `datatypes.go` with the single DV_CODED_TEXT-at-DV_TEXT carve-out; extend the DV_TEXT leaf decoder.
+- [x] Re-baseline the `dv_coded_text_as_dv_text` fixture pins (+4 compared: the 3 refused suffixes and the consequential `DV_TEXT missing required bare value`); regenerate census figures (356 → 360 compared, 1162 → 1158 excluded).
+- [x] Update `deviations.md` datatype row (substitution sentence); commit `fix(serialize/simplified): carry DV_CODED_TEXT at a DV_TEXT leaf in suffix form (REQ-053)`.
 
 **Verify:** `go test ./openehr/serialize/simplified/... ./testkit/...` and `go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v`.
 

@@ -10,16 +10,16 @@ go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v
 
 The census output is deterministic — diff it across commits to see the surface move.
 
-## Position as of 2026-08-03 (CODE_PHRASE leaves + optional datatype suffixes landed)
+## Position as of 2026-08-05 (DV_TEXT substitution carve-out landed)
 
 ```
-corpus: 34 fixtures, 1824 keys — 356 compared, 1162 excluded, 306 metadata held out
-coverage: 19.5% of upstream keys are in the modelled subset
+corpus: 34 fixtures, 1824 keys — 360 compared, 1158 excluded, 306 metadata held out
+coverage: 19.7% of upstream keys are in the modelled subset
 ```
 
 The metadata/excluded split moved on 2026-08-03 without the coverage figure moving: the composer hold-out became suffix-aware, so the 12 `composer|id`/`|id_scheme`/`|id_namespace` keys left the hold-out (318 → 306) and joined the refusals (1150 → 1162) where they belong. `compared` is untouched — those keys were never in the comparison; they were being counted as a spelling difference when they are a refusal.
 
-**19.5% is the honest number, and it is the point of this probe.** The corpus is upstream-authored FLAT written against a mature Java implementation; this SDK's REQ-053 codec models a deliberately narrow slice of it. Nothing here was known before the harness ran — [PROBE-076](../../../docs/specifications/conformance.md#probe-076--flat--structured-composition-round-trip) round-trips the SDK's *own* output and so reports 24/25 green over the same codec. The gap between those two numbers is exactly the value of feeding in FLAT this SDK did not write.
+**19.7% is the honest number, and it is the point of this probe.** The corpus is upstream-authored FLAT written against a mature Java implementation; this SDK's REQ-053 codec models a deliberately narrow slice of it. Nothing here was known before the harness ran — [PROBE-076](../../../docs/specifications/conformance.md#probe-076--flat--structured-composition-round-trip) round-trips the SDK's *own* output and so reports 24/25 green over the same codec. The gap between those two numbers is exactly the value of feeding in FLAT this SDK did not write.
 
 ### How the number has moved
 
@@ -29,6 +29,7 @@ The metadata/excluded split moved on 2026-08-03 without the coverage figure movi
 | 2026-08-01 | 192 | 10.5% | **nothing** — `category` was wrongly held out as composition metadata (see below); its 102 keys were already round-tripping byte-for-byte. No codec gap closed, no excluded surface moved. |
 | 2026-08-03 | 328 | 18.0% | **a real codec gap closing** — the CODE_PHRASE leaf mapping ([plan](../../../docs/plans/archive/2026-08-03-flat-coverage-ratchet.md) Phase 1). The `unsupported datatype: CODE_PHRASE` family, 68 refusals over 136 keys, is gone from the census: excluded fell 1314 → 1178 and every fixture gained exactly its ENTRY's `language\|code`, `language\|terminology`, `encoding\|code`, `encoding\|terminology`. |
 | 2026-08-03 | 356 | 19.5% | **the optional datatype suffixes** ([plan](../../../docs/plans/archive/2026-08-03-flat-coverage-ratchet.md) Phase 2) — 28 keys: `\|magnitude_status`, `\|normal_status`, `\|accuracy`, `\|accuracy_is_percent`, `\|precision`, `\|units_system`, `\|units_display_name`, `\|formatting` across DV_QUANTITY / COUNT / PROPORTION / DURATION / DATE / DATE_TIME / TIME / TEXT / CODED_TEXT. Unlike Phase 1 this **changes emitted bytes**: `capturedKeys` decides suffix-form versus `\|raw`, so a value carrying one of these now rides suffixes where it previously rode a `\|raw` fragment. Undecorated values are byte-identical (an absent attribute writes no suffix). |
+| 2026-08-05 | 360 | 19.7% | **the DV_TEXT substitution carve-out** ([plan](../../../docs/plans/2026-08-05-flat-rm-attributes.md) Phase A, REQ-053) — 4 keys, all in `dv_coded_text_as_dv_text`: a fully-captured `DV_CODED_TEXT` at a `DV_TEXT`-typed leaf now rides the DV_CODED_TEXT suffix set (`\|code` + `\|value` + `\|terminology` + `\|formatting`) instead of `\|raw`, and decode re-selects the coded builder from `\|code` at a `DV_TEXT` leaf. That cleared the 3 refused suffixes **and** the consequential `DV_TEXT missing required bare value` refusal (the surviving `\|formatting` had been left with nothing to rebuild from). A *decorated* coded text (mappings, preferred_term, …) still rides `\|raw`; every other substituted subtype is unchanged. |
 
 The CODE_PHRASE round trip needed three things, and the third is the one worth remembering: the encoder's leaf test gated on *input descriptors or a `DV_` prefix*, and the reference emits these in-context leaves with **no inputs at all**, so every such node was classed as structural and skipped before any datatype mapping was consulted. A leaf type is now recognised by `simplified.isValueLeafType`; the reference's silence about inputs is not evidence that a node carries no value. `rmpath` also had to resolve `language` / `encoding` on the five ENTRY subtypes (REQ-121) — with the leaf mapping in place but resolution missing, the keys would have decoded and then silently failed to re-emit, which is exactly the shape of the encode-side drop closed on 2026-08-01.
 
@@ -63,7 +64,7 @@ Two things are treated differently:
 
 Everything that survives into the comparison must round-trip exactly: a missing key, an extra key, or a changed value **fails** the test.
 
-## Excluded families (1162 keys)
+## Excluded families (1158 keys)
 
 | Keys | Refusals | Reason | Owner |
 |---:|---:|---|---|
@@ -72,15 +73,13 @@ Everything that survives into the comparison must round-trip exactly: a missing 
 | 7 | 1 | `unsupported datatype: DV_MULTIMEDIA` | datatype not modelled by the codec. |
 | 6 | 2 | `unsupported datatype: DV_INTERVAL<DV_QUANTITY>` | datatype not modelled by the codec. |
 | 4 | 2 | `unsupported datatype: DV_PARSABLE` | datatype not modelled by the codec. |
-| 3 | 3 | `unsupported \|suffix for DV_TEXT` | **not** optional attributes — `\|code`, `\|terminology`, `\|value` at a DV_TEXT leaf, i.e. a DV_CODED_TEXT stored where the template says DV_TEXT (legal: it is a subtype). That is a **substitution**, and encode deliberately routes a substituted subtype to `\|raw` so decode cannot silently demote it. Accepting these on decode without changing that rule would break the round-trip — decode would build a DV_CODED_TEXT and re-encode it as `\|raw`, producing a missing key plus an extra one. Closing it means a deliberate carve-out in the substitution rule, not a suffix-table entry. |
 | 1 | 1 | `unsupported bare value for DV_PROPORTION` | the proportion written *also* as a bare value (`1.6532258064516128` beside its numerator/denominator) — the **derived** magnitude. DV_PROPORTION has no `magnitude` attribute; it is a computed function, so there is nothing to decode it into, and emitting it would mean reproducing the reference's exact float formatting. |
-| 1 | 1 | `unsupported datatype: DV_TEXT missing required bare value` | a **consequence** of the row above it, not an independent gap: on the `dv_coded_text_as_dv_text` leaf the modelled `\|formatting` survives while `\|code` / `\|terminology` / `\|value` are refused, leaving the group with no bare value to rebuild from. It resolves when the substitution row does. |
 | 1 | 1 | `unsupported datatype: EVENT` | an `any_event:N` node addressed as a value leaf (`\|sample_count`); its children are compared. |
 | 1 | 1 | `unsupported datatype: STRING` | ACTIVITY `action_archetype_id`. |
 
 "Refusals" counts decode passes, not leaves — a leaf carrying three unmodelled suffixes is refused three times, once per suffix, which is exactly why the suffix rows are now small.
 
-The per-datatype `|suffix` rows for DV_QUANTITY / PROPORTION / COUNT / DURATION / DATE / DATE_TIME / TIME / CODED_TEXT are **gone** as of the Phase 2 optional-suffix set. What remains under a `|suffix` heading is the DV_TEXT row above, which was never an optional-attribute problem.
+The per-datatype `|suffix` rows for DV_QUANTITY / PROPORTION / COUNT / DURATION / DATE / DATE_TIME / TIME / CODED_TEXT are **gone** as of the Phase 2 optional-suffix set, and the last one standing — `unsupported |suffix for DV_TEXT`, which was never an optional-attribute problem but the DV_CODED_TEXT-at-DV_TEXT **substitution** (plus its consequential `DV_TEXT missing required bare value` refusal) — cleared on 2026-08-05 with the REQ-053 carve-out in the substitution rule.
 
 The `|suffix` rows are collapsed to the datatype deliberately: a leaf often carries several unmodelled suffixes and which one the codec names first depends on map iteration order, so naming it would make the census non-deterministic. The *totals* are stable regardless of that order, since each unmodelled suffix is refused and removed individually.
 
@@ -117,7 +116,7 @@ Ranked by keys unlocked, cheapest first. **~~CODE_PHRASE leaves (136 keys)~~ —
 
 1. ~~**Optional datatype suffixes**~~ — **done 2026-08-03** (28 keys, not the 33 the earlier count implied: 4 of those were the DV_TEXT substitution family and the derived DV_PROPORTION magnitude, neither an optional attribute, and one `|formatting` was double-counted). It was **not** additive, as predicted: `capturedKeys` decides suffix-form versus `|raw`, so a decorated value that rode `|raw` now rides suffixes — recorded in `deviations.md`.
 
-   **DV_TEXT subtype substitution** (3 keys + 1 consequential) — the residue of that item. See the DV_TEXT row in the excluded table: it needs a carve-out in the substitution rule, not a suffix entry.
+   ~~**DV_TEXT subtype substitution** (3 keys + 1 consequential)~~ — the residue of that item, **done 2026-08-05** (REQ-053, [plan](../../../docs/plans/2026-08-05-flat-rm-attributes.md) Phase A): a carve-out in the substitution rule, not a suffix entry — a fully-captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the DV_CODED_TEXT suffix set both ways; decorated coded texts and every other substituted subtype keep riding `|raw`.
 2. **Composition metadata real-path spelling** (306 keys) — **decided 2026-08-03, [ADR 0015](../../../docs/adr/0015-flat-metadata-spelling.md): accept both spellings on input, emit `ctx/` only.** That unblocks REQ-115 and fixes a real rejection, but **it does not move these 306 keys and the coverage figure is unchanged.** Worth spelling out because the opposite is the natural assumption: this probe decodes upstream FLAT and *re-encodes* it, so a real-path key still comes back respelled as `ctx/` — one missing key plus one extra — and stays held out. Only emitting the reference's spelling would move them, which ADR 0015 rejects as a breaking output change.
 
    **What that rejection actually was**, since an earlier revision of this file got it wrong: it was not `ErrUnknownPath` over a respelling. The composition-level `language` / `territory` / `composer` leaves are CODE_PHRASE and PARTY_PROXY, and neither type had a suffix mapping, so an EHRbase-authored body failed as **`ErrUnsupportedDatatype`**. `ErrUnknownPath` was raised by `composer_self` alone, which reaches no Web Template node at all. The sharper problem came next: once the CODE_PHRASE leaf mapping landed (the row above), those keys stopped failing and started decoding **silently** through ordinary leaf placement, bypassing `ctx/` normalisation — the value landed straight on the RM attribute, where `applyContext` (which runs after content, assigning from the `ctx/` values) overwrote it, and a body carrying only the real path failed the mandatory-context check instead. Accepting the spelling is what closed that.

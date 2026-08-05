@@ -58,8 +58,9 @@ var capturedKeys = map[string]map[string]bool{
 // is the Web Template leaf type. A DV_* value whose canonical form is fully
 // captured by the suffix mapping (the common case) is emitted as suffixes; a
 // decorated DV_* value (extra attributes, incl. nested decorations of the
-// composite keys), a substituted subtype, or an unmapped DV_* type is embedded
-// losslessly as a |raw canonical fragment; a leaf datatype this codec does not
+// composite keys), a substituted subtype (bar the two spec-sanctioned forms
+// noted below), or an unmapped DV_* type is embedded losslessly as a |raw
+// canonical fragment; a leaf datatype this codec does not
 // map at all (party / context / other RM attribute) is a documented skip (see
 // deviations.md). CODE_PHRASE is mapped despite not being a DataValue — the
 // reference emits ENTRY language / encoding as leaves in their own right.
@@ -76,20 +77,31 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listO
 	// A substituted subtype (the value's dynamic type differs from the WT leaf
 	// type) must not take the suffix form: decode rebuilds from the leaf type
 	// and would silently retype it (e.g. a DV_EHR_URI at a DV_URI leaf). It
-	// rides |raw, stamped with its dynamic type. The one spec-sanctioned
-	// substitution is DV_TEXT at a DV_CODED_TEXT leaf (the |other form).
+	// rides |raw, stamped with its dynamic type. Two substitutions are
+	// spec-sanctioned in non-|raw form (REQ-053): DV_TEXT at a DV_CODED_TEXT
+	// leaf (the |other form) and DV_CODED_TEXT at a DV_TEXT leaf, whose |code
+	// suffix lets decode re-select the coded builder — no retyping either way.
 	dyn := dvTypeName(v)
 	textAtCodedLeaf := dyn == "DV_TEXT" && rmType == "DV_CODED_TEXT"
-	if dyn != "" && dyn != rmType && !textAtCodedLeaf {
+	codedAtTextLeaf := dyn == "DV_CODED_TEXT" && rmType == "DV_TEXT"
+	if dyn != "" && dyn != rmType && !textAtCodedLeaf && !codedAtTextLeaf {
 		return emitRaw(out, flatPath, v, dyn)
 	}
-	if captured, known := capturedKeys[rmType]; known {
+	// The coded-at-text carve-out is judged (and emitted) by the value's own
+	// DV_CODED_TEXT suffix set, not the leaf's DV_TEXT one: a decorated coded
+	// text whose extras the suffixes cannot carry (mappings, a preferred_term,
+	// …) still rides |raw below, stamped with its dynamic type.
+	sfxType := rmType
+	if codedAtTextLeaf {
+		sfxType = "DV_CODED_TEXT"
+	}
+	if captured, known := capturedKeys[sfxType]; known {
 		m, err := canonicalMap(v)
 		if err != nil {
 			return err
 		}
-		if capturedFully(rmType, m, captured) {
-			return emitCoreLeaf(out, flatPath, v, rmType, listOpen)
+		if capturedFully(sfxType, m, captured) {
+			return emitCoreLeaf(out, flatPath, v, sfxType, listOpen)
 		}
 	}
 	// A modelled leaf type whose value the suffix form cannot capture (a

@@ -1012,6 +1012,20 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		}
 		return frag, nil
 	}
+	// REQ-053 — the one substitution carried in suffix form: a DV_CODED_TEXT
+	// stored at a DV_TEXT-typed leaf (the corpus's dv_coded_text_as_dv_text
+	// shape). |code is the discriminator: its presence re-selects the
+	// DV_CODED_TEXT builder, and the group then follows that type's own rules —
+	// |value required, |terminology / |formatting optional, bare value refused.
+	// Without |code the leaf stays a plain DV_TEXT and a stray |value /
+	// |terminology is refused by the allowlist below, as before. The encoder is
+	// the exact inverse: leafToFlat routes a fully-captured DV_CODED_TEXT at a
+	// DV_TEXT leaf to the coded suffix set instead of |raw.
+	if rmType == "DV_TEXT" {
+		if _, coded := sfx["code"]; coded {
+			rmType = "DV_CODED_TEXT"
+		}
+	}
 	if err := checkSuffixAllowlist(rmType, sfx); err != nil {
 		return nil, err
 	}
