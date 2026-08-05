@@ -959,7 +959,7 @@ func partyLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rma
 		groups = append(groups, *g)
 	}
 	slices.SortFunc(groups, func(a, b rmattrGroup) int {
-		return cmp.Or(strings.Compare(a.prefix(), b.prefix()))
+		return strings.Compare(a.prefix(), b.prefix())
 	})
 	return groups, nil
 }

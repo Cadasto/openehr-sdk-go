@@ -39,6 +39,13 @@ package simplified
 //     standalone party uses. Both spellings rebuild the same DV_IDENTIFIER list
 //     and each position accepts only its own, so a nested `_identifier:N` on a
 //     participation is refused naming the key.
+//
+// The grammar is closed and has **no `|raw` carrier**: a party is not a
+// DataValue, so there is no canonical-fragment escape hatch behind it. Every
+// shape the suffixes cannot express is therefore a typed error on both sides —
+// which is why encode refuses an untypeable OBJECT_ID, a PARTY_SELF carrying an
+// external reference, a coded `|function` and a PARTICIPATION `time`
+// (rmattr_party_encode.go) instead of narrowing any of them.
 
 import (
 	"fmt"
