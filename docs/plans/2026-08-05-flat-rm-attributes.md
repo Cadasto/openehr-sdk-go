@@ -9,7 +9,7 @@
 **Probes:** [PROBE-089](../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Draft — reserved); [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
 **Implementation:** partial — Phases A and B landed (PR 1); Phases C0–C4 open (PR 2)
 **Depends on:** landed REQ-053 codec (`openehr/serialize/simplified/`), REQ-106/111 (WebTemplate + compiled-template bridge), REQ-121 (`rmpath`), ADR 0014/0015; the PROBE-086 harness (`testkit/conformance/webtemplate/`) and pinned corpus (`testkit/cassettes/flat-conformance/`)
-**Defers:** `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — spec-named, corpus-unexercised, stay typed refusals; the composer `external_ref` / `composer/_identifier:N` surface (ADR 0015 boundary); accepting the ITS `ctx/` sketches for EVENT_CONTEXT optionals (ADR 0016 § Decision 3); FEEDER_AUDIT_DETAILS `other_details` (ITEM_STRUCTURE — no corpus fixture); `.schema` media types; reused-sibling FLAT (owned by the REQ-116 residual)
+**Defers:** `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — spec-named, corpus-unexercised, stay typed refusals; the composer `external_ref` / `composer/_identifier:N` / `composer/relationship` surface (ADR 0015 boundary); PARTICIPATION `time` (no channel in the reference's suffix set, corpus-unexercised); accepting the ITS `ctx/` sketches for EVENT_CONTEXT optionals (ADR 0016 § Decision 3); FEEDER_AUDIT_DETAILS `other_details` (ITEM_STRUCTURE — no corpus fixture); `.schema` media types; reused-sibling FLAT (owned by the REQ-116 residual)
 
 ## Goal
 
@@ -45,9 +45,9 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 | Phase A — DV_TEXT substitution carve-out | done |
 | Phase B — `ctx/setting` emission + alias + harness waiver removal | done |
 | PR 1 opened (A + B + Phase 0) | |
-| Phase C0 — underscore router (decode) + emission hook (encode) + simple families | |
+| Phase C0 — underscore router (decode) + emission hook (encode) + simple families | done |
 | Phase C1 — value-decoration families (`_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`, `_null_reason`) | done |
-| Phase C2 — party grammar (`_health_care_facility`, participations, `_identifier`, ENTRY `subject`) | |
+| Phase C2 — party grammar (`_health_care_facility`, participations, `_identifier`, ENTRY `subject`) | done |
 | Phase C3 — DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL leaves + `_feeder_audit` | |
 | Phase C4 — PROBE-089, census re-baseline, docs, status flips | |
 | PR 2 opened (C0–C4) | |
@@ -165,7 +165,7 @@ C3 consumes `partySuffixes` / `partyRMAttr` for FEEDER_AUDIT_DETAILS' `/location
 - [x] **Corpus correction (constraint 6), wire.md amended in the same commit:** the party `external_ref`'s `type` is **not** fixed. The reference writes no `|type` and hardcodes `PARTY`, but the vendored PROBE-076 fixture `clinical_content_validation.json` carries `PERSON` and `ORGANISATION` references at `composer`, `health_care_facility` and every participation performer — refusing them would have failed a green probe, and normalising them to `PARTY` is the silent loss REQ-053 forbids. So absent `|type` decodes as `PARTY` (byte-exact for every corpus body, which never gains the key) and encode emits `|type` only when the value differs. The suffix is the reference's own spelling of the same RM attribute in the OBJECT_REF families.
 - [x] Composer boundary: `composer|id*` stays the PARTY_PROXY leaf refusal (12 corpus keys), and the composer's party *sub-structure* — `composer/_identifier:N` (8 keys) and `composer/relationship` (3) — is refused in `siphonContext` with a typed error naming the key and the ADR 0015 boundary; pinned in `context_test.go`.
 - [x] ENTRY `subject` leaf: `leafToFlat` maps PARTY_PROXY — PARTY_SELF emits nothing (the `WithTemplate` default; symmetric), PARTY_IDENTIFIED emits the party suffixes, PARTY_RELATED adds `/relationship`; decode siphons the whole leaf (own suffixes + `/relationship` + `/_identifier:N`) as one party group *before* the `_` router, because those three key shapes address one RM value and the party's concrete subtype is only known once all three are in hand. `rmpath` gained `subject` on the five ENTRY subtypes (REQ-121 pattern) and the `TestInContextLeavesResolveViaRmpath` exemptions are deleted; `emitNode` gained an explicit `ctx/`-only leaf guard so the composer stays ctx-spelled now that PARTY_PROXY is emittable. Removes the "documented skip" for subject in `deviations.md`.
-- [x] Census pins; commits per family.
+- [x] Census pins; commits per family. Census 595 → 885 compared, 923 → 633 excluded (32.6% → 48.5%); every one of the four families' 290 corpus keys compared, no residue. The PARTY_PROXY excluded row falls 20 → 12 (exactly the composer `external_ref`), and the 11 composer sub-structure keys move from `path not in web template` to their own named row.
 
 **`_identifier` is not a router family.** The plan listed it as one; it is only ever reached *inside* a party (nested in `_health_care_facility`'s tails, at the `subject` leaf, or under a C3 FEEDER_AUDIT_DETAILS party), so the party implementation owns it and the router has no owner to judge it against — `<entry>/_identifier:0` stays `ErrUnknownPath`. The composition's composer is the one path that would have reached it as a family, and that is the ADR 0015 refusal above.
 

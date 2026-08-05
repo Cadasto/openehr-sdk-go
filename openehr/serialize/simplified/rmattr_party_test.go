@@ -10,6 +10,7 @@ package simplified
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"strings"
 	"testing"
 
@@ -229,13 +230,8 @@ func TestRMAttrParticipationRefusals(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			body := rmattrBody(nil)
-			for k, v := range base {
-				body[k] = v
-			}
-			for k, v := range tc.keys {
-				body[k] = v
-			}
+			body := rmattrBody(base)
+			maps.Copy(body, tc.keys)
 			err := decodeRMAttrErr(t, wt, body)
 			if !errors.Is(err, tc.want) {
 				t.Errorf("err = %v, want %v", err, tc.want)
