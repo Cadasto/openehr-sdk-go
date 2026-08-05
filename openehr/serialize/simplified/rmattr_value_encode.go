@@ -31,14 +31,21 @@ import (
 // only extras are listed here rides suffixes plus `_` keys where it used to ride
 // one `|raw` fragment (REQ-140; deviations.md § |raw boundary).
 //
-// A decoration the grammar does *not* yet carry — DV_TEXT's `language` and
-// `encoding`, which the corpus spells `_language` / `_encoding` and Phase C3
-// owns — is deliberately absent, so a value carrying one still rides `|raw`
-// whole and loses nothing.
+// Every entry has a reader in [valueRMAttrs]; a widening with no reader would
+// silently drop the attribute, which the final refusal there guards against.
 var valueDecorationAttrs = map[string]string{
 	"normal_range":           "_normal_range",
 	"other_reference_ranges": "_other_reference_ranges",
 	"mappings":               "_mapping",
+	"charset":                "_charset",
+	"language":               "_language",
+	"encoding":               "_encoding",
+	"thumbnail":              "_thumbnail",
+	// `accuracy` widens only the three DV_TEMPORAL types: DV_QUANTITY, DV_COUNT,
+	// DV_DURATION and DV_PROPORTION declare it as a Real their `|accuracy` suffix
+	// already captures, so the widening is a no-op there (see
+	// [decodeRMAttrTemporalAccuracy] for the two-spellings rule).
+	"accuracy": "_accuracy",
 }
 
 // valueRMAttrs writes the underscore-carried decorations of a leaf value at its
@@ -49,64 +56,151 @@ var valueDecorationAttrs = map[string]string{
 // type whose captured set was widened by a decoration but which no branch here
 // reads would have its decoration silently dropped, so it fails loudly instead.
 func valueRMAttrs(out map[string]any, base string, v any, anchor string) error {
-	switch {
-	case anchorCarries(anchor, "normal_range"):
-		// DV_ORDERED: `normal_range` + `other_reference_ranges`, whose generic
-		// parameter differs per datatype (the generated RM narrows the interval to
-		// the anchor type for three of them and leaves it abstract for the rest).
-		if dv, ok := as[rm.DVQuantity](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVCount](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVProportion](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVOrdinal](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVDateTime](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVDate](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVTime](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-		if dv, ok := as[rm.DVDuration](v); ok {
-			return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
-		}
-	case anchorCarries(anchor, "mappings"):
-		// DV_TEXT and its coded subtype: `mappings`. Both cases are needed — [as]
-		// matches the exact type, and DV_CODED_TEXT reaches the attribute through
-		// its embedded DV_TEXT.
-		if dv, ok := as[rm.DVCodedText](v); ok {
-			return mappingsRMAttr(out, base, dv.Mappings)
-		}
-		if dv, ok := as[rm.DVText](v); ok {
-			return mappingsRMAttr(out, base, dv.Mappings)
-		}
-	}
 	if !decoratedAnchor(anchor) {
 		return nil // a datatype the grammar decorates with nothing
+	}
+	// The dispatch is on the value's **dynamic** type, which is the anchor itself
+	// or one of REQ-053's two sanctioned substitutions — a value whose type differs
+	// otherwise rode `|raw` and never reaches here — so each branch emits exactly
+	// the decorations the RM declares on that type. The generic parameter of the
+	// two DV_ORDERED intervals differs per datatype (the generated RM narrows it to
+	// the anchor type for some and leaves it abstract for others), which is why
+	// they cannot share one branch.
+	switch {
+	case isTyped[rm.DVQuantity](v):
+		dv, _ := as[rm.DVQuantity](v)
+		return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+	case isTyped[rm.DVCount](v):
+		dv, _ := as[rm.DVCount](v)
+		return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+	case isTyped[rm.DVProportion](v):
+		dv, _ := as[rm.DVProportion](v)
+		return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+	case isTyped[rm.DVOrdinal](v):
+		dv, _ := as[rm.DVOrdinal](v)
+		return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+	case isTyped[rm.DVDuration](v):
+		dv, _ := as[rm.DVDuration](v)
+		return orderedRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges)
+	// DV_TEMPORAL adds the DV_DURATION-typed `accuracy`, which has no scalar suffix.
+	case isTyped[rm.DVDateTime](v):
+		dv, _ := as[rm.DVDateTime](v)
+		return temporalRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges, dv.Accuracy)
+	case isTyped[rm.DVDate](v):
+		dv, _ := as[rm.DVDate](v)
+		return temporalRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges, dv.Accuracy)
+	case isTyped[rm.DVTime](v):
+		dv, _ := as[rm.DVTime](v)
+		return temporalRMAttrs(out, base, anchor, dv.NormalRange, dv.OtherReferenceRanges, dv.Accuracy)
+	// DV_TEXT and its coded subtype: `mappings` plus the two CODE_PHRASE members.
+	// Both cases are needed — [as] matches the exact type, and DV_CODED_TEXT
+	// reaches the attributes through its embedded DV_TEXT.
+	case isTyped[rm.DVCodedText](v):
+		dv, _ := as[rm.DVCodedText](v)
+		return textRMAttrs(out, base, dv.DVText)
+	case isTyped[rm.DVText](v):
+		dv, _ := as[rm.DVText](v)
+		return textRMAttrs(out, base, dv)
+	// DV_ENCAPSULATED: the same two CODE_PHRASE members, plus DV_MULTIMEDIA's
+	// nested thumbnail.
+	case isTyped[rm.DVMultimedia](v):
+		dv, _ := as[rm.DVMultimedia](v)
+		if err := codePhraseMembersRMAttr(out, base,
+			codePhraseMember{"_charset", dv.Charset}, codePhraseMember{"_language", dv.Language}); err != nil {
+			return err
+		}
+		if dv.Thumbnail == nil {
+			return nil
+		}
+		_, err := emitLeafValue(out, base+"/_thumbnail", *dv.Thumbnail, "DV_MULTIMEDIA", false, false)
+		return err
+	case isTyped[rm.DVParsable](v):
+		dv, _ := as[rm.DVParsable](v)
+		return codePhraseMembersRMAttr(out, base,
+			codePhraseMember{"_charset", dv.Charset}, codePhraseMember{"_language", dv.Language})
 	}
 	return fmt.Errorf("%w: %q holds a %T whose underscore-carried RM attributes this codec cannot read (REQ-140)",
 		ErrUnsupportedDatatype, base, v)
 }
 
-// anchorCarries reports whether the underscore grammar carries attr for anchor —
-// the same rminfo-derived rule the decode router applies, read off the widened
-// captured set so the two cannot disagree.
-func anchorCarries(anchor, attr string) bool {
-	return capturedKeysDecorated[anchor][attr] && !capturedKeys[anchor][attr]
+// isTyped reports whether v holds a T in either the value or the pointer form —
+// [as] without the extraction, so a switch can dispatch on the type and then bind
+// the value in its own case.
+func isTyped[T any](v any) bool {
+	_, ok := as[T](v)
+	return ok
 }
 
 // decoratedAnchor reports whether anchor's captured set was widened at all, i.e.
 // whether [valueRMAttrs] owes the value any `_` key.
 func decoratedAnchor(anchor string) bool {
 	return len(capturedKeysDecorated[anchor]) > len(capturedKeys[anchor])
+}
+
+// temporalRMAttrs writes a DV_DATE / DV_DATE_TIME / DV_TIME's decorations: the
+// two DV_ORDERED ones plus `_accuracy`.
+//
+// DV_TEMPORAL redefines `accuracy` as a DV_DURATION object where DV_AMOUNT
+// declares a Real, so it has no scalar `|accuracy` suffix and rides its own family
+// (the reference's spelling — `ehrbase_conformance_data_types_dv_date` and its two
+// siblings). It goes out through the DV_DURATION leaf emitter, so a decorated
+// accuracy rides `_accuracy|raw` rather than being refused.
+func temporalRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
+	normal *rm.DVInterval[T], others []rm.ReferenceRange[T], accuracy *rm.DVDuration,
+) error {
+	if err := orderedRMAttrs(out, base, anchor, normal, others); err != nil {
+		return err
+	}
+	if accuracy == nil {
+		return nil
+	}
+	_, err := emitLeafValue(out, base+"/_accuracy", *accuracy, "DV_DURATION", false, false)
+	return err
+}
+
+// textRMAttrs writes a DV_TEXT's (and, through the embedded struct, a
+// DV_CODED_TEXT's) decorations: `_mapping:N` plus the two CODE_PHRASE members the
+// corpus spells `_language` and `_encoding`.
+func textRMAttrs(out map[string]any, base string, dv rm.DVText) error {
+	if err := mappingsRMAttr(out, base, dv.Mappings); err != nil {
+		return err
+	}
+	return codePhraseMembersRMAttr(out, base,
+		codePhraseMember{"_language", dv.Language}, codePhraseMember{"_encoding", dv.Encoding})
+}
+
+// codePhraseMember pairs an underscore family with the CODE_PHRASE it spells.
+type codePhraseMember struct {
+	family string
+	cp     *rm.CodePhrase
+}
+
+// codePhraseMembersRMAttr writes the CODE_PHRASE-valued members a value carries —
+// `_charset`, `_language`, `_encoding` — in argument order, so a refusal names the
+// same member on every run.
+//
+// Each goes out through the CODE_PHRASE **leaf** emitter, which carries `|code`,
+// `|terminology` and `|preferred_term` and rides `|raw` for anything beyond them
+// (a decorated TERMINOLOGY_ID), so no representable member is refused for want of a
+// channel. A member whose code is empty *is* refused: [codePhraseToFlat] writes
+// nothing for it, and these are pointer fields where "present but blank" is
+// distinguishable from absent — silently collapsing the two would drop the
+// attribute.
+func codePhraseMembersRMAttr(out map[string]any, base string, ms ...codePhraseMember) error {
+	for _, m := range ms {
+		if m.cp == nil {
+			continue
+		}
+		path := base + "/" + m.family
+		if m.cp.CodeString == "" {
+			return fmt.Errorf("%w: %q carries a CODE_PHRASE with no code, which the suffix set writes as nothing at all",
+				ErrUnsupportedDatatype, path)
+		}
+		if _, err := emitLeafValue(out, path, *m.cp, "CODE_PHRASE", false, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // orderedRMAttrs writes the two DV_ORDERED decorations: `_normal_range` and one

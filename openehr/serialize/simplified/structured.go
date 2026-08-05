@@ -153,11 +153,28 @@ func flatToStructured(flat map[string]any) (map[string]any, error) {
 	return root, nil
 }
 
+// bareStructuredKey is the STRUCTURED member a leaf's **bare** FLAT value takes
+// when that leaf also carries |suffixes or nested `_` attributes, so the array
+// element has to be an object: `"|"` — the `"|"+suffix` convention with the empty
+// suffix the FLAT key itself spells.
+//
+// A leaf carrying *only* a bare value stays a bare scalar in the array, which is
+// what every STRUCTURED body this codec has ever emitted looks like; the key
+// appears exactly where the alternative is a scalar/object collision. Several FLAT
+// leaves genuinely have that shape — a DV_TEXT beside `|formatting`, a DV_COUNT
+// beside `|normal_status`, any bare leaf carrying a REQ-140 `_` family, and (the
+// case that forced this) a DV_MULTIMEDIA, whose bare key is the uri and whose
+// `|mediatype` + `|size` are RM-mandatory. `"|"` is not a legal FLAT suffix, so the
+// inverse mapping is unambiguous without an OPT, which `|value` would not be
+// (DV_ORDINAL and DV_CODED_TEXT spell a real `|value`).
+const bareStructuredKey = "|"
+
 // insertStructured places val at segs (relative to obj), growing arrays by
-// :index. A bare leaf sets the array element to the scalar value; a suffixed
-// leaf sets a |suffix key on the element object. The :index is bounded so a
-// hostile key cannot force an unbounded allocation; a scalar/object collision
-// at one slot is an error.
+// :index. A bare leaf sets the array element to the scalar value, unless the slot
+// already holds (or later needs) an object, in which case it takes
+// [bareStructuredKey]; a suffixed leaf sets a |suffix key on the element object.
+// The :index is bounded so a hostile key cannot force an unbounded allocation; two
+// values competing for one slot is an error, never a last-write-wins overwrite.
 func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any, budget *allocBudget) error {
 	seg := segs[0]
 	idx := max(seg.idx, 0)
@@ -177,21 +194,34 @@ func insertStructured(obj map[string]any, segs []flatSeg, suffix string, val any
 
 	isLeaf := len(segs) == 1
 	if isLeaf && suffix == "" {
-		if arr[idx] != nil {
+		switch cur := arr[idx].(type) {
+		case nil:
+			arr[idx] = val
+		case map[string]any:
+			if _, taken := cur[bareStructuredKey]; taken {
+				return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
+			}
+			cur[bareStructuredKey] = val
+		default:
 			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
 		}
-		arr[idx] = val
 		return nil
 	}
 	el, ok := arr[idx].(map[string]any)
 	if !ok {
-		if arr[idx] != nil {
-			return fmt.Errorf("%w: conflicting scalar and object at %q index %d", ErrUnknownPath, seg.id, idx)
-		}
 		el = make(map[string]any)
+		// A scalar already at this slot is the same leaf's bare value, placed before
+		// its suffixes by the sorted key order: it moves onto the object rather than
+		// colliding with it.
+		if arr[idx] != nil {
+			el[bareStructuredKey] = arr[idx]
+		}
 		arr[idx] = el
 	}
 	if isLeaf {
+		if _, taken := el["|"+suffix]; taken {
+			return fmt.Errorf("%w: conflicting values at %q index %d", ErrUnknownPath, seg.id, idx)
+		}
 		el["|"+suffix] = val
 		return nil
 	}
@@ -257,6 +287,15 @@ func structuredToFlat(s map[string]any) (map[string]any, error) {
 // fail-loud posture.
 func structWalk(out map[string]any, path string, obj map[string]any) error {
 	for k, v := range obj {
+		if k == bareStructuredKey {
+			// The leaf's bare value, spelled as a member because the element also
+			// carries suffixes or nested `_` attributes (see [bareStructuredKey]).
+			if _, taken := out[path]; taken {
+				return fmt.Errorf("%w: structured: %q is spelled twice", ErrUnknownPath, path)
+			}
+			out[path] = v
+			continue
+		}
 		if strings.HasPrefix(k, "|") {
 			out[path+k] = v
 			continue

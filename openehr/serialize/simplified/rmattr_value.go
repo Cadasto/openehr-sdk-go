@@ -356,6 +356,25 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 	return iv, nil
 }
 
+// intervalLeafSuffixes decodes a **DV_INTERVAL Web Template leaf** — the same
+// grammar `_normal_range` spells at a decoration position, at a template-modelled
+// node instead (REQ-053's DV_INTERVAL<T> leaf closure). anchor is the bound
+// datatype the Web Template names inside the angle brackets.
+//
+// The group arrives from [compositeLeafGroups] rather than the `_` router, so its
+// family is the leaf's own FLAT segment id and every refusal names the key the
+// payload author wrote.
+func intervalLeafSuffixes(g rmattrGroup, anchor string) (map[string]any, error) {
+	ts, err := splitRMAttrTails(g, nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := ts.check(g, intervalOwnTails, intervalSubTails); err != nil {
+		return nil, err
+	}
+	return intervalSuffixes(g, ts, anchor)
+}
+
 // decodeRMAttrNormalRange decodes `_normal_range` on a DV_ORDERED leaf — a
 // DV_INTERVAL of the leaf's own anchor type.
 func decodeRMAttrNormalRange(g rmattrGroup, anchor string) (any, error) {
@@ -489,6 +508,44 @@ func decodeRMAttrNullFlavour(g rmattrGroup, _ string) (any, error) {
 // coded subtype).
 func decodeRMAttrNullReason(g rmattrGroup, _ string) (any, error) {
 	return decodeRMAttrLeafValue(g, "DV_TEXT")
+}
+
+// --- the DataValue members that are themselves datatypes ----------------
+
+// decodeRMAttrCodePhraseMember decodes `_charset`, `_language` and `_encoding` —
+// the CODE_PHRASE-valued members a DV_ENCAPSULATED subtype or a DV_TEXT carries.
+// One decoder for all three families on all four owners: which owner admits which
+// member is read off the RM (rminfo, via [rmattrDecode]), and the value is the
+// CODE_PHRASE leaf builder's, so the standalone and the ENTRY `language` spellings
+// of one datatype cannot diverge. The corpus writes `|code`, `|terminology` and —
+// on DV_TEXT's language — `|preferred_term`.
+func decodeRMAttrCodePhraseMember(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "CODE_PHRASE")
+}
+
+// decodeRMAttrThumbnail decodes `_thumbnail` — a nested DV_MULTIMEDIA in the same
+// suffix form its owner rides, so the grammar is recursive by construction.
+//
+// The nested value's *own* underscore members have no sub-path spelling here: a
+// thumbnail carrying a charset, a language or a thumbnail of its own rides
+// `_thumbnail|raw` instead (the DV_MULTIMEDIA leaf builder's `|raw` carrier —
+// lossless, and a shape the pinned corpus never writes). Recorded in
+// deviations.md.
+func decodeRMAttrThumbnail(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_MULTIMEDIA")
+}
+
+// decodeRMAttrTemporalAccuracy decodes `_accuracy` on a DV_DATE / DV_DATE_TIME /
+// DV_TIME leaf — a bare DV_DURATION value.
+//
+// DV_TEMPORAL redefines `accuracy` as a DV_DURATION **object** where DV_AMOUNT
+// (and so DV_QUANTITY, DV_COUNT, DV_DURATION, DV_PROPORTION) declares a Real, so
+// the attribute has two spellings in the reference's grammar: the scalar
+// `|accuracy` suffix and this family. The family is admitted only where the RM
+// declares the DV_DURATION form ([rmattrFamily.attrType]), so one attribute never
+// has two channels at one owner.
+func decodeRMAttrTemporalAccuracy(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_DURATION")
 }
 
 // decodeRMAttrLeafValue decodes a family whose whole value is one datatype

@@ -535,9 +535,6 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 		// reaches a party reaches its identifier list through the party grammar
 		// (rmattr_party.go), so an ENTRY owner is a path that names no family.
 		rmattrObs + "/_identifier:0|id",
-		rmattrElement + "/_charset|code",
-		rmattrElement + "/_language|code",
-		rmattrElement + "/_thumbnail|size",
 		rmattrAction + "/_instruction_details|activity_id",
 		rmattrSection + "/_wf_definition|value",
 		// Not a family at all: a typo must not be mistaken for one.

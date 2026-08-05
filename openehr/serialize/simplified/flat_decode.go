@@ -100,15 +100,18 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	}
 	budget := &allocBudget{limit: maxTotalNodes}
 	ambiguous := ambiguousBarePaths(wt)
-	// Siphon off the party leaves first (REQ-053's ENTRY `subject`, REQ-140's
-	// party grammar). A party leaf's three key shapes — its own suffixes, the
-	// PARTY_RELATED `/relationship` sub-object and the nested `_identifier:N`
-	// list — all address one RM value, and which concrete PARTY_PROXY subtype
-	// that is is only known once all three are in hand, so they are collected
-	// together and decoded by the one party implementation. It has to run before
-	// the `_` router, which would otherwise claim `subject/_identifier:0` as a
-	// family whose owner is a leaf the grammar cannot judge.
-	partyGroups, err := partyLeafGroups(content, wt)
+	// Siphon off the composite leaves first — the ones whose FLAT form has
+	// sub-paths of its own rather than a suffix set (REQ-053's ENTRY `subject` and
+	// the DV_INTERVAL leaf, REQ-140's party and interval grammars). A party leaf's
+	// three key shapes — its own suffixes, the PARTY_RELATED `/relationship`
+	// sub-object and the nested `_identifier:N` list — all address one RM value,
+	// and which concrete PARTY_PROXY subtype that is is only known once all three
+	// are in hand; an interval leaf's `/lower` and `/upper` are the same shape. So
+	// they are collected together and decoded by the one implementation each
+	// grammar has. It has to run before the `_` router, which would otherwise claim
+	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
+	// judge.
+	compositeGroups, err := compositeLeafGroups(content, wt)
 	if err != nil {
 		return nil, err
 	}
@@ -160,10 +163,10 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
 		}
 	}
-	// Party leaves are placed like any other leaf, after the clinical loop so a
+	// Composite leaves are placed like any other leaf, after the clinical loop so a
 	// malformed ordinary key still surfaces first.
-	for _, g := range partyGroups {
-		if err := placePartyLeaf(compJSON, wt, g, ambiguous, budget, names); err != nil {
+	for _, g := range compositeGroups {
+		if err := placeCompositeLeaf(compJSON, wt, g, ambiguous, budget, names); err != nil {
 			return nil, err
 		}
 	}
@@ -924,24 +927,30 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
 }
 
-// partyLeafGroups siphons the FLAT keys addressed at a party-valued Web Template
-// leaf out of content, one [rmattrGroup] per leaf instance, in a stable order.
+// compositeLeafGroups siphons the FLAT keys addressed at a **composite** Web
+// Template leaf out of content, one [rmattrGroup] per leaf instance, in a stable
+// order. A composite leaf is one whose FLAT form is not a suffix set but a small
+// grammar with sub-paths of its own — a party (`subject/_identifier:0|id`,
+// `subject/relationship|code`) or a DV_INTERVAL (`…/lower|magnitude`) — so its
+// keys have to be collected before the leaf loop, which would try to resolve
+// `lower` and `relationship` as Web Template children that do not exist.
 //
 // The group is the same tail-carrier the `_` router uses — base is the leaf's
 // *parent* path, family its own FLAT segment id, and the tails everything after
 // it — so [rmattrGroup.prefix] reproduces the leaf's own FLAT spelling and the
-// party grammar decodes it with no second mechanism (REQ-140 design constraint 5).
+// party / interval grammars decode it with no second mechanism (REQ-140 design
+// constraint 5).
 //
 // Keys are consumed from content: what stays behind is ordinary leaf data.
-func partyLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
+func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
 	byLeaf := make(map[string]*rmattrGroup)
 	for _, key := range slices.Sorted(maps.Keys(content)) {
 		pk, err := parseFlatKey(key)
 		if err != nil {
 			return nil, err
 		}
-		base, family, index, tail, isParty := splitPartyLeafKey(wt, pk)
-		if !isParty {
+		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, pk)
+		if !isComposite {
 			continue
 		}
 		val := content[key]
@@ -964,19 +973,19 @@ func partyLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rma
 	return groups, nil
 }
 
-// splitPartyLeafKey splits a parsed FLAT key at the party-valued Web Template
+// splitCompositeLeafKey splits a parsed FLAT key at the composite Web Template
 // leaf it addresses, if any: the first segment run that resolves to a childless
-// node of a party RM type. base is the leaf's parent path, family and index the
-// leaf segment itself, and tail everything after it (each remaining segment with
-// a leading "/", then "|suffix").
+// node of a party or DV_INTERVAL RM type. base is the leaf's parent path, family
+// and index the leaf segment itself, and tail everything after it (each remaining
+// segment with a leading "/", then "|suffix").
 //
-// Two kinds of key are deliberately not party leaves. One whose path reaches an
-// `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s nested
-// `/subject` is inside its tails, not at a Web Template node — and one addressing
-// a `ctx/`-owned metadata leaf is the composer, whose party sub-structure is the
-// ADR 0015 refusal in [siphonContext] and whose own suffixes stay a PARTY_PROXY
-// leaf refusal.
-func splitPartyLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
+// Two kinds of key are deliberately not composite leaves. One whose path reaches
+// an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
+// nested `/subject` is inside its tails, not at a Web Template node — and one
+// addressing a `ctx/`-owned metadata leaf is the composer, whose party
+// sub-structure is the ADR 0015 refusal in [siphonContext] and whose own suffixes
+// stay a PARTY_PROXY leaf refusal.
+func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
 	node := wt.Tree
 	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
 		return "", "", 0, "", false
@@ -991,7 +1000,7 @@ func splitPartyLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family 
 			return "", "", 0, "", false
 		}
 		node = next
-		if len(node.Children) > 0 || !isPartyLeafType(node.RMType) {
+		if len(node.Children) > 0 || !isCompositeLeafType(node.RMType) {
 			continue
 		}
 		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
@@ -1027,13 +1036,20 @@ func childByID(node *webtemplate.Node, id string) *webtemplate.Node {
 	return nil
 }
 
-// placePartyLeaf decodes one party-leaf group and places the party at the leaf's
-// canonical path, exactly as the clinical leaf loop places a DataValue.
-func placePartyLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
+// isCompositeLeafType reports whether a childless Web Template leaf of this RM
+// type carries a grammar with sub-paths of its own rather than a suffix set, and
+// therefore has to be siphoned by [compositeLeafGroups] before the leaf loop.
+func isCompositeLeafType(rmType string) bool {
+	return isPartyLeafType(rmType) || isIntervalLeafType(rmType)
+}
+
+// placeCompositeLeaf decodes one composite-leaf group and places the value at the
+// leaf's canonical path, exactly as the clinical leaf loop places a DataValue.
+func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
 	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
 ) error {
-	// A party leaf is single-valued at every position the reference spells one, so
-	// `:0` is the interconversion's explicit-index spelling and anything higher
+	// A composite leaf is single-valued at every position the reference spells one,
+	// so `:0` is the interconversion's explicit-index spelling and anything higher
 	// addresses a list slot the RM attribute does not have.
 	if g.index > 0 {
 		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)",
@@ -1045,22 +1061,36 @@ func placePartyLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmat
 	}
 	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
 	if err != nil {
-		// splitPartyLeafKey resolved this path already, so the only way here is the
-		// reused-sibling refusal, which carries its own message.
+		// splitCompositeLeafKey resolved this path already, so the only way here is
+		// the reused-sibling refusal, which carries its own message.
 		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
 	}
-	party, populated, err := partyLeafSuffixes(g)
+	value, err := compositeLeafValue(g, node.RMType)
 	if err != nil {
 		return err
 	}
-	if !populated {
-		return fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
-			ErrUnsupportedDatatype, g.prefix())
-	}
-	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, party, budget, names); err != nil {
+	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, names); err != nil {
 		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
 	}
 	return nil
+}
+
+// compositeLeafValue decodes a composite leaf's group by its RM type: the party
+// grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
+// same implementation those families use at every other position.
+func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
+	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
+		return intervalLeafSuffixes(g, anchor)
+	}
+	party, populated, err := partyLeafSuffixes(g)
+	if err != nil {
+		return nil, err
+	}
+	if !populated {
+		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	return party, nil
 }
 
 // rmattrOwnerAt resolves the owner of an underscore-family group whose base
@@ -1528,6 +1558,12 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if t, ok := sfx["terminology"]; ok {
 			cp["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
+		// |preferred_term is the one attribute the standalone leaf spelling carries
+		// and the nested defining_code triple does not (corpus:
+		// `dv_text/_language|preferred_term`).
+		if pt, ok := sfx["preferred_term"]; ok {
+			cp["preferred_term"] = pt
+		}
 		return cp, nil
 	case "DV_IDENTIFIER":
 		id, err := requireSuffix(rmType, sfx, "id")
@@ -1541,8 +1577,77 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			}
 		}
 		return out, nil
+	case "DV_PARSABLE":
+		// Both attributes are RM-mandatory, so half a leaf is refused rather than
+		// decoded to a coerced empty string. `charset` and `language` ride the
+		// REQ-140 `_charset` / `_language` members, not suffixes.
+		value, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		formalism, err := requireSuffix(rmType, sfx, "formalism")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_PARSABLE", "value": value, "formalism": formalism}, nil
+	case "DV_MULTIMEDIA":
+		return multimediaFromSuffixes(sfx)
 	}
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
+}
+
+// multimediaFromSuffixes rebuilds a canonical DV_MULTIMEDIA from its FLAT suffix
+// set (REQ-140). `media_type` and `size` are RM-mandatory, so they are required
+// rather than defaulted; the bare key is the **uri**, and the two Byte[]
+// attributes carry the base64 their canonical form uses.
+//
+// The three CODE_PHRASE-valued attributes reachable here travel as a bare code:
+// media_type in the implied [mediaTypeTerminology], the two algorithms with no
+// terminology at all (see there). `charset`, `language` and `thumbnail` are not
+// suffixes — they ride the REQ-140 underscore members.
+func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
+	mediaType, err := requireSuffix("DV_MULTIMEDIA", sfx, "mediatype")
+	if err != nil {
+		return nil, err
+	}
+	size, err := requireSuffix("DV_MULTIMEDIA", sfx, "size")
+	if err != nil {
+		return nil, err
+	}
+	code, err := ctxString("|mediatype", mediaType)
+	if err != nil {
+		return nil, err
+	}
+	dv := map[string]any{
+		"_type":      "DV_MULTIMEDIA",
+		"media_type": codePhraseJSON(code, mediaTypeTerminology),
+		"size":       size,
+	}
+	if uri, ok := sfx[""]; ok {
+		dv["uri"] = map[string]any{"_type": "DV_URI", "value": uri}
+	}
+	for suffix, attr := range map[string]string{
+		"data": "data", "integrity_check": "integrity_check", "alternatetext": "alternate_text",
+	} {
+		if v, ok := sfx[suffix]; ok {
+			dv[attr] = v
+		}
+	}
+	for _, attr := range multimediaBareCodeAttrs {
+		v, ok := sfx[attr]
+		if !ok {
+			continue
+		}
+		algo, err := ctxString("|"+attr, v)
+		if err != nil {
+			return nil, err
+		}
+		// No terminology: the wire carries the code alone and this codec has no
+		// openEHR code-set identifier to imply for either algorithm group, so
+		// inventing one would put a terminology on the RM the author never wrote.
+		dv[attr] = map[string]any{"_type": "CODE_PHRASE", "code_string": algo}
+	}
+	return dv, nil
 }
 
 // allowedSuffixes lists, per datatype, the pipe suffixes (and "" for a bare
@@ -1573,7 +1678,13 @@ var allowedSuffixes = map[string]map[string]bool{
 		"accuracy": true, "accuracy_is_percent": true, "precision": true,
 	},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
-	"CODE_PHRASE":   {"code": true, "terminology": true},
+	"CODE_PHRASE":   {"code": true, "terminology": true, "preferred_term": true},
+	"DV_PARSABLE":   {"": true, "formalism": true},
+	"DV_MULTIMEDIA": {
+		"": true, "mediatype": true, "size": true, "data": true,
+		"alternatetext": true, "integrity_check": true,
+		"integrity_check_algorithm": true, "compression_algorithm": true,
+	},
 }
 
 // suffixKind is the JSON value kind an optional pass-through suffix must carry.

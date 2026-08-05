@@ -92,7 +92,14 @@ func (g rmattrGroup) slot() int { return max(g.index, 0) }
 // bounds with.
 type rmattrFamily struct {
 	attr string
-	list bool
+	// attrType, when set, is the RM type the owner must declare attr as for this
+	// family to be admitted. It exists for the one attribute the reference spells
+	// two ways: DV_TEMPORAL redefines `accuracy` as a DV_DURATION object where
+	// DV_AMOUNT declares a Real, and the Real has the scalar `|accuracy` suffix —
+	// so `_accuracy` must reach the temporal types and only them, or one attribute
+	// would have two channels at one owner.
+	attrType string
+	list     bool
 	// value marks a family that decorates the **DataValue** a collapsed ELEMENT
 	// leaf holds rather than the LOCATABLE itself: one FLAT path addresses both
 	// (the Web Template folds ELEMENT.value into its leaf node), so the RM class
@@ -142,6 +149,14 @@ var rmattrFamilies = map[string]rmattrFamily{
 	"_mapping":      {attr: "mappings", list: true, value: true, decode: decodeRMAttrTermMapping},
 	"_null_flavour": {attr: "null_flavour", decode: decodeRMAttrNullFlavour},
 	"_null_reason":  {attr: "null_reason", decode: decodeRMAttrNullReason},
+	"_charset":      {attr: "charset", value: true, decode: decodeRMAttrCodePhraseMember},
+	"_language":     {attr: "language", value: true, decode: decodeRMAttrCodePhraseMember},
+	"_encoding":     {attr: "encoding", value: true, decode: decodeRMAttrCodePhraseMember},
+	"_thumbnail":    {attr: "thumbnail", value: true, decode: decodeRMAttrThumbnail},
+	"_accuracy": {
+		attr: "accuracy", attrType: "DV_DURATION", value: true,
+		decode: decodeRMAttrTemporalAccuracy,
+	},
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
@@ -282,9 +297,17 @@ func rmattrDecode(owner rmattrOwner, g rmattrGroup, indexes map[int]bool, budget
 	if fam.value {
 		judged = owner.leaf
 	}
-	if _, declared := rminfo.Default.AttributeRMType(judged, fam.attr); !declared {
+	declaredType, declared := rminfo.Default.AttributeRMType(judged, fam.attr)
+	if !declared {
 		return fmt.Errorf("%w: %q (%s declares no %s attribute)", ErrUnknownPath, g.prefix(),
 			cmp.Or(judged, owner.kind), fam.attr)
+	}
+	// The attribute exists on this owner but not in the type the family spells it
+	// as — the DV_TEMPORAL / DV_AMOUNT `accuracy` split, where the Real form rides
+	// the scalar `|accuracy` suffix instead (see [rmattrFamily.attrType]).
+	if fam.attrType != "" && declaredType != fam.attrType {
+		return fmt.Errorf("%w: %q addresses %s.%s, which is typed %s here rather than %s — that form has its own suffix (REQ-140)",
+			ErrUnknownPath, g.prefix(), judged, fam.attr, declaredType, fam.attrType)
 	}
 	if err := checkRMAttrIndexes(g, fam, indexes); err != nil {
 		return err

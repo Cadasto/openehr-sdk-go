@@ -365,31 +365,68 @@ func TestMappingsThroughStructured(t *testing.T) {
 	}
 }
 
-// TestUnderscoreFamilyBesideBareLeafRefused — REQ-053 / REQ-140. STRUCTURED
-// gives one array element per FLAT segment, and that element is *either* the
-// bare leaf value or an object holding the segment's members: a leaf spelled
-// bare (`t/e`) that also carries an underscore family (`t/e/_uid`,
-// `t/e/_mapping:0|match`) needs both at once, and the format as this codec
-// implements it has no spelling for that.
+// TestBareLeafBesideMembersThroughStructured — REQ-053 / REQ-140. STRUCTURED
+// gives one array element per FLAT segment, and that element is *either* the bare
+// leaf value or an object holding the segment's members. A leaf spelled bare
+// (`t/e`) that also carries a `|suffix`, an underscore family (`t/e/_uid`,
+// `t/e/_mapping:0|match`) or a sub-path needs both at once, and until REQ-140
+// Phase C3 the conversion refused it — a residual reachable from real corpus
+// bodies (`…/dv_count` = 7 beside `…/dv_count/_normal_range/lower`) that predates
+// the underscore families, since C0's `_uid` collided identically.
 //
-// The conversion refuses rather than dropping either side, which is the REQ-053
-// posture — but it *is* a residual, reachable from real corpus bodies
-// (`…/dv_count` = 7 beside `…/dv_count/_normal_range/lower`), and it predates the
-// underscore families: C0's `_uid` collides identically, as the second case
-// pins. Recorded in deviations.md § Conformance; closing it needs a reference
-// spelling for the bare value as an object member, which no vendored STRUCTURED
-// fixture supplies yet.
-func TestUnderscoreFamilyBesideBareLeafRefused(t *testing.T) {
+// The bare value now takes the `"|"` member on that object, which is the
+// `"|"+suffix` convention with the empty suffix the FLAT key itself spells and is
+// therefore reversible without an OPT. Round-tripped in both directions here for
+// every shape that forced the collision.
+func TestBareLeafBesideMembersThroughStructured(t *testing.T) {
 	for name, flat := range map[string]map[string]any{
-		"C1 _mapping": {"t/e": "DV_TEXT value", "t/e/_mapping:0|match": "="},
-		"C0 _uid":     {"t/e": "DV_TEXT value", "t/e/_uid": "9fcc1c70-9349-444d-b9cb-8fa817697f5e"},
+		// The scalar families carry the interconversion's explicit `:0` (every
+		// segment is re-spelled with one — the equivalence the `_` router honours).
+		"C1 _mapping":      {"t/e:0": "DV_TEXT value", "t/e:0/_mapping:0|match": "="},
+		"C0 _uid":          {"t/e:0": "DV_TEXT value", "t/e:0/_uid:0": "9fcc1c70-9349-444d-b9cb-8fa817697f5e"},
+		"optional suffix":  {"t/e:0": "DV_TEXT value", "t/e:0|formatting": "markdown"},
+		"C3 DV_MULTIMEDIA": {"t/e:0": "http://med.tube.com/sample", "t/e:0|mediatype": "video/H261", "t/e:0|size": float64(504903212)},
+		"C3 _accuracy":     {"t/e:0": "2022-01-12", "t/e:0/_accuracy:0": "P2D"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := simplified.FlatToStructured(mustJSON(t, flat)); err == nil {
-				t.Error("FlatToStructured accepted a bare leaf beside an underscore family — " +
-					"if a spelling was added, replace this pin with a round-trip")
+			s, err := simplified.FlatToStructured(mustJSON(t, flat))
+			if err != nil {
+				t.Fatalf("FlatToStructured: %v", err)
+			}
+			back, err := simplified.StructuredToFlat(s)
+			if err != nil {
+				t.Fatalf("StructuredToFlat: %v", err)
+			}
+			var got map[string]any
+			if err := json.Unmarshal(back, &got); err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(got, flat) {
+				t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v\n via  %s", got, flat, s)
 			}
 		})
+	}
+}
+
+// TestBareStructuredMemberIsTheEmptySuffix — REQ-053. The bare value's STRUCTURED
+// member is exactly `"|"`, and the element it sits on is an object only where the
+// collision forced one: a leaf carrying nothing but a bare value stays a bare
+// scalar, which is what every STRUCTURED body this codec emitted before Phase C3
+// looks like.
+func TestBareStructuredMemberIsTheEmptySuffix(t *testing.T) {
+	plain, err := simplified.FlatToStructured(mustJSON(t, map[string]any{"t/e:0": "v"}))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	if got := string(plain); got != `{"t":{"e":["v"]}}` {
+		t.Errorf("a bare-only leaf = %s, want the scalar spelling", got)
+	}
+	mixed, err := simplified.FlatToStructured(mustJSON(t, map[string]any{"t/e:0": "v", "t/e:0|formatting": "markdown"}))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	if got := string(mixed); got != `{"t":{"e":[{"|":"v","|formatting":"markdown"}]}}` {
+		t.Errorf("a bare value beside a suffix = %s, want the \"|\" member", got)
 	}
 }
 
