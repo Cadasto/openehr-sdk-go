@@ -129,7 +129,9 @@ var rmattrFamilies = map[string]rmattrFamily{
 		attr: "other_reference_ranges", list: true, value: true,
 		decode: decodeRMAttrReferenceRange,
 	},
-	"_mapping": {attr: "mappings", list: true, value: true, decode: decodeRMAttrTermMapping},
+	"_mapping":      {attr: "mappings", list: true, value: true, decode: decodeRMAttrTermMapping},
+	"_null_flavour": {attr: "null_flavour", decode: decodeRMAttrNullFlavour},
+	"_null_reason":  {attr: "null_reason", decode: decodeRMAttrNullReason},
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name

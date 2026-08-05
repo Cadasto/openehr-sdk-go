@@ -231,7 +231,29 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	}
 	v, err := rmpath.ItemAtPath(resolveRoot, relPath)
 	if err != nil {
-		return skipNotFound(err, relPath)
+		if !errors.Is(err, rmpath.ErrPathNotFound) {
+			return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
+		}
+		// An absent leaf *value* does not mean an absent owner: a collapsed ELEMENT
+		// whose `value` is Void carries a `_null_flavour` in its place (REQ-140), and
+		// that is precisely the shape the value resolution cannot see. Every other
+		// absent optional still writes nothing, because the owner walk below finds no
+		// ELEMENT (or no attributes on it) either.
+		if isContainer {
+			return nil
+		}
+		sub := make(map[string]any)
+		if err := emitLeafOwnerRMAttrs(sub, node, flatPrefix+"/"+node.ID, resolveRoot, resolveRootAql); err != nil {
+			return err
+		}
+		if len(sub) == 0 {
+			return nil
+		}
+		if err := refuseReusedSibling(node, ambiguous); err != nil {
+			return err
+		}
+		maps.Copy(out, sub)
+		return nil
 	}
 	if err := refuseReusedSibling(node, ambiguous); err != nil {
 		return err

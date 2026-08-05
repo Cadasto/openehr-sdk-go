@@ -191,7 +191,7 @@ type expectation struct {
 //	go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v
 var pinned = map[string]expectation{
 	"ehrbase_conformance_Element_feeder_audit":                {excluded: 52, compared: 15},
-	"ehrbase_conformance_Element_null_flavor":                 {excluded: 8, compared: 9},
+	"ehrbase_conformance_Element_null_flavor":                 {excluded: 4, compared: 13},
 	"ehrbase_conformance_action":                              {excluded: 63, compared: 22},
 	"ehrbase_conformance_admin_entry":                         {excluded: 49, compared: 17},
 	"ehrbase_conformance_cluster":                             {excluded: 38, compared: 13},

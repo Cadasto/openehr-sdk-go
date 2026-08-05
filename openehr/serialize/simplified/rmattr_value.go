@@ -358,6 +358,55 @@ func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
 	return tm, nil
 }
 
+// --- ELEMENT null flavour / null reason ---------------------------------
+
+// decodeRMAttrNullFlavour decodes `_null_flavour` on a collapsed ELEMENT leaf.
+//
+// It is the ordinary DV_CODED_TEXT suffix grammar — `|code` and `|value`
+// required, `|terminology` optional and preserved — not an `openehr`-implied
+// code+value pair: `ehrbase_conformance_Element_null_flavor.json` writes
+// `|terminology: "openehr"` explicitly, and inventing the terminology for a body
+// that omits it would put a key on the wire the author never wrote (constraint 6;
+// wire.md § REQ-140 corrected 2026-08-05). Which openEHR code is a legal null
+// flavour stays with the validation package, as every other code set does.
+//
+// This is the one family that is legal beside an **absent** value — that is what
+// it is for — so it decorates the ELEMENT rather than the value, and the router
+// never asks for a `value` node on its behalf.
+func decodeRMAttrNullFlavour(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_CODED_TEXT")
+}
+
+// decodeRMAttrNullReason decodes `_null_reason` — a bare DV_TEXT, through the
+// DV_TEXT leaf builder, so the Phase A carve-out lets a DV_CODED_TEXT ride the
+// `|code` spelling here too (`null_reason` is typed DV_TEXT, which admits its
+// coded subtype).
+func decodeRMAttrNullReason(g rmattrGroup, _ string) (any, error) {
+	return decodeRMAttrLeafValue(g, "DV_TEXT")
+}
+
+// decodeRMAttrLeafValue decodes a family whose whole value is one datatype
+// spelled in its own suffix form, with no sub-paths of its own: the group's tails
+// *are* the suffix map. Errors are wrapped naming the family prefix, the base key
+// the census scopes a datatype refusal by.
+func decodeRMAttrLeafValue(g rmattrGroup, rmType string) (any, error) {
+	ts, err := splitRMAttrTails(g)
+	if err != nil {
+		return nil, err
+	}
+	if len(ts.sub) > 0 {
+		seg := slices.Sorted(maps.Keys(ts.sub))[0]
+		suffix := slices.Sorted(maps.Keys(ts.sub[seg]))[0]
+		return nil, fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)",
+			ErrUnsupportedDatatype, ts.key(g, subTail(seg, suffix)), g.family)
+	}
+	dv, err := dvFromSuffixes(rmType, false, ts.own)
+	if err != nil {
+		return nil, fmt.Errorf("simplified: decode %q: %w", g.prefix(), err)
+	}
+	return dv, nil
+}
+
 // matchCode reads `|match` as the single character TERM_MAPPING admits, returning
 // its code point. Anything else — absent, empty, longer than one rune, or a
 // character outside the set — is a typed error rather than a truncated or zero

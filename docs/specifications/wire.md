@@ -187,8 +187,8 @@ The grammar is **recursive and typed by the owning RM class**, not a flat key li
 | any LOCATABLE node (composition root, ENTRY, CLUSTER, collapsed `ELEMENT` leaf) | `_uid` | bare value (UID-based id) |
 | | `_link:N` | LINK — `\|meaning`, `\|type`, `\|target` |
 | | `_feeder_audit` | FEEDER_AUDIT (below) |
-| collapsed `ELEMENT` leaf | `_null_flavour` | DV_CODED_TEXT — `\|code` + `\|value` (`openehr` terminology implied); legal beside an **absent** bare value |
-| | `_null_reason` | DV_TEXT — bare value |
+| collapsed `ELEMENT` leaf | `_null_flavour` | DV_CODED_TEXT — `\|code` + `\|value`, with `\|terminology` optional and carried as written (the corpus spells `openehr` explicitly rather than implying it); legal beside an **absent** bare value |
+| | `_null_reason` | DV_TEXT — bare value (its coded subtype rides § REQ-053's `\|code` substitution, as at any DV_TEXT position) |
 | ENTRY subtypes | `_work_flow_id`, `_guideline_id` | OBJECT_REF — `\|id`, `\|id_scheme`, `\|namespace`, `\|type` |
 | | `_other_participation:N` | PARTICIPATION (below) |
 | EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |

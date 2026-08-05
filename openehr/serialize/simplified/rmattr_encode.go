@@ -53,10 +53,37 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if err := linksRMAttr(out, base, links); err != nil {
 		return err
 	}
+	if el, isElement := as[rm.Element](owner); isElement {
+		if err := nullRMAttrs(out, base, el); err != nil {
+			return err
+		}
+	}
 	if err := objectRefRMAttr(out, base+"/_work_flow_id", entryWorkflowIDOf(owner)); err != nil {
 		return err
 	}
 	return objectRefRMAttr(out, base+"/_guideline_id", careEntryGuidelineIDOf(owner))
+}
+
+// nullRMAttrs writes an ELEMENT's `_null_flavour` and `_null_reason` — the two
+// families that stand in for the value a collapsed leaf would otherwise carry.
+//
+// Both go out through [emitLeafValue], so each is spelled in its own datatype's
+// suffix form (`|code`+`|value`(+`|terminology`) for the coded null flavour, a
+// bare value for the reason) with the `|raw` carrier behind it for a decorated
+// one. Both fields are pointers/interfaces, so nil is genuine absence and there
+// is no zero/absent ambiguity to resolve.
+func nullRMAttrs(out map[string]any, base string, el rm.Element) error {
+	if el.NullFlavour != nil {
+		if _, err := emitLeafValue(out, base+"/_null_flavour", *el.NullFlavour, "DV_CODED_TEXT", false, false); err != nil {
+			return err
+		}
+	}
+	if el.NullReason != nil && !rm.IsTypedNil(el.NullReason) {
+		if _, err := emitLeafValue(out, base+"/_null_reason", el.NullReason, "DV_TEXT", false, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // rmattrLinksOf returns the LINK list carried by a LOCATABLE, and whether owner

@@ -439,6 +439,143 @@ func elementText(t *testing.T, comp *rm.Composition) rm.DataValue {
 	return nil
 }
 
+// --- _null_flavour / _null_reason ---------------------------------------
+
+// TestRMAttrNullFlavourWithoutValue — REQ-140, and the point of the family: an
+// ELEMENT whose `value` is absent carries its `null_flavour` instead, so the FLAT
+// body has the `_null_flavour` keys and **no bare key at all**. Both directions
+// have to cope with that: decode must not trip the missing-required-value arm
+// (there is no leaf group to decode), and encode must still walk the ELEMENT's
+// attributes although the leaf path resolves to nothing.
+//
+// The spelling is `ehrbase_conformance_Element_null_flavor.json`'s, which writes
+// `|terminology` explicitly beside `|code` and `|value` — so the family rides the
+// ordinary DV_CODED_TEXT suffix grammar rather than an `openehr`-implied pair
+// (wire.md § REQ-140 corrected in the same commit).
+func TestRMAttrNullFlavourWithoutValue(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	body := rmattrBody(map[string]any{
+		rmattrCount + "/_null_flavour|code":        "253",
+		rmattrCount + "/_null_flavour|terminology": "openehr",
+		rmattrCount + "/_null_flavour|value":       "unknown",
+		rmattrCount + "/_null_reason":              "sample reason",
+	})
+	comp := decodeRMAttr(t, wt, body)
+	el := nullFlavouredElement(t, comp)
+	if el.Value != nil {
+		t.Errorf("ELEMENT.value = %#v, want nil — the body spelled no leaf value", el.Value)
+	}
+	if el.NullFlavour == nil {
+		t.Fatal("null_flavour not decoded")
+	}
+	if el.NullFlavour.DefiningCode.CodeString != "253" || el.NullFlavour.Value != "unknown" {
+		t.Errorf("null_flavour = %+v", *el.NullFlavour)
+	}
+	if got := el.NullFlavour.DefiningCode.TerminologyID.Value; got != "openehr" {
+		t.Errorf("null_flavour terminology = %q, want openehr", got)
+	}
+	if el.NullReason == nil || el.NullReason.GetValue() != "sample reason" {
+		t.Errorf("null_reason = %+v", el.NullReason)
+	}
+
+	got := reencodeRMAttr(t, wt, comp)
+	for k, want := range body {
+		if !strings.Contains(k, "_null") {
+			continue
+		}
+		if have := got[k]; !sameCtxValue(want, have) {
+			t.Errorf("re-encode of %q = %#v, want %#v", k, have, want)
+		}
+	}
+	// …and no bare key was invented for the absent value.
+	if v, spelled := got[rmattrCount]; spelled {
+		t.Errorf("re-encode invented a bare leaf value %#v for a null-flavoured ELEMENT", v)
+	}
+}
+
+// TestRMAttrNullFlavourBesideValue — REQ-140. The family sits on the ELEMENT, not
+// on its value, so it composes with a leaf that *does* carry one (the RM's own
+// invariant runs the other way — an absent value requires a null flavour, not the
+// reverse — and semantic validation stays with the validation package).
+func TestRMAttrNullFlavourBesideValue(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
+		rmattrCount:                          7,
+		rmattrCount + "/_null_flavour|code":  "271",
+		rmattrCount + "/_null_flavour|value": "no information",
+	})
+	el := nullFlavouredElement(t, comp)
+	if el.Value == nil {
+		t.Error("the leaf value was dropped beside a null flavour")
+	}
+	// No |terminology spelled, so none is invented on the way back either.
+	if got := el.NullFlavour.DefiningCode.TerminologyID.Value; got != "" {
+		t.Errorf("null_flavour terminology = %q, want empty (none spelled)", got)
+	}
+}
+
+// TestRMAttrNullFlavourHalfPairRefused — REQ-140. `_null_flavour` is a
+// DV_CODED_TEXT: `|code` and `|value` are both required, so half a pair must not
+// decode to a coerced empty rubric or an unlabelled code.
+func TestRMAttrNullFlavourHalfPairRefused(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, keys := range map[string]map[string]any{
+		"code alone":        {rmattrCount + "/_null_flavour|code": "253"},
+		"value alone":       {rmattrCount + "/_null_flavour|value": "unknown"},
+		"terminology alone": {rmattrCount + "/_null_flavour|terminology": "openehr"},
+		"bare value":        {rmattrCount + "/_null_flavour": "unknown"},
+		"unknown suffix":    {rmattrCount + "/_null_flavour|typo": "x"},
+		"sub-path":          {rmattrCount + "/_null_flavour/target|code": "x"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := decodeRMAttrErr(t, wt, rmattrBody(keys)); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// TestRMAttrNullFamiliesOnlyOnElement — REQ-140. `null_flavour` and `null_reason`
+// are declared on ELEMENT, so the families reach a collapsed leaf and nothing
+// else — the rminfo rule, not a hand-kept owner list.
+func TestRMAttrNullFamiliesOnlyOnElement(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for _, owner := range []string{rmattrRoot, rmattrSection, rmattrObs} {
+		for _, family := range []string{"/_null_flavour|code", "/_null_reason"} {
+			t.Run(owner+family, func(t *testing.T) {
+				if err := decodeRMAttrErr(t, wt, rmattrBody(map[string]any{
+					owner + family: "x",
+				})); !errors.Is(err, ErrUnknownPath) {
+					t.Errorf("err = %v, want ErrUnknownPath", err)
+				}
+			})
+		}
+	}
+}
+
+// nullFlavouredElement digs out the ELEMENT carrying a null flavour.
+func nullFlavouredElement(t *testing.T, comp *rm.Composition) *rm.Element {
+	t.Helper()
+	obs := firstObservation(t, comp)
+	for _, ev := range obs.Data.Events {
+		pe, ok := ev.(*rm.PointEvent[rm.ItemStructure])
+		if !ok {
+			continue
+		}
+		tree, ok := pe.Data.(*rm.ItemTree)
+		if !ok {
+			continue
+		}
+		for _, it := range tree.Items {
+			if el, ok := it.(*rm.Element); ok && el.NullFlavour != nil {
+				return el
+			}
+		}
+	}
+	t.Fatal("no null-flavoured ELEMENT found under the observation")
+	return nil
+}
+
 // --- the anchor rule ----------------------------------------------------
 
 // TestRMAttrValueFamilyOwnerRule — REQ-140. A value-decoration family is judged
