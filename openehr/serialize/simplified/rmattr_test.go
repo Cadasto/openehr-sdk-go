@@ -27,6 +27,7 @@ import (
 // upstream bodies they mirror.
 const (
 	rmattrRoot    = "conformance-ehrbase.de.v0"
+	rmattrContext = rmattrRoot + "/context"
 	rmattrSection = rmattrRoot + "/conformance_section"
 	rmattrObs     = rmattrSection + "/conformance_observation"
 	rmattrEvent   = rmattrObs + "/any_event:0"
@@ -530,9 +531,9 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	for _, key := range []string{
 		rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
 		rmattrElement + "/_feeder_audit/original_content",
-		rmattrRoot + "/context/_health_care_facility|id",
-		rmattrRoot + "/context/_participation:0|function",
-		rmattrObs + "/_other_participation:0|function",
+		// `_identifier` is not a router family at all: every position that
+		// reaches a party reaches its identifier list through the party grammar
+		// (rmattr_party.go), so an ENTRY owner is a path that names no family.
 		rmattrObs + "/_identifier:0|id",
 		rmattrElement + "/_charset|code",
 		rmattrElement + "/_language|code",

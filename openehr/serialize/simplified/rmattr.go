@@ -105,10 +105,17 @@ type rmattrFamily struct {
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
 // ErrUnknownPath — the fail-loud posture REQ-053 sets and REQ-140 inherits, and
 // the mechanism by which the families later phases own (`_feeder_audit`,
-// `_health_care_facility`, `_participation`, `_other_participation`,
-// `_identifier`, `_charset`, `_language`, `_encoding`, `_thumbnail`) and the two
-// the plan defers indefinitely (`_instruction_details`, `_wf_definition`) stay
-// visible in the PROBE-086 census instead of decoding into nothing.
+// `_charset`, `_language`, `_encoding`, `_thumbnail`) and the two the plan defers
+// indefinitely (`_instruction_details`, `_wf_definition`) stay visible in the
+// PROBE-086 census instead of decoding into nothing.
+//
+// `_identifier` is deliberately **not** a family here, though the corpus writes
+// it: it is only ever reached *inside* a party — nested in
+// `_health_care_facility`'s tails, at the ENTRY `subject` leaf, or (Phase C3)
+// under a FEEDER_AUDIT_DETAILS party — so the one party implementation owns it
+// (rmattr_party.go) and no owner exists for the router to judge it against. The
+// composition's **composer** is the one path that would reach it as a family, and
+// that is the ADR 0015 boundary flat_decode.go refuses by name.
 //
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY
@@ -118,13 +125,16 @@ type rmattrFamily struct {
 // the class consulted is the leaf datatype instead (rmattr_value.go), which is
 // what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only.
 var rmattrFamilies = map[string]rmattrFamily{
-	"_uid":          {attr: "uid", decode: decodeRMAttrUID},
-	"_link":         {attr: "links", list: true, decode: decodeRMAttrLink},
-	"_work_flow_id": {attr: "workflow_id", decode: decodeRMAttrObjectRef},
-	"_guideline_id": {attr: "guideline_id", decode: decodeRMAttrObjectRef},
-	"_end_time":     {attr: "end_time", decode: decodeRMAttrEndTime},
-	"_location":     {attr: "location", decode: decodeRMAttrLocation},
-	"_normal_range": {attr: "normal_range", value: true, decode: decodeRMAttrNormalRange},
+	"_uid":                  {attr: "uid", decode: decodeRMAttrUID},
+	"_link":                 {attr: "links", list: true, decode: decodeRMAttrLink},
+	"_work_flow_id":         {attr: "workflow_id", decode: decodeRMAttrObjectRef},
+	"_guideline_id":         {attr: "guideline_id", decode: decodeRMAttrObjectRef},
+	"_end_time":             {attr: "end_time", decode: decodeRMAttrEndTime},
+	"_location":             {attr: "location", decode: decodeRMAttrLocation},
+	"_health_care_facility": {attr: "health_care_facility", decode: decodeRMAttrHealthCareFacility},
+	"_participation":        {attr: "participations", list: true, decode: decodeRMAttrParticipation},
+	"_other_participation":  {attr: "other_participations", list: true, decode: decodeRMAttrParticipation},
+	"_normal_range":         {attr: "normal_range", value: true, decode: decodeRMAttrNormalRange},
 	"_other_reference_ranges": {
 		attr: "other_reference_ranges", list: true, value: true,
 		decode: decodeRMAttrReferenceRange,

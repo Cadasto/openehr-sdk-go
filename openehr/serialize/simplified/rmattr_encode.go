@@ -61,7 +61,10 @@ func rmattrEncode(owner any, base string, out map[string]any) error {
 	if err := objectRefRMAttr(out, base+"/_work_flow_id", entryWorkflowIDOf(owner)); err != nil {
 		return err
 	}
-	return objectRefRMAttr(out, base+"/_guideline_id", careEntryGuidelineIDOf(owner))
+	if err := objectRefRMAttr(out, base+"/_guideline_id", careEntryGuidelineIDOf(owner)); err != nil {
+		return err
+	}
+	return participationsRMAttr(out, base, "_other_participation", entryOtherParticipationsOf(owner))
 }
 
 // nullRMAttrs writes an ELEMENT's `_null_flavour` and `_null_reason` — the two
@@ -177,6 +180,29 @@ func entryWorkflowIDOf(owner any) rm.ObjectRefLike {
 	return nil
 }
 
+// entryOtherParticipationsOf returns ENTRY.other_participations, or nil when
+// owner is not an ENTRY. Same owner set as `workflow_id` — all five ENTRY
+// subtypes declare it and nothing else does, which is what makes the decode-side
+// rminfo check refuse `_other_participation:N` on a SECTION or a CLUSTER.
+func entryOtherParticipationsOf(owner any) []rm.Participation {
+	if v, ok := as[rm.Observation](owner); ok {
+		return v.OtherParticipations
+	}
+	if v, ok := as[rm.Evaluation](owner); ok {
+		return v.OtherParticipations
+	}
+	if v, ok := as[rm.Instruction](owner); ok {
+		return v.OtherParticipations
+	}
+	if v, ok := as[rm.Action](owner); ok {
+		return v.OtherParticipations
+	}
+	if v, ok := as[rm.AdminEntry](owner); ok {
+		return v.OtherParticipations
+	}
+	return nil
+}
+
 // careEntryGuidelineIDOf returns CARE_ENTRY.guideline_id, or nil when owner is
 // not a CARE_ENTRY.
 //
@@ -252,11 +278,11 @@ func uidRMAttr(out map[string]any, base string, uid rm.UIDBasedID) error {
 func linksRMAttr(out map[string]any, base string, links []rm.Link) error {
 	for i, l := range links {
 		path := base + "/_link:" + strconv.Itoa(i)
-		meaning, err := linkTextRMAttr(path+"|meaning", l.Meaning)
+		meaning, err := plainDVText(path+"|meaning", l.Meaning, "LINK")
 		if err != nil {
 			return err
 		}
-		typ, err := linkTextRMAttr(path+"|type", l.Type)
+		typ, err := plainDVText(path+"|type", l.Type, "LINK")
 		if err != nil {
 			return err
 		}
@@ -267,18 +293,21 @@ func linksRMAttr(out map[string]any, base string, links []rm.Link) error {
 	return nil
 }
 
-// linkTextRMAttr reduces a LINK.meaning / .type to the plain string its suffix
-// carries. The suffix has no channel for a coded term or a DV_TEXT decoration
-// (`formatting`, `hyperlink`, `language`, `encoding`, `mappings`) and LINK has no
-// `|raw` carrier anywhere in the grammar, so such a value is a typed error
-// rather than a silent narrowing to its rubric.
-func linkTextRMAttr(key string, v rm.DVTextLike) (string, error) {
+// plainDVText reduces an RM-mandatory DV_TEXT attribute to the plain string its
+// suffix carries — LINK's `|meaning` / `|type`, PARTICIPATION's `|function`.
+// owner names the RM class in the "absent" message.
+//
+// None of these suffixes has a channel for a coded term or a DV_TEXT decoration
+// (`formatting`, `hyperlink`, `language`, `encoding`, `mappings`), and these
+// families have no `|raw` carrier anywhere in the grammar, so such a value is a
+// typed error rather than a silent narrowing to its rubric.
+func plainDVText(key string, v rm.DVTextLike, owner string) (string, error) {
 	if v == nil || rm.IsTypedNil(v) {
-		return "", fmt.Errorf("%w: %q is RM-mandatory on LINK but absent", ErrUnsupportedDatatype, key)
+		return "", fmt.Errorf("%w: %q is RM-mandatory on %s but absent", ErrUnsupportedDatatype, key, owner)
 	}
 	dv, plain := as[rm.DVText](v)
 	if !plain {
-		return "", fmt.Errorf("%w: %q cannot carry a %T; the LINK suffixes take a plain DV_TEXT", ErrUnsupportedDatatype, key, v)
+		return "", fmt.Errorf("%w: %q cannot carry a %T; the %s suffixes take a plain DV_TEXT", ErrUnsupportedDatatype, key, v, owner)
 	}
 	if dv.Formatting != nil || dv.Hyperlink != nil || dv.Language != nil || dv.Encoding != nil || len(dv.Mappings) > 0 {
 		return "", fmt.Errorf("%w: %q cannot carry a decorated DV_TEXT (formatting, hyperlink, language, encoding or mappings)", ErrUnsupportedDatatype, key)
@@ -328,11 +357,12 @@ func objectRefRMAttr(out map[string]any, path string, ref rm.ObjectRefLike) erro
 	return nil
 }
 
-// eventContextRMAttrs writes the EVENT_CONTEXT optionals this phase carries —
-// `_end_time` and `_location` — under the real `context` segment (ADR 0016; the
-// ITS `ctx/` sketches for them are deliberately not implemented). Both fields
-// are pointers, so nil is genuine absence and there is no zero/absent ambiguity
-// of the kind EVENT_CONTEXT.setting has.
+// eventContextRMAttrs writes the EVENT_CONTEXT optionals the underscore grammar
+// carries — `_end_time`, `_location`, `_health_care_facility` and
+// `_participation:N` — under the real `context` segment (ADR 0016; the ITS `ctx/`
+// sketches for them are deliberately not implemented). `end_time` and `location`
+// are pointers and `health_care_facility` an interface, so nil is genuine absence
+// and there is no zero/absent ambiguity of the kind EVENT_CONTEXT.setting has.
 func eventContextRMAttrs(out map[string]any, base string, ec rm.EventContext) error {
 	if ec.EndTime != nil {
 		if err := endTimeRMAttr(out, base, *ec.EndTime); err != nil {
@@ -342,7 +372,10 @@ func eventContextRMAttrs(out map[string]any, base string, ec rm.EventContext) er
 	if ec.Location != nil {
 		out[base+"/_location"] = *ec.Location
 	}
-	return nil
+	if err := partyRMAttr(out, base+"/_health_care_facility", ec.HealthCareFacility); err != nil {
+		return err
+	}
+	return participationsRMAttr(out, base, "_participation", ec.Participations)
 }
 
 // endTimeRMAttr writes `<base>/_end_time`. The key is a bare value, so a

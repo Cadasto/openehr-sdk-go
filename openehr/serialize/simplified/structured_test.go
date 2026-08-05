@@ -393,6 +393,94 @@ func TestUnderscoreFamilyBesideBareLeafRefused(t *testing.T) {
 	}
 }
 
+// TestPartyGrammarThroughStructured — REQ-140. The party families are the first
+// to combine all three key shapes in one instance: own suffixes, an *indexed*
+// suffix (`|identifiers_id:N` — the reference's inlined identifier spelling), and
+// a sub-path object (`/relationship`). None of them needs a STRUCTURED rule of
+// its own — an indexed suffix is opaque after the last `|`, so it survives as a
+// `|`-prefixed member verbatim — and this pins that, in both directions,
+// OPT-free.
+func TestPartyGrammarThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/context/_health_care_facility|id":                   "9091",
+		"t/context/_health_care_facility|id_scheme":            "HOSPITAL-NS",
+		"t/context/_health_care_facility|id_namespace":         "HOSPITAL-NS",
+		"t/context/_health_care_facility|name":                 "Hospital",
+		"t/context/_health_care_facility/_identifier:0|id":     "122",
+		"t/context/_health_care_facility/_identifier:0|issuer": "issuer",
+		"t/context/_participation:0|function":                  "requester",
+		"t/context/_participation:0|mode":                      "face-to-face communication",
+		"t/context/_participation:0|identifiers_id:0":          "122",
+		"t/context/_participation:0|identifiers_issuer:0":      "issuer",
+		"t/context/_participation:1|function":                  "performer",
+		"t/context/_participation:1/relationship|code":         "10",
+		"t/context/_participation:1/relationship|value":        "mother",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	ctx := s["t"].(map[string]any)["context"].([]any)[0].(map[string]any)
+	// The nested `_identifier:N` is an array of its own inside the party object.
+	hcf, ok := ctx["_health_care_facility"].([]any)
+	if !ok || len(hcf) != 1 {
+		t.Fatalf("_health_care_facility = %#v, want a 1-element array", ctx["_health_care_facility"])
+	}
+	party, _ := hcf[0].(map[string]any)
+	if party["|name"] != "Hospital" {
+		t.Errorf("_health_care_facility[0].|name = %#v", party["|name"])
+	}
+	ids, ok := party["_identifier"].([]any)
+	if !ok || len(ids) != 1 {
+		t.Fatalf("_identifier = %#v, want a 1-element array", party["_identifier"])
+	}
+	if first, _ := ids[0].(map[string]any); first["|id"] != "122" {
+		t.Errorf("_identifier[0] = %#v", ids[0])
+	}
+	// The participation's *indexed suffix* stays one opaque member key.
+	ps, ok := ctx["_participation"].([]any)
+	if !ok || len(ps) != 2 {
+		t.Fatalf("_participation = %#v, want a 2-element array", ctx["_participation"])
+	}
+	p0, _ := ps[0].(map[string]any)
+	if p0["|identifiers_id:0"] != "122" {
+		t.Errorf("_participation[0] = %#v, want the inlined |identifiers_id:0 member", ps[0])
+	}
+	// A performer's `/relationship` nests as its own array, like any sub-path.
+	p1, _ := ps[1].(map[string]any)
+	rel, ok := p1["relationship"].([]any)
+	if !ok || len(rel) != 1 {
+		t.Fatalf("_participation[1].relationship = %#v, want a 1-element array", p1["relationship"])
+	}
+
+	// Back to FLAT: every key returns, with the interconversion's usual
+	// re-spelling of every *segment* with an explicit `:index` (the suffix is
+	// untouched, so `|identifiers_id:0` comes back verbatim).
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{}
+	for k, v := range flat {
+		k = strings.Replace(k, "t/context/", "t/context:0/", 1)
+		k = strings.Replace(k, "_health_care_facility|", "_health_care_facility:0|", 1)
+		k = strings.Replace(k, "_health_care_facility/", "_health_care_facility:0/", 1)
+		k = strings.Replace(k, "/relationship|", "/relationship:0|", 1)
+		want[k] = v
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
+	}
+}
+
 // TestUnderscoreKeysStructuredDecode — REQ-140. The index normalisation the
 // interconversion applies must not break the codec: a STRUCTURED body carrying
 // underscore families decodes through UnmarshalStructured to the same

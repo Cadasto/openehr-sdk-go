@@ -27,20 +27,27 @@ import (
 	"strings"
 )
 
-// rmattrTails is one family instance's tails split into the two positions the
+// rmattrTails is one family instance's tails split into the three positions the
 // recursive grammar has: the family's **own** suffixes (`|match`,
-// `|lower_included`, or "" for a bare value) and one sub-object per leading path
-// segment (`/lower`, `/meaning`, `/target`), each collected as the suffix map
-// [dvFromSuffixes] takes.
+// `|lower_included`, or "" for a bare value), one sub-object per leading path
+// segment (`/lower`, `/meaning`, `/target`), and one *indexed* sub-object list
+// per list-valued segment (`/_identifier:N` inside a party — REQ-140 § C2) —
+// each collected as the suffix map [dvFromSuffixes] takes.
 //
 // orig maps a normalised tail back to the spelling the payload actually used,
 // because the STRUCTURED interconversion re-spells every segment with an
 // explicit `:index` (`/lower:0|magnitude`) and an error must name the key its
 // author wrote.
 type rmattrTails struct {
-	own  map[string]any
-	sub  map[string]map[string]any
-	orig map[string]string
+	own map[string]any
+	sub map[string]map[string]any
+	// sublist holds the indexed sub-path segments the recursive grammar reaches:
+	// `/_identifier:0|id` becomes sublist["_identifier"][0]["id"]. Only a segment
+	// the family named in the `lists` set it passed [splitRMAttrTails] lands
+	// here; every other segment keeps the single-valued rule, so a stray
+	// `/relationship:1` is refused rather than quietly becoming a list.
+	sublist map[string]map[int]map[string]any
+	orig    map[string]string
 }
 
 // ownTail / subTail are the normalised tail spellings, the keys [rmattrTails.orig]
@@ -59,6 +66,13 @@ func subTail(seg, suffix string) string {
 	return "/" + seg + "|" + suffix
 }
 
+// subListTail is the normalised spelling of one slot of an indexed sub-path
+// list. The `:index` is kept where [subTail] has none to keep, because two
+// slots of the same segment are two different keys.
+func subListTail(seg string, idx int, suffix string) string {
+	return subTail(seg+":"+strconv.Itoa(idx), suffix)
+}
+
 // key rebuilds the full FLAT key a tail arrived under, preferring the payload's
 // own spelling. Used for every refusal message and for the `decode %q` wrapper
 // a nested value's error carries, which is what lets the PROBE-086 census scope
@@ -70,16 +84,19 @@ func (ts rmattrTails) key(g rmattrGroup, tail string) string {
 	return g.key(tail)
 }
 
-// splitRMAttrTails partitions g's tails. A sub-path segment carrying `:0` is the
-// index-less spelling (the interconversion normalises every segment), so it is
-// folded onto it; anything higher addresses a list position no attribute of a
-// DataValue has, and two spellings landing on one slot are refused rather than
-// silently merged — the same rule [checkRMAttrIndexes] applies to `_family:N`.
-func splitRMAttrTails(g rmattrGroup) (rmattrTails, error) {
+// splitRMAttrTails partitions g's tails. lists names the sub-path segments the
+// family treats as an indexed list (nil for a family that has none); every other
+// segment is single-valued, so a `:0` on it is the index-less spelling (the
+// interconversion normalises every segment) and folds onto it, while anything
+// higher addresses a list position that attribute does not have. Two spellings
+// landing on one slot are refused rather than silently merged — the same rule
+// [checkRMAttrIndexes] applies to `_family:N`.
+func splitRMAttrTails(g rmattrGroup, lists map[string]bool) (rmattrTails, error) {
 	ts := rmattrTails{
-		own:  make(map[string]any),
-		sub:  make(map[string]map[string]any),
-		orig: make(map[string]string),
+		own:     make(map[string]any),
+		sub:     make(map[string]map[string]any),
+		sublist: make(map[string]map[int]map[string]any),
+		orig:    make(map[string]string),
 	}
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		val := g.tails[tail]
@@ -89,41 +106,75 @@ func splitRMAttrTails(g rmattrGroup) (rmattrTails, error) {
 			ts.orig[ownTail(suffix)] = tail
 			continue
 		}
-		seg, err := rmattrSubSegment(g, tail, path)
+		seg, idx, isList, err := rmattrSubSegment(g, tail, path, lists)
 		if err != nil {
 			return rmattrTails{}, err
 		}
-		if ts.sub[seg] == nil {
-			ts.sub[seg] = make(map[string]any)
+		slot := ts.sub[seg]
+		norm := subTail(seg, suffix)
+		if isList {
+			if ts.sublist[seg] == nil {
+				ts.sublist[seg] = make(map[int]map[string]any)
+			}
+			if ts.sublist[seg][idx] == nil {
+				ts.sublist[seg][idx] = make(map[string]any)
+			}
+			slot, norm = ts.sublist[seg][idx], subListTail(seg, idx, suffix)
+		} else if slot == nil {
+			slot = make(map[string]any)
+			ts.sub[seg] = slot
 		}
-		if _, taken := ts.sub[seg][suffix]; taken {
+		if _, taken := slot[suffix]; taken {
 			return rmattrTails{}, fmt.Errorf("%w: %q collides with another spelling of the same sub-path; remove one",
 				ErrUnsupportedDatatype, g.key(tail))
 		}
-		ts.sub[seg][suffix] = val
-		ts.orig[subTail(seg, suffix)] = tail
+		slot[suffix] = val
+		ts.orig[norm] = tail
 	}
 	return ts, nil
 }
 
 // rmattrSubSegment normalises one tail's sub-path into the segment name the
-// grammar tables are keyed by. A multi-segment path is returned joined, so the
-// caller's allowlist refuses it naming the offending key rather than reporting
-// its first segment as if the rest were not there.
-func rmattrSubSegment(g rmattrGroup, tail, path string) (string, error) {
+// grammar tables are keyed by, and reports whether it addresses a slot of an
+// indexed list. A multi-segment path is returned joined, so the caller's
+// allowlist refuses it naming the offending key rather than reporting its first
+// segment as if the rest were not there.
+//
+// Only the leading segment may carry an index, and only for a segment in lists:
+// the recursive grammar's lists sit at the position the family names them at
+// (`/_identifier:N`), never deeper.
+func rmattrSubSegment(g rmattrGroup, tail, path string, lists map[string]bool) (seg string, idx int, isList bool, err error) {
 	segs := strings.Split(strings.TrimPrefix(path, "/"), "/")
-	for i, seg := range segs {
-		id, idx, err := rmattrSegIndex(g, tail, seg)
+	head := -1
+	for i, s := range segs {
+		id, n, err := rmattrSegIndex(g, tail, s)
 		if err != nil {
-			return "", err
-		}
-		if idx > 0 {
-			return "", fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute",
-				ErrUnsupportedDatatype, g.key(tail), seg)
+			return "", 0, false, err
 		}
 		segs[i] = id
+		if i == 0 {
+			head = n
+			continue
+		}
+		if n > 0 {
+			return "", 0, false, rmattrNotAList(g, tail, id)
+		}
 	}
-	return strings.Join(segs, "/"), nil
+	joined := strings.Join(segs, "/")
+	if lists[joined] {
+		return joined, max(head, 0), true, nil
+	}
+	if head > 0 {
+		return "", 0, false, rmattrNotAList(g, tail, segs[0])
+	}
+	return joined, 0, false, nil
+}
+
+// rmattrNotAList is the refusal for a `:index` on a sub-path segment the family
+// declares single-valued.
+func rmattrNotAList(g rmattrGroup, tail, seg string) error {
+	return fmt.Errorf("%w: %q carries a :index, but %s addresses a single-valued RM attribute",
+		ErrUnsupportedDatatype, g.key(tail), seg)
 }
 
 // rmattrSegIndex splits a `:index` off a sub-path segment under the FLAT
@@ -170,11 +221,66 @@ func (ts rmattrTails) check(g rmattrGroup, own, sub map[string]bool) error {
 // `decode "<key>"` with the *base* key — so the census reads the refusal at the
 // same precision it reads a leaf's.
 func (ts rmattrTails) value(g rmattrGroup, seg, rmType string) (map[string]any, error) {
-	dv, err := dvFromSuffixes(rmType, false, ts.sub[seg])
+	return ts.valueAt(g, subTail(seg, ""), rmType, ts.sub[seg])
+}
+
+// listValue is [rmattrTails.value] for one slot of an indexed sub-path list.
+func (ts rmattrTails) listValue(g rmattrGroup, seg string, idx int, rmType string) (map[string]any, error) {
+	return ts.valueAt(g, subListTail(seg, idx, ""), rmType, ts.sublist[seg][idx])
+}
+
+// valueAt is the shared body: decode sfx as rmType, naming tail's own FLAT key on
+// failure.
+func (ts rmattrTails) valueAt(g rmattrGroup, tail, rmType string, sfx map[string]any) (map[string]any, error) {
+	dv, err := dvFromSuffixes(rmType, false, sfx)
 	if err != nil {
-		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, subTail(seg, "")), err)
+		return nil, fmt.Errorf("simplified: decode %q: %w", ts.key(g, tail), err)
 	}
 	return dv, nil
+}
+
+// listSlots returns the dense slot sequence of an indexed sub-path list, or nil
+// when the family instance carries none. The `:index` rules are the ones
+// [checkRMAttrIndexes] applies to a `_family:N` sequence — bounded by
+// [maxRepeatIndex], no gaps — because a gap here would fabricate an empty
+// instance out of a malformed payload exactly as it would there.
+func (ts rmattrTails) listSlots(g rmattrGroup, seg string) ([]int, error) {
+	slots := ts.sublist[seg]
+	if len(slots) == 0 {
+		return nil, nil
+	}
+	for _, idx := range slices.Sorted(maps.Keys(slots)) {
+		if idx > maxRepeatIndex {
+			return nil, fmt.Errorf("%w: %q :index %d exceeds bound %d",
+				ErrUnknownPath, ts.key(g, subListTail(seg, idx, "")), idx, maxRepeatIndex)
+		}
+	}
+	out := make([]int, 0, len(slots))
+	for i := range len(slots) {
+		if slots[i] == nil {
+			return nil, fmt.Errorf("%w: %s/%s sits in a sparse :index sequence (no :%d); the occurrences must run 0..%d",
+				ErrUnknownPath, g.prefix(), seg, i, len(slots)-1)
+		}
+		out = append(out, i)
+	}
+	return out, nil
+}
+
+// ownString reads one of a family's own suffixes as a string. present is false
+// when the payload did not spell it, so an RM-optional attribute stays absent
+// rather than becoming a coerced empty string; a value of another JSON kind is
+// refused here, where the FLAT key is still in hand to name it.
+func (ts rmattrTails) ownString(g rmattrGroup, suffix string) (value string, present bool, err error) {
+	v, present := ts.own[suffix]
+	if !present {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", true, fmt.Errorf("%w: %q must be a string, got %T",
+			ErrUnsupportedDatatype, ts.key(g, ownTail(suffix)), v)
+	}
+	return s, true, nil
 }
 
 // boolTail reads one of the interval's boundary Booleans, defaulting to def when
@@ -253,7 +359,7 @@ func intervalSuffixes(g rmattrGroup, ts rmattrTails, anchor string) (map[string]
 // decodeRMAttrNormalRange decodes `_normal_range` on a DV_ORDERED leaf — a
 // DV_INTERVAL of the leaf's own anchor type.
 func decodeRMAttrNormalRange(g rmattrGroup, anchor string) (any, error) {
-	ts, err := splitRMAttrTails(g)
+	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +383,7 @@ var refRangeSubTails = map[string]bool{"lower": true, "upper": true, "meaning": 
 // or a DV_CODED_TEXT under the Phase A rule — `|code` present selects the coded
 // builder — which is exactly what the corpus writes at both spellings.
 func decodeRMAttrReferenceRange(g rmattrGroup, anchor string) (any, error) {
-	ts, err := splitRMAttrTails(g)
+	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +434,7 @@ const matchCodes = "=<>?"
 // `/purpose` by the DV_CODED_TEXT one, which requires `|code`+`|value` and takes
 // `|terminology` when present.
 func decodeRMAttrTermMapping(g rmattrGroup, _ string) (any, error) {
-	ts, err := splitRMAttrTails(g)
+	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +496,7 @@ func decodeRMAttrNullReason(g rmattrGroup, _ string) (any, error) {
 // *are* the suffix map. Errors are wrapped naming the family prefix, the base key
 // the census scopes a datatype refusal by.
 func decodeRMAttrLeafValue(g rmattrGroup, rmType string) (any, error) {
-	ts, err := splitRMAttrTails(g)
+	ts, err := splitRMAttrTails(g, nil)
 	if err != nil {
 		return nil, err
 	}
