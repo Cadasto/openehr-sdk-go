@@ -842,6 +842,17 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
+      - docs/plans/2026-08-05-flat-rm-attributes.md
+    # Two RM invariants the generic example synthesiser used to violate were
+    # closed from the REQ-053/REQ-140 PR reviews (2026-08-05), both because an
+    # RM-invalid generated instance is also unrepresentable in FLAT:
+    #   - EVENT_CONTEXT.setting now pins the openehr-coded `238 other care`
+    #     default rather than an invented archetype-local code (Setting_valid).
+    #   - an unconstrained abstract PARTY_PROXY is now filled with PARTY_SELF,
+    #     not an empty PARTY_IDENTIFIED, which violates Basic_validity and on
+    #     the FLAT wire is indistinguishable from PARTY_SELF anyway. This is a
+    #     user-visible change to the ENTRY subject of every generated
+    #     composition (concreteFor, openehr/instance/generate.go).
     notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
@@ -1375,9 +1386,12 @@ requirements:
     # composer/_identifier:N and composer/relationship, which ADR 0015 gives no
     # carrier, an ADR decision rather than a codec one. That boundary is
     # asymmetric and deliberately so: decode refuses those spellings (census-
-    # visible), while encode projects the composer onto ctx/composer_name and
-    # DROPS its external_ref / identifiers rather than refuse every composition
-    # whose composer is properly referenced — one vendored corpus body is; and the ctx/ short forms ADR 0016 decision 3 declines for the
+    # visible), while encode projects ONE of them -- a PARTY_IDENTIFIED composer
+    # carrying a name keeps the name and DROPS its external_ref / identifiers,
+    # rather than refuse every composition whose composer is properly referenced
+    # (one vendored corpus body is). Every other shape is refused on encode too:
+    # a PARTY_RELATED composer, a PARTY_SELF with an external_ref, and a nameless
+    # PARTY_IDENTIFIED; and the ctx/ short forms ADR 0016 decision 3 declines for the
     # EVENT_CONTEXT optionals, which ride this grammar at their real paths
     # instead. Not an underscore question at all: the 19 keys this SDK's
     # WebTemplate projection does not carry (ism_transition/*, INTERVAL_EVENT

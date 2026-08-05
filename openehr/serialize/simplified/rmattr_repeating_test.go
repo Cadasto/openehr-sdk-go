@@ -412,3 +412,70 @@ func TestRepeatingNullFlavourOnlyInstanceRoundTrips(t *testing.T) {
 		t.Errorf("the null-flavour-only instance did not survive decode: %v", got)
 	}
 }
+
+// --- STRUCTURED leg -------------------------------------------------------
+
+// MarshalStructured delegates to encodeFlat, so the repeating owner walk
+// reaches it too — but STRUCTURED is a separate public surface and every other
+// repeating test here is FLAT-only. It nests the instances as an array, each
+// carrying its own `_uid`, and the OPT-free interconversion re-spells every
+// segment with an explicit index (`x:1/_uid:0`) and back.
+func TestRepeatingElementThroughStructured(t *testing.T) {
+	wt := repeatingLeafWT()
+	comp := repeatingLeafComp(
+		&rm.Element{
+			ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"},
+			UID:   &rm.HierObjectID{Value: "9fcc1c70-9349-444d-b9cb-8fa817697f50"},
+			Value: &rm.DVText{Value: "one"},
+		},
+		&rm.Element{
+			ArchetypeNodeID: "at0002", Name: rm.DVText{Value: "x"},
+			UID:   &rm.HierObjectID{Value: "9fcc1c70-9349-444d-b9cb-8fa817697f51"},
+			Value: &rm.DVText{Value: "two"},
+		},
+	)
+	s, err := MarshalStructured(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalStructured: %v", err)
+	}
+	back, err := UnmarshalStructured(s, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalStructured: %v", err)
+	}
+	viaStructured, err := MarshalFlat(back, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat after STRUCTURED: %v", err)
+	}
+	direct, err := MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	want, got := flatMap(t, direct), flatMap(t, viaStructured)
+	if len(want) != len(got) {
+		t.Errorf("key count %d -> %d through STRUCTURED", len(want), len(got))
+	}
+	for key, w := range want {
+		if g := got[key]; g != w {
+			t.Errorf("STRUCTURED round trip lost %s: %v, want %v", key, g, w)
+		}
+	}
+
+	// OPT-free FLAT -> STRUCTURED -> FLAT keeps each instance's own owner attrs.
+	sf, err := FlatToStructured(direct)
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	fs, err := StructuredToFlat(sf)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	free := flatMap(t, fs)
+	for key, want := range map[string]any{
+		"root/ev:0/x:0/_uid:0": "9fcc1c70-9349-444d-b9cb-8fa817697f50",
+		"root/ev:0/x:1/_uid:0": "9fcc1c70-9349-444d-b9cb-8fa817697f51",
+	} {
+		if got := free[key]; got != want {
+			t.Errorf("%s = %v, want %v", key, got, want)
+		}
+	}
+}

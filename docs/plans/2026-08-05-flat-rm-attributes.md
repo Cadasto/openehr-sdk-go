@@ -50,7 +50,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 | Phase C2 — party grammar (`_health_care_facility`, participations, `_identifier`, ENTRY `subject`) | done |
 | Phase C3 — DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL leaves + `_feeder_audit` | done |
 | Phase C4 — PROBE-089, census re-baseline, docs, status flips | done |
-| PR 2 opened (C0–C4) | |
+| PR 2 opened (C0–C4) | done |
 
 ## Design constraints (binding for every phase)
 
@@ -185,7 +185,7 @@ C3 consumes `partySuffixes` / `partyRMAttr` for FEEDER_AUDIT_DETAILS' `/location
 - [x] **STRUCTURED** gained a spelling for a bare leaf value beside the same leaf's members — the `"|"` member, i.e. the `"|"+suffix` convention with the empty suffix. It had to: a DV_MULTIMEDIA leaf always carries a bare uri *and* mandatory suffixes, so without it the leaf could not interconvert at all and two green PROBE-076 legs would have turned red. This closes the residual C1 recorded as an expected refusal (`_uid` / `_normal_range` beside a bare leaf), reversibly and without an OPT — `|value` would not have been reversible, since DV_ORDINAL and DV_CODED_TEXT spell a real `|value`.
 - [x] Census pins re-baselined: 885 → 1466 compared, 633 → 52 excluded (48.5% → 80.4%). Every `path not in web template` refusal bar 22 keys collapsed.
 
-**Residue this phase leaves** (all in `deviations.md` / `SKIPPED.md`): 52 corpus keys, none of them an underscore family this phase claimed — the composer boundary 23 (ADR 0015: `external_ref` 12 + party sub-structure 11), the DV_PROPORTION derived bare magnitudes 5, the two deferred families `_instruction_details` 3 + `_wf_definition` 2, and 20 keys the **WebTemplate builder** does not project at all (the `ism_transition/*` set 10 including its `_reason:0`, INTERVAL_EVENT `math_function` 3 + `width` 1 + `|sample_count` 1, ACTION `time` 1, OBSERVATION `history_origin` 1, CLUSTER `labresult/text_value` 1, ACTIVITY `action_archetype_id` 1). Nothing in that list is reachable by widening the underscore grammar.
+**Residue this phase leaves** (all in `deviations.md` / `SKIPPED.md`): 52 corpus keys, none of them an underscore family this phase claimed — the composer boundary 23 (ADR 0015: `external_ref` 12 + party sub-structure 11), the DV_PROPORTION derived bare magnitudes 5, the two deferred families `_instruction_details` 3 + `_wf_definition` 2, and 19 keys the **WebTemplate builder** does not project at all (the `ism_transition/*` set 10 including its `_reason:0`, INTERVAL_EVENT `math_function` 3 + `width` 1 + `|sample_count` 1, ACTION `time` 1, OBSERVATION `history_origin` 1, CLUSTER `labresult/text_value` 1, ACTIVITY `action_archetype_id` 1). Nothing in that list is reachable by widening the underscore grammar.
 
 
 ## Phase C4 — probe, census, docs, status flips *(PR 2 close-out)*
