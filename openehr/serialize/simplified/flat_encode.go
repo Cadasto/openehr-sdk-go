@@ -93,22 +93,24 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 		// Absent composer: nothing to represent, nothing substituted.
 	case *rm.PartySelf:
 		if c != nil {
-			out["ctx/composer_self"] = true
+			if err := composerSelfToCtx(out, *c); err != nil {
+				return err
+			}
 		}
 	case rm.PartySelf:
-		out["ctx/composer_self"] = true
+		if err := composerSelfToCtx(out, c); err != nil {
+			return err
+		}
 	case *rm.PartyIdentified:
 		if c != nil {
-			if c.Name == nil || *c.Name == "" {
-				return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+			if err := composerNameToCtx(out, *c); err != nil {
+				return err
 			}
-			out["ctx/composer_name"] = *c.Name
 		}
 	case rm.PartyIdentified:
-		if c.Name == nil || *c.Name == "" {
-			return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+		if err := composerNameToCtx(out, c); err != nil {
+			return err
 		}
-		out["ctx/composer_name"] = *c.Name
 	default:
 		return fmt.Errorf("%w: composer %T is not representable in the ctx/ short forms", ErrUnsupportedDatatype, comp.Composer)
 	}
@@ -120,6 +122,41 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// composerNameToCtx writes the composition's composer as `ctx/composer_name` —
+// the only spelling the ctx/ short form carries for a PARTY_IDENTIFIED (ADR
+// 0015).
+//
+// A composer that also carries an `external_ref` or `identifiers` keeps only
+// its name. That is a **drop, not a refusal**, and the one place this codec
+// makes that trade deliberately: the ctx/ short form has no key for either, and
+// decode refuses the real-path `composer/…` spellings that would carry them, so
+// no channel exists short of extending the grammar. Refusing instead would make
+// every composition whose composer is properly referenced — most real ones, and
+// one of the vendored corpus bodies — unencodable, which is a worse answer than
+// a documented projection loss for a format that is a lossy projection by
+// design. Registered in deviations.md § composer; the wire.md "none dropped"
+// claim is scoped around it.
+func composerNameToCtx(out map[string]any, c rm.PartyIdentified) error {
+	if c.Name == nil || *c.Name == "" {
+		return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+	}
+	out["ctx/composer_name"] = *c.Name
+	return nil
+}
+
+// composerSelfToCtx writes a PARTY_SELF composer as `ctx/composer_self`, which
+// is a bare Boolean: an `external_ref` beside it has nowhere to go and is
+// refused rather than dropped, the same policy partyProxyRMAttr applies at every
+// other PARTY_SELF position.
+func composerSelfToCtx(out map[string]any, c rm.PartySelf) error {
+	if c.ExternalRef != nil {
+		return fmt.Errorf("%w: composer PARTY_SELF carries an external_ref, which ctx/composer_self cannot spell — it is a bare Boolean (ADR 0015)",
+			ErrUnsupportedDatatype)
+	}
+	out["ctx/composer_self"] = true
 	return nil
 }
 
@@ -225,6 +262,23 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
 
 	if node.Max != 1 {
+		// A repeatable collapsed leaf is walked from its ELEMENT owners, not
+		// from their values (REQ-140). Resolving `…/value` across instances
+		// loses which ELEMENT each value came from, so the underscore
+		// attributes would be read off the *unindexed* owner path — which
+		// matches every instance at once (ErrPathAmbiguous, failing the whole
+		// document) and, were it unique, would stamp one instance's attributes
+		// onto every :index. It also misses an ELEMENT carrying only a
+		// `_null_flavour`, which has no value to resolve at all.
+		if !isContainer {
+			owners, err := repeatingLeafOwners(resolveRoot, relPath)
+			if err != nil {
+				return err
+			}
+			if len(owners) > 0 {
+				return emitRepeatingLeafOwners(out, node, flatPrefix, owners, ambiguous)
+			}
+		}
 		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)
 		if err != nil {
 			return skipNotFound(err, relPath)
@@ -373,4 +427,56 @@ func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath s
 		return nil
 	}
 	return rmattrEncode(owner, flatPath, out)
+}
+
+// repeatingLeafOwners resolves the ELEMENT instances hidden behind a repeatable
+// collapsed leaf, or nil when the node is not one — a childless leaf sitting on
+// a non-LOCATABLE attribute (`context/start_time`, an ISM_TRANSITION member,
+// ACTIVITY `timing`) has no ELEMENT owner and keeps the plain value walk.
+func repeatingLeafOwners(resolveRoot rm.Locatable, relPath string) ([]any, error) {
+	ownerRel, isElementValue := strings.CutSuffix(relPath, "/value")
+	if !isElementValue || ownerRel == "" {
+		return nil, nil
+	}
+	owners, err := rmpath.ItemsAtPath(resolveRoot, ownerRel)
+	if err != nil {
+		return nil, skipNotFound(err, ownerRel)
+	}
+	for _, owner := range owners {
+		if _, isElement := as[rm.Element](owner); !isElement {
+			return nil, nil
+		}
+	}
+	return owners, nil
+}
+
+// emitRepeatingLeafOwners writes one :index per resolved ELEMENT instance: its
+// collapsed value — absent when the ELEMENT carries only a `_null_flavour` —
+// followed by that same instance's underscore attributes.
+func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPrefix string, owners []any, ambiguous map[string]bool) error {
+	if err := refuseReusedSibling(node, ambiguous); err != nil {
+		return err
+	}
+	// The :index counts emitted instances, not RM list positions — an instance
+	// contributing no FLAT key is omitted without consuming an index, for the
+	// reason spelled out in emitNode.
+	idx := 0
+	for _, owner := range owners {
+		sub := make(map[string]any)
+		flatPath := flatPrefix + "/" + node.ID + ":" + strconv.Itoa(idx)
+		if el, isElement := as[rm.Element](owner); isElement && el.Value != nil && !rm.IsTypedNil(el.Value) {
+			if err := leafToFlat(sub, flatPath, el.Value, node.RMType, leafListOpen(node)); err != nil {
+				return err
+			}
+		}
+		if err := rmattrEncode(owner, flatPath, sub); err != nil {
+			return err
+		}
+		if len(sub) == 0 {
+			continue
+		}
+		maps.Copy(out, sub)
+		idx++
+	}
+	return nil
 }

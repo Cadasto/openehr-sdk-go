@@ -746,6 +746,19 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 			predType[bare] = next.RMType
 			if seg.idx >= 0 {
 				predIndex[bare] = seg.idx
+				// A collapsed leaf's index belongs to the ELEMENT the Web
+				// Template folded away, one attribute up: placement keys on
+				// the *container* segment's path, so an index stored only
+				// under the leaf's own `…/value` spelling is never read and
+				// every instance lands on list slot 0 — a duplicate placement
+				// that refuses the second one (REQ-140). A template that does
+				// carry a node for the owner itself has already recorded its
+				// own index there, and that one wins.
+				if owner, collapsed := strings.CutSuffix(bare, "/value"); collapsed && owner != "" {
+					if _, taken := predIndex[owner]; !taken {
+						predIndex[owner] = seg.idx
+					}
+				}
 			}
 		}
 		node = next

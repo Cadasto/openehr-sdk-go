@@ -748,3 +748,81 @@ func elementValue[T any](t *testing.T, comp *rm.Composition) T {
 	t.Fatalf("no ELEMENT carrying a %T found under the observation", zero)
 	return zero
 }
+
+// --- interval bounds ------------------------------------------------------
+
+// A bounded interval end must carry a bound. Encode used to accept an end whose
+// `*_unbounded` flag was false while the bound was Void, and the two bound
+// representations failed differently: an interface-typed bound
+// (`DVInterval[DVOrdered]`, what a canonical decode produces) emitted nothing —
+// decode then read the opposite of what the flags said — while a concrete-typed
+// bound put its Go zero value on the wire as a *fabricated* bound, a
+// `|magnitude` of 0 under an empty, RM-mandatory `|unit`. Both are refused.
+func TestIntervalBoundedEndWithoutBoundRefused(t *testing.T) {
+	lower := rm.DVQuantity{Magnitude: 1, Units: "mm"}
+	for name, encode := range map[string]func(map[string]any) error{
+		// Concrete bound type: Upper is the datatype's zero value.
+		"concrete": func(out map[string]any) error {
+			return intervalToFlat(out, "x/_normal_range", "DV_QUANTITY",
+				rm.Interval[rm.DVQuantity]{Lower: lower})
+		},
+		// Interface bound type: Upper is a nil DV_ORDERED.
+		"interface": func(out map[string]any) error {
+			return intervalToFlat(out, "x/_normal_range", "DV_QUANTITY",
+				rm.Interval[rm.DVOrdered]{Lower: lower})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := map[string]any{}
+			err := encode(out)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			for key := range out {
+				if strings.Contains(key, "/upper") {
+					t.Errorf("a refused bound still wrote %q", key)
+				}
+			}
+		})
+	}
+}
+
+// The refusal must not catch a legitimately zero bound: DV_COUNT's magnitude of
+// 0 is a real lower bound, and it carries no empty RM-mandatory suffix.
+func TestIntervalZeroCountBoundEncodes(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "x/_normal_range", "DV_COUNT", rm.Interval[rm.DVCount]{
+		Lower: rm.DVCount{Magnitude: 0},
+		Upper: rm.DVCount{Magnitude: 10},
+	}); err != nil {
+		t.Fatalf("intervalToFlat on a 0..10 count range: %v", err)
+	}
+	for key, want := range map[string]any{
+		"x/_normal_range/lower": int64(0),
+		"x/_normal_range/upper": int64(10),
+	} {
+		if got := out[key]; got != want {
+			t.Errorf("%s = %#v, want %#v", key, got, want)
+		}
+	}
+}
+
+// An end genuinely marked unbounded still writes only its flag — the shape the
+// refusal above must leave alone.
+func TestIntervalUnboundedEndEncodes(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "x/_normal_range", "DV_QUANTITY", rm.Interval[rm.DVQuantity]{
+		Lower:          rm.DVQuantity{Magnitude: 1, Units: "mm"},
+		UpperUnbounded: true,
+	}); err != nil {
+		t.Fatalf("intervalToFlat on a half-open range: %v", err)
+	}
+	if got := out["x/_normal_range|upper_unbounded"]; got != true {
+		t.Errorf("|upper_unbounded = %v, want true", got)
+	}
+	for key := range out {
+		if strings.Contains(key, "/upper") {
+			t.Errorf("an unbounded end wrote a bound key %q", key)
+		}
+	}
+}

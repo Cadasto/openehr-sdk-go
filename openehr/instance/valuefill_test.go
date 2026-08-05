@@ -115,3 +115,47 @@ func TestGeneratedSettingSatisfiesSettingValid(t *testing.T) {
 		})
 	}
 }
+
+// TestGeneratedSubjectSatisfiesBasicValidity — REQ-107. ENTRY.subject is an
+// RM-mandatory PARTY_PROXY, and the generator fills an unconstrained abstract
+// attribute with a bare instance of its concrete stand-in. PARTY_IDENTIFIED is
+// not a valid stand-in there: its invariant `Basic_validity` requires at least
+// one of `name`, `identifiers` or `external_ref`, so the empty one carried an
+// RM violation from the moment it was generated — and on the FLAT wire it is
+// also indistinguishable from PARTY_SELF, which the simplified codec spells by
+// the absence of every party key (PR #89 review). PARTY_SELF is the only
+// PARTY_PROXY subtype that is valid with no attributes at all.
+func TestGeneratedSubjectSatisfiesBasicValidity(t *testing.T) {
+	name := "Test Composer"
+	for _, fixture := range []string{"body_weight", "vital_signs", "minimal_observation.en.v1"} {
+		t.Run(fixture, func(t *testing.T) {
+			out, err := instance.Generate(context.Background(), compileFixture(t, fixture), instance.Options{
+				Policy:    instance.Example,
+				Territory: "NL",
+				Composer:  &rm.PartyIdentified{Name: &name},
+			})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			comp, err := instance.AsComposition(out)
+			if err != nil {
+				t.Fatalf("AsComposition: %v", err)
+			}
+			for _, item := range comp.Content {
+				entry, isEntry := item.(*rm.Observation)
+				if !isEntry {
+					continue
+				}
+				switch subject := entry.Subject.(type) {
+				case *rm.PartySelf, rm.PartySelf:
+				case *rm.PartyIdentified:
+					if subject.Name == nil && subject.ExternalRef == nil && len(subject.Identifiers) == 0 {
+						t.Error("generated ENTRY.subject is an empty PARTY_IDENTIFIED, which violates Basic_validity")
+					}
+				case nil:
+					t.Error("generated ENTRY.subject is absent (ENTRY.subject is RM-mandatory)")
+				}
+			}
+		})
+	}
+}

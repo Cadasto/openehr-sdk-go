@@ -555,3 +555,57 @@ func TestRMAttrPartyRefusals(t *testing.T) {
 		})
 	}
 }
+
+// --- party validity refusals ---------------------------------------------
+
+// A PARTY_IDENTIFIED that satisfies none of `name`, `identifiers` or
+// `external_ref` writes no key at all, and the absence of every party key is how
+// this grammar spells PARTY_SELF at an RM-mandatory position. Encoding it would
+// round-trip the party back as a *different subtype*, so it is refused — which
+// is also what the RM already says (invariant `Basic_validity`).
+func TestEmptyPartyIdentifiedRefused(t *testing.T) {
+	empty := ""
+	for name, party := range map[string]rm.PartyProxy{
+		"no name, no identifier, no external_ref": &rm.PartyIdentified{},
+		"present but empty name":                  &rm.PartyIdentified{Name: &empty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := partyRMAttr(out, "x/_provider", party); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if len(out) != 0 {
+				t.Errorf("a refused party still wrote %v", out)
+			}
+		})
+	}
+}
+
+// A party carrying any one of the three is fine — the refusal above must not
+// widen into "a party needs a name".
+func TestPartyIdentifiedWithOnlyIdentifierEncodes(t *testing.T) {
+	out := map[string]any{}
+	party := &rm.PartyIdentified{Identifiers: []rm.DVIdentifier{{ID: "id-0"}}}
+	if err := partyRMAttr(out, "x/_provider", party); err != nil {
+		t.Fatalf("partyRMAttr: %v", err)
+	}
+	if got := out["x/_provider/_identifier:0|id"]; got != "id-0" {
+		t.Errorf("_identifier:0|id = %v, want id-0", got)
+	}
+}
+
+// PARTICIPATION.performer is RM-mandatory, and at a mandatory position the
+// absence of every party key is PARTY_SELF. A nil performer written as absence
+// would have decode invent a PARTY_SELF nobody put there.
+func TestParticipationNilPerformerRefused(t *testing.T) {
+	out := map[string]any{}
+	err := participationsRMAttr(out, "x", "_participation", []rm.Participation{{
+		Function: rm.DVText{Value: "requester"},
+	}})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "performer") {
+		t.Errorf("err = %v, want it to name the performer", err)
+	}
+}

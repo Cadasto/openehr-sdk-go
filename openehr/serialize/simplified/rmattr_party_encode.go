@@ -96,8 +96,25 @@ func partySuffixesToFlat(out map[string]any, path string, p any) ([]rm.DVIdentif
 
 // partyIdentifiedToFlat writes the PARTY_IDENTIFIED half of a party (which
 // PARTY_RELATED embeds) and returns its identifier list.
+//
+// A party carrying none of `name`, `identifiers` or `external_ref` is refused:
+// the RM already forbids it (PARTY_IDENTIFIED invariant `Basic_validity`), and
+// on this wire it is worse than invalid — it writes no key at all, and the
+// absence of every party key is precisely how the grammar spells PARTY_SELF at
+// an RM-mandatory position. Emitting it would round-trip a PARTY_IDENTIFIED
+// back as a *different subtype* (REQ-140). An empty `name` is refused on the
+// same grounds (`Name_valid`), since decode cannot tell `|name: ""` from a
+// party that never carried one.
 func partyIdentifiedToFlat(out map[string]any, path string, p rm.PartyIdentified) ([]rm.DVIdentifier, error) {
+	if p.Name == nil && p.ExternalRef == nil && len(p.Identifiers) == 0 {
+		return nil, fmt.Errorf("%w: %q is a PARTY_IDENTIFIED carrying neither a name, an identifier nor an external_ref (RM invariant `Basic_validity`); it would write no key, and no party key is how this grammar spells PARTY_SELF",
+			ErrUnsupportedDatatype, path)
+	}
 	if p.Name != nil {
+		if *p.Name == "" {
+			return nil, fmt.Errorf("%w: %q is present but empty (RM invariant `Name_valid`); decode reads an absent `|name` as a party that never carried one",
+				ErrUnsupportedDatatype, path+"|name")
+		}
 		out[path+"|name"] = *p.Name
 	}
 	if p.ExternalRef != nil {
@@ -131,16 +148,24 @@ func partyRefToFlat(out map[string]any, path string, ref rm.PartyRef) error {
 	default:
 		out[path+"|type"] = ref.Type
 	}
+	// Each pointer arm re-checks for nil: a typed nil held in the OBJECT_ID
+	// interface misses the `case nil` arm (see objectRefRMAttr).
 	switch id := ref.ID.(type) {
 	case nil:
 		return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
 	case rm.GenericID:
 		out[path+"|id"], out[path+"|id_scheme"] = id.Value, id.Scheme
 	case *rm.GenericID:
+		if id == nil {
+			return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
+		}
 		out[path+"|id"], out[path+"|id_scheme"] = id.Value, id.Scheme
 	case rm.HierObjectID:
 		out[path+"|id"] = id.Value
 	case *rm.HierObjectID:
+		if id == nil {
+			return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
+		}
 		out[path+"|id"] = id.Value
 	default:
 		return fmt.Errorf("%w: %q cannot carry a %T; only GENERIC_ID (with `|id_scheme`) and HIER_OBJECT_ID (without) are distinguishable in this suffix set",
@@ -181,6 +206,14 @@ func participationRMAttr(out map[string]any, path string, p rm.Participation) er
 			return err
 		}
 		out[path+"|mode"] = rubric
+	}
+	// PARTICIPATION.performer is RM-mandatory, and at a mandatory position the
+	// absence of every party key *is* PARTY_SELF (see partySuffixesToFlat). A
+	// nil performer therefore cannot be written as absence without decode
+	// reading a PARTY_SELF nobody put there — refuse it instead.
+	if p.Performer == nil || rm.IsTypedNil(p.Performer) {
+		return fmt.Errorf("%w: %q carries no PARTICIPATION.performer, which is RM-mandatory; writing nothing is how this grammar spells PARTY_SELF, so decode would invent one",
+			ErrUnsupportedDatatype, path)
 	}
 	ids, err := partySuffixesToFlat(out, path, p.Performer)
 	if err != nil {

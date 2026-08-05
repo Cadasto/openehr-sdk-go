@@ -650,8 +650,15 @@ func concreteFor(rmType string) string {
 		return "DV_TEXT"
 	case "LOCATABLE":
 		return "CLUSTER"
+	// PARTY_SELF, not PARTY_IDENTIFIED: the generator fills an unconstrained
+	// PARTY_PROXY with no attributes, and PARTY_SELF is the only subtype that
+	// is RM-valid empty. PARTY_IDENTIFIED requires at least one of `name`,
+	// `identifiers` or `external_ref` (invariant `Basic_validity`), so the
+	// empty one this used to build was invalid the moment it was generated —
+	// and PARTY_SELF is in any case the conventional default for a
+	// self-referencing ENTRY `subject`.
 	case "PARTY_PROXY":
-		return "PARTY_IDENTIFIED"
+		return "PARTY_SELF"
 	// AOM 1.4 primitive short names → canonical DV wrapper.
 	case "DURATION":
 		return "DV_DURATION"

@@ -18,6 +18,7 @@ package simplified
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -242,15 +243,11 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // type it cannot be nil at all, so the flag is the only channel that can say
 // "no bound here").
 func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interval[T]) error {
-	if !iv.LowerUnbounded {
-		if _, err := emitLeafValue(out, base+"/lower", any(iv.Lower), anchor, false, false); err != nil {
-			return err
-		}
+	if err := intervalBoundToFlat(out, base, anchor, "lower", any(iv.Lower), iv.LowerUnbounded); err != nil {
+		return err
 	}
-	if !iv.UpperUnbounded {
-		if _, err := emitLeafValue(out, base+"/upper", any(iv.Upper), anchor, false, false); err != nil {
-			return err
-		}
+	if err := intervalBoundToFlat(out, base, anchor, "upper", any(iv.Upper), iv.UpperUnbounded); err != nil {
+		return err
 	}
 	if iv.LowerUnbounded {
 		out[base+"|lower_unbounded"] = true
@@ -264,6 +261,47 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 	if !iv.UpperIncluded {
 		out[base+"|upper_included"] = false
 	}
+	return nil
+}
+
+// intervalBoundToFlat writes one end of a DV_INTERVAL, or nothing when that end
+// is unbounded.
+//
+// A *bounded* end must carry a bound the wire can actually spell. The RM ties
+// the flag to the value directly — `lower_unbounded = (lower = Void)` — so an
+// end that claims to be bounded and holds no usable bound is an invalid
+// interval, and neither way of papering over it is acceptable: with an
+// interface-typed bound (`DVInterval[DVOrdered]`, what a canonical decode
+// produces) a Void bound emits nothing at all, leaving decode to read the
+// opposite of what the flags say, while a concrete-typed bound cannot be nil
+// and its Go zero value puts a *fabricated* bound on the wire (`|magnitude` 0
+// under an empty, RM-mandatory `|unit`). Refuse both (REQ-140).
+//
+// The empty-suffix test is what separates the fabricated zero from a legitimate
+// one: every suffix an interval bound spells is RM-mandatory for its datatype —
+// the optional decorations are written only when set — so an empty string means
+// a mandatory field was never populated. A genuine zero magnitude (`DV_COUNT`'s
+// `0` lower bound) carries no empty suffix and passes.
+func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded bool) error {
+	if unbounded {
+		return nil
+	}
+	path := base + "/" + end
+	sub := make(map[string]any)
+	if _, err := emitLeafValue(sub, path, bound, anchor, false, false); err != nil {
+		return err
+	}
+	if len(sub) == 0 {
+		return fmt.Errorf("%w: %q carries no %s bound but is not marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so decode would read a bounded end that no key spells",
+			ErrUnsupportedDatatype, path, end, end, end, end)
+	}
+	for key, v := range sub {
+		if s, isString := v.(string); isString && s == "" {
+			return fmt.Errorf("%w: %q is RM-mandatory on the %s bound but empty — an unpopulated %s is not an unbounded end, which is spelled `%s|%s_unbounded`",
+				ErrUnsupportedDatatype, key, anchor, anchor, base, end)
+		}
+	}
+	maps.Copy(out, sub)
 	return nil
 }
 

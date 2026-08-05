@@ -365,6 +365,10 @@ func objectRefRMAttr(out map[string]any, path string, ref rm.ObjectRefLike) erro
 	if !plain {
 		return fmt.Errorf("%w: %q cannot carry a %T; the suffix set carries no subtype discriminator", ErrUnsupportedDatatype, path, ref)
 	}
+	// A typed nil (`(*GenericID)(nil)` held in the OBJECT_ID interface) misses
+	// the `case nil` arm, so each pointer arm re-checks: MarshalFlat is public
+	// API and a Go-constructed OBJECT_REF can carry one. uidRMAttr guards the
+	// same shape.
 	switch id := o.ID.(type) {
 	case nil:
 		return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
@@ -372,11 +376,17 @@ func objectRefRMAttr(out map[string]any, path string, ref rm.ObjectRefLike) erro
 		out[path+"|id"] = id.Value
 		out[path+"|id_scheme"] = id.Scheme
 	case *rm.GenericID:
+		if id == nil {
+			return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
+		}
 		out[path+"|id"] = id.Value
 		out[path+"|id_scheme"] = id.Scheme
 	case rm.HierObjectID:
 		out[path+"|id"] = id.Value
 	case *rm.HierObjectID:
+		if id == nil {
+			return fmt.Errorf("%w: %q is RM-mandatory on OBJECT_REF but absent", ErrUnsupportedDatatype, path+"|id")
+		}
 		out[path+"|id"] = id.Value
 	default:
 		return fmt.Errorf("%w: %q cannot carry a %T; only GENERIC_ID (with `|id_scheme`) and HIER_OBJECT_ID (without) are distinguishable in this suffix set",
