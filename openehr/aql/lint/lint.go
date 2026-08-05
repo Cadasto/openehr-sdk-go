@@ -200,12 +200,22 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 // spec's judgement on the construct is reported, rather than in the parser or
 // the emitter. The builder refuses to CONSTRUCT either shape.
 func topIssues(doc *parse.Document) []Issue {
-	if doc.Top == nil {
+	// Keyed on PRESENCE, not on the decoded bound: an out-of-range count
+	// leaves [parse.Document.Top] nil (nothing is truncated into a bound), and
+	// keying on that would silence both findings for exactly the query that
+	// carries a deprecated clause AND an unusable count.
+	if !doc.HasTop {
 		return nil
+	}
+	// Name the clause when it decoded; an unrepresentable count has no
+	// canonical rendering, so the code carries the construct alone.
+	clause := "TOP"
+	if doc.Top != nil {
+		clause = aql.FormatTop(doc.Top)
 	}
 	issues := []Issue{{
 		Code:     "aql_deprecated_top",
-		Detail:   fmt.Sprintf("SELECT %s is deprecated from openEHR QUERY Release-1.1.0 and slated for removal; use LIMIT with ORDER BY", aql.FormatTop(doc.Top)),
+		Detail:   fmt.Sprintf("SELECT %s is deprecated from openEHR QUERY Release-1.1.0 and slated for removal; use LIMIT with ORDER BY", clause),
 		Severity: Warning,
 	}}
 	if doc.HasLimit {

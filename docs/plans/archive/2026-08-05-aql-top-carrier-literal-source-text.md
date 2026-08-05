@@ -1,10 +1,10 @@
 # Plan — AQL `SELECT TOP` carrier and literal source text
 
 **Date:** 2026-08-05
-**Status:** Complete
+**Status:** Landed
 **Owner:** SDK maintainers
-**Covers:** **REQ-118** ([clinical-modeling.md § REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text)) — amends [§ REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (residual list) and extends the [§ REQ-109](../specifications/clinical-modeling.md#layer-2--shape-ast-walk-no-cdr) Layer-2 lint catalogue by two codes
-**Probes:** [PROBE-087](../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (extended), [PROBE-088](../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) (extended); PROBE-028 unaffected
+**Covers:** **REQ-118** ([clinical-modeling.md § REQ-118](../../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text)) — amends [§ REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (residual list) and extends the [§ REQ-109](../../specifications/clinical-modeling.md#layer-2--shape-ast-walk-no-cdr) Layer-2 lint catalogue by two codes
+**Probes:** [PROBE-087](../../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (extended), [PROBE-088](../../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) (extended); PROBE-028 unaffected
 **Implementation:** landed
 **Depends on:** REQ-113 (structured AST), REQ-117 (catalogue completion, `LiteralExpr` / in-text paging), REQ-055 (canonical write form) — all landed
 **Defers:** `TOP` semantics for a CDR that tolerates `TOP` + `LIMIT`; source text for arbitrary SELECT expressions or WHERE-side values; any grammar-profile change (no new `SDK-AQL-NNN` row)
@@ -16,7 +16,7 @@ Close the two remaining fidelity holes in the structured AQL AST that a consumer
 ## Definition of Ready
 
 - **`Covers:`** names REQ-118 and the two REQs it amends/extends. ✅
-- Canonical normative prose exists: [clinical-modeling.md § REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) + the [REQ.md](../specifications/REQ.md) registry row + the [traceability.yaml](../specifications/traceability.yaml) entry. ✅
+- Canonical normative prose exists: [clinical-modeling.md § REQ-118](../../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) + the [REQ.md](../../specifications/REQ.md) registry row + the [traceability.yaml](../../specifications/traceability.yaml) entry. ✅
 - No irreversible fork needs an ADR: the two live decisions (a dedicated `TOP` carrier rather than `LimitExpr` reuse; canonical emission with read-side-only source text) follow from the grammar profile and the already-normative canonical write form, and are stated in the REQ-118 § itself. ✅
 - Ground truth quoted, not guessed: openEHR **QUERY Release-1.1.0 § 4.4.3** for the syntax, the deprecation, and the `TOP`-with-`LIMIT` prohibition; `resources/aql/grammar/active/AqlParser.g4` (`top : TOP INTEGER direction=(FORWARD|BACKWARD)?`) for what the profile actually admits. ✅
 
@@ -24,9 +24,9 @@ Close the two remaining fidelity holes in the structured AQL AST that a consumer
 
 - Code and tests carry `// REQ-118` / `// PROBE-087` / `// PROBE-088` citations.
 - `traceability.yaml` `implementation: proposed → landed`, REQ.md **Impl.** column `planned → landed`.
-- PROBE-080/087 case counts in [conformance.md](../specifications/conformance.md) and [clinical-modeling.md](../specifications/clinical-modeling.md) re-pinned to the grown corpus (they are stated as exact numbers, so a stale count is drift).
+- PROBE-080/087 case counts in [conformance.md](../../specifications/conformance.md) and [clinical-modeling.md](../../specifications/clinical-modeling.md) re-pinned to the grown corpus (they are stated as exact numbers, so a stale count is drift).
 - `make spec-check` and `make ci` pass.
-- Plan archived under [`docs/plans/archive/`](archive/).
+- Plan archived under [`docs/plans/archive/`](.). ✅
 
 ## Implementation checklist
 
@@ -38,8 +38,8 @@ Close the two remaining fidelity holes in the structured AQL AST that a consumer
 | Phase 3 — builder write side + channel exclusivity | done |
 | Phase 4 — lint diagnosis (2 codes) | done |
 | Phase 5 — corpus, goldens, count re-pins | done |
-| `make spec-check` | |
-| `make ci` | |
+| `make spec-check` | done — OK |
+| `make ci` | done — 0 lint issues, all tests pass |
 
 ## Phases
 
@@ -87,7 +87,7 @@ Close the two remaining fidelity holes in the structured AQL AST that a consumer
 - Add the two Layer-2 codes whose canonical catalogue home is the REQ-109 table: `aql_deprecated_top` (Warning, once per query carrying a `TOP`) and `aql_top_with_limit` (Error, `TOP` together with a `LIMIT` clause).
 - Both read the parsed structure — no prose keying, no second parse.
 
-**Verification:** `TestLintDeprecatedTop`, `TestLintTopWithLimit` (both codes present, `Result.OK()` false only for the Error), and one clean-query case asserting neither fires. PROBE-028's cassette multiset is unchanged — assert that explicitly rather than assuming it.
+**Verification:** `TestLintDeprecatedTop`, `TestLintTopWithLimit` (both codes present, `Result.OK()` false only for the Error), `TestLintNoTopClauseRaisesNeitherCode` (the negative control, including a `LIMIT`-only query), and `TestLintTopWithUnrepresentableCount` (presence vs representability — see below). PROBE-028's cassette multiset is unchanged, and already pinned by `TestProbe028AQLLint`, which asserts exact per-cassette code multisets (`valid.aql` → none) — a spuriously firing code fails it.
 
 **Definition of done:** a query the openEHR spec forbids is reported by the SDK's own gate, at Error severity, without the emitter or the parser having to refuse it.
 
@@ -108,10 +108,12 @@ Both were open questions the ask left underdetermined; neither needed an ADR bec
 - **`TOP $n` is not modelled.** The profile's `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` admits no `PARAMETER`, so reusing the `LimitExpr` vocabulary (which carries `ParamLimit`) would have created an AST shape whose emission the parser rejects. A dedicated `aql.TopClause{N, Dir}` carries what the grammar actually admits — and the direction, which `LimitExpr` cannot hold at all. The `SDK-AQL-003` parameter relaxation is deliberately **not** extended to a construct the spec is removing.
 - **A canonical renderer for a constructed value already exists.** `aql.FormatValue` is public, so the "export the renderer" alternative needed no work; only the *as-written* half was missing, which is what `LiteralExpr.Raw` now carries. The source span is read from the character stream rather than `GetText()`, because `GetText()` drops interior whitespace (`- 5` → `-5`) and a canonicalisation is exactly what this field exists to avoid.
 
+- **Lint keys on clause PRESENCE, not on the decoded bound.** Caught in review: an out-of-range `TOP` count leaves the decoded carrier nil (nothing is truncated into a bound), so a check keyed on it went silent for exactly the query that pairs a deprecated clause with an unusable count — and with a `LIMIT`. `parse.Document` now separates `HasTop` (read from the tree) from `Top` (the decoded bound), and REQ-118 states the rule normatively.
+
 ## Mapping to specs
 
-- [docs/specifications/clinical-modeling.md § REQ-118](../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) — normative contract (carriers, prohibited combination, write side, amended residual list)
-- [docs/specifications/clinical-modeling.md § REQ-109 Layer 2](../specifications/clinical-modeling.md#layer-2--shape-ast-walk-no-cdr) — canonical home of the two new lint codes
-- [docs/specifications/conformance.md § PROBE-087](../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) / [§ PROBE-088](../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) — acceptance
-- [docs/specifications/REQ.md](../specifications/REQ.md) — registry row
-- [resources/aql/grammar/DIVERGENCES.md](../../resources/aql/grammar/DIVERGENCES.md) — unchanged; this plan adds no grammar delta
+- [docs/specifications/clinical-modeling.md § REQ-118](../../specifications/clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) — normative contract (carriers, prohibited combination, write side, amended residual list)
+- [docs/specifications/clinical-modeling.md § REQ-109 Layer 2](../../specifications/clinical-modeling.md#layer-2--shape-ast-walk-no-cdr) — canonical home of the two new lint codes
+- [docs/specifications/conformance.md § PROBE-087](../../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) / [§ PROBE-088](../../specifications/conformance.md#probe-088--aql-builder-containment-and-paging-stability) — acceptance
+- [docs/specifications/REQ.md](../../specifications/REQ.md) — registry row
+- [resources/aql/grammar/DIVERGENCES.md](../../../resources/aql/grammar/DIVERGENCES.md) — unchanged; this plan adds no grammar delta

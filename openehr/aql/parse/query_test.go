@@ -1303,7 +1303,13 @@ func TestParseQueryLiteralSourceText(t *testing.T) {
 		"double_quoted_string": {`SELECT "dq" FROM EHR e`, `"dq"`, aql.StringValue{S: "dq"}, "SELECT 'dq' FROM EHR e"},
 		"single_quoted_string": {"SELECT 'sq' FROM EHR e", "'sq'", aql.StringValue{S: "sq"}, "SELECT 'sq' FROM EHR e"},
 		"boolean_keyword":      {"SELECT TRUE FROM EHR e", "TRUE", aql.BoolValue{B: true}, "SELECT true FROM EHR e"},
-		"null_keyword":         {"SELECT null FROM EHR e", "null", aql.NullValue{}, "SELECT NULL FROM EHR e"},
+		// Interior whitespace: `numericPrimitive : … | SYM_MINUS
+		// numericPrimitive` admits a space after the sign, and GetText() would
+		// concatenate the tokens to `-5` — a canonicalisation, which is what
+		// this field exists to avoid. The span is read from the character
+		// stream instead, so `- 5` survives verbatim.
+		"negative_with_space": {"SELECT - 5 FROM EHR e", "- 5", aql.IntValue{N: -5}, "SELECT -5 FROM EHR e"},
+		"null_keyword":        {"SELECT null FROM EHR e", "null", aql.NullValue{}, "SELECT NULL FROM EHR e"},
 		// A bare `$p` is NOT a projection: `columnExpr : identifiedPath |
 		// primitive | aggregateFunctionCall | functionCall` admits no
 		// PARAMETER, so a parameter literal only reaches LiteralExpr as a

@@ -517,3 +517,36 @@ func TestLintNoTopClauseRaisesNeitherCode(t *testing.T) {
 		})
 	}
 }
+
+// TestLintTopWithUnrepresentableCount pins the split between PRESENCE and
+// REPRESENTABILITY (REQ-118). A `TOP` count outside Go `int` leaves
+// parse.Document.Top nil — nothing is truncated into a bound — but the query
+// still USED the deprecated construct, and still pairs it with a LIMIT the spec
+// forbids. Keying the checks on the decoded bound silenced both findings for
+// exactly this query; they key on Document.HasTop instead.
+// REQ-118 · REQ-109
+func TestLintTopWithUnrepresentableCount(t *testing.T) {
+	const oor = "SELECT TOP 99999999999999999999 e/ehr_id/value FROM EHR e LIMIT 10"
+	res := lint.LintString(oor, nil)
+	if !has(res, "aql_deprecated_top") {
+		t.Errorf("aql_deprecated_top not raised for an out-of-range TOP: %v", codes(res))
+	}
+	if !has(res, "aql_top_with_limit") {
+		t.Errorf("aql_top_with_limit not raised for an out-of-range TOP beside a LIMIT: %v", codes(res))
+	}
+	if res.OK() {
+		t.Error("Result.OK() = true, want false (the TOP+LIMIT combination is an Error)")
+	}
+	// The flat view must still refuse to invent a bound: presence is known,
+	// the count is not.
+	doc, err := parse.Parse(oor)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if !doc.HasTop {
+		t.Error("Document.HasTop = false, want true (the clause is present in the source)")
+	}
+	if doc.Top != nil {
+		t.Errorf("Document.Top = %+v, want nil (an unrepresentable count must not become a bound)", *doc.Top)
+	}
+}

@@ -18,13 +18,9 @@ Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ 
 
 The fourth plan in this set — the upstream FLAT parity harness — **landed 2026-08-01 and was archived** ([archive/2026-07-16-web-template-tests-conformance.md](archive/2026-07-16-web-template-tests-conformance.md)): PROBE-086 is Implemented (Sandbox), and REQ-080's roadmap row moved `planned → partial`.
 
+The AQL read-side fidelity plan **landed 2026-08-05 and was archived** ([archive/2026-08-05-aql-top-carrier-literal-source-text.md](archive/2026-08-05-aql-top-carrier-literal-source-text.md)): REQ-118 is `landed`, the deprecated `SELECT TOP` clause parses/emits/builds instead of being refused, a projected literal carries its source text, and two new lint codes report the spec-forbidden `TOP` + `LIMIT` pairing. `TOP $n` stays unmodelled — the grammar admits no parameter there.
+
 The AQL expressivity plan **landed 2026-08-04 and was archived** ([archive/2026-08-04-aql-expressivity-completion.md](archive/2026-08-04-aql-expressivity-completion.md)): REQ-117 is `landed`, PROBE-087 (structured-AST catalogue completeness) and PROBE-088 (builder containment + in-text paging stability) are Implemented, and the only surviving `aql.ErrIncompleteAST` class is an integer literal the AST cannot represent. A builder entry point for a FROM-root containment junction stays deferred.
-
-### AQL read-side fidelity (2026-08-05)
-
-| Plan | Scope | Covers | Probe |
-|---|---|---|---|
-| [2026-08-05-aql-top-carrier-literal-source-text.md](2026-08-05-aql-top-carrier-literal-source-text.md) | The deprecated `SELECT TOP n [FORWARD\|BACKWARD]` clause as a parse **and** build carrier, a projected literal's source text, and the lint diagnosis for the spec-forbidden `TOP` + `LIMIT` combination | REQ-118 (amends REQ-117's residual list; extends the REQ-109 Layer-2 codes) | PROBE-087 / PROBE-088 (extended) |
 
 ### Simplified formats — WebTemplate + FLAT/STRUCTURED (planned umbrella)
 
