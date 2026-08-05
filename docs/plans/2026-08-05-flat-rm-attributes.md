@@ -3,17 +3,17 @@
 > **For agentic workers:** execute task-by-task with TDD (failing test → minimal code → green → commit). Each phase names its files, interfaces, and verification commands. Workers see only their own phase — the **Interfaces** blocks and the Design constraints are the contract between phases.
 
 **Date:** 2026-08-05
-**Status:** Draft (approved design; Phase 0 authored)
+**Status:** Done (2026-08-05) — all phases executed
 **Owner:** SDK maintainers
-**Covers:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (new — underscore-prefixed RM attributes; opens the wire-extension band 140–149); amendments to [REQ-053](../specifications/wire.md#req-053) (DV_TEXT substitution carve-out; `ctx/setting` as the sixth respelled field; DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closure — **prose not yet authored into `wire.md`; Phase C3 precondition, see Definition of Ready**); [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md) (EVENT_CONTEXT optionals ride the underscore grammar)
-**Probes:** [PROBE-089](../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Draft — reserved); [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
-**Implementation:** partial — Phases A and B landed (PR 1); Phases C0–C4 open (PR 2)
+**Covers:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (new — underscore-prefixed RM attributes; opens the wire-extension band 140–149); amendments to [REQ-053](../specifications/wire.md#req-053) (DV_TEXT substitution carve-out; `ctx/setting` as the sixth respelled field; DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closure); [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md) (EVENT_CONTEXT optionals ride the underscore grammar)
+**Probes:** [PROBE-089](../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Implemented (Sandbox) — [`probe_089_underscore_round_trip.go`](../../testkit/probes/serialize/probe_089_underscore_round_trip.go)); [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
+**Implementation:** landed
 **Depends on:** landed REQ-053 codec (`openehr/serialize/simplified/`), REQ-106/111 (WebTemplate + compiled-template bridge), REQ-121 (`rmpath`), ADR 0014/0015; the PROBE-086 harness (`testkit/conformance/webtemplate/`) and pinned corpus (`testkit/cassettes/flat-conformance/`)
 **Defers:** `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — spec-named, corpus-unexercised, stay typed refusals; the composer `external_ref` / `composer/_identifier:N` / `composer/relationship` surface (ADR 0015 boundary); PARTICIPATION `time` (no channel in the reference's suffix set, corpus-unexercised); accepting the ITS `ctx/` sketches for EVENT_CONTEXT optionals (ADR 0016 § Decision 3); FEEDER_AUDIT_DETAILS `other_details` (ITEM_STRUCTURE — no corpus fixture); `.schema` media types; reused-sibling FLAT (owned by the REQ-116 residual)
 
 ## Goal
 
-Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT subtype-substitution carve-out, (B) `ctx/setting` emission, and (C) the full REQ-140 underscore-prefixed RM attribute grammar plus the leaf-datatype closures its machinery enables (DV_MULTIMEDIA, DV_PARSABLE, DV_INTERVAL, ENTRY `subject`). Consumers: every FLAT/STRUCTURED integrator round-tripping real EHRbase-authored payloads — at HEAD, **0 of 34** upstream corpus bodies decode end-to-end because all refuse on `_`-prefixed keys; after this plan all 34 decode and PROBE-086 coverage rises from **19.7% (after Phase A) to ~80%** of upstream keys.
+Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT subtype-substitution carve-out, (B) `ctx/setting` emission, and (C) the full REQ-140 underscore-prefixed RM attribute grammar plus the leaf-datatype closures its machinery enables (DV_MULTIMEDIA, DV_PARSABLE, DV_INTERVAL, ENTRY `subject`). Consumers: every FLAT/STRUCTURED integrator round-tripping real EHRbase-authored payloads — at the start of this plan **0 of 34** upstream corpus bodies decoded end-to-end, because every one of them refuses on `_`-prefixed keys; after this plan ~~all 34 decode~~ and PROBE-086 coverage rises from **19.5% to ~80%** of upstream keys. *(Outcome, 2026-08-05 — the coverage half held exactly (**1466 of 1824** keys, 19.5% → **80.4%**); the struck half did not, and it is annotated rather than deleted: **24 of 34** bodies now decode with **zero** refusals, and the other 10 refuse only the **non-underscore** residue this plan never scoped — the ADR 0015 composer boundary 23 keys, the WebTemplate-projection gaps 19, the derived DV_PROPORTION magnitudes 5, and the two deferred families 5. No underscore family the grammar carries is refused anywhere in the corpus.)*
 
 ## Delivery shape — two PRs, one plan
 
@@ -44,12 +44,12 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 | Phase 0 — SDD artefacts (wire.md § REQ-140 + REQ-053 amendments, REQ.md row + band, conformance.md PROBE-089 + PROBE-086 prose, traceability.yaml, ADR 0016, this plan) | done |
 | Phase A — DV_TEXT substitution carve-out | done |
 | Phase B — `ctx/setting` emission + alias + harness waiver removal | done |
-| PR 1 opened (A + B + Phase 0) | |
+| PR 1 opened (A + B + Phase 0) | done (PR #88) |
 | Phase C0 — underscore router (decode) + emission hook (encode) + simple families | done |
 | Phase C1 — value-decoration families (`_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`, `_null_reason`) | done |
 | Phase C2 — party grammar (`_health_care_facility`, participations, `_identifier`, ENTRY `subject`) | done |
 | Phase C3 — DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL leaves + `_feeder_audit` | done |
-| Phase C4 — PROBE-089, census re-baseline, docs, status flips | |
+| Phase C4 — PROBE-089, census re-baseline, docs, status flips | done |
 | PR 2 opened (C0–C4) | |
 
 ## Design constraints (binding for every phase)
@@ -114,9 +114,9 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 **Families landed here:** `_uid` (any LOCATABLE incl. root), `_link:N` (`|meaning`, `|type`, `|target` ↔ `rm.Link{Meaning DvText, Type DvText, Target DvEhrUri}`), `_work_flow_id` + `_guideline_id` (ENTRY, OBJECT_REF), `context/_end_time`, `context/_location`.
 
 **Tasks (TDD each family):**
-- [ ] Failing round-trip tests per family against a vendored OPT fixture (use `fixtures.FlatConformanceOpt` and hand-authored minimal FLAT maps); unknown family stays `ErrUnknownPath`; known family + bogus suffix (`_link:0|typo`) errors naming the key; `_link:1` without `_link:0` errors (existing sparse-index rule); STRUCTURED interconversion carries the keys (`structured.go` needs no OPT — add cases to `structured_test.go`).
-- [ ] Implement splitter + hook + the five families; wire encode: `emitNode` calls `rmattrEncode` after leaf/locatable emission; composition root gets the call from the top-level marshal.
-- [ ] Corpus movement: re-baseline pins for fixtures whose only unmodelled keys were these families; commit per family or per coherent pair.
+- [x] Failing round-trip tests per family against a vendored OPT fixture (use `fixtures.FlatConformanceOpt` and hand-authored minimal FLAT maps); unknown family stays `ErrUnknownPath`; known family + bogus suffix (`_link:0|typo`) errors naming the key; `_link:1` without `_link:0` errors (existing sparse-index rule); STRUCTURED interconversion carries the keys (`structured.go` needs no OPT — add cases to `structured_test.go`).
+- [x] Implement splitter + hook + the five families; wire encode: `emitNode` calls `rmattrEncode` after leaf/locatable emission; composition root gets the call from the top-level marshal.
+- [x] Corpus movement: re-baseline pins for fixtures whose only unmodelled keys were these families; commit per family or per coherent pair. *(Landed as one router-plus-five-families commit — the families share the splitter, so a per-family commit would not have compiled; census 360 → 494 compared, 19.7% → 27.1%.)*
 
 **Verify:** package tests + census regeneration after the last family.
 
@@ -190,11 +190,11 @@ C3 consumes `partySuffixes` / `partyRMAttr` for FEEDER_AUDIT_DETAILS' `/location
 
 ## Phase C4 — probe, census, docs, status flips *(PR 2 close-out)*
 
-- [ ] PROBE-089 probe: `testkit/probes/serialize/probe_089_underscore_round_trip.go` (repo probe pattern — see `probe_086_upstream_flat_parity.go` wrapper style) + per-family fixture set; run by `TestProbe089`; conformance.md Status flip to Implemented (Sandbox), summary-table cell update.
-- [ ] Census re-baseline: regenerate `SKIPPED.md` (`go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v`); rewrite its prose — excluded-families table (expect residue: composer boundary 16 keys, derived DV_PROPORTION magnitude 1, `ism_transition/*` + ACTION `time` + `|sample_count` + STRING `action_archetype_id` as the non-underscore WebTemplate-builder residue), coverage headline (~80%), "What would move these numbers" rewritten.
-- [ ] `deviations.md` full pass: deferred-features table rows for `_` attributes, subject, datatypes cleared/rewritten; `|raw` boundary text updated; vendored vocabularies (if any) recorded.
-- [ ] Status flips: REQ.md REQ-140 row `planned → landed`; traceability.yaml `implementation: landed` + `tests:` enumerated; roadmap.md FLAT/STRUCTURED row + REQ-140 mention; umbrella plan residual paragraph rewritten (remaining: `.schema` acceptance, reused-sibling FLAT, deferred `_instruction_details`/`_wf_definition`/`other_details`, ITS `ctx/` sketches); plans README (this plan → archive note); CHANGELOG one bullet.
-- [ ] `make ci` + `make spec-check`; archive plan (`git mv` to `docs/plans/archive/`, index row) — after PR 2 merges, per repo convention.
+- [x] PROBE-089 probe: `testkit/probes/serialize/probe_089_underscore_round_trip.go` (repo probe pattern — see `probe_086_upstream_flat_parity.go` wrapper style) + per-family fixture set; run by `TestProbe089`; conformance.md Status flip to Implemented (Sandbox), summary-table cell update. *(14 fixtures, one per grammar-table row, over four legs: whole-body byte-exactness; an encode leg that takes the decoded composition out through **canonical JSON and back** before re-encoding, so the attribute has to survive as canonical RM and a `|raw` at a base the grammar carries is its own failure; the deliberate refusals with the sentinel each boundary declares — `TestProbe089Refusals`; and the STRUCTURED vocabulary as array-valued members. Bite verified by mutation, not assumed: disabling the owner walk fails 8 fixtures, disabling the value-decoration emitter 5.)*
+- [x] Census re-baseline: regenerate `SKIPPED.md` (`go test ./testkit/conformance/webtemplate/ -run TestCensus -census -v`); rewrite its prose — excluded-families table (expect residue: composer boundary 16 keys, derived DV_PROPORTION magnitude 1, `ism_transition/*` + ACTION `time` + `|sample_count` + STRING `action_archetype_id` as the non-underscore WebTemplate-builder residue), coverage headline (~80%), "What would move these numbers" rewritten. *(Done incrementally, per design constraint 8 — each phase re-baselined the pins and the prose in its own commit; the measured residue is **52 keys, not the ~18 predicted here**: composer boundary **23** (the party sub-structure was refused one level down as well), WebTemplate-projection **19**, derived DV_PROPORTION magnitudes **5** (the interval bounds inherit the leaf refusal), deferred families **5**.)*
+- [x] `deviations.md` full pass: deferred-features table rows for `_` attributes, subject, datatypes cleared/rewritten; `|raw` boundary text updated; vendored vocabularies (if any) recorded. *(Done per phase rather than in one sweep — the `|raw` boundary moved three times, so a single pass would have described only the last. Two vocabularies are recorded: the openEHR `participation mode` group and the implied `IANA_media-types` identifier.)*
+- [x] Status flips: REQ.md REQ-140 row `planned → landed`; traceability.yaml `implementation: landed` + `tests:` enumerated; roadmap.md FLAT/STRUCTURED row + REQ-140 mention; umbrella plan residual paragraph rewritten (remaining: `.schema` acceptance, reused-sibling FLAT, deferred `_instruction_details`/`_wf_definition`/`other_details`, ITS `ctx/` sketches); plans README (this plan → archive note); CHANGELOG one bullet.
+- [x] `make ci` + `make spec-check` green on the close-out. Archiving the plan (`git mv` to `docs/plans/archive/`, index row) waits for the PR 2 merge, per repo convention — the plans README row says so.
 
 ## Verification commands (all phases)
 

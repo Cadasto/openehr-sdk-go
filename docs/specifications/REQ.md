@@ -102,7 +102,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-121 | Locatable path read access | [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) | landed |
 | REQ-122 | Version-control derived helpers | [rm-functions.md § REQ-122](rm-functions.md#req-122--version-control-derived-helpers) | landed |
 | REQ-123 | Temporal data-value helpers | [rm-functions.md § REQ-123](rm-functions.md#req-123--temporal-data-value-helpers) | landed |
-| REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) | planned |
+| REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) | landed |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 

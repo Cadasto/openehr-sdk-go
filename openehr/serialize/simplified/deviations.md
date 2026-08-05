@@ -188,6 +188,14 @@ output — that comparison is **PROBE-086** (Implemented, Sandbox): its harness 
 `testkit/cassettes/flat-conformance/` over the modelled subset, with the refusal
 inventory in that package's `SKIPPED.md`.
 
+**PROBE-089** (Implemented, Sandbox — `testkit/probes/serialize/probe_089_underscore_round_trip.go`)
+is the per-family view of the REQ-140 grammar, where PROBE-086 is the aggregate one: fourteen
+SDK-authored fixtures, one per grammar-table row, each asserting a byte-exact whole-body
+round-trip, an encode leg that takes the decoded composition out through **canonical JSON and
+back** before re-encoding (so an underscore value the canonical form does not model cannot
+survive), the deliberate refusals with the sentinel each boundary declares, and the STRUCTURED
+vocabulary as array-valued members.
+
 **A bare leaf value beside the same leaf's members: the `"|"` STRUCTURED member — closed
 2026-08-05 (REQ-140 Phase C3).** STRUCTURED gives one array element per FLAT segment, and
 that element is *either* the leaf's bare value or an object holding the segment's members —
