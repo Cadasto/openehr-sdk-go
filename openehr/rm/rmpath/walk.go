@@ -38,17 +38,14 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 //
 // The attributes deliberately still absent are EVENT_CONTEXT `start_time` /
 // `setting` and COMPOSITION `language` / `territory`. All four are owned by the
-// ctx/ short-form spelling on encode — ctx/time, ctx/setting, ctx/language,
-// ctx/territory — so resolving them here would double-spell the value, and
-// ADR 0015 made that permanent: encode emits the ctx/ short forms only (decode
-// accepts both spellings). ADR 0015 settled the *spelling* without clearing
-// `ctx/setting` emission, which is still deferred, so a non-default
-// EVENT_CONTEXT `setting` is dropped on encode — recorded in
-// simplified/deviations.md. Resolving `setting` on a conformant WithTemplate
-// decode would emit the decoder's synthesized default (`238|other care`, see
-// flat_decode.go completeRequired / defaultAttr) rather than zeros; a
-// zero-valued leaf is what a template-less decode or a hand-built RM value
-// would yield.
+// ctx/ short-form spelling on encode — ctx/time, ctx/setting|code + |value,
+// ctx/language, ctx/territory — so resolving them here would double-spell the
+// value, and ADR 0015 made that permanent: encode emits the ctx/ short forms
+// only (decode accepts both spellings). `setting` joined that class on
+// 2026-08-05, when the amended REQ-053 closed the `ctx/setting` emission gap
+// ADR 0015 had left open — a populated EVENT_CONTEXT `setting` now round-trips
+// through the pair, and its exemption is the same permanent double-spell as
+// `start_time`'s (see simplified/flat_encode.go emitContextSetting).
 //
 // COMPOSITION `composer` does resolve (compositionChildren below) — the FLAT
 // encoder simply declines to write a PARTY_PROXY. Of the REQ-121 completeness

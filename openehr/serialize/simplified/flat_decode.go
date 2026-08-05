@@ -185,37 +185,41 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 //     assigns from the ctx/ values) overwrote it; a body carrying only the real
 //     path failed the mandatory-context check instead.
 //
-// Entries here are respellings *only* — same information, different surface. Two
-// composition-level families deliberately stay out, because admitting them would
-// be adding a field rather than accepting a spelling:
+// Entries here are respellings *only* — same information, different surface.
+// `context/setting|code` / `|value` joined on 2026-08-05 (the amended REQ-053):
+// ADR 0015 had left it out because `ctx/setting` was unimplemented on both
+// surfaces — an emission gap, not a spelling one — and closing that gap
+// (encode writes the pair, applyContext rebuilds the setting) is what made the
+// real path a genuine respelling. Note the alias deliberately shadows any Web
+// Template `setting` node: the same RM attribute either way, and `rmpath`
+// leaves `…/context/setting` unresolvable so encode cannot double-spell it.
 //
-//   - `context/setting|*` — ctx/setting is unsupported on decode *too*, so this
-//     is an unimplemented field on both surfaces, not a spelling gap.
-//   - `composer|id` / `|id_scheme` / `|id_namespace` — the composer's
-//     external_ref, which the ctx/ short forms structurally cannot carry. Silently
-//     dropping it would violate REQ-053's semantics-preserving contract.
-//
-// The composer external_ref suffixes stay refused and appear in the PROBE-086
-// census; `context/setting` is held out of that census as the documented waiver —
-// its real path decodes wherever the Web Template carries the node, then
-// re-encodes to nothing until ctx/setting emission lands (see deviations.md and
+// One composition-level family deliberately stays out, because admitting it
+// would be adding a field rather than accepting a spelling: `composer|id` /
+// `|id_scheme` / `|id_namespace` — the composer's external_ref, which the ctx/
+// short forms structurally cannot carry. Silently dropping it would violate
+// REQ-053's semantics-preserving contract, so those suffixes stay refused and
+// appear in the PROBE-086 census (see deviations.md and
 // docs/specifications/conformance.md § PROBE-086).
 var metadataAliases = map[string]string{
-	"language|code":      "ctx/language",
-	"territory|code":     "ctx/territory",
-	"composer|name":      "ctx/composer_name",
-	"composer_self":      "ctx/composer_self",
-	"context/start_time": "ctx/time",
+	"language|code":         "ctx/language",
+	"territory|code":        "ctx/territory",
+	"composer|name":         "ctx/composer_name",
+	"composer_self":         "ctx/composer_self",
+	"context/start_time":    "ctx/time",
+	"context/setting|code":  "ctx/setting|code",
+	"context/setting|value": "ctx/setting|value",
 }
 
-// metadataAliasTerminology pins the terminology each respelled CODE_PHRASE
-// carries implicitly in the ctx/ form, where only the code travels. The suffix
-// is a witness, not data: the value is checked and discarded. Accepting a
-// mismatch would silently rewrite the terminology, since applyContext hardcodes
-// these when rebuilding the CODE_PHRASE.
+// metadataAliasTerminology pins the terminology each respelled coded field
+// carries implicitly in the ctx/ form, where the terminology does not travel.
+// The suffix is a witness, not data: the value is checked and discarded.
+// Accepting a mismatch would silently rewrite the terminology, since
+// applyContext hardcodes these when rebuilding the CODE_PHRASE.
 var metadataAliasTerminology = map[string]string{
-	"language|terminology":  "ISO_639-1",
-	"territory|terminology": "ISO_3166-1",
+	"language|terminology":        "ISO_639-1",
+	"territory|terminology":       "ISO_3166-1",
+	"context/setting|terminology": "openehr",
 }
 
 // MetadataAliasSpellings returns the root-relative FLAT spellings the decoder
@@ -365,6 +369,11 @@ type ctxInfo struct {
 	haveComposerName    bool
 	time                string
 	haveTime            bool
+	// setting carries the ctx/setting|code + |value pair (REQ-053). parseCtx
+	// enforces that the two arrive together, so applyContext keys on
+	// haveSettingCode alone.
+	settingCode, settingValue         string
+	haveSettingCode, haveSettingValue bool
 }
 
 // parseCtx decodes the ctx/ entries. Only the core context fields are supported;
@@ -398,12 +407,31 @@ func parseCtx(ctx map[string]any, origin map[string]string) (ctxInfo, error) {
 		case "time":
 			ci.time, err = ctxString(label, val)
 			ci.haveTime = true
+		case "setting|code":
+			ci.settingCode, err = ctxString(label, val)
+			ci.haveSettingCode = true
+		case "setting|value":
+			ci.settingValue, err = ctxString(label, val)
+			ci.haveSettingValue = true
 		default:
 			err = fmt.Errorf("%w: %q (context field not supported — see deviations.md)", ErrUnknownPath, key)
 		}
 		if err != nil {
 			return ci, err
 		}
+	}
+	// ctx/setting travels as a pair: the rubric is not derivable from the code
+	// without a terminology service, and a code is not derivable from the rubric
+	// at all, so half of it cannot be completed — it is refused naming the
+	// missing key (REQ-053). The same shape requireSuffix enforces for a leaf's
+	// mandatory suffixes.
+	if ci.haveSettingCode != ci.haveSettingValue {
+		present, missing := "ctx/setting|code", "ctx/setting|value"
+		if !ci.haveSettingCode {
+			present, missing = "ctx/setting|value", "ctx/setting|code"
+		}
+		return ci, fmt.Errorf("%w: %s without %s — the ctx/setting pair travels together",
+			ErrUnsupportedDatatype, ctxSpelling(origin, present), missing)
 	}
 	// composer_self and a composer name are two mutually exclusive
 	// representations of one RM attribute: PARTY_SELF carries no name, and
@@ -444,16 +472,27 @@ func applyContext(compJSON map[string]any, ci ctxInfo) error {
 	case ci.haveComposerName:
 		compJSON["composer"] = map[string]any{"_type": "PARTY_IDENTIFIED", "name": ci.composerName}
 	}
-	if ci.haveTime {
+	if ci.haveTime || ci.haveSettingCode {
 		// Merge into any EVENT_CONTEXT already reconstructed from clinical paths
-		// (setting, other_context, health_care_facility, …) rather than replacing
-		// it — otherwise that data would be lost.
+		// (other_context, …) rather than replacing it — otherwise that data would
+		// be lost.
 		ctxObj, _ := compJSON["context"].(map[string]any)
 		if ctxObj == nil {
 			ctxObj = map[string]any{"_type": "EVENT_CONTEXT"}
 			compJSON["context"] = ctxObj
 		}
-		ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+		if ci.haveTime {
+			ctxObj["start_time"] = map[string]any{"_type": "DV_DATE_TIME", "value": ci.time}
+		}
+		if ci.haveSettingCode {
+			// parseCtx enforced the pair, and the terminology is the implied
+			// openehr (a real-path |terminology witness naming anything else was
+			// already refused in siphonContext) — REQ-053.
+			ctxObj["setting"] = map[string]any{
+				"_type": "DV_CODED_TEXT", "value": ci.settingValue,
+				"defining_code": codePhraseJSON(ci.settingCode, "openehr"),
+			}
+		}
 	}
 	return nil
 }
