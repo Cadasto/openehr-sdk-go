@@ -643,6 +643,42 @@ func TestMetadataNonRespellingsStillRefused(t *testing.T) {
 	}
 }
 
+// TestComposerPartySubStructureRefused — REQ-140, the ADR 0015 boundary. REQ-140's
+// party grammar reaches a party's `_identifier:N` list and PARTY_RELATED's
+// `/relationship` everywhere *except* the composition's composer: no `ctx/` short
+// form can carry either, so a composer decoded from those keys could not be
+// re-emitted (ADR 0015 keeps encode ctx/-only) and the value would vanish on the
+// way out — the silent loss REQ-053 forbids. Both are refused by name, with the
+// boundary cited, and counted in the PROBE-086 census; the corpus writes both
+// (`ehrbase_conformance_party_identified.json` and `…_party_related.json`).
+func TestComposerPartySubStructureRefused(t *testing.T) {
+	comp, wt := genComposition(t, vitalSignsOPT)
+	for name, key := range map[string]string{
+		"nested identifier": "/composer/_identifier:0|id",
+		"relationship":      "/composer/relationship|code",
+	} {
+		t.Run(name, func(t *testing.T) {
+			var full string
+			in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+				full = root + key
+				m[full] = "122"
+			})
+			_, err := simplified.UnmarshalFlat(in, wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			// The census scopes an exclusion by the key the refusal names, and the
+			// message has to say *why* it is refused rather than unsupported.
+			if !strings.Contains(err.Error(), full) {
+				t.Errorf("err = %v, want it to name %q", err, full)
+			}
+			if !strings.Contains(err.Error(), "ADR 0015") {
+				t.Errorf("err = %v, want it to cite the ADR 0015 boundary", err)
+			}
+		})
+	}
+}
+
 // TestMetadataConflictOnCompositeValueDoesNotPanic — regression, PR #86 review.
 // putCtx compared two candidate values with `!=` on `any`, which panics for a
 // JSON object or array. A malformed payload reaches that path whenever both

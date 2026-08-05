@@ -481,6 +481,63 @@ func TestPartyGrammarThroughStructured(t *testing.T) {
 	}
 }
 
+// TestSubjectLeafThroughStructured — REQ-053. The ENTRY `subject` leaf is a
+// *nested object* in STRUCTURED, not a scalar: its own suffixes are `|`-prefixed
+// members and its `/relationship` and `_identifier:N` sub-objects are arrays
+// beside them. OPT-free, both directions.
+func TestSubjectLeafThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/obs/subject|id":                 "1234-5678",
+		"t/obs/subject|id_namespace":       "EHR.NETWORK",
+		"t/obs/subject|name":               "Silvia Blake",
+		"t/obs/subject/_identifier:0|id":   "122",
+		"t/obs/subject/relationship|code":  "10",
+		"t/obs/subject/relationship|value": "mother",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	obs := s["t"].(map[string]any)["obs"].([]any)[0].(map[string]any)
+	subject, ok := obs["subject"].([]any)
+	if !ok || len(subject) != 1 {
+		t.Fatalf("subject = %#v, want a 1-element array", obs["subject"])
+	}
+	el, _ := subject[0].(map[string]any)
+	if el["|name"] != "Silvia Blake" {
+		t.Errorf("subject[0].|name = %#v", el["|name"])
+	}
+	for _, member := range []string{"_identifier", "relationship"} {
+		if arr, ok := el[member].([]any); !ok || len(arr) != 1 {
+			t.Errorf("subject[0].%s = %#v, want a 1-element array", member, el[member])
+		}
+	}
+
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{}
+	for k, v := range flat {
+		k = strings.Replace(k, "t/obs/", "t/obs:0/", 1)
+		k = strings.Replace(k, "subject|", "subject:0|", 1)
+		k = strings.Replace(k, "subject/", "subject:0/", 1)
+		k = strings.Replace(k, "/relationship|", "/relationship:0|", 1)
+		want[k] = v
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT:\n got  %#v\n want %#v", back, want)
+	}
+}
+
 // TestUnderscoreKeysStructuredDecode — REQ-140. The index normalisation the
 // interconversion applies must not break the codec: a STRUCTURED body carrying
 // underscore families decodes through UnmarshalStructured to the same

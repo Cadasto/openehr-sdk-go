@@ -98,6 +98,20 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
+	budget := &allocBudget{limit: maxTotalNodes}
+	ambiguous := ambiguousBarePaths(wt)
+	// Siphon off the party leaves first (REQ-053's ENTRY `subject`, REQ-140's
+	// party grammar). A party leaf's three key shapes — its own suffixes, the
+	// PARTY_RELATED `/relationship` sub-object and the nested `_identifier:N`
+	// list — all address one RM value, and which concrete PARTY_PROXY subtype
+	// that is is only known once all three are in hand, so they are collected
+	// together and decoded by the one party implementation. It has to run before
+	// the `_` router, which would otherwise claim `subject/_identifier:0` as a
+	// family whose owner is a leaf the grammar cannot judge.
+	partyGroups, err := partyLeafGroups(content, wt)
+	if err != nil {
+		return nil, err
+	}
 	// Siphon off the underscore-prefixed RM attributes (REQ-140): a path
 	// segment starting with `_` ends Web Template resolution at the segment
 	// before it, so those keys are grouped per (owner path, family, :index) and
@@ -121,8 +135,6 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// is deterministic: distinct-node-id siblings with no explicit :index
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
-	budget := &allocBudget{limit: maxTotalNodes}
-	ambiguous := ambiguousBarePaths(wt)
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		sfx := groups[base]
 		pk, err := parseFlatKey(base)
@@ -146,6 +158,13 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		}
 		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
+		}
+	}
+	// Party leaves are placed like any other leaf, after the clinical loop so a
+	// malformed ordinary key still surfaces first.
+	for _, g := range partyGroups {
+		if err := placePartyLeaf(compJSON, wt, g, ambiguous, budget, names); err != nil {
+			return nil, err
 		}
 	}
 	// Underscore RM attributes come after the clinical leaves, so their owners
@@ -351,6 +370,21 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
+		}
+		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
+		// a party's sub-structure — its `_identifier:N` list and, for a
+		// PARTY_RELATED, `/relationship` — everywhere except here: no `ctx/` short
+		// form can carry it, so a composer decoded from those keys could not be
+		// re-emitted (encode is ctx/-only) and the value would vanish on the way
+		// out. That is the silent loss REQ-053 forbids, so the keys are refused by
+		// name and counted in the PROBE-086 census, exactly as the composer's own
+		// `|id` / `|id_scheme` / `|id_namespace` external_ref suffixes are (those
+		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
+		// means giving the composer's reference a `ctx/` carrier, which is an
+		// ADR-level decision, not a codec one.
+		if _, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub {
+			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
+				ErrUnsupportedDatatype, key)
 		}
 		content[key] = val
 	}
@@ -888,6 +922,145 @@ func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, 
 	}
 	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
 	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+}
+
+// partyLeafGroups siphons the FLAT keys addressed at a party-valued Web Template
+// leaf out of content, one [rmattrGroup] per leaf instance, in a stable order.
+//
+// The group is the same tail-carrier the `_` router uses — base is the leaf's
+// *parent* path, family its own FLAT segment id, and the tails everything after
+// it — so [rmattrGroup.prefix] reproduces the leaf's own FLAT spelling and the
+// party grammar decodes it with no second mechanism (REQ-140 design constraint 5).
+//
+// Keys are consumed from content: what stays behind is ordinary leaf data.
+func partyLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
+	byLeaf := make(map[string]*rmattrGroup)
+	for _, key := range slices.Sorted(maps.Keys(content)) {
+		pk, err := parseFlatKey(key)
+		if err != nil {
+			return nil, err
+		}
+		base, family, index, tail, isParty := splitPartyLeafKey(wt, pk)
+		if !isParty {
+			continue
+		}
+		val := content[key]
+		delete(content, key)
+		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
+		g := byLeaf[id]
+		if g == nil {
+			g = &rmattrGroup{base: base, family: family, index: index, tails: make(map[string]any)}
+			byLeaf[id] = g
+		}
+		g.tails[tail] = val
+	}
+	groups := make([]rmattrGroup, 0, len(byLeaf))
+	for _, g := range byLeaf {
+		groups = append(groups, *g)
+	}
+	slices.SortFunc(groups, func(a, b rmattrGroup) int {
+		return cmp.Or(strings.Compare(a.prefix(), b.prefix()))
+	})
+	return groups, nil
+}
+
+// splitPartyLeafKey splits a parsed FLAT key at the party-valued Web Template
+// leaf it addresses, if any: the first segment run that resolves to a childless
+// node of a party RM type. base is the leaf's parent path, family and index the
+// leaf segment itself, and tail everything after it (each remaining segment with
+// a leading "/", then "|suffix").
+//
+// Two kinds of key are deliberately not party leaves. One whose path reaches an
+// `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s nested
+// `/subject` is inside its tails, not at a Web Template node — and one addressing
+// a `ctx/`-owned metadata leaf is the composer, whose party sub-structure is the
+// ADR 0015 refusal in [siphonContext] and whose own suffixes stay a PARTY_PROXY
+// leaf refusal.
+func splitPartyLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
+	node := wt.Tree
+	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
+		return "", "", 0, "", false
+	}
+	for i := 1; i < len(pk.segs); i++ {
+		seg := pk.segs[i]
+		if strings.HasPrefix(seg.id, "_") {
+			return "", "", 0, "", false
+		}
+		next := childByID(node, seg.id)
+		if next == nil {
+			return "", "", 0, "", false
+		}
+		node = next
+		if len(node.Children) > 0 || !isPartyLeafType(node.RMType) {
+			continue
+		}
+		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+			return "", "", 0, "", false
+		}
+		var b, t strings.Builder
+		for j, s := range pk.segs[:i] {
+			if j > 0 {
+				b.WriteByte('/')
+			}
+			writeFlatSeg(&b, s)
+		}
+		for _, s := range pk.segs[i+1:] {
+			t.WriteByte('/')
+			writeFlatSeg(&t, s)
+		}
+		if pk.suffix != "" {
+			t.WriteByte('|')
+			t.WriteString(pk.suffix)
+		}
+		return b.String(), seg.id, seg.idx, t.String(), true
+	}
+	return "", "", 0, "", false
+}
+
+// childByID returns node's child with the given FLAT segment id, or nil.
+func childByID(node *webtemplate.Node, id string) *webtemplate.Node {
+	for _, ch := range node.Children {
+		if ch.ID == id {
+			return ch
+		}
+	}
+	return nil
+}
+
+// placePartyLeaf decodes one party-leaf group and places the party at the leaf's
+// canonical path, exactly as the clinical leaf loop places a DataValue.
+func placePartyLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
+	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+) error {
+	// A party leaf is single-valued at every position the reference spells one, so
+	// `:0` is the interconversion's explicit-index spelling and anything higher
+	// addresses a list slot the RM attribute does not have.
+	if g.index > 0 {
+		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)",
+			ErrUnknownPath, g.prefix(), g.family)
+	}
+	pk, err := parseFlatKey(g.prefix())
+	if err != nil {
+		return err
+	}
+	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
+	if err != nil {
+		// splitPartyLeafKey resolved this path already, so the only way here is the
+		// reused-sibling refusal, which carries its own message.
+		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
+	}
+	party, populated, err := partyLeafSuffixes(g)
+	if err != nil {
+		return err
+	}
+	if !populated {
+		return fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, party, budget, names); err != nil {
+		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
+	}
+	return nil
 }
 
 // rmattrOwnerAt resolves the owner of an underscore-family group whose base

@@ -86,29 +86,38 @@ var (
 // decodeRMAttrHealthCareFacility decodes `context/_health_care_facility` — a
 // party as one family's whole value.
 func decodeRMAttrHealthCareFacility(g rmattrGroup, _ string) (any, error) {
-	ts, err := splitRMAttrTails(g, partyListTails)
-	if err != nil {
-		return nil, err
-	}
-	if err := ts.check(g, partyOwnTails, partySubTails); err != nil {
-		return nil, err
-	}
-	ids, err := partyIdentifiers(g, ts)
-	if err != nil {
-		return nil, err
-	}
-	party, populated, err := partySuffixes(g, ts, ids)
+	party, populated, err := partyLeafSuffixes(g)
 	if err != nil {
 		return nil, err
 	}
 	if !populated {
-		// Unreachable while the allowlist above admits only party keys, but a
-		// fabricated PARTY_IDENTIFIED with no name, identifier or reference would
-		// breach the RM's own invariant, so say so rather than emit one.
+		// Unreachable while the allowlist admits only party keys, but a fabricated
+		// PARTY_IDENTIFIED with no name, identifier or reference would breach the
+		// RM's own invariant, so say so rather than emit one.
 		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
 			ErrUnsupportedDatatype, g.prefix())
 	}
 	return party, nil
+}
+
+// partyLeafSuffixes decodes a **standalone** party — one whose whole value is the
+// position: `context/_health_care_facility`, the ENTRY `subject` leaf
+// (flat_decode.go's party-leaf siphon) and, from Phase C3, a FEEDER_AUDIT_DETAILS
+// party. It is the nested `_identifier:N` spelling of the identifier list, as
+// against a PARTICIPATION's inlined one.
+func partyLeafSuffixes(g rmattrGroup) (map[string]any, bool, error) {
+	ts, err := splitRMAttrTails(g, partyListTails)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := ts.check(g, partyOwnTails, partySubTails); err != nil {
+		return nil, false, err
+	}
+	ids, err := partyIdentifiers(g, ts)
+	if err != nil {
+		return nil, false, err
+	}
+	return partySuffixes(g, ts, ids)
 }
 
 // partySuffixes assembles the canonical party carried by one grammar position's

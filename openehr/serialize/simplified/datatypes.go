@@ -131,6 +131,18 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 	if v == nil || nilRMPointer(v) {
 		return "", nil
 	}
+	// A party leaf — the ENTRY `subject` in-context leaf (REQ-053) — is not a
+	// DataValue and has no suffix *set*: it decomposes through REQ-140's party
+	// grammar, which owns the same spelling at every other position it reaches a
+	// party (rmattr_party_encode.go). The returned anchor is "" because a party
+	// carries no value decoration, so the [valueRMAttrs] walk is not owed.
+	//
+	// The composition's `composer` is the same datatype and is deliberately *not*
+	// reached here: emitNode holds the ctx/-owned metadata leaves back by name
+	// (ADR 0015), rather than relying on this arm's absence as it used to.
+	if isPartyLeafType(rmType) {
+		return "", partyRMAttr(out, flatPath, v)
+	}
 	// A substituted subtype (the value's dynamic type differs from the WT leaf
 	// type) must not take the suffix form: decode rebuilds from the leaf type
 	// and would silently retype it (e.g. a DV_EHR_URI at a DV_URI leaf). It
@@ -183,9 +195,24 @@ func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, li
 // Inputs-presence test: the reference emits ENTRY `language` / `encoding` as
 // in-context leaves with no input descriptors at all (webtemplate.entryIC), and
 // PROBE-075 parity locks that shape, so the reference's silence about inputs
-// must not be read as "no value here".
+// must not be read as "no value here". A party leaf joined on the same terms with
+// REQ-140's party grammar.
 func isValueLeafType(rmType string) bool {
-	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE"
+	return strings.HasPrefix(rmType, "DV_") || rmType == "CODE_PHRASE" || isPartyLeafType(rmType)
+}
+
+// isPartyLeafType reports whether a Web Template leaf's RM type is a party — the
+// ENTRY `subject` and COMPOSITION `composer` in-context leaves, which the
+// reference declares as the abstract PARTY_PROXY. The concrete subtypes are
+// admitted too, because a template is free to narrow the slot and the FLAT
+// spelling is the same either way (the party grammar reads the subtype off the
+// keys, not off the leaf type).
+func isPartyLeafType(rmType string) bool {
+	switch rmType {
+	case "PARTY_PROXY", "PARTY_IDENTIFIED", "PARTY_RELATED", "PARTY_SELF":
+		return true
+	}
+	return false
 }
 
 // canonicalMap returns v's canonical JSON parsed as a generic object — the

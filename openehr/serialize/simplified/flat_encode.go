@@ -166,6 +166,27 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 	return nil
 }
 
+// ctxOnlyLeafPaths are the canonical paths of the composition-level metadata
+// leaves ADR 0015 keeps on the `ctx/` surface. [emitNode] skips them: emitting
+// one at its real FLAT path would spell a single value under two keys, and
+// ADR 0015 makes the ctx/-only encode permanent (decode still accepts both
+// spellings — see metadataAliases).
+//
+// The rule is asserted here rather than left to fall out of a gap elsewhere.
+// Three of the five are unreachable today because `rmpath` deliberately does not
+// resolve them, and `composer` was unreachable because [leafToFlat] mapped no
+// PARTY_PROXY — until REQ-140's party grammar gave it one, at which point the
+// composer's `external_ref` would have started being emitted at `<root>/composer`
+// beside `ctx/composer_name`. "The codec cannot write it" is not a spelling
+// decision; this table is.
+var ctxOnlyLeafPaths = map[string]bool{
+	"/language":           true,
+	"/territory":          true,
+	"/composer":           true,
+	"/context/start_time": true,
+	"/context/setting":    true,
+}
+
 // emitNode resolves node against resolveRoot (whose canonical path is
 // resolveRootAql) and writes FLAT entries under flatPrefix. A repeating node
 // enumerates its instances and stamps a zero-based :index; a container
@@ -188,6 +209,9 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	isLeaf := !isContainer && (len(node.Inputs) > 0 || isValueLeafType(node.RMType))
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
+	}
+	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+		return nil
 	}
 	// Resolution against the RM instance keys on archetype_node_id, so the
 	// REQ-116 name predicate the Web Template now carries is dropped here.

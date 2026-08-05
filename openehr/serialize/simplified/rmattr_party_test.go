@@ -8,6 +8,7 @@ package simplified
 // that would break an upstream body breaks a test here first.
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -348,6 +349,129 @@ func TestParticipationEncodeRefusals(t *testing.T) {
 			mutate(comp)
 			if _, err := MarshalFlat(comp, wt); !errors.Is(err, ErrUnsupportedDatatype) {
 				t.Errorf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}
+
+// --- the ENTRY `subject` leaf (REQ-053) ---------------------------------
+
+// TestSubjectLeafRoundTrip — REQ-053. The ENTRY `subject` in-context leaf is a
+// PARTY_PROXY, which the codec skipped in both directions until REQ-140's party
+// grammar gave it a spelling. Three key shapes address one RM value here — the
+// leaf's own suffixes, the nested `_identifier:N` and PARTY_RELATED's
+// `/relationship` — exactly as `ehrbase_conformance_party_identified.json` and
+// `…_party_related.json` write them.
+func TestSubjectLeafRoundTrip(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
+		rmattrObs + "/subject|id":                     "1234-5678",
+		rmattrObs + "/subject|id_scheme":              "UUID",
+		rmattrObs + "/subject|id_namespace":           "EHR.NETWORK",
+		rmattrObs + "/subject|name":                   "Silvia Blake",
+		rmattrObs + "/subject/_identifier:0|id":       "122",
+		rmattrObs + "/subject/_identifier:0|issuer":   "issuer",
+		rmattrObs + "/subject/_identifier:0|assigner": "assigner",
+		rmattrObs + "/subject/_identifier:0|type":     "type",
+	})
+	obs := firstObservation(t, comp)
+	subject, ok := obs.Subject.(*rm.PartyIdentified)
+	if !ok {
+		t.Fatalf("subject = %T, want *rm.PartyIdentified", obs.Subject)
+	}
+	if subject.Name == nil || *subject.Name != "Silvia Blake" {
+		t.Errorf("subject name = %v", subject.Name)
+	}
+	if len(subject.Identifiers) != 1 || subject.Identifiers[0].ID != "122" {
+		t.Errorf("subject identifiers = %+v", subject.Identifiers)
+	}
+	if subject.ExternalRef == nil || subject.ExternalRef.Namespace != "EHR.NETWORK" {
+		t.Errorf("subject external_ref = %+v", subject.ExternalRef)
+	}
+}
+
+// TestSubjectLeafRelatedRoundTrip — REQ-053. `subject/relationship` selects
+// PARTY_RELATED at the leaf exactly as it does inside a family.
+func TestSubjectLeafRelatedRoundTrip(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := assertRMAttrRoundTrip(t, wt, map[string]any{
+		rmattrObs + "/subject|name":                     "Silvia Blake",
+		rmattrObs + "/subject/relationship|code":        "10",
+		rmattrObs + "/subject/relationship|terminology": "openehr",
+		rmattrObs + "/subject/relationship|value":       "mother",
+	})
+	related, ok := firstObservation(t, comp).Subject.(*rm.PartyRelated)
+	if !ok {
+		t.Fatalf("subject = %T, want *rm.PartyRelated", firstObservation(t, comp).Subject)
+	}
+	if related.Relationship.Value != "mother" {
+		t.Errorf("relationship = %+v", related.Relationship)
+	}
+}
+
+// TestSubjectLeafPartySelfEmitsNothing — REQ-053. PARTY_SELF is spelled by the
+// absence of every party key, which is what makes the leaf symmetric with the
+// `WithTemplate` RM-mandatory completion: that default is a PARTY_SELF, so a
+// conformant decode's re-encode must not gain a single `subject` key.
+func TestSubjectLeafPartySelfEmitsNothing(t *testing.T) {
+	wt, c := conformanceWT(t)
+	body := rmattrBody(nil)
+	b, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	comp, err := UnmarshalFlat(b, wt, WithTemplate(c))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	if _, self := firstObservation(t, comp).Subject.(*rm.PartySelf); !self {
+		t.Fatalf("WithTemplate default subject = %T, want *rm.PartySelf — the symmetry under test",
+			firstObservation(t, comp).Subject)
+	}
+	for k := range reencodeRMAttr(t, wt, comp) {
+		if strings.Contains(k, "/subject") {
+			t.Errorf("re-encode emitted %q for a PARTY_SELF subject; PARTY_SELF is spelled by absence", k)
+		}
+	}
+}
+
+// TestSubjectLeafRefusals — REQ-053 / REQ-140. The leaf carries the same closed
+// grammar as every other party position, and a party leaf is single-valued.
+func TestSubjectLeafRefusals(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	for name, tc := range map[string]struct {
+		keys map[string]any
+		want error
+		name string
+	}{
+		"unknown suffix": {
+			keys: map[string]any{rmattrObs + "/subject|id_typo": "x"},
+			want: ErrUnsupportedDatatype,
+			name: rmattrObs + "/subject|id_typo",
+		},
+		"unknown sub-path": {
+			keys: map[string]any{rmattrObs + "/subject/relation|code": "10"},
+			want: ErrUnsupportedDatatype,
+			name: rmattrObs + "/subject/relation|code",
+		},
+		"indexed party leaf": {
+			keys: map[string]any{rmattrObs + "/subject:1|name": "Silvia Blake"},
+			want: ErrUnknownPath,
+			name: rmattrObs + "/subject:1",
+		},
+		"raw fragment": {
+			keys: map[string]any{rmattrObs + "/subject|raw": map[string]any{"_type": "PARTY_SELF"}},
+			want: ErrUnsupportedDatatype,
+			name: rmattrObs + "/subject|raw",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := decodeRMAttrErr(t, wt, rmattrBody(tc.keys))
+			if !errors.Is(err, tc.want) {
+				t.Errorf("err = %v, want %v", err, tc.want)
+			}
+			if !strings.Contains(err.Error(), tc.name) {
+				t.Errorf("err = %v, want it to name %q", err, tc.name)
 			}
 		})
 	}
