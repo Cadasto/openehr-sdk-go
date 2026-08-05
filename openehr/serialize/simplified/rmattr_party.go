@@ -262,6 +262,11 @@ func partySuffixes(g rmattrGroup, ts rmattrTails, identifiers []any) (party map[
 		}
 		party["_type"] = "PARTY_RELATED"
 		party["relationship"] = rel
+		// Redundant while the guard above holds, and kept deliberately: without
+		// it the final !populated check depends on that guard for correctness,
+		// and softening the guard would turn a relationship-only party into a
+		// silent drop rather than a refusal.
+		populated = true
 	}
 	if !populated {
 		return nil, false, nil
