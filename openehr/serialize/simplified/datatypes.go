@@ -11,18 +11,27 @@ import (
 	"cmp"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
 )
 
 // capturedKeys maps a leaf rmType to the canonical top-level attribute keys its
 // FLAT suffix form fully represents. A value carrying any canonical key outside
-// this set (mappings, normal_range, other_reference_ranges, hyperlink, …) is not
-// faithfully expressible as suffixes, so it is emitted as a lossless |raw
-// fragment instead. This keeps the codec semantics-preserving (REQ-053) while
-// still producing the human-readable suffix form for the common, undecorated case.
+// this set (hyperlink, language, encoding, …) is not faithfully expressible as
+// suffixes, so it is emitted as a lossless |raw fragment instead. This keeps the
+// codec semantics-preserving (REQ-053) while still producing the human-readable
+// suffix form for the common, undecorated case.
+//
+// The suffix set is not the whole FLAT vocabulary: at a Web Template leaf the
+// REQ-140 underscore families carry three further attributes beside the suffixes
+// (normal_range, other_reference_ranges, mappings), so the decision there is
+// taken against [capturedKeysDecorated] — this table stays the *suffix-only*
+// answer, which is what a nested position with no `_` keys of its own (an
+// interval bound, a REFERENCE_RANGE meaning) is judged by.
 var capturedKeys = map[string]map[string]bool{
 	"DV_TEXT":       {"value": true, "formatting": true},
 	"DV_CODED_TEXT": {"value": true, "defining_code": true, "formatting": true},
@@ -54,6 +63,32 @@ var capturedKeys = map[string]map[string]bool{
 	"CODE_PHRASE": {"code_string": true, "terminology_id": true},
 }
 
+// capturedKeysDecorated is [capturedKeys] widened, per datatype, by whichever
+// [valueDecorationAttrs] the RM says that datatype declares — the set that
+// decides the |raw boundary at a Web Template leaf, where [valueRMAttrs] writes
+// those attributes as REQ-140 `_` keys beside the suffixes.
+//
+// Derived from rminfo rather than listed, so it is the same rule the decode
+// router applies (`normal_range` reaches every DV_ORDERED, `mappings` DV_TEXT and
+// its coded subtype) and cannot drift from the BMM. A datatype that has no
+// captured suffix form at all is absent here too: it rides |raw whole, and no
+// widening could change that.
+var capturedKeysDecorated = decoratedCapturedKeys()
+
+func decoratedCapturedKeys() map[string]map[string]bool {
+	out := make(map[string]map[string]bool, len(capturedKeys))
+	for rmType, keys := range capturedKeys {
+		wide := maps.Clone(keys)
+		for attr := range valueDecorationAttrs {
+			if _, declared := rminfo.Default.AttributeRMType(rmType, attr); declared {
+				wide[attr] = true
+			}
+		}
+		out[rmType] = wide
+	}
+	return out
+}
+
 // leafToFlat writes the FLAT entries for a single leaf value at flatPath. rmType
 // is the Web Template leaf type. A DV_* value whose canonical form is fully
 // captured by the suffix mapping (the common case) is emitted as suffixes; a
@@ -68,11 +103,33 @@ var capturedKeys = map[string]map[string]bool{
 // DV_COUNT and DV_BOOLEAN carry their value as the bare leaf (mapping to RM
 // magnitude / value), not a |suffix — per the STABLE Simplified Formats RM
 // mappings.
+//
+// A value emitted in suffix form then gets its REQ-140 underscore-carried
+// attributes ([valueRMAttrs]) beside those suffixes; one that rode |raw does not,
+// because the fragment already carries them.
 func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listOpen bool) error {
+	anchor, err := emitLeafValue(out, flatPath, v, rmType, listOpen, true)
+	if err != nil || anchor == "" {
+		return err
+	}
+	return valueRMAttrs(out, flatPath, v, anchor)
+}
+
+// emitLeafValue writes the leaf value itself — the suffix form or the |raw
+// fallback — and returns the suffix type it used, or "" when the value was
+// absent or rode |raw. That return is what tells [leafToFlat] whether the
+// underscore decorations are still owed, and it doubles as the anchor type they
+// are spelled with.
+//
+// decorated says whether this position has the REQ-140 `_` keys available: true
+// at a Web Template leaf, false at a nested position inside the underscore
+// grammar (an interval bound, a REFERENCE_RANGE meaning), where a decorated
+// value has to ride |raw because there is nowhere else for its extras to go.
+func emitLeafValue(out map[string]any, flatPath string, v any, rmType string, listOpen, decorated bool) (string, error) {
 	// A typed-nil RM pointer carries no value; skip it rather than dereferencing
 	// it in the value switch (which would panic). Equivalent to an absent leaf.
 	if v == nil || nilRMPointer(v) {
-		return nil
+		return "", nil
 	}
 	// A substituted subtype (the value's dynamic type differs from the WT leaf
 	// type) must not take the suffix form: decode rebuilds from the leaf type
@@ -85,32 +142,37 @@ func leafToFlat(out map[string]any, flatPath string, v any, rmType string, listO
 	textAtCodedLeaf := dyn == "DV_TEXT" && rmType == "DV_CODED_TEXT"
 	codedAtTextLeaf := dyn == "DV_CODED_TEXT" && rmType == "DV_TEXT"
 	if dyn != "" && dyn != rmType && !textAtCodedLeaf && !codedAtTextLeaf {
-		return emitRaw(out, flatPath, v, dyn)
+		return "", emitRaw(out, flatPath, v, dyn)
 	}
 	// The coded-at-text carve-out is judged (and emitted) by the value's own
 	// DV_CODED_TEXT suffix set, not the leaf's DV_TEXT one: a decorated coded
-	// text whose extras the suffixes cannot carry (mappings, a preferred_term,
-	// …) still rides |raw below, stamped with its dynamic type.
+	// text whose extras neither the suffixes nor the underscore families can
+	// carry (a preferred_term, …) still rides |raw below, stamped with its
+	// dynamic type.
 	sfxType := rmType
 	if codedAtTextLeaf {
 		sfxType = "DV_CODED_TEXT"
 	}
-	if captured, known := capturedKeys[sfxType]; known {
+	table := capturedKeys
+	if decorated {
+		table = capturedKeysDecorated
+	}
+	if captured, known := table[sfxType]; known {
 		m, err := canonicalMap(v)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if capturedFully(sfxType, m, captured) {
-			return emitCoreLeaf(out, flatPath, v, sfxType, listOpen)
+			return sfxType, emitCoreLeaf(out, flatPath, v, sfxType, listOpen)
 		}
 	}
 	// A modelled leaf type whose value the suffix form cannot capture (a
 	// preferred_term, a decorated TERMINOLOGY_ID) rides |raw rather than falling
 	// through to the non-value skip below, which would lose it silently.
 	if isValueLeafType(rmType) {
-		return emitRaw(out, flatPath, v, cmp.Or(dyn, rmType))
+		return "", emitRaw(out, flatPath, v, cmp.Or(dyn, rmType))
 	}
-	return nil
+	return "", nil
 }
 
 // isValueLeafType reports whether a childless Web Template node of this RM type

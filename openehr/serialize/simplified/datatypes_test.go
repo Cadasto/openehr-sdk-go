@@ -429,21 +429,59 @@ func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
 	}
 }
 
-// TestQuantityDecoratedRaw checks a decorated value falls back to |raw rather
-// than silently dropping the extra attribute. The decoration is `normal_range`:
-// `magnitude_status` used to serve here but is a modelled suffix since the
-// optional-suffix set landed, so it no longer forces the fallback.
-func TestQuantityDecoratedRaw(t *testing.T) {
-	out := map[string]any{}
-	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: &rm.DVInterval[rm.DVQuantity]{}}
-	if err := leafToFlat(out, "p/x", q, "DV_QUANTITY", false); err != nil {
+// TestNormalRangeNarrowsRawBoundary — REQ-140. The `|raw` boundary narrowed
+// deliberately when the underscore families landed, and both sides of it are
+// pinned here because the failure modes are opposite and both silent:
+//
+//   - a value whose only extras the underscore grammar now carries takes the
+//     suffix form *plus* `_` keys, and must not fall back to `|raw` (which would
+//     be a needless respelling of every decorated value on the wire);
+//   - a value with an extra still outside the grammar — a `normal_status` coded
+//     outside the implied openEHR terminology, the unchanged rule — rides one
+//     `|raw` fragment and must emit **no** `_` keys, because the fragment already
+//     carries the normal_range and spelling it twice would let the two disagree.
+func TestNormalRangeNarrowsRawBoundary(t *testing.T) {
+	normal := &rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{
+		Lower:         rm.DVQuantity{Magnitude: 1, Units: "mm"},
+		Upper:         rm.DVQuantity{Magnitude: 9, Units: "mm"},
+		LowerIncluded: true, UpperIncluded: true,
+	}}
+
+	suffixed := map[string]any{}
+	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: normal}
+	if err := leafToFlat(suffixed, "p/x", q, "DV_QUANTITY", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	if _, ok := out["p/x|raw"]; !ok {
-		t.Errorf("decorated quantity should emit |raw, got %#v", out)
+	if _, rode := suffixed["p/x|raw"]; rode {
+		t.Errorf("a normal_range is now expressible and must not ride |raw: %#v", suffixed)
 	}
-	if _, ok := out["p/x|magnitude"]; ok {
-		t.Error("decorated quantity should not emit bare |magnitude suffixes")
+	for key, want := range map[string]any{
+		"p/x|magnitude":                     1.0,
+		"p/x|unit":                          "mm",
+		"p/x/_normal_range/lower|magnitude": 1.0,
+		"p/x/_normal_range/upper|magnitude": 9.0,
+	} {
+		if got := suffixed[key]; got != want {
+			t.Errorf("%s = %#v, want %#v (all keys: %#v)", key, got, want, suffixed)
+		}
+	}
+	// Closed endpoints are the decode default, so they are not spelled.
+	for _, key := range []string{"p/x/_normal_range|lower_included", "p/x/_normal_range|upper_included"} {
+		if _, spelled := suffixed[key]; spelled {
+			t.Errorf("%s spelled although it carries the default", key)
+		}
+	}
+
+	raw := map[string]any{}
+	q.NormalStatus = &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
+	if err := leafToFlat(raw, "p/x", q, "DV_QUANTITY", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := raw["p/x|raw"]; !ok {
+		t.Errorf("an extra outside the grammar must still ride |raw, got %#v", raw)
+	}
+	if len(raw) != 1 {
+		t.Errorf("a |raw value must be the only entry, got %#v", raw)
 	}
 }
 
@@ -451,9 +489,13 @@ func TestQuantityDecoratedRaw(t *testing.T) {
 // keeps its magnitude exactly through the |raw path (json.Number, not float64).
 func TestRawFragmentPreservesLargeInteger(t *testing.T) {
 	out := map[string]any{}
-	// A decorated DV_COUNT rides |raw — decorated by normal_range, which stays
-	// outside the modelled suffix set.
-	c := rm.DVCount{Magnitude: 9007199254740993, NormalRange: &rm.DVInterval[rm.DVCount]{}}
+	// A decorated DV_COUNT rides |raw — decorated by a normal_status coded outside
+	// the openEHR terminology the bare `|normal_status` code implies, which is the
+	// decoration that stays outside the modelled sets (REQ-140 narrowed the rest).
+	c := rm.DVCount{
+		Magnitude:    9007199254740993,
+		NormalStatus: &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}
 	if err := leafToFlat(out, "p/x", c, "DV_COUNT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}

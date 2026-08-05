@@ -187,6 +187,105 @@ func TestUnderscoreKeysThroughStructured(t *testing.T) {
 	}
 }
 
+// TestValueDecorationsThroughStructured — REQ-140. The value-decoration
+// families are the first with a *sub-path* inside the family (`/lower`,
+// `/meaning`), so STRUCTURED nests one level deeper than C0's families did: the
+// family is an array member and its sub-object is an array under that. Both
+// directions are pinned OPT-free, including the interconversion's index
+// normalisation — which now reaches the sub-path segment too (`/lower:0`), the
+// spelling the decoder folds back onto the index-less one.
+func TestValueDecorationsThroughStructured(t *testing.T) {
+	flat := map[string]any{
+		"t/e/_normal_range/lower|magnitude":                 20.5,
+		"t/e/_normal_range/lower|unit":                      "unit",
+		"t/e/_normal_range|lower_included":                  false,
+		"t/e/_other_reference_ranges:0/lower|magnitude":     70.5,
+		"t/e/_other_reference_ranges:0/meaning|code":        "260360000",
+		"t/e/_other_reference_ranges:0/meaning|terminology": "SNOMED-CT",
+		"t/e/_other_reference_ranges:0/meaning|value":       "very high",
+		"t/e/_other_reference_ranges:0|upper_unbounded":     true,
+		"t/e/_other_reference_ranges:1/meaning":             "high",
+	}
+	sb, err := simplified.FlatToStructured(mustJSON(t, flat))
+	if err != nil {
+		t.Fatalf("FlatToStructured: %v", err)
+	}
+	var s map[string]any
+	if err := json.Unmarshal(sb, &s); err != nil {
+		t.Fatalf("unmarshal structured: %v", err)
+	}
+	root, _ := s["t"].(map[string]any)
+	el, _ := root["e"].([]any)
+	if len(el) != 1 {
+		t.Fatalf("e = %#v, want a 1-element array", root["e"])
+	}
+	leaf, _ := el[0].(map[string]any)
+	// The scalar family is a one-element array; its bound is a nested array, and
+	// its own boolean a |-prefixed member beside it.
+	nr, ok := leaf["_normal_range"].([]any)
+	if !ok || len(nr) != 1 {
+		t.Fatalf("_normal_range = %#v, want a 1-element array", leaf["_normal_range"])
+	}
+	nrEl, _ := nr[0].(map[string]any)
+	if nrEl["|lower_included"] != false {
+		t.Errorf("_normal_range[0].|lower_included = %#v", nrEl["|lower_included"])
+	}
+	lower, ok := nrEl["lower"].([]any)
+	if !ok || len(lower) != 1 {
+		t.Fatalf("_normal_range[0].lower = %#v, want a 1-element array", nrEl["lower"])
+	}
+	if bound, _ := lower[0].(map[string]any); bound["|magnitude"] != 20.5 {
+		t.Errorf("_normal_range[0].lower[0] = %#v", lower[0])
+	}
+	// The indexed family is an array member per instance.
+	orr, ok := leaf["_other_reference_ranges"].([]any)
+	if !ok || len(orr) != 2 {
+		t.Fatalf("_other_reference_ranges = %#v, want a 2-element array", leaf["_other_reference_ranges"])
+	}
+	second, _ := orr[1].(map[string]any)
+	if m, _ := second["meaning"].([]any); len(m) != 1 || m[0] != "high" {
+		t.Errorf("_other_reference_ranges[1].meaning = %#v, want [\"high\"]", second["meaning"])
+	}
+
+	// Back to FLAT: every key returns, every segment re-spelled with an explicit
+	// `:index` — the sub-path segments included.
+	fb, err := simplified.StructuredToFlat(sb)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var back map[string]any
+	if err := json.Unmarshal(fb, &back); err != nil {
+		t.Fatalf("unmarshal flat: %v", err)
+	}
+	want := map[string]any{
+		"t/e:0/_normal_range:0/lower:0|magnitude":               20.5,
+		"t/e:0/_normal_range:0/lower:0|unit":                    "unit",
+		"t/e:0/_normal_range:0|lower_included":                  false,
+		"t/e:0/_other_reference_ranges:0/lower:0|magnitude":     70.5,
+		"t/e:0/_other_reference_ranges:0/meaning:0|code":        "260360000",
+		"t/e:0/_other_reference_ranges:0/meaning:0|terminology": "SNOMED-CT",
+		"t/e:0/_other_reference_ranges:0/meaning:0|value":       "very high",
+		"t/e:0/_other_reference_ranges:0|upper_unbounded":       true,
+		"t/e:0/_other_reference_ranges:1/meaning:0":             "high",
+	}
+	if !reflect.DeepEqual(back, want) {
+		t.Errorf("FLAT -> STRUCTURED -> FLAT mismatch:\n got  %#v\n want %#v", back, want)
+	}
+
+	// …and the identity leg holds from the STRUCTURED side.
+	sb2, err := simplified.FlatToStructured(fb)
+	if err != nil {
+		t.Fatalf("FlatToStructured #2: %v", err)
+	}
+	var s2 map[string]any
+	if err := json.Unmarshal(sb2, &s2); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s2, s) {
+		t.Errorf("STRUCTURED round-trip mismatch:\n got  %#v\n want %#v", s2, s)
+	}
+}
+
 // TestUnderscoreKeysStructuredDecode — REQ-140. The index normalisation the
 // interconversion applies must not break the codec: a STRUCTURED body carrying
 // underscore families decodes through UnmarshalStructured to the same

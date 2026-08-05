@@ -943,15 +943,18 @@ func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base st
 	if err != nil {
 		return rmattrOwner{}, err
 	}
-	ownerAql, kind := bareAQLPath(node.AQLPath), node.RMType
+	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), node.RMType, ""
 	if len(node.Children) == 0 {
 		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
 		if !isElementValue {
 			return rmattrOwner{}, errSegNotFound
 		}
-		ownerAql, kind = trimmed, "ELEMENT"
+		// The leaf's own RM type is the *anchor* the value-decoration families are
+		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
+		// the ELEMENT and the DataValue it holds.
+		ownerAql, kind, leaf = trimmed, "ELEMENT", node.RMType
 	}
-	return rmattrOwner{kind: kind, resolve: walk(ownerAql, predIndex, predType)}, nil
+	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, predIndex, predType)}, nil
 }
 
 // bareAQLPath strips REQ-116 name predicates from a compiled AQL path,

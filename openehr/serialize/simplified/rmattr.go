@@ -84,28 +84,39 @@ func (g rmattrGroup) slot() int { return max(g.index, 0) }
 // rmattrFamily is one underscore-prefixed RM attribute family: the RM
 // attribute name it addresses (which is *not* always the family name with the
 // `_` removed — `_work_flow_id` addresses `workflow_id`), whether it is an
-// indexed list, and how one instance's group decodes into canonical JSON.
+// indexed list, whether it decorates the owner or the DataValue a collapsed
+// ELEMENT leaf holds, and how one instance's group decodes into canonical JSON.
+//
+// decode receives the anchor — the leaf datatype of a value-decoration family's
+// owner ("" for every other family), which `_normal_range` needs to decode its
+// bounds with.
 type rmattrFamily struct {
-	attr   string
-	list   bool
-	decode func(g rmattrGroup) (any, error)
+	attr string
+	list bool
+	// value marks a family that decorates the **DataValue** a collapsed ELEMENT
+	// leaf holds rather than the LOCATABLE itself: one FLAT path addresses both
+	// (the Web Template folds ELEMENT.value into its leaf node), so the RM class
+	// the family is judged against and the object it lands on are the value's,
+	// not the ELEMENT's. See rmattr_value.go.
+	value  bool
+	decode func(g rmattrGroup, anchor string) (any, error)
 }
 
 // rmattrFamilies is the vocabulary this codec carries. A family absent here is
 // ErrUnknownPath — the fail-loud posture REQ-053 sets and REQ-140 inherits, and
 // the mechanism by which the families later phases own (`_feeder_audit`,
-// `_normal_range`, `_other_reference_ranges`, `_mapping`, `_null_flavour`,
-// `_null_reason`, `_health_care_facility`, `_participation`,
-// `_other_participation`, `_identifier`, `_charset`, `_language`, `_thumbnail`)
-// and the two the plan defers indefinitely (`_instruction_details`,
-// `_wf_definition`) stay visible in the PROBE-086 census instead of decoding
-// into nothing.
+// `_health_care_facility`, `_participation`, `_other_participation`,
+// `_identifier`, `_charset`, `_language`, `_encoding`, `_thumbnail`) and the two
+// the plan defers indefinitely (`_instruction_details`, `_wf_definition`) stay
+// visible in the PROBE-086 census instead of decoding into nothing.
 //
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY
 // subtypes declare `workflow_id`, and `_uid` reaches every LOCATABLE because
 // they all declare `uid`. That is the spec's own rule ("the node it belongs
-// to") rather than a table that could drift from the BMM.
+// to") rather than a table that could drift from the BMM. For a `value` family
+// the class consulted is the leaf datatype instead (rmattr_value.go), which is
+// what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only.
 var rmattrFamilies = map[string]rmattrFamily{
 	"_uid":          {attr: "uid", decode: decodeRMAttrUID},
 	"_link":         {attr: "links", list: true, decode: decodeRMAttrLink},
@@ -113,6 +124,11 @@ var rmattrFamilies = map[string]rmattrFamily{
 	"_guideline_id": {attr: "guideline_id", decode: decodeRMAttrObjectRef},
 	"_end_time":     {attr: "end_time", decode: decodeRMAttrEndTime},
 	"_location":     {attr: "location", decode: decodeRMAttrLocation},
+	"_normal_range": {attr: "normal_range", value: true, decode: decodeRMAttrNormalRange},
+	"_other_reference_ranges": {
+		attr: "other_reference_ranges", list: true, value: true,
+		decode: decodeRMAttrReferenceRange,
+	},
 }
 
 // rmattrOwner is the resolved owner of an `_`-family group: the RM class name
@@ -125,7 +141,11 @@ var rmattrFamilies = map[string]rmattrFamily{
 // RM attribute about to be written: [walkAQL] needs the following path segment
 // to resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
 type rmattrOwner struct {
-	kind    string
+	kind string
+	// leaf is the RM type of the DataValue a collapsed ELEMENT owner holds under
+	// `value` ("" when the owner is not a collapsed leaf) — the **anchor** the
+	// value-decoration families are judged and decoded against (REQ-140 § C1).
+	leaf    string
 	resolve func(attr string) (map[string]any, error)
 }
 
@@ -241,28 +261,73 @@ func rmattrDecode(owner rmattrOwner, g rmattrGroup, indexes map[int]bool, budget
 		return fmt.Errorf("%w: %q (no such RM attribute family — see docs/specifications/wire.md § REQ-140 for the vocabulary this codec carries)",
 			ErrUnknownPath, g.prefix())
 	}
-	if _, declared := rminfo.Default.AttributeRMType(owner.kind, fam.attr); !declared {
-		return fmt.Errorf("%w: %q (%s declares no %s attribute)", ErrUnknownPath, g.prefix(), owner.kind, fam.attr)
+	// A value-decoration family is judged against the leaf datatype, not the
+	// ELEMENT that holds it (both answer to the same FLAT path). owner.leaf is ""
+	// for every owner that is not a collapsed leaf, which declares nothing — so
+	// `_normal_range` on a SECTION is refused by this one check.
+	judged := owner.kind
+	if fam.value {
+		judged = owner.leaf
+	}
+	if _, declared := rminfo.Default.AttributeRMType(judged, fam.attr); !declared {
+		return fmt.Errorf("%w: %q (%s declares no %s attribute)", ErrUnknownPath, g.prefix(),
+			cmp.Or(judged, owner.kind), fam.attr)
 	}
 	if err := checkRMAttrIndexes(g, fam, indexes); err != nil {
 		return err
 	}
-	val, err := fam.decode(g)
+	val, err := fam.decode(g, owner.leaf)
 	if err != nil {
 		return err
 	}
-	node, err := owner.resolve(fam.attr)
+	node, err := owner.resolve(cmp.Or(fam.host(), fam.attr))
 	if err != nil {
 		return err
+	}
+	if fam.value {
+		if node, err = rmattrValueNode(node, g, judged); err != nil {
+			return err
+		}
 	}
 	if fam.list {
 		return placeRMAttrList(node, fam.attr, g, val, budget)
 	}
 	if _, taken := node[fam.attr]; taken {
-		return fmt.Errorf("%w: %q duplicates a value already placed on %s.%s", ErrUnknownPath, g.prefix(), owner.kind, fam.attr)
+		return fmt.Errorf("%w: %q duplicates a value already placed on %s.%s", ErrUnknownPath, g.prefix(), judged, fam.attr)
 	}
 	node[fam.attr] = val
 	return nil
+}
+
+// host names the owner attribute the family's value is reached through: `value`
+// for a value decoration (the collapsed ELEMENT's DataValue slot), the family's
+// own attribute otherwise. It is what [rmattrOwner.resolve] walks to, and — for
+// a collapsed ELEMENT — the lookahead [concreteType] resolves the elided
+// ITEM_STRUCTURE with.
+func (f rmattrFamily) host() string {
+	if f.value {
+		return "value"
+	}
+	return f.attr
+}
+
+// rmattrValueNode narrows a resolved collapsed-ELEMENT node to the DataValue a
+// value-decoration family decorates.
+//
+// The decoration has no meaning without a value to carry it, and the clinical
+// leaf loop has already run by the time the router does (decodeFlat), so an
+// absent `value` here means the payload spelled a decoration for a leaf it never
+// spelled: refuse rather than fabricate a bare DataValue out of the anchor type,
+// which would invent a magnitude or a rubric the author never wrote. (An ELEMENT
+// legitimately *without* a value carries `_null_flavour` instead, which is an
+// owner family and never reaches here.)
+func rmattrValueNode(node map[string]any, g rmattrGroup, anchor string) (map[string]any, error) {
+	dv, ok := node["value"].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("%w: %q decorates a %s value the body does not carry; spell the leaf itself beside it",
+			ErrUnsupportedDatatype, g.prefix(), anchor)
+	}
+	return dv, nil
 }
 
 // checkRMAttrIndexes applies the FLAT `:index` rules to a `_family:N` sequence.
@@ -334,12 +399,12 @@ func placeRMAttrList(node map[string]any, attr string, g rmattrGroup, val any, b
 
 // --- suffix helpers -----------------------------------------------------
 
-// rmattrTails rejects any tail outside a family's grammar, naming the offending
-// FLAT key. The message deliberately avoids the "unexpected |x for TYPE"
-// phrasing the datatype allowlist uses: that shape is parsed by the PROBE-086
-// harness to scope a refusal to one suffix, and a family refusal scopes to the
-// whole family instance.
-func rmattrTails(g rmattrGroup, allowed map[string]bool) error {
+// checkRMAttrTails rejects any tail outside a family's grammar, naming the
+// offending FLAT key. The message deliberately avoids the "unexpected |x for
+// TYPE" phrasing the datatype allowlist uses: that shape is parsed by the
+// PROBE-086 harness to scope a refusal to one suffix, and a family refusal
+// scopes to the whole family instance.
+func checkRMAttrTails(g rmattrGroup, allowed map[string]bool) error {
 	for _, tail := range slices.Sorted(maps.Keys(g.tails)) {
 		if !allowed[tail] {
 			return fmt.Errorf("%w: %q is not part of the %s grammar (REQ-140)", ErrUnsupportedDatatype, g.key(tail), g.family)
@@ -381,8 +446,8 @@ var rmattrBareOnly = map[string]bool{"": true}
 
 // decodeRMAttrUID decodes `_uid` on any LOCATABLE. See the file comment for the
 // subtype policy.
-func decodeRMAttrUID(g rmattrGroup) (any, error) {
-	if err := rmattrTails(g, rmattrBareOnly); err != nil {
+func decodeRMAttrUID(g rmattrGroup, _ string) (any, error) {
+	if err := checkRMAttrTails(g, rmattrBareOnly); err != nil {
 		return nil, err
 	}
 	value, err := rmattrString(g, "")
@@ -414,8 +479,8 @@ var linkTails = map[string]bool{"|meaning": true, "|type": true, "|target": true
 // `|meaning` and `|type` rebuild as plain DV_TEXT — the suffixes carry a string
 // and nothing else, which is why encode refuses a coded or decorated value
 // rather than narrowing it (rmattr_encode.go).
-func decodeRMAttrLink(g rmattrGroup) (any, error) {
-	if err := rmattrTails(g, linkTails); err != nil {
+func decodeRMAttrLink(g rmattrGroup, _ string) (any, error) {
+	if err := checkRMAttrTails(g, linkTails); err != nil {
 		return nil, err
 	}
 	meaning, err := rmattrString(g, "|meaning")
@@ -446,8 +511,8 @@ var objectRefTails = map[string]bool{"|id": true, "|id_scheme": true, "|namespac
 // canonical OBJECT_REF. `|namespace` and `|type` are RM-mandatory on
 // OBJECT_REF, so they are required rather than defaulted; `|id_scheme` selects
 // the OBJECT_ID subtype (see the file comment).
-func decodeRMAttrObjectRef(g rmattrGroup) (any, error) {
-	if err := rmattrTails(g, objectRefTails); err != nil {
+func decodeRMAttrObjectRef(g rmattrGroup, _ string) (any, error) {
+	if err := checkRMAttrTails(g, objectRefTails); err != nil {
 		return nil, err
 	}
 	id, err := rmattrString(g, "|id")
@@ -476,8 +541,8 @@ func decodeRMAttrObjectRef(g rmattrGroup) (any, error) {
 // decodeRMAttrEndTime decodes EVENT_CONTEXT's `_end_time` — a bare DV_DATE_TIME
 // value (ADR 0016: the EVENT_CONTEXT optionals ride the underscore grammar
 // under the real `context` segment, not the ITS `ctx/` sketches).
-func decodeRMAttrEndTime(g rmattrGroup) (any, error) {
-	if err := rmattrTails(g, rmattrBareOnly); err != nil {
+func decodeRMAttrEndTime(g rmattrGroup, _ string) (any, error) {
+	if err := checkRMAttrTails(g, rmattrBareOnly); err != nil {
 		return nil, err
 	}
 	value, err := rmattrString(g, "")
@@ -489,8 +554,8 @@ func decodeRMAttrEndTime(g rmattrGroup) (any, error) {
 
 // decodeRMAttrLocation decodes EVENT_CONTEXT's `_location` — a bare String, so
 // the canonical form is the JSON string itself rather than an RM object.
-func decodeRMAttrLocation(g rmattrGroup) (any, error) {
-	if err := rmattrTails(g, rmattrBareOnly); err != nil {
+func decodeRMAttrLocation(g rmattrGroup, _ string) (any, error) {
+	if err := checkRMAttrTails(g, rmattrBareOnly); err != nil {
 		return nil, err
 	}
 	return rmattrString(g, "")

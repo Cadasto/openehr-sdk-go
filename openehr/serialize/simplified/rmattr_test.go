@@ -29,8 +29,19 @@ const (
 	rmattrRoot    = "conformance-ehrbase.de.v0"
 	rmattrSection = rmattrRoot + "/conformance_section"
 	rmattrObs     = rmattrSection + "/conformance_observation"
-	rmattrElement = rmattrObs + "/any_event:0/dv_quantity"
+	rmattrEvent   = rmattrObs + "/any_event:0"
+	rmattrElement = rmattrEvent + "/dv_quantity"
 	rmattrAction  = rmattrSection + "/conformance_action"
+	// The corpus template carries one collapsed ELEMENT per datatype under
+	// `any_event:0`, which is how the value-decoration families reach every
+	// DV_ORDERED anchor (REQ-140 Phase C1).
+	rmattrCount      = rmattrEvent + "/dv_count"
+	rmattrOrdinal    = rmattrEvent + "/dv_ordinal"
+	rmattrProportion = rmattrEvent + "/dv_proportion"
+	rmattrDateTime   = rmattrEvent + "/dv_date_time"
+	rmattrText       = rmattrEvent + "/dv_text"
+	rmattrCodedText  = rmattrEvent + "/dv_coded_text"
+	rmattrBoolean    = rmattrEvent + "/dv_boolean"
 )
 
 // conformanceWT builds the PROBE-086 corpus Web Template and compiled
@@ -519,8 +530,6 @@ func TestRMAttrDeferredFamiliesRefused(t *testing.T) {
 	for _, key := range []string{
 		rmattrRoot + "/_feeder_audit/originating_system_audit|system_id",
 		rmattrElement + "/_feeder_audit/original_content",
-		rmattrElement + "/_normal_range/lower|magnitude",
-		rmattrElement + "/_other_reference_ranges:0/meaning|code",
 		rmattrElement + "/_mapping:0|match",
 		rmattrElement + "/_null_flavour|code",
 		rmattrElement + "/_null_reason",
