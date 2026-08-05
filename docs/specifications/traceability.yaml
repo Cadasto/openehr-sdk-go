@@ -418,9 +418,10 @@ requirements:
     # values for the defaulted attributes are not round-tripped; the
     # EVENT_CONTEXT optionals participations / health_care_facility / end_time /
     # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
-    # REQ-140 underscore grammar); first-class
-    # _-attr suffix decomposition (covered losslessly via |raw); .schema media
-    # types on input. The upstream byte-conformance probe landed 2026-08-01 as
+    # REQ-140 underscore grammar); .schema media
+    # types on input. First-class _-attr decomposition is NO LONGER deferred:
+    # REQ-140 landed the whole underscore grammar on 2026-08-05, which narrowed
+    # the |raw boundary rather than relying on it (wire.md § REQ-140). The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
     # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
     #
@@ -1601,9 +1602,11 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 360 of the corpus's 1824 keys are in the modelled
-    # subset today (19.7%) — 1158 refused by the REQ-053 codec, 306 held out as
-    # composition metadata. That hold-out is suffix-aware respellings only
+    # Scope, stated plainly: 1466 of the corpus's 1824 keys are in the modelled
+    # subset today (80.4%) — 52 refused by the REQ-053 codec, 306 held out as
+    # composition metadata. (Before the REQ-140 underscore grammar landed on
+    # 2026-08-05 the same three numbers read 360 / 19.7% / 1158; the hold-out
+    # did not move, so the whole ratchet is refused-to-compared.) That hold-out is suffix-aware respellings only
     # (language, territory, composer|name, composer_self, context/start_time and
     # context/setting, which REQ-053 reads and writes as the ctx/ short forms;
     # the composer external_ref suffixes are deliberately NOT held out — they are
@@ -1627,7 +1630,10 @@ requirements:
     # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
     # an optional attribute). 356 → 360 (2026-08-05) closed that last row too:
     # the DV_CODED_TEXT-at-DV_TEXT carve-out took the dv_coded_text_as_dv_text
-    # fixture from 8 compared to 12. See
+    # fixture from 8 compared to 12. 360 -> 1466 (2026-08-05) is the REQ-140
+    # underscore grammar plus the DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL /
+    # ENTRY-subject leaves: 1106 keys moved excluded -> compared in one step,
+    # leaving 52 refusals. See
     # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
     # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #
