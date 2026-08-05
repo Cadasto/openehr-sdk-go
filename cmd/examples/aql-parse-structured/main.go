@@ -168,11 +168,15 @@ func describeSelectExpr(e parse.SelectExpr) string {
 		// AS alias nor a path. Show it only when it DIFFERS from the canonical
 		// rendering — `1.50` vs `1.5`, `"x"` vs `'x'` — since that difference is
 		// the whole reason the field exists.
-		canonical := describeValue(v.Value)
-		if v.Raw != "" && v.Raw != canonical {
-			return fmt.Sprintf("%s (source text: %s)", canonical, v.Raw)
+		//
+		// Compare against aql.FormatValue, the canonical AQL text, NOT against
+		// describeValue: the latter appends a type tag for this demo, so `1`
+		// would never equal `1 (int)` and every literal would claim a source
+		// text that differs when it does not.
+		if v.Raw != "" && v.Raw != aql.FormatValue(v.Value) {
+			return fmt.Sprintf("%s (source text: %s)", describeValue(v.Value), v.Raw)
 		}
-		return canonical
+		return describeValue(v.Value)
 	case parse.FunctionCall:
 		var body string
 		switch {

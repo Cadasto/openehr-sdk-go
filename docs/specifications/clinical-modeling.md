@@ -1057,7 +1057,7 @@ Emission through [`(*Query).Emit`](../../openehr/aql/parse/query.go) **MUST** ro
 
 ### Prohibited `TOP` + `LIMIT` combination
 
-The three layers treat the spec-invalid combination differently, and deliberately:
+The four layers treat the spec-invalid combination differently, and deliberately:
 
 - **Parse MUST accept and model both.** Nothing is dropped, so no `ErrIncompleteAST`; the parser reports what the source wrote.
 - **Emit MUST render both faithfully.** The profile accepts the text, so refusing here would break the round-trip property for a query the parser admits, and the emitter is not the diagnosis layer.

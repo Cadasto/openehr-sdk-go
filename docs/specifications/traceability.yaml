@@ -1086,14 +1086,15 @@ requirements:
     # arguments, path-valued operands (aql.PathValue), structured MATCHES
     # TERMINOLOGY / {URI} operands, the FROM-root containment junction
     # (parse.FromClause.Junction), and junctions over any in-catalogue operand.
-    # The complete residual ErrIncompleteAST list is two classes: a numeric
-    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, an
-    # INTEGER beyond int64, or a REAL beyond float64, in any value position;
-    # degrading would be silent precision loss), pinned by
-    # TestParseQuerySurfacesIncompleteAST, and a SELECT TOP clause — the
-    # latter CLOSED by REQ-118, which moves the top clause into the catalogue
-    # and leaves the numeric-literal class as the only residual —
-    # with TestFormerCatalogueGapsModelled asserting the nine round-trip cases covering the eight closed gap shapes
+    # The complete residual ErrIncompleteAST list is ONE class: a numeric
+    # literal the AST cannot represent (LIMIT/OFFSET beyond Go `int`, a SELECT
+    # TOP count beyond `int`, an INTEGER beyond int64, or a REAL beyond
+    # float64, in any value position; degrading would be silent precision
+    # loss), pinned by TestParseQuerySurfacesIncompleteAST. As first published
+    # this REQ listed a second residual — a SELECT TOP clause — which REQ-118
+    # CLOSED by adding the carrier; that history is informative only and no
+    # requirement to refuse a top clause is in force.
+    # TestFormerCatalogueGapsModelled asserts the nine round-trip cases covering the eight closed gap shapes
     # now parse, emit, and round-trip (PROBE-087).
     #
     # Lint (PROBE-028 unaffected, no new codes): parse.Document gains
