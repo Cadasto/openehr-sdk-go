@@ -865,9 +865,19 @@ func (g *generator) applyCompositionDefaults(c *rm.Composition) error {
 	if c.Context.StartTime.Value == "" {
 		c.Context.StartTime = rm.DVDateTime{Value: g.opts.Now.Format(time.RFC3339)}
 	}
-	// EventContext.Setting is BMM-mandatory; pin a documented default
-	// when the template doesn't constrain it.
-	if c.Context.Setting.DefiningCode.CodeString == "" {
+	// EventContext.Setting is BMM-mandatory and carries the RM invariant
+	// Setting_valid — its defining code MUST be a member of the openEHR
+	// terminology's `setting` group (RM composition package, EVENT_CONTEXT).
+	// "Populated" is therefore not enough: a template that leaves setting
+	// unconstrained lets the generic example synthesiser invent an
+	// archetype-local code (`local`/`example`), which reads as populated and
+	// still violates the invariant. Pin the documented default whenever what we
+	// hold is not openehr-coded, so the generator cannot emit an RM-invalid
+	// composition (REQ-107). The residual case — an `openehr` terminology with a
+	// code outside the `setting` group — needs the terminology tables to detect
+	// and is left to the RM-floor validator (REQ-112).
+	if c.Context.Setting.DefiningCode.CodeString == "" ||
+		c.Context.Setting.DefiningCode.TerminologyID.Value != "openehr" {
 		c.Context.Setting = rm.DVCodedText{
 			DVText: rm.DVText{Value: "other care"},
 			DefiningCode: rm.CodePhrase{

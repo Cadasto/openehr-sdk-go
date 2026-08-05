@@ -54,16 +54,20 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 }
 
 // emitContext writes composition-level metadata under the ctx/ prefix (REQ-053):
-// the mandatory language and territory code strings, the composer, and the
-// context start time. The ctx/ short forms for setting, participations,
-// health-care facility, workflow ids, and the composer external reference are
-// deferred — see deviations.md. (category is not a ctx/ field at all: it is a
-// template-constrained leaf and rides its own Web Template path.)
+// the mandatory language and territory code strings, the composer, the context
+// start time, and the context setting (ctx/setting|code + |value — the sixth
+// respelled field; ADR 0015's left-open emission gap, closed 2026-08-05). The
+// ctx/ short forms for participations, health-care facility, workflow ids, and
+// the composer external reference are deferred — see deviations.md. (category
+// is not a ctx/ field at all: it is a template-constrained leaf and rides its
+// own Web Template path.)
 //
 // A composer the ctx/ short forms cannot carry (PARTY_RELATED, or a
 // PARTY_IDENTIFIED without a name) is an error, not an omission: a decode of
 // the composer-less output under WithTemplate would default the composer to
-// PARTY_SELF — a silent type substitution (see deviations.md).
+// PARTY_SELF — a silent type substitution (see deviations.md). A setting the
+// ctx/setting pair cannot carry is refused on the same grounds
+// (emitContextSetting).
 func emitContext(out map[string]any, comp *rm.Composition) error {
 	if comp.Language.CodeString != "" {
 		out["ctx/language"] = comp.Language.CodeString
@@ -95,9 +99,57 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 	default:
 		return fmt.Errorf("%w: composer %T is not representable in the ctx/ short forms", ErrUnsupportedDatatype, comp.Composer)
 	}
-	if comp.Context != nil && comp.Context.StartTime.Value != "" {
-		out["ctx/time"] = comp.Context.StartTime.Value
+	if comp.Context != nil {
+		if comp.Context.StartTime.Value != "" {
+			out["ctx/time"] = comp.Context.StartTime.Value
+		}
+		if err := emitContextSetting(out, comp.Context.Setting); err != nil {
+			return err
+		}
 	}
+	return nil
+}
+
+// emitContextSetting writes EVENT_CONTEXT.setting as ctx/setting|code +
+// ctx/setting|value (REQ-053, amended 2026-08-05). The pair carries exactly an
+// openehr-coded code+value — the terminology is implied, not written — so a
+// populated setting outside that shape is ErrUnsupportedDatatype naming
+// ctx/setting rather than an omission: omitting it would let a WithTemplate
+// decode substitute the 238|other care default silently (the same stance as
+// the composer PARTY_RELATED rule). That refuses a non-openehr terminology
+// (including an empty one — rebuilding it as openehr would re-terminologise
+// the value), extras beyond code+value (mappings, formatting, a preferred
+// term, …), and a value carried without a defining code.
+//
+// The all-zero value writes nothing: setting is a non-pointer DV_CODED_TEXT on
+// EVENT_CONTEXT, so "unset" and "zero" coincide (the CODE_PHRASE all-zero
+// precedent) — an unconditional emit would put blank setting keys on every
+// composition decoded through the ctx/ forms.
+func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
+	extras := len(s.Mappings) > 0 || s.Formatting != nil || s.Hyperlink != nil ||
+		s.Language != nil || s.Encoding != nil || s.DefiningCode.PreferredTerm != nil
+	if s.DefiningCode.CodeString == "" {
+		if s.Value == "" && !extras && s.DefiningCode.TerminologyID.Value == "" {
+			return nil // all-zero: absent, nothing substituted
+		}
+		return fmt.Errorf("%w: ctx/setting requires a coded value, but EVENT_CONTEXT.setting carries no defining code beside value %q", ErrUnsupportedDatatype, s.Value)
+	}
+	if s.DefiningCode.TerminologyID.Value != "openehr" {
+		return fmt.Errorf("%w: ctx/setting implies the openehr terminology, but EVENT_CONTEXT.setting is coded in %q", ErrUnsupportedDatatype, s.DefiningCode.TerminologyID.Value)
+	}
+	if extras {
+		return fmt.Errorf("%w: ctx/setting carries only code and value, but EVENT_CONTEXT.setting has extras (mappings, formatting, a preferred term, …)", ErrUnsupportedDatatype)
+	}
+	// A code with no rubric is refused rather than emitted with an empty
+	// |value: parseCtx refuses that pair on the way back in, so emitting it
+	// would produce a body this codec's own decode rejects. DV_TEXT.value is
+	// RM-mandatory anyway, so the value is a defect at the source — the mirror
+	// of the decode-side rule, and the same stance as value-without-code above.
+	if s.Value == "" {
+		return fmt.Errorf("%w: ctx/setting requires the code's rubric, but EVENT_CONTEXT.setting carries code %q with an empty value", ErrUnsupportedDatatype, s.DefiningCode.CodeString)
+	}
+	out["ctx/setting|code"] = s.DefiningCode.CodeString
+	out["ctx/setting|value"] = s.Value
 	return nil
 }
 

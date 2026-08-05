@@ -153,6 +153,8 @@ func TestDecodeRejectsWrongTypedCtx(t *testing.T) {
 		{"ctx/territory", true},
 		{"ctx/time", 42},
 		{"ctx/composer_self", "true"},
+		{"ctx/setting|code", 238}, // REQ-053: the setting pair is string-valued
+		{"ctx/setting|value", 42},
 	} {
 		var m map[string]any
 		if err := json.Unmarshal(f1, &m); err != nil {

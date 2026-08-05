@@ -433,13 +433,6 @@ func TestReasonOfIsKeyIndependent(t *testing.T) {
 // real target for exactly that reason.
 const corpusRoot = "conformance-ehrbase.de.v0"
 
-// settingWaiver is the one hold-out the harness applies that no accepted codec
-// spelling backs: `context/setting|*` decodes through the real path wherever the
-// Web Template carries the node, and then re-encodes to nothing until
-// `ctx/setting` emission lands. A documented waiver (SKIPPED.md), not a
-// respelling — and the only one.
-const settingWaiver = "context/setting"
-
 // TestHoldOutMatchesCodecAliases pins the hold-out against the codec's *own*
 // tables, in both directions. Neither direction is symmetric noise-avoidance:
 // they fail on opposite, differently dangerous drifts.
@@ -453,14 +446,19 @@ const settingWaiver = "context/setting"
 // alias cannot land in the codec without this test noticing.
 //
 // Reverse — every hold-out the harness actually applies over the corpus key
-// universe must be one of those accepted spellings, or the single named waiver.
-// This is the direction that matters: a hold-out with no codec spelling behind it
-// silently absorbs a **refusal**, so a key the codec loses stops being counted as
-// lost. It is what the base-matched `composer` entry did to
+// universe must be one of those accepted spellings. **There is no waiver class**,
+// and this direction is what keeps it that way: a hold-out with no codec spelling
+// behind it silently absorbs a **refusal**, so a key the codec loses stops being
+// counted as lost. It is what the base-matched `composer` entry did to
 // `composer|id`/`|id_scheme`/`|id_namespace` — 12 corpus keys of PARTY_PROXY
 // `external_ref` loss, held out as if they were respellings, while SKIPPED.md,
 // ADR 0015 and the codec's own doc comments all said they were refused and
-// visible in the census (PR #86 review, round 3).
+// visible in the census (PR #86 review, round 3). The suite carried exactly one
+// named waiver — `context/setting`, a real encode-side drop while `ctx/setting`
+// emission was deferred — until the amended REQ-053 closed that gap on
+// 2026-08-05 and its keys became ordinary respellings; reintroducing a waiver
+// is a spec decision (conformance.md § PROBE-086), not a harness edit, and this
+// test fails on it.
 func TestHoldOutMatchesCodecAliases(t *testing.T) {
 	target, err := NewTarget()
 	if err != nil {
@@ -541,14 +539,16 @@ func TestHoldOutMatchesCodecAliases(t *testing.T) {
 			"matcher or the root is wrong and the Meta count is silently zero")
 	}
 	for _, rel := range slices.Sorted(maps.Keys(heldOut)) {
-		if accepted[rel] || baseOf(rel) == settingWaiver {
+		if accepted[rel] {
 			continue
 		}
 		t.Errorf("the harness holds out %d corpus keys spelled %q, but the codec accepts no such "+
-			"metadata spelling and it is not the %q waiver — the hold-out is absorbing a refusal, "+
-			"so the loss stops being counted. Either the codec must accept the spelling "+
-			"(simplified.metadataAliases) or the hold-out needs a documented waiver in SKIPPED.md",
-			heldOut[rel], rel, settingWaiver)
+			"metadata spelling — the hold-out is absorbing a refusal, so the loss stops being "+
+			"counted. Either the codec must accept the spelling (simplified.metadataAliases) or "+
+			"the key must reach decode and be counted in the census; the waiver class is empty "+
+			"since ctx/setting emission landed (REQ-053) and reintroducing one is a spec "+
+			"decision (conformance.md § PROBE-086), not a harness edit",
+			heldOut[rel], rel)
 	}
 }
 

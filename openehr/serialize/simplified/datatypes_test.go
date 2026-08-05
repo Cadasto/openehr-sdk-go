@@ -222,6 +222,127 @@ func TestSubstitutedSubtypeRidesRaw(t *testing.T) {
 	}
 }
 
+// TestCodedTextAtTextLeafRidesSuffixes — REQ-053: the one substitution carried
+// in suffix form. A fully-captured DV_CODED_TEXT stored at a DV_TEXT-typed
+// leaf (legal RM substitution) emits the DV_CODED_TEXT suffix set — |code,
+// |value, |terminology, |formatting — with no bare key and no |raw, matching
+// the reference implementation's dv_coded_text_as_dv_text corpus shape.
+// Decode re-selects the coded builder from |code at the DV_TEXT leaf, so the
+// pair is inverse.
+func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
+	v := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "Radial styloid tenosynovitis", Formatting: new("plain")},
+		DefiningCode: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}
+	for _, form := range []struct {
+		name string
+		v    any
+	}{{"value", v}, {"pointer", &v}} {
+		t.Run(form.name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/x", form.v, "DV_TEXT", false); err != nil {
+				t.Fatalf("leafToFlat: %v", err)
+			}
+			want := map[string]any{
+				"p/x|code":        "21794005",
+				"p/x|value":       "Radial styloid tenosynovitis",
+				"p/x|terminology": "SNOMED-CT",
+				"p/x|formatting":  "plain",
+			}
+			if len(out) != len(want) {
+				t.Fatalf("got %d entries %#v, want %d %#v", len(out), out, len(want), want)
+			}
+			for k, w := range want {
+				if out[k] != w {
+					t.Errorf("out[%q] = %#v, want %#v", k, out[k], w)
+				}
+			}
+			// And back: |code at the DV_TEXT leaf selects the DV_CODED_TEXT builder.
+			dv, err := dvFromSuffixes("DV_TEXT", false, suffixesOf(out, "p/x"))
+			if err != nil {
+				t.Fatalf("dvFromSuffixes: %v", err)
+			}
+			if dv["_type"] != "DV_CODED_TEXT" || dv["value"] != "Radial styloid tenosynovitis" || dv["formatting"] != "plain" {
+				t.Errorf("decoded %#v, want a DV_CODED_TEXT with value + formatting", dv)
+			}
+			dc, _ := dv["defining_code"].(map[string]any)
+			if dc["code_string"] != "21794005" {
+				t.Errorf("decoded defining_code = %#v, want code_string 21794005", dv["defining_code"])
+			}
+			tid, _ := dc["terminology_id"].(map[string]any)
+			if tid["value"] != "SNOMED-CT" {
+				t.Errorf("decoded terminology = %#v, want SNOMED-CT", dc["terminology_id"])
+			}
+		})
+	}
+}
+
+// TestDecoratedCodedTextAtTextLeafRidesRaw: the carve-out admits only a fully
+// captured value. Extras the DV_CODED_TEXT suffix set cannot carry (mappings —
+// not modelled yet) keep the substituted value on |raw, stamped with its
+// dynamic type, exactly as before (REQ-053: never drop silently).
+func TestDecoratedCodedTextAtTextLeafRidesRaw(t *testing.T) {
+	v := rm.DVCodedText{
+		DVText: rm.DVText{
+			Value: "Radial styloid tenosynovitis",
+			Mappings: []rm.TermMapping{{
+				Match:  '=',
+				Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+			}},
+		},
+		DefiningCode: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}
+	out := map[string]any{}
+	if err := leafToFlat(out, "p/x", v, "DV_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := out["p/x|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected |raw for a mapping-decorated coded text, got %#v", out)
+	}
+	if raw["_type"] != "DV_CODED_TEXT" {
+		t.Errorf("|raw _type = %v, want DV_CODED_TEXT (dynamic type)", raw["_type"])
+	}
+	if _, has := raw["mappings"]; !has {
+		t.Errorf("|raw fragment lost the mappings: %#v", raw)
+	}
+	if len(out) != 1 {
+		t.Errorf("|raw must ride alone, got %#v", out)
+	}
+}
+
+// TestCodedSuffixesAtTextLeafErrors — the fail-loud boundaries of the
+// carve-out (REQ-053): |code selects the coded builder, which then follows
+// DV_CODED_TEXT's own rules — |value is required, and the coded form has no
+// bare spelling. Without |code the leaf stays a plain DV_TEXT, so a stray
+// |value or |terminology is refused by the DV_TEXT allowlist as before.
+func TestCodedSuffixesAtTextLeafErrors(t *testing.T) {
+	for name, sfx := range map[string]map[string]any{
+		"code without value":          {"code": "21794005"},
+		"bare value beside code":      {"code": "21794005", "value": "v", "": "v"},
+		"value without code":          {"value": "v"},
+		"terminology without code":    {"": "v", "terminology": "SNOMED-CT"},
+		"code with unmodelled suffix": {"code": "21794005", "value": "v", "mapping": "x"},
+		"other is not a DV_TEXT form": {"other": "v"},
+		"code beside other refused":   {"code": "21794005", "value": "v", "other": "x"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := dvFromSuffixes("DV_TEXT", false, sfx); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("dvFromSuffixes(DV_TEXT, %v) err = %v, want ErrUnsupportedDatatype", sfx, err)
+			}
+		})
+	}
+	// A plain DV_TEXT leaf (bare value, optional |formatting) is untouched by
+	// the discriminator.
+	dv, err := dvFromSuffixes("DV_TEXT", false, map[string]any{"": "plain text"})
+	if err != nil {
+		t.Fatalf("plain DV_TEXT rejected: %v", err)
+	}
+	if dv["_type"] != "DV_TEXT" || dv["value"] != "plain text" {
+		t.Errorf("plain DV_TEXT decode = %#v", dv)
+	}
+}
+
 // TestNonLocalOrdinalRidesRaw: the ordinal suffix set has no |terminology
 // channel and decode rebuilds the symbol as archetype-local, so a symbol coded
 // in an external terminology must ride |raw rather than being rewritten.
@@ -859,5 +980,29 @@ func TestDateAccuracyRidesRaw(t *testing.T) {
 	}
 	if _, scalar := out["p/x|accuracy"]; scalar {
 		t.Error("emitted a scalar |accuracy for a DV_DURATION-typed accuracy")
+	}
+}
+
+// TestEmptyCodeDoesNotPromoteTextLeaf — REQ-053. The DV_CODED_TEXT-at-DV_TEXT
+// discriminator is a non-empty string |code, not the key's mere presence.
+// `|code: ""` / `|code: null` is what a form emits for "free text, no code
+// selected"; promoting those would mint a DV_CODED_TEXT whose
+// CODE_PHRASE.code_string is empty — RM-invalid, stable enough on re-encode that
+// nothing downstream flags it, and matched by any AQL predicate testing
+// defining_code/code_string against ”. They stay a plain DV_TEXT, so the stray
+// |code is refused by the allowlist exactly as it was before the carve-out
+// (PR #88 review).
+func TestEmptyCodeDoesNotPromoteTextLeaf(t *testing.T) {
+	for name, sfx := range map[string]map[string]any{
+		"empty string code":              {"code": "", "value": "free text"},
+		"null code":                      {"code": nil, "value": "free text"},
+		"empty code beside a bare value": {"code": "", "": "free text"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dv, err := dvFromSuffixes("DV_TEXT", false, sfx)
+			if !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Fatalf("dvFromSuffixes(DV_TEXT, %v) = %#v, err = %v; want ErrUnsupportedDatatype (must not promote to DV_CODED_TEXT)", sfx, dv, err)
+			}
+		})
 	}
 }

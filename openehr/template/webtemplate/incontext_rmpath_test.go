@@ -52,9 +52,9 @@ var unserialisableIC = map[string]string{
 	"COMPOSITION.composer":  "PARTY_PROXY: leafToFlat silently skips non-DV_ values; ctx/composer_name carries the name (external_ref is dropped — known deviation)",
 	"EVENT_CONTEXT.start_time": "carried by ctx/time on encode; resolving here would double-spell the value " +
 		"(ADR 0015 keeps encode ctx/-only) — no data loss today",
-	"EVENT_CONTEXT.setting": "ctx/setting emission is deferred (simplified/deviations.md), so nothing consumes a resolution; " +
-		"a template-less decode or a hand-built RM value would then emit a zero-valued leaf (a conformant WithTemplate " +
-		"decode defaults it to 238|other care). A non-default setting is currently dropped on encode — known deviation",
+	"EVENT_CONTEXT.setting": "carried by ctx/setting|code + |value on encode (REQ-053 amended 2026-08-05, ADR 0015's " +
+		"emission gap closed); resolving here would double-spell the value (encode stays ctx/-only, permanent under " +
+		"ADR 0015, like start_time) — no data loss today",
 	// ENTRY-level language / encoding are deliberately absent from this map: the
 	// CODE_PHRASE leaf mapping landed, so those leaves now resolve through rmpath
 	// — this guard enforces that, and TestEntryLanguageEncodingResolveToValues

@@ -119,9 +119,12 @@ var metaSpellings = map[string]bool{
 // This corpus has no other_context, so nothing is lost today — the narrow
 // list is what keeps that true if the corpus grows.
 //
-// The two are not held out for the same reason: `start_time` is a respelling
-// (`ctx/time`), `setting` is a waived encode-side drop. See
-// [IsCompositionMeta].
+// Both are respellings, base-matched like `language`/`territory` because every
+// suffix they carry is either an accepted alias or a checked witness:
+// `start_time` respells to `ctx/time`, and `setting` to `ctx/setting|code` +
+// `|value` with `|terminology` as an `openehr` witness (REQ-053, amended
+// 2026-08-05 — `setting` was the suite's one waived encode-side drop until
+// `ctx/setting` emission landed). See [IsCompositionMeta].
 var contextMetaLeaves = map[string]bool{
 	"setting": true, "start_time": true,
 }
@@ -135,33 +138,27 @@ var contextMetaLeaves = map[string]bool{
 // does with that spelling, not because of which leaf it sits on.
 //
 // This is the one place the comparison holds a key out on *both* sides, and
-// the hold-outs are not all the same kind of thing:
+// every hold-out is the same kind of thing — a respelling; the waiver class is
+// empty and TestHoldOutMatchesCodecAliases fails if one reappears:
 //
-//   - `language|*`, `territory|*`, `composer|name`, `composer_self` and
-//     `context/start_time` are **respellings**. Upstream writes them as real
-//     paths under the template root (`<root>/language|code`,
-//     `<root>/context/start_time`); REQ-053 reads and writes the `ctx/` short
-//     forms (`ctx/language`, `ctx/time`) — the same information on a different
-//     surface, a documented codec deviation rather than lost data. Comparing
-//     across the two spellings would report every such key as both missing and
-//     extra, which is noise, not signal.
+//   - `language|*`, `territory|*`, `composer|name`, `composer_self`,
+//     `context/start_time` and `context/setting|*` are **respellings**. Upstream
+//     writes them as real paths under the template root (`<root>/language|code`,
+//     `<root>/context/setting|code`); REQ-053 reads and writes the `ctx/` short
+//     forms (`ctx/language`, `ctx/setting|code` + `|value`) — the same
+//     information on a different surface, a documented codec deviation rather
+//     than lost data. Comparing across the two spellings would report every such
+//     key as both missing and extra, which is noise, not signal.
+//     `context/setting` joined this class on 2026-08-05 (the amended REQ-053):
+//     until `ctx/setting` emission landed it was the suite's one documented
+//     **waiver** — the real path decoded and then re-encoded to nothing — and
+//     ADR 0015 had deliberately left that emission gap open.
 //   - `composer|id`, `|id_scheme` and `|id_namespace` are **not** held out, and
 //     that is the point of the suffix-awareness. They are the PARTY_PROXY
 //     `external_ref`, which the `ctx/` short forms structurally cannot carry, so
 //     ADR 0015 refuses them on decode. They flow through to the codec, are
 //     refused there, and are counted as an excluded PARTY_PROXY family — real
 //     data loss, visible in the census, rather than absorbed by a base match.
-//   - `context/setting` is a **waiver of a known encode-side drop**, not a
-//     respelling. It decodes (a WithTemplate decode even defaults it to
-//     `238 other care`) and then re-encodes to *nothing at all*: the
-//     `ctx/setting` short form is deferred, so the value is dropped on the way
-//     out — openehr/serialize/simplified/deviations.md § `ctx/` context. Held
-//     out deliberately. It survived the ctx/-versus-real-path decision
-//     ([ADR 0015](../../../docs/adr/0015-flat-metadata-spelling.md), which
-//     settled the *spelling*): this is an **emission** gap — `ctx/setting` is
-//     not written at all — so it clears when that emission lands, not when a
-//     spelling wins. Until then the loss is recorded in SKIPPED.md, not
-//     concealed by the hold-out.
 //
 // Keys are held out even when decode happens to accept them, so a metadata
 // key that survives decode does not resurface as a phantom "missing" when

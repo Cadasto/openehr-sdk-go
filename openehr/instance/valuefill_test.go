@@ -79,3 +79,39 @@ func TestGenerateRandomFillReproducibleAndValid(t *testing.T) {
 		t.Error("RandomFill produced no leaf variation vs ExampleFill")
 	}
 }
+
+// TestGeneratedSettingSatisfiesSettingValid — REQ-107. EVENT_CONTEXT.setting
+// carries the RM invariant Setting_valid: the defining code must be a member of
+// the openEHR terminology's `setting` group. The generic example synthesiser
+// will happily invent an archetype-local code for a template that does not
+// constrain setting, which reads as "populated" and is still RM-invalid — and
+// the FLAT ctx/setting form (code + implied openehr terminology) then cannot
+// represent it, so MarshalFlat refused the generator's own output (PR #88
+// review). Every generated composition must be openehr-coded.
+func TestGeneratedSettingSatisfiesSettingValid(t *testing.T) {
+	name := "Test Composer"
+	for _, fixture := range []string{"body_weight", "vital_signs", "minimal_observation.en.v1"} {
+		t.Run(fixture, func(t *testing.T) {
+			out, err := instance.Generate(context.Background(), compileFixture(t, fixture), instance.Options{
+				Policy:    instance.Example,
+				Territory: "NL",
+				Composer:  &rm.PartyIdentified{Name: &name},
+			})
+			if err != nil {
+				t.Fatalf("Generate: %v", err)
+			}
+			comp, err := instance.AsComposition(out)
+			if err != nil {
+				t.Fatalf("AsComposition: %v", err)
+			}
+			code := comp.Context.Setting.DefiningCode
+			if code.CodeString == "" {
+				t.Error("generated setting has no defining code (EVENT_CONTEXT.setting is RM-mandatory)")
+			}
+			if code.TerminologyID.Value != "openehr" {
+				t.Errorf("generated setting is coded %q/%q; Setting_valid requires a code from the openehr setting group",
+					code.CodeString, code.TerminologyID.Value)
+			}
+		})
+	}
+}

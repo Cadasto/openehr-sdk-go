@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers) and REQ-095 (OpenAPI authoritative source). Transport hygiene (REQ-090–094) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source) and REQ-140 (underscore-prefixed RM attributes; the wire-extension band 140–149 continues the exhausted 050–059 band). Transport hygiene (REQ-090–094) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -157,10 +157,10 @@ Both variants serialize the **same** RM data (a `COMPOSITION`) under **template-
 
 - Path segments are **Web Template `id`s** (e.g. `blood_pressure`, `systolic`), joined by `/` and rooted at the template id — never archetype at-codes.
 - Repeating nodes carry a zero-based instance index `:0` / `:1`.
-- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` collapses into its value (no trailing `/value`).
+- Leaf attributes are pipe suffixes (`|magnitude`, `|unit`, `|code`, `|value`, `|terminology`, …); an `ELEMENT` collapses into its value (no trailing `/value`). Exactly **one subtype substitution** is carried in suffix form: a `DV_CODED_TEXT` stored at a `DV_TEXT`-typed leaf (legal RM substitution) **MUST** be emitted and accepted in the `DV_CODED_TEXT` suffix form — `|code` + `|value` + `|terminology` (plus the other modelled `DV_CODED_TEXT` suffixes, e.g. `|formatting`), with **no** bare-key spelling — matching the reference implementation, whose corpus carries the rubric under `|value` (`ehrbase_conformance_data_types_dv_coded_text_as_dv_text`); every other substituted subtype (the value's dynamic type differing from the leaf's declared type) rides `|raw`. The inverse substitution — an uncoded `DV_TEXT` at a `DV_CODED_TEXT` leaf — stays the `|other` open-value-set form.
 - Structural levels are removed relative to the canonical path: container attributes (`content`, `data`, `events`, `items`, …) are elided, and the `ITEM_STRUCTURE` family, `HISTORY`, and single unnamed `EVENT`s are collapsed.
-- Composition-level metadata is carried under the `ctx/` prefix (mandatory `language`, `territory`; optional `composer`, `time`, `setting`, participations, …). The reference implementation instead spells several of these as real paths under the template root (`<root>/language|code`, `<root>/composer|name`, `<root>/context/start_time`, …), carrying the same information. Decode **MUST** accept either spelling for a field that has an exact `ctx/` equivalent; encode **MUST** emit only the `ctx/` short form. Where both spellings appear for one field and disagree, the codec **MUST** fail rather than choose. A real-path `|terminology` witness that differs from the terminology the `ctx/` form implies **MUST** be rejected rather than silently rewritten; a matching witness carries no information the `ctx/` form lacks and is discarded. Two composition-level families are **not** respellings: the composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) stay refused and visible in the PROBE-086 census, while `context/setting` is held out by the conformance harness as its one documented waiver — it decodes via its real path where the template carries the node, and the value is dropped on encode until `ctx/setting` emission lands. See [ADR 0015](../adr/0015-flat-metadata-spelling.md).
-- Optional RM attributes the template does not constrain use an underscore prefix (`_uid`, `_link`, `_normal_range`, …); the `|raw` suffix embeds a pre-serialized canonical RM fragment, which **MUST** carry `_type`.
+- Composition-level metadata is carried under the `ctx/` prefix (mandatory `language`, `territory`; optional `composer`, `time`, `setting`). The reference implementation instead spells several of these as real paths under the template root (`<root>/language|code`, `<root>/composer|name`, `<root>/context/start_time`, …), carrying the same information. Decode **MUST** accept either spelling for a field that has an exact `ctx/` equivalent; encode **MUST** emit only the `ctx/` short form. Where both spellings appear for one field and disagree, the codec **MUST** fail rather than choose. A real-path `|terminology` witness that differs from the terminology the `ctx/` form implies **MUST** be rejected rather than silently rewritten; a matching witness carries no information the `ctx/` form lacks and is discarded. `context/setting` **is** such a respelling: encode **MUST** emit `ctx/setting|code` + `ctx/setting|value` when the source `EVENT_CONTEXT.setting` is populated (the all-zero value writes nothing), and decode **MUST** accept either spelling under the same disagreement and witness rules — the implied terminology is `openehr`, and a setting coded in any other terminology is a typed error, not a silent rewrite. Implying it is not a guess: the RM invariant `Setting_valid` on `EVENT_CONTEXT` requires `setting.defining_code` to be a member of the openEHR terminology's `setting` group, so `openehr` is the only terminology a conformant setting can carry and decode completing it is spec-conformant — the same footing as `ISO_639-1` for `language`. A witness naming anything else therefore contradicts the RM, which is why it is refused rather than honoured. Encode **MUST** likewise refuse a populated setting it cannot carry in that form rather than omit it; producers of RM-invalid settings are the defect, not the wire form. The ctx-only emission rule is scoped to the **six respelled scalar fields** (`language`, `territory`, `composer_name`, `composer_self`, `time`, `setting`). One composition-level family is **not** a respelling: the composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) — and its `_identifier:N` list (§ REQ-140) — stay refused and visible in the PROBE-086 census, because no `ctx/` short form can carry them. The `ctx/` short forms the *Simplified Formats* spec sketches for the **EVENT_CONTEXT optionals** (participations, `health_care_facility`, `end_time`, `location`) are not part of this contract: those attributes ride the underscore grammar under the real `context` segment (§ REQ-140, [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md)). See [ADR 0015](../adr/0015-flat-metadata-spelling.md).
+- Optional RM attributes the template does not constrain use an underscore prefix (`_uid`, `_link`, `_normal_range`, …) — the normative attribute vocabulary and value grammar are [§ REQ-140](#req-140--underscore-prefixed-rm-attributes); the `|raw` suffix embeds a pre-serialized canonical RM fragment, which **MUST** carry `_type`.
 
 **FLAT** is a single-level map of `path → primitive | object`. **STRUCTURED** is the same data as nested JSON keyed by the same segment `id`s, where every data value is wrapped in an **array** (even at cardinality `0..1` / `1..1`) and attribute suffixes appear as `|`-prefixed keys.
 
@@ -175,6 +175,45 @@ The codecs **MUST**:
 - Report a missing or mismatched Web Template / OPT as a typed error when conversion cannot proceed without it.
 
 The codecs **MUST** use the canonical media types `application/openehr.wt.flat+json` (FLAT) and `application/openehr.wt.structured+json` (STRUCTURED); they **SHOULD** accept EHRbase's non-conformant `.schema`-suffixed variants on input for interoperability, but **MUST NOT** emit them. (The `.schema` acceptance is a SHOULD the implementation currently defers — see the package [deviations register](../../openehr/serialize/simplified/deviations.md).)
+
+### REQ-140 — Underscore-prefixed RM attributes
+
+The FLAT / STRUCTURED codecs (REQ-053) **MUST** carry the *Simplified Formats* **underscore-prefixed RM attribute** grammar — the spec's *RM Attributes prefix* rule: an optional RM attribute the template does not constrain is addressed by prefixing its RM attribute name with `_` at the node it belongs to. The spec names the mechanism and the attribute set; the concrete suffix vocabulary below is the reference implementation's ([ADR 0014](../adr/0014-webtemplate-reference-implementation-lock.md)), pinned by the PROBE-086 corpus.
+
+The grammar is **recursive and typed by the owning RM class**, not a flat key list: a `_`-attribute's value decomposes by its own RM type, and `_`-attributes nest (`…/_feeder_audit/originating_system_audit/provider/_identifier:0|id`, `…/dv_multimedia/_thumbnail|size`). The codec **MUST** support, in **both** directions — encode emitting every populated in-scope attribute from the RM instance, decode rebuilding canonical RM:
+
+| Owner | Attributes | Value grammar |
+|---|---|---|
+| any LOCATABLE node (composition root, ENTRY, CLUSTER, collapsed `ELEMENT` leaf) | `_uid` | bare value (UID-based id) |
+| | `_link:N` | LINK — `\|meaning`, `\|type`, `\|target` |
+| | `_feeder_audit` | FEEDER_AUDIT (below) |
+| collapsed `ELEMENT` leaf | `_null_flavour` | DV_CODED_TEXT — `\|code` + `\|value` (`openehr` terminology implied); legal beside an **absent** bare value |
+| | `_null_reason` | DV_TEXT — bare value |
+| ENTRY subtypes | `_work_flow_id`, `_guideline_id` | OBJECT_REF — `\|id`, `\|id_scheme`, `\|namespace`, `\|type` |
+| | `_other_participation:N` | PARTICIPATION (below) |
+| EVENT_CONTEXT (under the real `context` segment) | `_health_care_facility` | PARTY_IDENTIFIED (below) |
+| | `_participation:N` | PARTICIPATION (below) |
+| | `_end_time` | bare value (DV_DATE_TIME) |
+| | `_location` | bare value (String) |
+| DV_ORDERED leaf | `_normal_range` | DV_INTERVAL — `/lower` + `/upper` carrying the anchor datatype's own suffix form, `\|lower_included`, `\|upper_included`, `\|lower_unbounded`, `\|upper_unbounded` |
+| | `_other_reference_ranges:N` | REFERENCE_RANGE — the interval grammar + `/meaning` (DV_TEXT / DV_CODED_TEXT) |
+| DV_TEXT / DV_CODED_TEXT leaf | `_mapping:N` | TERM_MAPPING — `\|match`, `/target\|code` + `\|terminology`, `/purpose` (DV_CODED_TEXT) |
+| DV_MULTIMEDIA value | `_charset`, `_language` | CODE_PHRASE — `\|code` + `\|terminology` |
+| | `_thumbnail` | nested DV_MULTIMEDIA (its own suffix set) |
+| PARTY_IDENTIFIED / PARTY_RELATED (wherever the grammar reaches one) | — | `\|id`, `\|id_scheme`, `\|id_namespace`, `\|name`; nested `_identifier:N` (DV_IDENTIFIER — `\|id`, `\|issuer`, `\|assigner`, `\|type`); PARTY_RELATED adds `/relationship` (DV_CODED_TEXT) |
+| PARTICIPATION | — | `\|function`, `\|mode`, the performer's party suffixes inline, and the performer's identifiers as **inlined indexed suffixes** `\|identifiers_id:N` / `\|identifiers_issuer:N` / `\|identifiers_assigner:N` / `\|identifiers_type:N` (the reference's spelling — **not** the nested `_identifier:N` form standalone party nodes use) |
+| FEEDER_AUDIT | `originating_system_item_id:N`, `feeder_system_item_id:N` | DV_IDENTIFIER suffixes |
+| | `originating_system_audit`, `feeder_system_audit` | FEEDER_AUDIT_DETAILS — `\|system_id`, `\|version_id`, `\|time`; `/location`, `/subject`, `/provider` as PARTY_IDENTIFIED |
+| | `original_content` **or** `original_content_multimedia` | DV_PARSABLE (bare + `\|formalism`) or DV_MULTIMEDIA — the DV_ENCAPSULATED choice disambiguated **by key name** (reference spelling) |
+
+Behavioural rules:
+
+- The round-trip **MUST** be semantics-preserving in both directions, under REQ-053's fail-loud posture: an unrecognised `_`-segment **MUST** be a typed error (`ErrUnknownPath`), an unrecognised suffix inside a family a typed error — never a silent drop.
+- Encode **MUST NOT** silently lose an in-scope attribute: a populated attribute is emitted in this grammar; what the grammar cannot carry either rides `|raw` (where a `|raw` carrier exists) or is a typed error. This **narrows the `|raw` boundary**: a decorated value whose extras are now expressible (a `normal_range`, `mappings`, …) rides suffixes plus `_`-attribute keys where it previously rode a whole `|raw` fragment.
+- STRUCTURED **MUST** carry the same vocabulary as nested members (`_`-keys as object members, arrays for `:N` lists), and OPT-free FLAT ↔ STRUCTURED interconversion **MUST** preserve it.
+- Deliberate exclusions (refused, visible in the PROBE-086 census — never silently dropped): the composer's `external_ref` suffixes and the composer's `_identifier:N` (no `ctx/` carrier — [ADR 0015](../adr/0015-flat-metadata-spelling.md) boundary); `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — named by the spec, unexercised by the pinned corpus, **deferred** as typed refusals until a pinnable fixture lands.
+
+Verified by [PROBE-089](conformance.md#probe-089--underscore-attribute-round-trip) (per-family round-trip) and the [PROBE-086](conformance.md#probe-086--upstream-flat-serialisation-parity) census movement.
 
 ## ITS-REST envelopes
 

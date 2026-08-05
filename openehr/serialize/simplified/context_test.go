@@ -1,18 +1,22 @@
 package simplified_test
 
 // REQ-053 — ctx/ context: composition-level metadata (language, territory,
-// composer, time) is carried under the ctx/ prefix (FLAT) / a ctx object
-// (STRUCTURED). Language + territory are mandatory on decode.
+// composer, time, setting) is carried under the ctx/ prefix (FLAT) / a ctx
+// object (STRUCTURED). Language + territory are mandatory on decode.
 import (
 	"encoding/json"
 	"errors"
+	"maps"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/simplified"
+	"github.com/cadasto/openehr-sdk-go/openehr/template"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
+	"github.com/cadasto/openehr-sdk-go/openehr/templatecompile"
 )
 
 // bodyWeightOPT is a fixture whose Web Template root id ("body_weight") sorts
@@ -21,6 +25,11 @@ import (
 // key order, so the pair pins both directions of that walk — see
 // TestMetadataCompositeValueRefusedInBothKeyOrders.
 const bodyWeightOPT = "../../../testkit/cassettes/templates/body_weight.opt"
+
+// corpusFlatOPT is the PROBE-086 corpus template — the one vendored OPT whose
+// Web Template carries a context/setting node, so it is the only target on which
+// the ctx/-owned-leaf shadowing is observable.
+const corpusFlatOPT = "../../../testkit/cassettes/flat-conformance/templates/conformance_ehrbase.de.v0.opt"
 
 func TestContextEncodeAndRoundTrip(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
@@ -170,6 +179,241 @@ func TestContextStructuredShape(t *testing.T) {
 	}
 }
 
+// TestSettingEncodeEmitsPair — REQ-053 (amended 2026-08-05): a populated
+// EVENT_CONTEXT.setting is emitted as the ctx/setting|code + ctx/setting|value
+// pair — the sixth respelled metadata field (ADR 0015's left-open emission gap,
+// closed) — and never as the real-path spelling.
+func TestSettingEncodeEmitsPair(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	comp.Context.Setting = rm.DVCodedText{
+		DVText:       rm.DVText{Value: "home"},
+		DefiningCode: rm.CodePhrase{CodeString: "225", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+	}
+	f, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f, &m); err != nil {
+		t.Fatal(err)
+	}
+	if m["ctx/setting|code"] != "225" {
+		t.Errorf("ctx/setting|code = %#v, want %q", m["ctx/setting|code"], "225")
+	}
+	if m["ctx/setting|value"] != "home" {
+		t.Errorf("ctx/setting|value = %#v, want %q", m["ctx/setting|value"], "home")
+	}
+	for k := range m {
+		if strings.HasPrefix(k, wt.Tree.ID+"/context/setting") {
+			t.Errorf("encode emitted the real-path spelling %q; ctx/ must be the only output form", k)
+		}
+	}
+}
+
+// TestSettingEncodeAllZeroWritesNothing — REQ-053: the all-zero setting writes
+// nothing. Setting is a non-pointer DV_CODED_TEXT on EVENT_CONTEXT, so "unset"
+// and "zero" coincide (the CODE_PHRASE all-zero precedent) — an unconditional
+// emit would put blank setting keys on every composition decoded through the
+// ctx/ forms.
+func TestSettingEncodeAllZeroWritesNothing(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	comp.Context.Setting = rm.DVCodedText{}
+	f, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(f, &m); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"ctx/setting|code", "ctx/setting|value"} {
+		if v, ok := m[k]; ok {
+			t.Errorf("all-zero setting emitted %s = %#v; want nothing", k, v)
+		}
+	}
+}
+
+// TestSettingEncodeRefusals — REQ-053: a setting the ctx/setting pair cannot
+// carry is a typed error naming ctx/setting, never an omission (mirrors the
+// composer PARTY_RELATED rule — omitting it would let a WithTemplate decode
+// substitute the 238|other care default silently): a non-openehr terminology
+// (the pair implies openehr), extras beyond code+value (mappings, formatting, a
+// preferred term, …), and a value without a code.
+func TestSettingEncodeRefusals(t *testing.T) {
+	okSetting := func() rm.DVCodedText {
+		return rm.DVCodedText{
+			DVText:       rm.DVText{Value: "other care"},
+			DefiningCode: rm.CodePhrase{CodeString: "238", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}
+	}
+	str := func(s string) *string { return &s }
+	tests := []struct {
+		name string
+		mut  func(*rm.DVCodedText)
+	}{
+		{"non-openehr terminology", func(s *rm.DVCodedText) { s.DefiningCode.TerminologyID.Value = "SNOMED-CT" }},
+		{"empty terminology", func(s *rm.DVCodedText) { s.DefiningCode.TerminologyID.Value = "" }},
+		{"mappings extra", func(s *rm.DVCodedText) {
+			s.Mappings = []rm.TermMapping{{Match: '=', Target: rm.CodePhrase{CodeString: "x"}}}
+		}},
+		{"formatting extra", func(s *rm.DVCodedText) { s.Formatting = str("plain") }},
+		{"language extra", func(s *rm.DVCodedText) { s.Language = &rm.CodePhrase{CodeString: "en"} }},
+		{"preferred term extra", func(s *rm.DVCodedText) { s.DefiningCode.PreferredTerm = str("Other care") }},
+		{"value without code", func(s *rm.DVCodedText) { s.DefiningCode = rm.CodePhrase{} }},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			comp, wt := genComposition(t, minimalObsOPT)
+			setting := okSetting()
+			tc.mut(&setting)
+			comp.Context.Setting = setting
+			_, err := simplified.MarshalFlat(comp, wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if !strings.Contains(err.Error(), "ctx/setting") {
+				t.Errorf("error %q does not name ctx/setting", err)
+			}
+		})
+	}
+}
+
+// TestSettingDecodePair — REQ-053: ctx/setting|code + ctx/setting|value rebuild
+// EVENT_CONTEXT.setting as a DV_CODED_TEXT in the implied openehr terminology.
+func TestSettingDecodePair(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	body := `{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"238","ctx/setting|value":"other care"}`
+	comp, err := simplified.UnmarshalFlat([]byte(body), wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat: %v", err)
+	}
+	if comp.Context == nil {
+		t.Fatal("decoded composition has no context")
+	}
+	s := comp.Context.Setting
+	if s.DefiningCode.CodeString != "238" {
+		t.Errorf("setting code = %q, want 238", s.DefiningCode.CodeString)
+	}
+	if s.DefiningCode.TerminologyID.Value != "openehr" {
+		t.Errorf("setting terminology = %q, want the implied openehr", s.DefiningCode.TerminologyID.Value)
+	}
+	if s.Value != "other care" {
+		t.Errorf("setting value = %q, want %q", s.Value, "other care")
+	}
+}
+
+// TestSettingDecodeHalfPairRejected — REQ-053: one of the ctx/setting pair
+// without the other is a typed error naming the missing key, not a guessed
+// completion (the rubric is not derivable from the code without a terminology
+// service, and a code is not derivable from the rubric at all).
+func TestSettingDecodeHalfPairRejected(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	tests := []struct {
+		name, body, missing string
+	}{
+		{
+			"code without value",
+			`{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"238"}`,
+			"ctx/setting|value",
+		},
+		{
+			"value without code",
+			`{"ctx/language":"en","ctx/territory":"NL","ctx/setting|value":"other care"}`,
+			"ctx/setting|code",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := simplified.UnmarshalFlat([]byte(tc.body), wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if !strings.Contains(err.Error(), tc.missing) {
+				t.Errorf("error %q does not name the missing key %q", err, tc.missing)
+			}
+		})
+	}
+}
+
+// TestSettingWithTemplateDefaultRoundTrip — REQ-053: the round-trip interaction
+// of the synthesised default. A WithTemplate decode of a body carrying no
+// setting completes EVENT_CONTEXT.setting to 238|other care so the result
+// validates (deviations.md § RM-mandatory attributes); re-encoding that
+// completed composition emits ctx/setting|code + |value — a faithful encoding
+// of the completed composition, gaining exactly the two default keys over the
+// input. An OPT-free decode synthesises nothing, so its re-encode stays
+// byte-identical to the setting-less input.
+func TestSettingWithTemplateDefaultRoundTrip(t *testing.T) {
+	parsed, err := template.ParseFile(minimalObsOPT)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	compiled, err := templatecompile.Compile(parsed)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	comp, wt := genComposition(t, minimalObsOPT)
+	f1, err := simplified.MarshalFlat(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat: %v", err)
+	}
+	var m1 map[string]any
+	if err := json.Unmarshal(f1, &m1); err != nil {
+		t.Fatal(err)
+	}
+	// The generated source carries the default setting, so its encoding pins the
+	// exact two keys the WithTemplate completion re-creates below.
+	if m1["ctx/setting|code"] != "238" || m1["ctx/setting|value"] != "other care" {
+		t.Fatalf("generated encoding carries setting %#v|%#v, want the 238|other care default",
+			m1["ctx/setting|code"], m1["ctx/setting|value"])
+	}
+	noSetting := make(map[string]any, len(m1))
+	maps.Copy(noSetting, m1)
+	delete(noSetting, "ctx/setting|code")
+	delete(noSetting, "ctx/setting|value")
+	body, err := json.Marshal(noSetting)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// OPT-free: nothing synthesised, nothing emitted — byte-identical.
+	bare, err := simplified.UnmarshalFlat(body, wt)
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (bare): %v", err)
+	}
+	f2, err := simplified.MarshalFlat(bare, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat (bare re-encode): %v", err)
+	}
+	var m2 map[string]any
+	if err := json.Unmarshal(f2, &m2); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(noSetting, m2) {
+		t.Errorf("OPT-free round-trip of a setting-less body is not byte-identical:\n in  (%d keys) = %v\n out (%d keys) = %v",
+			len(noSetting), sortedKeys(noSetting), len(m2), sortedKeys(m2))
+	}
+
+	// WithTemplate: the completed composition re-encodes with exactly the two
+	// default keys gained — nothing else moves.
+	named, err := simplified.UnmarshalFlat(body, wt, simplified.WithTemplate(compiled))
+	if err != nil {
+		t.Fatalf("UnmarshalFlat (WithTemplate): %v", err)
+	}
+	f3, err := simplified.MarshalFlat(named, wt)
+	if err != nil {
+		t.Fatalf("MarshalFlat (WithTemplate re-encode): %v", err)
+	}
+	var m3 map[string]any
+	if err := json.Unmarshal(f3, &m3); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(m1, m3) {
+		t.Errorf("WithTemplate round-trip did not gain exactly the two default setting keys:\n want (%d keys) = %v\n got  (%d keys) = %v",
+			len(m1), sortedKeys(m1), len(m3), sortedKeys(m3))
+	}
+}
+
 // reflatten re-marshals comp's FLAT form as a mutable map, applies mut, and
 // returns the JSON bytes — the shared setup for the metadata-spelling tests.
 func reflatten(t *testing.T, comp *rm.Composition, wt *webtemplate.WebTemplate, mut func(root string, m map[string]any)) []byte {
@@ -257,6 +501,29 @@ func TestMetadataRealPathSpellingAccepted(t *testing.T) {
 			check: func(t *testing.T, got *rm.Composition) {
 				if got.Context == nil || got.Context.StartTime.Value != "2021-06-01T09:30:00Z" {
 					t.Errorf("start_time = %#v, want 2021-06-01T09:30:00Z", got.Context)
+				}
+			},
+		},
+		{
+			// REQ-053 (amended 2026-08-05): context/setting is the sixth respelled
+			// field — the real-path pair normalises onto ctx/setting|code + |value,
+			// with |terminology as an openehr witness (checked, then discarded).
+			name: "context setting",
+			mut: func(root string, m map[string]any) {
+				delete(m, "ctx/setting|code")
+				delete(m, "ctx/setting|value")
+				m[root+"/context/setting|code"] = "225"
+				m[root+"/context/setting|value"] = "home"
+				m[root+"/context/setting|terminology"] = "openehr"
+			},
+			check: func(t *testing.T, got *rm.Composition) {
+				if got.Context == nil {
+					t.Fatal("decoded composition has no context")
+				}
+				s := got.Context.Setting
+				if s.DefiningCode.CodeString != "225" || s.Value != "home" ||
+					s.DefiningCode.TerminologyID.Value != "openehr" {
+					t.Errorf("setting = %#v, want 225|home in openehr", s)
 				}
 			},
 		},
@@ -360,36 +627,19 @@ func TestMetadataTerminologyWitnessChecked(t *testing.T) {
 }
 
 // TestMetadataNonRespellingsStillRefused — ADR 0015 admits respellings only.
-// Neither of these keys is aliased onto ctx/: context/setting is an unimplemented
-// field on both surfaces (ctx/setting is unsupported on decode too), and the
-// composer's external_ref cannot be carried by the short forms at all. So neither
-// may be quietly absorbed into the context — each has to surface as an error from
-// whatever refuses it.
+// The composer's external_ref suffixes are not aliased onto ctx/ (the short
+// forms structurally cannot carry them), so they are never quietly absorbed
+// into the context — they surface as an error from whatever refuses them.
+// (context/setting left this test on 2026-08-05: the amended REQ-053 aliases it
+// onto ctx/setting|code + |value — see TestMetadataRealPathSpellingAccepted.)
 func TestMetadataNonRespellingsStillRefused(t *testing.T) {
 	comp, wt := genComposition(t, vitalSignsOPT)
-	for _, tc := range []struct {
-		name string
-		mut  func(root string, m map[string]any)
-	}{
-		// Not aliased onto ctx/ — and with this fixture the refusal comes from the
-		// Web Template, which carries no context/setting node, rather than from a
-		// codec rule about the key itself. Where a template *does* carry the node
-		// the real path decodes, which is the documented PROBE-086 waiver (see
-		// deviations.md); what this pins is that it is never absorbed as metadata.
-		{"context/setting", func(root string, m map[string]any) {
-			m[root+"/context/setting|code"] = "238"
-			m[root+"/context/setting|value"] = "other care"
-		}},
-		{"composer external_ref", func(root string, m map[string]any) {
-			m[root+"/composer|id"] = "12345"
-			m[root+"/composer|id_scheme"] = "HOSPITAL-NS"
-		}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			if _, err := simplified.UnmarshalFlat(reflatten(t, comp, wt, tc.mut), wt); err == nil {
-				t.Error("decoded without error; want a refusal (see ADR 0015)")
-			}
-		})
+	in := reflatten(t, comp, wt, func(root string, m map[string]any) {
+		m[root+"/composer|id"] = "12345"
+		m[root+"/composer|id_scheme"] = "HOSPITAL-NS"
+	})
+	if _, err := simplified.UnmarshalFlat(in, wt); err == nil {
+		t.Error("composer external_ref decoded without error; want a refusal (see ADR 0015)")
 	}
 }
 
@@ -460,11 +710,15 @@ func TestMetadataRealPathComposerSelf(t *testing.T) {
 // are public API: a spelling added or dropped here changes what a census excuses
 // and must be a deliberate edit, not a side effect.
 func TestMetadataAliasAccessorsPinned(t *testing.T) {
-	wantAliases := []string{"composer_self", "composer|name", "context/start_time", "language|code", "territory|code"}
+	wantAliases := []string{
+		"composer_self", "composer|name",
+		"context/setting|code", "context/setting|value", "context/start_time",
+		"language|code", "territory|code",
+	}
 	if got := simplified.MetadataAliasSpellings(); !slices.Equal(got, wantAliases) {
 		t.Errorf("MetadataAliasSpellings() = %q, want %q", got, wantAliases)
 	}
-	wantWitnesses := []string{"language|terminology", "territory|terminology"}
+	wantWitnesses := []string{"context/setting|terminology", "language|terminology", "territory|terminology"}
 	if got := simplified.MetadataWitnessSpellings(); !slices.Equal(got, wantWitnesses) {
 		t.Errorf("MetadataWitnessSpellings() = %q, want %q", got, wantWitnesses)
 	}
@@ -617,6 +871,38 @@ func TestMetadataAliasFamilyConflictAndAgreement(t *testing.T) {
 			wantNamed: []string{"ctx/time", root + "/context/start_time"},
 		},
 		{
+			// The generated body carries the default ctx/setting pair, so the
+			// real-path spelling agrees or disagrees against it (REQ-053).
+			name:  "setting code",
+			agree: func(root string, m map[string]any) { m[root+"/context/setting|code"] = m["ctx/setting|code"] },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/context/setting|code"] = "225"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/setting|code", root + "/context/setting|code"},
+		},
+		{
+			name:  "setting value",
+			agree: func(root string, m map[string]any) { m[root+"/context/setting|value"] = m["ctx/setting|value"] },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/context/setting|value"] = "home"
+			},
+			wantErr:   simplified.ErrUnknownPath,
+			wantNamed: []string{"ctx/setting|value", root + "/context/setting|value"},
+		},
+		{
+			// The setting witness mirrors the language one: the ctx/ pair implies
+			// openehr, so a real path naming any other terminology is refused
+			// rather than silently re-terminologised (REQ-053).
+			name:  "setting terminology witness",
+			agree: func(root string, m map[string]any) { m[root+"/context/setting|terminology"] = "openehr" },
+			disagree: func(root string, m map[string]any) {
+				m[root+"/context/setting|terminology"] = "SNOMED-CT"
+			},
+			wantErr:   simplified.ErrUnsupportedDatatype,
+			wantNamed: []string{root + "/context/setting|terminology"},
+		},
+		{
 			// A witness is checked and discarded, so "disagree" means naming a
 			// terminology the ctx/ short form cannot carry — a different refusal
 			// class (ErrUnsupportedDatatype) with only the witness key to name.
@@ -718,5 +1004,221 @@ func TestComposerSelfWithComposerNameRejected(t *testing.T) {
 	}
 	if p.Name == nil || *p.Name != "Dr X" {
 		t.Errorf("composer name = %v, want Dr X", p.Name)
+	}
+}
+
+// TestContextOwnedLeafUnacceptedSpellingRefused — REQ-053. The ctx/ short forms
+// own EVENT_CONTEXT setting and start_time outright, and [applyContext] writes
+// them last. A spelling of those leaves that the alias table does not accept
+// used to resolve as an ordinary Web Template leaf and then be overwritten with
+// no error — a silent drop of clinical metadata (PR #88 review). Every such
+// spelling is now refused naming the key.
+//
+// The corpus OPT is the target on purpose: its Web Template carries a
+// context/setting node, which is what made the drop reachable at all.
+func TestContextOwnedLeafUnacceptedSpellingRefused(t *testing.T) {
+	parsed, err := template.ParseFile(corpusFlatOPT)
+	if err != nil {
+		t.Fatalf("ParseFile: %v", err)
+	}
+	compiled, err := templatecompile.Compile(parsed)
+	if err != nil {
+		t.Fatalf("Compile: %v", err)
+	}
+	wt, err := webtemplate.Build(compiled)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	root := wt.Tree.ID
+
+	for _, tc := range []struct {
+		name string
+		key  string
+		val  any
+	}{
+		{"setting raw beside the ctx pair", root + "/context/setting|raw", map[string]any{
+			"_type": "DV_CODED_TEXT", "value": "emergency care",
+			"defining_code": map[string]any{
+				"_type": "CODE_PHRASE", "code_string": "227",
+				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "openehr"},
+			},
+		}},
+		{"setting formatting", root + "/context/setting|formatting", "plain"},
+		{"setting bare", root + "/context/setting", "other care"},
+		{"start_time raw beside ctx/time", root + "/context/start_time|raw", map[string]any{
+			"_type": "DV_DATE_TIME", "value": "2026-08-05T10:00:00Z",
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := map[string]any{
+				"ctx/language": "en", "ctx/territory": "NL",
+				"ctx/setting|code": "238", "ctx/setting|value": "other care",
+				"ctx/time": "2026-08-05T09:00:00Z",
+				tc.key:     tc.val,
+			}
+			raw, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = simplified.UnmarshalFlat(raw, wt, simplified.WithTemplate(compiled))
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype (the value must not be silently dropped)", err)
+			}
+			if !strings.Contains(err.Error(), tc.key) {
+				t.Errorf("error %q does not name the offending key %q", err, tc.key)
+			}
+		})
+	}
+}
+
+// TestSettingDecodeEmptyHalfRefused — REQ-053. An empty code or rubric is not a
+// setting: the code would rebuild a CODE_PHRASE with no code_string (RM-invalid
+// and refused by emitContextSetting, so decode would mint a composition this
+// codec cannot re-encode), and an all-empty pair is not read as "absent" —
+// absent is the keys not being there, and treating an explicit empty pair as
+// absent would hand it the WithTemplate 238|other care default instead.
+func TestSettingDecodeEmptyHalfRefused(t *testing.T) {
+	_, wt := genComposition(t, minimalObsOPT)
+	for _, tc := range []struct{ name, body, named string }{
+		{"empty code", `{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"","ctx/setting|value":"other care"}`, "ctx/setting|code"},
+		{"empty value", `{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"238","ctx/setting|value":""}`, "ctx/setting|value"},
+		{"both empty", `{"ctx/language":"en","ctx/territory":"NL","ctx/setting|code":"","ctx/setting|value":""}`, "ctx/setting|code"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := simplified.UnmarshalFlat([]byte(tc.body), wt)
+			if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+			if !strings.Contains(err.Error(), tc.named) {
+				t.Errorf("error %q does not name %q", err, tc.named)
+			}
+		})
+	}
+}
+
+// TestSettingHalfPairNamesTheAuthorsSpelling — REQ-053. Both halves are reported
+// in the spelling the payload used; telling a real-path author to add a
+// ctx/-spelled key they never wrote points them at the wrong place.
+func TestSettingHalfPairNamesTheAuthorsSpelling(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	root := wt.Tree.ID
+	body := reflatten(t, comp, wt, func(root string, m map[string]any) {
+		delete(m, "ctx/setting|code")
+		delete(m, "ctx/setting|value")
+		m[root+"/context/setting|code"] = "238"
+		m[root+"/context/setting|terminology"] = "openehr"
+	})
+	_, err := simplified.UnmarshalFlat(body, wt)
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if want := root + "/context/setting|code"; !strings.Contains(err.Error(), want) {
+		t.Errorf("error %q does not name the present key in the author's spelling %q", err, want)
+	}
+}
+
+// TestContextStructuredSuffixNesting — REQ-053. ctx/setting is the first ctx
+// field to carry a |suffix, and a suffixed ctx field nests its members under the
+// field name the way a clinical leaf does — ctx.setting["|code"], not a literal
+// "setting|code" member. A flat piped member would not round-trip through a
+// reference-shaped STRUCTURED body (PR #88 review).
+func TestContextStructuredSuffixNesting(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	b, err := simplified.MarshalStructured(comp, wt)
+	if err != nil {
+		t.Fatalf("MarshalStructured: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	ctxObj, ok := m["ctx"].(map[string]any)
+	if !ok {
+		t.Fatalf("structured body has no ctx object: %v", m)
+	}
+	if _, flat := ctxObj["setting|code"]; flat {
+		t.Errorf("ctx carries a literal piped member %q; suffixes must nest under setting", "setting|code")
+	}
+	setting, nested := ctxObj["setting"].(map[string]any)
+	if !nested {
+		t.Fatalf("ctx.setting = %#v, want an object nesting |code and |value", ctxObj["setting"])
+	}
+	if setting["|code"] != "238" || setting["|value"] != "other care" {
+		t.Errorf("ctx.setting = %#v, want |code 238 and |value \"other care\"", setting)
+	}
+
+	// And the nesting is an exact inverse: STRUCTURED -> FLAT -> STRUCTURED.
+	back, err := simplified.StructuredToFlat(b)
+	if err != nil {
+		t.Fatalf("StructuredToFlat: %v", err)
+	}
+	var fm map[string]any
+	if err := json.Unmarshal(back, &fm); err != nil {
+		t.Fatal(err)
+	}
+	if fm["ctx/setting|code"] != "238" || fm["ctx/setting|value"] != "other care" {
+		t.Errorf("flattened ctx/setting = %#v / %#v, want 238 / other care",
+			fm["ctx/setting|code"], fm["ctx/setting|value"])
+	}
+}
+
+// TestSettingEncodeDecodeSymmetry — REQ-053. Whatever emitContextSetting emits,
+// parseCtx must accept, and whatever parseCtx refuses, emitContextSetting must
+// refuse too. The pair is the codec's only setting surface, so an asymmetry
+// means MarshalFlat can produce a body UnmarshalFlat rejects (PR #88 re-review:
+// a populated code with an empty rubric was emitted as |value:"" and then
+// refused on the way back in).
+func TestSettingEncodeDecodeSymmetry(t *testing.T) {
+	comp, wt := genComposition(t, minimalObsOPT)
+	for _, tc := range []struct {
+		name    string
+		setting rm.DVCodedText
+		encodes bool
+	}{
+		{"code and rubric", rm.DVCodedText{
+			DVText:       rm.DVText{Value: "home"},
+			DefiningCode: rm.CodePhrase{CodeString: "225", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}, true},
+		{"code with empty rubric", rm.DVCodedText{
+			DefiningCode: rm.CodePhrase{CodeString: "238", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}, false},
+		{"all zero writes nothing", rm.DVCodedText{}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			comp.Context.Setting = tc.setting
+			f, err := simplified.MarshalFlat(comp, wt)
+			if !tc.encodes {
+				if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+					t.Fatalf("MarshalFlat err = %v, want ErrUnsupportedDatatype (decode refuses this shape)", err)
+				}
+				if !strings.Contains(err.Error(), "ctx/setting") {
+					t.Errorf("error %q does not name ctx/setting", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("MarshalFlat: %v", err)
+			}
+			// The symmetry assertion: our own output must survive our own decode.
+			if _, err := simplified.UnmarshalFlat(f, wt); err != nil {
+				t.Fatalf("encode produced a body decode refuses: %v", err)
+			}
+		})
+	}
+}
+
+// TestStructuredEmptyCtxLeafRefused — REQ-053. An explicit empty ctx leaf object
+// is refused rather than flattened to nothing: silently dropping it turns
+// "explicitly empty" into "absent", which a WithTemplate decode then completes
+// with the 238|other care default — the same class parseCtx closed for the FLAT
+// pair (PR #88 re-review).
+func TestStructuredEmptyCtxLeafRefused(t *testing.T) {
+	body := []byte(`{"minimal":{},"ctx":{"language":"en","territory":"NL","setting":{}}}`)
+	_, err := simplified.StructuredToFlat(body)
+	if !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+		t.Fatalf("StructuredToFlat err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "ctx/setting") {
+		t.Errorf("error %q does not name ctx/setting", err)
 	}
 }

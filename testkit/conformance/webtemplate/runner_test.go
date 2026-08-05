@@ -198,7 +198,7 @@ var pinned = map[string]expectation{
 	"ehrbase_conformance_composition":                         {excluded: 19, compared: 10},
 	"ehrbase_conformance_data_types_dv_boolean":               {excluded: 5, compared: 9},
 	"ehrbase_conformance_data_types_dv_coded_text":            {excluded: 19, compared: 12},
-	"ehrbase_conformance_data_types_dv_coded_text_as_dv_text": {excluded: 23, compared: 8},
+	"ehrbase_conformance_data_types_dv_coded_text_as_dv_text": {excluded: 19, compared: 12},
 	"ehrbase_conformance_data_types_dv_count":                 {excluded: 10, compared: 13},
 	"ehrbase_conformance_data_types_dv_date":                  {excluded: 11, compared: 11},
 	"ehrbase_conformance_data_types_dv_date_time":             {excluded: 11, compared: 11},
