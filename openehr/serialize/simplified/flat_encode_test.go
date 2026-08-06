@@ -217,3 +217,33 @@ func TestEncodePartyRelatedComposerErrors(t *testing.T) {
 		t.Errorf("MarshalFlat(PARTY_RELATED composer) err = %v, want ErrUnsupportedDatatype", err)
 	}
 }
+
+// The other two composer shapes wire.md § REQ-140 makes typed errors on encode.
+// Only the PARTY_RELATED one above was pinned end-to-end; these two were made
+// normative in the same delta and left unguarded (PR #89 review).
+func TestEncodeComposerShapesCtxCannotCarry(t *testing.T) {
+	empty := ""
+	for name, composer := range map[string]rm.PartyProxy{
+		// `ctx/composer_self` is a bare Boolean — an external_ref beside it has
+		// nowhere to go and must not be dropped.
+		"PARTY_SELF carrying an external_ref": &rm.PartySelf{
+			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+				ID:        &rm.HierObjectID{Value: "ref-1"},
+				Namespace: "demographic", Type: "PERSON",
+			}},
+		},
+		// A nameless PARTY_IDENTIFIED would write no ctx/ key at all, and a
+		// WithTemplate decode of that output defaults the composer to PARTY_SELF
+		// — a silent type substitution.
+		"PARTY_IDENTIFIED with no name":    &rm.PartyIdentified{},
+		"PARTY_IDENTIFIED with empty name": &rm.PartyIdentified{Name: &empty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp, wt := genComposition(t, minimalObsOPT)
+			comp.Composer = composer
+			if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Errorf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
+	}
+}

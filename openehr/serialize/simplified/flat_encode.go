@@ -75,9 +75,10 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 // is not a ctx/ field at all: it is a template-constrained leaf and rides its
 // own Web Template path.)
 //
-// A composer the ctx/ short forms cannot carry (PARTY_RELATED, or a
-// PARTY_IDENTIFIED without a name) is an error, not an omission: a decode of
-// the composer-less output under WithTemplate would default the composer to
+// A composer the ctx/ short forms cannot carry (PARTY_RELATED, a
+// PARTY_IDENTIFIED without a name, or a PARTY_SELF carrying an external_ref)
+// is an error, not an omission: a decode of the composer-less output under
+// WithTemplate would default the composer to
 // PARTY_SELF — a silent type substitution (see deviations.md). A setting the
 // ctx/setting pair cannot carry is refused on the same grounds
 // (emitContextSetting).
@@ -137,8 +138,9 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 // every composition whose composer is properly referenced — most real ones, and
 // one of the vendored corpus bodies — unencodable, which is a worse answer than
 // a documented projection loss for a format that is a lossy projection by
-// design. Registered in deviations.md § composer; the wire.md "none dropped"
-// claim is scoped around it.
+// design. Registered in deviations.md (§ deferred features, the ctx/ context
+// row); wire.md § REQ-140 names it as one of the two deliberately out-of-scope
+// classes rather than scoping a "none dropped" claim around it.
 func composerNameToCtx(out map[string]any, c rm.PartyIdentified) error {
 	if c.Name == nil || *c.Name == "" {
 		return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
@@ -472,12 +474,17 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		if len(sub) == 0 {
 			continue
 		}
-		// Refused only once something actually resolved here, which is the
-		// invariant emitNode states: a node in the ambiguous set that resolves
-		// to nothing is skipped like any absent optional, so a composition that
-		// never touches the reused region still encodes. Owners existing is not
-		// enough — a degenerate ELEMENT carrying neither a value nor an
-		// underscore attribute contributes no key and must not trip the guard.
+		// Refused on the first actual **emission**: a node in the ambiguous set
+		// that contributes no key is skipped like any absent optional, so a
+		// composition that never touches the reused region still encodes. Owners
+		// existing is not enough — a degenerate ELEMENT carrying neither a value
+		// nor an underscore attribute writes nothing and must not trip the guard.
+		// Pinned by TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission.
+		//
+		// Note this is *stricter* than the repeating-container arm above, which
+		// still trips on resolution (`len(vals) > 0`, emitNode). Both are safe —
+		// nothing emitted means nothing misattributed — but the two arms do not
+		// yet state one rule; aligning them is a follow-up, not this fix.
 		if err := refuseReusedSibling(node, ambiguous); err != nil {
 			return err
 		}

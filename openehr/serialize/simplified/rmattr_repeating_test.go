@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rmpath"
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
 )
 
@@ -241,6 +242,46 @@ func TestObjectRefTypedNilIDDoesNotPanic(t *testing.T) {
 			}
 		})
 	}
+}
+
+// The reused-sibling guard fires on the first *emission*, not on owners merely
+// existing — a degenerate ELEMENT contributing no FLAT key must be skipped like
+// any absent optional so a composition that never touches the reused region
+// still encodes. Mutation testing found this unpinned: moving the guard back to
+// the top of emitRepeatingLeafOwners survived the whole suite.
+func TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission(t *testing.T) {
+	node := &webtemplate.Node{
+		ID: "reused", RMType: "DV_TEXT", NodeID: "at0001", Min: 0, Max: -1,
+		AQLPath: "/content[openEHR-EHR-OBSERVATION.x.v1]/data[at0001]/items[at0002]/value",
+	}
+	ambiguous := map[string]bool{bareAQLPath(node.AQLPath): true}
+
+	t.Run("owners that emit nothing do not trip it", func(t *testing.T) {
+		out := map[string]any{}
+		// Two ELEMENTs carrying neither a value nor an underscore attribute.
+		owners := []any{&rm.Element{}, &rm.Element{}}
+		if err := emitRepeatingLeafOwners(out, node, "root", owners, ambiguous); err != nil {
+			t.Fatalf("err = %v, want nil for owners contributing no key", err)
+		}
+		if len(out) != 0 {
+			t.Errorf("out = %v, want empty", out)
+		}
+	})
+
+	t.Run("the first emitting owner trips it", func(t *testing.T) {
+		out := map[string]any{}
+		owners := []any{&rm.Element{NullFlavour: &rm.DVCodedText{
+			DVText:       rm.DVText{Value: "unknown"},
+			DefiningCode: rm.CodePhrase{CodeString: "253", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		}}}
+		err := emitRepeatingLeafOwners(out, node, "root", owners, ambiguous)
+		if !errors.Is(err, rmpath.ErrPathAmbiguous) {
+			t.Fatalf("err = %v, want ErrPathAmbiguous", err)
+		}
+		if len(out) != 0 {
+			t.Errorf("out = %v, want nothing written before the refusal", out)
+		}
+	})
 }
 
 // --- interval decode symmetry --------------------------------------------
@@ -594,6 +635,74 @@ func TestIntervalConcreteZeroBoundBesideUnboundedFlagEncodes(t *testing.T) {
 	}
 	if got := out["b|lower_unbounded"]; got != true {
 		t.Errorf("|lower_unbounded = %v, want true", got)
+	}
+}
+
+// …but a concrete bound that is *populated* is not indistinguishable from an
+// absent one, and the first fix read the instantiation instead of the value:
+// `Interval[DVQuantity]{Lower: {3,"mm"}, LowerUnbounded: true}` encoded with
+// err == nil and the lower bound gone from the output — the same silent loss of
+// a populated clinical value the interface-typed arm already refuses.
+func TestIntervalConcretePopulatedBoundBesideUnboundedFlagRefused(t *testing.T) {
+	out := map[string]any{}
+	err := intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVQuantity]{
+		Lower: rm.DVQuantity{Magnitude: 3, Units: "mm"}, LowerUnbounded: true,
+		Upper: rm.DVQuantity{Magnitude: 9, Units: "mm"},
+	})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "lower") {
+		t.Errorf("err = %v, want it to name the contradicting end", err)
+	}
+}
+
+// A DV_COUNT's zero magnitude is a legitimate bound, not a fabricated one, so it
+// must survive both legs: silent beside `|*_unbounded` (indistinguishable from
+// absence) and emitted when the end is bounded.
+func TestIntervalCountZeroBoundIsLegitimate(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "b", "DV_COUNT", rm.Interval[rm.DVCount]{
+		Lower: rm.DVCount{Magnitude: 0},
+		Upper: rm.DVCount{Magnitude: 9},
+	}); err != nil {
+		t.Fatalf("intervalToFlat on a zero-lower DV_COUNT range: %v", err)
+	}
+	if got := out["b/lower"]; got != int64(0) {
+		t.Errorf("b/lower = %v (%T), want a bare 0", got, got)
+	}
+}
+
+// A Go-zero DV_PROPORTION bound reaches the wire as `0/0`, which the RM forbids
+// outright: `DV_PROPORTION` invariant `Valid_denominator: denominator /= 0.0`
+// (resources/bmm/openehr_rm_1.2.0.bmm.json). That is the same footing as the
+// `Basic_validity` / `Name_valid` / `Setting_valid` refusals this grammar already
+// makes, so the fabricated bound is refused rather than written.
+func TestIntervalProportionZeroDenominatorBoundRefused(t *testing.T) {
+	out := map[string]any{}
+	err := intervalToFlat(out, "b", "DV_PROPORTION", rm.Interval[rm.DVProportion]{
+		Upper: rm.DVProportion{Numerator: 1, Denominator: 2, Type: 0},
+	})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "Valid_denominator") {
+		t.Errorf("err = %v, want it to name the RM invariant", err)
+	}
+}
+
+// The counter-case: a populated proportion bound carries a non-zero denominator
+// and must still encode.
+func TestIntervalProportionPopulatedBoundEncodes(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "b", "DV_PROPORTION", rm.Interval[rm.DVProportion]{
+		Lower: rm.DVProportion{Numerator: 1, Denominator: 2},
+		Upper: rm.DVProportion{Numerator: 3, Denominator: 4},
+	}); err != nil {
+		t.Fatalf("intervalToFlat on a populated proportion range: %v", err)
+	}
+	if got, want := out["b/lower|denominator"], float64(2); got != want {
+		t.Errorf("b/lower|denominator = %v, want %v", got, want)
 	}
 }
 
