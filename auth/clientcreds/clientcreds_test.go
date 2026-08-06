@@ -216,7 +216,7 @@ func TestTokenOAuth2Error(t *testing.T) {
 	}
 	oa, ok := errors.AsType[*auth.OAuth2Error](err)
 	if !ok {
-		t.Fatal("expected OAuth2Error via errors.As")
+		t.Fatal("expected OAuth2Error via errors.AsType")
 	}
 	if oa.Code != "invalid_client" {
 		t.Errorf("OAuth2.Code = %q", oa.Code)

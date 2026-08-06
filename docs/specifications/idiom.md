@@ -220,6 +220,19 @@ Documented exceptions:
 - Builders (`aql.New().From(...)`, `composition.NewBuilder(opt)`) are **not** goroutine-safe and **MUST NOT** be shared across goroutines — they are construct-then-finalise types, not long-lived clients. Document this in each builder's `doc.go`.
 - The recorder/replay transport in `sandbox/` **MAY** be single-goroutine in record mode if the consumer-side construction is single-threaded; if so it **MUST** be documented.
 
+## String iteration
+
+A check defined over **bytes** — a wire-format guard, a byte-exact scanner —
+MUST iterate `for i := range len(s)`, never `for i := range s`. Ranging a string
+yields rune-start indices and skips UTF-8 continuation bytes, so a byte loop
+rewritten that way stops inspecting every byte. `for i := range s` is correct
+only where runes are genuinely the unit.
+
+`go fix` deliberately declines to rewrite `for i := 0; i < len(s); i++` on a
+string for exactly this reason — it applies the `rangeint` fixer to slices only.
+A `range s` over a byte-oriented check is therefore always hand-written, and
+always worth a second look in review.
+
 ## Imports and naming
 
 - **Import groups:** standard library; third-party; module-internal — separated by blank lines. `gofumpt` + `goimports` (run via `golangci-lint fmt` / `make fmt`) handle ordering and enforce the group separation.

@@ -183,6 +183,22 @@ func TestDVDurationFractionalOnlyOnSeconds(t *testing.T) {
 	}
 }
 
+// The duration scanner walks bytes, so a non-ASCII designator must be
+// refused rather than silently skipped. (This also passes under a
+// rune-ranging loop — any byte >= 0x80 is the lead byte of its rune and
+// hits the designator default first — but it pins that ISO 8601's ASCII
+// alphabet is the only one accepted.) REQ-123.
+func TestDVDurationRejectsNonASCIIDesignator(t *testing.T) {
+	for _, v := range []string{"P1Dé", "PT1Й", "P1\xffD", "P1D "} {
+		if _, err := (&rm.DVDuration{Value: v}).ToDuration(); !errors.Is(err, rm.ErrTemporalConversion) {
+			t.Errorf("ToDuration(%q) err = %v, want ErrTemporalConversion", v, err)
+		}
+		if m := (&rm.DVDuration{Value: v}).Magnitude(); m != 0 {
+			t.Errorf("Magnitude(%q) = %v, want 0 (malformed)", v, m)
+		}
+	}
+}
+
 func TestDVDateTimeNegativeAndBadTimezone(t *testing.T) {
 	tt, err := (&rm.DVDateTime{Value: "2024-03-15T10:30:00-05:00"}).ToTime()
 	if err != nil {

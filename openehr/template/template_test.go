@@ -194,7 +194,7 @@ func TestParseOPT_InvalidXML_UnwrapsXMLError(t *testing.T) {
 		t.Fatalf("got %v, want ErrInvalidOPT", err)
 	}
 	if _, ok := errors.AsType[*xml.SyntaxError](err); !ok {
-		t.Fatalf("got %v, want chain to expose *xml.SyntaxError via errors.As", err)
+		t.Fatalf("got %v, want chain to expose *xml.SyntaxError via errors.AsType", err)
 	}
 }
 

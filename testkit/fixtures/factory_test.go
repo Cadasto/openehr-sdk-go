@@ -1,6 +1,7 @@
 package fixtures_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -27,6 +28,12 @@ func TestFactoryForXMLBody_prologue(t *testing.T) {
 		// part of it would let the *next* element decide the type.
 		{"empty PI target", `<?><COMPOSITION/>`, &rm.Composition{}},
 		{"empty PI then folder", `<?><FOLDER/>`, &rm.Folder{}},
+		// The sharp edge: with a second PI after the degenerate one, a scan
+		// that starts past the opening "?" resynchronises on the *wrong*
+		// "?>" and silently returns COMPOSITION here. Not fail-closed — a
+		// wrong root type, which is why these two cases carry the fix.
+		{"empty PI then PI then root", `<?><FOLDER?><COMPOSITION/>`, &rm.Folder{}},
+		{"empty PI then PI then lowercase", `<?><EHR_STATUS?><folder/>`, &rm.EHRStatus{}},
 		{"unterminated PI", `<?xml version="1.0"`, nil},
 		{"no element", `not xml at all`, nil},
 		{"unknown root", `<WIDGET/>`, nil},
@@ -44,29 +51,9 @@ func TestFactoryForXMLBody_prologue(t *testing.T) {
 			if !ok {
 				t.Fatalf("FactoryForXMLBody(%q) = _, false; want %T, true", tc.body, tc.want)
 			}
-			if got := factory(); !sameType(got, tc.want) {
+			if got := factory(); fmt.Sprintf("%T", got) != fmt.Sprintf("%T", tc.want) {
 				t.Errorf("FactoryForXMLBody(%q) = %T, want %T", tc.body, got, tc.want)
 			}
 		})
-	}
-}
-
-func sameType(a, b any) bool {
-	//nolint:gocritic // a type switch would not be shorter for a 2-value compare
-	return typeName(a) == typeName(b)
-}
-
-func typeName(v any) string {
-	switch v.(type) {
-	case *rm.Composition:
-		return "COMPOSITION"
-	case *rm.Folder:
-		return "FOLDER"
-	case *rm.EHRStatus:
-		return "EHR_STATUS"
-	case *rm.DVQuantity:
-		return "DV_QUANTITY"
-	default:
-		return "OTHER"
 	}
 }

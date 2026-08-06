@@ -66,6 +66,23 @@ func TestFormatItemTagHeader_ControlCharsRejected(t *testing.T) {
 			name: "NUL in Key",
 			tag:  ehr.ItemTag{Key: "k\x00z"},
 		},
+		{
+			name: "DEL in Value",
+			tag:  ehr.ItemTag{Key: "k", Value: "v\x7fz"},
+		},
+		// The guard is defined over bytes, so a control byte must still be
+		// seen when it sits next to multi-byte UTF-8. (These pass under a
+		// rune-ranging loop too — a continuation byte is always 0x80–0xBF
+		// and so can never itself be C0 or DEL — but they pin the RFC 9110
+		// contract the doc comment states.)
+		{
+			name: "LF after a multi-byte rune",
+			tag:  ehr.ItemTag{Key: "k", Value: "café\ninjected"},
+		},
+		{
+			name: "DEL between multi-byte runes",
+			tag:  ehr.ItemTag{Key: "k", Value: "é\x7fé"},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
