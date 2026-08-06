@@ -454,9 +454,6 @@ func repeatingLeafOwners(resolveRoot rm.Locatable, relPath string) ([]any, error
 // collapsed value — absent when the ELEMENT carries only a `_null_flavour` —
 // followed by that same instance's underscore attributes.
 func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPrefix string, owners []any, ambiguous map[string]bool) error {
-	if err := refuseReusedSibling(node, ambiguous); err != nil {
-		return err
-	}
 	// The :index counts emitted instances, not RM list positions — an instance
 	// contributing no FLAT key is omitted without consuming an index, for the
 	// reason spelled out in emitNode.
@@ -474,6 +471,15 @@ func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPre
 		}
 		if len(sub) == 0 {
 			continue
+		}
+		// Refused only once something actually resolved here, which is the
+		// invariant emitNode states: a node in the ambiguous set that resolves
+		// to nothing is skipped like any absent optional, so a composition that
+		// never touches the reused region still encodes. Owners existing is not
+		// enough — a degenerate ELEMENT carrying neither a value nor an
+		// underscore attribute contributes no key and must not trip the guard.
+		if err := refuseReusedSibling(node, ambiguous); err != nil {
+			return err
 		}
 		maps.Copy(out, sub)
 		idx++

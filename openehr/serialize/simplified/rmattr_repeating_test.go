@@ -560,3 +560,110 @@ func TestCompositeLeafKeepsItsOwnerUnderscoreAttrs(t *testing.T) {
 		}
 	}
 }
+
+// --- interval mirror + inlined identifier index ---------------------------
+
+// Encode must refuse what decode refuses. A bound standing beside its
+// `|*_unbounded: true` flag contradicts the RM equivalence; dropping it silently
+// (the old behaviour) lost a populated clinical value while the same pair on the
+// way in was already a typed error.
+func TestIntervalBoundBesideUnboundedFlagRefusedOnEncode(t *testing.T) {
+	out := map[string]any{}
+	err := intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVOrdered]{
+		Lower: &rm.DVQuantity{Magnitude: 3, Units: "mm"}, LowerUnbounded: true,
+		Upper: &rm.DVQuantity{Magnitude: 9, Units: "mm"},
+	})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "lower") {
+		t.Errorf("err = %v, want it to name the contradicting end", err)
+	}
+}
+
+// The concrete instantiations have no Void: `Interval[DVQuantity]`'s zero Lower
+// is indistinguishable from an absent one, so an unbounded end there must stay
+// silent rather than refuse every half-open range.
+func TestIntervalConcreteZeroBoundBesideUnboundedFlagEncodes(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "b", "DV_QUANTITY", rm.Interval[rm.DVQuantity]{
+		LowerUnbounded: true,
+		Upper:          rm.DVQuantity{Magnitude: 9, Units: "mm"},
+	}); err != nil {
+		t.Fatalf("intervalToFlat on a half-open concrete range: %v", err)
+	}
+	if got := out["b|lower_unbounded"]; got != true {
+		t.Errorf("|lower_unbounded = %v, want true", got)
+	}
+}
+
+// A PARTICIPATION spells its performer's identifiers as inlined indexed
+// suffixes, and every fixture in the corpus and in PROBE-089 sits at `:0` — so
+// pinning the index to 0 survived the whole suite, exactly as the nested
+// `_identifier` spelling did. Two identifiers pin the sequence in both
+// directions.
+func TestParticipationInlinedIdentifiersBeyondIndexZero(t *testing.T) {
+	str := func(s string) *string { return &s }
+	out := map[string]any{}
+	err := participationsRMAttr(out, "x", "_participation", []rm.Participation{{
+		Function: rm.DVText{Value: "requester"},
+		Performer: &rm.PartyIdentified{
+			Name: str("Dr Test"),
+			Identifiers: []rm.DVIdentifier{
+				{ID: "id-0", Issuer: str("iss-0")},
+				{ID: "id-1", Issuer: str("iss-1"), Type: str("typ-1")},
+			},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("participationsRMAttr: %v", err)
+	}
+	for key, want := range map[string]any{
+		"x/_participation:0|identifiers_id:0":     "id-0",
+		"x/_participation:0|identifiers_issuer:0": "iss-0",
+		"x/_participation:0|identifiers_id:1":     "id-1",
+		"x/_participation:0|identifiers_issuer:1": "iss-1",
+		"x/_participation:0|identifiers_type:1":   "typ-1",
+	} {
+		if got := out[key]; got != want {
+			t.Errorf("%s = %v, want %v", key, got, want)
+		}
+	}
+}
+
+// Decode must keep every identifier, in both spellings. Truncating either list
+// to its first element survived the whole suite: no fixture anywhere decodes a
+// party carrying two, so only the encode side was pinned.
+func TestPartyIdentifiersDecodeKeepsEveryEntry(t *testing.T) {
+	wt, _ := conformanceWT(t)
+	comp := decodeRMAttr(t, wt, rmattrBody(map[string]any{
+		// Nested spelling, on a standalone party.
+		rmattrRoot + "/context/_health_care_facility|name":               "Hosp",
+		rmattrRoot + "/context/_health_care_facility/_identifier:0|id":   "hcf-0",
+		rmattrRoot + "/context/_health_care_facility/_identifier:1|id":   "hcf-1",
+		rmattrRoot + "/context/_health_care_facility/_identifier:1|type": "typ-1",
+		// Inlined spelling, on a PARTICIPATION performer.
+		rmattrRoot + "/context/_participation:0|function":           "requester",
+		rmattrRoot + "/context/_participation:0|name":               "Dr Test",
+		rmattrRoot + "/context/_participation:0|identifiers_id:0":   "p-0",
+		rmattrRoot + "/context/_participation:0|identifiers_id:1":   "p-1",
+		rmattrRoot + "/context/_participation:0|identifiers_type:1": "typ-1",
+	}))
+	hcf, ok := comp.Context.HealthCareFacility.(*rm.PartyIdentified)
+	if !ok {
+		t.Fatalf("health_care_facility = %T, want *rm.PartyIdentified", comp.Context.HealthCareFacility)
+	}
+	if len(hcf.Identifiers) != 2 {
+		t.Errorf("nested spelling decoded %d identifiers, want 2", len(hcf.Identifiers))
+	}
+	if len(comp.Context.Participations) != 1 {
+		t.Fatalf("decoded %d participations, want 1", len(comp.Context.Participations))
+	}
+	perf, ok := comp.Context.Participations[0].Performer.(*rm.PartyIdentified)
+	if !ok {
+		t.Fatalf("performer = %T, want *rm.PartyIdentified", comp.Context.Participations[0].Performer)
+	}
+	if len(perf.Identifiers) != 2 {
+		t.Errorf("inlined spelling decoded %d identifiers, want 2", len(perf.Identifiers))
+	}
+}

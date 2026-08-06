@@ -244,10 +244,18 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // type it cannot be nil at all, so the flag is the only channel that can say
 // "no bound here").
 func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interval[T]) error {
-	if err := intervalBoundToFlat(out, base, anchor, "lower", any(iv.Lower), iv.LowerUnbounded); err != nil {
+	// Whether Void is representable at all depends on the instantiation: an
+	// interface bound (`DVInterval[DVOrdered]`, what a canonical decode
+	// produces, and what every REFERENCE_RANGE carries) can be nil, so a bound
+	// standing beside `|*_unbounded: true` is a real contradiction; a concrete
+	// bound cannot be nil, so its Go zero is indistinguishable from absence and
+	// there is nothing to report.
+	var zero T
+	voidRepresentable := any(zero) == nil
+	if err := intervalBoundToFlat(out, base, anchor, "lower", any(iv.Lower), iv.LowerUnbounded, voidRepresentable); err != nil {
 		return err
 	}
-	if err := intervalBoundToFlat(out, base, anchor, "upper", any(iv.Upper), iv.UpperUnbounded); err != nil {
+	if err := intervalBoundToFlat(out, base, anchor, "upper", any(iv.Upper), iv.UpperUnbounded, voidRepresentable); err != nil {
 		return err
 	}
 	if iv.LowerUnbounded {
@@ -282,8 +290,17 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // legitimate one: a genuine zero magnitude (`DV_COUNT`'s `0` lower bound) leaves
 // no mandatory suffix empty and passes, while the Go zero `DV_QUANTITY` spells
 // its mandatory `|unit` as "".
-func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded bool) error {
+func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded, voidRepresentable bool) error {
 	if unbounded {
+		// The mirror of decode's refusal (intervalSuffixes): a bound standing
+		// beside its `|*_unbounded: true` contradicts the RM equivalence, and
+		// dropping it here would lose a populated clinical value silently while
+		// the same pair on the way in is a typed error. Only checkable where the
+		// instantiation can express Void — see intervalToFlat.
+		if voidRepresentable && bound != nil && !rm.IsTypedNil(bound) {
+			return fmt.Errorf("%w: %q carries a %s bound and is also marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so the pair contradicts itself",
+				ErrUnsupportedDatatype, base+"/"+end, end, end, end, end)
+		}
 		return nil
 	}
 	path := base + "/" + end
@@ -313,6 +330,20 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 // (`DV_QUANTITY`'s `|unit`, a bare-keyed temporal's own value). An *optional*
 // suffix explicitly set to "" is odd but not invalid, and it encodes at a plain
 // Web Template leaf, so it must encode at a bound too.
+//
+// The reach is therefore **string-valued mandatory suffixes only**, and that is
+// a real limit, not an oversight: it fires for DV_QUANTITY, DV_ORDINAL, DV_SCALE
+// and the four temporals, and cannot fire for the two anchors whose mandatory
+// suffixes are all numeric — DV_COUNT, where a zero magnitude is a legitimate
+// bound and must pass, and DV_PROPORTION, where a Go-zero bound reaches the wire
+// as `0/0`. Whether that last one is a fabrication worth refusing is an open
+// question: nothing in this repo (validator, RM type, spec §) states a
+// `denominator /= 0` invariant, so the codec does not invent one.
+//
+// A `typereg` miss also returns "no mandatory suffix". That is correct rather
+// than fail-open: the only anchor that misses is an abstract one
+// (`DV_INTERVAL<DV_ORDERED>`), whose bound rides `|raw` whole and is therefore
+// lossless with nothing to fabricate.
 func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool) {
 	ctor, known := typereg.Default.Lookup(anchor)
 	if !known {
