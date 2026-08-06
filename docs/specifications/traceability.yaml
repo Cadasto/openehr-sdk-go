@@ -418,9 +418,10 @@ requirements:
     # values for the defaulted attributes are not round-tripped; the
     # EVENT_CONTEXT optionals participations / health_care_facility / end_time /
     # location are NOT deferred ctx/ forms — ADR 0016 assigns them to the
-    # REQ-140 underscore grammar); first-class
-    # _-attr suffix decomposition (covered losslessly via |raw); .schema media
-    # types on input. The upstream byte-conformance probe landed 2026-08-01 as
+    # REQ-140 underscore grammar); .schema media
+    # types on input. First-class _-attr decomposition is NO LONGER deferred:
+    # REQ-140 landed the whole underscore grammar on 2026-08-05, which narrowed
+    # the |raw boundary rather than relying on it (wire.md § REQ-140). The upstream byte-conformance probe landed 2026-08-01 as
     # PROBE-086 (testkit/conformance/webtemplate) — deliberately not in this
     # REQ's probes: list; it exercises this codec, but REQ-080 owns it.
     #
@@ -448,6 +449,36 @@ requirements:
     # suffix-form substitution; the ctx-only emission rule is scoped to the six
     # respelled scalar fields (ADR 0016), the EVENT_CONTEXT optionals riding
     # the REQ-140 underscore grammar instead.
+    #
+    # Amended 2026-08-05 (same plan, PR 2 — the datatype-leaf closures REQ-140's
+    # machinery enabled). DV_PARSABLE (bare value + |formalism) and DV_MULTIMEDIA
+    # (bare **uri** + |mediatype + |size + |data + |alternatetext +
+    # |integrity_check + the two algorithms) are first-class leaves at a Web
+    # Template node and at every nested position the underscore grammar reaches
+    # one; a DV_PARSABLE at a leaf is now always fully captured and never rides
+    # |raw. DV_INTERVAL<T> is not a suffix set but the REQ-140 interval grammar,
+    # anchored on the bound datatype the Web Template names inside the angle
+    # brackets — a bare, unparameterised DV_INTERVAL names none and stays on
+    # |raw. The ENTRY `subject` (PARTY_PROXY) round-trips through the party
+    # grammar, PARTY_SELF spelled by the absence of every party key, which is
+    # what keeps the WithTemplate completion byte-identical on re-encode; the
+    # composition-metadata leaves are held back by name (ctxOnlyLeafPaths) now
+    # that PARTY_PROXY is emittable, rather than by a datatype gap. Two
+    # terminology decisions are recorded rather than inferred: the vendored
+    # openEHR `participation mode` group (the only vocabulary this codec
+    # carries, because |mode has no code channel) and the implied
+    # IANA_media-types identifier for DV_MULTIMEDIA.media_type (a code-set
+    # identifier, not a vocabulary — and refused for a value coded elsewhere,
+    # which rides |raw whole). The remaining coded-at-text carve-out is
+    # unchanged: only a *fully-captured* DV_CODED_TEXT at a DV_TEXT leaf takes
+    # the suffix form, a decorated one still rides |raw. `ctx/setting` and the
+    # standalone CODE_PHRASE leaves (now with |preferred_term) are as noted
+    # above. STRUCTURED gained the `"|"` member — a bare leaf value beside the
+    # same leaf's members, which a DV_MULTIMEDIA leaf always has; it is this
+    # codec's choice within the format's conventions, not corpus-pinned.
+    # Still deferred: `.schema` media types on input, ACTIVITY
+    # action_archetype_id (STRING — the last unmapped leaf type on encode), and
+    # reused-sibling FLAT (the REQ-116 residual, fail-loud in both directions).
     implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md
@@ -473,6 +504,11 @@ requirements:
       - openehr/serialize/simplified/context_test.go
       - openehr/serialize/simplified/raw_test.go
       - openehr/serialize/simplified/names_test.go
+      # The 2026-08-05 datatype-leaf closures: the encapsulated and interval
+      # leaves, the ENTRY subject, and the DataValue members they share with
+      # REQ-140's grammar.
+      - openehr/serialize/simplified/rmattr_encapsulated_test.go
+      - openehr/serialize/simplified/rmattr_party_test.go
 
   - id: REQ-055
     title: AQL wire boundary
@@ -806,6 +842,17 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
+      - docs/plans/2026-08-05-flat-rm-attributes.md
+    # Two RM invariants the generic example synthesiser used to violate were
+    # closed from the REQ-053/REQ-140 PR reviews (2026-08-05), both because an
+    # RM-invalid generated instance is also unrepresentable in FLAT:
+    #   - EVENT_CONTEXT.setting now pins the openehr-coded `238 other care`
+    #     default rather than an invented archetype-local code (Setting_valid).
+    #   - an unconstrained abstract PARTY_PROXY is now filled with PARTY_SELF,
+    #     not an empty PARTY_IDENTIFIED, which violates Basic_validity and on
+    #     the FLAT wire is indistinguishable from PARTY_SELF anyway. This is a
+    #     user-visible change to the ENTRY subject of every generated
+    #     composition (concreteFor, openehr/instance/generate.go).
     notes: "ValueFill{ExampleFill,RandomFill} + Options.ValueSource seam (composition.WithValueFill/WithValueSource). medium/detail_level level deferred."
 
   - id: REQ-101
@@ -1288,7 +1335,6 @@ requirements:
     title: Underscore-prefixed RM attributes (simplified formats)
     canonical: docs/specifications/wire.md#req-140--underscore-prefixed-rm-attributes
     status: draft
-    implementation: planned
     # The Simplified Formats "RM Attributes prefix" grammar for the REQ-053
     # codecs: optional RM attributes the template does not constrain, addressed
     # as `_`-prefixed segments (_uid, _link:N, _feeder_audit, _work_flow_id,
@@ -1303,12 +1349,92 @@ requirements:
     # (no new ctx/ short forms). Deliberate exclusions: composer external_ref
     # + composer/_identifier (ADR 0015 boundary); _instruction_details and
     # _wf_definition deferred as typed refusals (no pinnable fixture yet).
+    #
+    # LANDED 2026-08-05 over four phases (plan 2026-08-05-flat-rm-attributes.md,
+    # PR 2). The whole grammar table is carried in both directions, byte-exact:
+    # the decode router keyed by the owner's RM class (an `_` segment ends Web
+    # Template resolution at the segment before it) plus the encode hook on the
+    # owner walk; the simple families (_uid, _link:N, _work_flow_id,
+    # _guideline_id, context/_end_time, context/_location); the value
+    # decorations (_normal_range, _other_reference_ranges:N with the RM `range`
+    # level elided, _mapping:N, _null_flavour beside an absent bare value,
+    # _null_reason); the party grammar in one implementation for every position
+    # it reaches a party (context/_health_care_facility, context/_participation:N,
+    # _other_participation:N with the reference's inlined |identifiers_*:N, the
+    # nested _identifier:N, _provider, and the ENTRY subject leaf); and the
+    # deepest family, _feeder_audit, whose tails nest three levels
+    # (…/originating_system_audit/provider/_identifier:0|id). Owner
+    # admissibility comes from rminfo, not a hand table. Census: PROBE-086
+    # compared keys 360 -> 1466 of 1824 (19.7% -> 80.4%), the whole `path not in
+    # web template` refusal family bar 22 keys collapsed; PROBE-089 pins the
+    # per-family round-trip, the canonical-transit encode, the refusals and the
+    # STRUCTURED vocabulary. Corpus corrections settled against the plan and
+    # amended into wire.md in the same commits: the REFERENCE_RANGE `range`
+    # elision, the asymmetric interval boundary flags, |mode carrying the
+    # participation-mode rubric with no code, the party external_ref `type`
+    # being a default rather than a fixed PARTY, DV_MULTIMEDIA's bare key being
+    # the uri, and the explicit subject|_type: PARTY_SELF at an RM-optional
+    # PARTY_PROXY.
+    #
+    # STILL DEFERRED (refused loudly and none dropped, except the composer
+    # boundary noted below, which encode projects rather than refuses):
+    # _instruction_details
+    # (ACTION) and _wf_definition (INSTRUCTION) — spec-named, corpus-unexercised
+    # as a decodable grammar, so no fixture can pin them yet; FEEDER_AUDIT_DETAILS
+    # other_details (an ITEM_STRUCTURE with no channel in the reference's suffix
+    # set); PARTICIPATION time (same); the composer boundary — external_ref,
+    # composer/_identifier:N and composer/relationship, which ADR 0015 gives no
+    # carrier, an ADR decision rather than a codec one. That boundary is
+    # asymmetric and deliberately so: decode refuses those spellings (census-
+    # visible), while encode projects ONE of them -- a PARTY_IDENTIFIED composer
+    # carrying a name keeps the name and DROPS its external_ref / identifiers,
+    # rather than refuse every composition whose composer is properly referenced
+    # (one vendored corpus body is). Every other shape is refused on encode too:
+    # a PARTY_RELATED composer, a PARTY_SELF with an external_ref, and a nameless
+    # PARTY_IDENTIFIED. That is one of TWO encode-side drops, not the only one:
+    # the _uid / _link:N / _feeder_audit of a folded structural wrapper (ITEM_TREE,
+    # HISTORY, a lifted EVENT) are dropped too, because FLAT has no key for a node
+    # the Web Template does not model -- closable only reference-side (ADR 0014),
+    # and structurally invisible to PROBE-086 whose input is FLAT; and the ctx/ short forms ADR 0016 decision 3 declines for the
+    # EVENT_CONTEXT optionals, which ride this grammar at their real paths
+    # instead. Not an underscore question at all: the 19 keys this SDK's
+    # WebTemplate projection does not carry (ism_transition/*, INTERVAL_EVENT
+    # math_function/width, ACTION time, OBSERVATION history_origin, …), owned by
+    # openehr/template/webtemplate/deviations.md.
+    implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md
       - docs/adr/0016-event-context-optionals-underscore-spelling.md
     probes: [PROBE-089]
     packages:
       - openehr/serialize/simplified
+    tests:
+      # The router, the simple families, the `:index` rules and the owner-kind
+      # refusals.
+      - openehr/serialize/simplified/rmattr_test.go
+      # The value decorations, the interval grammar and the |raw boundary.
+      - openehr/serialize/simplified/rmattr_value_test.go
+      # The party grammar, the participations and the ENTRY subject leaf.
+      - openehr/serialize/simplified/rmattr_party_test.go
+      # Repeating collapsed ELEMENTs (owner walk + per-instance :index), the
+      # interval encode/decode refusal symmetry and the composer projection.
+      - openehr/serialize/simplified/rmattr_repeating_test.go
+      # The encapsulated / interval leaves and the DataValue members.
+      - openehr/serialize/simplified/rmattr_encapsulated_test.go
+      # _feeder_audit (three tail levels), _provider, the |_type discriminator
+      # and the other_details deferral.
+      - openehr/serialize/simplified/rmattr_feeder_test.go
+      # The captured-set widening (suffix form vs |raw) and the STRUCTURED "|"
+      # member the underscore families forced.
+      - openehr/serialize/simplified/datatypes_test.go
+      - openehr/serialize/simplified/structured_test.go
+      # The ADR 0015 composer boundary.
+      - openehr/serialize/simplified/context_test.go
+      # PROBE-089 — the per-family probe and its runner.
+      - testkit/probes/serialize/probe_089_underscore_round_trip.go
+      - testkit/probes/serialize/probes_test.go
+      # PROBE-086 — the census pins that move in step with each landed family.
+      - testkit/conformance/webtemplate/runner_test.go
     plans:
       - docs/plans/2026-08-05-flat-rm-attributes.md
 
@@ -1502,9 +1628,11 @@ requirements:
     # 30 fixtures) that PROBE-076 had run green over; fixed in rmpath the same
     # day (REQ-121).
     #
-    # Scope, stated plainly: 360 of the corpus's 1824 keys are in the modelled
-    # subset today (19.7%) — 1158 refused by the REQ-053 codec, 306 held out as
-    # composition metadata. That hold-out is suffix-aware respellings only
+    # Scope, stated plainly: 1466 of the corpus's 1824 keys are in the modelled
+    # subset today (80.4%) — 52 refused by the REQ-053 codec, 306 held out as
+    # composition metadata. (Before the REQ-140 underscore grammar landed on
+    # 2026-08-05 the same three numbers read 360 / 19.7% / 1158; the hold-out
+    # did not move, so the whole ratchet is refused-to-compared.) That hold-out is suffix-aware respellings only
     # (language, territory, composer|name, composer_self, context/start_time and
     # context/setting, which REQ-053 reads and writes as the ctx/ short forms;
     # the composer external_ref suffixes are deliberately NOT held out — they are
@@ -1528,7 +1656,10 @@ requirements:
     # per-datatype |suffix row but DV_TEXT's (which is subtype substitution, not
     # an optional attribute). 356 → 360 (2026-08-05) closed that last row too:
     # the DV_CODED_TEXT-at-DV_TEXT carve-out took the dv_coded_text_as_dv_text
-    # fixture from 8 compared to 12. See
+    # fixture from 8 compared to 12. 360 -> 1466 (2026-08-05) is the REQ-140
+    # underscore grammar plus the DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL /
+    # ENTRY-subject leaves: 1106 keys moved excluded -> compared in one step,
+    # leaving 52 refusals. See
     # docs/plans/archive/2026-08-03-flat-coverage-ratchet.md; the remaining ranked
     # inventory is in testkit/conformance/webtemplate/SKIPPED.md.
     #

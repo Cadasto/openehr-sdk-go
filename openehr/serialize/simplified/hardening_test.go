@@ -260,13 +260,17 @@ func TestStructuredToFlatRejectsMalformed(t *testing.T) {
 }
 
 // TestFlatToStructuredRejectsConflicts: two FLAT keys claiming the same
-// STRUCTURED slot with incompatible shapes (bare scalar vs |suffix object, or
-// a bare root value) must error deterministically — last-write-wins would make
-// the output depend on Go map iteration order.
+// STRUCTURED slot with incompatible shapes — two spellings of one bare value, or
+// a bare root value — must error deterministically; last-write-wins would make the
+// output depend on Go map iteration order.
+//
+// A bare value *beside* the same leaf's |suffixes or nested members is no longer
+// in this list: it is a legal FLAT shape (a DV_MULTIMEDIA's uri beside its
+// mandatory `|mediatype`) and STRUCTURED spells it with the `"|"` member — see
+// TestBareLeafBesideMembersThroughStructured.
 func TestFlatToStructuredRejectsConflicts(t *testing.T) {
 	cases := []string{
-		`{"t/leaf:0": "bare", "t/leaf:0|code": "c"}`,
-		`{"t/a:0": "x", "t/a:0/b:0": "y"}`,
+		`{"t/leaf": "x", "t/leaf:0": "y"}`,
 		`{"t": 5}`,
 	}
 	for _, in := range cases {

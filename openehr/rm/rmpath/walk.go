@@ -28,13 +28,14 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // WebTemplate can emit is resolvable here unless deliberately exempted.
 //
 // Resolving an attribute here does not by itself make the FLAT encoder fail:
-// leafToFlat skips the leaf datatypes it does not map (PARTY_PROXY, STRING — a
-// documented skip, see openehr/serialize/simplified/deviations.md) and emits
-// unmapped DV_* datatypes as |raw. "The codec cannot write it" is therefore a
-// reason for a leaf to stay unemitted, never a reason for an attribute to stay
-// unresolvable. CODE_PHRASE was in that skip list until the PROBE-086 coverage
-// ratchet gave it a |code + |terminology leaf mapping, which is why ENTRY
-// `language` / `encoding` resolve here now.
+// leafToFlat skips the leaf datatypes it does not map (STRING — a documented
+// skip, see openehr/serialize/simplified/deviations.md) and emits unmapped DV_*
+// datatypes as |raw. "The codec cannot write it" is therefore a reason for a
+// leaf to stay unemitted, never a reason for an attribute to stay unresolvable.
+// CODE_PHRASE was in that skip list until the PROBE-086 coverage ratchet gave it
+// a |code + |terminology leaf mapping, which is why ENTRY `language` / `encoding`
+// resolve here now; PARTY_PROXY left it on 2026-08-05 with REQ-140's party
+// grammar, which is why ENTRY `subject` does.
 //
 // The attributes deliberately still absent are EVENT_CONTEXT `start_time` /
 // `setting` and COMPOSITION `language` / `territory`. All four are owned by the
@@ -47,10 +48,12 @@ import "github.com/cadasto/openehr-sdk-go/openehr/rm"
 // through the pair, and its exemption is the same permanent double-spell as
 // `start_time`'s (see simplified/flat_encode.go emitContextSetting).
 //
-// COMPOSITION `composer` does resolve (compositionChildren below) — the FLAT
-// encoder simply declines to write a PARTY_PROXY. Of the REQ-121 completeness
-// set, only ENTRY `subject` and ACTIVITY `action_archetype_id` are not written
-// yet.
+// COMPOSITION `composer` does resolve (compositionChildren below) and is a
+// PARTY_PROXY the FLAT encoder now *could* write — it declines because the ctx/
+// short forms own composition metadata, which the encoder asserts by name rather
+// than by leaning on a datatype gap (simplified/flat_encode.go ctxOnlyLeafPaths).
+// Of the REQ-121 completeness set, only ACTIVITY `action_archetype_id` is not
+// written yet.
 func childrenAt(parent any, attr string) []any {
 	if isNilPointer(parent) {
 		return nil
@@ -223,27 +226,33 @@ func sectionChildren(s *rm.Section, attr string) []any {
 	return nil
 }
 
-// entryChildren resolves the two in-context attributes this helper covers of
-// those the five ENTRY subtypes share: `language` and `encoding` (REQ-121).
-// `subject` is a third such shared attribute the Web Template emits, but it
-// stays unresolved — see the hazard note on childrenAt. Delegated to from
-// OBSERVATION / EVALUATION / INSTRUCTION / ACTION / ADMIN_ENTRY; GENERIC_ENTRY
-// is deliberately not among them — it descends from CONTENT_ITEM, not ENTRY,
-// and carries neither attribute.
+// entryChildren resolves the three in-context attributes the five ENTRY subtypes
+// share and the Web Template emits: `language`, `encoding` and `subject`
+// (REQ-121). Delegated to from OBSERVATION / EVALUATION / INSTRUCTION / ACTION /
+// ADMIN_ENTRY; GENERIC_ENTRY is deliberately not among them — it descends from
+// CONTENT_ITEM, not ENTRY, and carries none of the three.
 //
-// Both are non-pointer CODE_PHRASE fields, so they are resolved *by value* —
-// the convention here for non-pointer attributes (cf. ACTION `time`,
-// COMPOSITION `category`) — a child is therefore always returned, and "unset"
-// reaches the caller as a zero CODE_PHRASE. The FLAT encoder's leaf mapping is
-// what declines to write an empty code (see simplified.codePhraseToFlat).
-// Resolution and writability are separate concerns; conflating them is what
-// previously hid an encode-side drop.
-func entryChildren(language, encoding rm.CodePhrase, attr string) []any {
+// `language` and `encoding` are non-pointer CODE_PHRASE fields, so they are
+// resolved *by value* — the convention here for non-pointer attributes (cf.
+// ACTION `time`, COMPOSITION `category`) — a child is therefore always returned,
+// and "unset" reaches the caller as a zero CODE_PHRASE. The FLAT encoder's leaf
+// mapping is what declines to write an empty code (see
+// simplified.codePhraseToFlat). Resolution and writability are separate concerns;
+// conflating them is what previously hid an encode-side drop.
+//
+// `subject` is a PARTY_PROXY interface, so it goes through iface: a genuinely
+// absent one yields no child, which the FLAT encoder reads as an absent optional
+// and writes nothing for. It stayed unresolved until 2026-08-05, when REQ-140's
+// party grammar gave PARTY_PROXY a FLAT spelling — the encode-side drop the
+// exemption had documented.
+func entryChildren(language, encoding rm.CodePhrase, subject rm.PartyProxy, attr string) []any {
 	switch attr {
 	case "language":
 		return []any{language}
 	case "encoding":
 		return []any{encoding}
+	case "subject":
+		return iface(subject)
 	}
 	return nil
 }
@@ -262,7 +271,7 @@ func observationChildren(o *rm.Observation, attr string) []any {
 	case "name":
 		return iface(o.Name)
 	}
-	return entryChildren(o.Language, o.Encoding, attr)
+	return entryChildren(o.Language, o.Encoding, o.Subject, attr)
 }
 
 func evaluationChildren(e *rm.Evaluation, attr string) []any {
@@ -274,7 +283,7 @@ func evaluationChildren(e *rm.Evaluation, attr string) []any {
 	case "name":
 		return iface(e.Name)
 	}
-	return entryChildren(e.Language, e.Encoding, attr)
+	return entryChildren(e.Language, e.Encoding, e.Subject, attr)
 }
 
 func instructionChildren(i *rm.Instruction, attr string) []any {
@@ -297,7 +306,7 @@ func instructionChildren(i *rm.Instruction, attr string) []any {
 		}
 		return []any{i.ExpiryTime}
 	}
-	return entryChildren(i.Language, i.Encoding, attr)
+	return entryChildren(i.Language, i.Encoding, i.Subject, attr)
 }
 
 func actionChildren(a *rm.Action, attr string) []any {
@@ -313,7 +322,7 @@ func actionChildren(a *rm.Action, attr string) []any {
 		// ACTION `time` leaf — but ItemAtPath is a public reader (REQ-121).
 		return []any{a.Time}
 	}
-	return entryChildren(a.Language, a.Encoding, attr)
+	return entryChildren(a.Language, a.Encoding, a.Subject, attr)
 }
 
 func adminEntryChildren(a *rm.AdminEntry, attr string) []any {
@@ -323,7 +332,7 @@ func adminEntryChildren(a *rm.AdminEntry, attr string) []any {
 	case "name":
 		return iface(a.Name)
 	}
-	return entryChildren(a.Language, a.Encoding, attr)
+	return entryChildren(a.Language, a.Encoding, a.Subject, attr)
 }
 
 func genericEntryChildren(g *rm.GenericEntry, attr string) []any {

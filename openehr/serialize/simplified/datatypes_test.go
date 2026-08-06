@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
 // suffixesOf reconstructs the decode-side suffix map from encoded FLAT entries
@@ -277,11 +278,14 @@ func TestCodedTextAtTextLeafRidesSuffixes(t *testing.T) {
 	}
 }
 
-// TestDecoratedCodedTextAtTextLeafRidesRaw: the carve-out admits only a fully
-// captured value. Extras the DV_CODED_TEXT suffix set cannot carry (mappings —
-// not modelled yet) keep the substituted value on |raw, stamped with its
-// dynamic type, exactly as before (REQ-053: never drop silently).
-func TestDecoratedCodedTextAtTextLeafRidesRaw(t *testing.T) {
+// TestDecoratedCodedTextAtTextLeaf: the carve-out admits only a value the wire
+// can carry whole, and REQ-140 moved that line. `mappings` is now expressible as
+// `_mapping:N` keys beside the coded suffixes — the shape the corpus's
+// `dv_coded_text_as_dv_text` fixture actually carries — while an extra still
+// outside the grammar (`hyperlink`, which the reference's suffix set has no
+// channel for and no underscore family spells) keeps the substituted value on
+// `|raw`, stamped with its dynamic type (REQ-053: never drop silently).
+func TestDecoratedCodedTextAtTextLeaf(t *testing.T) {
 	v := rm.DVCodedText{
 		DVText: rm.DVText{
 			Value: "Radial styloid tenosynovitis",
@@ -296,18 +300,38 @@ func TestDecoratedCodedTextAtTextLeafRidesRaw(t *testing.T) {
 	if err := leafToFlat(out, "p/x", v, "DV_TEXT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	raw, ok := out["p/x|raw"].(map[string]any)
+	if _, rode := out["p/x|raw"]; rode {
+		t.Errorf("a mapping is now expressible and must not ride |raw: %#v", out)
+	}
+	for key, want := range map[string]any{
+		"p/x|code":                          "21794005",
+		"p/x|value":                         "Radial styloid tenosynovitis",
+		"p/x/_mapping:0|match":              "=",
+		"p/x/_mapping:0/target|code":        "21794005",
+		"p/x/_mapping:0/target|terminology": "SNOMED-CT",
+	} {
+		if got := out[key]; got != want {
+			t.Errorf("%s = %#v, want %#v (all keys: %#v)", key, got, want, out)
+		}
+	}
+
+	raw := map[string]any{}
+	v.Hyperlink = &rm.DVURI{Value: "http://example.test/x"}
+	if err := leafToFlat(raw, "p/x", v, "DV_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	frag, ok := raw["p/x|raw"].(map[string]any)
 	if !ok {
-		t.Fatalf("expected |raw for a mapping-decorated coded text, got %#v", out)
+		t.Fatalf("expected |raw for a hyperlink-decorated coded text, got %#v", raw)
 	}
-	if raw["_type"] != "DV_CODED_TEXT" {
-		t.Errorf("|raw _type = %v, want DV_CODED_TEXT (dynamic type)", raw["_type"])
+	if frag["_type"] != "DV_CODED_TEXT" {
+		t.Errorf("|raw _type = %v, want DV_CODED_TEXT (dynamic type)", frag["_type"])
 	}
-	if _, has := raw["mappings"]; !has {
-		t.Errorf("|raw fragment lost the mappings: %#v", raw)
+	if _, has := frag["mappings"]; !has {
+		t.Errorf("|raw fragment lost the mappings: %#v", frag)
 	}
-	if len(out) != 1 {
-		t.Errorf("|raw must ride alone, got %#v", out)
+	if len(raw) != 1 {
+		t.Errorf("|raw must ride alone — no `_` keys beside it, got %#v", raw)
 	}
 }
 
@@ -413,9 +437,10 @@ func TestClosedCodedTextEncodeErrors(t *testing.T) {
 // the leaf type would make decode reconstruct a DV_CODED_TEXT with the text's
 // fields silently dropped.
 func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
-	// `language` rather than `formatting`: the latter became a modelled suffix
-	// with the optional-suffix set, so it no longer forces |raw.
-	v := rm.DVText{Value: "x", Language: &rm.CodePhrase{CodeString: "de"}}
+	// `hyperlink` rather than `formatting` or `language`: the first became a
+	// modelled suffix with the optional-suffix set and the second the REQ-140
+	// `_language` member, so neither forces |raw any more.
+	v := rm.DVText{Value: "x", Hyperlink: &rm.DVURI{Value: "http://example.test/x"}}
 	out := map[string]any{}
 	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
@@ -429,21 +454,59 @@ func TestDecoratedTextAtCodedLeafStampsDynamicType(t *testing.T) {
 	}
 }
 
-// TestQuantityDecoratedRaw checks a decorated value falls back to |raw rather
-// than silently dropping the extra attribute. The decoration is `normal_range`:
-// `magnitude_status` used to serve here but is a modelled suffix since the
-// optional-suffix set landed, so it no longer forces the fallback.
-func TestQuantityDecoratedRaw(t *testing.T) {
-	out := map[string]any{}
-	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: &rm.DVInterval[rm.DVQuantity]{}}
-	if err := leafToFlat(out, "p/x", q, "DV_QUANTITY", false); err != nil {
+// TestNormalRangeNarrowsRawBoundary — REQ-140. The `|raw` boundary narrowed
+// deliberately when the underscore families landed, and both sides of it are
+// pinned here because the failure modes are opposite and both silent:
+//
+//   - a value whose only extras the underscore grammar now carries takes the
+//     suffix form *plus* `_` keys, and must not fall back to `|raw` (which would
+//     be a needless respelling of every decorated value on the wire);
+//   - a value with an extra still outside the grammar — a `normal_status` coded
+//     outside the implied openEHR terminology, the unchanged rule — rides one
+//     `|raw` fragment and must emit **no** `_` keys, because the fragment already
+//     carries the normal_range and spelling it twice would let the two disagree.
+func TestNormalRangeNarrowsRawBoundary(t *testing.T) {
+	normal := &rm.DVInterval[rm.DVQuantity]{Interval: rm.Interval[rm.DVQuantity]{
+		Lower:         rm.DVQuantity{Magnitude: 1, Units: "mm"},
+		Upper:         rm.DVQuantity{Magnitude: 9, Units: "mm"},
+		LowerIncluded: true, UpperIncluded: true,
+	}}
+
+	suffixed := map[string]any{}
+	q := rm.DVQuantity{Magnitude: 1, Units: "mm", NormalRange: normal}
+	if err := leafToFlat(suffixed, "p/x", q, "DV_QUANTITY", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	if _, ok := out["p/x|raw"]; !ok {
-		t.Errorf("decorated quantity should emit |raw, got %#v", out)
+	if _, rode := suffixed["p/x|raw"]; rode {
+		t.Errorf("a normal_range is now expressible and must not ride |raw: %#v", suffixed)
 	}
-	if _, ok := out["p/x|magnitude"]; ok {
-		t.Error("decorated quantity should not emit bare |magnitude suffixes")
+	for key, want := range map[string]any{
+		"p/x|magnitude":                     1.0,
+		"p/x|unit":                          "mm",
+		"p/x/_normal_range/lower|magnitude": 1.0,
+		"p/x/_normal_range/upper|magnitude": 9.0,
+	} {
+		if got := suffixed[key]; got != want {
+			t.Errorf("%s = %#v, want %#v (all keys: %#v)", key, got, want, suffixed)
+		}
+	}
+	// Closed endpoints are the decode default, so they are not spelled.
+	for _, key := range []string{"p/x/_normal_range|lower_included", "p/x/_normal_range|upper_included"} {
+		if _, spelled := suffixed[key]; spelled {
+			t.Errorf("%s spelled although it carries the default", key)
+		}
+	}
+
+	raw := map[string]any{}
+	q.NormalStatus = &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}}
+	if err := leafToFlat(raw, "p/x", q, "DV_QUANTITY", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, ok := raw["p/x|raw"]; !ok {
+		t.Errorf("an extra outside the grammar must still ride |raw, got %#v", raw)
+	}
+	if len(raw) != 1 {
+		t.Errorf("a |raw value must be the only entry, got %#v", raw)
 	}
 }
 
@@ -451,9 +514,13 @@ func TestQuantityDecoratedRaw(t *testing.T) {
 // keeps its magnitude exactly through the |raw path (json.Number, not float64).
 func TestRawFragmentPreservesLargeInteger(t *testing.T) {
 	out := map[string]any{}
-	// A decorated DV_COUNT rides |raw — decorated by normal_range, which stays
-	// outside the modelled suffix set.
-	c := rm.DVCount{Magnitude: 9007199254740993, NormalRange: &rm.DVInterval[rm.DVCount]{}}
+	// A decorated DV_COUNT rides |raw — decorated by a normal_status coded outside
+	// the openEHR terminology the bare `|normal_status` code implies, which is the
+	// decoration that stays outside the modelled sets (REQ-140 narrowed the rest).
+	c := rm.DVCount{
+		Magnitude:    9007199254740993,
+		NormalStatus: &rm.CodePhrase{CodeString: "N", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}
 	if err := leafToFlat(out, "p/x", c, "DV_COUNT", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
@@ -544,23 +611,61 @@ func TestCodePhraseMissingCodeErrors(t *testing.T) {
 	}
 }
 
-// TestCodePhrasePreferredTermRidesRaw: a preferred_term is outside the
-// |code/|terminology pair, so the value must ride |raw rather than be emitted
-// with the term silently discarded — the same rule the nested CODE_PHRASE
-// inside a DV_CODED_TEXT already follows.
-func TestCodePhrasePreferredTermRidesRaw(t *testing.T) {
+// TestCodePhrasePreferredTermRidesSuffix — REQ-140. A **standalone** CODE_PHRASE
+// leaf has a `|preferred_term` suffix (the corpus writes it at
+// `dv_text/_language|preferred_term`), so the attribute no longer forces |raw
+// there. The **nested** spelling — a DV_CODED_TEXT's defining_code, whose triple
+// is |code+|value+|terminology — still has no channel for it and still rides |raw,
+// which is the asymmetry this test pins in both directions.
+func TestCodePhrasePreferredTermRidesSuffix(t *testing.T) {
 	pref := "English"
-	out := map[string]any{}
 	cp := rm.CodePhrase{CodeString: "en", PreferredTerm: &pref, TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
+
+	out := map[string]any{}
 	if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	raw, ok := out["p/x|raw"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected p/x|raw, got %#v", out)
+	if _, rode := out["p/x|raw"]; rode {
+		t.Errorf("a standalone CODE_PHRASE's preferred_term is a suffix and must not ride |raw: %#v", out)
 	}
-	if raw["preferred_term"] != "English" {
-		t.Errorf("|raw dropped preferred_term: %#v", raw)
+	if out["p/x|preferred_term"] != "English" {
+		t.Errorf("|preferred_term = %#v (all keys: %#v)", out["p/x|preferred_term"], out)
+	}
+
+	nested := map[string]any{}
+	coded := rm.DVCodedText{DVText: rm.DVText{Value: "English"}, DefiningCode: cp}
+	if err := leafToFlat(nested, "p/y", coded, "DV_CODED_TEXT", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	raw, ok := nested["p/y|raw"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected p/y|raw for a defining_code carrying a preferred_term, got %#v", nested)
+	}
+	dc, _ := raw["defining_code"].(map[string]any)
+	if dc["preferred_term"] != "English" {
+		t.Errorf("|raw dropped the nested preferred_term: %#v", raw)
+	}
+}
+
+// TestCodePhraseCodelessRidesRaw: an empty code_string makes
+// [codePhraseToFlat] write nothing at all, so a value that still carries a
+// terminology or a preferred_term must ride |raw — encoding it to nothing would
+// lose the rest of the value.
+func TestCodePhraseCodelessRidesRaw(t *testing.T) {
+	pref := "English"
+	for name, cp := range map[string]rm.CodePhrase{
+		"terminology only":    {TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}},
+		"preferred term only": {PreferredTerm: &pref},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/x", cp, "CODE_PHRASE", false); err != nil {
+				t.Fatalf("leafToFlat: %v", err)
+			}
+			if _, ok := out["p/x|raw"]; !ok {
+				t.Errorf("expected p/x|raw, got %#v", out)
+			}
+		})
 	}
 }
 
@@ -787,6 +892,47 @@ func TestFormattedTextAtOpenCodedLeafRidesRaw(t *testing.T) {
 	}
 }
 
+// TestMappingBesideOtherFreeText — REQ-140. The fourth DV_TEXT shape the codec
+// carries at a leaf: a DV_TEXT at an *open* DV_CODED_TEXT leaf rides `|other`,
+// which carries the value alone — but `_mapping:N` is a key of its own, not a
+// companion suffix, so the two compose. Unit-level because the PROBE-086 corpus
+// template constrains no open value-set leaf.
+func TestMappingBesideOtherFreeText(t *testing.T) {
+	out := map[string]any{}
+	v := rm.DVText{
+		Value: "free text",
+		Mappings: []rm.TermMapping{{
+			Match:  '=',
+			Target: rm.CodePhrase{CodeString: "21794005", TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+		}},
+	}
+	if err := leafToFlat(out, "p/x", v, "DV_CODED_TEXT", true); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if out["p/x|other"] != "free text" {
+		t.Errorf("|other = %#v, want the free text", out["p/x|other"])
+	}
+	if out["p/x/_mapping:0|match"] != "=" {
+		t.Errorf("the mapping was dropped beside |other: %#v", out)
+	}
+	if _, rode := out["p/x|raw"]; rode {
+		t.Errorf("|other + _mapping is expressible and must not ride |raw: %#v", out)
+	}
+	// Decode is the inverse at both positions: |other alone rebuilds the DV_TEXT…
+	dv, err := dvFromSuffixes("DV_CODED_TEXT", true, map[string]any{"other": "free text"})
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if dv["_type"] != "DV_TEXT" {
+		t.Errorf("|other rebuilt a %v, want DV_TEXT", dv["_type"])
+	}
+	// …and the family lands on it, judged against the leaf type, which inherits
+	// `mappings` from DV_TEXT.
+	if _, declared := rminfo.Default.AttributeRMType("DV_CODED_TEXT", "mappings"); !declared {
+		t.Error("DV_CODED_TEXT no longer declares mappings — the router would refuse the family")
+	}
+}
+
 // TestOtherRejectsCompanionSuffixes — regression, PR #86 review. The |other
 // rebuild returns a bare DV_TEXT, so any companion suffix the allowlist admits
 // would be accepted and then dropped. |other is mutually exclusive with every
@@ -962,21 +1108,25 @@ func TestOrderedSuffixWrongKindRejected(t *testing.T) {
 	}
 }
 
-// TestDateAccuracyRidesRaw: DV_DATE / DV_DATE_TIME / DV_TIME inherit from
-// DV_TEMPORAL, which redefines `accuracy` as a DV_DURATION object (its parent
-// DV_ABSOLUTE_QUANTITY declares a DV_AMOUNT) rather than the Real that DV_AMOUNT —
-// and so DV_QUANTITY, DV_COUNT, DV_DURATION, DV_PROPORTION — carries. It
-// therefore has no scalar suffix form and must keep forcing |raw. Guards against
-// `accuracy` being added to their capturedKeys by symmetry with DV_QUANTITY, which
-// would emit an object where a number belongs.
-func TestDateAccuracyRidesRaw(t *testing.T) {
+// TestDateAccuracyRidesUnderscoreFamily — REQ-140. DV_DATE / DV_DATE_TIME /
+// DV_TIME inherit from DV_TEMPORAL, which redefines `accuracy` as a DV_DURATION
+// object (its parent DV_ABSOLUTE_QUANTITY declares a DV_AMOUNT) rather than the
+// Real that DV_AMOUNT — and so DV_QUANTITY, DV_COUNT, DV_DURATION,
+// DV_PROPORTION — carries. It therefore has no scalar suffix and rides the
+// `_accuracy` family (the reference's spelling), which forced the whole value onto
+// |raw until REQ-140 Phase C3. The scalar `|accuracy` must still not appear, which
+// is what a `capturedKeys` entry added by symmetry with DV_QUANTITY would produce.
+func TestDateAccuracyRidesUnderscoreFamily(t *testing.T) {
 	out := map[string]any{}
 	d := rm.DVDate{Value: "2022-01-12", Accuracy: &rm.DVDuration{Value: "P1D"}}
 	if err := leafToFlat(out, "p/x", d, "DV_DATE", false); err != nil {
 		t.Fatalf("leafToFlat: %v", err)
 	}
-	if _, ok := out["p/x|raw"]; !ok {
-		t.Errorf("DV_DATE with a DV_DURATION accuracy should ride |raw, got %#v", out)
+	if _, ok := out["p/x|raw"]; ok {
+		t.Errorf("a DV_DURATION accuracy is now expressible and must not ride |raw: %#v", out)
+	}
+	if out["p/x/_accuracy"] != "P1D" {
+		t.Errorf("p/x/_accuracy = %#v (all keys: %#v)", out["p/x/_accuracy"], out)
 	}
 	if _, scalar := out["p/x|accuracy"]; scalar {
 		t.Error("emitted a scalar |accuracy for a DV_DURATION-typed accuracy")

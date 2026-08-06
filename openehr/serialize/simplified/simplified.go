@@ -58,20 +58,31 @@ var (
 	ErrNoTemplate = errors.New("simplified: nil web template")
 	// ErrUnknownPath is returned when a FLAT/STRUCTURED key is unresolvable or
 	// structurally inadmissible. Unresolvable: the key does not name a Web
-	// Template node (a typo, a wrong template, an unsupported ctx/ field), or it
-	// cannot be placed faithfully (an invalid / out-of-bound / sparse :index, a
-	// slot conflict between two keys, or the decoded-node budget).
+	// Template node (a typo, a wrong template, an unsupported ctx/ field), it
+	// names an underscore-prefixed RM attribute family this codec does not carry
+	// or one the owning node's RM class does not declare (REQ-140 — the grammar
+	// is typed by the owner, so `_work_flow_id` on a SECTION is as unresolvable
+	// as a misspelled segment), or it cannot be placed faithfully (an invalid /
+	// out-of-bound / sparse :index — including on a `_family:N` list — a slot
+	// conflict between two keys, or the decoded-node budget).
 	// Inadmissible: every key resolves, but the set of them cannot be honoured at
 	// once — two accepted spellings of one composition-metadata field that
-	// disagree, or ctx/composer_self beside a composer name (mutually exclusive
-	// representations of one RM attribute). The codec fails loudly rather than
+	// disagree, ctx/composer_self beside a composer name (mutually exclusive
+	// representations of one RM attribute), or two spellings of one
+	// single-valued underscore attribute. The codec fails loudly rather than
 	// dropping the entry or inventing a precedence rule (REQ-053
 	// semantics-preserving; ADR 0015 decision 4).
 	ErrUnknownPath = errors.New("simplified: path not in web template")
 	// ErrUnsupportedDatatype is returned when a leaf's RM datatype is not mapped
 	// to/from a FLAT suffix set and cannot ride |raw, when a suffix or ctx/
-	// value is not valid for its slot, or when a |raw / |other suffix is
-	// misused. Failing beats silently omitting or mistyping a value (REQ-053).
+	// value is not valid for its slot, when a |raw / |other suffix is
+	// misused, or when an underscore-prefixed RM attribute family (REQ-140)
+	// carries a key outside its grammar, is missing an RM-mandatory one, or
+	// holds a value the family's suffixes cannot express — a coded LINK.meaning,
+	// a decorated `context/_end_time`, an OBJECT_REF id that is neither
+	// GENERIC_ID nor HIER_OBJECT_ID. Those families have no |raw carrier, so
+	// there is nothing to fall back to. Failing beats silently omitting or
+	// mistyping a value (REQ-053).
 	ErrUnsupportedDatatype = errors.New("simplified: unsupported datatype")
 	// ErrMissingContext is returned when mandatory context (ctx/language,
 	// ctx/territory) is absent on decode.

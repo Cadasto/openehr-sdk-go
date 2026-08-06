@@ -12,10 +12,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A fully-captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form instead of `|raw`, and a populated `EVENT_CONTEXT.setting` round-trips as `ctx/setting|code` + `|value` (nested as `ctx.setting` in STRUCTURED) — PROBE-086 coverage 19.5% → 19.7%. **Encode now refuses a setting it cannot carry** (non-`openehr` terminology, extras) rather than dropping it.
-- **Generated compositions satisfy `Setting_valid` (REQ-107).** `instance.Generate` pins the openEHR-coded `238 other care` default whenever the template leaves `EVENT_CONTEXT.setting` unconstrained, instead of letting the example synthesiser invent an archetype-local code the RM invariant forbids and FLAT cannot carry.
-- **AQL `SELECT TOP` carrier and literal source text (REQ-118, PROBE-087/088).** The deprecated `SELECT TOP n [FORWARD|BACKWARD]` clause now parses, emits, and builds instead of being refused; a projected literal carries its source text; two lint codes flag the spec-forbidden `TOP` + `LIMIT` pairing.
-- **Underscore-prefixed RM attributes specified (REQ-140, ADR 0016, PROBE-089 Draft).** New `wire.md` § REQ-140 opens the wire-extension band 140–149 and pins the `_`-prefixed grammar; specification only, no codec support yet.
+- **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form, `EVENT_CONTEXT.setting` round-trips, and encode refuses a setting it cannot carry — coverage 19.5% → 19.7%.
+- **Generated compositions satisfy `Setting_valid` and `Basic_validity` (REQ-107).** `instance.Generate` now pins an openEHR-coded `setting` default and fills an unconstrained `PARTY_PROXY` with `PARTY_SELF`, changing the `subject` of every generated ENTRY.
+- **AQL `SELECT TOP` carrier and literal source text (REQ-118, PROBE-087/088).** The deprecated `SELECT TOP n` clause now parses, emits and builds, a projected literal carries its source text, and two lint codes flag `TOP` + `LIMIT`.
+- **Underscore-prefixed RM attributes in FLAT/STRUCTURED (REQ-140, REQ-053, ADR 0016, PROBE-089).** The simplified codecs carry the whole `_`-prefixed RM attribute grammar and the remaining datatype leaves, DV_SCALE included, taking upstream FLAT parity from 19.7% to 80.4%.
 
 ## [0.18.0] - 2026-08-05
 

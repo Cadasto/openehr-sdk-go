@@ -98,8 +98,34 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	if err != nil {
 		return nil, err
 	}
-	// Group FLAT keys by leaf instance (key minus the |suffix); each group's
-	// suffix->value pairs build one DataValue.
+	budget := &allocBudget{limit: maxTotalNodes}
+	ambiguous := ambiguousBarePaths(wt)
+	// Siphon off the composite leaves first — the ones whose FLAT form has
+	// sub-paths of its own rather than a suffix set (REQ-053's ENTRY `subject` and
+	// the DV_INTERVAL leaf, REQ-140's party and interval grammars). A party leaf's
+	// three key shapes — its own suffixes, the PARTY_RELATED `/relationship`
+	// sub-object and the nested `_identifier:N` list — all address one RM value,
+	// and which concrete PARTY_PROXY subtype that is is only known once all three
+	// are in hand; an interval leaf's `/lower` and `/upper` are the same shape. So
+	// they are collected together and decoded by the one implementation each
+	// grammar has. It has to run before the `_` router, which would otherwise claim
+	// `subject/_identifier:0` as a family whose owner is a leaf the grammar cannot
+	// judge.
+	compositeGroups, err := compositeLeafGroups(content, wt)
+	if err != nil {
+		return nil, err
+	}
+	// Siphon off the underscore-prefixed RM attributes (REQ-140): a path
+	// segment starting with `_` ends Web Template resolution at the segment
+	// before it, so those keys are grouped per (owner path, family, :index) and
+	// routed by the owner's RM class instead of resolving to a leaf. What stays
+	// in content is ordinary template-constrained leaf data.
+	attrGroups, attrIndexes, err := rmattrGroups(content)
+	if err != nil {
+		return nil, err
+	}
+	// Group the remaining FLAT keys by leaf instance (key minus the |suffix);
+	// each group's suffix->value pairs build one DataValue.
 	groups := make(map[string]map[string]any)
 	for key, val := range content {
 		base, suffix := splitSuffix(key)
@@ -112,8 +138,6 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 	// is deterministic: distinct-node-id siblings with no explicit :index
 	// (e.g. multiple content items, or elements under one ITEM_TREE) are
 	// appended in this order, which must not depend on Go map iteration.
-	budget := &allocBudget{limit: maxTotalNodes}
-	ambiguous := ambiguousBarePaths(wt)
 	for _, base := range slices.Sorted(maps.Keys(groups)) {
 		sfx := groups[base]
 		pk, err := parseFlatKey(base)
@@ -137,6 +161,28 @@ func decodeFlat(flat map[string]any, wt *webtemplate.WebTemplate, names map[stri
 		}
 		if err := placeLeaf(compJSON, leaf.AQLPath, predIndex, predType, dv, budget, names); err != nil {
 			return nil, fmt.Errorf("simplified: place %q: %w", base, err)
+		}
+	}
+	// Composite leaves are placed like any other leaf, after the clinical loop so a
+	// malformed ordinary key still surfaces first.
+	for _, g := range compositeGroups {
+		if err := placeCompositeLeaf(compJSON, wt, g, ambiguous, budget, names); err != nil {
+			return nil, err
+		}
+	}
+	// Underscore RM attributes come after the clinical leaves, so their owners
+	// are decorated onto nodes the content walk has already materialised rather
+	// than gap-filling their own (REQ-140).
+	for _, g := range attrGroups {
+		owner, err := rmattrOwnerAt(wt, compJSON, g.base, ambiguous, budget, names)
+		if errors.Is(err, errSegNotFound) {
+			return nil, fmt.Errorf("%w: %q", ErrUnknownPath, g.prefix())
+		}
+		if err != nil {
+			return nil, fmt.Errorf("simplified: %q: %w", g.prefix(), err)
+		}
+		if err := rmattrDecode(owner, g, attrIndexes[g.base+"\x00"+g.family], budget); err != nil {
+			return nil, err
 		}
 	}
 	// A sparse :index (":0" and ":2" with no ":1") would have gap-filled an
@@ -327,6 +373,21 @@ func siphonContext(flat map[string]any, rootID string) (ctx map[string]any, ctxO
 		if base, _, _ := strings.Cut(rel, "|"); contextMetaOwnedBases[base] {
 			return nil, nil, nil, fmt.Errorf("%w: %s is not a spelling the ctx/ short form can carry — %q owns this leaf, so only its accepted suffixes travel (see deviations.md)",
 				ErrUnsupportedDatatype, key, metadataOwnedBaseCtx[base])
+		}
+		// The ADR 0015 boundary, REQ-140 edition. REQ-140's party grammar reaches
+		// a party's sub-structure — its `_identifier:N` list and, for a
+		// PARTY_RELATED, `/relationship` — everywhere except here: no `ctx/` short
+		// form can carry it, so a composer decoded from those keys could not be
+		// re-emitted (encode is ctx/-only) and the value would vanish on the way
+		// out. That is the silent loss REQ-053 forbids, so the keys are refused by
+		// name and counted in the PROBE-086 census, exactly as the composer's own
+		// `|id` / `|id_scheme` / `|id_namespace` external_ref suffixes are (those
+		// reach the leaf loop and are refused there as PARTY_PROXY). Closing this
+		// means giving the composer's reference a `ctx/` carrier, which is an
+		// ADR-level decision, not a codec one.
+		if _, isComposerSub := strings.CutPrefix(rel, "composer/"); isComposerSub {
+			return nil, nil, nil, fmt.Errorf("%w: %q is composer party sub-structure, which no ctx/ short form can carry (ADR 0015 boundary)",
+				ErrUnsupportedDatatype, key)
 		}
 		content[key] = val
 	}
@@ -685,6 +746,19 @@ func resolveLeaf(wt *webtemplate.WebTemplate, segs []flatSeg, ambiguous map[stri
 			predType[bare] = next.RMType
 			if seg.idx >= 0 {
 				predIndex[bare] = seg.idx
+				// A collapsed leaf's index belongs to the ELEMENT the Web
+				// Template folded away, one attribute up: placement keys on
+				// the *container* segment's path, so an index stored only
+				// under the leaf's own `…/value` spelling is never read and
+				// every instance lands on list slot 0 — a duplicate placement
+				// that refuses the second one (REQ-140). A template that does
+				// carry a node for the owner itself has already recorded its
+				// own index there, and that one wins.
+				if owner, collapsed := strings.CutSuffix(bare, "/value"); collapsed && owner != "" {
+					if _, taken := predIndex[owner]; !taken {
+						predIndex[owner] = seg.idx
+					}
+				}
 			}
 		}
 		node = next
@@ -778,7 +852,31 @@ func parseAQL(p string) []aqlSeg {
 // depend on it — but the result is then format-idempotent, not canonically
 // complete; see deviations.md).
 func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, dv map[string]any, budget *allocBudget, names map[string]string) error {
+	cur, attr, err := walkAQL(compJSON, aqlPath, predIndex, predType, budget, names)
+	if err != nil {
+		return err
+	}
+	if _, exists := cur[attr]; exists {
+		// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
+		// "a:0" on a repeatable) — overwriting would silently drop one.
+		return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
+	}
+	cur[attr] = dv
+	return nil
+}
+
+// walkAQL materialises the intermediate RM nodes along aqlPath and returns the
+// object that holds its **final** segment, together with that segment's
+// attribute name — the seam [placeLeaf] and the REQ-140 attribute router share.
+// A leaf's terminal attribute is the datatype slot (`…/items[at0008]/value`); an
+// underscore family's is the RM attribute it addresses
+// (`…/items[at0008]/uid`), which is also the lookahead [concreteType] needs to
+// resolve the abstract ITEM_STRUCTURE slot the Web Template collapses.
+func walkAQL(compJSON map[string]any, aqlPath string, predIndex map[string]int, predType map[string]string, budget *allocBudget, names map[string]string) (map[string]any, string, error) {
 	segs := parseAQL(aqlPath)
+	if len(segs) == 0 {
+		return nil, "", fmt.Errorf("%w: empty canonical path", ErrUnknownPath)
+	}
 	cur := compJSON
 	curType := "COMPOSITION"
 	// Two path keys are rebuilt in lockstep, both in the BARE spelling
@@ -791,13 +889,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 	var aqlPrefix, namePrefix strings.Builder
 	for i, seg := range segs {
 		if i == len(segs)-1 {
-			if _, exists := cur[seg.attr]; exists {
-				// Two FLAT keys resolved to the same terminal slot (e.g. "a" vs
-				// "a:0" on a repeatable) — overwriting would silently drop one.
-				return fmt.Errorf("%w: duplicate placement at %q", ErrUnknownPath, aqlPath)
-			}
-			cur[seg.attr] = dv
-			return nil
+			return cur, seg.attr, nil
 		}
 		aqlPrefix.WriteString("/")
 		aqlPrefix.WriteString(seg.attr)
@@ -810,7 +902,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		nextAttr := segs[i+1].attr
 		childType := concreteType(curType, seg.attr, wtType, nextAttr)
 		if childType == "" {
-			return fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
+			return nil, "", fmt.Errorf("%w: cannot resolve RM type for %q on %s (aqlPath %q)", ErrUnknownPath, seg.attr, curType, aqlPath)
 		}
 		container, _ := rminfo.Default.IsContainer(curType, seg.attr)
 		namePrefix.WriteString("/")
@@ -823,7 +915,7 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		if container {
 			next, err := selectElem(cur, seg.attr, childType, seg.pred, predIndex[aqlPrefix.String()], budget)
 			if err != nil {
-				return err
+				return nil, "", err
 			}
 			cur = next
 		} else {
@@ -844,7 +936,266 @@ func placeLeaf(compJSON map[string]any, aqlPath string, predIndex map[string]int
 		}
 		curType = childType
 	}
+	// Unreachable: the loop returns at i == len(segs)-1 and segs is non-empty.
+	return nil, "", fmt.Errorf("%w: canonical path %q walked past its last segment", ErrUnknownPath, aqlPath)
+}
+
+// compositeLeafGroups siphons the FLAT keys addressed at a **composite** Web
+// Template leaf out of content, one [rmattrGroup] per leaf instance, in a stable
+// order. A composite leaf is one whose FLAT form is not a suffix set but a small
+// grammar with sub-paths of its own — a party (`subject/_identifier:0|id`,
+// `subject/relationship|code`) or a DV_INTERVAL (`…/lower|magnitude`) — so its
+// keys have to be collected before the leaf loop, which would try to resolve
+// `lower` and `relationship` as Web Template children that do not exist.
+//
+// The group is the same tail-carrier the `_` router uses — base is the leaf's
+// *parent* path, family its own FLAT segment id, and the tails everything after
+// it — so [rmattrGroup.prefix] reproduces the leaf's own FLAT spelling and the
+// party / interval grammars decode it with no second mechanism (REQ-140 design
+// constraint 5).
+//
+// Keys are consumed from content: what stays behind is ordinary leaf data.
+func compositeLeafGroups(content map[string]any, wt *webtemplate.WebTemplate) ([]rmattrGroup, error) {
+	byLeaf := make(map[string]*rmattrGroup)
+	for _, key := range slices.Sorted(maps.Keys(content)) {
+		pk, err := parseFlatKey(key)
+		if err != nil {
+			return nil, err
+		}
+		base, family, index, tail, isComposite := splitCompositeLeafKey(wt, pk)
+		if !isComposite {
+			continue
+		}
+		val := content[key]
+		delete(content, key)
+		id := base + "\x00" + family + "\x00" + strconv.Itoa(index)
+		g := byLeaf[id]
+		if g == nil {
+			g = &rmattrGroup{base: base, family: family, index: index, tails: make(map[string]any)}
+			byLeaf[id] = g
+		}
+		g.tails[tail] = val
+	}
+	groups := make([]rmattrGroup, 0, len(byLeaf))
+	for _, g := range byLeaf {
+		groups = append(groups, *g)
+	}
+	slices.SortFunc(groups, func(a, b rmattrGroup) int {
+		return strings.Compare(a.prefix(), b.prefix())
+	})
+	return groups, nil
+}
+
+// splitCompositeLeafKey splits a parsed FLAT key at the composite Web Template
+// leaf it addresses, if any: the first segment run that resolves to a childless
+// node of a party or DV_INTERVAL RM type. base is the leaf's parent path, family
+// and index the leaf segment itself, and tail everything after it (each remaining
+// segment with a leading "/", then "|suffix").
+//
+// Two kinds of key are deliberately not composite leaves. One whose path reaches
+// an `_`-prefixed segment first belongs to that family — a `_feeder_audit`'s
+// nested `/subject` is inside its tails, not at a Web Template node — and one
+// addressing a `ctx/`-owned metadata leaf is the composer, whose party
+// sub-structure is the ADR 0015 refusal in [siphonContext] and whose own suffixes
+// stay a PARTY_PROXY leaf refusal.
+func splitCompositeLeafKey(wt *webtemplate.WebTemplate, pk parsedKey) (base, family string, index int, tail string, ok bool) {
+	node := wt.Tree
+	if len(pk.segs) == 0 || pk.segs[0].id != node.ID {
+		return "", "", 0, "", false
+	}
+	for i := 1; i < len(pk.segs); i++ {
+		seg := pk.segs[i]
+		if strings.HasPrefix(seg.id, "_") {
+			return "", "", 0, "", false
+		}
+		next := childByID(node, seg.id)
+		if next == nil {
+			return "", "", 0, "", false
+		}
+		node = next
+		if len(node.Children) > 0 || !isCompositeLeafType(node.RMType) {
+			continue
+		}
+		if ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+			return "", "", 0, "", false
+		}
+		// A `_`-prefixed segment after the leaf belongs to the leaf's own
+		// grammar only where that grammar declares it: a party leaf carries a
+		// nested `_identifier:N`. Every other one addresses an underscore RM
+		// attribute of the LOCATABLE the Web Template folded the leaf into —
+		// `<leaf>/_uid`, `<leaf>/_link:N`, `<leaf>/_feeder_audit` — which the
+		// `_` router owns and resolves to that ELEMENT. Folding those into the
+		// leaf's tails instead deletes them from the router's view, and the
+		// leaf grammar then refuses them: a body MarshalFlat itself writes
+		// (REQ-140), and the `<leaf>/_uid` the upstream corpus writes too.
+		if i+1 < len(pk.segs) && strings.HasPrefix(pk.segs[i+1].id, "_") &&
+			!compositeLeafOwnsSub(node.RMType, pk.segs[i+1].id) {
+			return "", "", 0, "", false
+		}
+		var b, t strings.Builder
+		for j, s := range pk.segs[:i] {
+			if j > 0 {
+				b.WriteByte('/')
+			}
+			writeFlatSeg(&b, s)
+		}
+		for _, s := range pk.segs[i+1:] {
+			t.WriteByte('/')
+			writeFlatSeg(&t, s)
+		}
+		if pk.suffix != "" {
+			t.WriteByte('|')
+			t.WriteString(pk.suffix)
+		}
+		return b.String(), seg.id, seg.idx, t.String(), true
+	}
+	return "", "", 0, "", false
+}
+
+// childByID returns node's child with the given FLAT segment id, or nil.
+func childByID(node *webtemplate.Node, id string) *webtemplate.Node {
+	for _, ch := range node.Children {
+		if ch.ID == id {
+			return ch
+		}
+	}
 	return nil
+}
+
+// isCompositeLeafType reports whether a childless Web Template leaf of this RM
+// type carries a grammar with sub-paths of its own rather than a suffix set, and
+// therefore has to be siphoned by [compositeLeafGroups] before the leaf loop.
+func isCompositeLeafType(rmType string) bool {
+	return isPartyLeafType(rmType) || isIntervalLeafType(rmType)
+}
+
+// compositeLeafOwnsSub reports whether an `_`-prefixed sub-path segment under a
+// composite leaf belongs to that leaf's own grammar rather than to the LOCATABLE
+// the Web Template collapsed the leaf into.
+//
+// Only the party grammar declares one — the nested `_identifier:N` every party
+// position carries ([partyListTails]). A DV_INTERVAL leaf declares none, so
+// every `_` segment beneath one is an owner attribute.
+func compositeLeafOwnsSub(rmType, seg string) bool {
+	id, _, _ := strings.Cut(seg, ":")
+	return isPartyLeafType(rmType) && partyListTails[id]
+}
+
+// placeCompositeLeaf decodes one composite-leaf group and places the value at the
+// leaf's canonical path, exactly as the clinical leaf loop places a DataValue.
+func placeCompositeLeaf(compJSON map[string]any, wt *webtemplate.WebTemplate, g rmattrGroup,
+	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+) error {
+	// A composite leaf is single-valued at every position the reference spells one,
+	// so `:0` is the interconversion's explicit-index spelling and anything higher
+	// addresses a list slot the RM attribute does not have.
+	if g.index > 0 {
+		return fmt.Errorf("%w: %q (%s addresses a single-valued RM attribute, not an indexed list)",
+			ErrUnknownPath, g.prefix(), g.family)
+	}
+	pk, err := parseFlatKey(g.prefix())
+	if err != nil {
+		return err
+	}
+	node, predIndex, predType, err := resolveLeaf(wt, pk.segs, ambiguous)
+	if err != nil {
+		// splitCompositeLeafKey resolved this path already, so the only way here is
+		// the reused-sibling refusal, which carries its own message.
+		return fmt.Errorf("simplified: %q: %w", g.prefix(), err)
+	}
+	value, err := compositeLeafValue(g, node.RMType)
+	if err != nil {
+		return err
+	}
+	if err := placeLeaf(compJSON, node.AQLPath, predIndex, predType, value, budget, names); err != nil {
+		return fmt.Errorf("simplified: place %q: %w", g.prefix(), err)
+	}
+	return nil
+}
+
+// compositeLeafValue decodes a composite leaf's group by its RM type: the party
+// grammar (rmattr_party.go) or the interval grammar (rmattr_value.go), each the
+// same implementation those families use at every other position.
+func compositeLeafValue(g rmattrGroup, rmType string) (map[string]any, error) {
+	if anchor, isInterval := intervalLeafAnchor(rmType); isInterval {
+		return intervalLeafSuffixes(g, anchor)
+	}
+	party, populated, err := partyLeafSuffixes(g)
+	if err != nil {
+		return nil, err
+	}
+	if !populated {
+		return nil, fmt.Errorf("%w: %s carries no party key (PARTY_IDENTIFIED needs at least one of |name, |id or an _identifier)",
+			ErrUnsupportedDatatype, g.prefix())
+	}
+	return party, nil
+}
+
+// rmattrOwnerAt resolves the owner of an underscore-family group whose base
+// FLAT path is base (REQ-140): the RM class the family is judged against, plus a
+// deferred accessor that materialises the canonical-JSON node to decorate.
+//
+// Three shapes of owner, in the order they are tested:
+//
+//   - `<root>/context` is the composition's EVENT_CONTEXT, resolved *without*
+//     consulting the Web Template. ADR 0016 puts the EVENT_CONTEXT optionals
+//     under the real `context` segment, and they are RM-optional attributes a
+//     template need not constrain at all — so a template carrying no `context`
+//     node must behave exactly like one that does (the PROBE-086 corpus
+//     template carries one, with `start_time` and `setting` under it).
+//   - the template root is the COMPOSITION itself.
+//   - anything else resolves through the Web Template. A node with children owns
+//     the family directly; a **childless leaf** is a collapsed ELEMENT — the Web
+//     Template folds ELEMENT.value into the leaf node, so the LOCATABLE that
+//     owns `<leaf>/_uid` is the ELEMENT one attribute up (the corpus spells it
+//     that way on `…/any_event:0/dv_quantity`). A childless leaf whose canonical
+//     path does not end in `/value` hides no LOCATABLE (an in-context
+//     `context/start_time`, an ENTRY `language`, an ISM_TRANSITION member), so
+//     it has no underscore owner and the key is unresolvable.
+func rmattrOwnerAt(wt *webtemplate.WebTemplate, compJSON map[string]any, base string,
+	ambiguous map[string]bool, budget *allocBudget, names map[string]string,
+) (rmattrOwner, error) {
+	pk, err := parseFlatKey(base)
+	if err != nil {
+		return rmattrOwner{}, err
+	}
+	segs := pk.segs
+	if len(segs) == 0 || segs[0].id != wt.Tree.ID {
+		return rmattrOwner{}, errSegNotFound
+	}
+	walk := func(ownerAql string, predIndex map[string]int, predType map[string]string) func(string) (map[string]any, error) {
+		return func(attr string) (map[string]any, error) {
+			node, _, err := walkAQL(compJSON, ownerAql+"/"+attr, predIndex, predType, budget, names)
+			return node, err
+		}
+	}
+	// segs[1].idx <= 0: the OPT-free STRUCTURED interconversion re-spells every
+	// segment with an explicit index, so `context` and `context:0` are one node.
+	if len(segs) == 2 && segs[1].id == "context" && segs[1].idx <= 0 {
+		return rmattrOwner{kind: "EVENT_CONTEXT", resolve: walk("/context", nil, nil)}, nil
+	}
+	if len(segs) == 1 {
+		return rmattrOwner{
+			kind:    wt.Tree.RMType,
+			resolve: func(string) (map[string]any, error) { return compJSON, nil },
+		}, nil
+	}
+	node, predIndex, predType, err := resolveLeaf(wt, segs, ambiguous)
+	if err != nil {
+		return rmattrOwner{}, err
+	}
+	ownerAql, kind, leaf := bareAQLPath(node.AQLPath), node.RMType, ""
+	if len(node.Children) == 0 {
+		trimmed, isElementValue := strings.CutSuffix(ownerAql, "/value")
+		if !isElementValue {
+			return rmattrOwner{}, errSegNotFound
+		}
+		// The leaf's own RM type is the *anchor* the value-decoration families are
+		// judged and decoded against (REQ-140 § C1): one FLAT path addresses both
+		// the ELEMENT and the DataValue it holds.
+		ownerAql, kind, leaf = trimmed, "ELEMENT", node.RMType
+	}
+	return rmattrOwner{kind: kind, leaf: leaf, resolve: walk(ownerAql, predIndex, predType)}, nil
 }
 
 // bareAQLPath strips REQ-116 name predicates from a compiled AQL path,
@@ -1214,6 +1565,29 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			},
 		}
 		return map[string]any{"_type": "DV_ORDINAL", "value": ordinal, "symbol": symbol}, nil
+	case "DV_SCALE":
+		// The DV_ORDINAL grammar one class over: same symbol, same three
+		// suffixes, `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat).
+		code, err := requireSuffix(rmType, sfx, "code")
+		if err != nil {
+			return nil, err
+		}
+		val, err := requireSuffix(rmType, sfx, "value")
+		if err != nil {
+			return nil, err
+		}
+		scale, err := requireSuffix(rmType, sfx, "ordinal")
+		if err != nil {
+			return nil, err
+		}
+		symbol := map[string]any{
+			"_type": "DV_CODED_TEXT", "value": val,
+			"defining_code": map[string]any{
+				"_type": "CODE_PHRASE", "code_string": code,
+				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+			},
+		}
+		return map[string]any{"_type": "DV_SCALE", "value": scale, "symbol": symbol}, nil
 	case "DV_PROPORTION":
 		num, err := requireSuffix(rmType, sfx, "numerator")
 		if err != nil {
@@ -1245,6 +1619,12 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 		if t, ok := sfx["terminology"]; ok {
 			cp["terminology_id"] = map[string]any{"_type": "TERMINOLOGY_ID", "value": t}
 		}
+		// |preferred_term is the one attribute the standalone leaf spelling carries
+		// and the nested defining_code triple does not (corpus:
+		// `dv_text/_language|preferred_term`).
+		if pt, ok := sfx["preferred_term"]; ok {
+			cp["preferred_term"] = pt
+		}
 		return cp, nil
 	case "DV_IDENTIFIER":
 		id, err := requireSuffix(rmType, sfx, "id")
@@ -1258,8 +1638,77 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			}
 		}
 		return out, nil
+	case "DV_PARSABLE":
+		// Both attributes are RM-mandatory, so half a leaf is refused rather than
+		// decoded to a coerced empty string. `charset` and `language` ride the
+		// REQ-140 `_charset` / `_language` members, not suffixes.
+		value, err := requireSuffix(rmType, sfx, "")
+		if err != nil {
+			return nil, err
+		}
+		formalism, err := requireSuffix(rmType, sfx, "formalism")
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"_type": "DV_PARSABLE", "value": value, "formalism": formalism}, nil
+	case "DV_MULTIMEDIA":
+		return multimediaFromSuffixes(sfx)
 	}
 	return nil, fmt.Errorf("%w: %s", ErrUnsupportedDatatype, rmType)
+}
+
+// multimediaFromSuffixes rebuilds a canonical DV_MULTIMEDIA from its FLAT suffix
+// set (REQ-140). `media_type` and `size` are RM-mandatory, so they are required
+// rather than defaulted; the bare key is the **uri**, and the two Byte[]
+// attributes carry the base64 their canonical form uses.
+//
+// The three CODE_PHRASE-valued attributes reachable here travel as a bare code:
+// media_type in the implied [mediaTypeTerminology], the two algorithms with no
+// terminology at all (see there). `charset`, `language` and `thumbnail` are not
+// suffixes — they ride the REQ-140 underscore members.
+func multimediaFromSuffixes(sfx map[string]any) (map[string]any, error) {
+	mediaType, err := requireSuffix("DV_MULTIMEDIA", sfx, "mediatype")
+	if err != nil {
+		return nil, err
+	}
+	size, err := requireSuffix("DV_MULTIMEDIA", sfx, "size")
+	if err != nil {
+		return nil, err
+	}
+	code, err := ctxString("|mediatype", mediaType)
+	if err != nil {
+		return nil, err
+	}
+	dv := map[string]any{
+		"_type":      "DV_MULTIMEDIA",
+		"media_type": codePhraseJSON(code, mediaTypeTerminology),
+		"size":       size,
+	}
+	if uri, ok := sfx[""]; ok {
+		dv["uri"] = map[string]any{"_type": "DV_URI", "value": uri}
+	}
+	for suffix, attr := range map[string]string{
+		"data": "data", "integrity_check": "integrity_check", "alternatetext": "alternate_text",
+	} {
+		if v, ok := sfx[suffix]; ok {
+			dv[attr] = v
+		}
+	}
+	for _, attr := range multimediaBareCodeAttrs {
+		v, ok := sfx[attr]
+		if !ok {
+			continue
+		}
+		algo, err := ctxString("|"+attr, v)
+		if err != nil {
+			return nil, err
+		}
+		// No terminology: the wire carries the code alone and this codec has no
+		// openEHR code-set identifier to imply for either algorithm group, so
+		// inventing one would put a terminology on the RM the author never wrote.
+		dv[attr] = map[string]any{"_type": "CODE_PHRASE", "code_string": algo}
+	}
+	return dv, nil
 }
 
 // allowedSuffixes lists, per datatype, the pipe suffixes (and "" for a bare
@@ -1284,13 +1733,20 @@ var allowedSuffixes = map[string]map[string]bool{
 	"DV_COUNT":   {"": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_BOOLEAN": {"": true},
 	"DV_ORDINAL": {"code": true, "value": true, "ordinal": true},
+	"DV_SCALE":   {"code": true, "value": true, "ordinal": true},
 	"DV_PROPORTION": {
 		"numerator": true, "denominator": true, "type": true,
 		"magnitude_status": true, "normal_status": true,
 		"accuracy": true, "accuracy_is_percent": true, "precision": true,
 	},
 	"DV_IDENTIFIER": {"id": true, "issuer": true, "assigner": true, "type": true},
-	"CODE_PHRASE":   {"code": true, "terminology": true},
+	"CODE_PHRASE":   {"code": true, "terminology": true, "preferred_term": true},
+	"DV_PARSABLE":   {"": true, "formalism": true},
+	"DV_MULTIMEDIA": {
+		"": true, "mediatype": true, "size": true, "data": true,
+		"alternatetext": true, "integrity_check": true,
+		"integrity_check_algorithm": true, "compression_algorithm": true,
+	},
 }
 
 // suffixKind is the JSON value kind an optional pass-through suffix must carry.

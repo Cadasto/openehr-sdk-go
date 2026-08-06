@@ -49,7 +49,10 @@ import (
 var unserialisableIC = map[string]string{
 	"COMPOSITION.language":  "carried by ctx/language on encode; resolving here would double-spell it (the CODE_PHRASE leaf mapping exists since the PROBE-086 ratchet, so the datatype is no longer the reason)",
 	"COMPOSITION.territory": "carried by ctx/territory on encode; resolving here would double-spell it (see COMPOSITION.language)",
-	"COMPOSITION.composer":  "PARTY_PROXY: leafToFlat silently skips non-DV_ values; ctx/composer_name carries the name (external_ref is dropped — known deviation)",
+	"COMPOSITION.composer": "carried by ctx/composer_name on encode; resolving here would double-spell the value — " +
+		"and since REQ-140 gave PARTY_PROXY a FLAT spelling, the datatype is no longer the reason: " +
+		"simplified/flat_encode.go asserts the ctx/-only rule by name (ctxOnlyLeafPaths). " +
+		"The composer's external_ref stays dropped (the ADR 0015 boundary — known deviation)",
 	"EVENT_CONTEXT.start_time": "carried by ctx/time on encode; resolving here would double-spell the value " +
 		"(ADR 0015 keeps encode ctx/-only) — no data loss today",
 	"EVENT_CONTEXT.setting": "carried by ctx/setting|code + |value on encode (REQ-053 amended 2026-08-05, ADR 0015's " +
@@ -59,11 +62,11 @@ var unserialisableIC = map[string]string{
 	// CODE_PHRASE leaf mapping landed, so those leaves now resolve through rmpath
 	// — this guard enforces that, and TestEntryLanguageEncodingResolveToValues
 	// pins the resolved value.
-	"OBSERVATION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"EVALUATION.subject":           "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"INSTRUCTION.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ACTION.subject":               "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
-	"ADMIN_ENTRY.subject":          "PARTY_PROXY: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
+	// ENTRY-level subject is deliberately absent from this map as of 2026-08-05:
+	// REQ-140's party grammar gave PARTY_PROXY a FLAT spelling, so the encode-side
+	// drop those five exemptions documented is closed and this guard enforces the
+	// resolution — the same course ENTRY language / encoding took when the
+	// CODE_PHRASE leaf mapping landed.
 	"ACTIVITY.action_archetype_id": "STRING: leafToFlat silently skips non-DV_ values — codec gap, not an rmpath gap",
 }
 
@@ -86,6 +89,10 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 	// a distinguishable value rather than a zero CODE_PHRASE.
 	lang := rm.CodePhrase{CodeString: "en", TerminologyID: rm.TerminologyID{Value: "ISO_639-1"}}
 	enc := rm.CodePhrase{CodeString: "UTF-8", TerminologyID: rm.TerminologyID{Value: "IANA_character-sets"}}
+	// ENTRY subject is a PARTY_PROXY interface, so an unset one resolves to no
+	// child at all and the guard's non-nil assertion could not tell that apart
+	// from a missing childrenAt case.
+	subject := rm.PartyProxy(rm.PartySelf{})
 	switch rmType {
 	case "COMPOSITION", "EVENT_CONTEXT":
 		who, where := "Dr Who", "ward A3"
@@ -109,19 +116,19 @@ func populated(rmType string) (root rm.Locatable, prefix string, ok bool) {
 		}
 		return comp, "", true
 	case "OBSERVATION":
-		return &rm.Observation{Name: name, Language: lang, Encoding: enc}, "", true
+		return &rm.Observation{Name: name, Language: lang, Encoding: enc, Subject: subject}, "", true
 	case "EVALUATION":
-		return &rm.Evaluation{Name: name, Language: lang, Encoding: enc}, "", true
+		return &rm.Evaluation{Name: name, Language: lang, Encoding: enc, Subject: subject}, "", true
 	case "INSTRUCTION":
 		exp := when
 		return &rm.Instruction{
-			Name: name, Language: lang, Encoding: enc,
+			Name: name, Language: lang, Encoding: enc, Subject: subject,
 			Narrative: &rm.DVText{Value: "n"}, ExpiryTime: &exp,
 		}, "", true
 	case "ACTION":
-		return &rm.Action{Name: name, Language: lang, Encoding: enc, Time: when}, "", true
+		return &rm.Action{Name: name, Language: lang, Encoding: enc, Subject: subject, Time: when}, "", true
 	case "ADMIN_ENTRY":
-		return &rm.AdminEntry{Name: name, Language: lang, Encoding: enc}, "", true
+		return &rm.AdminEntry{Name: name, Language: lang, Encoding: enc, Subject: subject}, "", true
 	case "ACTIVITY":
 		return &rm.Activity{
 			Name:   name,

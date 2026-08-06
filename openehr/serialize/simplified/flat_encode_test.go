@@ -131,19 +131,26 @@ func TestEncodeSkipsEmptyRepeatInstances(t *testing.T) {
 	if len(comp.Content) != 1 {
 		t.Fatalf("fixture: want 1 content item, got %d", len(comp.Content))
 	}
-	// "Carries no representable leaf data" has to include the ENTRY in-context
-	// CODE_PHRASE pair: language and encoding are RM-mandatory and now emit as
-	// FLAT leaves, so clearing the events alone would leave four keys behind and
-	// the instance would legitimately occupy an index — testing coverage rather
-	// than compaction.
+	// "Carries no representable leaf data" has to include every attribute that
+	// emits without a Web Template leaf of its own, or the instance would
+	// legitimately occupy an index and the test would measure coverage rather
+	// than compaction:
+	//
+	//   - the ENTRY in-context CODE_PHRASE pair — language and encoding are
+	//     RM-mandatory and emit as FLAT leaves;
+	//   - the LOCATABLE identity attributes the REQ-140 underscore grammar
+	//     carries — instance.Generate stamps a `uid` on every archetyped node,
+	//     which now emits as `<path>/_uid`.
 	middle := deepCopyComposition(t, comp)
 	switch o := middle.Content[0].(type) {
 	case *rm.Observation:
 		o.Data.Events = nil
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
+		o.UID, o.Links = nil, nil
 	case rm.Observation:
 		o.Data.Events = nil
 		o.Language, o.Encoding = rm.CodePhrase{}, rm.CodePhrase{}
+		o.UID, o.Links = nil, nil
 		middle.Content[0] = o
 	default:
 		t.Fatalf("fixture: content[0] is %T, want an Observation", middle.Content[0])
@@ -208,5 +215,35 @@ func TestEncodePartyRelatedComposerErrors(t *testing.T) {
 	}
 	if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
 		t.Errorf("MarshalFlat(PARTY_RELATED composer) err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// The other two composer shapes wire.md § REQ-140 makes typed errors on encode.
+// Only the PARTY_RELATED one above was pinned end-to-end; these two were made
+// normative in the same delta and left unguarded (PR #89 review).
+func TestEncodeComposerShapesCtxCannotCarry(t *testing.T) {
+	empty := ""
+	for name, composer := range map[string]rm.PartyProxy{
+		// `ctx/composer_self` is a bare Boolean — an external_ref beside it has
+		// nowhere to go and must not be dropped.
+		"PARTY_SELF carrying an external_ref": &rm.PartySelf{
+			ExternalRef: &rm.PartyRef{ObjectRef: rm.ObjectRef{
+				ID:        &rm.HierObjectID{Value: "ref-1"},
+				Namespace: "demographic", Type: "PERSON",
+			}},
+		},
+		// A nameless PARTY_IDENTIFIED would write no ctx/ key at all, and a
+		// WithTemplate decode of that output defaults the composer to PARTY_SELF
+		// — a silent type substitution.
+		"PARTY_IDENTIFIED with no name":    &rm.PartyIdentified{},
+		"PARTY_IDENTIFIED with empty name": &rm.PartyIdentified{Name: &empty},
+	} {
+		t.Run(name, func(t *testing.T) {
+			comp, wt := genComposition(t, minimalObsOPT)
+			comp.Composer = composer
+			if _, err := simplified.MarshalFlat(comp, wt); !errors.Is(err, simplified.ErrUnsupportedDatatype) {
+				t.Errorf("MarshalFlat err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
 	}
 }

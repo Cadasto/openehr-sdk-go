@@ -50,6 +50,19 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 			return nil, err
 		}
 	}
+	// REQ-140 — the root COMPOSITION's own underscore attributes (it is a
+	// LOCATABLE the node walk never visits, because the walk starts at its
+	// children), and the EVENT_CONTEXT optionals under the real `context`
+	// segment (ADR 0016). The context prefix is spelled here rather than taken
+	// from a Web Template node because those attributes are RM-optional and a
+	// template need not constrain `context` at all — decode resolves the same
+	// prefix the same way (rmattrOwnerAt).
+	if err := rmattrEncode(comp, root.ID, out); err != nil {
+		return nil, err
+	}
+	if err := rmattrEncode(comp.Context, root.ID+"/context", out); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -62,9 +75,10 @@ func encodeFlat(comp *rm.Composition, wt *webtemplate.WebTemplate) (map[string]a
 // is not a ctx/ field at all: it is a template-constrained leaf and rides its
 // own Web Template path.)
 //
-// A composer the ctx/ short forms cannot carry (PARTY_RELATED, or a
-// PARTY_IDENTIFIED without a name) is an error, not an omission: a decode of
-// the composer-less output under WithTemplate would default the composer to
+// A composer the ctx/ short forms cannot carry (PARTY_RELATED, a
+// PARTY_IDENTIFIED without a name, or a PARTY_SELF carrying an external_ref)
+// is an error, not an omission: a decode of the composer-less output under
+// WithTemplate would default the composer to
 // PARTY_SELF — a silent type substitution (see deviations.md). A setting the
 // ctx/setting pair cannot carry is refused on the same grounds
 // (emitContextSetting).
@@ -80,22 +94,24 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 		// Absent composer: nothing to represent, nothing substituted.
 	case *rm.PartySelf:
 		if c != nil {
-			out["ctx/composer_self"] = true
+			if err := composerSelfToCtx(out, *c); err != nil {
+				return err
+			}
 		}
 	case rm.PartySelf:
-		out["ctx/composer_self"] = true
+		if err := composerSelfToCtx(out, c); err != nil {
+			return err
+		}
 	case *rm.PartyIdentified:
 		if c != nil {
-			if c.Name == nil || *c.Name == "" {
-				return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+			if err := composerNameToCtx(out, *c); err != nil {
+				return err
 			}
-			out["ctx/composer_name"] = *c.Name
 		}
 	case rm.PartyIdentified:
-		if c.Name == nil || *c.Name == "" {
-			return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+		if err := composerNameToCtx(out, c); err != nil {
+			return err
 		}
-		out["ctx/composer_name"] = *c.Name
 	default:
 		return fmt.Errorf("%w: composer %T is not representable in the ctx/ short forms", ErrUnsupportedDatatype, comp.Composer)
 	}
@@ -107,6 +123,42 @@ func emitContext(out map[string]any, comp *rm.Composition) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// composerNameToCtx writes the composition's composer as `ctx/composer_name` —
+// the only spelling the ctx/ short form carries for a PARTY_IDENTIFIED (ADR
+// 0015).
+//
+// A composer that also carries an `external_ref` or `identifiers` keeps only
+// its name. That is a **drop, not a refusal**, and the one place this codec
+// makes that trade deliberately: the ctx/ short form has no key for either, and
+// decode refuses the real-path `composer/…` spellings that would carry them, so
+// no channel exists short of extending the grammar. Refusing instead would make
+// every composition whose composer is properly referenced — most real ones, and
+// one of the vendored corpus bodies — unencodable, which is a worse answer than
+// a documented projection loss for a format that is a lossy projection by
+// design. Registered in deviations.md (§ deferred features, the ctx/ context
+// row); wire.md § REQ-140 names it as one of the two deliberately out-of-scope
+// classes rather than scoping a "none dropped" claim around it.
+func composerNameToCtx(out map[string]any, c rm.PartyIdentified) error {
+	if c.Name == nil || *c.Name == "" {
+		return fmt.Errorf("%w: composer PARTY_IDENTIFIED without a name is not representable as ctx/composer_name", ErrUnsupportedDatatype)
+	}
+	out["ctx/composer_name"] = *c.Name
+	return nil
+}
+
+// composerSelfToCtx writes a PARTY_SELF composer as `ctx/composer_self`, which
+// is a bare Boolean: an `external_ref` beside it has nowhere to go and is
+// refused rather than dropped, the same policy partyProxyRMAttr applies at every
+// other PARTY_SELF position.
+func composerSelfToCtx(out map[string]any, c rm.PartySelf) error {
+	if c.ExternalRef != nil {
+		return fmt.Errorf("%w: composer PARTY_SELF carries an external_ref, which ctx/composer_self cannot spell — it is a bare Boolean (ADR 0015)",
+			ErrUnsupportedDatatype)
+	}
+	out["ctx/composer_self"] = true
 	return nil
 }
 
@@ -153,6 +205,27 @@ func emitContextSetting(out map[string]any, s rm.DVCodedText) error {
 	return nil
 }
 
+// ctxOnlyLeafPaths are the canonical paths of the composition-level metadata
+// leaves ADR 0015 keeps on the `ctx/` surface. [emitNode] skips them: emitting
+// one at its real FLAT path would spell a single value under two keys, and
+// ADR 0015 makes the ctx/-only encode permanent (decode still accepts both
+// spellings — see metadataAliases).
+//
+// The rule is asserted here rather than left to fall out of a gap elsewhere.
+// Three of the five are unreachable today because `rmpath` deliberately does not
+// resolve them, and `composer` was unreachable because [leafToFlat] mapped no
+// PARTY_PROXY — until REQ-140's party grammar gave it one, at which point the
+// composer's `external_ref` would have started being emitted at `<root>/composer`
+// beside `ctx/composer_name`. "The codec cannot write it" is not a spelling
+// decision; this table is.
+var ctxOnlyLeafPaths = map[string]bool{
+	"/language":           true,
+	"/territory":          true,
+	"/composer":           true,
+	"/context/start_time": true,
+	"/context/setting":    true,
+}
+
 // emitNode resolves node against resolveRoot (whose canonical path is
 // resolveRootAql) and writes FLAT entries under flatPrefix. A repeating node
 // enumerates its instances and stamps a zero-based :index; a container
@@ -176,6 +249,9 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	if !isContainer && !isLeaf {
 		return nil // structural node carrying neither children nor value inputs
 	}
+	if isLeaf && ctxOnlyLeafPaths[bareAQLPath(node.AQLPath)] {
+		return nil
+	}
 	// Resolution against the RM instance keys on archetype_node_id, so the
 	// REQ-116 name predicate the Web Template now carries is dropped here.
 	// rmpath *does* honour a `node,'name'` predicate, which would filter
@@ -188,6 +264,23 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	relPath := bareAQLPath(strings.TrimPrefix(node.AQLPath, resolveRootAql))
 
 	if node.Max != 1 {
+		// A repeatable collapsed leaf is walked from its ELEMENT owners, not
+		// from their values (REQ-140). Resolving `…/value` across instances
+		// loses which ELEMENT each value came from, so the underscore
+		// attributes would be read off the *unindexed* owner path — which
+		// matches every instance at once (ErrPathAmbiguous, failing the whole
+		// document) and, were it unique, would stamp one instance's attributes
+		// onto every :index. It also misses an ELEMENT carrying only a
+		// `_null_flavour`, which has no value to resolve at all.
+		if !isContainer {
+			owners, err := repeatingLeafOwners(resolveRoot, relPath)
+			if err != nil {
+				return err
+			}
+			if len(owners) > 0 {
+				return emitRepeatingLeafOwners(out, node, flatPrefix, owners, ambiguous)
+			}
+		}
 		vals, err := rmpath.ItemsAtPath(resolveRoot, relPath)
 		if err != nil {
 			return skipNotFound(err, relPath)
@@ -218,7 +311,29 @@ func emitNode(out map[string]any, node *webtemplate.Node, flatPrefix string, res
 	}
 	v, err := rmpath.ItemAtPath(resolveRoot, relPath)
 	if err != nil {
-		return skipNotFound(err, relPath)
+		if !errors.Is(err, rmpath.ErrPathNotFound) {
+			return fmt.Errorf("simplified: resolve %q: %w", relPath, err)
+		}
+		// An absent leaf *value* does not mean an absent owner: a collapsed ELEMENT
+		// whose `value` is Void carries a `_null_flavour` in its place (REQ-140), and
+		// that is precisely the shape the value resolution cannot see. Every other
+		// absent optional still writes nothing, because the owner walk below finds no
+		// ELEMENT (or no attributes on it) either.
+		if isContainer {
+			return nil
+		}
+		sub := make(map[string]any)
+		if err := emitLeafOwnerRMAttrs(sub, node, flatPrefix+"/"+node.ID, resolveRoot, resolveRootAql); err != nil {
+			return err
+		}
+		if len(sub) == 0 {
+			return nil
+		}
+		if err := refuseReusedSibling(node, ambiguous); err != nil {
+			return err
+		}
+		maps.Copy(out, sub)
+		return nil
 	}
 	if err := refuseReusedSibling(node, ambiguous); err != nil {
 		return err
@@ -262,7 +377,8 @@ func skipNotFound(err error, relPath string) error {
 func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v any, isContainer bool, ancestorRoot rm.Locatable, ancestorAql string, ambiguous map[string]bool) error {
 	if isContainer {
 		root, rootAql := ancestorRoot, ancestorAql
-		if loc, ok := v.(rm.Locatable); ok {
+		loc, isLocatable := v.(rm.Locatable)
+		if isLocatable {
 			// A Locatable container becomes the new resolution root for its
 			// children (each repeatable instance is resolved independently).
 			root, rootAql = loc, node.AQLPath
@@ -272,7 +388,108 @@ func emitValue(out map[string]any, node *webtemplate.Node, flatPath string, v an
 				return err
 			}
 		}
+		// REQ-140 — after the node's own emission, its underscore attributes.
+		// Only a LOCATABLE owns any: EVENT_CONTEXT is handled from the root (its
+		// FLAT prefix is fixed, template node or not), and a non-Locatable
+		// container (ISM_TRANSITION) has no underscore attribute in the grammar.
+		if isLocatable {
+			return rmattrEncode(loc, flatPath, out)
+		}
 		return nil
 	}
-	return leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node))
+	if err := leafToFlat(out, flatPath, v, node.RMType, leafListOpen(node)); err != nil {
+		return err
+	}
+	return emitLeafOwnerRMAttrs(out, node, flatPath, ancestorRoot, ancestorAql)
+}
+
+// emitLeafOwnerRMAttrs writes the REQ-140 underscore attributes of the LOCATABLE
+// a collapsed leaf hides. The Web Template folds ELEMENT.value into its leaf
+// node, so `<leaf>/_uid` and `<leaf>/_link:N` belong to the ELEMENT one
+// attribute up — the one owner the node walk cannot reach, since the walk
+// resolves the leaf's own `…/value` path.
+//
+// Keyed on the canonical trailing `/value` attribute *and* on the resolved
+// parent actually being an ELEMENT. Every other childless leaf sits directly on
+// a non-LOCATABLE attribute of an enclosing node (`context/start_time`, ENTRY
+// `language`, an ISM_TRANSITION member, ACTIVITY `timing`), and that enclosing
+// node emits its own attributes at its own FLAT path — so emitting here too
+// would double-spell them.
+func emitLeafOwnerRMAttrs(out map[string]any, node *webtemplate.Node, flatPath string, ancestorRoot rm.Locatable, ancestorAql string) error {
+	rel := bareAQLPath(strings.TrimPrefix(node.AQLPath, ancestorAql))
+	ownerRel, isElementValue := strings.CutSuffix(rel, "/value")
+	if !isElementValue || ownerRel == "" {
+		return nil
+	}
+	owner, err := rmpath.ItemAtPath(ancestorRoot, ownerRel)
+	if err != nil {
+		return skipNotFound(err, ownerRel)
+	}
+	if _, isElement := as[rm.Element](owner); !isElement {
+		return nil
+	}
+	return rmattrEncode(owner, flatPath, out)
+}
+
+// repeatingLeafOwners resolves the ELEMENT instances hidden behind a repeatable
+// collapsed leaf, or nil when the node is not one — a childless leaf sitting on
+// a non-LOCATABLE attribute (`context/start_time`, an ISM_TRANSITION member,
+// ACTIVITY `timing`) has no ELEMENT owner and keeps the plain value walk.
+func repeatingLeafOwners(resolveRoot rm.Locatable, relPath string) ([]any, error) {
+	ownerRel, isElementValue := strings.CutSuffix(relPath, "/value")
+	if !isElementValue || ownerRel == "" {
+		return nil, nil
+	}
+	owners, err := rmpath.ItemsAtPath(resolveRoot, ownerRel)
+	if err != nil {
+		return nil, skipNotFound(err, ownerRel)
+	}
+	for _, owner := range owners {
+		if _, isElement := as[rm.Element](owner); !isElement {
+			return nil, nil
+		}
+	}
+	return owners, nil
+}
+
+// emitRepeatingLeafOwners writes one :index per resolved ELEMENT instance: its
+// collapsed value — absent when the ELEMENT carries only a `_null_flavour` —
+// followed by that same instance's underscore attributes.
+func emitRepeatingLeafOwners(out map[string]any, node *webtemplate.Node, flatPrefix string, owners []any, ambiguous map[string]bool) error {
+	// The :index counts emitted instances, not RM list positions — an instance
+	// contributing no FLAT key is omitted without consuming an index, for the
+	// reason spelled out in emitNode.
+	idx := 0
+	for _, owner := range owners {
+		sub := make(map[string]any)
+		flatPath := flatPrefix + "/" + node.ID + ":" + strconv.Itoa(idx)
+		if el, isElement := as[rm.Element](owner); isElement && el.Value != nil && !rm.IsTypedNil(el.Value) {
+			if err := leafToFlat(sub, flatPath, el.Value, node.RMType, leafListOpen(node)); err != nil {
+				return err
+			}
+		}
+		if err := rmattrEncode(owner, flatPath, sub); err != nil {
+			return err
+		}
+		if len(sub) == 0 {
+			continue
+		}
+		// Refused on the first actual **emission**: a node in the ambiguous set
+		// that contributes no key is skipped like any absent optional, so a
+		// composition that never touches the reused region still encodes. Owners
+		// existing is not enough — a degenerate ELEMENT carrying neither a value
+		// nor an underscore attribute writes nothing and must not trip the guard.
+		// Pinned by TestRepeatingLeafOwnersRefuseReusedSiblingOnFirstEmission.
+		//
+		// Note this is *stricter* than the repeating-container arm above, which
+		// still trips on resolution (`len(vals) > 0`, emitNode). Both are safe —
+		// nothing emitted means nothing misattributed — but the two arms do not
+		// yet state one rule; aligning them is a follow-up, not this fix.
+		if err := refuseReusedSibling(node, ambiguous); err != nil {
+			return err
+		}
+		maps.Copy(out, sub)
+		idx++
+	}
+	return nil
 }

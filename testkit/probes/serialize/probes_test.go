@@ -240,6 +240,110 @@ func TestProbe086CoverageFloor(t *testing.T) {
 	}
 }
 
+// TestProbe089 — the REQ-140 underscore-attribute round-trip over the
+// SDK-authored per-family fixture set. Every fixture MUST pass: unlike
+// PROBE-086, whose input is one upstream corpus and whose refusals are counted,
+// these fixtures are authored against the same vendored template for shapes the
+// grammar carries, so a refusal here is a defect.
+//
+// The fixture set is checked for completeness first: one case per REQ-140
+// grammar-table row, and the row list is what a reader diffs against the table.
+func TestProbe089(t *testing.T) {
+	target, err := serializeprobes.NewProbe089Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	if len(serializeprobes.Probe089Inputs) == 0 {
+		t.Fatal("Probe089Inputs is empty — the per-family fixture set went missing")
+	}
+	// Every family the router carries must appear in the fixture set: a family
+	// deleted from the fixtures would otherwise take its coverage with it.
+	rows := map[string]bool{}
+	for _, c := range serializeprobes.Probe089Inputs {
+		for _, row := range c.Rows {
+			rows[row] = true
+		}
+	}
+	for _, want := range []string{
+		"modelled LOCATABLE: _uid",
+		"modelled LOCATABLE: _link:N",
+		"modelled LOCATABLE: _feeder_audit",
+		"collapsed ELEMENT: _null_flavour",
+		"ENTRY: _work_flow_id",
+		"ENTRY: _other_participation:N",
+		"ENTRY: _provider",
+		"EVENT_CONTEXT: _health_care_facility",
+		"EVENT_CONTEXT: _participation:N",
+		"DV_ORDERED leaf: _normal_range",
+		"DV_TEXT leaf: _mapping:N",
+		"DV_INTERVAL<T> leaf (the interval grammar at a modelled node)",
+	} {
+		if !rows[want] {
+			t.Errorf("no fixture covers the REQ-140 grammar row %q", want)
+		}
+	}
+	for _, c := range serializeprobes.Probe089Inputs {
+		t.Run(c.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe089UnderscoreRoundTrip(target, c)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe089Refusals — leg (c). REQ-140's deliberate exclusions must fail
+// with the sentinel their boundary declares and a message naming the key, so
+// they stay visible in the PROBE-086 census instead of decoding and dropping.
+func TestProbe089Refusals(t *testing.T) {
+	target, err := serializeprobes.NewProbe089Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	if len(serializeprobes.Probe089Refusals) == 0 {
+		t.Fatal("Probe089Refusals is empty — the boundary would be unasserted")
+	}
+	for _, ref := range serializeprobes.Probe089Refusals {
+		t.Run(ref.Name, func(t *testing.T) {
+			r, err := serializeprobes.Probe089RefusedFamilies(target, ref)
+			if err != nil {
+				t.Fatalf("probe framework error: %v", err)
+			}
+			if r.Status != "pass" {
+				t.Errorf("status = %q (detail: %s); want pass", r.Status, r.Detail)
+			}
+		})
+	}
+}
+
+// TestProbe089FrameworkMisuse — a nil target, a fixture asserting nothing, and
+// a fixture naming no grammar row are framework misuse (a non-nil error), not
+// probe failures: a harness must be able to tell "the probe could not run"
+// from "the codec is wrong".
+func TestProbe089FrameworkMisuse(t *testing.T) {
+	if _, err := serializeprobes.Probe089UnderscoreRoundTrip(nil, serializeprobes.Probe089Inputs[0]); err == nil {
+		t.Error("nil target: err = nil; want a framework error")
+	}
+	target, err := serializeprobes.NewProbe089Target()
+	if err != nil {
+		t.Fatalf("build corpus target: %v", err)
+	}
+	for name, c := range map[string]serializeprobes.Probe089Case{
+		"no keys": {Name: "x", Rows: []string{"row"}},
+		"no rows": {Name: "x", Keys: map[string]any{"k": "v"}},
+	} {
+		if _, err := serializeprobes.Probe089UnderscoreRoundTrip(target, c); err == nil {
+			t.Errorf("%s: err = nil; want a framework error", name)
+		}
+	}
+	if _, err := serializeprobes.Probe089RefusedFamilies(target, serializeprobes.Probe089Refusal{Name: "x"}); err == nil {
+		t.Error("refusal with no keys: err = nil; want a framework error")
+	}
+}
+
 // TestProbe086FrameworkMisuse — a nil target or a case with no FLAT body is
 // framework misuse (a non-nil error), not a probe failure, so a harness can
 // tell "the probe could not run" from "the codec is wrong".
