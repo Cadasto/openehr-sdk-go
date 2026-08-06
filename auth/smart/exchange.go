@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -102,12 +103,9 @@ func rawJSONToAny(raw map[string]json.RawMessage) map[string]any {
 func tokenFromResponse(tr TokenResponse, issuer string) auth.Token {
 	tok := auth.Token{
 		Value:  tr.AccessToken,
-		Type:   tr.TokenType,
+		Type:   cmp.Or(tr.TokenType, auth.TokenTypeBearer),
 		Scope:  tr.Scope,
 		Issuer: issuer,
-	}
-	if tok.Type == "" {
-		tok.Type = auth.TokenTypeBearer
 	}
 	if tr.ExpiresIn > 0 {
 		tok.ExpiresAt = time.Now().Add(time.Duration(tr.ExpiresIn) * time.Second)

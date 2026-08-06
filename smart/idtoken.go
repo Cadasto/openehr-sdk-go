@@ -204,7 +204,7 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 		return nil, fmt.Errorf("%w: iss mismatch", auth.ErrJWKSValidationFailed)
 	}
 	aud := audienceStrings(claims["aud"])
-	if !audContains(aud, clientID) {
+	if !slices.Contains(aud, clientID) {
 		return nil, fmt.Errorf("%w: aud mismatch", auth.ErrJWKSValidationFailed)
 	}
 	exp, err := claimNumericTime(claims, "exp")
@@ -214,14 +214,18 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 	if !exp.After(now.Add(-clockSkew)) {
 		return nil, fmt.Errorf("%w: token expired", auth.ErrJWKSValidationFailed)
 	}
-	if nbf, ok, err := optionalClaimNumericTime(claims, "nbf"); err != nil {
+	nbf, ok, err := optionalClaimNumericTime(claims, "nbf")
+	if err != nil {
 		return nil, err
-	} else if ok && nbf.After(now.Add(clockSkew)) {
+	}
+	if ok && nbf.After(now.Add(clockSkew)) {
 		return nil, fmt.Errorf("%w: nbf in future", auth.ErrJWKSValidationFailed)
 	}
-	if iat, ok, err := optionalClaimNumericTime(claims, "iat"); err != nil {
+	iat, ok, err := optionalClaimNumericTime(claims, "iat")
+	if err != nil {
 		return nil, err
-	} else if ok && iat.After(now.Add(clockSkew)) {
+	}
+	if ok && iat.After(now.Add(clockSkew)) {
 		return nil, fmt.Errorf("%w: iat in future", auth.ErrJWKSValidationFailed)
 	}
 	if nonce != "" {
@@ -230,7 +234,6 @@ func claimsFromMap(claims map[string]any, issuer, clientID, nonce string, now ti
 			return nil, fmt.Errorf("%w: nonce mismatch", auth.ErrJWKSValidationFailed)
 		}
 	}
-	iat, _, _ := optionalClaimNumericTime(claims, "iat")
 	sub, _ := claimString(claims, "sub")
 	fhirUser, _ := claimString(claims, "fhirUser")
 	extra := make(map[string]any, len(claims))
@@ -272,10 +275,6 @@ func audienceStrings(v any) []string {
 	default:
 		return nil
 	}
-}
-
-func audContains(aud []string, want string) bool {
-	return slices.Contains(aud, want)
 }
 
 func claimNumericTime(claims map[string]any, key string) (time.Time, error) {
