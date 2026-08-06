@@ -830,3 +830,16 @@ func TestIntervalUnboundedEndEncodes(t *testing.T) {
 		}
 	}
 }
+
+// The encode mirror: a TERM_MAPPING whose target carries no code would emit a
+// `_mapping:N` with no `/target|code`, which decode then rejects.
+func TestRMAttrMappingCodelessTargetRefusedOnEncode(t *testing.T) {
+	out := map[string]any{}
+	err := mappingsRMAttr(out, "x", []rm.TermMapping{{
+		Match:  '=',
+		Target: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "SNOMED-CT"}},
+	}})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+}

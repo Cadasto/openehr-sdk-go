@@ -438,3 +438,53 @@ func intervalLeafOf(t *testing.T, comp *rm.Composition) rm.DVInterval[rm.DVOrder
 	}
 	return iv
 }
+
+// TestDVMultimediaPreferredTermRidesRaw — REQ-140. wire.md pins **two**
+// conditions on the `|mediatype` boundary: a foreign terminology (above) *and* a
+// `preferred_term`, which the bare code cannot carry either. Only the first was
+// pinned, so dropping the second condition survived the whole suite and the
+// preferred term was silently lost.
+func TestDVMultimediaPreferredTermRidesRaw(t *testing.T) {
+	pt := "PNG image"
+	out := map[string]any{}
+	m := rm.DVMultimedia{
+		MediaType: rm.CodePhrase{CodeString: "image/png", PreferredTerm: &pt},
+		Size:      31,
+	}
+	if err := leafToFlat(out, "p/mm", m, "DV_MULTIMEDIA", false); err != nil {
+		t.Fatalf("leafToFlat: %v", err)
+	}
+	if _, raw := out["p/mm|raw"]; !raw {
+		t.Errorf("a media_type carrying a preferred_term should ride |raw, got %#v", out)
+	}
+}
+
+// TestDVMultimediaAlgorithmTerminologyRidesRaw — REQ-140.
+// `|integrity_check_algorithm` and `|compression_algorithm` carry a bare code
+// with **no** implied terminology this specification can source, so a value that
+// names one must ride `|raw` rather than be silently re-terminologised on the
+// way back. Unpinned until now.
+func TestDVMultimediaAlgorithmTerminologyRidesRaw(t *testing.T) {
+	for name, m := range map[string]rm.DVMultimedia{
+		"integrity_check_algorithm": {
+			MediaType:               rm.CodePhrase{CodeString: "image/png"},
+			Size:                    31,
+			IntegrityCheckAlgorithm: &rm.CodePhrase{CodeString: "SHA-256", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		},
+		"compression_algorithm": {
+			MediaType:            rm.CodePhrase{CodeString: "image/png"},
+			Size:                 31,
+			CompressionAlgorithm: &rm.CodePhrase{CodeString: "zlib", TerminologyID: rm.TerminologyID{Value: "openehr"}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out := map[string]any{}
+			if err := leafToFlat(out, "p/mm", m, "DV_MULTIMEDIA", false); err != nil {
+				t.Fatalf("leafToFlat: %v", err)
+			}
+			if _, raw := out["p/mm|raw"]; !raw {
+				t.Errorf("a %s carrying a terminology should ride |raw, got %#v", name, out)
+			}
+		})
+	}
+}

@@ -609,3 +609,28 @@ func TestParticipationNilPerformerRefused(t *testing.T) {
 		t.Errorf("err = %v, want it to name the performer", err)
 	}
 }
+
+// TestParticipationModeDecorationRefused — REQ-140. `|mode` carries the openEHR
+// `participation mode` **rubric alone**, so a DV_CODED_TEXT decoration has no
+// channel and must be refused rather than narrowed away. The sibling checks
+// (foreign terminology, value/rubric mismatch) were pinned; this one was not, so
+// deleting it survived the whole suite and the decoration was silently dropped.
+func TestParticipationModeDecorationRefused(t *testing.T) {
+	pt := "face to face"
+	mode := rm.DVCodedText{
+		DVText:       rm.DVText{Value: "face-to-face communication"},
+		DefiningCode: rm.CodePhrase{CodeString: "216", TerminologyID: rm.TerminologyID{Value: "openehr"}, PreferredTerm: &pt},
+	}
+	out := map[string]any{}
+	err := participationsRMAttr(out, "x", "_participation", []rm.Participation{{
+		Function:  rm.DVText{Value: "requester"},
+		Mode:      &mode,
+		Performer: &rm.PartyIdentified{Name: func(s string) *string { return &s }("Dr Test")},
+	}})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	if !strings.Contains(err.Error(), "mode") {
+		t.Errorf("err = %v, want it to name |mode", err)
+	}
+}
