@@ -462,7 +462,9 @@ func parseDuration(s string) (durationParts, error) {
 	inTime := false
 	num := ""
 	sawComponent := false
-	for i := range s {
+	// Byte indices, not runes: designators are ASCII and every byte must
+	// be inspected, so `range s` (which skips continuation bytes) is wrong.
+	for i := range len(s) {
 		c := s[i]
 		switch {
 		case c == 'T':

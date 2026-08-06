@@ -83,21 +83,23 @@ func factoryForRMFilename(rel string) (func() any, bool) {
 func FactoryForXMLBody(body []byte) (func() any, bool) {
 	s := string(body)
 	for {
-		_, after, ok := strings.Cut(s, "<")
+		i := strings.Index(s, "<")
+		if i < 0 {
+			return nil, false
+		}
+		s = s[i:]
+		// Skip any XML declaration or processing instruction
+		// (<?xml …?>) sitting before the root element. The "?>" scan
+		// must run over the whole "<?…" token, not the part after the
+		// opening "?", so a degenerate "<?>" is consumed as one PI.
+		if !strings.HasPrefix(s, "<?") {
+			break
+		}
+		_, rest, ok := strings.Cut(s, "?>")
 		if !ok {
 			return nil, false
 		}
-		// Skip XML declarations (<?xml ...?>) before the root element.
-		if decl, ok := strings.CutPrefix(after, "?"); ok {
-			_, rest, ok := strings.Cut(decl, "?>")
-			if !ok {
-				return nil, false
-			}
-			s = rest
-			continue
-		}
-		s = "<" + after
-		break
+		s = rest
 	}
 	switch {
 	case strings.HasPrefix(s, "<dv_quantity"), strings.HasPrefix(s, "<DV_QUANTITY"):
