@@ -20,7 +20,7 @@
 # the Makefile's LINT_IMAGE pin.
 ARG GO_VERSION=1.26.4
 ARG ALPINE_VERSION=3.20
-ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.11.4-alpine
+ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.12.2-alpine
 # ANTLR generator (Java) version — MUST track the antlr4-go/antlr runtime in
 # go.mod (lockstep; see resources/aql/grammar/baseline/PIN).
 ARG ANTLR_VERSION=4.13.2
