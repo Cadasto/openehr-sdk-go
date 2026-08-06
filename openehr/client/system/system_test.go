@@ -3,6 +3,7 @@ package system_test
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -123,7 +124,7 @@ func TestCapabilitiesPreservesExtras(t *testing.T) {
 	}
 	for _, key := range []string{"support_email", "documentation_url", "supported_formats"} {
 		if _, ok := caps.Extras[key]; !ok {
-			t.Errorf("Extras missing %q (have keys: %v)", key, extrasKeys(caps.Extras))
+			t.Errorf("Extras missing %q (have keys: %v)", key, slices.Sorted(maps.Keys(caps.Extras)))
 		}
 	}
 	// Spot-check decode of one Extras value.
@@ -338,12 +339,4 @@ func TestRepositoryMirrorsPackageFunctions(t *testing.T) {
 	if !h.IsUp() {
 		t.Error("Repository.Health expected up")
 	}
-}
-
-func extrasKeys(m map[string]json.RawMessage) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }

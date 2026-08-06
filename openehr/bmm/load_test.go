@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -117,7 +118,7 @@ func TestLoad_eachBMM(t *testing.T) {
 			}
 			for _, pk := range tc.topLevelPkgKeys {
 				if _, ok := s.Packages[pk]; !ok {
-					t.Errorf("expected packages[%q] entry, got keys=%v", pk, mapKeys(s.Packages))
+					t.Errorf("expected packages[%q] entry, got keys=%v", pk, slices.Sorted(maps.Keys(s.Packages)))
 				}
 			}
 		})
@@ -594,12 +595,4 @@ func TestMapResolver_missing(t *testing.T) {
 	if !errors.Is(err, ErrSchemaNotFound) {
 		t.Errorf("got %v, want ErrSchemaNotFound", err)
 	}
-}
-
-func mapKeys(m map[string]*Package) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	return ks
 }

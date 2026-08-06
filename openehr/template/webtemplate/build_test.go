@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -274,9 +274,9 @@ func assertStructuralParity(t *testing.T, stem string) {
 			extra = append(extra, p)
 		}
 	}
-	sort.Strings(missing)
-	sort.Strings(extra)
-	sort.Strings(mismatch)
+	slices.Sort(missing)
+	slices.Sort(extra)
+	slices.Sort(mismatch)
 
 	t.Logf("PARITY: ref=%d ours=%d | matched=%d missing=%d extra=%d mismatch=%d",
 		len(refByPath), len(ourByPath), len(refByPath)-len(missing)-len(mismatch), len(missing), len(extra), len(mismatch))

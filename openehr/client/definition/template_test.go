@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -85,7 +87,7 @@ func TestUploadTemplate(t *testing.T) {
 	}
 	// `uri` is a deployment-specific field; should land in Extras.
 	if _, ok := meta.Extras["uri"]; !ok {
-		t.Errorf("expected Extras[uri], have keys %v", maskKeys(meta.Extras))
+		t.Errorf("expected Extras[uri], have keys %v", slices.Sorted(maps.Keys(meta.Extras)))
 	}
 	if transportMeta == nil || transportMeta.Location == "" {
 		t.Error("Location not captured")
@@ -351,12 +353,4 @@ func TestRepository(t *testing.T) {
 	if !bytes.Equal(got, opt) {
 		t.Error("Repository.GetTemplate bytes mismatch")
 	}
-}
-
-func maskKeys(m map[string]json.RawMessage) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }

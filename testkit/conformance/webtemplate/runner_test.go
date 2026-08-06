@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"flag"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -152,10 +153,7 @@ func TestCensus(t *testing.T) {
 	fmt.Fprintf(&b, "coverage: %.1f%% of upstream keys are in the modelled subset\n\n",
 		100*float64(compared)/float64(total))
 	fmt.Fprintf(&b, "%-6s %-8s %s\n", "FAMS", "KEYS", "REASON")
-	reasons := make([]string, 0, len(byReason))
-	for r := range byReason {
-		reasons = append(reasons, r)
-	}
+	reasons := slices.Collect(maps.Keys(byReason))
 	// Total order: keys descending, then the reason text ascending, so the
 	// census is byte-identical run to run and diffable across commits.
 	// cmp.Compare rather than a subtraction: the counts are bounded here, but a

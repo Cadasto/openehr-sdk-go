@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 
@@ -105,12 +106,7 @@ func collectDiscriminators(b []byte) typeSet {
 			}
 			// Sort keys for determinism — the SDK's canonical JSON
 			// already does this on emit, but inputs might not.
-			keys := make([]string, 0, len(t))
-			for k := range t {
-				keys = append(keys, k)
-			}
-			slices.Sort(keys)
-			for _, k := range keys {
+			for _, k := range slices.Sorted(maps.Keys(t)) {
 				walk(t[k])
 			}
 		case []any:
