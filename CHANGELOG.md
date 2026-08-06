@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-06
+
+Nineteenth `v0.x` minor — REQ-140's underscore-prefixed RM attribute grammar takes upstream FLAT parity from 19.7% to 80.4% of the EHRbase corpus, and AQL gains the deprecated `SELECT TOP` carrier. No public API removals; `instance.Generate` changes the `subject` of every generated ENTRY.
+
 ### Added
 
 - **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form, `EVENT_CONTEXT.setting` round-trips, and encode refuses a setting it cannot carry — coverage 19.5% → 19.7%.
@@ -17,6 +21,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **AQL `SELECT TOP` carrier and literal source text (REQ-118, PROBE-087/088).** The deprecated `SELECT TOP n` clause now parses, emits and builds, a projected literal carries its source text, and two lint codes flag `TOP` + `LIMIT`.
 - **Underscore-prefixed RM attributes in FLAT/STRUCTURED (REQ-140, REQ-053, ADR 0016, PROBE-089).** The simplified codecs carry the whole `_`-prefixed RM attribute grammar and the remaining datatype leaves, DV_SCALE included, taking upstream FLAT parity from 19.7% to 80.4%.
 - **Go idiom modernization (no API or spec change).** A tree-wide pass onto current stdlib idioms, fixing an XML prologue scan that could pick the wrong root type and a nondeterministic FLAT encode diagnostic.
+- **Toolchain and dependency pins.** golangci-lint v2.12.2 and the Go 1.26.5 dev image; OpenTelemetry 1.44 → 1.45, whose breaking changes are confined to modules this SDK does not import.
 
 ## [0.18.0] - 2026-08-05
 
