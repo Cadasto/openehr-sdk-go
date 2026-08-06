@@ -3,10 +3,10 @@
 > **For agentic workers:** execute task-by-task with TDD (failing test → minimal code → green → commit). Each phase names its files, interfaces, and verification commands. Workers see only their own phase — the **Interfaces** blocks and the Design constraints are the contract between phases.
 
 **Date:** 2026-08-05
-**Status:** Done (2026-08-05) — all phases executed
+**Status:** Done (2026-08-05) — all phases executed. Archived 2026-08-06: PR 2 (#89) merged without the `sdd-archive` move, so the close-out ran as a follow-up rather than inside the implementing PR.
 **Owner:** SDK maintainers
-**Covers:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (new — underscore-prefixed RM attributes; opens the wire-extension band 140–149); amendments to [REQ-053](../specifications/wire.md#req-053) (DV_TEXT substitution carve-out; `ctx/setting` as the sixth respelled field; DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closure); [ADR 0016](../adr/0016-event-context-optionals-underscore-spelling.md) (EVENT_CONTEXT optionals ride the underscore grammar)
-**Probes:** [PROBE-089](../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Implemented (Sandbox) — [`probe_089_underscore_round_trip.go`](../../testkit/probes/serialize/probe_089_underscore_round_trip.go)); [PROBE-086](../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
+**Covers:** [REQ-140](../../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (new — underscore-prefixed RM attributes; opens the wire-extension band 140–149); amendments to [REQ-053](../../specifications/wire.md#req-053) (DV_TEXT substitution carve-out; `ctx/setting` as the sixth respelled field; DV_MULTIMEDIA / DV_PARSABLE / DV_INTERVAL / ENTRY-`subject` leaf closure); [ADR 0016](../../adr/0016-event-context-optionals-underscore-spelling.md) (EVENT_CONTEXT optionals ride the underscore grammar)
+**Probes:** [PROBE-089](../../specifications/conformance.md#probe-089--underscore-attribute-round-trip) (Implemented (Sandbox) — [`probe_089_underscore_round_trip.go`](../../../testkit/probes/serialize/probe_089_underscore_round_trip.go)); [PROBE-086](../../specifications/conformance.md#probe-086--upstream-flat-serialisation-parity) census re-baseline; [PROBE-076](../../specifications/conformance.md#probe-076--flat--structured-composition-round-trip) corpus extension
 **Implementation:** landed
 **Depends on:** landed REQ-053 codec (`openehr/serialize/simplified/`), REQ-106/111 (WebTemplate + compiled-template bridge), REQ-121 (`rmpath`), ADR 0014/0015; the PROBE-086 harness (`testkit/conformance/webtemplate/`) and pinned corpus (`testkit/cassettes/flat-conformance/`)
 **Defers:** `_instruction_details` (ACTION) and `_wf_definition` (INSTRUCTION) — spec-named, corpus-unexercised, stay typed refusals; the composer `external_ref` / `composer/_identifier:N` / `composer/relationship` surface (ADR 0015 boundary); PARTICIPATION `time` (no channel in the reference's suffix set, corpus-unexercised); accepting the ITS `ctx/` sketches for EVENT_CONTEXT optionals (ADR 0016 § Decision 3); FEEDER_AUDIT_DETAILS `other_details` (ITEM_STRUCTURE — no corpus fixture); `.schema` media types; reused-sibling FLAT (owned by the REQ-116 residual)
@@ -34,7 +34,7 @@ Close the REQ-053 residual deferrals in one coordinated effort: (A) the DV_TEXT 
 - Code and tests land with `// REQ-140` / `// REQ-053` / `// PROBE-089` / `// PROBE-086` citations.
 - REQ-140 **Impl.** flips `planned → landed` (REQ.md + traceability.yaml, tests enumerated); PROBE-089 Status flips to Implemented (Sandbox).
 - `deviations.md` rewritten (rows below); `SKIPPED.md` regenerated (`-census`) with prose re-baselined; harness pins updated deliberately.
-- roadmap.md, umbrella plan ([2026-06-23-simplified-formats.md](2026-06-23-simplified-formats.md)), plans README, CHANGELOG (one artefact-class bullet per PR merge) updated.
+- roadmap.md, umbrella plan ([2026-06-23-simplified-formats.md](../2026-06-23-simplified-formats.md)), plans README, CHANGELOG (one artefact-class bullet per PR merge) updated.
 - `make ci` and `make spec-check` pass on each PR; plan archived under `docs/plans/archive/` after PR 2.
 
 ## Implementation checklist

@@ -104,7 +104,19 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth]
+    # transport/ is in scope, not just auth/: the `Authorization: <Type> <Value>`
+    # emission rule, the empty-Type-means-Bearer default and the zero-Token
+    # suppression are REQ-060's, implemented in transport.Client.plumbHeaders.
+    # The default and the suppression were unasserted at the transport layer
+    # until 2026-08-06 (only covered incidentally, by a per-request-override
+    # test), and the suppression rule lived only in a Go doc comment — both are
+    # now stated in auth.md § REQ-060 and owned by
+    # TestDoAuthorizationSchemeForwardedVerbatim, which also pins the documented
+    # default token source (AnonymousTokenSource on an unconfigured client).
+    packages: [auth, transport]
+    tests:
+      - auth/tokensource_test.go
+      - transport/client_test.go
 
   - id: REQ-066
     title: Caller attribution
@@ -479,6 +491,20 @@ requirements:
     # Still deferred: `.schema` media types on input, ACTIVITY
     # action_archetype_id (STRING — the last unmapped leaf type on encode), and
     # reused-sibling FLAT (the REQ-116 residual, fail-loud in both directions).
+    #
+    # Tidied 2026-08-06 (no behaviour change; the REQ-140 block carries the
+    # mirror note). The STRUCTURED `"|"` member gained RFC-2119 force — it was
+    # described, not required, in a paragraph where every other obligation
+    # carried a keyword: MUST on the object form, on the empty-suffix reading in
+    # both interconversion directions, and on the bare-scalar rule for a leaf
+    # that cannot collide, plus the not-corpus-pinned standing (ADR 0014 governs
+    # if a reference spelling appears) that deviations.md already claimed
+    # wire.md recorded. The three LEAF datatype suffix sets this REQ's comment
+    # has described since PR 2 -- DV_PARSABLE, DV_MULTIMEDIA, DV_INTERVAL<T> --
+    # moved out of § REQ-140's table into wire.md § REQ-053 § Leaf datatypes,
+    # so the normative home now agrees with this block, deviations.md and the
+    # test citations; § REQ-140 keeps a pointer and retains the two behavioural
+    # rules that govern the underscore positions too.
     implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md
@@ -490,7 +516,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -842,7 +868,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
     # Two RM invariants the generic example synthesiser used to violate were
     # closed from the REQ-053/REQ-140 PR reviews (2026-08-05), both because an
     # RM-invalid generated instance is also unrepresentable in FLAT:
@@ -1376,6 +1402,18 @@ requirements:
     # the uri, and the explicit subject|_type: PARTY_SELF at an RM-optional
     # PARTY_PROXY.
     #
+    # Boundary tidied 2026-08-06 (no behaviour change): the three LEAF datatype
+    # rows this grammar's machinery enabled -- DV_PARSABLE, DV_MULTIMEDIA and
+    # DV_INTERVAL<T> -- moved out of wire.md § REQ-140's table into § REQ-053
+    # § Leaf datatypes, where the other leaf suffix sets live. Each is reachable
+    # at a Web Template leaf with no `_` segment at all, so REQ-053 owns them;
+    # this grammar reaches the same three through nested VALUE positions
+    # (_thumbnail, original_content, an interval bound) and applies their leaf
+    # rules verbatim. The behavioural rules stayed here, cross-referenced from
+    # the moved rows: the DV_MULTIMEDIA bare-code terminology rule (it governs
+    # the underscore CODE_PHRASE members too) and the interval boundary flags
+    # (introduced by _normal_range, shared with the leaf).
+    #
     # STILL DEFERRED (refused loudly and none dropped, except the composer
     # boundary noted below, which encode projects rather than refuses):
     # _instruction_details
@@ -1436,7 +1474,7 @@ requirements:
       # PROBE-086 — the census pins that move in step with each landed family.
       - testkit/conformance/webtemplate/runner_test.go
     plans:
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
