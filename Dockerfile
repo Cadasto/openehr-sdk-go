@@ -18,8 +18,11 @@
 # go.mod's `go` line (which stays at the minor's `.0`, e.g. 1.26.0, per
 # REQ-002). Bump explicitly when a new stable patch ships — same policy as
 # the Makefile's LINT_IMAGE pin.
-ARG GO_VERSION=1.26.4
-ARG ALPINE_VERSION=3.20
+ARG GO_VERSION=1.26.5
+# No Alpine pin: the `dev` stage inherits whatever Alpine
+# `golang:${GO_VERSION}-alpine` ships. Pinning it separately needs the
+# `-alpineX.Y` tag form, which is not published for every Go patch, so a fixed
+# value fails the `make image-dev` build outright on some later Go bump.
 ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.12.2-alpine
 # ANTLR generator (Java) version — MUST track the antlr4-go/antlr runtime in
 # go.mod (lockstep; see resources/aql/grammar/baseline/PIN).
