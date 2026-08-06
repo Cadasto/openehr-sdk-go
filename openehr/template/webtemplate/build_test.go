@@ -67,7 +67,7 @@ func TestBuildNoDefaultLanguage(t *testing.T) {
 	if !foundOpen || !foundClose {
 		t.Fatal("fixture has no <language> block to strip")
 	}
-	stripped := append(append([]byte{}, before...), after...)
+	stripped := slices.Concat(before, after)
 
 	opt, err := template.ParseOPT(bytes.NewReader(stripped))
 	if err != nil {

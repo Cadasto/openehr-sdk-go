@@ -232,7 +232,8 @@ func ParseObjectVersionID(s string) (ObjectVersionID, error) {
 // TrunkVersion returns the trunk version number — the first dot-segment.
 // REQ-120.
 func (v *VersionTreeID) TrunkVersion() string {
-	return strings.SplitN(v.Value, ".", 2)[0]
+	trunk, _, _ := strings.Cut(v.Value, ".")
+	return trunk
 }
 
 // BranchNumber returns the branch number, or "" for a trunk-only id
@@ -258,7 +259,7 @@ func (v *VersionTreeID) BranchVersion() string {
 // not validate that the parts are integers ≥ 1); use ParseVersionTreeID
 // for well-formedness. REQ-120.
 func (v *VersionTreeID) IsBranch() bool {
-	return len(strings.Split(v.Value, ".")) == 3
+	return strings.Count(v.Value, ".") == 2
 }
 
 // IsFirst reports whether this identifies the first version

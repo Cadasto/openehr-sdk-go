@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -27,9 +28,7 @@ func (r *recorder) OnRequest(o Observation) {
 func (r *recorder) snapshot() []Observation {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	out := make([]Observation, len(r.all))
-	copy(out, r.all)
-	return out
+	return slices.Clone(r.all)
 }
 
 // TestObserverFiresOncePerLogicalCall is the primary acceptance test
@@ -47,7 +46,8 @@ func TestObserverFiresOncePerLogicalCall(t *testing.T) {
 	}))
 	defer srv.Close()
 	rec := &recorder{}
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithRetry(RetryPolicy{MaxAttempts: 3, InitialBackoff: time.Millisecond}),
 		WithObserver(rec),
@@ -90,7 +90,8 @@ func TestObserverFiresOnWireError(t *testing.T) {
 	}))
 	defer srv.Close()
 	rec := &recorder{}
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithObserver(rec),
 	)
@@ -119,7 +120,8 @@ func TestObservationTagsRoundTrip(t *testing.T) {
 	}))
 	defer srv.Close()
 	rec := &recorder{}
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithObserver(rec),
 	)
@@ -153,7 +155,8 @@ func TestObservationTagsDefensiveCopy(t *testing.T) {
 	mutating := observerFunc(func(o Observation) {
 		o.Tags["mutated"] = true
 	})
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithObserver(mutating),
 	)
@@ -175,7 +178,8 @@ func TestObserverPanicIsRecovered(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithObserver(observerFunc(func(Observation) { panic("boom") })),
 	)
@@ -191,7 +195,8 @@ func TestNilObserverIsNoop(t *testing.T) {
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
-	c, _ := New(newCatalog(t, srv),
+	c, _ := New(
+		newCatalog(t, srv),
 		WithHTTPClient(srv.Client()),
 		WithObserver(nil),
 	)

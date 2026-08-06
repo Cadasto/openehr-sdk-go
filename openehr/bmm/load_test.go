@@ -8,7 +8,6 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"testing"
 )
@@ -170,7 +169,7 @@ func TestLoad_baseInterfacesAndGenerics(t *testing.T) {
 	if got, want := len(enum.ItemNames), 4; got != want {
 		t.Errorf("VALIDITY_KIND.ItemNames: got %d, want %d", got, want)
 	}
-	if !reflect.DeepEqual(enum.ItemValuesString, enum.ItemNames) {
+	if !slices.Equal(enum.ItemValuesString, enum.ItemNames) {
 		t.Errorf("VALIDITY_KIND.ItemValuesString should default to ItemNames")
 	}
 
@@ -204,7 +203,7 @@ func TestLoad_rmEnumerationInteger(t *testing.T) {
 	if !enum.IsIntegerEnum() {
 		t.Errorf("PROPORTION_KIND: expected integer enum")
 	}
-	if got, want := enum.ItemValuesInt, []int64{0, 1, 2, 3, 4}; !reflect.DeepEqual(got, want) {
+	if got, want := enum.ItemValuesInt, []int64{0, 1, 2, 3, 4}; !slices.Equal(got, want) {
 		t.Errorf("PROPORTION_KIND.ItemValuesInt: got %v, want %v", got, want)
 	}
 }
