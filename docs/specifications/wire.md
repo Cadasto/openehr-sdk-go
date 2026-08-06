@@ -184,7 +184,7 @@ The grammar is **recursive and typed by the owning RM class**, not a flat key li
 
 | Owner | Attributes | Value grammar |
 |---|---|---|
-| any LOCATABLE node (composition root, ENTRY, CLUSTER, collapsed `ELEMENT` leaf) | `_uid` | bare value (UID-based id) |
+| any LOCATABLE the Web Template **models** (composition root, ENTRY, SECTION, CLUSTER, collapsed `ELEMENT` leaf) — a folded structural wrapper has no FLAT key and therefore no channel, see below | `_uid` | bare value (UID-based id) |
 | | `_link:N` | LINK — `\|meaning`, `\|type`, `\|target` |
 | | `_feeder_audit` | FEEDER_AUDIT (below) |
 | collapsed `ELEMENT` leaf | `_null_flavour` | DV_CODED_TEXT — `\|code` + `\|value`, with `\|terminology` optional and carried as written (the corpus spells `openehr` explicitly rather than implying it); legal beside an **absent** bare value |
