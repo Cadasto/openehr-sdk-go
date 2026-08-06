@@ -5,7 +5,7 @@
 - **Superseded by:** —
 - **Strand:** —
 - **Introduces:** —. **Amends:** [REQ-053](../specifications/wire.md#req-053) (scopes the ctx-only emission rule to the six respelled scalar fields). **Applies:** [REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes) (the grammar these attributes ride), REQ-080 / PROBE-086 (the parity probe whose census moves).
-- **Plan:** [2026-08-05-flat-rm-attributes.md](../plans/2026-08-05-flat-rm-attributes.md).
+- **Plan:** [2026-08-05-flat-rm-attributes.md](../plans/archive/2026-08-05-flat-rm-attributes.md).
 - **Related:** [ADR 0015](0015-flat-metadata-spelling.md) settled the composition-metadata spelling this decision deliberately does **not** reopen; [ADR 0014](0014-webtemplate-reference-implementation-lock.md) pins the reference whose spelling wins here.
 
 ## Context
@@ -34,6 +34,9 @@ Deciding now, together with REQ-140's Phase 0, avoids the failure mode ADR 0015 
 ## Consequences
 
 - **Positive — census keys actually move.** Unlike the ADR 0015 respellings (held out on both sides, net zero), these keys will join the PROBE-086 *compared* set once REQ-140 lands: the corpus writes `context/_*`, the codec will emit `context/_*`, and the round-trip is byte-comparable. Counted directly over the 34 corpus fixtures, that is **182 keys** — `_health_care_facility` 143, `_participation` 31, `_end_time` 4, `_location` 4. (ENTRY-level `_other_participation:N` is outside this ADR's scope and is not in that figure.)
+
+  > **Landed 2026-08-05** ([REQ-140](../specifications/wire.md#req-140--underscore-prefixed-rm-attributes), [plan](../plans/archive/2026-08-05-flat-rm-attributes.md)). All **182** keys joined the compared set, and the prediction held exactly: `context/_end_time` + `context/_location` with the router's simple families (Phase C0), `context/_health_care_facility` 143 + `context/_participation:N` 31 with the party grammar (Phase C2). Per-phase deltas are in [SKIPPED.md](../../testkit/conformance/webtemplate/SKIPPED.md). The bullet above is left in the future tense as written — it records the expectation at the time of the decision, not today's behaviour.
+
 - **Positive — one grammar, no fork.** PARTICIPATION and PARTY_IDENTIFIED decompose identically at `context/_participation`, `_other_participation` (ENTRY), and inside `_feeder_audit` — a single implementation surface instead of a `ctx/` special case beside a `_` general case.
 - **Consistent with ADR 0015's own reasoning.** ADR 0015 chose `ctx/` for the scalar fields because that was the SDK's *already-emitted* spelling and the ITS-documented one; here the already-documented, reference-emitted spelling is the underscore form. Both decisions preserve the emitted surface consumers can already rely on and admit the other spelling only as input.
 - **Negative — the ITS `ctx/` sketch is not honoured on input.** A hand-authored payload using `ctx/participation…` is refused. Accepted: no known producer emits it, the refusal is loud and typed, and the alias path stays open.

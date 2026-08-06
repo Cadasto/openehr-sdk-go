@@ -490,7 +490,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
     tests:
       - openehr/serialize/simplified/simplified_test.go
       - testkit/probes/serialize/probe_076_simplified_round_trip.go
@@ -842,7 +842,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-24-template-instance-example-generator.md
       - docs/plans/archive/2026-06-19-realworld-opt-synthesis.md
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
     # Two RM invariants the generic example synthesiser used to violate were
     # closed from the REQ-053/REQ-140 PR reviews (2026-08-05), both because an
     # RM-invalid generated instance is also unrepresentable in FLAT:
@@ -1436,7 +1436,7 @@ requirements:
       # PROBE-086 — the census pins that move in step with each landed family.
       - testkit/conformance/webtemplate/runner_test.go
     plans:
-      - docs/plans/2026-08-05-flat-rm-attributes.md
+      - docs/plans/archive/2026-08-05-flat-rm-attributes.md
 
   # --- Registry-coverage backfill: index every REQ.md id (spec-check enforces completeness).
   # status stays `draft` per the v0 convention; promotion to `stable` is a separate decision.
