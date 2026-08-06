@@ -409,18 +409,15 @@ func parseTime(s string) (timeParts, error) {
 		return p, errors.New("empty time")
 	}
 	// Strip timezone suffix.
-	switch {
-	case strings.HasSuffix(s, "Z"):
+	if base, ok := strings.CutSuffix(s, "Z"); ok {
 		p.tz, p.tzKnown = "Z", true
-		s = s[:len(s)-1]
-	default:
-		if i := strings.IndexByte(s, '+'); i >= 0 {
-			p.tz, p.tzKnown = s[i:], true
-			s = s[:i]
-		} else if i := strings.LastIndexByte(s, '-'); i > 0 {
-			p.tz, p.tzKnown = s[i:], true
-			s = s[:i]
-		}
+		s = base
+	} else if base, tz, ok := strings.Cut(s, "+"); ok {
+		p.tz, p.tzKnown = "+"+tz, true
+		s = base
+	} else if i := strings.LastIndexByte(s, '-'); i > 0 {
+		p.tz, p.tzKnown = s[i:], true
+		s = s[:i]
 	}
 	fields := strings.Split(s, ":")
 	if len(fields) == 0 || len(fields) > 3 {
@@ -451,20 +448,21 @@ func parseTime(s string) (timeParts, error) {
 
 func parseDuration(s string) (durationParts, error) {
 	var p durationParts
-	if strings.HasPrefix(s, "-") {
+	if rest, ok := strings.CutPrefix(s, "-"); ok {
 		p.neg = true
-		s = s[1:]
-	} else if strings.HasPrefix(s, "+") {
-		s = s[1:]
+		s = rest
+	} else if rest, ok := strings.CutPrefix(s, "+"); ok {
+		s = rest
 	}
-	if !strings.HasPrefix(s, "P") {
+	rest, ok := strings.CutPrefix(s, "P")
+	if !ok {
 		return p, fmt.Errorf("bad duration %q (no 'P')", s)
 	}
-	s = s[1:]
+	s = rest
 	inTime := false
 	num := ""
 	sawComponent := false
-	for i := 0; i < len(s); i++ {
+	for i := range s {
 		c := s[i]
 		switch {
 		case c == 'T':

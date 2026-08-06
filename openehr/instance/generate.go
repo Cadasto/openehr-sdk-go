@@ -459,7 +459,7 @@ func (g *generator) materialiseMultiple(
 			// child at least once. Drops to a per-child loop body of
 			// `1` which is the minimal-yet-complete contract.
 		}
-		for i := 0; i < childCount; i++ {
+		for range childCount {
 			if upperBound >= 0 && total >= upperBound {
 				return nil
 			}

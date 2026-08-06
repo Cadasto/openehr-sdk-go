@@ -371,8 +371,9 @@ func ParseArchetypeID(s string) (ArchetypeID, error) {
 // Name returns the terminology name — the part before "(" when a
 // parenthesised version is present, else the whole value. REQ-120.
 func (t *TerminologyID) Name() string {
-	if i := strings.IndexByte(t.Value, '('); i >= 0 && strings.HasSuffix(t.Value, ")") {
-		return t.Value[:i]
+	name, ver, ok := strings.Cut(t.Value, "(")
+	if ok && strings.HasSuffix(ver, ")") {
+		return name
 	}
 	return t.Value
 }
@@ -380,11 +381,15 @@ func (t *TerminologyID) Name() string {
 // VersionID returns the version inside the parentheses, or "" when no
 // "(version)" is present. REQ-120.
 func (t *TerminologyID) VersionID() string {
-	i := strings.IndexByte(t.Value, '(')
-	if i < 0 || !strings.HasSuffix(t.Value, ")") {
+	_, ver, ok := strings.Cut(t.Value, "(")
+	if !ok {
 		return ""
 	}
-	return t.Value[i+1 : len(t.Value)-1]
+	ver, ok = strings.CutSuffix(ver, ")")
+	if !ok {
+		return ""
+	}
+	return ver
 }
 
 // ParseTerminologyID validates s against the TERMINOLOGY_ID lexical form

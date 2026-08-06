@@ -160,18 +160,19 @@ func parsePath(path string) ([]segment, error) {
 
 // parseSegment parses one "attr" or "attr[predicate]" step.
 func parseSegment(raw string) (segment, error) {
-	i := strings.IndexByte(raw, '[')
-	if i < 0 {
+	attr, pred, ok := strings.Cut(raw, "[")
+	if !ok {
 		return segment{attr: raw}, nil
 	}
-	if !strings.HasSuffix(raw, "]") {
+	pred, ok = strings.CutSuffix(pred, "]")
+	if !ok {
 		return segment{}, fmt.Errorf("%w: unterminated predicate in %q", ErrPathSyntax, raw)
 	}
-	attr := strings.TrimSpace(raw[:i])
+	attr = strings.TrimSpace(attr)
 	if attr == "" {
 		return segment{}, fmt.Errorf("%w: predicate without attribute in %q", ErrPathSyntax, raw)
 	}
-	nodeID, name := parsePredicate(raw[i+1 : len(raw)-1])
+	nodeID, name := parsePredicate(pred)
 	return segment{attr: attr, nodeID: nodeID, name: name}, nil
 }
 
@@ -196,7 +197,8 @@ func parsePredicate(s string) (nodeID, name string) {
 		case p == "":
 			continue
 		case strings.ContainsRune(p, '='): // name/value='x' or name='x'
-			name = unquote(strings.TrimSpace(p[strings.IndexByte(p, '=')+1:]))
+			_, val, _ := strings.Cut(p, "=")
+			name = unquote(strings.TrimSpace(val))
 		case isQuoted(p):
 			name = unquote(p)
 		default:
