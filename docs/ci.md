@@ -17,7 +17,7 @@ Jobs run in parallel. All use Go **1.26.x** (`actions/setup-go@v6` with module c
 |---|---|---|
 | **Verify** | `fmt-check`, `mod-tidy-check`, `codegen-verify`, `aqlgen-verify`, `vet`, `spec-check`, `flat-conformance-verify`, `build` | Static checks and compile-all without running tests |
 | **Test** | `test` | Unit tests; `test` already depends on `codegen-verify` and `aqlgen-verify` |
-| **Lint** | (via `golangci-lint-action` v2.11.4, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
+| **Lint** | (via `golangci-lint-action` v2.12.2, config [`.golangci.yml`](../.golangci.yml)) | Same rules as `make lint` / `make lint-ci` |
 | **Race** | `test-race` | **Push to `main` only** — `-race` is slower; catches data races in `typereg` and codecs |
 
 PRs do not run the **Race** job. Merge to `main` triggers it on the post-merge push.
@@ -59,7 +59,7 @@ Run `make help` for the full grouped list. Common targets:
 ### Lint configuration
 
 - Config: [`.golangci.yml`](../.golangci.yml)
-- Pin: `golangci/golangci-lint:v2.11.4` (Makefile `LINT_IMAGE` and GitHub Action `version`)
+- Pin: `golangci/golangci-lint:v2.12.2` (Makefile `LINT_IMAGE` and GitHub Action `version`)
 - Generated files (the `// Code generated … DO NOT EDIT.` set) are skipped via `exclusions: generated: lax` in `.golangci.yml`
 
 ## Dependency updates

@@ -1,4 +1,4 @@
-# golangci-lint v2 — keep in sync with LINT_IMAGE in the Makefile (v2.11.4)
+# golangci-lint v2 — keep in sync with LINT_IMAGE in the Makefile (v2.12.2)
 # and the go-coding plugin reference (references/golangci.v2.yml).
 version: "2"
 
