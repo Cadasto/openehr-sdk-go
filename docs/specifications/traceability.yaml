@@ -106,12 +106,13 @@ requirements:
     implementation: landed
     # transport/ is in scope, not just auth/: the `Authorization: <Type> <Value>`
     # emission rule, the empty-Type-means-Bearer default and the zero-Token
-    # suppression are REQ-060's, implemented in transport.Client.applyAuth.
+    # suppression are REQ-060's, implemented in transport.Client.plumbHeaders.
     # The default and the suppression were unasserted at the transport layer
     # until 2026-08-06 (only covered incidentally, by a per-request-override
     # test), and the suppression rule lived only in a Go doc comment — both are
     # now stated in auth.md § REQ-060 and owned by
-    # TestDoAuthorizationSchemeForwardedVerbatim.
+    # TestDoAuthorizationSchemeForwardedVerbatim, which also pins the documented
+    # default token source (AnonymousTokenSource on an unconfigured client).
     packages: [auth, transport]
     tests:
       - auth/tokensource_test.go
@@ -490,6 +491,20 @@ requirements:
     # Still deferred: `.schema` media types on input, ACTIVITY
     # action_archetype_id (STRING — the last unmapped leaf type on encode), and
     # reused-sibling FLAT (the REQ-116 residual, fail-loud in both directions).
+    #
+    # Tidied 2026-08-06 (no behaviour change; the REQ-140 block carries the
+    # mirror note). The STRUCTURED `"|"` member gained RFC-2119 force — it was
+    # described, not required, in a paragraph where every other obligation
+    # carried a keyword: MUST on the object form, on the empty-suffix reading in
+    # both interconversion directions, and on the bare-scalar rule for a leaf
+    # that cannot collide, plus the not-corpus-pinned standing (ADR 0014 governs
+    # if a reference spelling appears) that deviations.md already claimed
+    # wire.md recorded. The three LEAF datatype suffix sets this REQ's comment
+    # has described since PR 2 -- DV_PARSABLE, DV_MULTIMEDIA, DV_INTERVAL<T> --
+    # moved out of § REQ-140's table into wire.md § REQ-053 § Leaf datatypes,
+    # so the normative home now agrees with this block, deviations.md and the
+    # test citations; § REQ-140 keeps a pointer and retains the two behavioural
+    # rules that govern the underscore positions too.
     implementation: landed
     adrs:
       - docs/adr/0015-flat-metadata-spelling.md

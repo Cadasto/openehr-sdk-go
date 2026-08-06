@@ -207,25 +207,29 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 }
 
 // TestDoAuthorizationSchemeForwardedVerbatim — REQ-060. transport/ emits
-// `Authorization: <Type> <Value>` without inspecting either half, and an empty
-// Type means Bearer. Every other transport auth test spells Type explicitly, so
-// the empty-Type default was only ever covered incidentally (by
-// TestDoPerRequestTokenSourceOverride, whose subject is the ctx override) —
-// setting a Type there, a natural tidy-up, would have retired the rule silently.
-// The non-standard scheme case pins "without inspection": transport/ must not
-// hold an allowlist of schemes.
+// `Authorization: <Type> <Value>` without inspecting either half, an empty Type
+// means Bearer, and a zero Token suppresses the header. The two transport tests
+// that did exercise an empty Type do it incidentally — TestDoNoAuthSuppresses-
+// Authorization sets NoAuth, so no header is emitted at all, and
+// TestDoPerRequestTokenSourceOverride's subject is the ctx override, so spelling
+// a Type there (a natural tidy-up) would have retired the default silently.
+// The DPoP case pins "without inspection": transport/ holds no scheme allowlist.
+// A nil src means the option is omitted, which pins the documented default —
+// auth.AnonymousTokenSource, hence no header on an unconfigured client.
 func TestDoAuthorizationSchemeForwardedVerbatim(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
 		name string
-		tok  auth.Token
+		src  auth.TokenSource
 		want string
 	}{
-		{"empty type defaults to Bearer", auth.Token{Value: "tok-1"}, "Bearer tok-1"},
-		{"explicit Bearer", auth.Token{Value: "tok-2", Type: auth.TokenTypeBearer}, "Bearer tok-2"},
-		{"Basic rides the generic rule", auth.Token{Value: "dXNlcjpwdw==", Type: auth.TokenTypeBasic}, "Basic dXNlcjpwdw=="},
-		{"unknown scheme forwarded uninspected", auth.Token{Value: "tok-3", Type: "DPoP"}, "DPoP tok-3"},
-		{"zero token emits no header", auth.Token{}, ""},
+		{"empty type defaults to Bearer", auth.StaticTokenSource(auth.Token{Value: "tok-1"}), "Bearer tok-1"},
+		{"explicit Bearer", auth.StaticTokenSource(auth.Token{Value: "tok-2", Type: auth.TokenTypeBearer}), "Bearer tok-2"},
+		{"Basic rides the generic rule", auth.StaticTokenSource(auth.Token{Value: "dXNlcjpwdw==", Type: auth.TokenTypeBasic}), "Basic dXNlcjpwdw=="},
+		{"unknown scheme forwarded uninspected", auth.StaticTokenSource(auth.Token{Value: "tok-3", Type: "DPoP"}), "DPoP tok-3"},
+		{"zero token emits no header", auth.StaticTokenSource(auth.Token{}), ""},
+		{"AnonymousTokenSource emits no header", auth.AnonymousTokenSource(), ""},
+		{"unconfigured client defaults to anonymous", nil, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -235,11 +239,14 @@ func TestDoAuthorizationSchemeForwardedVerbatim(t *testing.T) {
 				_, _ = w.Write([]byte(`{}`))
 			}))
 			defer srv.Close()
-			c, _ := New(
-				newCatalog(t, srv),
-				WithHTTPClient(srv.Client()),
-				WithTokenSource(auth.StaticTokenSource(tc.tok)),
-			)
+			opts := []Option{WithHTTPClient(srv.Client())}
+			if tc.src != nil {
+				opts = append(opts, WithTokenSource(tc.src))
+			}
+			c, err := New(newCatalog(t, srv), opts...)
+			if err != nil {
+				t.Fatal(err)
+			}
 			if _, err := c.Do(t.Context(), &Request{Path: "/ehr"}); err != nil {
 				t.Fatal(err)
 			}
