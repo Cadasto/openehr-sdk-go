@@ -461,8 +461,8 @@ func TestSourceMapsOAuth2Error(t *testing.T) {
 	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
 		t.Errorf("expected ErrTokenExchangeFailed, got %v", err)
 	}
-	var oa *auth.OAuth2Error
-	if !errors.As(err, &oa) || oa.Code != "invalid_grant" {
+	oa, ok := errors.AsType[*auth.OAuth2Error](err)
+	if !ok || oa.Code != "invalid_grant" {
 		t.Errorf("expected invalid_grant, got %v", oa)
 	}
 }

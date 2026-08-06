@@ -283,8 +283,8 @@ func TestDoMapsErrorEnvelopes(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error")
 			}
-			var we *WireError
-			if !errors.As(err, &we) {
+			we, ok := errors.AsType[*WireError](err)
+			if !ok {
 				t.Fatalf("expected *WireError, got %T", err)
 			}
 			if we.StatusCode != tc.status {
@@ -712,8 +712,8 @@ func TestWireErrorDefaultOmitsMessageAndRawBody(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	var we *WireError
-	if !errors.As(err, &we) {
+	we, ok := errors.AsType[*WireError](err)
+	if !ok {
 		t.Fatalf("expected *WireError, got %T", err)
 	}
 
@@ -768,8 +768,8 @@ func TestWireErrorOptInPreservesMessageAndRawBody(t *testing.T) {
 		t.Fatal("expected error")
 	}
 
-	var we *WireError
-	if !errors.As(err, &we) {
+	we, ok := errors.AsType[*WireError](err)
+	if !ok {
 		t.Fatalf("expected *WireError, got %T", err)
 	}
 

@@ -425,8 +425,8 @@ func (s *Source) Token(ctx context.Context) (auth.Token, error) {
 		// return ErrReauthRequired without issuing another doomed POST.
 		// On transient failures (5xx, network, ctx) retain both so callers
 		// may retry (REQ-063).
-		var ex2 *auth.ExchangeError
-		if errors.As(err, &ex2) && ex2.Terminal() {
+		ex2, ok := errors.AsType[*auth.ExchangeError](err)
+		if ok && ex2.Terminal() {
 			s.refresh = ""
 			s.cur = auth.Token{}
 			err = &auth.ExchangeError{Sentinel: auth.ErrReauthRequired, Inner: err}

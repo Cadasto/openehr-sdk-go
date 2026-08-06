@@ -80,8 +80,8 @@ func Probe041CatalogRefreshOn401(ctx context.Context, cassetteBody []byte) (Resu
 		r.Detail = "Refresh against a 401 backend MUST surface an error, got nil"
 		return r, nil
 	}
-	var derr *discovery.DiscoveryError
-	if !errors.As(refreshErr, &derr) {
+	derr, ok := errors.AsType[*discovery.DiscoveryError](refreshErr)
+	if !ok {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("Refresh error = %v; want *discovery.DiscoveryError", refreshErr)
 		return r, nil

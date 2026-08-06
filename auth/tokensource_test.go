@@ -187,11 +187,11 @@ func TestExchangeError(t *testing.T) {
 	if !errors.Is(e, inner) {
 		t.Error("errors.Is(_, inner) failed")
 	}
-	var got *OAuth2Error
-	if !errors.As(e, &got) {
-		t.Error("errors.As(_, &OAuth2Error) failed")
+	got, ok := errors.AsType[*OAuth2Error](e)
+	if !ok {
+		t.Error("errors.AsType[*OAuth2Error] failed")
 	}
 	if got != oa {
-		t.Errorf("errors.As returned %v, want %v", got, oa)
+		t.Errorf("errors.AsType returned %v, want %v", got, oa)
 	}
 }

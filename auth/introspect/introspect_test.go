@@ -125,8 +125,8 @@ func TestIntrospectNonTwoXX(t *testing.T) {
 	if !errors.Is(err, auth.ErrTokenExchangeFailed) {
 		t.Errorf("expected errors.Is ErrTokenExchangeFailed, got %v", err)
 	}
-	var ex *auth.ExchangeError
-	if !errors.As(err, &ex) || ex.StatusCode != http.StatusUnauthorized {
+	ex, ok := errors.AsType[*auth.ExchangeError](err)
+	if !ok || ex.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected *auth.ExchangeError status 401, got %v", err)
 	}
 }

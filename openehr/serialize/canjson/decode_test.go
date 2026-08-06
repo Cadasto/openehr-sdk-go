@@ -124,8 +124,8 @@ func TestDecodeErrorCarriesPath(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for bogus _type inside content[0]")
 	}
-	var de *canjson.DecodeError
-	if !errors.As(err, &de) {
+	de, ok := errors.AsType[*canjson.DecodeError](err)
+	if !ok {
 		t.Fatalf("err = %v; want *canjson.DecodeError", err)
 	}
 	if !strings.Contains(de.Path, "content") {

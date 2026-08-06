@@ -68,8 +68,8 @@ type CodedTextItem struct {
 }
 
 // WireError is the typed wire-level error returned to consumers. Use
-// errors.As(err, &w) to extract; errors.Is(err, transport.ErrXxx) to
-// classify.
+// errors.AsType[*transport.WireError](err) to extract; errors.Is(err,
+// transport.ErrXxx) to classify.
 type WireError struct {
 	// StatusCode is the HTTP status code received.
 	StatusCode int

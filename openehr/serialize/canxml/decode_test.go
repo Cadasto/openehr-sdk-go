@@ -82,8 +82,8 @@ func TestUnmarshalRejectsPrefixedXSIType(t *testing.T) {
 	}
 	// The unresolved, prefixed value MUST reach the registry verbatim —
 	// this is what pins the boundary against a silent prefix strip.
-	var de *canxml.DecodeError
-	if !errors.As(err, &de) {
+	de, ok := errors.AsType[*canxml.DecodeError](err)
+	if !ok {
 		t.Fatalf("err = %v; want *canxml.DecodeError", err)
 	}
 	if de.Type != "ns2:PARTY_SELF" {
@@ -131,8 +131,8 @@ func TestUnmarshalDecodeErrorCarriesPath(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for bogus xsi:type inside content[0]")
 	}
-	var de *canxml.DecodeError
-	if !errors.As(err, &de) {
+	de, ok := errors.AsType[*canxml.DecodeError](err)
+	if !ok {
 		t.Fatalf("err = %v; want *canxml.DecodeError", err)
 	}
 	if !strings.Contains(de.Path, "content") {

@@ -53,7 +53,7 @@ func (e *OAuth2Error) Error() string {
 // ExchangeError wraps a token-exchange or refresh failure with the
 // parsed OAuth2 error (if any), the HTTP status, and the underlying
 // transport error. Detection uses errors.Is against the sentinels above;
-// extraction uses errors.As(err, &ex *auth.ExchangeError).
+// extraction uses errors.AsType[*auth.ExchangeError](err) (or errors.As).
 type ExchangeError struct {
 	// Sentinel is the categorical error class (one of the package
 	// sentinels). errors.Is returns true against this value.
@@ -83,7 +83,7 @@ func (e *ExchangeError) Error() string {
 }
 
 // Unwrap walks the wrapped errors. errors.Is(err, auth.ErrTokenExchangeFailed)
-// and errors.As(err, &oauth *auth.OAuth2Error) both work.
+// and errors.AsType[*auth.OAuth2Error](err) both work.
 func (e *ExchangeError) Unwrap() []error {
 	out := make([]error, 0, 3)
 	if e.Sentinel != nil {
@@ -102,7 +102,8 @@ func (e *ExchangeError) Unwrap() []error {
 // response whose OAuth2 envelope is invalid_grant, invalid_client, or
 // invalid_token. Transient failures (5xx, network, context, unparsed) return
 // false so callers retain the refresh token and may retry (REQ-063). Reach this
-// method via errors.As(err, &ex) rather than a direct type assertion; it is
+// method via errors.AsType[*auth.ExchangeError](err) rather than a direct
+// type assertion; it is
 // nil-receiver safe.
 func (e *ExchangeError) Terminal() bool {
 	if e == nil || e.StatusCode < 400 || e.StatusCode >= 500 || e.OAuth2 == nil {

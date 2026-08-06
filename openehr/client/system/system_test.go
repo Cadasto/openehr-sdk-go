@@ -205,8 +205,8 @@ func TestCapabilitiesSurfacesWireError(t *testing.T) {
 			if !errors.Is(err, tc.sentinel) {
 				t.Errorf("expected errors.Is %v, got %v", tc.sentinel, err)
 			}
-			var we *transport.WireError
-			if !errors.As(err, &we) || we.OpenEHR == nil {
+			we, ok := errors.AsType[*transport.WireError](err)
+			if !ok || we.OpenEHR == nil {
 				t.Errorf("expected WireError with OpenEHR detail, got %v", err)
 			}
 		})

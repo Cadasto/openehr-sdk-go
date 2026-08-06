@@ -233,8 +233,8 @@ func TestDeleteTemplateMethodNotAllowed(t *testing.T) {
 	defer srv.Close()
 	_, err := definition.DeleteTemplate(t.Context(), newClient(t, srv), "x", definition.FormatADL14)
 	// Server returns 405 (no SDK sentinel for that — surfaces as WireError).
-	var we *transport.WireError
-	if !errors.As(err, &we) || we.StatusCode != http.StatusMethodNotAllowed {
+	we, ok := errors.AsType[*transport.WireError](err)
+	if !ok || we.StatusCode != http.StatusMethodNotAllowed {
 		t.Errorf("expected WireError with 405, got %v", err)
 	}
 }

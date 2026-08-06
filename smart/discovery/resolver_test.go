@@ -92,8 +92,8 @@ func TestResolveSpecVersionMismatch(t *testing.T) {
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonSpecVersionMismatch {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonSpecVersionMismatch {
 		t.Fatalf("expected spec_version_mismatch, got %v", err)
 	}
 	if derr.SpecVersionGot != "1.0.3" {
@@ -217,8 +217,8 @@ func TestResolveMissingServiceRequired(t *testing.T) {
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonMissingService {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonMissingService {
 		t.Fatalf("expected missing_service, got %v", err)
 	}
 	if len(derr.MissingServices) != 1 || derr.MissingServices[0] != ServiceIDOpenEHRRest {
@@ -233,8 +233,8 @@ func TestResolveMalformedURL(t *testing.T) {
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonMalformedURL {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonMalformedURL {
 		t.Fatalf("expected malformed_url, got %v", err)
 	}
 }
@@ -246,8 +246,8 @@ func TestResolveParseError(t *testing.T) {
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonParseError {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonParseError {
 		t.Fatalf("expected parse_error, got %v", err)
 	}
 }
@@ -259,8 +259,8 @@ func TestResolveFetchFailedNon2xx(t *testing.T) {
 	defer srv.Close()
 	r := mustResolver(t, WithHTTPClient(srv.Client()))
 	_, err := r.Resolve(t.Context(), srv.URL)
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonFetchFailed {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonFetchFailed {
 		t.Fatalf("expected fetch_failed, got %v", err)
 	}
 }
@@ -271,8 +271,8 @@ func TestResolveInsecureIssuerRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = r.Resolve(t.Context(), "http://insecure.example.com")
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonInsecureURL {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonInsecureURL {
 		t.Fatalf("expected insecure_url, got %v", err)
 	}
 }
@@ -348,8 +348,8 @@ func TestResolveIssuerMismatch(t *testing.T) {
 	if cat != nil {
 		t.Error("expected nil catalog on issuer mismatch")
 	}
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonIssuerMismatch {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonIssuerMismatch {
 		t.Fatalf("expected issuer_mismatch DiscoveryError, got %v", err)
 	}
 }
@@ -404,8 +404,8 @@ func TestResolveInsecureEndpointRejectedStrict(t *testing.T) {
 	if cat != nil {
 		t.Error("expected nil catalog when endpoint URLs are non-https in strict mode")
 	}
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) || derr.Reason != ReasonInsecureURL {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok || derr.Reason != ReasonInsecureURL {
 		t.Fatalf("expected insecure_url DiscoveryError, got %v", err)
 	}
 }
@@ -584,8 +584,8 @@ func TestResolveSurfacesAuthMetadata_AbsentEndpointsAreNil(t *testing.T) { // RE
 }
 
 func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
-	var derr *DiscoveryError
-	if !errors.As(err, &derr) {
+	derr, ok := errors.AsType[*DiscoveryError](err)
+	if !ok {
 		return false
 	}
 	return derr.Reason == want
