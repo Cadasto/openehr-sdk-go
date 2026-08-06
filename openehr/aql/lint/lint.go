@@ -64,12 +64,7 @@ type Result struct {
 // OK reports whether the result carries no Error-severity issue. Warnings do
 // not make a result not-OK.
 func (r Result) OK() bool {
-	for _, i := range r.Issues {
-		if i.Severity == Error {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(r.Issues, func(i Issue) bool { return i.Severity == Error })
 }
 
 // Options tunes a lint pass. The zero value (or nil) runs the AST-shape
@@ -240,12 +235,9 @@ func namesSelectAlias(p parse.IdentifiedPath, selectAliases map[string]bool) boo
 }
 
 func hasIdentifiableScope(doc *parse.Document) bool {
-	for _, ce := range doc.Classes {
-		if ce.Archetype != "" || ce.ParamArchetype || ce.Version || ce.RMType == "EHR" {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(doc.Classes, func(ce parse.ClassExpr) bool {
+		return ce.Archetype != "" || ce.ParamArchetype || ce.Version || ce.RMType == "EHR"
+	})
 }
 
 // paramIssues runs the Layer-2 parameter-binding checks against a Query's

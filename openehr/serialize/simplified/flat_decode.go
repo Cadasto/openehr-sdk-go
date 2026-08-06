@@ -1892,12 +1892,7 @@ func checkSuffixAllowlist(rmType string, sfx map[string]any) error {
 // leafListOpen reports whether a Web Template leaf constrains an open value-set
 // (any input with listOpen) — the precondition for the |other free-text form.
 func leafListOpen(node *webtemplate.Node) bool {
-	for _, in := range node.Inputs {
-		if in.ListOpen {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(node.Inputs, func(in webtemplate.Input) bool { return in.ListOpen })
 }
 
 // requireSuffix returns sfx[name], or an error if it is absent — a missing

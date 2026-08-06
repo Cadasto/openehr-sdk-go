@@ -98,9 +98,8 @@ func runCase(tc ValidateCase) string {
 	for _, i := range res.Issues {
 		got = append(got, i.Code)
 	}
-	want := append([]string(nil), tc.WantCodes...)
-	if !codesMatch(got, want) {
-		return fmt.Sprintf("codes mismatch: got %v want %v", sortedCopy(got), sortedCopy(want))
+	if !codesMatch(got, tc.WantCodes) {
+		return fmt.Sprintf("codes mismatch: got %v want %v", sortedCopy(got), sortedCopy(tc.WantCodes))
 	}
 	return ""
 }
@@ -109,20 +108,11 @@ func runCase(tc ValidateCase) string {
 // multiset (order-irrelevant equality). Implemented via sorted
 // comparison so the probe stays allocation-light and deterministic.
 func codesMatch(got, want []string) bool {
-	if len(got) != len(want) {
-		return false
-	}
-	g, w := sortedCopy(got), sortedCopy(want)
-	for i := range g {
-		if g[i] != w[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(sortedCopy(got), sortedCopy(want))
 }
 
 func sortedCopy(in []string) []string {
-	out := append([]string(nil), in...)
+	out := slices.Clone(in)
 	slices.Sort(out)
 	return out
 }

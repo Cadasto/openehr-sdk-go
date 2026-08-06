@@ -79,10 +79,10 @@ func TestResolveCassette(t *testing.T) {
 	if rest.BaseURL.String() != "https://api.example.com/openehr/v1" {
 		t.Errorf("base_url = %q", rest.BaseURL.String())
 	}
-	if !containsString(cat.Auth.ResponseTypesSupported, "code") {
+	if !slices.Contains(cat.Auth.ResponseTypesSupported, "code") {
 		t.Errorf("response_types_supported = %v", cat.Auth.ResponseTypesSupported)
 	}
-	if !containsString(cat.Auth.CodeChallengeMethodsSupported, "S256") {
+	if !slices.Contains(cat.Auth.CodeChallengeMethodsSupported, "S256") {
 		t.Errorf("code_challenge_methods_supported = %v", cat.Auth.CodeChallengeMethodsSupported)
 	}
 }
@@ -521,23 +521,23 @@ func TestResolveSurfacesAuthMetadata(t *testing.T) { // REQ-062, REQ-070
 	}
 
 	// --- auth-methods list (may already be surfaced by Phase 1; verify value) ---
-	if !containsString(auth.TokenEndpointAuthMethodsSupported, "private_key_jwt") {
+	if !slices.Contains(auth.TokenEndpointAuthMethodsSupported, "private_key_jwt") {
 		t.Errorf("TokenEndpointAuthMethodsSupported = %v, want [private_key_jwt ...]", auth.TokenEndpointAuthMethodsSupported)
 	}
 
 	// --- token-endpoint signing-alg list (feeds Phase 3b G-3; surface only) ---
-	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "RS384") {
+	if !slices.Contains(auth.TokenEndpointAuthSigningAlgValuesSupported, "RS384") {
 		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
 	}
-	if !containsString(auth.TokenEndpointAuthSigningAlgValuesSupported, "ES384") {
+	if !slices.Contains(auth.TokenEndpointAuthSigningAlgValuesSupported, "ES384") {
 		t.Errorf("TokenEndpointAuthSigningAlgValuesSupported = %v, want [RS384 ES384]", auth.TokenEndpointAuthSigningAlgValuesSupported)
 	}
 
 	// --- id-token signing-alg list (feeds Phase 3e verify allowlist; surface only) ---
-	if !containsString(auth.IDTokenSigningAlgValuesSupported, "RS256") {
+	if !slices.Contains(auth.IDTokenSigningAlgValuesSupported, "RS256") {
 		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
 	}
-	if !containsString(auth.IDTokenSigningAlgValuesSupported, "ES384") {
+	if !slices.Contains(auth.IDTokenSigningAlgValuesSupported, "ES384") {
 		t.Errorf("IDTokenSigningAlgValuesSupported = %v, want [RS256 ES384]", auth.IDTokenSigningAlgValuesSupported)
 	}
 }
@@ -589,8 +589,4 @@ func asDiscoveryError(err error, want DiscoveryErrorReason) bool {
 		return false
 	}
 	return derr.Reason == want
-}
-
-func containsString(s []string, v string) bool {
-	return slices.Contains(s, v)
 }

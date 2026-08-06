@@ -24,15 +24,6 @@ func compileVitalSigns(t *testing.T) *templatecompile.Compiled {
 	return c
 }
 
-func hasCode(r validation.Result, code string) bool {
-	for _, i := range r.Issues {
-		if i.Code == code {
-			return true
-		}
-	}
-	return false
-}
-
 // ValidateAQL surfaces a syntax failure as code "aql_syntax", which Issue.Err
 // maps to the ErrAQLSyntax sentinel (REQ-109 → REQ-102 bridge).
 func TestValidateAQL_Syntax(t *testing.T) {
@@ -73,7 +64,7 @@ func TestValidateAQL_ArchetypeNotInTemplate(t *testing.T) {
 	c := compileVitalSigns(t)
 	q := aql.NewQuery("SELECT o FROM OBSERVATION o[openEHR-EHR-OBSERVATION.lab_result.v1]")
 	r := validation.ValidateAQL(q, c)
-	if !hasCode(r, "aql_archetype_not_in_template") {
+	if !containsCode(r.Issues, "aql_archetype_not_in_template") {
 		t.Fatalf("want aql_archetype_not_in_template; issues = %+v", r.Issues)
 	}
 }
@@ -99,7 +90,7 @@ func TestValidateAQL_WarningOnlyIsOK(t *testing.T) {
 	if !r.OK {
 		t.Fatalf("warning-only result must be OK, got %+v", r.Issues)
 	}
-	if !hasCode(r, "aql_from_archetype") {
+	if !containsCode(r.Issues, "aql_from_archetype") {
 		t.Fatalf("want aql_from_archetype warning present; issues = %+v", r.Issues)
 	}
 	if r.Issues[0].Severity != validation.Warning {
@@ -116,7 +107,7 @@ func TestValidateAQL_UnboundParam(t *testing.T) {
 			"WHERE e/ehr_id/value = $ehr_id",
 	)
 	r := validation.ValidateAQL(q, c)
-	if !hasCode(r, "aql_unbound_param") {
+	if !containsCode(r.Issues, "aql_unbound_param") {
 		t.Fatalf("want aql_unbound_param; issues = %+v", r.Issues)
 	}
 }

@@ -330,12 +330,9 @@ func collapseElement(el *templatecompile.CompiledNode, elPath string, attr *temp
 // hasTextAlternative reports whether any of the value alternatives is a
 // plain DV_TEXT (the "other, please specify" free-text option).
 func hasTextAlternative(alts []*templatecompile.CompiledNode) bool {
-	for _, a := range alts {
-		if a.RMTypeName() == "DV_TEXT" {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(alts, func(a *templatecompile.CompiledNode) bool {
+		return a.RMTypeName() == "DV_TEXT"
+	})
 }
 
 // newNode builds the common fields of a WebTemplate node from a compiled node.
