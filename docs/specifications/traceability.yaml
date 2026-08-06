@@ -104,7 +104,18 @@ requirements:
     canonical: docs/specifications/auth.md#req-060
     status: draft
     implementation: landed
-    packages: [auth]
+    # transport/ is in scope, not just auth/: the `Authorization: <Type> <Value>`
+    # emission rule, the empty-Type-means-Bearer default and the zero-Token
+    # suppression are REQ-060's, implemented in transport.Client.applyAuth.
+    # The default and the suppression were unasserted at the transport layer
+    # until 2026-08-06 (only covered incidentally, by a per-request-override
+    # test), and the suppression rule lived only in a Go doc comment — both are
+    # now stated in auth.md § REQ-060 and owned by
+    # TestDoAuthorizationSchemeForwardedVerbatim.
+    packages: [auth, transport]
+    tests:
+      - auth/tokensource_test.go
+      - transport/client_test.go
 
   - id: REQ-066
     title: Caller attribution

@@ -206,6 +206,51 @@ func TestDoPerRequestTokenSourceOverride(t *testing.T) {
 	}
 }
 
+// TestDoAuthorizationSchemeForwardedVerbatim — REQ-060. transport/ emits
+// `Authorization: <Type> <Value>` without inspecting either half, and an empty
+// Type means Bearer. Every other transport auth test spells Type explicitly, so
+// the empty-Type default was only ever covered incidentally (by
+// TestDoPerRequestTokenSourceOverride, whose subject is the ctx override) —
+// setting a Type there, a natural tidy-up, would have retired the rule silently.
+// The non-standard scheme case pins "without inspection": transport/ must not
+// hold an allowlist of schemes.
+func TestDoAuthorizationSchemeForwardedVerbatim(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		tok  auth.Token
+		want string
+	}{
+		{"empty type defaults to Bearer", auth.Token{Value: "tok-1"}, "Bearer tok-1"},
+		{"explicit Bearer", auth.Token{Value: "tok-2", Type: auth.TokenTypeBearer}, "Bearer tok-2"},
+		{"Basic rides the generic rule", auth.Token{Value: "dXNlcjpwdw==", Type: auth.TokenTypeBasic}, "Basic dXNlcjpwdw=="},
+		{"unknown scheme forwarded uninspected", auth.Token{Value: "tok-3", Type: "DPoP"}, "DPoP tok-3"},
+		{"zero token emits no header", auth.Token{}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			var captured string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured = r.Header.Get("Authorization")
+				_, _ = w.Write([]byte(`{}`))
+			}))
+			defer srv.Close()
+			c, _ := New(
+				newCatalog(t, srv),
+				WithHTTPClient(srv.Client()),
+				WithTokenSource(auth.StaticTokenSource(tc.tok)),
+			)
+			if _, err := c.Do(t.Context(), &Request{Path: "/ehr"}); err != nil {
+				t.Fatal(err)
+			}
+			if captured != tc.want {
+				t.Errorf("Authorization = %q, want %q (REQ-060: <Type> <Value>, empty Type = %s)",
+					captured, tc.want, auth.TokenTypeBearer)
+			}
+		})
+	}
+}
+
 func TestDoBasicAuthAuthorization(t *testing.T) {
 	var captured string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

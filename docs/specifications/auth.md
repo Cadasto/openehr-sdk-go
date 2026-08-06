@@ -62,7 +62,7 @@ type TokenSource interface {
 Rules:
 
 - Every authenticated request path **MUST** acquire its bearer through a `TokenSource`. No package outside `auth/<provider>/` may construct a `Token` directly.
-- `Token.Value` is opaque to `transport/`; transports forward it as `Authorization: <Type> <Value>` without inspection. When `Type` is empty, `transport/` treats it as `Bearer`.
+- `Token.Value` is opaque to `transport/`: transports **MUST** forward it as `Authorization: <Type> <Value>` without inspecting either half — there is no scheme allowlist, so a scheme this SDK has no provider for (`DPoP`, …) reaches the wire verbatim. When `Type` is empty, `transport/` **MUST** treat it as `Bearer`. A **zero** `Token` (no value and no type — `auth.Token.IsZero`) is the anonymous case and **MUST** suppress the `Authorization` header entirely rather than emit an empty scheme or an empty credential; `auth.AnonymousTokenSource` is the sanctioned way to ask for it, and it is `transport/`'s default token source.
 - A `TokenSource` **MAY** be stateful (caching, refresh) but **MUST** be safe for concurrent use (REQ-026).
 
 ### Provider sub-packages (REQ-012)
