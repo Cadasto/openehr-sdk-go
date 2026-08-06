@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -334,21 +335,19 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 	if v, ok := CallerAttributionFromContext(ctx); ok {
 		attr = v
 	}
-	if !attr.IsEmpty() {
-		if v := attr.HeaderJSON(); v != "" {
-			httpReq.Header.Set(c.cfg.callerAttributionHeader, v)
-			// Also surface on the active span so OTel-driven audit
-			// reaches a destination beyond the wire (REQ-066).
-			span := trace.SpanFromContext(ctx)
-			if attr.AgentID != "" {
-				span.SetAttributes(attribute.String("caller.agent_id", attr.AgentID))
-			}
-			if attr.ModelProvider != "" {
-				span.SetAttributes(attribute.String("caller.model_provider", attr.ModelProvider))
-			}
-			for k, val := range attr.Attributes {
-				span.SetAttributes(attribute.String("caller."+k, val))
-			}
+	if v := attr.HeaderJSON(); v != "" {
+		httpReq.Header.Set(c.cfg.callerAttributionHeader, v)
+		// Also surface on the active span so OTel-driven audit
+		// reaches a destination beyond the wire (REQ-066).
+		span := trace.SpanFromContext(ctx)
+		if attr.AgentID != "" {
+			span.SetAttributes(attribute.String("caller.agent_id", attr.AgentID))
+		}
+		if attr.ModelProvider != "" {
+			span.SetAttributes(attribute.String("caller.model_provider", attr.ModelProvider))
+		}
+		for k, val := range attr.Attributes {
+			span.SetAttributes(attribute.String("caller."+k, val))
 		}
 	}
 
@@ -370,10 +369,7 @@ func (c *Client) plumbHeaders(ctx context.Context, req *Request, httpReq *http.R
 			return fmt.Errorf("transport: acquire token: %w", err)
 		}
 		if !tok.IsZero() {
-			typ := tok.Type
-			if typ == "" {
-				typ = "Bearer"
-			}
+			typ := cmp.Or(tok.Type, auth.TokenTypeBearer)
 			httpReq.Header.Set("Authorization", typ+" "+tok.Value)
 		}
 	}
@@ -460,8 +456,8 @@ func decodeOpenEHRError(body []byte) (*OpenEHRErrorDetail, bool) {
 // isWire401 reports whether err is a *WireError whose StatusCode is 401.
 // Used by the opt-in 401→reauth guard in Do (REQ-063).
 func isWire401(err error) bool {
-	var we *WireError
-	return errors.As(err, &we) && we.StatusCode == 401
+	we, ok := errors.AsType[*WireError](err)
+	return ok && we.StatusCode == 401
 }
 
 // shouldRetry consults the configured RetryPolicy. Network errors are
@@ -477,8 +473,7 @@ func (c *Client) shouldRetry(req *Request, resp *Response, err error, attempt in
 	if err != nil {
 		// A *WireError carries a status — defer to the status-based
 		// retriable check so RetriableStatus is the single gate.
-		var we *WireError
-		if errors.As(err, &we) {
+		if we, ok := errors.AsType[*WireError](err); ok {
 			return c.cfg.retry.retriable(req.effectiveMethod(), we.StatusCode)
 		}
 		// Token-source errors that are deterministically terminal (the config

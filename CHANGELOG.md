@@ -16,6 +16,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **Generated compositions satisfy `Setting_valid` and `Basic_validity` (REQ-107).** `instance.Generate` now pins an openEHR-coded `setting` default and fills an unconstrained `PARTY_PROXY` with `PARTY_SELF`, changing the `subject` of every generated ENTRY.
 - **AQL `SELECT TOP` carrier and literal source text (REQ-118, PROBE-087/088).** The deprecated `SELECT TOP n` clause now parses, emits and builds, a projected literal carries its source text, and two lint codes flag `TOP` + `LIMIT`.
 - **Underscore-prefixed RM attributes in FLAT/STRUCTURED (REQ-140, REQ-053, ADR 0016, PROBE-089).** The simplified codecs carry the whole `_`-prefixed RM attribute grammar and the remaining datatype leaves, DV_SCALE included, taking upstream FLAT parity from 19.7% to 80.4%.
+- **Go idiom modernization (no API or spec change).** A tree-wide pass onto current stdlib idioms, fixing an XML prologue scan that could pick the wrong root type and a nondeterministic FLAT encode diagnostic.
 
 ## [0.18.0] - 2026-08-05
 

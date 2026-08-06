@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -869,21 +870,13 @@ func mustCompileSyntheticOPT(t *testing.T, xml string) *templatecompile.Compiled
 }
 
 func containsCode(issues []validation.Issue, code string) bool {
-	for _, i := range issues {
-		if i.Code == code {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(issues, func(i validation.Issue) bool { return i.Code == code })
 }
 
 func containsIssue(issues []validation.Issue, path, code string) bool {
-	for _, i := range issues {
-		if i.Path == path && i.Code == code {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(issues, func(i validation.Issue) bool {
+		return i.Path == path && i.Code == code
+	})
 }
 
 const singleAttributeSlotOPT = `<?xml version="1.0" encoding="utf-8"?>

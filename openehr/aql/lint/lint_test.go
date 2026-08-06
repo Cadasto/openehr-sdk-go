@@ -47,12 +47,7 @@ func codes(r lint.Result) []string {
 }
 
 func has(r lint.Result, code string) bool {
-	for _, i := range r.Issues {
-		if i.Code == code {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(r.Issues, func(i lint.Issue) bool { return i.Code == code })
 }
 
 // --- Layer 1: syntax / empty -------------------------------------------------

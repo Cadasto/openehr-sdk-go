@@ -5,7 +5,7 @@ package webtemplate_test
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 
@@ -167,7 +167,7 @@ func assertInputParity(t *testing.T, stem string) {
 		}
 		mismatch = append(mismatch, fmt.Sprintf("%s\n    ref:  [%s]\n    ours: [%s]", p, rs, os))
 	}
-	sort.Strings(mismatch)
+	slices.Sort(mismatch)
 
 	t.Logf("INPUT PARITY: compared=%d matched=%d mismatch=%d", len(refInputs), matched, len(mismatch))
 	if len(mismatch) > 0 {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -278,9 +279,7 @@ func buildSegments(node *tcimpl.CompiledNode) ([]pathSegment, error) {
 		segs = append(segs, seg)
 	}
 	// Reverse — collected child→root, need root→child.
-	for i, j := 0, len(segs)-1; i < j; i, j = i+1, j-1 {
-		segs[i], segs[j] = segs[j], segs[i]
-	}
+	slices.Reverse(segs)
 	return segs, nil
 }
 

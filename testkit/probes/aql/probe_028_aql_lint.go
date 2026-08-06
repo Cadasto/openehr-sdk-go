@@ -83,16 +83,7 @@ func runLintCase(tc LintCase) string {
 
 // codesMatch reports multiset (order-irrelevant) equality of got and want.
 func codesMatch(got, want []string) bool {
-	if len(got) != len(want) {
-		return false
-	}
-	g, w := sortedCopy(got), sortedCopy(want)
-	for i := range g {
-		if g[i] != w[i] {
-			return false
-		}
-	}
-	return true
+	return slices.Equal(sortedCopy(got), sortedCopy(want))
 }
 
 func sortedCopy(in []string) []string {

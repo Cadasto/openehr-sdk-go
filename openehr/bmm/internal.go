@@ -3,18 +3,14 @@ package bmm
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"slices"
 )
 
 // sortedKeys returns the keys of m in lexicographic order. Used to
 // produce stable JSON output for polymorphic maps.
 func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	return slices.Sorted(maps.Keys(m))
 }
 
 // strictUnmarshal decodes raw into v with DisallowUnknownFields = false

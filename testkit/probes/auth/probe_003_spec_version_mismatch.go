@@ -36,8 +36,8 @@ func Probe003SpecVersionMismatch(ctx context.Context, mismatchedCassette []byte)
 		r.Detail = "Resolve accepted an incompatible spec_version; want spec_version_mismatch"
 		return r, nil
 	}
-	var de *discovery.DiscoveryError
-	if !errors.As(err, &de) || de.Reason != discovery.ReasonSpecVersionMismatch {
+	de, ok := errors.AsType[*discovery.DiscoveryError](err)
+	if !ok || de.Reason != discovery.ReasonSpecVersionMismatch {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("error %v is not DiscoveryError(spec_version_mismatch)", err)
 		return r, nil

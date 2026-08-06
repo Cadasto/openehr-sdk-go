@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"testing"
 )
@@ -117,7 +117,7 @@ func TestLoad_eachBMM(t *testing.T) {
 			}
 			for _, pk := range tc.topLevelPkgKeys {
 				if _, ok := s.Packages[pk]; !ok {
-					t.Errorf("expected packages[%q] entry, got keys=%v", pk, mapKeys(s.Packages))
+					t.Errorf("expected packages[%q] entry, got keys=%v", pk, slices.Sorted(maps.Keys(s.Packages)))
 				}
 			}
 		})
@@ -139,7 +139,7 @@ func TestLoad_basePrimitivesIncludeIso8601(t *testing.T) {
 	if !sc.IsAbstract() {
 		t.Errorf("Iso8601_type: expected abstract")
 	}
-	if !contains(sc.Ancestors(), "Temporal") {
+	if !slices.Contains(sc.Ancestors(), "Temporal") {
 		t.Errorf("Iso8601_type.ancestors does not include Temporal: %v", sc.Ancestors())
 	}
 }
@@ -169,7 +169,7 @@ func TestLoad_baseInterfacesAndGenerics(t *testing.T) {
 	if got, want := len(enum.ItemNames), 4; got != want {
 		t.Errorf("VALIDITY_KIND.ItemNames: got %d, want %d", got, want)
 	}
-	if !reflect.DeepEqual(enum.ItemValuesString, enum.ItemNames) {
+	if !slices.Equal(enum.ItemValuesString, enum.ItemNames) {
 		t.Errorf("VALIDITY_KIND.ItemValuesString should default to ItemNames")
 	}
 
@@ -203,7 +203,7 @@ func TestLoad_rmEnumerationInteger(t *testing.T) {
 	if !enum.IsIntegerEnum() {
 		t.Errorf("PROPORTION_KIND: expected integer enum")
 	}
-	if got, want := enum.ItemValuesInt, []int64{0, 1, 2, 3, 4}; !reflect.DeepEqual(got, want) {
+	if got, want := enum.ItemValuesInt, []int64{0, 1, 2, 3, 4}; !slices.Equal(got, want) {
 		t.Errorf("PROPORTION_KIND.ItemValuesInt: got %v, want %v", got, want)
 	}
 }
@@ -594,16 +594,4 @@ func TestMapResolver_missing(t *testing.T) {
 	if !errors.Is(err, ErrSchemaNotFound) {
 		t.Errorf("got %v, want ErrSchemaNotFound", err)
 	}
-}
-
-func mapKeys(m map[string]*Package) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	return ks
-}
-
-func contains(ss []string, s string) bool {
-	return slices.Contains(ss, s)
 }

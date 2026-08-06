@@ -158,7 +158,9 @@ func escapeItemTagValue(s string) string {
 // horizontal tab, or DEL (0x7F). CR/LF in particular must never reach a
 // header value, where they enable header injection.
 func hasCtrlChars(s string) bool {
-	for i := 0; i < len(s); i++ {
+	// Ranges byte indices, not runes: the check is defined over bytes,
+	// and `range s` would skip UTF-8 continuation bytes.
+	for i := range len(s) {
 		if (s[i] < 0x20 && s[i] != '\t') || s[i] == 0x7f {
 			return true
 		}

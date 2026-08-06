@@ -64,12 +64,7 @@ type Result struct {
 // OK reports whether the result carries no Error-severity issue. Warnings do
 // not make a result not-OK.
 func (r Result) OK() bool {
-	for _, i := range r.Issues {
-		if i.Severity == Error {
-			return false
-		}
-	}
-	return true
+	return !slices.ContainsFunc(r.Issues, func(i Issue) bool { return i.Severity == Error })
 }
 
 // Options tunes a lint pass. The zero value (or nil) runs the AST-shape
@@ -110,8 +105,7 @@ func LintString(q string, opts *Options) Result {
 // syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
 // line/column in Detail for aql_syntax; [parse.SyntaxError] carries position.
 func syntaxDetail(err error) string {
-	var se *parse.SyntaxError
-	if errors.As(err, &se) {
+	if se, ok := errors.AsType[*parse.SyntaxError](err); ok {
 		return fmt.Sprintf("%d:%d: %s", se.Pos.Line, se.Pos.Col, se.Msg)
 	}
 	return err.Error()
@@ -241,12 +235,9 @@ func namesSelectAlias(p parse.IdentifiedPath, selectAliases map[string]bool) boo
 }
 
 func hasIdentifiableScope(doc *parse.Document) bool {
-	for _, ce := range doc.Classes {
-		if ce.Archetype != "" || ce.ParamArchetype || ce.Version || ce.RMType == "EHR" {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(doc.Classes, func(ce parse.ClassExpr) bool {
+		return ce.Archetype != "" || ce.ParamArchetype || ce.Version || ce.RMType == "EHR"
+	})
 }
 
 // paramIssues runs the Layer-2 parameter-binding checks against a Query's

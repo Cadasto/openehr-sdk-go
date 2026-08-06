@@ -88,15 +88,18 @@ func FactoryForXMLBody(body []byte) (func() any, bool) {
 			return nil, false
 		}
 		s = s[i:]
-		if strings.HasPrefix(s, "<?") {
-			end := strings.Index(s, "?>")
-			if end < 0 {
-				return nil, false
-			}
-			s = s[end+2:]
-			continue
+		// Skip any XML declaration or processing instruction
+		// (<?xml …?>) sitting before the root element. The "?>" scan
+		// must run over the whole "<?…" token, not the part after the
+		// opening "?", so a degenerate "<?>" is consumed as one PI.
+		if !strings.HasPrefix(s, "<?") {
+			break
 		}
-		break
+		_, rest, ok := strings.Cut(s, "?>")
+		if !ok {
+			return nil, false
+		}
+		s = rest
 	}
 	switch {
 	case strings.HasPrefix(s, "<dv_quantity"), strings.HasPrefix(s, "<DV_QUANTITY"):

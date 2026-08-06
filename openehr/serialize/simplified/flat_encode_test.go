@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -56,12 +57,7 @@ func genComposition(t *testing.T, optPath string) (*rm.Composition, *webtemplate
 }
 
 func sortedKeys(m map[string]any) []string {
-	ks := make([]string, 0, len(m))
-	for k := range m {
-		ks = append(ks, k)
-	}
-	sort.Strings(ks)
-	return ks
+	return slices.Sorted(maps.Keys(m))
 }
 
 func TestMarshalFlatDVTextLeaf(t *testing.T) {

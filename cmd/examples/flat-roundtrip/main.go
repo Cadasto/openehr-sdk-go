@@ -11,9 +11,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"reflect"
-	"sort"
+	"slices"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/openehr/serialize/canjson"
@@ -114,12 +115,7 @@ func printFlat(flat []byte) {
 	if err := json.Unmarshal(flat, &m); err != nil {
 		log.Fatalf("parse flat: %v", err)
 	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
+	for _, k := range slices.Sorted(maps.Keys(m)) {
 		fmt.Printf("  %s = %v\n", k, m[k])
 	}
 }

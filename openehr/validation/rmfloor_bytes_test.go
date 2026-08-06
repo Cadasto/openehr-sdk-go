@@ -40,7 +40,7 @@ func TestValidateRMEHRStatusBytes_MissingSubject(t *testing.T) {
 	if r.OK {
 		t.Fatalf("EHR_STATUS omitting subject must not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/subject", "required") {
+	if !containsIssue(r.Issues, "/subject", "required") {
 		t.Errorf("expected required @ /subject, got %+v", r.Issues)
 	}
 }
@@ -52,7 +52,7 @@ func TestValidateRMEHRStatusBytes_BareSubjectOK(t *testing.T) {
 	if !r.OK {
 		t.Fatalf("bare-but-present subject must be OK; got %+v", r.Issues)
 	}
-	if hasIssue(r.Issues, "/subject", "required") {
+	if containsIssue(r.Issues, "/subject", "required") {
 		t.Errorf("present subject must not be flagged required; got %+v", r.Issues)
 	}
 }
@@ -72,10 +72,10 @@ func TestValidateRMEHRStatusBytes_MissingNameStillFlagged(t *testing.T) {
 	if r.OK {
 		t.Fatalf("missing name must not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/name", "required") {
+	if !containsIssue(r.Issues, "/name", "required") {
 		t.Errorf("expected required @ /name, got %+v", r.Issues)
 	}
-	if hasIssue(r.Issues, "/subject", "required") {
+	if containsIssue(r.Issues, "/subject", "required") {
 		t.Errorf("present subject must not be flagged; got %+v", r.Issues)
 	}
 }
@@ -97,7 +97,7 @@ func TestValidateRMEHRStatusBytes_MalformedSubject(t *testing.T) {
 	if r.OK {
 		t.Fatalf("malformed subject must not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/", "invalid_shape") {
+	if !containsIssue(r.Issues, "/", "invalid_shape") {
 		t.Errorf("expected invalid_shape @ /, got %+v", r.Issues)
 	}
 }
@@ -119,7 +119,7 @@ func TestValidateRMEHRStatusBytes_SubjectNull(t *testing.T) {
 	if r.OK {
 		t.Fatalf("subject: null must not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/subject", "required") {
+	if !containsIssue(r.Issues, "/subject", "required") {
 		t.Errorf("expected required @ /subject for a null subject, got %+v", r.Issues)
 	}
 }
@@ -138,7 +138,7 @@ func TestValidateRMEHRStatusBytes_InvalidShape(t *testing.T) {
 			if r.OK {
 				t.Errorf("%s input must not be OK", tc.name)
 			}
-			if !hasIssue(r.Issues, "/", "invalid_shape") {
+			if !containsIssue(r.Issues, "/", "invalid_shape") {
 				t.Errorf("expected invalid_shape @ /, got %+v", r.Issues)
 			}
 		})

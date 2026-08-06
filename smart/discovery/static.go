@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"time"
 )
 
@@ -60,9 +61,7 @@ func cloneServices(in map[string]ServiceEntry) map[string]ServiceEntry {
 			u := *v.BaseURL
 			v.BaseURL = &u
 		}
-		caps := make([]string, len(v.Capabilities))
-		copy(caps, v.Capabilities)
-		v.Capabilities = caps
+		v.Capabilities = slices.Clone(v.Capabilities)
 		out[k] = v
 	}
 	return out

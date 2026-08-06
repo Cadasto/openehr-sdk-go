@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -472,12 +473,7 @@ func (r *Resolver) validate(cat *ServiceCatalog) error {
 }
 
 func acceptedVersionsString(m map[string]struct{}) string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	slices.Sort(out)
-	return strings.Join(out, ",")
+	return strings.Join(slices.Sorted(maps.Keys(m)), ",")
 }
 
 // warnInsecure emits a logger warning when any catalog URL uses

@@ -382,8 +382,8 @@ func TestExecuteAQLError(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 
-		var aqlErr *query.AQLError
-		if !errors.As(err, &aqlErr) {
+		aqlErr, ok := errors.AsType[*query.AQLError](err)
+		if !ok {
 			t.Fatalf("expected *query.AQLError, got %T: %v", err, err)
 		}
 
@@ -433,8 +433,8 @@ func TestExecuteAQLError(t *testing.T) {
 			t.Fatal("expected error, got nil")
 		}
 
-		var aqlErr *query.AQLError
-		if !errors.As(err, &aqlErr) {
+		aqlErr, ok := errors.AsType[*query.AQLError](err)
+		if !ok {
 			t.Fatalf("expected *query.AQLError, got %T: %v", err, err)
 		}
 
@@ -497,8 +497,7 @@ func TestExecutePathResolutionError(t *testing.T) {
 			if err == nil {
 				t.Fatal("expected error, got nil")
 			}
-			var aqlErr *query.AQLError
-			if !errors.As(err, &aqlErr) {
+			if _, ok := errors.AsType[*query.AQLError](err); !ok {
 				t.Fatalf("expected *query.AQLError, got %T", err)
 			}
 			if got := errors.Is(err, aql.ErrPathResolution); got != tc.wantIsErr {

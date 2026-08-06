@@ -726,7 +726,8 @@ func TestIntervalProportionZeroDenominatorBoundRefused(t *testing.T) {
 
 // Making DV_SCALE first-class brought it inside emptyMandatorySuffix: a Go-zero
 // bound now spells an empty mandatory `|code` and is refused, where it used to
-// ride out as a fabricated `|raw` fragment. Behaviour-covered but unpinned.
+// ride out as a fabricated `|raw` fragment. Which suffix gets named is pinned by
+// TestIntervalScaleZeroBoundNamesLexicallyFirstEmptySuffix below.
 func TestIntervalScaleZeroBoundRefused(t *testing.T) {
 	out := map[string]any{}
 	err := intervalToFlat(out, "b", "DV_SCALE", rm.Interval[rm.DVScale]{
@@ -741,8 +742,34 @@ func TestIntervalScaleZeroBoundRefused(t *testing.T) {
 	if !errors.Is(err, ErrUnsupportedDatatype) {
 		t.Fatalf("err = %v, want ErrUnsupportedDatatype for a Go-zero DV_SCALE lower bound", err)
 	}
-	if !strings.Contains(err.Error(), "code") {
+	if !strings.Contains(err.Error(), "b/lower|code") {
 		t.Errorf("err = %v, want it to name the empty mandatory suffix", err)
+	}
+}
+
+// A Go-zero DV_SCALE bound spells two empty RM-mandatory string suffixes
+// (`|code` and `|value`); emptyMandatorySuffix must report the lexically
+// first, not whichever key map iteration happens to visit first.
+func TestIntervalScaleZeroBoundNamesLexicallyFirstEmptySuffix(t *testing.T) {
+	out := map[string]any{}
+	err := intervalToFlat(out, "b", "DV_SCALE", rm.Interval[rm.DVScale]{
+		Upper: rm.DVScale{
+			Symbol: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "slight"},
+				DefiningCode: rm.CodePhrase{CodeString: "at0003", TerminologyID: rm.TerminologyID{Value: "local"}},
+			},
+			Value: 2.5,
+		},
+	})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, `b/lower|code`) {
+		t.Errorf("err = %v, want it to name the lexically first empty mandatory suffix b/lower|code", err)
+	}
+	if strings.Contains(msg, `b/lower|value`) {
+		t.Errorf("err = %v, must not name b/lower|value when b/lower|code is also empty", err)
 	}
 }
 

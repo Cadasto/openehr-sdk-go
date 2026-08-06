@@ -197,8 +197,7 @@ func Health(ctx context.Context, c *transport.Client) (*HealthStatus, error) {
 	})
 	h := &HealthStatus{CheckedAt: time.Now()}
 	if err != nil {
-		var we *transport.WireError
-		if errors.As(err, &we) {
+		if we, ok := errors.AsType[*transport.WireError](err); ok {
 			h.Status = healthDown
 			h.HTTPStatusCode = we.StatusCode
 			return h, nil

@@ -1,6 +1,7 @@
 package smart
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
@@ -99,15 +100,8 @@ func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenRespo
 			return nil, fmt.Errorf("smart: id_token: %w", err)
 		}
 		lc.IDToken = claims
-		if lc.User == "" {
-			lc.User = claims.FHIRUser
-		}
-		if lc.User == "" {
-			lc.User = claims.Subject
-		}
-		if lc.Issuer == "" {
-			lc.Issuer = claims.Issuer
-		}
+		lc.User = cmp.Or(lc.User, claims.FHIRUser, claims.Subject)
+		lc.Issuer = cmp.Or(lc.Issuer, claims.Issuer)
 		lc.Principal = principalFromClaims(idTokenClaimMap(claims), cfg.PrincipalClaims)
 	}
 	if lc.Principal == nil && len(tr.Raw) > 0 {

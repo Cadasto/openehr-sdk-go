@@ -2,6 +2,7 @@ package poly
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/typereg"
@@ -19,7 +20,7 @@ func TestDecodeErrorMessageIncludesPathAndType(t *testing.T) {
 	de := &DecodeError{Path: "/content/0", Type: "OBSERVATION", Inner: errors.New("inner")}
 	msg := de.Error()
 	for _, want := range []string{"/content/0", "OBSERVATION", "inner"} {
-		if !contains(msg, want) {
+		if !strings.Contains(msg, want) {
 			t.Errorf("DecodeError.Error() = %q; missing substring %q", msg, want)
 		}
 	}
@@ -33,16 +34,4 @@ func TestResolveTypeMissing(t *testing.T) {
 	if !errors.Is(err, typereg.ErrUnknownType) {
 		t.Errorf("err = %v; want errors.Is(_, typereg.ErrUnknownType)", err)
 	}
-}
-
-func contains(s, sub string) bool {
-	if len(sub) == 0 {
-		return true
-	}
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

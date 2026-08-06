@@ -11,6 +11,7 @@ package validation_test
 //     panicking, mirroring REQ-110's nil_* contract.
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -29,7 +30,7 @@ func TestValidateRMFolder_MissingName(t *testing.T) {
 	if r.OK {
 		t.Fatalf("ValidateRMFolder with missing name should not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/name", "required") {
+	if !containsIssue(r.Issues, "/name", "required") {
 		t.Errorf("expected required issue at /name, got %+v", r.Issues)
 	}
 }
@@ -157,7 +158,7 @@ func TestValidateRM_DVIntervalUnboundedSkipped(t *testing.T) {
 	// allowed; this test asserts the invariant evaluator did not
 	// falsely fire.
 	for _, i := range r.Issues {
-		if i.Code == "rm_invariant" && containsSubstring(i.Detail, "DV_INTERVAL") {
+		if i.Code == "rm_invariant" && strings.Contains(i.Detail, "DV_INTERVAL") {
 			t.Errorf("unexpected rm_invariant on unbounded DV_INTERVAL: %s", i.Detail)
 		}
 	}
@@ -178,7 +179,7 @@ func TestValidateRM_DVIntervalDifferentUnitsSkipped(t *testing.T) {
 	}
 	r := validation.ValidateRM(&iv)
 	for _, i := range r.Issues {
-		if i.Code == "rm_invariant" && containsSubstring(i.Detail, "DV_INTERVAL") {
+		if i.Code == "rm_invariant" && strings.Contains(i.Detail, "DV_INTERVAL") {
 			t.Errorf("cross-unit DV_INTERVAL must not be flagged lower>upper: %s", i.Detail)
 		}
 	}
@@ -236,7 +237,7 @@ func TestValidateRMFolder_ObjectRefItemMissingType(t *testing.T) {
 	if r.OK {
 		t.Fatalf("ValidateRMFolder with OBJECT_REF missing type/namespace should not be OK; issues=%+v", r.Issues)
 	}
-	if !hasIssue(r.Issues, "/items[0]/type", "rm_invariant") {
+	if !containsIssue(r.Issues, "/items[0]/type", "rm_invariant") {
 		t.Errorf("expected rm_invariant at /items[0]/type, got %+v", r.Issues)
 	}
 }
@@ -321,31 +322,4 @@ func TestValidateRMDemographic_NilGuard(t *testing.T) {
 	if r.OK || !containsCode(r.Issues, "nil_party") {
 		t.Errorf("ValidateRMDemographic(nil) want nil_party, got %+v", r.Issues)
 	}
-}
-
-// hasIssue is a focused predicate combining path + code matching —
-// shorter than (containsCode + hand-loop) and self-documenting at call
-// site.
-func hasIssue(issues []validation.Issue, path, code string) bool {
-	for _, i := range issues {
-		if i.Path == path && i.Code == code {
-			return true
-		}
-	}
-	return false
-}
-
-// containsSubstring is a tiny helper used only by the
-// unbounded-skip test where the detail message matters but the code
-// alone is non-discriminating.
-func containsSubstring(s, sub string) bool {
-	if sub == "" {
-		return true
-	}
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

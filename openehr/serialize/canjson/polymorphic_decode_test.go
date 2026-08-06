@@ -3,6 +3,7 @@ package canjson_test
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"os"
 	"slices"
 	"testing"
@@ -84,12 +85,7 @@ func collectDiscriminators(t *testing.T, b []byte) map[string]int {
 			if tn, ok := tt["_type"].(string); ok {
 				out[tn]++
 			}
-			keys := make([]string, 0, len(tt))
-			for k := range tt {
-				keys = append(keys, k)
-			}
-			slices.Sort(keys)
-			for _, k := range keys {
+			for _, k := range slices.Sorted(maps.Keys(tt)) {
 				walk(tt[k])
 			}
 		case []any:

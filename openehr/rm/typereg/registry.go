@@ -49,9 +49,7 @@ func jsonNestingDepth(data []byte) int {
 			inStr = true
 		case '{', '[':
 			depth++
-			if depth > maxDepth {
-				maxDepth = depth
-			}
+			maxDepth = max(maxDepth, depth)
 			if depth > maxDecodeDepth {
 				return depth // early exit; caller rejects
 			}

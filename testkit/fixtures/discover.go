@@ -43,15 +43,8 @@ var rmJSONExcludedPrefixes = []string{
 }
 
 func excludedRMJSONStem(stem string) bool {
-	if rmJSONExcluded[stem] {
-		return true
-	}
-	for _, p := range rmJSONExcludedPrefixes {
-		if strings.HasPrefix(stem, p) {
-			return true
-		}
-	}
-	return false
+	return rmJSONExcluded[stem] ||
+		slices.ContainsFunc(rmJSONExcludedPrefixes, func(p string) bool { return strings.HasPrefix(stem, p) })
 }
 
 // compositionXMLExcluded composition XML on disk but not exercised by canxml

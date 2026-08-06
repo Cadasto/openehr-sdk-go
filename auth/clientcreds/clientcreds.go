@@ -15,6 +15,7 @@
 package clientcreds
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -351,19 +352,11 @@ func (s *Source) fetch(ctx context.Context) (auth.Token, error) {
 			expiresAt = time.Now().Add(time.Duration(secs) * time.Second)
 		}
 	}
-	typ := tr.TokenType
-	if typ == "" {
-		typ = "Bearer"
-	}
-	scope := tr.Scope
-	if scope == "" {
-		scope = s.cfg.Scope
-	}
 	return auth.Token{
 		Value:     tr.AccessToken,
-		Type:      typ,
+		Type:      cmp.Or(tr.TokenType, auth.TokenTypeBearer),
 		ExpiresAt: expiresAt,
-		Scope:     scope,
+		Scope:     cmp.Or(tr.Scope, s.cfg.Scope),
 		Issuer:    s.cfg.Issuer,
 	}, nil
 }

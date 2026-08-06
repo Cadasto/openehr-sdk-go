@@ -5,6 +5,7 @@ package simplified
 import (
 	"errors"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/template/webtemplate"
@@ -116,7 +117,7 @@ func TestParseFlatKey(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parseFlatKey: %v", err)
 			}
-			if !reflect.DeepEqual(got.segs, tc.wantSegs) {
+			if !slices.Equal(got.segs, tc.wantSegs) {
 				t.Errorf("segs = %+v, want %+v", got.segs, tc.wantSegs)
 			}
 			if got.suffix != tc.wantSuffix {

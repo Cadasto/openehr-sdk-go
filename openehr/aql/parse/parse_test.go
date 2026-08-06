@@ -145,8 +145,8 @@ func TestParseSyntaxErrorPosition(t *testing.T) {
 	if !errors.Is(err, aql.ErrSyntax) {
 		t.Fatalf("err = %v, want ErrSyntax", err)
 	}
-	var se *parse.SyntaxError
-	if !errors.As(err, &se) {
+	se, ok := errors.AsType[*parse.SyntaxError](err)
+	if !ok {
 		t.Fatalf("expected *parse.SyntaxError, got %T", err)
 	}
 	if se.Pos.Line != 1 || se.Pos.Col < 1 {

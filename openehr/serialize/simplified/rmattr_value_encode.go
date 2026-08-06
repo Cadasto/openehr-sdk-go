@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -375,8 +376,11 @@ func boundContradictsUnbounded(bound any, voidRepresentable bool) bool {
 	return !v.IsZero()
 }
 
-// emptyMandatorySuffix reports the first suffix a bound leaves empty that its
-// datatype declares RM-mandatory.
+// emptyMandatorySuffix reports the lexically first suffix a bound leaves empty
+// that its datatype declares RM-mandatory. A bound can leave more than one
+// empty — a Go-zero DV_SCALE spells both `|code` and `|value` — so the scan is
+// ordered rather than left to map iteration, which would make the diagnostic
+// (and any test pinning it) differ run to run.
 //
 // Which suffixes those are is read off the datatype rather than enumerated
 // here: an RM-optional field is a pointer, nil in a freshly constructed
@@ -409,8 +413,8 @@ func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool
 	if _, err := emitLeafValue(zero, path, ctor(), anchor, false, false); err != nil {
 		return "", false
 	}
-	for key, v := range zero {
-		if s, isString := v.(string); !isString || s != "" {
+	for _, key := range slices.Sorted(maps.Keys(zero)) {
+		if s, isString := zero[key].(string); !isString || s != "" {
 			continue
 		}
 		if s, isString := sub[key].(string); isString && s == "" {

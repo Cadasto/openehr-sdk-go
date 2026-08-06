@@ -47,8 +47,8 @@ func mapQueryError(err error) error {
 	if err == nil {
 		return nil
 	}
-	var we *transport.WireError
-	if !errors.As(err, &we) {
+	we, ok := errors.AsType[*transport.WireError](err)
+	if !ok {
 		return err
 	}
 	if we.OpenEHR != nil && (we.OpenEHR.Message != "" || we.OpenEHR.Code != "") {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/internal/templatecompile"
@@ -216,7 +217,7 @@ func TestBuilder_Set_unknownPath(t *testing.T) {
 	// path string AND the template-side cause for callers diagnosing
 	// from logs. Wrapping NodeAt's typed cause was added in the
 	// follow-up; pin its diagnostic content here.
-	if msg := err.Error(); !contains(msg, "/no/such/path") {
+	if msg := err.Error(); !strings.Contains(msg, "/no/such/path") {
 		t.Errorf("error missing path string: %v", err)
 	}
 	// PR #20 re-review (Important 1): the multi-%w wrap means
@@ -257,7 +258,7 @@ func TestBuilder_Build_AggregatesErrors(t *testing.T) {
 	}
 	// Both bad-path strings should appear in the joined diagnostic.
 	msg := err.Error()
-	if !contains(msg, "/no/such/path") || !contains(msg, "/also/missing") {
+	if !strings.Contains(msg, "/no/such/path") || !strings.Contains(msg, "/also/missing") {
 		t.Errorf("joined error missing one of the two bad paths: %v", err)
 	}
 }
@@ -289,12 +290,6 @@ func TestBuilder_Build_Idempotent(t *testing.T) {
 	if out == nil {
 		t.Error("second Build returned nil skeleton")
 	}
-}
-
-// contains is a local micro-helper to keep the aggregated-error test
-// self-contained without pulling strings.Contains everywhere.
-func contains(haystack, needle string) bool {
-	return bytes.Contains([]byte(haystack), []byte(needle))
 }
 
 // TestBuilder_TemplateID asserts Builder.TemplateID matches the
