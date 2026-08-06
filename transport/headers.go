@@ -46,7 +46,7 @@ type CallerAttribution struct {
 // HeaderJSON returns the JSON-encoded header value for a non-empty
 // attribution; returns "" when the value is effectively empty.
 func (a CallerAttribution) HeaderJSON() string {
-	if a.AgentID == "" && a.ModelProvider == "" && len(a.Attributes) == 0 {
+	if a.IsEmpty() {
 		return ""
 	}
 	type wire struct {

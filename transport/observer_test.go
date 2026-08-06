@@ -106,8 +106,7 @@ func TestObserverFiresOnWireError(t *testing.T) {
 	if obs.Err == nil {
 		t.Errorf("Err = nil, want *WireError")
 	}
-	var we *WireError
-	if !errors.As(obs.Err, &we) {
+	if _, ok := errors.AsType[*WireError](obs.Err); !ok {
 		t.Errorf("Err = %v, want *WireError", obs.Err)
 	}
 }
