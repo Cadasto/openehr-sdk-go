@@ -1391,7 +1391,11 @@ requirements:
     # rather than refuse every composition whose composer is properly referenced
     # (one vendored corpus body is). Every other shape is refused on encode too:
     # a PARTY_RELATED composer, a PARTY_SELF with an external_ref, and a nameless
-    # PARTY_IDENTIFIED; and the ctx/ short forms ADR 0016 decision 3 declines for the
+    # PARTY_IDENTIFIED. That is one of TWO encode-side drops, not the only one:
+    # the _uid / _link:N / _feeder_audit of a folded structural wrapper (ITEM_TREE,
+    # HISTORY, a lifted EVENT) are dropped too, because FLAT has no key for a node
+    # the Web Template does not model -- closable only reference-side (ADR 0014),
+    # and structurally invisible to PROBE-086 whose input is FLAT; and the ctx/ short forms ADR 0016 decision 3 declines for the
     # EVENT_CONTEXT optionals, which ride this grammar at their real paths
     # instead. Not an underscore question at all: the 19 keys this SDK's
     # WebTemplate projection does not carry (ism_transition/*, INTERVAL_EVENT

@@ -247,10 +247,15 @@ func orderedRMAttrs[T rm.DVOrdered](out map[string]any, base, anchor string,
 // here", and only a bound differing from the Go zero contradicts it
 // ([boundContradictsUnbounded]).
 func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interval[T]) error {
-	if err := intervalBoundToFlat(out, base, anchor, "lower", any(iv.Lower), iv.LowerUnbounded); err != nil {
+	// Whether the instantiation can express Void at all is knowledge only this
+	// generic frame has — boxing into `any` erases it — and it changes what
+	// counts as a contradiction. Read it off a zero T rather than the bound.
+	var zero T
+	voidRepresentable := any(zero) == nil || rm.IsTypedNil(any(zero))
+	if err := intervalBoundToFlat(out, base, anchor, "lower", any(iv.Lower), iv.LowerUnbounded, voidRepresentable); err != nil {
 		return err
 	}
-	if err := intervalBoundToFlat(out, base, anchor, "upper", any(iv.Upper), iv.UpperUnbounded); err != nil {
+	if err := intervalBoundToFlat(out, base, anchor, "upper", any(iv.Upper), iv.UpperUnbounded, voidRepresentable); err != nil {
 		return err
 	}
 	if iv.LowerUnbounded {
@@ -285,13 +290,13 @@ func intervalToFlat[T any](out map[string]any, base, anchor string, iv rm.Interv
 // legitimate one: a genuine zero magnitude (`DV_COUNT`'s `0` lower bound) leaves
 // no mandatory suffix empty and passes, while the Go zero `DV_QUANTITY` spells
 // its mandatory `|unit` as "".
-func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded bool) error {
+func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any, unbounded, voidRepresentable bool) error {
 	if unbounded {
 		// The mirror of decode's refusal (intervalSuffixes): a bound standing
 		// beside its `|*_unbounded: true` contradicts the RM equivalence, and
 		// dropping it here would lose a populated clinical value silently while
 		// the same pair on the way in is a typed error.
-		if boundContradictsUnbounded(bound) {
+		if boundContradictsUnbounded(bound, voidRepresentable) {
 			return fmt.Errorf("%w: %q carries a %s bound and is also marked `|%s_unbounded`; the RM ties the two (`%s_unbounded = (%s = Void)`), so the pair contradicts itself",
 				ErrUnsupportedDatatype, base+"/"+end, end, end, end, end)
 		}
@@ -320,7 +325,10 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 	// refusals in the party grammar and `Setting_valid` at the `ctx/` boundary,
 	// not a rule this codec invents. Scoped to a *bound*, where the zero is
 	// fabricated by absence; a producer-supplied `0/0` at a plain Web Template
-	// leaf is that producer's defect and is carried as written.
+	// leaf is that producer's defect and is carried as written. Encode-only for
+	// the same reason: a wire `|denominator: 0` is a value some producer wrote,
+	// not one absence fabricated here, so refusing it on decode would be RM
+	// validation rather than a codec concern (the validation package owns it).
 	if dv, isProportion := as[rm.DVProportion](bound); isProportion && dv.Denominator == 0 {
 		return fmt.Errorf("%w: %q is 0, which the RM forbids (`DV_PROPORTION` invariant `Valid_denominator: denominator /= 0.0`); an unpopulated bound is not an unbounded end, which is spelled `%s|%s_unbounded`",
 			ErrUnsupportedDatatype, path+"|denominator", base, end)
@@ -333,21 +341,32 @@ func intervalBoundToFlat(out map[string]any, base, anchor, end string, bound any
 // reader could tell apart from absence, and so contradicts its `|*_unbounded`
 // flag rather than merely restating it.
 //
-// The two instantiations spell absence differently, and reading the
-// *instantiation* rather than the *value* is what let a populated concrete bound
-// through: an interface bound (`DVInterval[DVOrdered]` — every REFERENCE_RANGE's
+// The two instantiations spell absence differently, and the rule differs with
+// them. An **interface** bound (`DVInterval[DVOrdered]` — every REFERENCE_RANGE's
 // `range`, and what a polymorphic `DV_INTERVAL` site decodes to) says Void with
-// nil, while a concrete bound (`DVInterval[DVQuantity]` and the eight other
+// nil, so *anything* non-nil beside the flag is a contradiction, including a
+// value-boxed zero: the producer put something in a slot that could have held
+// Void. A **concrete** bound (`DVInterval[DVQuantity]` and the eight other
 // narrowed instantiations, which is what a canonical decode of a DV_QUANTITY's
-// `normal_range` and what `instance.Generate` both produce) cannot be nil at all
-// and has exactly one spelling for absence — the Go zero. Anything else is a
-// value the flag would silently delete, on either instantiation.
+// `normal_range` and what `instance.Generate` both produce) cannot be nil at
+// all, so absence has exactly one spelling — the Go zero — and only a bound
+// differing from it can be reported.
+//
+// That last limit is real and unclosable, not an oversight: for a concrete `T`,
+// `Interval[DVCount]{LowerUnbounded: true}` and the same value with an explicit
+// `Lower: DVCount{0}` are the *same bits*. Refusing the pair would refuse every
+// half-open concrete count range, so a legitimate clinical zero beside the flag
+// stays silent. Only the interface instantiation can carry that distinction, and
+// there it is enforced.
 //
 // A non-nil *pointer* counts as a bound even when it addresses a zero: the
-// pointer itself is distinguishable from Void, so the contradiction is real.
-func boundContradictsUnbounded(bound any) bool {
+// pointer itself is distinguishable from Void.
+func boundContradictsUnbounded(bound any, voidRepresentable bool) bool {
 	if bound == nil || rm.IsTypedNil(bound) {
 		return false
+	}
+	if voidRepresentable {
+		return true
 	}
 	v := reflect.ValueOf(bound)
 	if v.Kind() == reflect.Pointer {

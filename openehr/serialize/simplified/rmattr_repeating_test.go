@@ -657,6 +657,39 @@ func TestIntervalConcretePopulatedBoundBesideUnboundedFlagRefused(t *testing.T) 
 	}
 }
 
+// An interface-typed bound can spell Void as nil, so *anything* non-nil beside
+// the flag contradicts it — including a value-boxed zero. Reading only
+// `reflect.IsZero` relaxed this arm and let a value-boxed zero pass, which the
+// concrete-bound fix must not do (PR #89 review).
+func TestIntervalValueBoxedZeroBoundBesideUnboundedFlagRefused(t *testing.T) {
+	out := map[string]any{}
+	err := intervalToFlat(out, "b", "DV_COUNT", rm.Interval[rm.DVOrdered]{
+		Lower: rm.DVCount{Magnitude: 0}, LowerUnbounded: true,
+		Upper: rm.DVCount{Magnitude: 9},
+	})
+	if !errors.Is(err, ErrUnsupportedDatatype) {
+		t.Fatalf("err = %v, want ErrUnsupportedDatatype", err)
+	}
+}
+
+// The unclosable limit, pinned so it stays a known one: for a *concrete* bound
+// `Interval[DVCount]{LowerUnbounded: true}` and the same value with an explicit
+// zero Lower are the same bits, so refusing the pair would refuse every
+// half-open concrete count range. It stays silent, and only the interface
+// instantiation above carries the distinction.
+func TestIntervalConcreteCountZeroBoundBesideUnboundedFlagStaysSilent(t *testing.T) {
+	out := map[string]any{}
+	if err := intervalToFlat(out, "b", "DV_COUNT", rm.Interval[rm.DVCount]{
+		Lower: rm.DVCount{Magnitude: 0}, LowerUnbounded: true,
+		Upper: rm.DVCount{Magnitude: 9},
+	}); err != nil {
+		t.Fatalf("err = %v, want nil — a concrete zero is indistinguishable from absence", err)
+	}
+	if got := out["b|lower_unbounded"]; got != true {
+		t.Errorf("|lower_unbounded = %v, want true", got)
+	}
+}
+
 // A DV_COUNT's zero magnitude is a legitimate bound, not a fabricated one, so it
 // must survive both legs: silent beside `|*_unbounded` (indistinguishable from
 // absence) and emitted when the end is bounded.
@@ -774,5 +807,71 @@ func TestPartyIdentifiersDecodeKeepsEveryEntry(t *testing.T) {
 	}
 	if len(perf.Identifiers) != 2 {
 		t.Errorf("inlined spelling decoded %d identifiers, want 2", len(perf.Identifiers))
+	}
+}
+
+// --- DV_SCALE first-class closure ------------------------------------------
+
+// DV_SCALE is DV_ORDINAL with a Real `value`, and was the one DV_* the codec
+// left riding `|raw` in both directions — an unregistered gap rather than a
+// decision (PR #89 review). It now takes the sibling's three suffixes, so the
+// emitted form and the decoded form must agree end to end.
+func TestDVScaleRidesTheOrdinalSuffixSet(t *testing.T) {
+	dv := rm.DVScale{
+		Symbol: rm.DVCodedText{
+			DVText: rm.DVText{Value: "slight breathlessness"},
+			DefiningCode: rm.CodePhrase{
+				CodeString:    "at0003",
+				TerminologyID: rm.TerminologyID{Value: "local"},
+			},
+		},
+		Value: 2.5,
+	}
+
+	out := map[string]any{}
+	if _, err := emitLeafValue(out, "s", dv, "DV_SCALE", false, false); err != nil {
+		t.Fatalf("emitLeafValue: %v", err)
+	}
+	for key, want := range map[string]any{
+		"s|code":    "at0003",
+		"s|value":   "slight breathlessness",
+		"s|ordinal": 2.5,
+	} {
+		if got := out[key]; got != want {
+			t.Errorf("%s = %v (%T), want %v", key, got, got, want)
+		}
+	}
+	if _, rode := out["s|raw"]; rode {
+		t.Error("DV_SCALE still rides |raw; it should take the suffix form")
+	}
+
+	// Decode the same three suffixes back.
+	got, err := dvFromSuffixes("DV_SCALE", false, map[string]any{
+		"code": "at0003", "value": "slight breathlessness", "ordinal": 2.5,
+	})
+	if err != nil {
+		t.Fatalf("dvFromSuffixes: %v", err)
+	}
+	if got["_type"] != "DV_SCALE" {
+		t.Errorf("_type = %v, want DV_SCALE", got["_type"])
+	}
+	if got["value"] != 2.5 {
+		t.Errorf("value = %v, want 2.5 — the Real is what separates DV_SCALE from DV_ORDINAL", got["value"])
+	}
+}
+
+// The suffix form must be refused when a required suffix is missing, the same
+// way DV_ORDINAL's is — not fall back to a partial value.
+func TestDVScaleIncompleteSuffixSetRefused(t *testing.T) {
+	for name, sfx := range map[string]map[string]any{
+		"no |code":    {"value": "x", "ordinal": 1.0},
+		"no |value":   {"code": "at0003", "ordinal": 1.0},
+		"no |ordinal": {"code": "at0003", "value": "x"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := dvFromSuffixes("DV_SCALE", false, sfx); !errors.Is(err, ErrUnsupportedDatatype) {
+				t.Errorf("err = %v, want ErrUnsupportedDatatype", err)
+			}
+		})
 	}
 }

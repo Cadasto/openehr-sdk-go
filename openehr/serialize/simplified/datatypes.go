@@ -51,6 +51,8 @@ var capturedKeys = map[string]map[string]bool{
 	"DV_COUNT":   {"magnitude": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_BOOLEAN": {"value": true},
 	"DV_ORDINAL": {"symbol": true, "value": true},
+	// DV_SCALE is DV_ORDINAL with a Real `value`; same symbol, same captured set.
+	"DV_SCALE": {"symbol": true, "value": true},
 	"DV_PROPORTION": {
 		"numerator": true, "denominator": true, "type": true,
 		"magnitude_status": true, "normal_status": true,
@@ -404,7 +406,7 @@ func capturedFully(rmType string, m map[string]any, captured map[string]bool) bo
 			return m["formatting"] == nil
 		}
 		return codePhraseCaptured(m["defining_code"])
-	case "DV_ORDINAL":
+	case "DV_ORDINAL", "DV_SCALE":
 		sym, ok := m["symbol"].(map[string]any)
 		if !ok {
 			return false
@@ -569,6 +571,10 @@ func emitCoreLeaf(out map[string]any, flatPath string, v any, rmType string, lis
 	}
 	if dv, ok := as[rm.DVOrdinal](v); ok {
 		ordinalToFlat(out, flatPath, dv)
+		return nil
+	}
+	if dv, ok := as[rm.DVScale](v); ok {
+		scaleToFlat(out, flatPath, dv)
 		return nil
 	}
 	if dv, ok := as[rm.DVProportion](v); ok {
@@ -751,6 +757,8 @@ func dvTypeName(v any) string {
 		return "DV_URI"
 	case rm.DVOrdinal, *rm.DVOrdinal:
 		return "DV_ORDINAL"
+	case rm.DVScale, *rm.DVScale:
+		return "DV_SCALE"
 	case rm.DVProportion, *rm.DVProportion:
 		return "DV_PROPORTION"
 	case rm.DVIdentifier, *rm.DVIdentifier:
@@ -938,6 +946,22 @@ func ordinalToFlat(out map[string]any, flatPath string, dv rm.DVOrdinal) {
 	out[flatPath+"|code"] = dv.Symbol.DefiningCode.CodeString
 	out[flatPath+"|value"] = dv.Symbol.Value
 	out[flatPath+"|ordinal"] = int64(dv.Value)
+}
+
+// scaleToFlat emits the |code, |value and |ordinal suffixes for a DV_SCALE leaf.
+//
+// DV_SCALE is DV_ORDINAL with a Real `value` — same `symbol: DV_CODED_TEXT`, same
+// RM attribute names — so it takes the same three suffixes, `|ordinal` carrying
+// the Real. **Not corpus-pinned:** no vendored body and no reference sample
+// spells a DV_SCALE, so this is this codec's choice within the format's own
+// conventions, on the same footing as the STRUCTURED `"|"` member, and wire.md
+// § REQ-053 records it as such. Reusing the sibling's spelling for the sibling's
+// attribute is the same move the party `|type` suffix makes; should a reference
+// sample later spell it otherwise, ADR 0014 means the reference wins.
+func scaleToFlat(out map[string]any, flatPath string, dv rm.DVScale) {
+	out[flatPath+"|code"] = dv.Symbol.DefiningCode.CodeString
+	out[flatPath+"|value"] = dv.Symbol.Value
+	out[flatPath+"|ordinal"] = float64(dv.Value)
 }
 
 // proportionToFlat emits the |numerator, |denominator and |type suffixes for a

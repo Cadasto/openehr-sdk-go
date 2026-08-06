@@ -1565,6 +1565,29 @@ func dvFromSuffixes(rmType string, listOpen bool, sfx map[string]any) (map[strin
 			},
 		}
 		return map[string]any{"_type": "DV_ORDINAL", "value": ordinal, "symbol": symbol}, nil
+	case "DV_SCALE":
+		// The DV_ORDINAL grammar one class over: same symbol, same three
+		// suffixes, `|ordinal` carrying DV_SCALE's Real `value` (scaleToFlat).
+		code, err := requireSuffix(rmType, sfx, "code")
+		if err != nil {
+			return nil, err
+		}
+		val, err := requireSuffix(rmType, sfx, "value")
+		if err != nil {
+			return nil, err
+		}
+		scale, err := requireSuffix(rmType, sfx, "ordinal")
+		if err != nil {
+			return nil, err
+		}
+		symbol := map[string]any{
+			"_type": "DV_CODED_TEXT", "value": val,
+			"defining_code": map[string]any{
+				"_type": "CODE_PHRASE", "code_string": code,
+				"terminology_id": map[string]any{"_type": "TERMINOLOGY_ID", "value": "local"},
+			},
+		}
+		return map[string]any{"_type": "DV_SCALE", "value": scale, "symbol": symbol}, nil
 	case "DV_PROPORTION":
 		num, err := requireSuffix(rmType, sfx, "numerator")
 		if err != nil {
@@ -1710,6 +1733,7 @@ var allowedSuffixes = map[string]map[string]bool{
 	"DV_COUNT":   {"": true, "magnitude_status": true, "normal_status": true, "accuracy": true, "accuracy_is_percent": true},
 	"DV_BOOLEAN": {"": true},
 	"DV_ORDINAL": {"code": true, "value": true, "ordinal": true},
+	"DV_SCALE":   {"code": true, "value": true, "ordinal": true},
 	"DV_PROPORTION": {
 		"numerator": true, "denominator": true, "type": true,
 		"magnitude_status": true, "normal_status": true,

@@ -15,7 +15,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **FLAT DV_TEXT substitution and `ctx/setting` emission (REQ-053, PROBE-086).** A captured `DV_CODED_TEXT` at a `DV_TEXT` leaf rides the coded suffix form, `EVENT_CONTEXT.setting` round-trips, and encode refuses a setting it cannot carry — coverage 19.5% → 19.7%.
 - **Generated compositions satisfy `Setting_valid` and `Basic_validity` (REQ-107).** `instance.Generate` now pins an openEHR-coded `setting` default and fills an unconstrained `PARTY_PROXY` with `PARTY_SELF`, changing the `subject` of every generated ENTRY.
 - **AQL `SELECT TOP` carrier and literal source text (REQ-118, PROBE-087/088).** The deprecated `SELECT TOP n` clause now parses, emits and builds, a projected literal carries its source text, and two lint codes flag `TOP` + `LIMIT`.
-- **Underscore-prefixed RM attributes in FLAT/STRUCTURED (REQ-140, REQ-053, ADR 0016, PROBE-089).** The simplified codecs carry the whole `_`-prefixed RM attribute grammar and the remaining datatype leaves, taking upstream FLAT parity from 19.7% to 80.4%.
+- **Underscore-prefixed RM attributes in FLAT/STRUCTURED (REQ-140, REQ-053, ADR 0016, PROBE-089).** The simplified codecs carry the whole `_`-prefixed RM attribute grammar and the remaining datatype leaves, DV_SCALE included, taking upstream FLAT parity from 19.7% to 80.4%.
 
 ## [0.18.0] - 2026-08-05
 
