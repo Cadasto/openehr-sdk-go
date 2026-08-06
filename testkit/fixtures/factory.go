@@ -83,19 +83,20 @@ func factoryForRMFilename(rel string) (func() any, bool) {
 func FactoryForXMLBody(body []byte) (func() any, bool) {
 	s := string(body)
 	for {
-		i := strings.Index(s, "<")
-		if i < 0 {
+		_, after, ok := strings.Cut(s, "<")
+		if !ok {
 			return nil, false
 		}
-		s = s[i:]
-		if strings.HasPrefix(s, "<?") {
-			end := strings.Index(s, "?>")
-			if end < 0 {
+		// Skip XML declarations (<?xml ...?>) before the root element.
+		if decl, ok := strings.CutPrefix(after, "?"); ok {
+			_, rest, ok := strings.Cut(decl, "?>")
+			if !ok {
 				return nil, false
 			}
-			s = s[end+2:]
+			s = rest
 			continue
 		}
+		s = "<" + after
 		break
 	}
 	switch {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -322,7 +323,7 @@ func TestPutWithAuditDetails(t *testing.T) {
 	if header == "" {
 		t.Fatal("openehr-audit-details header not set")
 	}
-	if !contains(header, `system_id="cdr.example"`) {
+	if !strings.Contains(header, `system_id="cdr.example"`) {
 		t.Errorf("audit header = %q", header)
 	}
 }
@@ -343,13 +344,4 @@ func TestPutSendsLifecycleStateHeader(t *testing.T) {
 	if got := captured.Header.Get("openehr-version"); got != `lifecycle_state.code_string="532"` {
 		t.Errorf("openehr-version = %q, want lifecycle_state.code_string=\"532\"", got)
 	}
-}
-
-func contains(s, sub string) bool {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return true
-		}
-	}
-	return false
 }

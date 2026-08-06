@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
@@ -325,7 +326,7 @@ func TestProbe072RejectsTimeCommittedAudit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Status != "fail" || !contains(r.Detail, "time_committed") {
+	if r.Status != "fail" || !strings.Contains(r.Detail, "time_committed") {
 		t.Errorf("PROBE-072 status=%q detail=%q (want fail mentioning time_committed)", r.Status, r.Detail)
 	}
 }
@@ -340,10 +341,10 @@ func TestProbe013CrossEHRIsolation(t *testing.T) {
 		// Tenant-isolated server: any composition GET under ehrBID for a
 		// VersionUID that doesn't belong to ehrBID is a hard 404. The
 		// probe MUST NOT see EHR A's id or data on this path.
-		if got := r.URL.Path; !contains(got, string(ehrBID)) {
+		if got := r.URL.Path; !strings.Contains(got, string(ehrBID)) {
 			t.Errorf("expected request path to target ehrBID, got %q", got)
 		}
-		if contains(r.URL.Path, string(ehrAID)) {
+		if strings.Contains(r.URL.Path, string(ehrAID)) {
 			t.Errorf("path should NOT contain ehrAID, got %q", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusNotFound)
@@ -374,18 +375,4 @@ func TestProbe013RejectsTenantLeak(t *testing.T) {
 	if r.Status != "fail" {
 		t.Errorf("expected fail on 200 cross-EHR read, got %q", r.Status)
 	}
-}
-
-// contains is a local micro-helper to keep the cross-EHR isolation
-// test self-contained (no `strings` import churn in this file).
-func contains(haystack, needle string) bool {
-	if len(needle) > len(haystack) {
-		return false
-	}
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return true
-		}
-	}
-	return false
 }

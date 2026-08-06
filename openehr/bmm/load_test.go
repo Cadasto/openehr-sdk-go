@@ -139,7 +139,7 @@ func TestLoad_basePrimitivesIncludeIso8601(t *testing.T) {
 	if !sc.IsAbstract() {
 		t.Errorf("Iso8601_type: expected abstract")
 	}
-	if !contains(sc.Ancestors(), "Temporal") {
+	if !slices.Contains(sc.Ancestors(), "Temporal") {
 		t.Errorf("Iso8601_type.ancestors does not include Temporal: %v", sc.Ancestors())
 	}
 }
@@ -602,8 +602,4 @@ func mapKeys(m map[string]*Package) []string {
 		ks = append(ks, k)
 	}
 	return ks
-}
-
-func contains(ss []string, s string) bool {
-	return slices.Contains(ss, s)
 }
