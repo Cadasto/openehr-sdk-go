@@ -110,8 +110,7 @@ func LintString(q string, opts *Options) Result {
 // syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
 // line/column in Detail for aql_syntax; [parse.SyntaxError] carries position.
 func syntaxDetail(err error) string {
-	var se *parse.SyntaxError
-	if errors.As(err, &se) {
+	if se, ok := errors.AsType[*parse.SyntaxError](err); ok {
 		return fmt.Sprintf("%d:%d: %s", se.Pos.Line, se.Pos.Col, se.Msg)
 	}
 	return err.Error()
