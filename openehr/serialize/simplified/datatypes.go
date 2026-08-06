@@ -954,8 +954,8 @@ func ordinalToFlat(out map[string]any, flatPath string, dv rm.DVOrdinal) {
 // RM attribute names — so it takes the same three suffixes, `|ordinal` carrying
 // the Real. **Not corpus-pinned:** no vendored body and no reference sample
 // spells a DV_SCALE, so this is this codec's choice within the format's own
-// conventions, on the same footing as the STRUCTURED `"|"` member, and wire.md
-// § REQ-053 records it as such. Reusing the sibling's spelling for the sibling's
+// conventions, on the same footing as the STRUCTURED `"|"` member, and both
+// wire.md § REQ-053 and deviations.md record it as such. Reusing the sibling's spelling for the sibling's
 // attribute is the same move the party `|type` suffix makes; should a reference
 // sample later spell it otherwise, ADR 0014 means the reference wins.
 func scaleToFlat(out map[string]any, flatPath string, dv rm.DVScale) {

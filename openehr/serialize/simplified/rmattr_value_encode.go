@@ -394,16 +394,12 @@ func boundContradictsUnbounded(bound any, voidRepresentable bool) bool {
 // RM forbids by name and which [intervalBoundToFlat] therefore refuses on the
 // `Valid_denominator` invariant directly, one guard down.
 //
-// Two anchors are outside the check rather than inside it, both because they
-// have no [capturedKeys] entry and so ride `|raw` whole: the abstract
-// `DV_INTERVAL<DV_ORDERED>`, and **DV_SCALE**. A `|raw` bound is lossless — it
-// round-trips whatever the producer held, fabricating nothing — so there is no
-// empty mandatory suffix to find. The consequence is worth stating plainly: a
-// Go-zero DV_SCALE bound is carried as a `|raw` fragment with an empty
-// `symbol.defining_code`, which is RM-invalid but faithfully the producer's own
-// value, not one this codec invented. Refusing it would be a new policy on a
-// surface no corpus body exercises; giving DV_SCALE a `capturedKeys` entry would
-// bring it inside this check instead.
+// It fires for DV_SCALE too, since 2026-08-06: DV_SCALE gained a [capturedKeys]
+// entry and the DV_ORDINAL suffix set, so a Go-zero bound now spells an empty
+// mandatory `|code` and is refused here rather than riding out as a fabricated
+// `|raw` fragment. Only one anchor stays outside the check — the abstract
+// `DV_INTERVAL<DV_ORDERED>`, which has no [capturedKeys] entry and whose bound
+// rides `|raw` whole, losslessly, with nothing to fabricate.
 func emptyMandatorySuffix(sub map[string]any, path, anchor string) (string, bool) {
 	ctor, known := typereg.Default.Lookup(anchor)
 	if !known {
