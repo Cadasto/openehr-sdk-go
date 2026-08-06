@@ -1376,6 +1376,18 @@ requirements:
     # the uri, and the explicit subject|_type: PARTY_SELF at an RM-optional
     # PARTY_PROXY.
     #
+    # Boundary tidied 2026-08-06 (no behaviour change): the three LEAF datatype
+    # rows this grammar's machinery enabled -- DV_PARSABLE, DV_MULTIMEDIA and
+    # DV_INTERVAL<T> -- moved out of wire.md § REQ-140's table into § REQ-053
+    # § Leaf datatypes, where the other leaf suffix sets live. Each is reachable
+    # at a Web Template leaf with no `_` segment at all, so REQ-053 owns them;
+    # this grammar reaches the same three through nested VALUE positions
+    # (_thumbnail, original_content, an interval bound) and applies their leaf
+    # rules verbatim. The behavioural rules stayed here, cross-referenced from
+    # the moved rows: the DV_MULTIMEDIA bare-code terminology rule (it governs
+    # the underscore CODE_PHRASE members too) and the interval boundary flags
+    # (introduced by _normal_range, shared with the leaf).
+    #
     # STILL DEFERRED (refused loudly and none dropped, except the composer
     # boundary noted below, which encode projects rather than refuses):
     # _instruction_details

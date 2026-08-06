@@ -60,7 +60,7 @@ func TestDVParsableLeafRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDVParsableHalfSpelledRefused — REQ-140. `value` and `formalism` are both
+// TestDVParsableHalfSpelledRefused — REQ-053. `value` and `formalism` are both
 // RM-mandatory on DV_PARSABLE, so half a leaf must not decode to a coerced
 // empty string.
 func TestDVParsableHalfSpelledRefused(t *testing.T) {
@@ -149,7 +149,7 @@ func TestDVMultimediaLeafRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDVMultimediaMandatorySuffixesRequired — REQ-140. `media_type` and `size`
+// TestDVMultimediaMandatorySuffixesRequired — REQ-053. `media_type` and `size`
 // are RM-mandatory on DV_MULTIMEDIA; a body spelling neither must not decode to
 // a zero-valued one.
 func TestDVMultimediaMandatorySuffixesRequired(t *testing.T) {
@@ -256,7 +256,7 @@ func TestDVIntervalLeafRoundTrip(t *testing.T) {
 	}
 }
 
-// TestDVIntervalLeafBareBound — REQ-140. The bound is decoded and emitted by the
+// TestDVIntervalLeafBareBound — REQ-053/REQ-140. The bound is decoded and emitted by the
 // anchor datatype's own machinery, so a DV_COUNT interval carries bare bounds.
 func TestDVIntervalLeafBareBound(t *testing.T) {
 	wt, _ := conformanceWT(t)
@@ -267,7 +267,7 @@ func TestDVIntervalLeafBareBound(t *testing.T) {
 	})
 }
 
-// TestDVIntervalLeafBogusSubPathRefused — REQ-140. The interval leaf's grammar is
+// TestDVIntervalLeafBogusSubPathRefused — REQ-053/REQ-140. The interval leaf's grammar is
 // closed: a sub-path that is neither `/lower` nor `/upper` is refused naming the
 // key rather than resolving as a Web Template child that does not exist.
 func TestDVIntervalLeafBogusSubPathRefused(t *testing.T) {

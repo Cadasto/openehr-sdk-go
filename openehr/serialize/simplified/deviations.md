@@ -219,7 +219,8 @@ turned red. Round-tripped both ways in `structured_test.go`
 (`TestBareLeafBesideMembersThroughStructured`, `TestBareStructuredMemberIsTheEmptySuffix`) for
 every shape that used to collide. **Not corpus-pinned:** no vendored STRUCTURED fixture
 exercises the shape, so `"|"` is this codec's choice within the format's own conventions, and
-wire.md § REQ-053 records it as such.
+wire.md § REQ-053 states it normatively as such — the object form, the empty-suffix reading in
+both interconversion directions, and the bare-scalar rule for a leaf that cannot collide.
 
 **DV_SCALE takes the DV_ORDINAL suffix set — CLOSED 2026-08-06 (PR #89 review).** DV_SCALE
 is DV_ORDINAL with a Real `value`, and was the one `DV_*` with no `capturedKeys` and no
