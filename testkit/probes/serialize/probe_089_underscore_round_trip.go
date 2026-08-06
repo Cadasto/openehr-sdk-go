@@ -121,7 +121,7 @@ func (c Probe089Case) Body() map[string]any {
 var Probe089Inputs = []Probe089Case{
 	{
 		Name: "locatable_uid_and_link",
-		Rows: []string{"any LOCATABLE: _uid", "any LOCATABLE: _link:N"},
+		Rows: []string{"modelled LOCATABLE: _uid", "modelled LOCATABLE: _link:N"},
 		Keys: map[string]any{
 			// The concrete UID_BASED_ID subtype is re-derived from the lexical
 			// form, so the root's three-part id and the bare UUIDs below must
@@ -340,7 +340,7 @@ var Probe089Inputs = []Probe089Case{
 	{
 		Name: "feeder_audit_recursive",
 		Rows: []string{
-			"any LOCATABLE: _feeder_audit",
+			"modelled LOCATABLE: _feeder_audit",
 			"FEEDER_AUDIT: originating_system_item_id:N / feeder_system_item_id:N",
 			"FEEDER_AUDIT_DETAILS: |system_id, |version_id, |time, /location, /subject, /provider",
 			"FEEDER_AUDIT: original_content (DV_PARSABLE)",

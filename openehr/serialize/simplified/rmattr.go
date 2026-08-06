@@ -127,7 +127,9 @@ type rmattrFamily struct {
 // Which *owners* admit a family is not listed here: it is read off the RM
 // itself (rminfo), so `_work_flow_id` is ENTRY-only because only the five ENTRY
 // subtypes declare `workflow_id`, and `_uid` reaches every LOCATABLE because
-// they all declare `uid`. That is the spec's own rule ("the node it belongs
+// they all declare `uid`. That is RM *admissibility*; which of those LOCATABLEs
+// a FLAT key can actually address is a separate, narrower question the Web
+// Template answers (see deviations.md § folded structural wrappers). That is the spec's own rule ("the node it belongs
 // to") rather than a table that could drift from the BMM. For a `value` family
 // the class consulted is the leaf datatype instead (rmattr_value.go), which is
 // what makes `_normal_range` DV_ORDERED-only and `_mapping` DV_TEXT-only.
@@ -489,7 +491,9 @@ var rmattrBareOnly = map[string]bool{"": true}
 
 // --- families -----------------------------------------------------------
 
-// decodeRMAttrUID decodes `_uid` on any LOCATABLE. See the file comment for the
+// decodeRMAttrUID decodes `_uid` on any LOCATABLE the Web Template models (a
+// folded structural wrapper has no FLAT key, so none ever reaches decode). See
+// the file comment for the
 // subtype policy.
 func decodeRMAttrUID(g rmattrGroup, _ string) (any, error) {
 	if err := checkRMAttrTails(g, rmattrBareOnly); err != nil {

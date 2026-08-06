@@ -265,9 +265,9 @@ func TestProbe089(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		"any LOCATABLE: _uid",
-		"any LOCATABLE: _link:N",
-		"any LOCATABLE: _feeder_audit",
+		"modelled LOCATABLE: _uid",
+		"modelled LOCATABLE: _link:N",
+		"modelled LOCATABLE: _feeder_audit",
 		"collapsed ELEMENT: _null_flavour",
 		"ENTRY: _work_flow_id",
 		"ENTRY: _other_participation:N",
