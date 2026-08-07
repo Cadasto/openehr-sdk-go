@@ -3,6 +3,7 @@ package aql
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 )
 
@@ -42,13 +43,43 @@ type WhereExpr interface {
 // the WHERE predicate back to AQL without depending on package-local
 // internals.
 func FormatWhere(w WhereExpr) (string, error) {
-	if w == nil {
+	pred, ok := derefWhere(w)
+	if !ok {
+		// No predicate at all — the documented "no WHERE clause" case. A
+		// typed-nil lands here too: it denotes no predicate just as an untyped
+		// nil does, and at the TOP level that is a clause the caller does not
+		// have. Inside a composite the same absence is refused instead, because
+		// there an operand that vanishes changes what the query asks.
 		return "", nil
 	}
-	if err := w.validate(); err != nil {
+	if err := pred.validate(); err != nil {
 		return "", err
 	}
-	return w.expr(), nil
+	return pred.expr(), nil
+}
+
+// derefWhere normalises a [WhereExpr] to the predicate it denotes, reporting
+// false when it denotes none.
+//
+// The value-receiver problem [DerefValue] solves for values applies to the
+// predicate vocabulary too: expr and validate have value receivers, so
+// `*Comparison` satisfies WhereExpr and calling either on a nil one panics.
+// Every entry point that dispatches on a caller-supplied predicate — the top
+// level, a [NotExpr] operand, a [Junction] term — MUST come through here, or a
+// public boundary crashes instead of refusing.
+func derefWhere(w WhereExpr) (WhereExpr, bool) {
+	if w == nil {
+		return nil, false
+	}
+	rv := reflect.ValueOf(w)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil, false
+		}
+		rv = rv.Elem()
+	}
+	inner, ok := rv.Interface().(WhereExpr)
+	return inner, ok
 }
 
 // FormatValue renders an [aql.Value] to canonical AQL text (the same
@@ -261,8 +292,16 @@ func (j Junction) expr() string {
 }
 
 func (j Junction) validate() error {
-	for _, t := range j.Terms {
-		if err := t.validate(); err != nil {
+	for i, t := range j.Terms {
+		// A term denoting no predicate is refused, not skipped: dropping an
+		// arm of an AND/OR widens or narrows the result set silently. The
+		// constructors ([And] / [Or]) already drop an UNTYPED nil before a
+		// Junction is built, so reaching here means a hand-assembled tree.
+		term, ok := derefWhere(t)
+		if !ok {
+			return fmt.Errorf("%w: %s junction term %d carries no predicate", ErrInvalidQuery, string(j.Op), i)
+		}
+		if err := term.validate(); err != nil {
 			return err
 		}
 	}
@@ -318,10 +357,14 @@ func (n NotExpr) expr() string {
 }
 
 func (n NotExpr) validate() error {
-	if n.Operand == nil {
+	// Refused rather than emitted as a bare `NOT`: a negation with nothing to
+	// negate has no reading. A typed-nil operand denotes the same absence as an
+	// untyped one, so both land here instead of panicking in validate.
+	operand, ok := derefWhere(n.Operand)
+	if !ok {
 		return fmt.Errorf("%w: NOT with nil operand", ErrInvalidQuery)
 	}
-	return n.Operand.validate()
+	return operand.validate()
 }
 
 // Not constructs a [NotExpr]. A nil operand yields nil (the emitter has

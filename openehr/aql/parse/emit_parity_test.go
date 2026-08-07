@@ -266,13 +266,17 @@ func TestEmitRefusesMisplacedJunction(t *testing.T) {
 }
 
 // TestEmitRefusesIncompleteContainment — REQ-119. [aql.Containment.validateTree]
-// refuses a class node without an RM type and alias; Emit had no counterpart, so
-// the read/write parity claim held only for the junction-placement rule.
+// refuses a class node without an RM type; Emit had no counterpart, so the
+// read/write parity claim held only for the junction-placement rule.
 //
 // It matters twice over, because the read side infers the node KIND from an
 // absent RMType: an incomplete class node otherwise looks like a junction, so it
 // either emitted a dangling `CONTAINS ` or got diagnosed as a misplaced junction
 // the caller never wrote. Completeness is therefore checked first.
+//
+// An ALIAS is deliberately not required — see
+// TestEmitAcceptsAnAliaslessContainment, which locks that in so the check is
+// not "tightened" into refusing valid AQL.
 func TestEmitRefusesIncompleteContainment(t *testing.T) {
 	class := func(rmType, alias string) parse.Containment {
 		return parse.Containment{Class: parse.ClassExpr{RMType: rmType, Alias: alias}}
@@ -412,9 +416,20 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 			parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}}},
 		}},
 		"TERMINOLOGY 3 strings": parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("expand", "//fhir", "url=x")},
-		"string literal":        parse.LiteralExpr{Value: aql.String("O'Brien")},
-		"real literal":          parse.LiteralExpr{Value: aql.Real(2)},
-		"func literal":          parse.LiteralExpr{Value: aql.Func("LENGTH", aql.Path("c/x"))},
+		// The POINTER twin of the same three arguments. A `*aql.StringValue` is
+		// a string literal too, and the value-position guard already accepts
+		// one, so refusing it here bound the same rule to one carrier only
+		// (REQ-119, "every shape, including its pointer twin").
+		"TERMINOLOGY 3 pointer strings": parse.FunctionCall{Name: "TERMINOLOGY", Args: []parse.SelectExpr{
+			parse.LiteralExpr{Value: &aql.StringValue{S: "expand"}},
+			parse.LiteralExpr{Value: &aql.StringValue{S: "//fhir"}},
+			parse.LiteralExpr{Value: &aql.StringValue{S: "url=x"}},
+		}},
+		"pointer string literal": parse.LiteralExpr{Value: &aql.StringValue{S: "O'Brien"}},
+		"pointer func literal":   parse.LiteralExpr{Value: &aql.FuncCall{Name: "LENGTH", Args: []aql.Value{aql.Path("c/x")}}},
+		"string literal":         parse.LiteralExpr{Value: aql.String("O'Brien")},
+		"real literal":           parse.LiteralExpr{Value: aql.Real(2)},
+		"func literal":           parse.LiteralExpr{Value: aql.Func("LENGTH", aql.Path("c/x"))},
 	} {
 		t.Run("emits/"+name, func(t *testing.T) {
 			out, err := mk(e).Emit()
@@ -446,7 +461,11 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 			if !ok {
 				return
 			}
-			if _, isCall := lit.Value.(aql.FuncCall); isCall {
+			// Normalised, because a `*aql.FuncCall` is a projected call too —
+			// this carve-out had the very shape-vs-pointer-twin bug the guards
+			// under test exist to prevent, and the pointer case below caught it.
+			inner, _ := aql.DerefValue(lit.Value)
+			if _, isCall := inner.(aql.FuncCall); isCall {
 				if _, ok := doc.Select.Items[0].Expr.(parse.FunctionCall); !ok {
 					t.Errorf("a FuncCall carried in a LiteralExpr came back %T, want parse.FunctionCall",
 						doc.Select.Items[0].Expr)
@@ -554,4 +573,113 @@ func TestFormatWhereDoesNotPanicOnItsOwnRefusalPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestEmitAcceptsAnAliaslessContainment locks in what Emit must NOT refuse.
+//
+// The completeness walk checks the RM type and deliberately says nothing about
+// the alias: `classExprOperand` takes the alias as optional, so an alias-less
+// CONTAINS is valid AQL that ParseQuery accepts. [aql.Builder] does require one,
+// which makes "Build refuses it, so Emit should too" a tempting and WRONG
+// inference — it would have Emit reject a query the parser had just read.
+//
+// Every other Emit fixture carries aliases, so without this case a tightened
+// check would pass CI.
+func TestEmitAcceptsAnAliaslessContainment(t *testing.T) {
+	for _, q := range []string{
+		"SELECT c/x FROM COMPOSITION c CONTAINS OBSERVATION",
+		"SELECT c/x FROM COMPOSITION c CONTAINS OBSERVATION CONTAINS CLUSTER",
+		"SELECT c/x FROM COMPOSITION CONTAINS OBSERVATION o",
+		"SELECT * FROM EHR",
+	} {
+		t.Run(q, func(t *testing.T) {
+			doc, err := parse.ParseQuery(q)
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			out, err := doc.Emit()
+			if err != nil {
+				t.Fatalf("Emit refused AQL that ParseQuery accepted: %v", err)
+			}
+			if out != q {
+				t.Errorf("Emit = %q, want the canonical input %q", out, q)
+			}
+		})
+	}
+}
+
+// TestFormatWhereDoesNotPanicOnATypedNilPredicate — the WhereExpr sibling of
+// the Value-side pointer-twin rule.
+//
+// expr and validate have value receivers, so `*Comparison` satisfies WhereExpr
+// and calling either on a nil one panics. Absence means the same thing in both
+// vocabularies but has different consequences by POSITION: at the top level a
+// missing predicate is simply no WHERE clause, while inside a NOT or a junction
+// an operand that vanished would silently change what the query asks, so it is
+// refused there.
+func TestFormatWhereDoesNotPanicOnATypedNilPredicate(t *testing.T) {
+	nilCmp := (*aql.Comparison)(nil)
+
+	t.Run("top level denotes no clause", func(t *testing.T) {
+		for name, w := range map[string]aql.WhereExpr{
+			"untyped nil":            nil,
+			"typed-nil *Comparison":  nilCmp,
+			"typed-nil *MatchesExpr": (*aql.MatchesExpr)(nil),
+			"typed-nil *Junction":    (*aql.Junction)(nil),
+			"typed-nil *NotExpr":     (*aql.NotExpr)(nil),
+		} {
+			t.Run(name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("FormatWhere panicked: %v", r)
+					}
+				}()
+				out, err := aql.FormatWhere(w)
+				if err != nil || out != "" {
+					t.Errorf("out=%q err=%v, want \"\" and no error", out, err)
+				}
+			})
+		}
+	})
+
+	t.Run("inside a composite it is refused", func(t *testing.T) {
+		for name, w := range map[string]aql.WhereExpr{
+			"NOT operand":   aql.NotExpr{Operand: nilCmp},
+			"AND term":      aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{aql.Eq("c/x", aql.Int(1)), nilCmp}},
+			"OR term first": aql.Junction{Op: aql.OpOr, Terms: []aql.WhereExpr{nilCmp, aql.Eq("c/x", aql.Int(1))}},
+			"nested":        aql.NotExpr{Operand: aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{nilCmp}}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("FormatWhere panicked: %v", r)
+					}
+				}()
+				out, err := aql.FormatWhere(w)
+				if !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Fatalf("err = %v, want ErrInvalidQuery", err)
+				}
+				if out != "" {
+					t.Errorf("a refused predicate still emitted %q", out)
+				}
+			})
+		}
+	})
+
+	// A pointer to a POPULATED predicate must still render, identically to the
+	// value shape — the guard normalises, it does not reject pointers.
+	t.Run("populated pointer renders", func(t *testing.T) {
+		c := aql.Comparison{Path: "c/x", Op: aql.OpEq, Val: aql.Int(1)}
+		viaPtr, err := aql.FormatWhere(&c)
+		if err != nil {
+			t.Fatalf("pointer predicate refused: %v", err)
+		}
+		viaVal, err := aql.FormatWhere(c)
+		if err != nil {
+			t.Fatalf("value predicate refused: %v", err)
+		}
+		if viaPtr != viaVal {
+			t.Errorf("pointer rendered %q, value %q", viaPtr, viaVal)
+		}
+	})
 }

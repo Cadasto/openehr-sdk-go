@@ -537,7 +537,16 @@ func validateSelectTerminology(v FunctionCall) error {
 			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
 				aql.ErrInvalidQuery, aql.TerminologyFunc, i, a)
 		}
-		if _, ok := lit.Value.(aql.StringValue); !ok {
+		// Normalise before the shape check: a `*aql.StringValue` is a string
+		// literal too, and the value-position guard (aql.ValidateValue) already
+		// accepts one, so matching the value shape alone made the SAME rule
+		// bind one carrier and not the other (REQ-119, "every shape, including
+		// its pointer twin").
+		arg, ok := aql.DerefValue(lit.Value)
+		if !ok {
+			return fmt.Errorf("%w: %s() argument %d has no value", aql.ErrInvalidQuery, aql.TerminologyFunc, i)
+		}
+		if _, isString := arg.(aql.StringValue); !isString {
 			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
 				aql.ErrInvalidQuery, aql.TerminologyFunc, i, lit.Value)
 		}

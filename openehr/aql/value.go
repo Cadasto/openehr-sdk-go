@@ -362,6 +362,23 @@ func Terminology(operation, api, params string) Value {
 // handing it to the unvalidated [FormatValue].
 func ValidateValue(v Value) error { return validateValue(v) }
 
+// DerefValue normalises a [Value] to the value shape it denotes, reporting
+// false when it denotes none — an untyped nil, or a nil pointer.
+//
+// It is the sanctioned way to answer "which shape is this?" about a Value.
+// token has a value receiver, so `*FuncCall` satisfies Value alongside
+// `FuncCall`, and a bare type switch that lists only the value shapes silently
+// misses every pointer twin — which is reachable without anyone writing `&`,
+// since [MatchesExpr.Terminology] is itself a `*FuncCall`. Any code deciding
+// behaviour from a Value's concrete type MUST normalise first, whether it lives
+// in this package or in a write path outside it, or the same rule will bind one
+// carrier and not the other (REQ-119).
+//
+//	if s, ok := aql.DerefValue(v); ok {
+//	    if lit, isString := s.(aql.StringValue); isString { … }
+//	}
+func DerefValue(v Value) (Value, bool) { return derefValue(v) }
+
 func validateValue(v Value) error {
 	// A pointer shape satisfies Value (token has a value receiver), and the
 	// switch below matches only value shapes — so without this every `*FuncCall`
