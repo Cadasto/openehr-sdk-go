@@ -1,6 +1,7 @@
 package aql
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -53,6 +54,13 @@ func FormatWhere(w WhereExpr) (string, error) {
 // FormatValue renders an [aql.Value] to canonical AQL text (the same
 // emission the Builder uses internally). Returns "" for a nil Value.
 // Mirrors [FormatWhere] for the value side of the vocabulary.
+//
+// UNLIKE [FormatWhere], it does NOT validate: it has no error to return, so it
+// cannot refuse, and a value the grammar has no spelling for renders as its Go
+// text (`+Inf`, `NaN`) or as a call the parser rejects. It is therefore the
+// deliberate escape hatch for a value the caller has already checked, and is
+// excluded from REQ-119's round-trip closure guarantee for that reason. Call
+// [ValidateValue] first if the value did not come from a validated source.
 func FormatValue(v Value) string {
 	if v == nil {
 		return ""
@@ -413,11 +421,6 @@ func (m MatchesExpr) validate() error {
 	return nil
 }
 
-// uriTailChars are the characters the grammar's URI token admits after the
-// scheme — the union of URI_UNRESERVED, URI_SUB_DELIMS, URI_GEN_DELIMS and the
-// `%` that leads URI_PCT_ENCODED (resources/aql/grammar/active/AqlLexer.g4).
-const uriTailChars = "-._~" + "!$&'()*+,;=" + ":/?#[]@" + "%"
-
 // validateURIOperand refuses a `MATCHES {uri}` operand the grammar's URI token
 // cannot carry.
 //
@@ -428,45 +431,259 @@ const uriTailChars = "-._~" + "!$&'()*+,;=" + ":/?#[]@" + "%"
 // MATCHES {uri://b}` — that no round-trip, golden, or parser check can catch.
 // Refusing at validation is the only place the substitution is visible.
 //
-// This is a character-level guard against exactly that class, not a full
-// RFC-3986 parse: it pins the scheme shape and rejects every byte outside the
-// token's alphabet (`}`, whitespace, quotes, `<`, `>`, `\`, `^`, `|`, backtick
-// and the controls). A structurally odd but in-alphabet URI still reaches the
-// wire, where the backend is the authority — the same division of labour the
-// SDK keeps everywhere else (PROBE-021).
+// The check is POSITIONAL, following the token's own decomposition (`URI :
+// URI_SCHEME ':' URI_HIER_PART ( '?' URI_QUERY )? ( '#' URI_FRAGMENT )?`,
+// resources/aql/grammar/active/AqlLexer.g4), because a flat union of the
+// delimiter sets is not what the token admits: `%` leads `URI_PCT_ENCODED` and
+// so requires two hex digits, `[`/`]` occur only as an `URI_IP_LITERAL` host,
+// and `#` separates the fragment once and appears nowhere inside it. A flat
+// alphabet accepted all three and emitted AQL this SDK's own parser rejects
+// (REQ-119).
+//
+// It is still not an RFC-3986 parser: `URI_REG_NAME`, `URI_PORT` and
+// `URI_PATH_*` are character classes in this grammar, so a structurally odd but
+// spellable URI (an empty host, a dotted-quad out of range) reaches the wire,
+// where the backend stays the authority — the same division of labour the SDK
+// keeps everywhere else (PROBE-021). The property this guard owes is narrower
+// and testable: whatever it accepts MUST come back from ParseQuery as one
+// MATCHES predicate on the same URI.
 func validateURIOperand(uri, path string) error {
-	// URI : URI_SCHEME ':' … with URI_SCHEME : ALPHA_CHAR ( ALPHA_CHAR | DIGIT
-	// | '+' | '-' | '.' )* — an absent scheme is the commonest way a caller
-	// passes something that is not a URI at all.
+	bad := func(what string, detail any) error {
+		return fmt.Errorf("%w: MATCHES on %q carries a URI %s (%v): %q",
+			ErrInvalidQuery, path, what, detail, uri)
+	}
+	// URI_SCHEME : ALPHA_CHAR ( ALPHA_CHAR | DIGIT | '+' | '-' | '.' )* — an
+	// absent scheme is the commonest way a caller passes something that is not
+	// a URI at all.
 	scheme, rest, ok := strings.Cut(uri, ":")
 	if !ok || scheme == "" {
-		return fmt.Errorf("%w: MATCHES on %q carries a URI operand with no scheme: %q", ErrInvalidQuery, path, uri)
+		return bad("operand", "no scheme")
 	}
 	if !asciiLetter(scheme[0]) {
-		return fmt.Errorf("%w: MATCHES on %q carries a URI whose scheme does not start with a letter: %q", ErrInvalidQuery, path, uri)
+		return bad("whose scheme does not start with a letter", scheme)
 	}
 	for i := range len(scheme) {
 		if c := scheme[i]; !schemeChar(c) {
-			return fmt.Errorf("%w: MATCHES on %q carries a URI with an invalid scheme character %q: %q", ErrInvalidQuery, path, string(rune(c)), uri)
+			return bad("with an invalid scheme character", string([]byte{c}))
 		}
 	}
-	for i := range len(rest) {
-		if c := rest[i]; !uriTailChar(c) {
-			return fmt.Errorf("%w: MATCHES on %q carries a URI with %q, which the AQL URI token cannot spell: %q", ErrInvalidQuery, path, string(rune(c)), uri)
+
+	// The fragment comes off first and the query second, so a '?' inside the
+	// fragment stays part of it (URI_FRAGMENT admits '?', URI_QUERY does not
+	// admit '#').
+	hier, frag, hasFrag := strings.Cut(rest, "#")
+	hier, query, _ := strings.Cut(hier, "?")
+	if hasFrag {
+		if strings.Contains(frag, "#") {
+			return bad("with a second", "'#' — URI_FRAGMENT admits none")
+		}
+		if err := checkURIRun(frag, uriQueryByte); err != nil {
+			return bad("whose fragment is unspellable", err)
+		}
+	}
+	if err := checkURIRun(query, uriQueryByte); err != nil {
+		return bad("whose query is unspellable", err)
+	}
+
+	// URI_HIER_PART : '//' URI_AUTHORITY URI_PATH_ABEMPTY | URI_PATH_ABSOLUTE
+	// | URI_PATH_ROOTLESS | URI_PATH_EMPTY. Only the authority form admits a
+	// bracketed host, so brackets are refused everywhere else by URI_PCHAR.
+	if authority, ok := strings.CutPrefix(hier, "//"); ok {
+		// URI_PATH_ABEMPTY starts at the first '/', so everything before it is
+		// the authority and the rest stays with the path check below.
+		hier = ""
+		if slash := strings.IndexByte(authority, '/'); slash >= 0 {
+			authority, hier = authority[:slash], authority[slash:]
+		}
+		if err := checkURIAuthority(authority); err != nil {
+			return bad("whose authority is unspellable", err)
+		}
+	}
+	if err := checkURIRun(hier, uriPathByte); err != nil {
+		return bad("whose path is unspellable", err)
+	}
+	// Spellable as a URI is necessary but not sufficient: the operand is lexed
+	// on its own between the braces, and TERM_CODE is declared BEFORE URI
+	// (AqlLexer.g4:174 vs :179), so on an equal-length match it wins the tie and
+	// `matchesOperand` — which admits URI and not TERM_CODE — rejects the token.
+	if termCodeShadows(uri) {
+		return bad("that lexes as a TERM_CODE rather than a URI", "the operand is <term>::<code>, "+
+			"which MATCHES admits only as an archetype-predicate operand")
+	}
+	return nil
+}
+
+// termCodeShadows reports whether the whole text matches `TERM_CODE :
+// TERM_CODE_CHAR+ ( '(' TERM_CODE_CHAR+ ')' )? '::' TERM_CODE_CHAR+ ( '|'
+// ~[|[\]]+ '|' )?`, in which case the lexer prefers TERM_CODE over URI.
+//
+// `TERM_CODE_CHAR : NAME_CHAR | '.'` admits no `:` and no `/`, which is why
+// `a::/b` and `a:::b` stay URIs while `SNOMED-CT::73211009` does not.
+func termCodeShadows(s string) bool {
+	if display, ok := strings.CutSuffix(s, "|"); ok {
+		// The optional trailing `'|' ~[|[\]]+ '|'` display name.
+		head, inner, found := strings.Cut(display, "|")
+		if !found || inner == "" || strings.ContainsAny(inner, "|[]") {
+			return false
+		}
+		s = head
+	}
+	head, code, ok := strings.Cut(s, "::")
+	if !ok {
+		return false
+	}
+	if open := strings.IndexByte(head, '('); open >= 0 {
+		// The optional parenthesised `( '(' TERM_CODE_CHAR+ ')' )` qualifier.
+		closed, ok := strings.CutSuffix(head[open+1:], ")")
+		if !ok || !allTermCodeChars(closed) {
+			return false
+		}
+		head = head[:open]
+	}
+	return allTermCodeChars(head) && allTermCodeChars(code)
+}
+
+func allTermCodeChars(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := range len(s) {
+		if c := s[i]; !wordChar(c) && c != '-' && c != '.' {
+			return false
+		}
+	}
+	return true
+}
+
+// checkURIAuthority checks `( URI_USERINFO '@' )? URI_HOST ( ':' URI_PORT )?`.
+func checkURIAuthority(authority string) error {
+	if userinfo, host, ok := strings.Cut(authority, "@"); ok {
+		if err := checkURIRun(userinfo, uriUserinfoByte); err != nil {
+			return fmt.Errorf("userinfo: %w", err)
+		}
+		authority = host
+	}
+	// URI_IP_LITERAL : '[' URI_IPV6_LITERAL ']' is the only bracketed form, and
+	// it is the whole host, so anything after ']' can only be `:` port.
+	if rest, ok := strings.CutPrefix(authority, "["); ok {
+		lit, tail, closed := strings.Cut(rest, "]")
+		if !closed {
+			return errors.New("'[' opens an IP literal that is never closed")
+		}
+		if err := checkURIIPv6(lit); err != nil {
+			return err
+		}
+		if tail == "" {
+			return nil
+		}
+		port, isPort := strings.CutPrefix(tail, ":")
+		if !isPort {
+			return fmt.Errorf("%q follows the IP literal; only \":\" port may", tail)
+		}
+		return checkURIPort(port)
+	}
+	// URI_HOST : URI_IPV4_ADDRESS | URI_REG_NAME — both are drawn from the
+	// reg-name alphabet, so one check covers them; a trailing `:digits*` is
+	// URI_PORT (which the grammar lets be empty).
+	if host, port, ok := strings.Cut(authority, ":"); ok {
+		if err := checkURIPort(port); err != nil {
+			return err
+		}
+		authority = host
+	}
+	if err := checkURIRun(authority, uriRegNameByte); err != nil {
+		return fmt.Errorf("host: %w", err)
+	}
+	return nil
+}
+
+// checkURIIPv6 checks URI_IPV6_LITERAL : HEX_QUAD (':' HEX_QUAD)* '::' HEX_QUAD
+// (':' HEX_QUAD)* — note this grammar REQUIRES the `::` and a full quad on each
+// side, so the common abbreviations (`::1`, `2001:db8::1`) are not spellable.
+func checkURIIPv6(lit string) error {
+	left, right, ok := strings.Cut(lit, "::")
+	if !ok {
+		return fmt.Errorf("IPv6 literal %q carries no \"::\", which URI_IPV6_LITERAL requires", lit)
+	}
+	if strings.Contains(right, "::") {
+		return fmt.Errorf("IPv6 literal %q carries more than one \"::\"", lit)
+	}
+	for _, half := range []string{left, right} {
+		if half == "" {
+			return fmt.Errorf("IPv6 literal %q omits a group; URI_IPV6_LITERAL requires a quad either side of \"::\"", lit)
+		}
+		for quad := range strings.SplitSeq(half, ":") {
+			if len(quad) != 4 {
+				return fmt.Errorf("IPv6 literal %q carries %q; URI_IPV6_LITERAL admits only 4-digit hex quads", lit, quad)
+			}
+			for i := range len(quad) {
+				if !hexDigit(quad[i]) {
+					return fmt.Errorf("IPv6 literal %q carries a non-hex digit in %q", lit, quad)
+				}
+			}
 		}
 	}
 	return nil
 }
 
-// schemeChar spells URI_SCHEME's tail set; uriTailChar spells everything the
-// token admits after the scheme separator.
+// checkURIPort checks URI_PORT : DIGIT* (empty is admitted by the grammar).
+func checkURIPort(port string) error {
+	for i := range len(port) {
+		if c := port[i]; c < '0' || c > '9' {
+			return fmt.Errorf("port %q is not URI_PORT : DIGIT*", port)
+		}
+	}
+	return nil
+}
+
+// checkURIRun walks one URI component, admitting a byte that passes admits or a
+// `%HH` triple (URI_PCT_ENCODED). `%` is handled here rather than in the byte
+// predicates because it is the one place the token is not a character class.
+func checkURIRun(s string, admits func(byte) bool) error {
+	for i := 0; i < len(s); {
+		if c := s[i]; c == '%' {
+			if i+2 >= len(s) || !hexDigit(s[i+1]) || !hexDigit(s[i+2]) {
+				return fmt.Errorf("%q is not URI_PCT_ENCODED : '%%' HEX_DIGIT HEX_DIGIT", s[i:min(i+3, len(s))])
+			}
+			i += 3
+			continue
+		} else if !admits(c) {
+			return fmt.Errorf("%q is outside the alphabet of this position", string([]byte{c}))
+		}
+		i++
+	}
+	return nil
+}
+
+// The byte predicates below spell the grammar's URI fragments. `%` is never
+// admitted by one — [checkURIRun] owns URI_PCT_ENCODED.
 func schemeChar(c byte) bool {
 	return asciiLetter(c) || (c >= '0' && c <= '9') || strings.IndexByte("+-.", c) >= 0
 }
 
-func uriTailChar(c byte) bool {
-	return asciiLetter(c) || (c >= '0' && c <= '9') || strings.IndexByte(uriTailChars, c) >= 0
+func hexDigit(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }
+
+// uriUnreservedByte spells URI_UNRESERVED; uriSubDelimByte spells URI_SUB_DELIMS.
+func uriUnreservedByte(c byte) bool {
+	return asciiLetter(c) || (c >= '0' && c <= '9') || strings.IndexByte("-._~", c) >= 0
+}
+
+func uriSubDelimByte(c byte) bool { return strings.IndexByte("!$&'()*+,;=", c) >= 0 }
+
+// uriRegNameByte spells URI_REG_NAME; uriUserinfoByte adds ':'; uriPcharByte
+// adds ':' and '@'; uriPathByte adds '/'; uriQueryByte adds '/' and '?' (which
+// is also URI_FRAGMENT's set).
+func uriRegNameByte(c byte) bool { return uriUnreservedByte(c) || uriSubDelimByte(c) }
+
+func uriUserinfoByte(c byte) bool { return uriRegNameByte(c) || c == ':' }
+
+func uriPcharByte(c byte) bool { return uriUserinfoByte(c) || c == '@' }
+
+func uriPathByte(c byte) bool { return uriPcharByte(c) || c == '/' }
+
+func uriQueryByte(c byte) bool { return uriPathByte(c) || c == '?' }
 
 // Matches constructs a [MatchesExpr] over a braced value list.
 func Matches(path string, values ...Value) WhereExpr {

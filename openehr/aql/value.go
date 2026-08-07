@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // Value is a value position in a query — a bound parameter, a literal, an
@@ -27,6 +28,13 @@ import (
 // treat an unrecognised case as out-of-catalogue — refuse, skip, or
 // report — and MUST NOT panic on it.
 //
+// Every shape has a POINTER twin: token has a value receiver, so `*FuncCall`
+// and friends satisfy Value too, and [MatchesExpr.Terminology] is itself a
+// `*FuncCall`. A consumer type-switching over Value MUST therefore either
+// handle `case *aql.FuncCall:` alongside `case aql.FuncCall:` or route through
+// [EqualValues] / the validating emitters, which normalise a pointer to the
+// shape it points at.
+//
 // # Comparability
 //
 // A Value is NOT safe to compare with `==`, and MUST NOT be used as a map
@@ -44,30 +52,61 @@ type Value interface {
 }
 
 // EqualValues reports whether two values occupy the same value position — the
-// total, panic-free replacement for `==` on a [Value] (see § Comparability).
+// replacement for `==` on a [Value] (see § Comparability), panic-free over every
+// value and pointer shape of the catalogue, including a typed-nil pointer.
 //
-// Two values are equal when they have the same dynamic type and the same
-// canonical wire form. Defining it through the emitted token rather than
-// field-by-field keeps one rule for all eight shapes and ties equality to what
-// actually reaches the server: values that emit identical AQL are identical to
-// the query. Two consequences are worth naming — an [IntValue] never equals
-// the numerically equal [RealValue] (they emit `1` and `1.0`, and AQL types
-// them differently), and two [PathValue]s agree on their Raw text alone, so a
-// parsed path equals the hand-built one that emits the same text even though
-// only the parsed one carries decomposed segments.
+// Two values are equal when they have the same shape and the same canonical wire
+// form. Defining it through the emitted token rather than field-by-field keeps
+// one rule for all eight shapes and ties equality to what actually reaches the
+// server: values that emit identical AQL are identical to the query. Three
+// consequences are worth naming — an [IntValue] never equals the numerically
+// equal [RealValue] (they emit `1` and `1.0`, and AQL types them differently);
+// two [PathValue]s agree on their Raw text alone, so a parsed path equals the
+// hand-built one that emits the same text even though only the parsed one
+// carries decomposed segments; and a [FuncCall] whose Args carry a nil element
+// equals the same call without it, because [FuncCall.token] skips a nil argument
+// (the emitters refuse one outright, so this arises only for a value that never
+// passed validation).
 //
-// A nil value equals only another nil value. The type check is reflective
-// rather than a type switch so a shape added later (the set is additive) is
-// compared correctly the day it lands, instead of silently reporting unequal
-// to itself until someone remembers to extend a switch.
+// A pointer is compared as the shape it points at, so `&FuncCall{…}` equals the
+// equivalent `FuncCall{…}`; a nil value — untyped, or a typed-nil pointer —
+// equals only another nil value. The shape check is reflective rather than a
+// type switch so a shape added later (the set is additive) is compared correctly
+// the day it lands, instead of silently reporting unequal to itself until
+// someone remembers to extend a switch.
 func EqualValues(a, b Value) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
+	av, aok := derefValue(a)
+	bv, bok := derefValue(b)
+	if !aok || !bok {
+		return aok == bok
 	}
-	if reflect.TypeOf(a) != reflect.TypeOf(b) {
+	if reflect.TypeOf(av) != reflect.TypeOf(bv) {
 		return false
 	}
-	return a.token() == b.token()
+	return av.token() == bv.token()
+}
+
+// derefValue normalises a [Value] to its value shape, reporting false when
+// there is nothing to compare or emit — an untyped nil, or a nil pointer.
+//
+// token has a value receiver, so a pointer to any shape also satisfies Value,
+// and calling token on a NIL one panics ("value method … called using nil
+// pointer"). [MatchesExpr.Terminology] is a `*FuncCall`, so its zero value is
+// exactly that pointer; normalising here keeps every caller — validation,
+// equality — total over the shapes the API can hand them.
+func derefValue(v Value) (Value, bool) {
+	if v == nil {
+		return nil, false
+	}
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return nil, false
+		}
+		rv = rv.Elem()
+	}
+	inner, ok := rv.Interface().(Value)
+	return inner, ok
 }
 
 // ParamValue is a named placeholder. Name is the placeholder identifier
@@ -105,35 +144,56 @@ type StringValue struct {
 // The C0 controls with a defined escape are emitted in escaped form rather than
 // raw so canonical AQL stays single-line and printable; every other character
 // (including `"`) is admitted raw by the token and rides through unchanged.
+//
+// A byte that is not part of a valid UTF-8 sequence is emitted as the grammar's
+// `OCTAL_ESC` (`\NNN`). A Go string is a byte string, so one lifted from a
+// latin-1 source can carry such a byte; emitted raw it survives the token but
+// NOT the round trip, because the lexer decodes its input to runes and yields
+// U+FFFD instead — the value came back changed, with no error anywhere
+// (REQ-119). Octal is the only spelling the grammar has for an arbitrary byte.
 func (v StringValue) token() string {
 	var sb strings.Builder
 	sb.Grow(len(v.S) + 2)
 	sb.WriteByte('\'')
-	for i := range len(v.S) {
-		// Ranges bytes, not runes: every character this switch escapes is
-		// ASCII, and a multi-byte rune's continuation bytes are all >= 0x80,
-		// so they fall to the default arm and are copied through verbatim.
-		switch c := v.S[i]; c {
-		case '\\':
-			sb.WriteString(`\\`)
-		case '\'':
-			sb.WriteString(`\'`)
-		case '\a':
-			sb.WriteString(`\a`)
-		case '\b':
-			sb.WriteString(`\b`)
-		case '\f':
-			sb.WriteString(`\f`)
-		case '\n':
-			sb.WriteString(`\n`)
-		case '\r':
-			sb.WriteString(`\r`)
-		case '\t':
-			sb.WriteString(`\t`)
-		case '\v':
-			sb.WriteString(`\v`)
-		default:
-			sb.WriteByte(c)
+	for i := 0; i < len(v.S); {
+		c := v.S[i]
+		if c < utf8.RuneSelf {
+			// Every character the grammar makes us escape is ASCII, so the
+			// switch only ever sees a single-byte rune.
+			switch c {
+			case '\\':
+				sb.WriteString(`\\`)
+			case '\'':
+				sb.WriteString(`\'`)
+			case '\a':
+				sb.WriteString(`\a`)
+			case '\b':
+				sb.WriteString(`\b`)
+			case '\f':
+				sb.WriteString(`\f`)
+			case '\n':
+				sb.WriteString(`\n`)
+			case '\r':
+				sb.WriteString(`\r`)
+			case '\t':
+				sb.WriteString(`\t`)
+			case '\v':
+				sb.WriteString(`\v`)
+			default:
+				sb.WriteByte(c)
+			}
+			i++
+			continue
+		}
+		// DecodeRuneInString returns (RuneError, 1) for exactly the bytes that
+		// begin no valid sequence — a correctly encoded U+FFFD returns size 3
+		// and so rides through verbatim like any other rune.
+		if r, size := utf8.DecodeRuneInString(v.S[i:]); r == utf8.RuneError && size == 1 {
+			fmt.Fprintf(&sb, `\%03o`, c)
+			i++
+		} else {
+			sb.WriteString(v.S[i : i+size])
+			i += size
 		}
 	}
 	sb.WriteByte('\'')
@@ -247,20 +307,26 @@ type FuncCall struct {
 	Args []Value
 }
 
-// token renders `NAME(arg, …)`. It cannot report an error, so it stays
-// TOLERANT of a nil argument and skips it; refusing a nil arg is
-// [validateValue]'s job, and every public emission path ([Builder.Build],
-// [FormatWhere]) validates before emitting — a nil argument never reaches this
-// method through a supported entry point.
+// token renders `NAME(arg, …)`. The name is trimmed as well as upper-cased, so
+// the emitted spelling is the one [validateFuncName] approved rather than one
+// carrying stray space the grammar's skipped WS would hide.
+//
+// It cannot report an error, so it stays TOLERANT of an argument that has no
+// wire form — a nil, or a typed-nil pointer shape — and skips it. Refusing one
+// is [ValidateValue]'s job, and the validating emission paths ([Builder.Build],
+// [FormatWhere], [github.com/cadasto/openehr-sdk-go/openehr/aql/parse.Query.Emit])
+// all call it, so such an argument never reaches this method through them. The
+// unvalidated [FormatValue] can, which is why skipping beats panicking.
 func (f FuncCall) token() string {
 	parts := make([]string, 0, len(f.Args))
 	for _, a := range f.Args {
-		if a == nil {
+		arg, ok := derefValue(a)
+		if !ok {
 			continue
 		}
-		parts = append(parts, a.token())
+		parts = append(parts, arg.token())
 	}
-	return strings.ToUpper(f.Name) + "(" + strings.Join(parts, ", ") + ")"
+	return strings.ToUpper(strings.TrimSpace(f.Name)) + "(" + strings.Join(parts, ", ") + ")"
 }
 
 // Func constructs a [FuncCall] with the given (case-insensitive) name and
@@ -284,11 +350,31 @@ func Terminology(operation, api, params string) Value {
 	}
 }
 
-// validateValue reports a structurally unusable [Value] — one whose token
-// form would emit syntactically invalid AQL (REQ-117). It complements the
+// ValidateValue reports a structurally unusable [Value] — one whose token form
+// would emit syntactically invalid AQL (REQ-117, REQ-119). It complements the
 // per-[WhereExpr] validate methods, which own the clause-level rules.
+//
+// [FormatWhere] and [Builder.Build] call it for you. It is exported so a write
+// path outside this package — notably
+// [github.com/cadasto/openehr-sdk-go/openehr/aql/parse.Query.Emit], which
+// carries values in SELECT positions this package does not model — can hold the
+// same line, and so a consumer assembling a value by hand can check it before
+// handing it to the unvalidated [FormatValue].
+func ValidateValue(v Value) error { return validateValue(v) }
+
 func validateValue(v Value) error {
-	switch t := v.(type) {
+	// A pointer shape satisfies Value (token has a value receiver), and the
+	// switch below matches only value shapes — so without this every `*FuncCall`
+	// would fall through to `return nil` and emit unchecked, and a nil one would
+	// panic in token(). See [derefValue].
+	inner, ok := derefValue(v)
+	if !ok {
+		if v == nil {
+			return nil // a nil Value is the callers' own business (see MatchesExpr.validate)
+		}
+		return fmt.Errorf("%w: nil %T value", ErrInvalidQuery, v)
+	}
+	switch t := inner.(type) {
 	case PathValue:
 		if strings.TrimSpace(t.Raw) == "" {
 			return fmt.Errorf("%w: path value with empty path text", ErrInvalidQuery)
@@ -314,7 +400,8 @@ func validateValue(v Value) error {
 					ErrInvalidQuery, TerminologyFunc, len(t.Args))
 			}
 			for i, a := range t.Args {
-				if _, ok := a.(StringValue); !ok {
+				arg, _ := derefValue(a)
+				if _, ok := arg.(StringValue); !ok {
 					return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
 						ErrInvalidQuery, TerminologyFunc, i, a)
 				}
@@ -344,8 +431,17 @@ func validateValue(v Value) error {
 // `aggregateFunctionCall`, which the grammar admits in SELECT alone. Emitting
 // `COUNT(o/y) > 5` produced a WHERE clause the SDK's own parser rejects.
 //
+// Shadowing depends on DECLARATION ORDER, not on being a keyword: ANTLR breaks
+// an equal-length tie in favour of the rule declared first, so only a keyword
+// declared BEFORE `IDENTIFIER` (AqlLexer.g4:168) shadows it. `true` / `false`
+// are the counter-example and MUST NOT be listed here — `BOOLEAN` is declared
+// at :232, after IDENTIFIER, so `TRUE(o/x)` lexes as an IDENTIFIER and the
+// grammar admits it as a function name. The read side relies on the same
+// ordering (see the BOOLEAN notes in parse/extract_query.go), and listing them
+// made `Emit` refuse an AST `ParseQuery` had just produced.
+//
 // Source: resources/aql/grammar/active/AqlLexer.g4 (§ Keywords, § Operators,
-// § aggregate function, BOOLEAN). Held honest against the grammar by
+// § aggregate function). Held honest against the grammar by
 // TestReservedFuncNamesTrackTheGrammar in openehr/aql/parse, which is the only
 // side that may import the generated lexer.
 var reservedNonFuncWords = map[string]bool{
@@ -356,7 +452,14 @@ var reservedNonFuncWords = map[string]bool{
 	"FORWARD": true, "BACKWARD": true, "CONTAINS": true, "AND": true, "OR": true,
 	"NOT": true, "EXISTS": true, "LIKE": true, "MATCHES": true,
 	"COUNT": true, "MIN": true, "MAX": true, "SUM": true, "AVG": true,
-	"TRUE": true, "FALSE": true,
+}
+
+// aggregateFuncWords are the subset of [reservedNonFuncWords] that the grammar
+// DOES admit as a function name — but in `aggregateFunctionCall`, which
+// `columnExpr` reaches and no value position does (AqlParser.g4). A SELECT-side
+// name check must therefore admit them; a value-position one must not.
+var aggregateFuncWords = map[string]bool{
+	"COUNT": true, "MIN": true, "MAX": true, "SUM": true, "AVG": true,
 }
 
 // asciiLetter and wordChar spell the grammar's ALPHA_CHAR and WORD_CHAR
@@ -374,7 +477,18 @@ func wordChar(c byte) bool {
 // validateFuncName refuses a [FuncCall] name the grammar cannot lex in a value
 // position — one that is empty, not shaped like an IDENTIFIER, or spelled like
 // a reserved word that shadows IDENTIFIER.
-func validateFuncName(name string) error {
+func validateFuncName(name string) error { return checkFuncName(name, false) }
+
+// ValidateSelectFuncName refuses a name the grammar cannot lex as a projected
+// function call. It is [validateFuncName]'s SELECT-side sibling and differs in
+// exactly one way: the aggregates are admitted, because `aggregateFunctionCall`
+// is reachable from `columnExpr` (REQ-119).
+//
+// Exported for [github.com/cadasto/openehr-sdk-go/openehr/aql/parse], which
+// models a projected call as its own type and cannot reach the unexported form.
+func ValidateSelectFuncName(name string) error { return checkFuncName(name, true) }
+
+func checkFuncName(name string, allowAggregates bool) error {
 	n := strings.ToUpper(strings.TrimSpace(name))
 	if n == "" {
 		return fmt.Errorf("%w: function call with empty name", ErrInvalidQuery)
@@ -385,11 +499,17 @@ func validateFuncName(name string) error {
 	}
 	for i := range len(n) {
 		if c := n[i]; !wordChar(c) {
-			return fmt.Errorf("%w: function name %q carries %q, which no AQL identifier admits", ErrInvalidQuery, name, string(rune(c)))
+			return fmt.Errorf("%w: function name %q carries %q, which no AQL identifier admits",
+				ErrInvalidQuery, name, string([]byte{c}))
 		}
 	}
-	if reservedNonFuncWords[n] {
-		return fmt.Errorf("%w: %q is a reserved AQL keyword and cannot name a function in a value position", ErrInvalidQuery, n)
+	if reservedNonFuncWords[n] && (!allowAggregates || !aggregateFuncWords[n]) {
+		where := "in a value position"
+		if allowAggregates {
+			where = "in a SELECT position"
+		}
+		return fmt.Errorf("%w: %q is a reserved AQL keyword and cannot name a function %s",
+			ErrInvalidQuery, n, where)
 	}
 	return nil
 }

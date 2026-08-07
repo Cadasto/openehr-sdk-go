@@ -431,7 +431,7 @@ func (q *Query) Emit() (string, error) {
 	if dup := duplicateAlias(q.From); dup != "" {
 		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
 	}
-	if err := misplacedJunction(q.From); err != nil {
+	if err := validateContainmentTree(q.From); err != nil {
 		return "", err
 	}
 	sb.WriteString(" FROM ")
@@ -520,8 +520,25 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 		if v.Value == nil {
 			return "", fmt.Errorf("%w: SELECT literal with nil value", aql.ErrInvalidQuery)
 		}
+		// REQ-119: [aql.FormatValue] cannot refuse — it has no error to return —
+		// so the value-position guards ([aql.ValidateValue]: the non-finite real,
+		// the reserved function name, TERMINOLOGY's arity) must be applied HERE
+		// or the closure property holds for WHERE and not for SELECT. Without
+		// this, `SELECT +Inf` and `SELECT TERMINOLOGY('a')` emitted with
+		// err == nil, and `SELECT NaN` came back a path.
+		if err := aql.ValidateValue(v.Value); err != nil {
+			return "", fmt.Errorf("SELECT literal: %w", err)
+		}
 		return aql.FormatValue(v.Value), nil
 	case FunctionCall:
+		// REQ-119: a projected call's name must lex as the grammar's IDENTIFIER
+		// or one of its *_FUNCTION_ID tokens. Unlike a value position, SELECT
+		// reaches `aggregateFunctionCall`, so the aggregates are admissible here
+		// — which is why this is [aql.ValidateSelectFuncName] and not the
+		// value-position check.
+		if err := aql.ValidateSelectFuncName(v.Name); err != nil {
+			return "", fmt.Errorf("SELECT function call: %w", err)
+		}
 		var body string
 		switch {
 		case v.Star:
@@ -547,7 +564,9 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 			}
 			body = strings.Join(args, ", ")
 		}
-		return v.Name + "(" + body + ")", nil
+		// Trimmed, so the emitted spelling is the one just validated; the casing
+		// is left as parsed (REQ-055 canonicalises keywords, not function names).
+		return strings.TrimSpace(v.Name) + "(" + body + ")", nil
 	}
 	if e == nil {
 		return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
@@ -623,25 +642,64 @@ func duplicateAlias(from FromClause) string {
 	return walk(from.Contains)
 }
 
-// misplacedJunction reports the first containment chain in the FROM tree that
-// carries a junction anywhere but its END, or nil when the tree is emittable.
+// validateContainmentTree reports the first structural defect in the FROM tree
+// that [emitContainment] would otherwise render as text the SDK's own parser
+// rejects, or nil when the tree is emittable.
 //
-// This is the read-side mirror of [aql.Containment.validateTree]'s
-// junction-placement rule (REQ-117): the grammar takes a parenthesised group
-// as a whole `containsExpr` alternative, so no CONTAINS keyword may follow
-// one. [emitContainment] flattens a class node's children into one chain, so
-// a junction in a non-final position renders `… CONTAINS (A OR B) CONTAINS C`
-// — text the SDK's own parser rejects.
+// It is the read-side mirror of [aql.Containment.validateTree] (REQ-117,
+// REQ-119) and refuses the same two things:
+//
+//   - An INCOMPLETE class node. A node that is neither a junction (operands, no
+//     class of its own) nor a usable class emits nothing at all, so the chain
+//     renders a dangling `… CONTAINS ` — or, with ChildJoin set on a class node,
+//     silently DROPS the join and renders a plain CONTAINS chain instead.
+//   - A MISPLACED junction. The grammar takes a parenthesised group as a whole
+//     `containsExpr` alternative, so no CONTAINS keyword may follow one, and a
+//     junction in a non-final position renders `… CONTAINS (A OR B) CONTAINS C`.
+//
+// Completeness is checked FIRST, because [isContainmentJunction] infers the node
+// kind from an absent RMType: an incomplete class node otherwise looks like a
+// junction and gets diagnosed as a misplaced one, naming a junction the caller
+// never wrote.
 //
 // The extractor never builds such a tree (it only ever mirrors AQL that
 // already parsed), so this guards the direct-construction path the [Query]
 // doc blesses: a consumer that assembles or rewrites an AST by hand. Without
 // it, the write side refuses the shape at Build() while the read side emitted
 // it with err == nil — the asymmetry [Containment.emit] claims does not exist.
-func misplacedJunction(from FromClause) error {
+func validateContainmentTree(from FromClause) error {
 	fail := func() error {
 		return fmt.Errorf("%w: containment junction followed by a further CONTAINS term — a junction may "+
 			"only end a containment chain; write the deeper nesting inside its operands", aql.ErrInvalidQuery)
+	}
+	// A junction carries operands and no class; a class node carries a class and
+	// no join of its own. Anything else has no emittable spelling.
+	var checkComplete func(c Containment) error
+	checkComplete = func(c Containment) error {
+		if !isContainmentJunction(c) {
+			if c.Class.RMType == "" && !c.Class.Version {
+				return fmt.Errorf("%w: CONTAINS requires an RM type (or VERSION) and an alias", aql.ErrInvalidQuery)
+			}
+			if c.ChildJoin != 0 {
+				return fmt.Errorf("%w: class containment %q carries a ChildJoin; a join belongs to a junction "+
+					"node (no class of its own), and emission would silently drop it",
+					aql.ErrInvalidQuery, c.Class.RMType)
+			}
+		}
+		for _, ch := range c.Children {
+			if err := checkComplete(ch); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, root := range []*Containment{from.Junction, from.Contains} {
+		if root == nil {
+			continue
+		}
+		if err := checkComplete(*root); err != nil {
+			return err
+		}
 	}
 	// chainEndsInJunction asks whether the FLATTENED chain rooted at c ends in
 	// a junction — an element whose own tail is a junction is still followed

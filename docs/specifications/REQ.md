@@ -125,11 +125,11 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |
-| Clinical modeling | 100–109 | 110–119 |
+| Clinical modeling | 100–109 | — (see note) |
 | RM behavioural functions | 120–123 | 124–129 |
 | SDK authoring & client tooling | 130 (reserved) | 131–139 |
 | Wire format — extensions | 140 | 141–149 |
 
 Identifiers **MUST** be stable once published. Renumbering is prohibited.
 
-The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130).
+The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. The clinical-modeling band (100–119) is **exhausted** as of REQ-119: 110–113 and 116–119 are registered, and 114 / 115 are reserved by the [OPT author-validator](../plans/2026-07-16-opt-author-validator.md) and [FLAT author-linter](../plans/2026-07-16-flat-author-linter.md) plans. The next clinical-modeling requirement needs a new band, allocated here first. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130).

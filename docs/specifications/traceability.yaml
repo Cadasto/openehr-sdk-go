@@ -1285,74 +1285,41 @@ requirements:
     title: Re-parseable canonical AQL emission
     canonical: docs/specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission
     status: draft
-    # EXTENDS REQ-055's "the typed builders cannot emit syntactically invalid
-    # AQL" and REQ-117's fixed-point property from the SHAPES the catalogue
-    # models down into the VALUE POSITIONS inside them. Both prior rules were
-    # stated over clause structure; the corpora that pin them are written in
-    # canonical form, so no case ever carried a value that needed escaping and
-    # four value-level renderers went unconfronted with the grammar.
+    # WHY THIS EXISTS, in one line: REQ-055's "the typed builders cannot emit
+    # syntactically invalid AQL" and REQ-117's fixed-point property are both
+    # stated over the clause SHAPES the catalogue models, and nothing bound the
+    # VALUE POSITIONS inside them. The rules themselves are normative in the
+    # canonical section — see `canonical:` above; they are not restated here.
     #
-    # The five defects, all reported on PR #87 and left open there:
-    #   1. StringValue.token escaped `'` SQL-style as `''`. The lexer's STRING
-    #      admits only ESCAPE_SEQ / UTF8CHAR / OCTAL_ESC, so a doubled quote
-    #      ENDED the token: any literal with an apostrophe emitted AQL this
-    #      SDK's own parser rejected. unquoteAQLString had the mirror bug (it
-    #      unescaped `''`, unreachable for grammar-valid input, and did not
-    #      resolve the escapes that DO occur), so the decode side is fixed with
-    #      it — a backslash was not escaped at all on the way out either.
-    #   2. RealValue.token used 'f' with no fractional part, so a whole real
-    #      re-lexed as INTEGER (silent RealValue -> IntValue drift) and 1e20
-    #      rendered 21 digits that overflow int64 — the emitted text was
-    #      refused with ErrIncompleteAST on re-parse, breaking the fixed point.
-    #   3. numericPrimitiveAsValue parsed the magnitude before applying the
-    #      sign, so math.MinInt64 was falsely refused: int64's range is
-    #      asymmetric and the value is exactly representable.
-    #   4. MATCHES {uri} emitted its operand verbatim (the token is unquoted)
-    #      with no guard. THE ONE SILENT DEFECT: a `}` closes the operand and
-    #      the tail becomes more query, so `{uri://a} OR c/y MATCHES {uri://b}`
-    #      is VALID AQL asking something else. No round-trip, golden, or
-    #      parser check can catch a valid-but-different query, which is why
-    #      the acceptance asserts round-trip IDENTITY rather than parseability.
-    #   5. A value-position FuncCall name was unvalidated, so the aggregates
-    #      (COUNT/MIN/MAX/SUM/AVG — real AQL functions, but only in
-    #      aggregateFunctionCall, admitted in SELECT alone) emitted with
-    #      err == nil. TERMINOLOGY's fixed 3-string arity was unchecked too;
-    #      that one was found BY the new grammar-confrontation test, not by
-    #      the review.
+    # WHY THE CORPUS COULD NOT HAVE CAUGHT IT: roundtrip_test.go is written in
+    # canonical form, so no case ever carried a value that needed an escape, and
+    # the value-level renderers were never confronted with the grammar. That is
+    # the structural reason, and it is why PROBE-090 asserts round-trip IDENTITY
+    # (and, for a source literal, TWICE) rather than mere parseability.
     #
-    # Also here, both from the same PR #87 residual list: (*parse.Query).Emit
-    # gained the containment structural refusals REQ-117 required only of
-    # Build() — the extractor cannot build a violating tree, so this binds the
-    # direct-construction path parse.Query blesses — and aql.EqualValues gives
-    # the value vocabulary a total comparison. The latter is documentation plus
-    # surface, not a behaviour change: PathValue and FuncCall became
-    # uncomparable in v0.18.0 when REQ-117 added their slice fields, and unlike
-    # the aql.Containment break released beside it the compiler cannot see it.
+    # NO PLAN: implementation-aligned fix-up per README § Source of truth — this
+    # closes the residuals reported on PR #87 and left open there, so the spec
+    # section and this entry land in the same PR as the code. No plan document
+    # exists or is needed.
     #
-    # Both grammar-derived guards are held honest MECHANICALLY rather than by
-    # a hand-maintained list: openehr/aql may not import the generated lexer
-    # (REQ-013 — the dependency runs the other way), so the confrontations live
-    # in openehr/aql/parse. TestReservedFuncNamesTrackTheGrammar reads every
-    # token name out of AqlLexer.g4 and asserts validator/parser agreement on
-    # each (72 names); a keyword added upstream fails there instead of
-    # silently becoming emittable.
-    #
-    # WIRE-VISIBLE: the string escaping changes the canonical form for any
-    # literal carrying `'` or `\`, and a whole-valued real now emits `2.0`
-    # rather than `2`. Neither prior spelling was re-parseable by this SDK, so
-    # no correct program depended on them; recorded in the CHANGELOG.
+    # WIRE-VISIBLE (classified semver-minor in the canonical section, and in
+    # wire.md § REQ-055 where the canonical write form lives): a literal
+    # carrying `'` or `\` and a whole-valued real (`2` -> `2.0`) emit
+    # differently from v0.19.0. Recorded in the CHANGELOG.
     implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
     probes: [PROBE-090]
     tests:
-      # PROBE-090 — emit -> parse -> equal value across every value kind, and
-      # the two grammar confrontations.
+      # PROBE-090 — emit -> parse -> equal value across every value kind, the
+      # twice-through fixed point, and the grammar confrontations.
       - openehr/aql/parse/literal_roundtrip_test.go
+      # Emit-side parity: the SELECT value positions, the containment
+      # refusals, and the URI guard vs the grammar.
       - openehr/aql/parse/emit_parity_test.go
-      # Write-side refusals (URI, function name, TERMINOLOGY arity) and the
-      # EqualValues contract.
+      # Write-side refusals (URI, function name, TERMINOLOGY arity), the
+      # pointer shapes, and the EqualValues contract.
       - openehr/aql/value_test.go
       # The canonical-form change: the builder golden that carried the SQL
       # doubling now carries the ESCAPE_SEQ spelling.

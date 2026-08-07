@@ -1,5 +1,7 @@
 package parse_test
 
+// REQ-119 · PROBE-090
+//
 // literal_roundtrip_test.go pins the value-position literal contracts of the
 // REQ-117 fixed-point property that the corpus in roundtrip_test.go could not
 // reach: the corpus is written in canonical form, so it never contained a
@@ -9,12 +11,15 @@ package parse_test
 // surface unless a case actually exercises the escape.
 
 import (
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
@@ -104,6 +109,24 @@ func TestParsedStringEscapesDecode(t *testing.T) {
 		"unicode":        {`'\u00e9t\u00e9'`, "été"},
 		"octal":          {`'\101\102'`, "AB"},
 		"no escapes":     {`'plain'`, "plain"},
+		// UTF8CHAR is exactly four hex digits, so a non-BMP character has no
+		// other spelling than a UTF-16 surrogate PAIR — which is how any
+		// JSON/JavaScript-derived client writes an emoji or a CJK extension.
+		// Decoding each half on its own yielded two U+FFFD, silently.
+		// NB: the aqlText below is the AQL SOURCE, so the backslashes are
+		// doubled in the Go literal — `\\ud83d` is the six characters the
+		// lexer sees, not one rune.
+		"surrogate pair":       {"'\\ud83d\\ude00'", "\U0001F600"},
+		"surrogate pair twice": {"'\\ud83d\\ude00\\ud83d\\ude01'", "\U0001F600\U0001F601"},
+		"pair among BMP":       {"'a\\ud83d\\ude00b'", "a\U0001F600b"},
+		// An unpaired half denotes no character; U+FFFD is the lenient reading.
+		"lone high surrogate": {"'\\ud83d'", "�"},
+		"lone low surrogate":  {"'\\ude00'", "�"},
+		"high then BMP":       {"'\\ud83d\\u0041'", "�A"},
+		// `\4`–`\7` lead at most TWO octal digits (OCTAL_ESC : '\\' [0-3] OCTAL
+		// OCTAL | '\\' OCTAL OCTAL | '\\' OCTAL), so a third digit is literal.
+		"octal 2-digit lead": {`'\477'`, "'7"},
+		"octal max":          {`'\777'`, "?7"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			doc, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE c/n = " + tc.aqlText)
@@ -113,6 +136,248 @@ func TestParsedStringEscapesDecode(t *testing.T) {
 			got := doc.Where.(aql.Comparison).Val.(aql.StringValue).S
 			if got != tc.want {
 				t.Errorf("decoded %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// parseWhereString parses `WHERE c/n = <lit>` and returns the decoded string.
+func parseWhereString(lit string) (string, error) {
+	doc, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE c/n = " + lit)
+	if err != nil {
+		return "", err
+	}
+	return doc.Where.(aql.Comparison).Val.(aql.StringValue).S, nil
+}
+
+// TestStringRoundTripIsAFixedPoint — REQ-119's closure property applied TWICE.
+// Decoding a literal and re-emitting it MUST reach a fixed point, which is
+// stronger than "the emitted text parses" and is what a caller who reads a
+// query, edits one clause, and writes it back depends on.
+//
+// The escapes carrying an arbitrary BYTE are where this used to fail: `'\377'`
+// decoded to a lone 0xFF, `token` copied it through raw, and the SECOND parse
+// yielded U+FFFD — the lexer decodes its input to runes. The value came back
+// changed with no error anywhere.
+func TestStringRoundTripIsAFixedPoint(t *testing.T) {
+	for name, lit := range map[string]string{
+		"octal high byte":   `'\377'`,
+		"octal 0x80":        `'\200'`,
+		"octal utf8 pair":   `'\303\251'`, // a valid two-byte é
+		"octal low":         `'\101'`,
+		"nul":               `'\0'`,
+		"surrogate pair":    "'\\ud83d\\ude00'",
+		"escaped quote":     `'O\'Brien'`,
+		"escaped backslash": `'C:\\temp'`,
+		"plain":             `'plain'`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			first, err := parseWhereString(lit)
+			if err != nil {
+				t.Fatalf("first parse of %s: %v", lit, err)
+			}
+			wire := aql.FormatValue(aql.String(first))
+			second, err := parseWhereString(wire)
+			if err != nil {
+				t.Fatalf("re-emitted %s does not parse: %v", wire, err)
+			}
+			if first != second {
+				t.Errorf("not a fixed point\n  literal: %s\n  decode1: %q (% x)\n  re-emit: %s\n  decode2: %q (% x)",
+					lit, first, first, wire, second, second)
+			}
+			if !utf8.ValidString(wire) {
+				t.Errorf("emitted invalid UTF-8 (% x); an arbitrary byte must go out as OCTAL_ESC", wire)
+			}
+		})
+	}
+}
+
+// TestInvalidUTF8StringSurvivesEmission is the write-side entry to the same
+// property: a Go string is a byte string, so one lifted from a latin-1 column
+// can carry a byte that begins no valid UTF-8 sequence. Emitted raw it survived
+// the STRING token but not the round trip.
+func TestInvalidUTF8StringSurvivesEmission(t *testing.T) {
+	for name, s := range map[string]string{
+		"lone 0xff":      "\xff",
+		"0xff 0xfe":      "\xff\xfe",
+		"truncated pair": "a\xc3",
+		"latin-1 mixed":  "caf\xe9 \u00e9",
+		"valid U+FFFD":   "\uFFFD",
+	} {
+		t.Run(name, func(t *testing.T) {
+			wire, got := whereRoundTrip(t, aql.String(s))
+			sv, ok := got.(aql.StringValue)
+			if !ok {
+				t.Fatalf("recovered %T, want aql.StringValue (emitted %s)", got, wire)
+			}
+			if sv.S != s {
+				t.Errorf("round trip lost the value\n  in:   %q (% x)\n  wire: %s\n  out:  %q (% x)",
+					s, s, wire, sv.S, sv.S)
+			}
+		})
+	}
+}
+
+// TestScientificNotationExtraction — REQ-119. [numericPrimitiveAsValue] reads
+// four numeric token shapes; nothing in the corpus ever exercised SCI_REAL or
+// SCI_INTEGER, so dropping either from the extractor left every test in the
+// module passing while `WHERE c/n = 1e3` became unparseable.
+//
+// Emission normalises to decimal (`1.5e3` → `1500.0`) — the REQ-055 canonical
+// form — so the assertion is on the recovered VALUE and the fixed point, not on
+// the text surviving unchanged.
+func TestScientificNotationExtraction(t *testing.T) {
+	for _, tc := range []struct {
+		literal string
+		want    float64
+	}{
+		{"1e3", 1000},
+		{"1E3", 1000},
+		{"1.5e3", 1500},
+		{"1.5E3", 1500},
+		{"2e+8", 2e8},
+		{"1e-3", 0.001},
+		{"-1e3", -1000},
+		{"-1.5e-3", -0.0015},
+		{"1e20", 1e20},
+	} {
+		t.Run(tc.literal, func(t *testing.T) {
+			doc, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE c/n = " + tc.literal)
+			if err != nil {
+				t.Fatalf("ParseQuery(%s): %v", tc.literal, err)
+			}
+			rv, ok := doc.Where.(aql.Comparison).Val.(aql.RealValue)
+			if !ok {
+				t.Fatalf("recovered %T, want aql.RealValue", doc.Where.(aql.Comparison).Val)
+			}
+			if rv.F != tc.want {
+				t.Errorf("recovered %v, want %v", rv.F, tc.want)
+			}
+			out, err := doc.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			again, err := parse.ParseQuery(out)
+			if err != nil {
+				t.Fatalf("re-emitted %q does not parse: %v", out, err)
+			}
+			if got := again.Where.(aql.Comparison).Val.(aql.RealValue).F; got != tc.want {
+				t.Errorf("second parse recovered %v, want %v (wire %q)", got, tc.want, out)
+			}
+		})
+	}
+}
+
+// TestNegativeZeroRealKeepsItsSign — `rv.F != f` cannot catch a lost sign bit,
+// since -0.0 == 0.0, so the negative-zero case needs [math.Signbit].
+func TestNegativeZeroRealKeepsItsSign(t *testing.T) {
+	wire, got := whereRoundTrip(t, aql.Real(math.Copysign(0, -1)))
+	rv, ok := got.(aql.RealValue)
+	if !ok {
+		t.Fatalf("recovered %T, want aql.RealValue", got)
+	}
+	if !math.Signbit(rv.F) {
+		t.Errorf("negative zero came back positive (wire %s)", wire)
+	}
+}
+
+// TestDoubleUnaryMinusIsAccepted — `numericPrimitive : … | SYM_MINUS
+// numericPrimitive` is RECURSIVE, so the grammar admits a repeated minus. The
+// extractor descended one level only, so `- -5` arrived here as the text `--5`
+// and was reported as a literal out of range for the value vocabulary — a wrong
+// diagnosis for a nesting it simply did not walk.
+func TestDoubleUnaryMinusIsAccepted(t *testing.T) {
+	for _, tc := range []struct {
+		literal string
+		want    int64
+	}{
+		{"-5", -5},
+		{"- -5", 5},
+		{"- - -5", -5},
+	} {
+		t.Run(tc.literal, func(t *testing.T) {
+			doc, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE c/n = " + tc.literal)
+			if err != nil {
+				t.Fatalf("ParseQuery(%s): %v", tc.literal, err)
+			}
+			iv, ok := doc.Where.(aql.Comparison).Val.(aql.IntValue)
+			if !ok {
+				t.Fatalf("recovered %T, want aql.IntValue", doc.Where.(aql.Comparison).Val)
+			}
+			if iv.N != tc.want {
+				t.Errorf("recovered %d, want %d", iv.N, tc.want)
+			}
+		})
+	}
+}
+
+// TestFuncCallRoundTripsToAnEqualValue closes PROBE-090's "every value kind"
+// claim for the shape it did not cover: the reserved-name refusals pin what is
+// NOT emittable, and this pins that an admitted call comes back equal.
+//
+// It also exercises [aql.EqualValues] as the property's own comparison, which is
+// what PROBE-090's wire assertion is written in terms of.
+func TestFuncCallRoundTripsToAnEqualValue(t *testing.T) {
+	for name, v := range map[string]aql.Value{
+		"path arg":      aql.Func("LENGTH", aql.Path("o/x")),
+		"literal arg":   aql.Func("ABS", aql.Int(3)),
+		"real arg":      aql.Func("ABS", aql.Real(2)),
+		"string arg":    aql.Func("LENGTH", aql.String("O'Brien")),
+		"param arg":     aql.Func("LENGTH", aql.Param("p")),
+		"nested call":   aql.Func("ABS", aql.Func("LENGTH", aql.Path("o/x"))),
+		"multi arg":     aql.Func("CONCAT_WS", aql.String(","), aql.Path("o/x"), aql.Path("o/y")),
+		"terminology":   aql.Terminology("expand", "//fhir", "url=x"),
+		"lower-case in": aql.Func("length", aql.Path("o/x")),
+	} {
+		t.Run(name, func(t *testing.T) {
+			// The LEFT operand: `functionCall` is one of the two things the
+			// grammar admits there (the other is an identifiedPath), so this is
+			// the only position that exercises a FuncCall on the read side.
+			pred, err := aql.FormatWhere(aql.Compare(v, aql.OpGt, aql.Int(5)))
+			if err != nil {
+				t.Fatalf("FormatWhere(%#v): %v", v, err)
+			}
+			doc, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE " + pred)
+			if err != nil {
+				t.Fatalf("emitted %q does not re-parse: %v", pred, err)
+			}
+			got := doc.Where.(aql.Comparison).Left
+			if !aql.EqualValues(v, got) {
+				t.Errorf("round trip did not recover an equal value\n  in:   %#v\n  wire: %s\n  out:  %#v",
+					v, pred, got)
+			}
+		})
+	}
+}
+
+// TestEveryValueKindRoundTripsToAnEqualValue makes PROBE-090's "every value kind
+// survives emit → parse → equal value" literal, in the RIGHT-hand operand
+// position where the grammar admits a bare literal. Bool / Null / Param / Path
+// were the shapes no case covered.
+func TestEveryValueKindRoundTripsToAnEqualValue(t *testing.T) {
+	for name, v := range map[string]aql.Value{
+		"bool true":   aql.Bool(true),
+		"bool false":  aql.Bool(false),
+		"null":        aql.Null(),
+		"param":       aql.Param("ehr_id"),
+		"path":        aql.Path("o/x"),
+		"int":         aql.Int(-7),
+		"int min":     aql.Int(math.MinInt64),
+		"int max":     aql.Int(math.MaxInt64),
+		"real":        aql.Real(37.5),
+		"real whole":  aql.Real(2),
+		"real huge":   aql.Real(math.MaxFloat64),
+		"real tiny":   aql.Real(math.SmallestNonzeroFloat64),
+		"string":      aql.String("plain"),
+		"string odd":  aql.String(`O'Brien\`),
+		"func":        aql.Func("LENGTH", aql.Path("o/x")),
+		"terminology": aql.Terminology("expand", "//fhir", "url=x"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			pred, got := whereRoundTrip(t, v)
+			if !aql.EqualValues(v, got) {
+				t.Errorf("round trip did not recover an equal value\n  in:   %#v\n  wire: %s\n  out:  %#v",
+					v, pred, got)
 			}
 		})
 	}
@@ -160,6 +425,11 @@ func TestNonFiniteRealRefused(t *testing.T) {
 			_, err := aql.FormatWhere(aql.Compare(aql.Path("c/n"), aql.OpEq, aql.Real(f)))
 			if err == nil {
 				t.Fatal("emitted a non-finite real, want ErrInvalidQuery")
+			}
+			// REQ-119 requires the refusal to WRAP ErrInvalidQuery, which a
+			// message substring cannot establish.
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
 			}
 			if !strings.Contains(err.Error(), "no AQL spelling") {
 				t.Errorf("err = %v, want the no-AQL-spelling refusal", err)
@@ -217,16 +487,30 @@ func TestIntLiteralRangeBoundaries(t *testing.T) {
 // not a `fragment`, which never produces a token a parser rule can name.
 var tokenNameRE = regexp.MustCompile(`(?m)^([A-Z][A-Z0-9_]*)\s*:`)
 
+// keywordFragmentTexts are the keyword SPELLINGS that carry no token name of
+// their own, so [tokenNameRE] cannot reach them: `BOOLEAN : SYM_TRUE |
+// SYM_FALSE` names the token, while `true` / `false` live in fragments. They are
+// exactly where the reserved list was wrong — BOOLEAN is declared AFTER
+// IDENTIFIER, so the grammar admits `TRUE(o/x)` and refusing it made Emit reject
+// an AST ParseQuery had just produced. Anything the grammar spells only inside a
+// fragment belongs here, or the "every token name" claim is not the whole rule.
+var keywordFragmentTexts = []string{"true", "TRUE", "false", "FALSE", "CONTAINS_STR"}
+
 // TestReservedFuncNamesTrackTheGrammar holds aql's reserved-word list honest
 // against the vendored grammar it was derived from.
 //
 // `openehr/aql` cannot import the generated lexer (the dependency runs the
 // other way), so the write side carries a hand-maintained list of keywords
 // that shadow IDENTIFIER and therefore cannot name a value-position function.
-// This test reads every token name out of the grammar file and asserts, for
-// each, that the validator and the parser agree: a name the builder accepts
+// This test reads every token name out of the grammar file — plus the keyword
+// texts that live only in fragments, see [keywordFragmentTexts] — and asserts,
+// for each, that the validator and the parser agree: a name the builder accepts
 // MUST produce parseable AQL, and one it refuses MUST NOT. A keyword added
 // upstream fails here instead of silently becoming emittable.
+//
+// Shadowing turns on DECLARATION ORDER, not on keyword-ness — only a token
+// declared before `IDENTIFIER` shadows it — which is why the property under test
+// is builder/parser AGREEMENT rather than membership of any list.
 func TestReservedFuncNamesTrackTheGrammar(t *testing.T) {
 	path := filepath.Join("..", "..", "..", "resources", "aql", "grammar", "active", "AqlLexer.g4")
 	src, err := os.ReadFile(path)
@@ -237,15 +521,18 @@ func TestReservedFuncNamesTrackTheGrammar(t *testing.T) {
 	if len(names) < 40 {
 		t.Fatalf("only %d token names matched — the extraction regexp has drifted", len(names))
 	}
-	var checked int
+	candidates := slices.Clone(keywordFragmentTexts)
 	for _, m := range names {
-		name := m[1]
-		// Only names shaped like an identifier can be spelled as a function
-		// name at all; the symbol and composite tokens (SYM_*, STRING, …) are
-		// not candidates a caller could pass to aql.Func.
-		if strings.HasPrefix(name, "SYM_") || strings.HasPrefix(name, "URI_") {
-			continue
+		// Only a name shaped like an identifier can be spelled as a function name
+		// at all. `SYM_*` are the symbol tokens; nothing else is filtered, since
+		// a composite token's NAME (STRING, BOOLEAN, URI, …) is itself a legal
+		// identifier and so is a candidate the parser must agree about.
+		if !strings.HasPrefix(m[1], "SYM_") {
+			candidates = append(candidates, m[1])
 		}
+	}
+	var checked int
+	for _, name := range candidates {
 		checked++
 		t.Run(name, func(t *testing.T) {
 			// TERMINOLOGY has its own grammar rule with a fixed arity and

@@ -1,12 +1,16 @@
 package aql_test
 
-// value_test.go covers the value-position guards REQ-117 requires of the
-// write side: the URI operand (the one position with no quoting to hide
-// behind), the reserved-word function names, and the total value equality
-// that replaced `==` when the vocabulary gained slice fields.
+// REQ-119 · PROBE-090
+//
+// value_test.go covers the value-position guards REQ-119 adds to the write side
+// of the REQ-117 catalogue: the URI operand (the one position with no quoting to
+// hide behind), the reserved-word function names, the pointer shapes that
+// bypassed validation entirely, and the total value equality that replaced `==`
+// when the vocabulary gained slice fields.
 
 import (
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -120,7 +124,7 @@ func TestFuncNameRefusesReservedAndMalformed(t *testing.T) {
 		"aggregate AVG":   "AVG",
 		"keyword SELECT":  "SELECT",
 		"keyword NOT":     "NOT",
-		"boolean TRUE":    "TRUE",
+		"keyword NULL":    "NULL",
 		"leading digit":   "1FUNC",
 		"embedded space":  "MY FUNC",
 		"embedded paren":  "F(",
@@ -136,11 +140,92 @@ func TestFuncNameRefusesReservedAndMalformed(t *testing.T) {
 		})
 	}
 	// Positive control — a grammar function and a plain identifier still emit.
-	for _, fn := range []string{"LENGTH", "ABS", "CONCAT_WS", "my_func"} {
+	//
+	// `true` / `false` belong here, NOT in the refusal table above: shadowing
+	// depends on DECLARATION ORDER, and BOOLEAN is declared AFTER IDENTIFIER in
+	// AqlLexer.g4, so `TRUE(o/x)` lexes as an IDENTIFIER and the grammar admits
+	// it. Refusing them made Emit reject an AST ParseQuery had just produced —
+	// TestReservedFuncNamesTrackTheGrammar's boolean cases pin the parser half.
+	for _, fn := range []string{"LENGTH", "ABS", "CONCAT_WS", "my_func", "TRUE", "false"} {
 		if _, err := aql.FormatWhere(aql.Compare(
 			aql.Func(fn, aql.Path("o/x")), aql.OpGt, aql.Int(5))); err != nil {
 			t.Errorf("Func(%q) refused: %v", fn, err)
 		}
+	}
+}
+
+// TestSelectFuncNameAdmitsAggregates — REQ-119. The SELECT-side name check is
+// the value-position one minus the aggregates, because `aggregateFunctionCall`
+// is reachable from `columnExpr` and from no value position. Emission of a
+// projected call goes through it, so `SELECT COUNT(…)` must survive while
+// `SELECT SELECT(…)` must not.
+func TestSelectFuncNameAdmitsAggregates(t *testing.T) {
+	for _, fn := range []string{"COUNT", "MIN", "MAX", "SUM", "AVG", "LENGTH", "my_func"} {
+		if err := aql.ValidateSelectFuncName(fn); err != nil {
+			t.Errorf("ValidateSelectFuncName(%q) = %v, want nil", fn, err)
+		}
+		if fn == "LENGTH" || fn == "my_func" {
+			continue
+		}
+		// The same name is still refused in a value position.
+		if _, err := aql.FormatWhere(aql.Compare(
+			aql.Func(fn, aql.Path("o/x")), aql.OpGt, aql.Int(5))); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("value-position Func(%q) err = %v, want ErrInvalidQuery", fn, err)
+		}
+	}
+	for _, fn := range []string{"SELECT", "CONTAINS", "1FUNC", ""} {
+		if err := aql.ValidateSelectFuncName(fn); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("ValidateSelectFuncName(%q) = %v, want ErrInvalidQuery", fn, err)
+		}
+	}
+}
+
+// TestPointerShapedValuesAreValidated — REQ-119. `token` has a value receiver,
+// so `*FuncCall` and friends satisfy [aql.Value] too, and
+// [aql.MatchesExpr.Terminology] is itself a `*FuncCall` — pointer shapes are the
+// API's own idiom, not an abuse.
+//
+// Before REQ-119 they fell through validateValue's type switch to `return nil`,
+// so one `&` bypassed every value guard, and a typed-nil pointer PANICKED inside
+// FormatWhere and EqualValues rather than being refused.
+func TestPointerShapedValuesAreValidated(t *testing.T) {
+	for name, v := range map[string]aql.Value{
+		"&FuncCall reserved name": &aql.FuncCall{Name: "COUNT", Args: []aql.Value{aql.Path("o/y")}},
+		"&RealValue +Inf":         &aql.RealValue{F: math.Inf(1)},
+		"&RealValue NaN":          &aql.RealValue{F: math.NaN()},
+		"&PathValue empty":        &aql.PathValue{},
+		"&FuncCall bad arity":     &aql.FuncCall{Name: aql.TerminologyFunc, Args: []aql.Value{aql.String("a")}},
+		"typed-nil *FuncCall":     (*aql.FuncCall)(nil),
+		"nested typed-nil arg":    aql.Func("LENGTH", (*aql.PathValue)(nil)),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := aql.FormatWhere(aql.Compare(aql.Path("c/x"), aql.OpGt, v))
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+	// A pointer to a VALID shape must still emit, and must emit the same text
+	// and compare equal to the value shape it points at.
+	ptr := &aql.FuncCall{Name: "LENGTH", Args: []aql.Value{aql.Path("o/x")}}
+	val := aql.Func("LENGTH", aql.Path("o/x"))
+	got, err := aql.FormatWhere(aql.Compare(aql.Path("c/x"), aql.OpGt, ptr))
+	if err != nil {
+		t.Fatalf("a pointer to a valid FuncCall was refused: %v", err)
+	}
+	if want := "c/x > LENGTH(o/x)"; got != want {
+		t.Errorf("emitted %q, want %q", got, want)
+	}
+	if !aql.EqualValues(ptr, val) || !aql.EqualValues(val, ptr) {
+		t.Error("EqualValues does not see through a pointer shape")
+	}
+	// The typed-nil pointer is where `EqualValues` used to panic.
+	var nilFn *aql.FuncCall
+	if aql.EqualValues(nilFn, val) || aql.EqualValues(val, nilFn) {
+		t.Error("a typed-nil pointer compared equal to a populated value")
+	}
+	if !aql.EqualValues(nilFn, nil) {
+		t.Error("a typed-nil pointer should compare equal to a nil Value — both have no wire form")
 	}
 }
 
@@ -149,7 +234,7 @@ func TestFuncNameRefusesReservedAndMalformed(t *testing.T) {
 // EqualValues is the total replacement.
 func TestEqualValues(t *testing.T) {
 	for name, tc := range map[string]struct {
-		a, b Value2
+		a, b aql.Value
 		want bool
 	}{
 		"same string":      {aql.String("x"), aql.String("x"), true},
@@ -179,10 +264,6 @@ func TestEqualValues(t *testing.T) {
 	}
 }
 
-// Value2 aliases aql.Value so the table above can hold nils without the
-// linter reading them as an untyped nil interface conversion.
-type Value2 = aql.Value
-
 // TestEqualValuesDoesNotPanicWhereEqualsWould pins the motivating case: the
 // same comparison spelled with `==` panics.
 func TestEqualValuesDoesNotPanicWhereEqualsWould(t *testing.T) {
@@ -199,4 +280,38 @@ func TestEqualValuesDoesNotPanicWhereEqualsWould(t *testing.T) {
 		}()
 		_ = a == b //nolint:staticcheck // deliberately provoking the documented panic
 	}()
+
+	// § Comparability makes two further claims that were asserted only in prose.
+	// Both are the reason EqualValues exists, so both are pinned here: a stale
+	// claim would otherwise send a consumer looking for a panic that no longer
+	// happens, or leave a real one undocumented.
+	mustPanic := func(what string, f func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Errorf("%s did not panic; the doc claim in Value § Comparability is stale", what)
+			}
+		}()
+		f()
+	}
+	mustPanic("using a PathValue as a map key", func() {
+		m := map[aql.Value]bool{}
+		m[aql.Path("o/x")] = true
+	})
+	mustPanic("`==` on two Comparisons holding a PathValue", func() {
+		x := aql.Compare(aql.Path("c/n"), aql.OpEq, aql.Path("o/x"))
+		y := aql.Compare(aql.Path("c/n"), aql.OpEq, aql.Path("o/x"))
+		_ = x == y //nolint:staticcheck // deliberately provoking the documented panic
+	})
+	mustPanic("`==` on two LikeExprs holding a PathValue", func() {
+		x := aql.LikeExpr{Path: "c/n", Pattern: aql.Path("o/x")}
+		y := aql.LikeExpr{Path: "c/n", Pattern: aql.Path("o/x")}
+		_ = x == y //nolint:staticcheck // deliberately provoking the documented panic
+	})
+	// And the documented nil-arg collapse: token() skips an argument with no
+	// wire form, so EqualValues cannot distinguish it from an absent one. The
+	// emitters refuse such a value, so this only arises before validation.
+	if !aql.EqualValues(aql.Func("F", nil), aql.Func("F")) {
+		t.Error("the nil-argument collapse documented on EqualValues no longer holds")
+	}
 }
