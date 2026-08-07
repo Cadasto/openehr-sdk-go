@@ -149,11 +149,21 @@ func (c Comparison) expr() string {
 
 // leftToken renders the left operand: the structured [Comparison.Left]
 // value when present, the raw path otherwise (REQ-117).
+//
+// It routes through [FormatValue] rather than calling token directly, so it is
+// TOTAL over every shape the field can hold. token has a value receiver, which
+// means a typed-nil pointer (`(*FuncCall)(nil)`) satisfies Value with a non-nil
+// interface and panics when token is called on it. That matters here and not in
+// the other emitters because [Comparison.validate] calls leftToken while
+// BUILDING AN ERROR — naming the operand an unknown operator was used on — and
+// that error is produced before the operand itself has been checked. A refusal
+// path that panics on the way to reporting the refusal is the worst version of
+// this bug, so the left operand of a value with no wire form renders as "".
 func (c Comparison) leftToken() string {
-	if c.Left != nil {
-		return c.Left.token()
+	if c.Left == nil {
+		return c.Path
 	}
-	return c.Path
+	return FormatValue(c.Left)
 }
 
 func (c Comparison) validate() error {

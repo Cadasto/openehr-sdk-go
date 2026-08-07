@@ -722,8 +722,14 @@ func validateContainmentTree(from FromClause) error {
 	var checkComplete func(c Containment) error
 	checkComplete = func(c Containment) error {
 		if !isContainmentJunction(c) {
+			// An alias is deliberately NOT required. `aql.Builder` insists on
+			// one, but that is a write-side ergonomic choice, not a grammar
+			// rule: `classExprOperand` takes the alias as optional, and
+			// `… CONTAINS OBSERVATION` both parses and round-trips. Refusing
+			// it here would make Emit reject valid AQL that ParseQuery had
+			// just accepted — the opposite of the parity this walk exists for.
 			if c.Class.RMType == "" && !c.Class.Version {
-				return fmt.Errorf("%w: CONTAINS requires an RM type (or VERSION) and an alias", aql.ErrInvalidQuery)
+				return fmt.Errorf("%w: CONTAINS requires an RM type (or VERSION)", aql.ErrInvalidQuery)
 			}
 			if c.ChildJoin != 0 {
 				return fmt.Errorf("%w: class containment %q carries a ChildJoin; a join belongs to a junction "+

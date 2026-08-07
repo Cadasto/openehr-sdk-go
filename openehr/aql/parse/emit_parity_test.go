@@ -510,3 +510,48 @@ func TestFormatValueDoesNotPanicOnAValueWithNoWireForm(t *testing.T) {
 		t.Errorf("pointer shape rendered %q, value shape %q", got, want)
 	}
 }
+
+// TestFormatWhereDoesNotPanicOnItsOwnRefusalPath — the last reachable
+// typed-nil panic, and the worst-placed one: on the way to REPORTING a refusal.
+//
+// [aql.Comparison.validate] checks the operator FIRST and names the left
+// operand in that error, so it renders the operand before the operand has been
+// validated. With an unknown operator and a typed-nil Left, building the error
+// message panicked — a public entry point crashing while trying to tell the
+// caller their query was invalid. The known-operator paths were already clean,
+// because they reach `ValidateValue`, which refuses a typed-nil first; only the
+// error-formatting path was exposed.
+func TestFormatWhereDoesNotPanicOnItsOwnRefusalPath(t *testing.T) {
+	for name, c := range map[string]aql.Comparison{
+		"unknown op + typed-nil *FuncCall": {
+			Left: (*aql.FuncCall)(nil), Op: aql.Operator("???"), Val: aql.String("x"),
+		},
+		"unknown op + typed-nil *PathValue": {
+			Left: (*aql.PathValue)(nil), Op: aql.Operator("???"), Val: aql.String("x"),
+		},
+		"unknown op + typed-nil Left + nil Val": {
+			Left: (*aql.FuncCall)(nil), Op: aql.Operator("???"),
+		},
+		"known op + typed-nil Left": {
+			Left: (*aql.FuncCall)(nil), Op: aql.OpEq, Val: aql.String("x"),
+		},
+		"unknown op + plain path": {
+			Path: "o/x", Op: aql.Operator("???"), Val: aql.String("x"),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("FormatWhere panicked while refusing: %v", r)
+				}
+			}()
+			out, err := aql.FormatWhere(c)
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery", err)
+			}
+			if out != "" {
+				t.Errorf("a refused comparison still emitted %q", out)
+			}
+		})
+	}
+}
