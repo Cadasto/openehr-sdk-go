@@ -58,7 +58,10 @@ func TestBuilderClauses(t *testing.T) {
 		"FROM EHR e " +
 		"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] " +
 		"WHERE o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5 " +
-		"AND (o/name/value = 'Temperature' OR o/name/value = 'O''Brien') " +
+		// `O'Brien` escapes as `O\'Brien`: the grammar's ESCAPE_SEQ, not the
+		// SQL doubling this expectation used to carry, which the SDK's own
+		// parser rejected. TestStringLiteralEscapesRoundTrip pins the rule.
+		`AND (o/name/value = 'Temperature' OR o/name/value = 'O\'Brien') ` +
 		"ORDER BY o/name/value DESC"
 	if q.String() != want {
 		t.Fatalf("clause emission mismatch:\n got: %q\nwant: %q", q.String(), want)

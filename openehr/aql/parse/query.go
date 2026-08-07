@@ -17,6 +17,7 @@ package parse
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -430,6 +431,9 @@ func (q *Query) Emit() (string, error) {
 	if dup := duplicateAlias(q.From); dup != "" {
 		return "", fmt.Errorf("%w: duplicate alias %q", aql.ErrInvalidQuery, dup)
 	}
+	if err := misplacedJunction(q.From); err != nil {
+		return "", err
+	}
 	sb.WriteString(" FROM ")
 	if q.From.Junction != nil {
 		// REQ-117: a junction AT the root needs no grouping parentheses —
@@ -615,6 +619,62 @@ func duplicateAlias(from FromClause) string {
 	// REQ-117: a FROM-root junction binds its aliases too.
 	if dup := walk(from.Junction); dup != "" {
 		return dup
+	}
+	return walk(from.Contains)
+}
+
+// misplacedJunction reports the first containment chain in the FROM tree that
+// carries a junction anywhere but its END, or nil when the tree is emittable.
+//
+// This is the read-side mirror of [aql.Containment.validateTree]'s
+// junction-placement rule (REQ-117): the grammar takes a parenthesised group
+// as a whole `containsExpr` alternative, so no CONTAINS keyword may follow
+// one. [emitContainment] flattens a class node's children into one chain, so
+// a junction in a non-final position renders `… CONTAINS (A OR B) CONTAINS C`
+// — text the SDK's own parser rejects.
+//
+// The extractor never builds such a tree (it only ever mirrors AQL that
+// already parsed), so this guards the direct-construction path the [Query]
+// doc blesses: a consumer that assembles or rewrites an AST by hand. Without
+// it, the write side refuses the shape at Build() while the read side emitted
+// it with err == nil — the asymmetry [Containment.emit] claims does not exist.
+func misplacedJunction(from FromClause) error {
+	fail := func() error {
+		return fmt.Errorf("%w: containment junction followed by a further CONTAINS term — a junction may "+
+			"only end a containment chain; write the deeper nesting inside its operands", aql.ErrInvalidQuery)
+	}
+	// chainEndsInJunction asks whether the FLATTENED chain rooted at c ends in
+	// a junction — an element whose own tail is a junction is still followed
+	// by the next element's CONTAINS keyword.
+	var chainEndsInJunction func(c Containment) bool
+	chainEndsInJunction = func(c Containment) bool {
+		if isContainmentJunction(c) {
+			return true
+		}
+		return len(c.Children) > 0 && chainEndsInJunction(c.Children[len(c.Children)-1])
+	}
+	var walk func(c *Containment) error
+	walk = func(c *Containment) error {
+		if c == nil {
+			return nil
+		}
+		// A junction node's children are unordered operands with no CONTAINS
+		// between them, so the placement rule applies to a class node's chain
+		// only — the same carve-out the builder side makes.
+		if !isContainmentJunction(*c) &&
+			slices.ContainsFunc(c.Children[:max(len(c.Children)-1, 0)], chainEndsInJunction) {
+			return fail()
+		}
+		for i := range c.Children {
+			if err := walk(&c.Children[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	// The FROM root is itself the head of a chain when it carries Contains.
+	if err := walk(from.Junction); err != nil {
+		return err
 	}
 	return walk(from.Contains)
 }

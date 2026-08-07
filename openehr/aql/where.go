@@ -396,6 +396,9 @@ func (m MatchesExpr) validate() error {
 	case forms > 1:
 		return fmt.Errorf("%w: MATCHES on %q sets more than one operand form", ErrInvalidQuery, m.Path)
 	}
+	if uri := strings.TrimSpace(m.URI); uri != "" {
+		return validateURIOperand(uri, m.Path)
+	}
 	if m.Terminology != nil {
 		return validateValue(*m.Terminology)
 	}
@@ -408,6 +411,61 @@ func (m MatchesExpr) validate() error {
 		}
 	}
 	return nil
+}
+
+// uriTailChars are the characters the grammar's URI token admits after the
+// scheme — the union of URI_UNRESERVED, URI_SUB_DELIMS, URI_GEN_DELIMS and the
+// `%` that leads URI_PCT_ENCODED (resources/aql/grammar/active/AqlLexer.g4).
+const uriTailChars = "-._~" + "!$&'()*+,;=" + ":/?#[]@" + "%"
+
+// validateURIOperand refuses a `MATCHES {uri}` operand the grammar's URI token
+// cannot carry.
+//
+// The operand is emitted verbatim between braces because the token is
+// unquoted, which makes it the one value position with no escaping to hide
+// behind: a `}` closes the operand early, so a URI carrying one turns a single
+// predicate into a different, still-VALID query — `MATCHES {uri://a} OR c/y
+// MATCHES {uri://b}` — that no round-trip, golden, or parser check can catch.
+// Refusing at validation is the only place the substitution is visible.
+//
+// This is a character-level guard against exactly that class, not a full
+// RFC-3986 parse: it pins the scheme shape and rejects every byte outside the
+// token's alphabet (`}`, whitespace, quotes, `<`, `>`, `\`, `^`, `|`, backtick
+// and the controls). A structurally odd but in-alphabet URI still reaches the
+// wire, where the backend is the authority — the same division of labour the
+// SDK keeps everywhere else (PROBE-021).
+func validateURIOperand(uri, path string) error {
+	// URI : URI_SCHEME ':' … with URI_SCHEME : ALPHA_CHAR ( ALPHA_CHAR | DIGIT
+	// | '+' | '-' | '.' )* — an absent scheme is the commonest way a caller
+	// passes something that is not a URI at all.
+	scheme, rest, ok := strings.Cut(uri, ":")
+	if !ok || scheme == "" {
+		return fmt.Errorf("%w: MATCHES on %q carries a URI operand with no scheme: %q", ErrInvalidQuery, path, uri)
+	}
+	if !asciiLetter(scheme[0]) {
+		return fmt.Errorf("%w: MATCHES on %q carries a URI whose scheme does not start with a letter: %q", ErrInvalidQuery, path, uri)
+	}
+	for i := range len(scheme) {
+		if c := scheme[i]; !schemeChar(c) {
+			return fmt.Errorf("%w: MATCHES on %q carries a URI with an invalid scheme character %q: %q", ErrInvalidQuery, path, string(rune(c)), uri)
+		}
+	}
+	for i := range len(rest) {
+		if c := rest[i]; !uriTailChar(c) {
+			return fmt.Errorf("%w: MATCHES on %q carries a URI with %q, which the AQL URI token cannot spell: %q", ErrInvalidQuery, path, string(rune(c)), uri)
+		}
+	}
+	return nil
+}
+
+// schemeChar spells URI_SCHEME's tail set; uriTailChar spells everything the
+// token admits after the scheme separator.
+func schemeChar(c byte) bool {
+	return asciiLetter(c) || (c >= '0' && c <= '9') || strings.IndexByte("+-.", c) >= 0
+}
+
+func uriTailChar(c byte) bool {
+	return asciiLetter(c) || (c >= '0' && c <= '9') || strings.IndexByte(uriTailChars, c) >= 0
 }
 
 // Matches constructs a [MatchesExpr] over a braced value list.

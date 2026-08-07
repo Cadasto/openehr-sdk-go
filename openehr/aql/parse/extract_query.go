@@ -972,16 +972,89 @@ func primitiveAsValue(c gen.IPrimitiveContext) aql.Value {
 func unquoteAQLString(raw string) aql.Value {
 	if len(raw) >= 2 {
 		first, last := raw[0], raw[len(raw)-1]
-		if first == '\'' && last == '\'' {
-			inner := raw[1 : len(raw)-1]
-			return aql.StringValue{S: strings.ReplaceAll(inner, "''", "'")}
-		}
-		if first == '"' && last == '"' {
-			inner := raw[1 : len(raw)-1]
-			return aql.StringValue{S: strings.ReplaceAll(inner, `""`, `"`)}
+		if (first == '\'' && last == '\'') || (first == '"' && last == '"') {
+			return aql.StringValue{S: unescapeAQLString(raw[1 : len(raw)-1])}
 		}
 	}
 	return aql.StringValue{S: raw}
+}
+
+// unescapeAQLString resolves the STRING token's escape forms into the runes
+// they denote — the inverse of aql.StringValue.token.
+//
+// The lexer admits three escape shapes inside a quoted STRING
+// (resources/aql/grammar/active/AqlLexer.g4): `ESCAPE_SEQ` (`'\\'
+// ['"?abfnrtv\\*]`), `UTF8CHAR` (`'\\u' HEX HEX HEX HEX`), and `OCTAL_ESC`
+// (one to three octal digits behind a backslash). It admits no SQL-style
+// quote doubling — a doubled quote lexes as two adjacent STRING tokens
+// (`'O'` then `'Brien'`), which is a syntax error, not one escaped literal,
+// so a doubled quote can never reach this function inside one token and the
+// SQL unescaping this function used to do was unreachable for grammar-valid
+// input while being the wrong inverse for the escaped form that does occur.
+//
+// A trailing lone backslash cannot occur in a lexed token (it would escape the
+// closing quote), but is passed through rather than dropped so a hand-built
+// caller cannot lose a character silently.
+func unescapeAQLString(s string) string {
+	if !strings.ContainsRune(s, '\\') {
+		return s
+	}
+	var sb strings.Builder
+	sb.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] != '\\' || i+1 >= len(s) {
+			sb.WriteByte(s[i])
+			i++
+			continue
+		}
+		switch c := s[i+1]; {
+		case c == 'u' && i+5 < len(s):
+			if r, err := strconv.ParseUint(s[i+2:i+6], 16, 32); err == nil {
+				sb.WriteRune(rune(r))
+				i += 6
+				continue
+			}
+			sb.WriteByte(s[i])
+			i++
+		case c >= '0' && c <= '7':
+			// OCTAL_ESC is greedy up to three digits, but `\0`–`\3` may lead a
+			// three-digit form while `\4`–`\7` may lead at most two.
+			n := 1
+			for n < 3 && i+1+n < len(s) && s[i+1+n] >= '0' && s[i+1+n] <= '7' {
+				n++
+			}
+			if n == 3 && c > '3' {
+				n = 2
+			}
+			v, err := strconv.ParseUint(s[i+1:i+1+n], 8, 16)
+			if err != nil {
+				sb.WriteByte(s[i])
+				i++
+				continue
+			}
+			sb.WriteByte(byte(v))
+			i += 1 + n
+		default:
+			if r, ok := aqlEscapeChar[c]; ok {
+				sb.WriteByte(r)
+				i += 2
+				continue
+			}
+			// Not an ESCAPE_SEQ member: the lexer would not have produced it,
+			// so keep both bytes rather than inventing a meaning for it.
+			sb.WriteByte(s[i])
+			i++
+		}
+	}
+	return sb.String()
+}
+
+// aqlEscapeChar maps the ESCAPE_SEQ suffixes to the bytes they denote.
+// `\?` and `\*` are identity escapes the grammar admits (the latter is the
+// SDK-AQL-004 profile addition); the rest are the C escapes.
+var aqlEscapeChar = map[byte]byte{
+	'\'': '\'', '"': '"', '?': '?', '*': '*', '\\': '\\',
+	'a': '\a', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v',
 }
 
 // stripSurroundingQuotes peels a single set of single-quote delimiters
@@ -997,31 +1070,29 @@ func stripSurroundingQuotes(s string) string {
 
 func numericPrimitiveAsValue(c gen.INumericPrimitiveContext) aql.Value {
 	// Handle the optional unary minus by collecting the inner numeric.
-	sign := 1
+	//
+	// The sign is carried as TEXT rather than applied as a multiplier after
+	// parsing the magnitude: int64's range is asymmetric, so `math.MinInt64`
+	// has no positive counterpart and parsing its magnitude first overflows a
+	// value that is exactly representable once signed.
+	sign := ""
 	if c.SYM_MINUS() != nil {
-		sign = -1
+		sign = "-"
 		if inner := c.NumericPrimitive(); inner != nil {
 			c = inner
 		}
 	}
 	if t := c.INTEGER(); t != nil {
-		if n, err := strconv.ParseInt(t.GetText(), 10, 64); err == nil {
-			return aql.IntValue{N: int64(sign) * n}
+		if n, err := strconv.ParseInt(sign+t.GetText(), 10, 64); err == nil {
+			return aql.IntValue{N: n}
 		}
 	}
-	if t := c.SCI_INTEGER(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
+	for _, t := range []antlr.TerminalNode{c.SCI_INTEGER(), c.REAL(), c.SCI_REAL()} {
+		if t == nil {
+			continue
 		}
-	}
-	if t := c.REAL(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
-		}
-	}
-	if t := c.SCI_REAL(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
+		if f, err := strconv.ParseFloat(sign+t.GetText(), 64); err == nil {
+			return aql.RealValue{F: f}
 		}
 	}
 	return nil
