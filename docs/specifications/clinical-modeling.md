@@ -1092,3 +1092,56 @@ The four layers treat the spec-invalid combination differently, and deliberately
 - Building-block independence (REQ-013) unchanged and still enforced by the forbidden-import tests.
 - **Lives in:** [`openehr/aql/top.go`](../../openehr/aql/top.go) (shared vocabulary), [`openehr/aql/builder.go`](../../openehr/aql/builder.go) (write side), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (AST + emitter), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (extraction), [`openehr/aql/lint/lint.go`](../../openehr/aql/lint/lint.go) (diagnosis).
 - **Plan:** [`docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md`](../plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md) — REQ-118 (archived after Phase 5).
+
+---
+
+## REQ-119 — Re-parseable canonical AQL emission
+
+[§ REQ-055](wire.md#req-055--wire-boundary) guarantees that the typed builders cannot emit syntactically invalid AQL, and [§ REQ-117](#req-117--aql-expression-catalogue-completion) requires `(*Query).Emit` to be a fixed point of the parse/emit round trip. Both are stated over the *shapes* the catalogue models. Neither reaches the **value positions inside** those shapes, and that is where the guarantee leaked: a string literal, a real literal, a `MATCHES {uri}` operand, and a function name were each rendered by a rule that no test confronted with the grammar, because the round-trip corpus is written in canonical form and so never contained a value that needed escaping.
+
+The consequences were not uniform, and one is materially worse than the rest. Emitting text the parser *rejects* is loud — the caller gets an error the moment they re-read their own query. Emitting text the parser *accepts as something else* is silent, and the `{uri}` operand did exactly that.
+
+### The emission closure property
+
+Everything this SDK emits, it MUST be able to read back as what it meant:
+
+- **Round-trip closure.** For every value a supported write path emits — [`aql.Builder.Build`](../../openehr/aql/builder.go), [`aql.FormatWhere`](../../openehr/aql/where.go), [`aql.FormatValue`](../../openehr/aql/value.go), [`(*parse.Query).Emit`](../../openehr/aql/parse/query.go) — `ParseQuery` of the emitted text MUST succeed and MUST recover an equal value. A write path MUST NOT emit a value it cannot read back.
+- **No silent substitution.** Where an operand is emitted VERBATIM because its grammar token is unquoted, the write side MUST refuse any operand text that would change the query's structure rather than emit it. This is the strong form of the rule: refusal is required even though the resulting text may itself be valid AQL, precisely because valid-but-different text is invisible to every round-trip, golden, and parser check downstream.
+- **Refuse, never re-spell.** A value the grammar cannot carry MUST fail with an error wrapping `aql.ErrInvalidQuery`, not be silently normalised into a spelling that parses. Re-spelling would change what the query asks.
+
+### Canonical value spellings
+
+The canonical write form ([wire.md § REQ-055](wire.md#req-055--wire-boundary)) is extended with these value-level rules. Each is derived from the vendored grammar profile (`resources/aql/grammar/active/`, ADR 0007), which is the authority:
+
+- **String literals** MUST be escaped with the grammar's `ESCAPE_SEQ` (a backslash before the escaped character). The SQL-style doubled-quote convention MUST NOT be emitted: the lexer's `STRING` token admits only `ESCAPE_SEQ`, `UTF8CHAR`, `OCTAL_ESC`, or a character that is neither a backslash nor the delimiter, so a doubled quote ENDS the token and reopens another one. Decoding MUST be the exact inverse and MUST resolve all three escape shapes.
+- **Real literals** MUST emit a fractional part, so the text re-lexes as `REAL : DIGIT* '.' DIGIT+` and never as `INTEGER : DIGIT+`. A real with no AQL spelling (an infinity or NaN) MUST be refused.
+- **Integer literals** are bounded by `aql.IntValue`'s `int64`, whose range is asymmetric. The negative bound is exactly representable and MUST be accepted; the residual refusal of [§ REQ-117](#req-117--aql-expression-catalogue-completion) applies only to a literal genuinely outside the type.
+- **A value-position function name** MUST lex as the grammar's `IDENTIFIER` or one of its `*_FUNCTION_ID` tokens. A name spelled like a reserved keyword MUST be refused — notably the aggregates (`COUNT`, `MIN`, `MAX`, `SUM`, `AVG`), which are real AQL functions but belong to `aggregateFunctionCall`, admitted in `SELECT` alone.
+- **`TERMINOLOGY`** has its own grammar rule with a fixed arity and argument type; a call MUST carry exactly three string-literal arguments.
+- **A `MATCHES {uri}` operand** MUST be refused unless it is spellable as the grammar's `URI` token: a scheme, then characters drawn from the token's alphabet.
+
+### Emit-side structural parity
+
+`(*parse.Query).Emit` MUST apply the containment structural refusals [§ REQ-117](#req-117--aql-expression-catalogue-completion) requires of `Build()` — a junction may only END a containment chain — with an error wrapping `aql.ErrInvalidQuery`.
+
+The read and write sides therefore refuse the same trees, which is what [`aql.Containment`](../../openehr/aql/containment.go) already claimed. The extractor cannot itself build a violating tree (it only ever mirrors AQL that already parsed), so this binds the direct-construction path `parse.Query` blesses: a consumer that assembles or rewrites an AST by hand.
+
+### Value comparability
+
+The shared value vocabulary is **not** `==`-comparable and MUST NOT be used as a map key: `aql.PathValue` and `aql.FuncCall` carry slices, so `==` on either — or on any `WhereExpr` holding one — panics at run time. The SDK MUST expose a total, panic-free equality over `aql.Value`, and its godoc MUST state the restriction.
+
+This is a documentation-and-surface requirement, not a behaviour change: the types became uncomparable in v0.18.0 when REQ-117 added the slice fields. Unlike the `aql.Containment` break released beside it, the compiler cannot see this one, which is why it MUST be stated rather than left to a consumer's crash.
+
+### Out of scope
+
+- **Validating URI structure beyond the token alphabet.** The guard pins the scheme and rejects every character the `URI` token cannot spell; it is not an RFC-3986 parser. A structurally odd but in-alphabet URI reaches the wire, where the backend stays the authority ([PROBE-021](conformance.md#probe-021--aql-parse-error-mapping)).
+- **Equality over `WhereExpr` / `SelectExpr`.** Only the `Value` vocabulary gets a total comparison here; predicate-tree equality is a larger surface with its own normalisation questions.
+- **Widening the grammar profile.** No rule here licenses a grammar change; every refusal is derived FROM the vendored profile.
+- **A canonical spelling for control characters without a defined escape.** The `STRING` token admits them raw, so they round-trip; rendering them as `\uXXXX` is a cosmetic choice with no correctness content.
+
+### Acceptance
+
+- **[PROBE-090](conformance.md#probe-090--aql-emission-round-trip-closure)** — every value kind survives emit → parse → equal value; the write-side guards are confronted with the grammar rather than with a hand-written expectation.
+- Both grammar-derived rules are held honest MECHANICALLY, not by a list a maintainer must remember to update: `TestReservedFuncNamesTrackTheGrammar` reads every token name out of `AqlLexer.g4` and asserts the validator and the parser agree on each, and `TestMatchesURIGuardTracksTheGrammar` asserts the URI guard accepts exactly the operands that round-trip intact.
+- Building-block independence (REQ-013) unchanged: `openehr/aql` still does not import the generated lexer, which is why the grammar confrontations live in `openehr/aql/parse`.
+- **Lives in:** [`openehr/aql/value.go`](../../openehr/aql/value.go) (literal spellings, function names, `EqualValues`), [`openehr/aql/where.go`](../../openehr/aql/where.go) (URI operand guard), [`openehr/aql/parse/extract_query.go`](../../openehr/aql/parse/extract_query.go) (unescaping, signed-integer extraction), [`openehr/aql/parse/query.go`](../../openehr/aql/parse/query.go) (Emit-side structural parity).

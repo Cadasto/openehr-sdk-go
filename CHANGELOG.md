@@ -10,6 +10,11 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value now round-trips: string and real literals gain their grammar-correct spelling, `MATCHES {uri}`, function names and `TERMINOLOGY` arity are validated, and `parse.Query.Emit` refuses a misplaced containment junction.
+- **`aql.EqualValues` (REQ-119).** A total comparison for `aql.Value`, which is not `==`-comparable — `PathValue` and `FuncCall` gained slice fields in v0.18.0, so `==` on either, or on a `WhereExpr` holding one, panics.
+
 ## [0.19.0] - 2026-08-06
 
 Nineteenth `v0.x` minor — REQ-140's underscore-prefixed RM attribute grammar takes upstream FLAT parity from 19.7% to 80.4% of the EHRbase corpus, and AQL gains the deprecated `SELECT TOP` carrier. No public API removals; `instance.Generate` changes the `subject` of every generated ENTRY.
