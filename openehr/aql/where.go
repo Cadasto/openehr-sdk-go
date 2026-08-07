@@ -52,8 +52,8 @@ func FormatWhere(w WhereExpr) (string, error) {
 }
 
 // FormatValue renders an [aql.Value] to canonical AQL text (the same
-// emission the Builder uses internally). Returns "" for a nil Value.
-// Mirrors [FormatWhere] for the value side of the vocabulary.
+// emission the Builder uses internally). Mirrors [FormatWhere] for the value
+// side of the vocabulary.
 //
 // UNLIKE [FormatWhere], it does NOT validate: it has no error to return, so it
 // cannot refuse, and a value the grammar has no spelling for renders as its Go
@@ -61,11 +61,17 @@ func FormatWhere(w WhereExpr) (string, error) {
 // deliberate escape hatch for a value the caller has already checked, and is
 // excluded from REQ-119's round-trip closure guarantee for that reason. Call
 // [ValidateValue] first if the value did not come from a validated source.
+//
+// It does not PANIC, though: a value with no wire form at all — a nil, or a
+// typed-nil pointer shape such as the zero [MatchesExpr.Terminology] — returns
+// "". Refusing one is [ValidateValue]'s job, and an unvalidated formatter that
+// panics is a worse escape hatch than one that renders nothing.
 func FormatValue(v Value) string {
-	if v == nil {
+	inner, ok := derefValue(v)
+	if !ok {
 		return ""
 	}
-	return v.token()
+	return inner.token()
 }
 
 // Operator is a comparison operator on a [Comparison]. The wire string is

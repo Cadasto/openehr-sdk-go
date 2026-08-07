@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every value a validating write path emits now round-trips, in SELECT as well as WHERE; `aql.ValidateValue` and `aql.EqualValues` expose the check and a panic-free comparison. **Changes emitted AQL** for a literal carrying `'` or `\` and for a whole-valued real (`2` → `2.0`) — both prior spellings were unparseable, so pinned goldens need regenerating.
+- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value now round-trips. **Changes emitted AQL** for a literal carrying `'` or `\` and for a whole-valued real (`2` → `2.0`), so pinned goldens need regenerating.
 
 ## [0.19.0] - 2026-08-06
 

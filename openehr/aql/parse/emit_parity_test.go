@@ -367,6 +367,26 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 		"nil func argument":     parse.LiteralExpr{Value: aql.Func("LENGTH", nil)},
 		"pointer-shaped value":  parse.LiteralExpr{Value: &aql.RealValue{F: math.Inf(1)}},
 		"projected SELECT name": parse.FunctionCall{Name: "SELECT", Args: []parse.SelectExpr{}},
+		// `terminologyFunction` fixes BOTH the arity and the argument type, and a
+		// projected call is modelled by parse.FunctionCall rather than
+		// aql.FuncCall, so aql.ValidateValue's arity check does not reach it.
+		"projected TERMINOLOGY 1 arg":  parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("a")},
+		"projected TERMINOLOGY 2 args": parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("a", "b")},
+		"projected TERMINOLOGY 4 args": parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("a", "b", "c", "d")},
+		"projected TERMINOLOGY 0 args": parse.FunctionCall{Name: "TERMINOLOGY"},
+		"projected TERMINOLOGY lower":  parse.FunctionCall{Name: "terminology", Args: selectLits("a")},
+		"projected TERMINOLOGY path arg": parse.FunctionCall{Name: "TERMINOLOGY", Args: []parse.SelectExpr{
+			parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}}},
+			parse.LiteralExpr{Value: aql.String("b")},
+			parse.LiteralExpr{Value: aql.String("c")},
+		}},
+		"projected TERMINOLOGY int arg": parse.FunctionCall{Name: "TERMINOLOGY", Args: []parse.SelectExpr{
+			parse.LiteralExpr{Value: aql.Int(1)},
+			parse.LiteralExpr{Value: aql.String("b")},
+			parse.LiteralExpr{Value: aql.String("c")},
+		}},
+		"projected TERMINOLOGY star":     parse.FunctionCall{Name: "TERMINOLOGY", Star: true},
+		"projected TERMINOLOGY distinct": parse.FunctionCall{Name: "TERMINOLOGY", Distinct: true, Args: selectLits("a", "b", "c")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out, err := mk(e).Emit()
@@ -380,25 +400,113 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 	}
 
 	// Positive controls: a projected AGGREGATE is legal in SELECT and nowhere
-	// else, so the SELECT-side name check must admit it, and an ordinary literal
-	// must still emit and re-parse.
+	// else, so the SELECT-side name check must admit it; a well-formed
+	// TERMINOLOGY must survive the new arity check; and an ordinary literal must
+	// still emit and re-parse.
 	for name, e := range map[string]parse.SelectExpr{
 		"aggregate COUNT": parse.FunctionCall{Name: "COUNT", Star: true},
 		"aggregate AVG": parse.FunctionCall{Name: "AVG", Args: []parse.SelectExpr{
 			parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}}},
 		}},
-		"string literal": parse.LiteralExpr{Value: aql.String("O'Brien")},
-		"real literal":   parse.LiteralExpr{Value: aql.Real(2)},
-		"func literal":   parse.LiteralExpr{Value: aql.Func("LENGTH", aql.Path("c/x"))},
+		"aggregate DISTINCT": parse.FunctionCall{Name: "COUNT", Distinct: true, Args: []parse.SelectExpr{
+			parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}}},
+		}},
+		"TERMINOLOGY 3 strings": parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("expand", "//fhir", "url=x")},
+		"string literal":        parse.LiteralExpr{Value: aql.String("O'Brien")},
+		"real literal":          parse.LiteralExpr{Value: aql.Real(2)},
+		"func literal":          parse.LiteralExpr{Value: aql.Func("LENGTH", aql.Path("c/x"))},
 	} {
 		t.Run("emits/"+name, func(t *testing.T) {
 			out, err := mk(e).Emit()
 			if err != nil {
 				t.Fatalf("Emit refused a legal SELECT item: %v", err)
 			}
-			if _, err := parse.ParseQuery(out); err != nil {
-				t.Errorf("emitted %q does not re-parse: %v", out, err)
+			doc, err := parse.ParseQuery(out)
+			if err != nil {
+				t.Fatalf("emitted %q does not re-parse: %v", out, err)
+			}
+			// Text fixed point, for every shape: re-emitting what we just read
+			// must reproduce the same AQL. This is the SELECT-side form of the
+			// closure property and holds regardless of which carrier the read
+			// side chose.
+			again, err := doc.Emit()
+			if err != nil {
+				t.Fatalf("re-emit of %q failed: %v", out, err)
+			}
+			if again != out {
+				t.Errorf("SELECT item is not a fixed point\n  first:  %q\n  second: %q", out, again)
+			}
+			// For a literal, closure additionally means the recovered VALUE is
+			// equal — re-parse alone left the SELECT half weaker than the WHERE
+			// half. The exception is a FuncCall: the SELECT side models a
+			// projected call as parse.FunctionCall (see aql.FuncCall's godoc), so
+			// carrying one in a LiteralExpr normalises to that carrier on re-read.
+			// The text is identical either way, which the fixed point above pins.
+			lit, ok := e.(parse.LiteralExpr)
+			if !ok {
+				return
+			}
+			if _, isCall := lit.Value.(aql.FuncCall); isCall {
+				if _, ok := doc.Select.Items[0].Expr.(parse.FunctionCall); !ok {
+					t.Errorf("a FuncCall carried in a LiteralExpr came back %T, want parse.FunctionCall",
+						doc.Select.Items[0].Expr)
+				}
+				return
+			}
+			back, ok := doc.Select.Items[0].Expr.(parse.LiteralExpr)
+			if !ok {
+				t.Fatalf("SELECT item came back %T, want parse.LiteralExpr (wire %q)",
+					doc.Select.Items[0].Expr, out)
+			}
+			if !aql.EqualValues(lit.Value, back.Value) {
+				t.Errorf("SELECT literal did not round-trip to an equal value\n  in:   %#v\n  wire: %q\n  out:  %#v",
+					lit.Value, out, back.Value)
 			}
 		})
+	}
+}
+
+// selectLits wraps string literals as projected SELECT items.
+func selectLits(ss ...string) []parse.SelectExpr {
+	out := make([]parse.SelectExpr, 0, len(ss))
+	for _, s := range ss {
+		out = append(out, parse.LiteralExpr{Value: aql.String(s)})
+	}
+	return out
+}
+
+// TestFormatValueDoesNotPanicOnAValueWithNoWireForm — [aql.FormatValue] is the
+// deliberately unvalidated formatter, which makes a typed-nil pointer shape
+// reachable through it: the validating paths refuse one, but by contract this one
+// does not validate. An escape hatch that panics is worse than one that renders
+// nothing, so it returns "".
+//
+// [aql.MatchesExpr.Terminology] is a `*aql.FuncCall`, so its zero value is
+// exactly that pointer — this is reachable without anyone writing `(*T)(nil)`.
+func TestFormatValueDoesNotPanicOnAValueWithNoWireForm(t *testing.T) {
+	var m aql.MatchesExpr
+	for name, v := range map[string]aql.Value{
+		"untyped nil":            nil,
+		"zero MatchesExpr field": m.Terminology,
+		"typed-nil *FuncCall":    (*aql.FuncCall)(nil),
+		"typed-nil *PathValue":   (*aql.PathValue)(nil),
+		"typed-nil *RealValue":   (*aql.RealValue)(nil),
+		"typed-nil *StringValue": (*aql.StringValue)(nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("FormatValue panicked: %v", r)
+				}
+			}()
+			if got := aql.FormatValue(v); got != "" {
+				t.Errorf("FormatValue = %q, want \"\"", got)
+			}
+		})
+	}
+	// A pointer to a POPULATED shape must still render, and identically to the
+	// value shape it addresses.
+	if got, want := aql.FormatValue(&aql.StringValue{S: "O'Brien"}), aql.FormatValue(aql.String("O'Brien")); got != want {
+		t.Errorf("pointer shape rendered %q, value shape %q", got, want)
 	}
 }

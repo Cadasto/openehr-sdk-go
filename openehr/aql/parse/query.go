@@ -507,6 +507,44 @@ func emitSelectItem(item SelectItem) (string, error) {
 	return s, nil
 }
 
+// validateSelectTerminology holds a projected [FunctionCall] named TERMINOLOGY
+// to the grammar's `terminologyFunction : TERMINOLOGY '(' STRING ',' STRING ','
+// STRING ')'` (REQ-119).
+//
+// That rule is not the general `functionCall`: the arity and the argument type
+// are both fixed, so any other shape emits text the parser rejects. The
+// value-position sibling is checked in [aql.ValidateValue], but a PROJECTED call
+// is modelled by [FunctionCall] rather than [aql.FuncCall], so it needs its own
+// check here — the same read/write asymmetry the SELECT literal arm closes.
+//
+// `DISTINCT` and `*` are refused for the same reason: `terminologyFunction`
+// admits neither.
+func validateSelectTerminology(v FunctionCall) error {
+	if !strings.EqualFold(strings.TrimSpace(v.Name), aql.TerminologyFunc) {
+		return nil
+	}
+	if v.Star || v.Distinct {
+		return fmt.Errorf("%w: %s() admits neither DISTINCT nor a star argument",
+			aql.ErrInvalidQuery, aql.TerminologyFunc)
+	}
+	if len(v.Args) != 3 {
+		return fmt.Errorf("%w: %s() takes exactly 3 string arguments, got %d",
+			aql.ErrInvalidQuery, aql.TerminologyFunc, len(v.Args))
+	}
+	for i, a := range v.Args {
+		lit, ok := a.(LiteralExpr)
+		if !ok {
+			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
+				aql.ErrInvalidQuery, aql.TerminologyFunc, i, a)
+		}
+		if _, ok := lit.Value.(aql.StringValue); !ok {
+			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
+				aql.ErrInvalidQuery, aql.TerminologyFunc, i, lit.Value)
+		}
+	}
+	return nil
+}
+
 func emitSelectExpr(e SelectExpr) (string, error) {
 	switch v := e.(type) {
 	case PathExpr:
@@ -538,6 +576,13 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 		// value-position check.
 		if err := aql.ValidateSelectFuncName(v.Name); err != nil {
 			return "", fmt.Errorf("SELECT function call: %w", err)
+		}
+		// The name being admissible is not the whole rule for TERMINOLOGY: it has
+		// its own grammar rule with a fixed arity AND argument type, and a
+		// projected call is modelled by this type rather than by [aql.FuncCall],
+		// so [aql.ValidateValue]'s arity check does not reach it.
+		if err := validateSelectTerminology(v); err != nil {
+			return "", err
 		}
 		var body string
 		switch {
