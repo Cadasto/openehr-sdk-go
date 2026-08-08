@@ -37,6 +37,11 @@ type IdentifiedPath struct {
 	Predicate string
 	// Segments are the path steps after the alias, in order.
 	Segments []PathSegment
-	// Raw is the whitespace-collapsed source text of the whole path.
+	// Raw is the VERBATIM source text of the whole path, whitespace
+	// included. It was once whitespace-collapsed, which broke REQ-119
+	// round-trip closure for any path carrying a predicate the grammar
+	// separates with a keyword: `o/items[a/b='c' AND d/e='f']` collapsed to
+	// `…'c'ANDd/e=…`, where `ANDd` re-lexes as one IDENTIFIER and the
+	// emitted query no longer parses.
 	Raw string
 }
