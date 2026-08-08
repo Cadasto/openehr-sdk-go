@@ -10,6 +10,11 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value now round-trips. **Changes emitted AQL** for a literal carrying `'` or `\` and for a whole-valued real (`2` → `2.0`), so pinned goldens need regenerating.
+- **AQL write paths refuse what they used to emit broken (REQ-119).** *Breaking:* `Build`/`FormatWhere`/`Emit` now return `ErrInvalidQuery` for malformed parameter names, reserved function names, wrong `TERMINOLOGY` arity, unspellable `MATCHES {uri}` operands, ungrammatical aggregate shapes, empty `ORDER BY` paths, and out-of-vocabulary sort directions; `Build` additionally refuses blank `FROM` parts (which used to re-parse as a different query — the hand-built `Emit` twin is tracked in #96).
+
 ## [0.19.0] - 2026-08-06
 
 Nineteenth `v0.x` minor — REQ-140's underscore-prefixed RM attribute grammar takes upstream FLAT parity from 19.7% to 80.4% of the EHRbase corpus, and AQL gains the deprecated `SELECT TOP` carrier. No public API removals; `instance.Generate` changes the `subject` of every generated ENTRY.

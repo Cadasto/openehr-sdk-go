@@ -284,6 +284,8 @@ Both styles **MUST** produce the **same AQL string on the wire** for the same lo
 
 Additively since REQ-117, the canonical forms for negated containment (`NOT CONTAINS`), sibling containment junctions (`AND` / `OR`, parenthesised only where precedence requires), and the **opt-in in-text `LIMIT` / `OFFSET`** — which relaxes rules 1 and 7 only for callers who explicitly request it, the envelope staying the default and combining the two channels being a build-time error — are specified by [clinical-modeling.md § REQ-117](clinical-modeling.md#req-117--aql-expression-catalogue-completion) and asserted by PROBE-088.
 
+The rules above are stated over clause structure and reach no further than the **shapes** a clause is built from. The canonical spelling of each VALUE inside them — string escaping, a real's fractional part, the `MATCHES {uri}` operand alphabet — is specified by [clinical-modeling.md § REQ-119 § Canonical value spellings](clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) and asserted by PROBE-090. **REQ-119 changes two spellings** relative to v0.19.0: a literal carrying `'` or `\`, and a whole-valued real (`2` → `2.0`). The string's prior form was not re-parseable by this SDK's own parser; the real's prior form re-parsed as a *different* value (`2` came back an integer), already failing round-trip identity — on that basis the change is classified semver-**minor** by exception to the rule above, but it does rewrite a golden that pins such a literal.
+
 The reference golden lives at [`openehr/aql/testdata/wire/`](../../openehr/aql/testdata/wire/) and is asserted by PROBE-020.
 
 ### AQL executor

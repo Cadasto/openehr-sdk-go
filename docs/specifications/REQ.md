@@ -98,6 +98,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-116 | Template-level node naming and name-predicated paths | [clinical-modeling.md § REQ-116](clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) | landed |
 | REQ-117 | AQL expression-catalogue completion | [clinical-modeling.md § REQ-117](clinical-modeling.md#req-117--aql-expression-catalogue-completion) | landed |
 | REQ-118 | Deprecated `SELECT TOP` clause and literal source text | [clinical-modeling.md § REQ-118](clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) | landed |
+| REQ-119 | Re-parseable canonical AQL emission | [clinical-modeling.md § REQ-119](clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) | landed |
 | REQ-120 | RM identifier parsing and derivation | [rm-functions.md § REQ-120](rm-functions.md#req-120--rm-identifier-parsing-and-derivation) | landed |
 | REQ-121 | Locatable path read access | [rm-functions.md § REQ-121](rm-functions.md#req-121--locatable-path-read-access) | landed |
 | REQ-122 | Version-control derived helpers | [rm-functions.md § REQ-122](rm-functions.md#req-122--version-control-derived-helpers) | landed |
@@ -124,11 +125,11 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |
-| Clinical modeling | 100–109 | 110–119 |
+| Clinical modeling | 100–119 | — (see note) |
 | RM behavioural functions | 120–123 | 124–129 |
 | SDK authoring & client tooling | 130 (reserved) | 131–139 |
 | Wire format — extensions | 140 | 141–149 |
 
 Identifiers **MUST** be stable once published. Renumbering is prohibited.
 
-The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130).
+The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. The clinical-modeling band (100–119) is **exhausted** as of REQ-119: 110–113 and 116–119 are registered, and 114 / 115 are reserved by the [OPT author-validator](../plans/2026-07-16-opt-author-validator.md) and [FLAT author-linter](../plans/2026-07-16-flat-author-linter.md) plans. The next clinical-modeling requirement needs a new band, allocated here first. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130).
