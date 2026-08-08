@@ -283,6 +283,15 @@ func (a *ast) build() (Query, error) {
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
 	}
+	// Both are IDENTIFIER positions emitted verbatim, so they get the same
+	// refusal (*parse.Query).Emit applies — Build/Emit parity from day one
+	// rather than one write path hardened and the other left open (issue #96).
+	if err := ValidateIdentifier(a.from.rmType); err != nil {
+		return Query{}, fmt.Errorf("FROM RM type: %w", err)
+	}
+	if err := ValidateIdentifier(a.from.alias); err != nil {
+		return Query{}, fmt.Errorf("FROM alias: %w", err)
+	}
 	// ORDER BY was the one clause whose operands build wrote unchecked while
 	// parse.Query.Emit refused them — the Build/Emit write-path fork REQ-119
 	// closed for WHERE (REQ-055's builder guarantee, PROBE-021).

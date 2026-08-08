@@ -304,6 +304,23 @@ func (c Containment) validateTree(seen map[string]bool) error {
 		if c.rmType == "" || c.alias == "" {
 			return fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
 		}
+		// The three verbatim positions of a containment, held to the same rule
+		// (*parse.Query).Emit applies to the AST it reads (issue #96).
+		if err := ValidateIdentifier(c.rmType); err != nil {
+			return fmt.Errorf("CONTAINS RM type: %w", err)
+		}
+		if err := ValidateIdentifier(c.alias); err != nil {
+			return fmt.Errorf("CONTAINS alias: %w", err)
+		}
+		if c.archetypeID != "" {
+			if name, isParam := strings.CutPrefix(c.archetypeID, "$"); isParam {
+				if err := validateParamName(name); err != nil {
+					return fmt.Errorf("CONTAINS archetype parameter: %w", err)
+				}
+			} else if err := ValidateArchetypeID(c.archetypeID); err != nil {
+				return fmt.Errorf("CONTAINS archetype: %w", err)
+			}
+		}
 		if seen[c.alias] {
 			return fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
 		}

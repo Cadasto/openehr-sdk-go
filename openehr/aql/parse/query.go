@@ -590,6 +590,13 @@ func emitSelectItem(item SelectItem) (string, error) {
 		return "", err
 	}
 	if item.Alias != "" {
+		// `selectExpr : columnExpr (AS aliasName=IDENTIFIER)?` — one token, so
+		// the exact guard is writable and the splice it otherwise admits is
+		// invisible: `Alias: "x, c/y"` emitted `SELECT c/x AS x, c/y FROM …`
+		// with err == nil, which re-parses as TWO projections (issue #96).
+		if err := aql.ValidateIdentifier(item.Alias); err != nil {
+			return "", fmt.Errorf("SELECT alias: %w", err)
+		}
 		s += " AS " + item.Alias
 	}
 	return s, nil
@@ -959,9 +966,16 @@ func validateContainmentTree(from FromClause) error {
 		return nil
 	}
 	// The FROM root is a ClassExpr outside the containment walk, so its
-	// bracket operands are checked here or nowhere.
-	if err := checkClassOperands(from.Root); err != nil {
-		return err
+	// operands are checked here or nowhere — but ONLY when the root is the one
+	// carrying the FROM. With a root JUNCTION the Root field is the zero
+	// ClassExpr and is never emitted, so checking it refused every
+	// `FROM A a OR B b` the parser had just produced. The round-trip suite
+	// caught that the moment the identifier guard landed, which is exactly what
+	// those positive controls are for.
+	if from.Junction == nil {
+		if err := checkClassOperands(from.Root); err != nil {
+			return err
+		}
 	}
 	for _, root := range []*Containment{from.Junction, from.Contains} {
 		if root == nil {
@@ -1023,6 +1037,45 @@ func checkClassOperands(c ClassExpr) error {
 		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a standing predicate (%q); "+
 			"the bracket position carries exactly one, and emission would silently drop the predicate",
 			aql.ErrInvalidQuery, c.RMType, c.Archetype, c.Predicate)
+	}
+	// The single-token positions [emitClassExpr] splices VERBATIM (issue #96).
+	// Unguarded, `Alias: "c CONTAINS OBSERVATION o"` emitted a whole extra
+	// containment term that re-parses cleanly — REQ-119's silent-substitution
+	// class, in a position where (unlike a path) the exact guard IS writable.
+	//
+	// RMType is checked only off the VERSION branch: there `emitClassExpr`
+	// writes the VERSION keyword and ignores RMType, and `ParseQuery` pairs
+	// `RMType: "VERSION"` with the flag, so the reserved-word rule would
+	// otherwise refuse the extractor's own output. Unflagged, `RMType: "VERSION"`
+	// IS refused — it emits text that re-parses with `Version: true`, an AST the
+	// caller did not write.
+	if !c.Version {
+		if err := aql.ValidateIdentifier(c.RMType); err != nil {
+			return fmt.Errorf("FROM class RM type: %w", err)
+		}
+	}
+	// An empty alias is the anonymous class the grammar's optional `variable`
+	// admits — absent, not malformed.
+	if c.Alias != "" {
+		if err := aql.ValidateIdentifier(c.Alias); err != nil {
+			return fmt.Errorf("class %q alias: %w", c.RMType, err)
+		}
+	}
+	if c.Archetype != "" {
+		// `archetypePredicate : ARCHETYPE_HRID | PARAMETER` — one token per
+		// alternative, which ParamArchetype selects between.
+		if c.ParamArchetype {
+			name, ok := strings.CutPrefix(c.Archetype, "$")
+			if !ok {
+				return fmt.Errorf("%w: class %q carries a $param archetype %q with no leading '$'",
+					aql.ErrInvalidQuery, c.RMType, c.Archetype)
+			}
+			if err := aql.ValidateValue(aql.ParamValue{Name: name}); err != nil {
+				return fmt.Errorf("class %q archetype parameter: %w", c.RMType, err)
+			}
+		} else if err := aql.ValidateArchetypeID(c.Archetype); err != nil {
+			return fmt.Errorf("class %q archetype: %w", c.RMType, err)
+		}
 	}
 	return nil
 }
