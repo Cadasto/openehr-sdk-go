@@ -12,8 +12,8 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value now round-trips. **Changes emitted AQL** for a literal carrying `'` or `\` and for a whole-valued real (`2` → `2.0`), so pinned goldens need regenerating.
-- **AQL write paths refuse what they used to emit broken (REQ-119).** *Breaking:* `Build`/`FormatWhere`/`Emit` now return `ErrInvalidQuery` for malformed parameter names, reserved function names (including names whose spelling only case-folds into the identifier alphabet, e.g. `ı`), wrong `TERMINOLOGY` arity, unspellable `MATCHES {uri}` operands, ungrammatical aggregate shapes, empty `ORDER BY` paths, and out-of-vocabulary sort directions; `Build` additionally refuses blank `FROM` parts (which used to re-parse as a different query — the hand-built `Emit` twin is tracked in #96). A hand-built `VERSION` FROM root now counts as present: it emits standing alone and is refused beside a root junction instead of being silently dropped.
+- **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value round-trips; **changes emitted AQL** for escaped strings and whole-valued reals (`2` → `2.0`).
+- **AQL write paths refuse previously emitted invalid AQL (REQ-119).** *Breaking:* validating `Build` / `FormatWhere` / `Emit` return `ErrInvalidQuery` where they once wrote structure-changing or unparseable text — see `traceability.yaml`.
 
 ## [0.19.0] - 2026-08-06
 

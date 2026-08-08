@@ -448,12 +448,13 @@ func Func(name string, args ...Value) Value {
 	return FuncCall{Name: asciiUpper(strings.TrimSpace(name)), Args: args}
 }
 
-// asciiUpper upper-cases the ASCII letters of s and leaves every other byte
-// alone. strings.ToUpper is NOT a substitute anywhere a function name is
-// canonicalised or compared: its Unicode mapping folds some non-ASCII letters
-// INTO the ASCII alphabet (ı → I, ſ → S), turning a name the lexer cannot
-// tokenise into a legal-looking spelling instead of leaving it for the
-// alphabet check to refuse.
+// asciiUpper upper-cases the ASCII letters of s and leaves every other rune
+// alone (non-ASCII code points stay unchanged). [strings.ToUpper] is NOT a
+// substitute anywhere a function name is canonicalised or compared: its
+// Unicode mapping folds some non-ASCII letters INTO the ASCII alphabet
+// (ı → I, ſ → S), turning a name the lexer cannot tokenise into a
+// legal-looking spelling instead of leaving it for the alphabet check to
+// refuse.
 func asciiUpper(s string) string {
 	return strings.Map(func(r rune) rune {
 		if r >= 'a' && r <= 'z' {
@@ -622,11 +623,11 @@ var aggregateFuncWords = map[string]bool{
 	"COUNT": true, "MIN": true, "MAX": true, "SUM": true, "AVG": true,
 }
 
-// IsAggregateFunc reports whether name (case-insensitively) is one of the
-// grammar's `aggregateFunctionCall` names — COUNT, MIN, MAX, SUM, AVG. These
-// are admissible in SELECT alone, and their argument SHAPE is fixed by that
-// rule rather than by the general `functionCall`; the parse-side emitter uses
-// this to hold a projected aggregate to its own rule (REQ-119) without
+// IsAggregateFunc reports whether name (ASCII case-insensitively) is one of
+// the grammar's `aggregateFunctionCall` names — COUNT, MIN, MAX, SUM, AVG.
+// These are admissible in SELECT alone, and their argument SHAPE is fixed by
+// that rule rather than by the general `functionCall`; the parse-side emitter
+// uses this to hold a projected aggregate to its own rule (REQ-119) without
 // duplicating the name set.
 func IsAggregateFunc(name string) bool {
 	return aggregateFuncWords[asciiUpper(strings.TrimSpace(name))]
