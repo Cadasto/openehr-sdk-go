@@ -35,7 +35,11 @@ func (b *Builder) Select(cols ...SelectField) *Builder {
 // From("COMPOSITION", "c"). Use [Builder.FromEHR] for the common ehr_id-scoped
 // case.
 func (b *Builder) From(rmType, alias string) *Builder {
-	b.ast.from = &fromClause{rmType: rmType, alias: alias}
+	// Trimmed like [Col]: a blank part must collapse to the empty string so
+	// build's presence check refuses it — written verbatim, `From("   ", "c")`
+	// emitted `FROM     c`, which RE-PARSES as an alias-less class named `c`:
+	// the alias silently became the RM type (REQ-119's substitution class).
+	b.ast.from = &fromClause{rmType: strings.TrimSpace(rmType), alias: strings.TrimSpace(alias)}
 	b.ast.ehrFilter = nil // re-scoping the source drops any prior FromEHR filter
 	return b
 }
@@ -49,6 +53,7 @@ func (b *Builder) From(rmType, alias string) *Builder {
 // AQL; this builder emits the WHERE form so the EHR scope composes uniformly
 // with other conditions in one clause.
 func (b *Builder) FromEHR(alias string, id Value) *Builder {
+	alias = strings.TrimSpace(alias) // as in From; also keeps the ehr_id path below clean
 	b.ast.from = &fromClause{rmType: "EHR", alias: alias}
 	b.ast.ehrFilter = nil // reset first so FromEHR(alias, nil) clears a prior filter
 	if id != nil {
@@ -89,7 +94,10 @@ func (b *Builder) Where(e WhereExpr) *Builder {
 
 // OrderBy appends an ORDER BY term.
 func (b *Builder) OrderBy(path string, dir Direction) *Builder {
-	b.ast.orderBy = append(b.ast.orderBy, orderTerm{path: path, dir: dir})
+	// Trimmed like [Col] so a blank path collapses to "" and build refuses it
+	// — written verbatim it emitted `ORDER BY  ASC`, a syntax error the
+	// grammar's `orderByExpr : identifiedPath …` has no reading for.
+	b.ast.orderBy = append(b.ast.orderBy, orderTerm{path: strings.TrimSpace(path), dir: dir})
 	return b
 }
 
@@ -219,6 +227,11 @@ func (d Direction) keyword() string {
 	return "ASC"
 }
 
+// known mirrors [BoolOp.known] and the TopDir vocabulary check: keyword()
+// spells any other value as ASC, so an out-of-vocabulary Direction must be
+// refused before it is silently re-directed (REQ-119's substitution class).
+func (d Direction) known() bool { return d == Ascending || d == Descending }
+
 type orderTerm struct {
 	path string
 	dir  Direction
@@ -270,6 +283,18 @@ func (a *ast) build() (Query, error) {
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
 	}
+	// ORDER BY was the one clause whose operands build wrote unchecked while
+	// parse.Query.Emit refused them — the Build/Emit write-path fork REQ-119
+	// closed for WHERE (REQ-055's builder guarantee, PROBE-021).
+	for _, t := range a.orderBy {
+		if t.path == "" {
+			return Query{}, fmt.Errorf("%w: empty ORDER BY path", ErrInvalidQuery)
+		}
+		if !t.dir.known() {
+			return Query{}, fmt.Errorf("%w: ORDER BY direction %d is outside the ASC/DESC vocabulary; "+
+				"emitting would silently re-direct it to ASC", ErrInvalidQuery, t.dir)
+		}
+	}
 	// REQ-117: a containment term is a whole expression (chain, negation,
 	// junction), so alias uniqueness and the class-completeness rule are
 	// checked over the entire tree. Repeated Contains / NotContains calls emit
@@ -319,21 +344,28 @@ func (a *ast) build() (Query, error) {
 
 	// The implicit ehr_id filter from FromEHR AND-combines with any explicit
 	// WHERE predicate so a single canonical WHERE clause results.
+	//
+	// Rendered through [FormatWhere] — the SAME validate-then-emit sequence
+	// parse.Query.Emit uses — so the subsystem has exactly one WHERE emission
+	// path. Build and Emit previously each ran their own validate()+expr()
+	// pair; they agreed, but a two-copy sequence is how the typed-nil and
+	// parenthesisation defects kept splitting between the write paths
+	// (REQ-119). effectiveWhere still owns the FromEHR combining and the
+	// collapse of a predicate denoting nothing.
 	where := a.effectiveWhere()
-	if where != nil {
-		// Reject malformed predicates (nil values, empty paths) before emitting
-		// so the typed builders can never produce invalid AQL (PROBE-021).
-		if err := where.validate(); err != nil {
-			return Query{}, err
-		}
-		// A non-nil predicate that emits nothing (e.g. And() with no terms)
-		// would yield a trailing, syntactically invalid WHERE.
-		pred := where.expr()
-		if strings.TrimSpace(pred) == "" {
-			return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
-		}
+	pred, err := FormatWhere(where)
+	if err != nil {
+		return Query{}, err
+	}
+	switch {
+	case strings.TrimSpace(pred) != "":
 		sb.WriteString(" WHERE ")
 		sb.WriteString(pred)
+	case where != nil:
+		// A present predicate that renders nothing would yield a trailing,
+		// syntactically invalid WHERE. Junction.validate refuses the term-less
+		// junction that used to reach this, so it is a backstop.
+		return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
 	}
 
 	if len(a.orderBy) > 0 {
@@ -428,16 +460,26 @@ func (a *ast) validateTop(inline bool) error {
 // setter (or a new [Value] shape) refuses loudly instead of emitting AQL the
 // grammar rejects.
 func validateLimitValue(keyword string, v Value) error {
-	switch t := v.(type) {
-	case nil:
+	if v == nil {
 		return nil // clause absent
+	}
+	// Normalised like every other dispatch site (REQ-119): the setters only
+	// store value shapes today, but this switch must not become the one place
+	// a pointer twin is refused as "not an integer or a $parameter".
+	inner, ok := derefValue(v)
+	if !ok {
+		return fmt.Errorf("%w: in-text %s carries a nil %T", ErrInvalidQuery, keyword, v)
+	}
+	switch t := inner.(type) {
 	case IntValue:
 		if t.N < 0 {
 			return fmt.Errorf("%w: negative in-text %s (%d)", ErrInvalidQuery, keyword, t.N)
 		}
 	case ParamValue:
-		if strings.TrimSpace(t.Name) == "" {
-			return fmt.Errorf("%w: in-text %s parameter with an empty name", ErrInvalidQuery, keyword)
+		// The same PARAMETER token as any other placeholder position, so the
+		// same guard: `LIMIT $a b` is two tokens and does not re-parse.
+		if err := validateParamName(t.Name); err != nil {
+			return fmt.Errorf("in-text %s: %w", keyword, err)
 		}
 	default:
 		return fmt.Errorf("%w: in-text %s must be an integer or a $parameter, got %T",
@@ -450,12 +492,22 @@ func validateLimitValue(keyword string, v Value) error {
 // explicit WHERE predicate. The ehr_id condition leads so the canonical clause
 // reads `WHERE e/ehr_id/value = $x AND <rest>`.
 func (a *ast) effectiveWhere() WhereExpr {
+	// A predicate denoting nothing is collapsed to a genuine nil BEFORE the
+	// combination, because absence is positional (REQ-119): at the top level it
+	// is simply no clause. Left un-normalised, a typed nil took a third path
+	// again — [And] keeps it as a junction TERM, where absence is correctly
+	// refused — so one input produced three behaviours depending on whether
+	// FromEHR was used.
+	where := a.where
+	if _, ok := derefWhere(where); !ok {
+		where = nil
+	}
 	switch {
-	case a.ehrFilter != nil && a.where != nil:
-		return And(a.ehrFilter, a.where)
+	case a.ehrFilter != nil && where != nil:
+		return And(a.ehrFilter, where)
 	case a.ehrFilter != nil:
 		return a.ehrFilter
 	default:
-		return a.where
+		return where
 	}
 }

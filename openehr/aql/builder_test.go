@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
 // referenceQuery builds "all OBSERVATIONs of archetype body_temperature for a
@@ -58,7 +59,10 @@ func TestBuilderClauses(t *testing.T) {
 		"FROM EHR e " +
 		"CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.body_temperature.v2] " +
 		"WHERE o/data[at0001]/events[at0006]/data/items[at0004]/value/magnitude > 37.5 " +
-		"AND (o/name/value = 'Temperature' OR o/name/value = 'O''Brien') " +
+		// `O'Brien` escapes as `O\'Brien`: the grammar's ESCAPE_SEQ, not the
+		// SQL doubling this expectation used to carry, which the SDK's own
+		// parser rejected. TestStringLiteralEscapesRoundTrip pins the rule.
+		`AND (o/name/value = 'Temperature' OR o/name/value = 'O\'Brien') ` +
 		"ORDER BY o/name/value DESC"
 	if q.String() != want {
 		t.Fatalf("clause emission mismatch:\n got: %q\nwant: %q", q.String(), want)
@@ -209,11 +213,70 @@ func TestBuildRejectsMalformedInput(t *testing.T) {
 			Contains(aql.Archetype("OBSERVATION", "e", "")),
 		"dup alias two contains": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
 			Contains(aql.Archetype("COMPOSITION", "c", "")).Contains(aql.Archetype("OBSERVATION", "c", "")),
+		// ORDER BY was the one clause build wrote unchecked while Emit refused
+		// the same operands — the last Build/Emit write-path fork (REQ-119).
+		"empty ORDER BY path": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
+			OrderBy("", aql.Ascending),
+		"blank ORDER BY path": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
+			OrderBy("   ", aql.Descending),
+		// keyword() spells any out-of-vocabulary Direction as ASC — a silently
+		// re-directed sort, not a syntax error, so only refusal is visible.
+		"out-of-vocabulary direction": aql.NewBuilder().Select(aql.Col("o")).FromEHR("e", nil).
+			OrderBy("o/x", aql.Direction(7)),
+		// Blank-not-empty FROM parts: written verbatim these EMITTED, and the
+		// rmType case re-parsed as a different query (see
+		// TestBlankFromPartsWereASilentSubstitution for the confrontation).
+		"blank from rmType":   aql.NewBuilder().Select(aql.Col("o")).From("   ", "c"),
+		"blank from alias":    aql.NewBuilder().Select(aql.Col("o")).From("COMPOSITION", "   "),
+		"blank FromEHR alias": aql.NewBuilder().Select(aql.Col("o")).FromEHR("   ", nil),
+		"blank select field":  aql.NewBuilder().Select(aql.Col("   ")).FromEHR("e", nil),
 	}
 	for name, b := range tests {
 		t.Run(name, func(t *testing.T) {
 			if _, err := b.Build(); !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Fatalf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+}
+
+// TestBlankFromPartsWereASilentSubstitution confronts the grammar with the
+// exact bytes Build emitted before the blank-part refusals, proving each
+// refusal right: the ORDER BY forms have no parse, and the blank-rmType form
+// is worse — it PARSES, as an alias-less class named by what the caller meant
+// as the alias. A wire that changes meaning is REQ-119's silent-substitution
+// class; a refusal is the only visible outcome.
+func TestBlankFromPartsWereASilentSubstitution(t *testing.T) {
+	for name, wire := range map[string]string{
+		"empty ORDER BY path": "SELECT c/x FROM COMPOSITION c ORDER BY  ASC",
+		"blank ORDER BY path": "SELECT c/x FROM COMPOSITION c ORDER BY     DESC",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := parse.ParseQuery(wire); err == nil {
+				t.Fatalf("%q parses; the Build refusal would be too strict", wire)
+			}
+		})
+	}
+	t.Run("blank from rmType re-parsed as a different query", func(t *testing.T) {
+		doc, err := parse.ParseQuery("SELECT c/x FROM     c")
+		if err != nil {
+			t.Fatalf("the old emission no longer demonstrates the substitution: %v", err)
+		}
+		if doc.From.Root.RMType != "c" || doc.From.Root.Alias != "" {
+			t.Fatalf("expected the alias to have become the RM type, got RMType=%q Alias=%q",
+				doc.From.Root.RMType, doc.From.Root.Alias)
+		}
+	})
+	// Positive controls: both in-vocabulary directions emit and re-parse.
+	for name, dir := range map[string]aql.Direction{"ASC": aql.Ascending, "DESC": aql.Descending} {
+		t.Run("direction "+name, func(t *testing.T) {
+			q, err := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+				OrderBy("c/x", dir).Build()
+			if err != nil {
+				t.Fatalf("Build refused a legal ORDER BY: %v", err)
+			}
+			if _, err := parse.ParseQuery(q.Q); err != nil {
+				t.Fatalf("emitted %q does not re-parse: %v", q.Q, err)
 			}
 		})
 	}

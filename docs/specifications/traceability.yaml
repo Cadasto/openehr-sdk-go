@@ -1281,6 +1281,60 @@ requirements:
     plans:
       - docs/plans/archive/2026-08-05-aql-top-carrier-literal-source-text.md
 
+  - id: REQ-119
+    title: Re-parseable canonical AQL emission
+    canonical: docs/specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission
+    status: draft
+    # WHY THIS EXISTS, in one line: REQ-055's "the typed builders cannot emit
+    # syntactically invalid AQL" and REQ-117's fixed-point property are both
+    # stated over the clause SHAPES the catalogue models, and nothing bound the
+    # VALUE POSITIONS inside them. The rules themselves are normative in the
+    # canonical section — see `canonical:` above; they are not restated here.
+    #
+    # WHY THE CORPUS COULD NOT HAVE CAUGHT IT: roundtrip_test.go is written in
+    # canonical form, so no case ever carried a value that needed an escape, and
+    # the value-level renderers were never confronted with the grammar. That is
+    # the structural reason, and it is why PROBE-090 asserts round-trip IDENTITY
+    # (and, for a source literal, TWICE) rather than mere parseability.
+    #
+    # NO PLAN: implementation-aligned fix-up per README § Source of truth — this
+    # closes the residuals reported on PR #87 and left open there, so the spec
+    # section and this entry land in the same PR as the code. No plan document
+    # exists or is needed.
+    #
+    # WIRE-VISIBLE (classified semver-minor in the canonical section, and in
+    # wire.md § REQ-055 where the canonical write form lives): a literal
+    # carrying `'` or `\` and a whole-valued real (`2` -> `2.0`) emit
+    # differently from v0.19.0. Recorded in the CHANGELOG.
+    implementation: landed
+    packages:
+      - openehr/aql
+      - openehr/aql/parse
+    probes: [PROBE-090]
+    tests:
+      # The two STRUCTURAL guards: a source-level tripwire failing any new
+      # un-normalised dispatch site on a sealed vocabulary, and the
+      # position x kind x carrier sweep (whatever a position accepts must
+      # round-trip to an equal value; both carriers get the same answer).
+      - openehr/aql/parse/dispatch_tripwire_test.go
+      - openehr/aql/parse/value_position_parity_test.go
+      # PROBE-090 — emit -> parse -> equal value across every value kind, the
+      # twice-through fixed point, both string delimiters, the fuzz target,
+      # and the grammar confrontations.
+      - openehr/aql/parse/literal_roundtrip_test.go
+      # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
+      # containment refusals and the order they fire in, the URI guard vs the
+      # grammar, and the pointer twin of every sealed set the emitters dispatch
+      # on (aql.WhereExpr, parse.SelectExpr, parse.LimitExpr).
+      - openehr/aql/parse/emit_parity_test.go
+      # Write-side refusals (URI, function name, TERMINOLOGY arity, the narrow
+      # LIKE / MATCHES operand slots, the PARAMETER spelling, the junction
+      # operator and arity), the pointer shapes, and the EqualValues contract.
+      - openehr/aql/value_test.go
+      # The canonical-form change: the builder golden that carried the SQL
+      # doubling now carries the ESCAPE_SEQ spelling.
+      - openehr/aql/builder_test.go
+
   - id: REQ-120
     title: RM identifier parsing and derivation
     canonical: docs/specifications/rm-functions.md#req-120--rm-identifier-parsing-and-derivation

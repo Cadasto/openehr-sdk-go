@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
 	"github.com/antlr4-go/antlr/v4"
 
@@ -433,6 +434,11 @@ func (ex *astExtractor) extractContainment(c gen.IContainsExprContext) *Containm
 		for _, op := range operands {
 			child := ex.extractContainment(op)
 			if child == nil {
+				// Defensive: a dropped operand would emit `A` where the
+				// source said `A OR B` — one arm of the junction silently
+				// gone, the substitution class this file must surface as a
+				// gap instead (REQ-119).
+				ex.incomplete("containment operand %q is outside the catalogue", op.GetText())
 				continue
 			}
 			// REQ-117: flatten a same-operator operand so `A OR B OR C`
@@ -506,6 +512,12 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 					// token; ParamArchetype is the typed signal.
 					ce.Archetype = p.GetText()
 					ce.ParamArchetype = true
+				} else {
+					// Defensive: `archetypePredicate : ARCHETYPE_HRID |
+					// PARAMETER` — both handled. Leaving Archetype empty with
+					// HasPredicate set would silently drop the predicate, a
+					// row filter, from emission.
+					ex.incomplete("archetype predicate %q is outside the catalogue", ap.GetText())
 				}
 			default:
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
@@ -528,6 +540,10 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		return ce
 	}
+	// Defensive: both classExprOperand alternatives are handled above. The
+	// zero ClassExpr is refused loudly at Emit (validateContainmentTree), but
+	// the gap belongs at PARSE time, where every sibling records it.
+	ex.incomplete("class expression %q is outside the catalogue", c.GetText())
 	return ClassExpr{}
 }
 
@@ -542,6 +558,11 @@ func (ex *astExtractor) extractWhereClause(c gen.IWhereClauseContext) aql.WhereE
 			return ex.extractWhereExpr(we)
 		}
 	}
+	// Defensive: a whereClause always carries a whereExpr child against the
+	// current grammar. Returning nil WITHOUT the gap would silently emit the
+	// query with its WHERE gone — a wider result set, err == nil — which is
+	// the exact failure the file header promises cannot happen.
+	ex.incomplete("WHERE clause %q carries no expression the catalogue models", c.GetText())
 	return nil
 }
 
@@ -553,6 +574,10 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 		// NOT applies to the next WhereExpr operand.
 		ops := c.AllWhereExpr()
 		if len(ops) == 0 {
+			// Defensive: `NOT whereExpr` always carries its operand. A nil
+			// return here erased the whole predicate silently (see
+			// extractWhereClause above).
+			ex.incomplete("NOT in %q carries no operand", c.GetText())
 			return nil
 		}
 		return aql.Not(ex.extractWhereExpr(ops[0]))
@@ -574,10 +599,15 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 			// is ONE [aql.Junction] with three terms — the documented
 			// shared-vocabulary contract — rather than the parser's
 			// left-nested pair-of-pairs. Emission is unaffected (a nested
-			// same-operator junction needs no parentheses).
-			if inner, ok := t.(aql.Junction); ok && inner.Op == join {
-				terms = append(terms, inner.Terms...)
-				continue
+			// same-operator junction needs no parentheses). The extractor
+			// only ever builds value shapes, so DerefWhere is a pass-through
+			// here — used anyway so every shape decision in the subsystem
+			// goes through one door (the dispatch-site tripwire checks that).
+			if norm, ok := aql.DerefWhere(t); ok {
+				if inner, isJunction := norm.(aql.Junction); isJunction && inner.Op == join {
+					terms = append(terms, inner.Terms...)
+					continue
+				}
 			}
 			terms = append(terms, t)
 		}
@@ -596,6 +626,9 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 	if ie := c.IdentifiedExpr(); ie != nil {
 		return ex.extractIdentifiedExpr(ie)
 	}
+	// Defensive: every whereExpr alternative is handled above. A silent nil
+	// here would drop the predicate (or one junction arm) from the model.
+	ex.incomplete("WHERE expression %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -934,9 +967,9 @@ func keywordLiteralValue(text string) (aql.Value, bool) {
 
 // primitiveAsValue lifts a Primitive to an [aql.Value] — STRING /
 // numeric / BOOLEAN / DATE / TIME / DATETIME / NULL. Surface text
-// canonicalisation: STRING strips outer single quotes and undoes
-// the AQL embedded-quote escape (two consecutive single quotes →
-// one); DATE/TIME/DATETIME strip outer single quotes from the lexer
+// canonicalisation: STRING strips outer quotes and resolves the
+// grammar's escape sequences ([unescapeAQLString]);
+// DATE/TIME/DATETIME strip outer single quotes from the lexer
 // token (the lexer rule includes them); NULL maps to the typed
 // [aql.NullValue] sentinel rather than a quoted string literal.
 func primitiveAsValue(c gen.IPrimitiveContext) aql.Value {
@@ -965,64 +998,200 @@ func primitiveAsValue(c gen.IPrimitiveContext) aql.Value {
 }
 
 // unquoteAQLString inverts [aql.StringValue.token]: strips outer
-// quotes (single or double, the grammar admits both) and undoes the
-// AQL embedded-quote escape for single-quoted literals (two
-// consecutive single quotes → one). Falls back to the raw text when
-// the input lacks recognised delimiters.
+// quotes (single or double, the grammar admits both) and resolves the
+// escape sequences the STRING token admits ([unescapeAQLString] —
+// there is no SQL-style quote doubling in AQL). Falls back to the raw
+// text when the input lacks recognised delimiters.
 func unquoteAQLString(raw string) aql.Value {
 	if len(raw) >= 2 {
 		first, last := raw[0], raw[len(raw)-1]
-		if first == '\'' && last == '\'' {
-			inner := raw[1 : len(raw)-1]
-			return aql.StringValue{S: strings.ReplaceAll(inner, "''", "'")}
-		}
-		if first == '"' && last == '"' {
-			inner := raw[1 : len(raw)-1]
-			return aql.StringValue{S: strings.ReplaceAll(inner, `""`, `"`)}
+		if (first == '\'' && last == '\'') || (first == '"' && last == '"') {
+			return aql.StringValue{S: unescapeAQLString(raw[1 : len(raw)-1])}
 		}
 	}
 	return aql.StringValue{S: raw}
 }
 
-// stripSurroundingQuotes peels a single set of single-quote delimiters
-// from a DATE/TIME/DATETIME lexer token (`'2026-01-01T00:00:00'` →
-// `2026-01-01T00:00:00`). Used so the emitter's StringValue.token
-// re-quotes cleanly instead of producing triple-quoted text.
+// unescapeAQLString resolves the STRING token's escape forms into the runes
+// they denote — the inverse of aql.StringValue.token.
+//
+// The lexer admits three escape shapes inside a quoted STRING
+// (resources/aql/grammar/active/AqlLexer.g4): `ESCAPE_SEQ` (`'\\'
+// ['"?abfnrtv\\*]`), `UTF8CHAR` (`'\\u' HEX HEX HEX HEX`), and `OCTAL_ESC`
+// (one to three octal digits behind a backslash). It admits no SQL-style
+// quote doubling — a doubled quote lexes as two adjacent STRING tokens
+// (`'O'` then `'Brien'`), which is a syntax error, not one escaped literal,
+// so a doubled quote can never reach this function inside one token and the
+// SQL unescaping this function used to do was unreachable for grammar-valid
+// input while being the wrong inverse for the escaped form that does occur.
+//
+// A trailing lone backslash cannot occur in a lexed token (it would escape the
+// closing quote), but is passed through rather than dropped so a hand-built
+// caller cannot lose a character silently.
+func unescapeAQLString(s string) string {
+	if !strings.ContainsRune(s, '\\') {
+		return s
+	}
+	var sb strings.Builder
+	sb.Grow(len(s))
+	for i := 0; i < len(s); {
+		if s[i] != '\\' || i+1 >= len(s) {
+			sb.WriteByte(s[i])
+			i++
+			continue
+		}
+		switch c := s[i+1]; {
+		case c == 'u' && i+5 < len(s):
+			// bitSize 16, not 32: four hex digits cannot exceed 0xFFFF, and
+			// saying so makes the conversion to rune provably lossless rather
+			// than merely unreachable (CodeQL flags the wider form).
+			r, err := strconv.ParseUint(s[i+2:i+6], 16, 16)
+			if err != nil {
+				sb.WriteByte(s[i])
+				i++
+				continue
+			}
+			// UTF8CHAR is exactly four hex digits, so a non-BMP character has no
+			// other spelling than a UTF-16 surrogate PAIR — which is how any
+			// JSON/JavaScript-derived client writes an emoji or a CJK extension.
+			// WriteRune substitutes U+FFFD for a lone surrogate, so combining the
+			// pair here is what keeps such a literal from decoding to two
+			// replacement characters, silently (REQ-119).
+			if lo, ok := trailingSurrogate(s, i, rune(r)); ok {
+				sb.WriteRune(utf16.DecodeRune(rune(r), lo))
+				i += 12
+				continue
+			}
+			// An unpaired half denotes no character. WriteRune renders it U+FFFD,
+			// which is the lenient reading and the one the lexer's own input
+			// decoding already applies to malformed bytes.
+			sb.WriteRune(rune(r))
+			i += 6
+		case c >= '0' && c <= '7':
+			// OCTAL_ESC is greedy up to three digits, but `\0`–`\3` may lead a
+			// three-digit form while `\4`–`\7` may lead at most two.
+			n := 1
+			for n < 3 && i+1+n < len(s) && s[i+1+n] >= '0' && s[i+1+n] <= '7' {
+				n++
+			}
+			if n == 3 && c > '3' {
+				n = 2
+			}
+			// bitSize 8 matches the byte this writes: with the clamp above the
+			// value cannot exceed 0o377, and pinning it means a regression in
+			// that clamp takes the pass-through arm below instead of silently
+			// truncating (bitSize 16 would yield 256, and byte(256) == 0).
+			v, err := strconv.ParseUint(s[i+1:i+1+n], 8, 8)
+			if err != nil {
+				sb.WriteByte(s[i])
+				i++
+				continue
+			}
+			sb.WriteByte(byte(v))
+			i += 1 + n
+		default:
+			if r, ok := aqlEscapeChar[c]; ok {
+				sb.WriteByte(r)
+				i += 2
+				continue
+			}
+			// Not an ESCAPE_SEQ member: the lexer would not have produced it,
+			// so keep both bytes rather than inventing a meaning for it.
+			sb.WriteByte(s[i])
+			i++
+		}
+	}
+	return sb.String()
+}
+
+// trailingSurrogate reports the low half of a UTF-16 surrogate pair when hi is a
+// high surrogate and the very next thing in s is a `\uXXXX` spelling a low one.
+// i indexes the backslash of the escape that produced hi, so the candidate
+// occupies s[i+6:i+12].
+func trailingSurrogate(s string, i int, hi rune) (rune, bool) {
+	if !utf16.IsSurrogate(hi) || hi > 0xDBFF || i+12 > len(s) ||
+		s[i+6] != '\\' || s[i+7] != 'u' {
+		return 0, false
+	}
+	lo, err := strconv.ParseUint(s[i+8:i+12], 16, 16)
+	if err != nil || rune(lo) < 0xDC00 || rune(lo) > 0xDFFF {
+		return 0, false
+	}
+	return rune(lo), true
+}
+
+// aqlEscapeChar maps the ESCAPE_SEQ suffixes to the bytes they denote.
+// `\?` and `\*` are identity escapes the grammar admits (the latter is the
+// SDK-AQL-004 profile addition); the rest are the C escapes.
+var aqlEscapeChar = map[byte]byte{
+	'\'': '\'', '"': '"', '?': '?', '*': '*', '\\': '\\',
+	'a': '\a', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v',
+}
+
+// stripSurroundingQuotes peels one set of quote delimiters from a
+// DATE/TIME/DATETIME lexer token (`'2026-01-01T00:00:00'` →
+// `2026-01-01T00:00:00`), so the emitter's StringValue.token re-quotes
+// cleanly instead of producing triple-quoted text.
+//
+// BOTH delimiters, because the three tokens admit both — `DATETIME :
+// SYM_SINGLE_QUOTE … | SYM_DOUBLE_QUOTE ISO8601_DATE_TIME SYM_DOUBLE_QUOTE`
+// (AqlLexer.g4). Peeling single quotes only made a double-quoted temporal
+// literal round-trip with its quotes EMBEDDED in the value — `= "2026-…"`
+// re-emitted as `'"2026-…"'`, a comparison that matches nothing, err == nil
+// (REQ-119's silent class; the sibling unquoteAQLString always handled both).
+// The token body is an ISO-8601 datetime, so it can contain neither delimiter
+// and needs no unescaping.
 func stripSurroundingQuotes(s string) string {
-	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+	if len(s) >= 2 && ((s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"')) {
 		return s[1 : len(s)-1]
 	}
 	return s
 }
 
 func numericPrimitiveAsValue(c gen.INumericPrimitiveContext) aql.Value {
-	// Handle the optional unary minus by collecting the inner numeric.
-	sign := 1
-	if c.SYM_MINUS() != nil {
-		sign = -1
-		if inner := c.NumericPrimitive(); inner != nil {
-			c = inner
+	// `numericPrimitive : … | SYM_MINUS numericPrimitive` is RECURSIVE, so
+	// descend while there are minuses to strip and let the parity decide the
+	// sign — stopping after one level made the grammar-legal `- -5` arrive here
+	// as the text `--5` and be reported as an out-of-range literal.
+	//
+	// The sign is then carried as TEXT rather than applied as a multiplier after
+	// parsing the magnitude: int64's range is asymmetric, so `math.MinInt64`
+	// has no positive counterpart and parsing its magnitude first overflows a
+	// value that is exactly representable once signed.
+	negative := false
+	for c.SYM_MINUS() != nil {
+		inner := c.NumericPrimitive()
+		if inner == nil {
+			break
 		}
+		negative = !negative
+		c = inner
+	}
+	sign := ""
+	if negative {
+		sign = "-"
 	}
 	if t := c.INTEGER(); t != nil {
-		if n, err := strconv.ParseInt(t.GetText(), 10, 64); err == nil {
-			return aql.IntValue{N: int64(sign) * n}
+		if n, err := strconv.ParseInt(sign+t.GetText(), 10, 64); err == nil {
+			return aql.IntValue{N: n}
 		}
+		return nil
 	}
-	if t := c.SCI_INTEGER(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
-		}
+	// The three real-valued token shapes share one conversion; a switch keeps
+	// the early-out and allocates nothing per literal.
+	var t antlr.TerminalNode
+	switch {
+	case c.REAL() != nil:
+		t = c.REAL()
+	case c.SCI_INTEGER() != nil:
+		t = c.SCI_INTEGER()
+	case c.SCI_REAL() != nil:
+		t = c.SCI_REAL()
+	default:
+		return nil
 	}
-	if t := c.REAL(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
-		}
-	}
-	if t := c.SCI_REAL(); t != nil {
-		if f, err := strconv.ParseFloat(t.GetText(), 64); err == nil {
-			return aql.RealValue{F: float64(sign) * f}
-		}
+	if f, err := strconv.ParseFloat(sign+t.GetText(), 64); err == nil {
+		return aql.RealValue{F: f}
 	}
 	return nil
 }
@@ -1071,7 +1240,14 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		}
 		if tf := it.TerminologyFunction(); tf != nil {
 			out = append(out, aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)})
+			continue
 		}
+		// Defensive: `valueListItem : primitive | PARAMETER |
+		// terminologyFunction`, all handled above. Skipping an unmodelled
+		// member would emit a NARROWER list than the source — valid AQL
+		// matching fewer values, silently — so a widened grammar must land
+		// here as a gap instead.
+		ex.incomplete("MATCHES member %q is outside the catalogue", it.GetText())
 	}
 	if len(out) == 0 {
 		// The grammar requires at least one valueListItem, so an empty
