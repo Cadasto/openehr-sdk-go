@@ -78,9 +78,11 @@ type ClassExpr struct {
 	// `{path, operator, value}` comparison (e.g. `ehr_id/value = $x`),
 	// reusing the shared [aql.Comparison] / [aql.Value] vocabulary
 	// (REQ-113). Non-nil only when the predicate is a simple comparison;
-	// nil for an archetype HRID (see [Archetype]), a version predicate, or
-	// a non-scalar / complex standing predicate — the verbatim [Predicate]
-	// text stays authoritative there. The comparison's Path is the relative
+	// nil for an archetype HRID (see [Archetype]), a version predicate, a
+	// non-scalar / complex standing predicate, or a comparison whose literal
+	// the value vocabulary cannot represent (an out-of-range numeric) — the
+	// verbatim [Predicate] text stays authoritative in every nil case, so
+	// emission is lossless regardless. The comparison's Path is the relative
 	// object path as written, and its ParsedPath carries the same path's
 	// structured Segments with an empty Alias (a relative predicate path
 	// binds no FROM alias) — the WHERE-side symmetry for the class-predicate
