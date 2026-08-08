@@ -102,6 +102,26 @@ func TestTerminologyFuncArity(t *testing.T) {
 			}
 		})
 	}
+	// The POINTER twin of three good arguments. The SELECT-side carrier is
+	// pinned for this ("TERMINOLOGY 3 pointer strings" in emit_parity_test.go);
+	// the value-side one was not, in the very commit that bound the rule to
+	// BOTH carriers — so dropping the normalisation here left CI green.
+	t.Run("pointer string arguments", func(t *testing.T) {
+		call := aql.FuncCall{Name: aql.TerminologyFunc, Args: []aql.Value{
+			&aql.StringValue{S: "expand"}, &aql.StringValue{S: "//fhir"}, &aql.StringValue{S: "url=x"},
+		}}
+		if err := aql.ValidateValue(call); err != nil {
+			t.Errorf("ValidateValue with *StringValue arguments = %v, want nil", err)
+		}
+		out, err := aql.FormatWhere(aql.Compare(call, aql.OpEq, aql.String("y")))
+		if err != nil {
+			t.Fatalf("FormatWhere with *StringValue arguments: %v", err)
+		}
+		if want := "TERMINOLOGY('expand', '//fhir', 'url=x') = 'y'"; out != want {
+			t.Errorf("out = %q, want %q", out, want)
+		}
+	})
+
 	// Positive control — the sanctioned constructor still emits.
 	got, err := aql.FormatWhere(aql.Compare(
 		aql.Terminology("expand", "//fhir", "url=x"), aql.OpEq, aql.String("y")))
@@ -313,5 +333,254 @@ func TestEqualValuesDoesNotPanicWhereEqualsWould(t *testing.T) {
 	// emitters refuse such a value, so this only arises before validation.
 	if !aql.EqualValues(aql.Func("F", nil), aql.Func("F")) {
 		t.Error("the nil-argument collapse documented on EqualValues no longer holds")
+	}
+}
+
+// TestParameterNamesMustSpellThePARAMETERToken — REQ-119.
+//
+// `PARAMETER : '$' IDENTIFIER_CHAR` with `IDENTIFIER_CHAR : ALPHA_CHAR
+// WORD_CHAR*`. This position had NO guard, though [aql.Param] is what
+// § REQ-055 rule 4 designates as the channel for caller data.
+//
+// Two failure modes, and the second is why this is a fix rather than a
+// tidy-up: `Param("a b")` emits `$a b`, which the parser rejects (loud), while
+// `Param("p AND c/secret = 1")` emits text that parses CLEANLY as two
+// predicates instead of one — a structure change through the channel the
+// injection guard recommends, invisible to every round-trip check.
+func TestParameterNamesMustSpellThePARAMETERToken(t *testing.T) {
+	for name, param := range map[string]string{
+		"empty":            "",
+		"leading digit":    "1x",
+		"leading dollar":   "$$x",
+		"embedded space":   "a b",
+		"embedded slash":   "a/b",
+		"embedded dash":    "a-b",
+		"whole predicate":  "p AND c/secret = 1",
+		"closing brace":    "p} OR c/y = 1",
+		"trailing newline": "p\n",
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			if err := aql.ValidateValue(aql.Param(param)); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("ValidateValue(Param(%q)) = %v, want ErrInvalidQuery", param, err)
+			}
+			if _, err := aql.FormatWhere(aql.Eq("c/x", aql.Param(param))); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("FormatWhere with Param(%q) = %v, want ErrInvalidQuery", param, err)
+			}
+		})
+	}
+
+	// Positive controls — every spelling the token admits must keep working,
+	// including the documented `$`-stripping in [aql.Param].
+	for name, param := range map[string]string{
+		"lower":            "ehr_id",
+		"upper":            "EHRID",
+		"mixed with digit": "p1",
+		"underscored":      "a_b_c",
+		"single letter":    "p",
+		"dollar stripped":  "$ehr_id",
+	} {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			if err := aql.ValidateValue(aql.Param(param)); err != nil {
+				t.Errorf("ValidateValue(Param(%q)) = %v, want nil", param, err)
+			}
+		})
+	}
+}
+
+// TestNarrowOperandSlotsRefuseAWiderValue — REQ-119.
+//
+// Three positions are NARROWER than the general `terminal` value position, and
+// all three delegated to validateValue, which enforces the wider set:
+//
+//	likeOperand    : STRING | PARAMETER
+//	valueListItem  : primitive | PARAMETER | terminologyFunction
+//	matchesOperand : … | terminologyFunction        (the bare, brace-less form)
+//
+// So `aql.Like` and `aql.Matches` — documented public constructors — emitted
+// `c/x LIKE 5` and `c/x MATCHES {c/y}` with err == nil. It is the same argument
+// the TERMINOLOGY arity guard already makes, one rule down.
+func TestNarrowOperandSlotsRefuseAWiderValue(t *testing.T) {
+	terminology := aql.Terminology("expand", "//fhir", "url=x")
+	termCall, _ := terminology.(aql.FuncCall)
+
+	t.Run("LIKE", func(t *testing.T) {
+		for name, v := range map[string]aql.Value{
+			"integer":       aql.Int(5),
+			"real":          aql.Real(2),
+			"boolean":       aql.Bool(true),
+			"null":          aql.Null(),
+			"path":          aql.Path("c/y"),
+			"function call": aql.Func("LENGTH", aql.Path("c/y")),
+			"terminology":   terminology,
+		} {
+			t.Run("refused/"+name, func(t *testing.T) {
+				if _, err := aql.FormatWhere(aql.Like("c/x", v)); !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Errorf("Like with %T = %v, want ErrInvalidQuery", v, err)
+				}
+			})
+		}
+		for name, v := range map[string]aql.Value{
+			"string":         aql.String("a%"),
+			"parameter":      aql.Param("p"),
+			"pointer string": &aql.StringValue{S: "a%"},
+		} {
+			t.Run("accepted/"+name, func(t *testing.T) {
+				if _, err := aql.FormatWhere(aql.Like("c/x", v)); err != nil {
+					t.Errorf("Like with %T = %v, want nil", v, err)
+				}
+			})
+		}
+	})
+
+	t.Run("MATCHES value list", func(t *testing.T) {
+		for name, v := range map[string]aql.Value{
+			"path":          aql.Path("c/y"),
+			"function call": aql.Func("LENGTH", aql.Path("c/y")),
+		} {
+			t.Run("refused/"+name, func(t *testing.T) {
+				if _, err := aql.FormatWhere(aql.Matches("c/x", v)); !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Errorf("Matches with %T = %v, want ErrInvalidQuery", v, err)
+				}
+			})
+		}
+		// A path in ANY position of the list, not only the first.
+		t.Run("refused/path after a good member", func(t *testing.T) {
+			_, err := aql.FormatWhere(aql.Matches("c/x", aql.String("a"), aql.Path("c/y")))
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+		for name, v := range map[string]aql.Value{
+			"string":      aql.String("a"),
+			"integer":     aql.Int(5),
+			"real":        aql.Real(2.5),
+			"boolean":     aql.Bool(false),
+			"null":        aql.Null(),
+			"parameter":   aql.Param("p"),
+			"terminology": terminology,
+			"pointer":     &aql.StringValue{S: "a"},
+		} {
+			t.Run("accepted/"+name, func(t *testing.T) {
+				if _, err := aql.FormatWhere(aql.Matches("c/x", v)); err != nil {
+					t.Errorf("Matches with %T = %v, want nil", v, err)
+				}
+			})
+		}
+	})
+
+	t.Run("bare MATCHES terminology operand", func(t *testing.T) {
+		bad := aql.MatchesExpr{Path: "c/x", Terminology: &aql.FuncCall{
+			Name: "LENGTH", Args: []aql.Value{aql.Path("c/y")},
+		}}
+		if _, err := aql.FormatWhere(bad); !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Errorf("bare LENGTH() operand = %v, want ErrInvalidQuery", err)
+		}
+		good := aql.MatchesExpr{Path: "c/x", Terminology: &termCall}
+		if _, err := aql.FormatWhere(good); err != nil {
+			t.Errorf("bare TERMINOLOGY() operand = %v, want nil", err)
+		}
+	})
+}
+
+// TestTerminologyGuardTrimsTheName — REQ-119.
+//
+// [aql.FuncCall.token] emits the TRIMMED, upper-cased name, and checkFuncName
+// trims before its own lookup — but the arity/argument gate read the raw field,
+// so ` terminology ` slipped past it and then emitted `TERMINOLOGY(1, 2)`. The
+// SELECT-side twin (validateSelectTerminology) already trimmed: the same rule,
+// bound to one carrier and not the other.
+func TestTerminologyGuardTrimsTheName(t *testing.T) {
+	for _, name := range []string{" TERMINOLOGY", "TERMINOLOGY ", " terminology\t", "\nTerminology "} {
+		t.Run(name, func(t *testing.T) {
+			wrong := aql.FuncCall{Name: name, Args: []aql.Value{aql.Int(1), aql.Int(2)}}
+			if err := aql.ValidateValue(wrong); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("ValidateValue(%q with 2 int args) = %v, want ErrInvalidQuery", name, err)
+			}
+			right := aql.FuncCall{Name: name, Args: []aql.Value{
+				aql.String("a"), aql.String("b"), aql.String("c"),
+			}}
+			if err := aql.ValidateValue(right); err != nil {
+				t.Errorf("ValidateValue(%q with 3 string args) = %v, want nil", name, err)
+			}
+		})
+	}
+}
+
+// TestJunctionValidatesItsOperatorAndArity — REQ-119.
+//
+// [aql.Comparison] has always checked its operator; [aql.Junction] never checked
+// its own, and BoolOp had no `known()` at all. The zero value is the reachable
+// one — a hand-assembled Junction carries it by default — and it emitted two
+// predicates joined by nothing.
+//
+// The term-less case is the same constructor-guards-it asymmetry the typed-nil
+// work closed for terms: [aql.And] / [aql.Or] collapse the empty case to nil,
+// the struct literal does not, and `NOT ()` reaches the wire.
+func TestJunctionValidatesItsOperatorAndArity(t *testing.T) {
+	a := aql.Eq("c/x", aql.Int(1))
+	b := aql.Eq("c/y", aql.Int(2))
+
+	for name, w := range map[string]aql.WhereExpr{
+		"zero-value operator":    aql.Junction{Terms: []aql.WhereExpr{a, b}},
+		"unknown operator":       aql.Junction{Op: aql.BoolOp("XOR"), Terms: []aql.WhereExpr{a, b}},
+		"non-canonical casing":   aql.Junction{Op: aql.BoolOp("and"), Terms: []aql.WhereExpr{a, b}},
+		"no terms":               aql.Junction{Op: aql.OpAnd},
+		"no terms under a NOT":   aql.NotExpr{Operand: aql.Junction{Op: aql.OpAnd}},
+		"no terms as an operand": aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, aql.Junction{Op: aql.OpOr}}},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := aql.FormatWhere(w)
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+			}
+			if out != "" {
+				t.Errorf("a refused junction still emitted %q", out)
+			}
+		})
+	}
+
+	for name, tc := range map[string]struct {
+		w    aql.WhereExpr
+		want string
+	}{
+		"AND of two":  {aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, b}}, "c/x = 1 AND c/y = 2"},
+		"OR of two":   {aql.Junction{Op: aql.OpOr, Terms: []aql.WhereExpr{a, b}}, "c/x = 1 OR c/y = 2"},
+		"single term": {aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a}}, "c/x = 1"},
+	} {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			out, err := aql.FormatWhere(tc.w)
+			if err != nil {
+				t.Fatalf("err = %v, want nil", err)
+			}
+			if out != tc.want {
+				t.Errorf("out = %q, want %q", out, tc.want)
+			}
+		})
+	}
+}
+
+// TestFormatValueDoesNotPanicOnATypedNilArgument — REQ-119.
+//
+// [aql.FormatValue] is the unvalidated escape hatch, so a value with no wire
+// form reaches it by design; [aql.FuncCall.token] then renders each ARGUMENT,
+// and a typed-nil argument is the same pointer twin one level in. The existing
+// no-panic test enumerates typed-nil values but never one nested inside a call.
+func TestFormatValueDoesNotPanicOnATypedNilArgument(t *testing.T) {
+	for name, arg := range map[string]aql.Value{
+		"untyped nil":            nil,
+		"typed-nil *PathValue":   (*aql.PathValue)(nil),
+		"typed-nil *FuncCall":    (*aql.FuncCall)(nil),
+		"typed-nil *StringValue": (*aql.StringValue)(nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("FormatValue panicked: %v", r)
+				}
+			}()
+			if got, want := aql.FormatValue(aql.Func("LENGTH", arg)), "LENGTH()"; got != want {
+				t.Errorf("FormatValue = %q, want %q (a nil argument renders as nothing)", got, want)
+			}
+		})
 	}
 }

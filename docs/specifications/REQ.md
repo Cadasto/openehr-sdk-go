@@ -125,7 +125,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |
-| Clinical modeling | 100–109 | — (see note) |
+| Clinical modeling | 100–119 | — (see note) |
 | RM behavioural functions | 120–123 | 124–129 |
 | SDK authoring & client tooling | 130 (reserved) | 131–139 |
 | Wire format — extensions | 140 | 141–149 |

@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql"
@@ -69,8 +70,20 @@ func TestMatchesURIGuardTracksTheGrammar(t *testing.T) {
 		"http://[2001:0db8]/p",
 		"http://[2001:0db8::1]/p",
 		"http://[2001:0db8::0001/p",
+		// One bad byte per NON-PATH component. Every refusal above puts its bad
+		// byte in the path or the scheme, so the query / fragment / userinfo /
+		// host / port checks were each pinned zero ways: deleting any one of
+		// them left the whole suite green while the builder emitted AQL this
+		// SDK's own parser rejects.
+		"http://example.org/p?x=<y>",
+		"http://example.org/p#f<g",
+		"http://us<er@example.org/p",
+		"http://ex ample.org/p",
+		"http://example.org:80a0/p",
 		// Spellable as a URI, but TERM_CODE is declared first and wins the tie,
-		// and matchesOperand admits URI only.
+		// and matchesOperand admits URI only. Only these two REACH that check —
+		// the display-name and paren forms below are refused earlier, by the
+		// path and scheme alphabets, so they do not exercise it.
 		"a::b",
 		"SNOMED-CT::73211009",
 		"SNOMED-CT(2026)::73211009",
@@ -81,6 +94,11 @@ func TestMatchesURIGuardTracksTheGrammar(t *testing.T) {
 		"http://example.org/p?a=1?b=2",
 		"http://example.org/p#frag",
 		"http://example.org/p#frag?q=1",
+		// Query AND fragment, in the RFC-3986 order. Its absence meant the two
+		// `strings.Cut` calls could be swapped without failing CI — and under
+		// that swap this ordinary URL is REFUSED. An anti-tightening control,
+		// like TestEmitAcceptsAnAliaslessContainment.
+		"http://example.org/p?a=1#f",
 		"http://example.org/'",
 		"http://example.org/a!$&'()*+,;=",
 		"http://example.org/a%20b",
@@ -682,4 +700,481 @@ func TestFormatWhereDoesNotPanicOnATypedNilPredicate(t *testing.T) {
 			t.Errorf("pointer rendered %q, value %q", viaPtr, viaVal)
 		}
 	})
+}
+
+// TestJunctionParenthesisationBindsThePointerTwin — REQ-119.
+//
+// [aql.Junction.expr] and [aql.NotExpr.expr] decide whether to emit precedence
+// parentheses from the operand's CONCRETE SHAPE. Both asserted the value shape
+// only, so a `*aql.Junction` fell through and a nested OR emitted unparenthesised.
+//
+// This is the worst version of the pointer-twin defect, and the reason it needs
+// its own test rather than a line in the typed-nil table: the output is VALID
+// AQL that re-parses and re-emits to itself, so it is a fixed point of the round
+// trip — every existing check passes while the query means something else. The
+// assertion is therefore byte-identity between the two carriers, not
+// parseability.
+//
+// The typed-nil test's "populated pointer renders" case could not see this: it
+// uses a top-level `*Comparison`, a LEAF, which is the one shape where no
+// dispatch on the operand happens.
+func TestJunctionParenthesisationBindsThePointerTwin(t *testing.T) {
+	a := aql.Eq("c/a", aql.Int(1))
+	or := aql.Junction{Op: aql.OpOr, Terms: []aql.WhereExpr{
+		aql.Eq("c/b", aql.Int(2)), aql.Eq("c/c", aql.Int(3)),
+	}}
+	and := aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{
+		aql.Eq("c/b", aql.Int(2)), aql.Eq("c/c", aql.Int(3)),
+	}}
+
+	for name, tc := range map[string]struct{ value, pointer aql.WhereExpr }{
+		"OR nested in an AND": {
+			value:   aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, or}},
+			pointer: aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, &or}},
+		},
+		"OR under a NOT": {
+			value:   aql.NotExpr{Operand: or},
+			pointer: aql.NotExpr{Operand: &or},
+		},
+		"AND under a NOT": {
+			value:   aql.NotExpr{Operand: and},
+			pointer: aql.NotExpr{Operand: &and},
+		},
+		"through the And constructor": {
+			value:   aql.And(a, or),
+			pointer: aql.And(a, &or),
+		},
+		"through the Not constructor": {
+			value:   aql.Not(or),
+			pointer: aql.Not(&or),
+		},
+		"nested two deep": {
+			value:   aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, aql.NotExpr{Operand: or}}},
+			pointer: aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{a, &aql.NotExpr{Operand: &or}}},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			viaValue, err := aql.FormatWhere(tc.value)
+			if err != nil {
+				t.Fatalf("value shape refused: %v", err)
+			}
+			viaPointer, err := aql.FormatWhere(tc.pointer)
+			if err != nil {
+				t.Fatalf("pointer shape refused: %v", err)
+			}
+			if viaPointer != viaValue {
+				t.Errorf("pointer emitted %q, value emitted %q — the same tree must render the same text",
+					viaPointer, viaValue)
+			}
+			// Belt and braces: the text must also mean what it says. A dropped
+			// parenthesis re-parses cleanly, so only the tree shape shows it.
+			q := "SELECT c/x FROM COMPOSITION c WHERE " + viaPointer
+			doc, err := parse.ParseQuery(q)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", q, err)
+			}
+			back, err := doc.Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if back != q {
+				t.Errorf("not a fixed point: %q -> %q", q, back)
+			}
+		})
+	}
+
+	// The same tree through aql.Builder.Build, which REQ-119 names as a
+	// validating write path alongside FormatWhere.
+	t.Run("through Builder.Build", func(t *testing.T) {
+		build := func(w aql.WhereExpr) string {
+			q, err := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").Where(w).Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+			return q.Q
+		}
+		if got, want := build(aql.And(a, &or)), build(aql.And(a, or)); got != want {
+			t.Errorf("Build with a pointer term = %q, want %q", got, want)
+		}
+	})
+}
+
+// TestBuildDoesNotPanicOnATypedNilPredicate — REQ-119, "absence is positional".
+//
+// [aql.FormatWhere] was made total over a typed-nil predicate; [aql.Builder.Build]
+// is the OTHER validating write path the closure clause names, and it still
+// called validate through the nil pointer. `where != nil` is true for a typed
+// nil, and validate has a value receiver.
+//
+// The FromEHR case is the interesting one: effectiveWhere AND-combines the
+// implicit ehr_id filter with the caller's predicate, so an un-normalised typed
+// nil became a junction TERM — where absence is correctly refused — giving one
+// input three different behaviours depending on the route.
+func TestBuildDoesNotPanicOnATypedNilPredicate(t *testing.T) {
+	nilCmp := (*aql.Comparison)(nil)
+
+	for name, tc := range map[string]struct {
+		where aql.WhereExpr
+		want  string
+	}{
+		"untyped nil":            {nil, "SELECT c/x FROM COMPOSITION c"},
+		"typed-nil *Comparison":  {nilCmp, "SELECT c/x FROM COMPOSITION c"},
+		"typed-nil *Junction":    {(*aql.Junction)(nil), "SELECT c/x FROM COMPOSITION c"},
+		"typed-nil *MatchesExpr": {(*aql.MatchesExpr)(nil), "SELECT c/x FROM COMPOSITION c"},
+		"typed-nil *NotExpr":     {(*aql.NotExpr)(nil), "SELECT c/x FROM COMPOSITION c"},
+		// And() keeps a TYPED nil (it drops only an untyped one), so a
+		// single typed-nil term becomes the whole predicate.
+		"And of one typed nil": {aql.And(nilCmp), "SELECT c/x FROM COMPOSITION c"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Build panicked: %v", r)
+				}
+			}()
+			q, err := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").Where(tc.where).Build()
+			if err != nil {
+				t.Fatalf("Build refused a top-level absence: %v", err)
+			}
+			if q.Q != tc.want {
+				t.Errorf("Build = %q, want %q", q.Q, tc.want)
+			}
+		})
+	}
+
+	t.Run("FromEHR keeps the implicit filter and drops the absent predicate", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Build panicked: %v", r)
+			}
+		}()
+		q, err := aql.NewBuilder().Select(aql.Col("c/x")).FromEHR("e", aql.Param("id")).Where(nilCmp).Build()
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		const want = "SELECT c/x FROM EHR e WHERE e/ehr_id/value = $id"
+		if q.Q != want {
+			t.Errorf("Build = %q, want %q", q.Q, want)
+		}
+	})
+
+	// A POPULATED pointer predicate must still build, identically to the value.
+	t.Run("populated pointer builds", func(t *testing.T) {
+		c := aql.Comparison{Path: "c/x", Op: aql.OpEq, Val: aql.Int(1)}
+		viaPtr, err := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").Where(&c).Build()
+		if err != nil {
+			t.Fatalf("pointer predicate refused: %v", err)
+		}
+		viaVal, err := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").Where(c).Build()
+		if err != nil {
+			t.Fatalf("value predicate refused: %v", err)
+		}
+		if viaPtr.Q != viaVal.Q {
+			t.Errorf("pointer built %q, value built %q", viaPtr.Q, viaVal.Q)
+		}
+	})
+}
+
+// TestEmitValidatesPagingAndOrderPositions — REQ-119 binds the value guards to
+// EVERY position Emit renders, not the WHERE clause alone.
+//
+// `limitValue : INTEGER | PARAMETER` and `orderByExpr : identifiedPath …` are
+// value positions, and [aql.Builder] has always guarded them. Emit did not, so
+// the read and write sides disagreed on the same operand — and [parse.LimitExpr]
+// turned out to be a THIRD sealed interface with value receivers, whose pointer
+// twin `q.Limit != nil` waved through to a panicking token().
+func TestEmitValidatesPagingAndOrderPositions(t *testing.T) {
+	base := func(t *testing.T) *parse.Query {
+		t.Helper()
+		q, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c")
+		if err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+		return q
+	}
+
+	t.Run("refused", func(t *testing.T) {
+		for name, mut := range map[string]func(*parse.Query){
+			"typed-nil *IntLimit":    func(q *parse.Query) { q.Limit = (*parse.IntLimit)(nil) },
+			"typed-nil *ParamLimit":  func(q *parse.Query) { q.Limit = (*parse.ParamLimit)(nil) },
+			"negative LIMIT":         func(q *parse.Query) { q.Limit = parse.IntLimit{N: -1} },
+			"empty LIMIT parameter":  func(q *parse.Query) { q.Limit = parse.ParamLimit{} },
+			"LIMIT parameter with $": func(q *parse.Query) { q.Limit = parse.ParamLimit{Name: "$n"} },
+			"LIMIT parameter spaced": func(q *parse.Query) { q.Limit = parse.ParamLimit{Name: "a b"} },
+			"negative OFFSET": func(q *parse.Query) {
+				q.Limit, q.Offset = parse.IntLimit{N: 5}, parse.IntLimit{N: -1}
+			},
+			"empty ORDER BY path": func(q *parse.Query) { q.OrderBy = []parse.OrderTerm{{}} },
+		} {
+			t.Run(name, func(t *testing.T) {
+				q := base(t)
+				mut(q)
+				defer func() {
+					if r := recover(); r != nil {
+						t.Fatalf("Emit panicked: %v", r)
+					}
+				}()
+				out, err := q.Emit()
+				if !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+				}
+				if out != "" {
+					t.Errorf("a refused query still emitted %q", out)
+				}
+			})
+		}
+	})
+
+	// Positive controls: what Emit must keep accepting, asserted as a fixed
+	// point so a tightened guard fails here rather than shipping.
+	t.Run("accepted", func(t *testing.T) {
+		for _, q := range []string{
+			"SELECT c/x FROM COMPOSITION c LIMIT 5",
+			"SELECT c/x FROM COMPOSITION c LIMIT 0",
+			"SELECT c/x FROM COMPOSITION c LIMIT 5 OFFSET 10",
+			"SELECT c/x FROM COMPOSITION c LIMIT $n",
+			"SELECT c/x FROM COMPOSITION c LIMIT $n OFFSET $m",
+			"SELECT c/x FROM COMPOSITION c ORDER BY c/y ASC",
+			"SELECT c/x FROM COMPOSITION c ORDER BY c/y DESC LIMIT 5",
+		} {
+			t.Run(q, func(t *testing.T) {
+				doc, err := parse.ParseQuery(q)
+				if err != nil {
+					t.Fatalf("ParseQuery: %v", err)
+				}
+				out, err := doc.Emit()
+				if err != nil {
+					t.Fatalf("Emit refused AQL that ParseQuery accepted: %v", err)
+				}
+				if out != q {
+					t.Errorf("Emit = %q, want the canonical input %q", out, q)
+				}
+			})
+		}
+	})
+
+	// A POPULATED pointer operand must render, identically to the value shape —
+	// the normalisation accepts pointers, it does not merely reject nil ones.
+	// Without this the deref could be deleted and the refusals above would
+	// still pass, since the default arm catches a pointer type too.
+	t.Run("populated pointer operands render", func(t *testing.T) {
+		for name, tc := range map[string]struct{ value, pointer parse.LimitExpr }{
+			"IntLimit":   {parse.IntLimit{N: 5}, &parse.IntLimit{N: 5}},
+			"ParamLimit": {parse.ParamLimit{Name: "n"}, &parse.ParamLimit{Name: "n"}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				q := base(t)
+				q.Limit = tc.value
+				viaValue, err := q.Emit()
+				if err != nil {
+					t.Fatalf("value shape refused: %v", err)
+				}
+				q = base(t)
+				q.Limit = tc.pointer
+				viaPointer, err := q.Emit()
+				if err != nil {
+					t.Fatalf("pointer shape refused: %v", err)
+				}
+				if viaPointer != viaValue {
+					t.Errorf("pointer emitted %q, value emitted %q", viaPointer, viaValue)
+				}
+			})
+		}
+	})
+}
+
+// TestEmitTreatsAVersionClassAsAClassNode — REQ-119.
+//
+// checkComplete and isContainmentJunction are two spellings of "is this a class
+// node?", and they disagreed: the spec says a class node carries an RM type OR
+// is a VERSION class expression, checkComplete implements that, and
+// isContainmentJunction read RMType alone. A `VERSION v` node with no RMType was
+// therefore blessed as complete and then reclassified as a boolean grouping, so
+// Emit dropped it from the chain — silently, into AQL that parses cleanly.
+//
+// [emitClassExpr] already treats Version as authoritative, so the two carriers
+// of the same question now agree.
+func TestEmitTreatsAVersionClassAsAClassNode(t *testing.T) {
+	mk := func(cls parse.ClassExpr) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+				IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}},
+			}}}},
+			From: parse.FromClause{
+				Root: parse.ClassExpr{RMType: "EHR", Alias: "e"},
+				Contains: &parse.Containment{
+					Class:    cls,
+					Children: []parse.Containment{{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}}},
+				},
+			},
+		}
+	}
+	const want = "SELECT c/x FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c"
+
+	// The extractor always sets RMType too, so only the first shape is
+	// reachable by hand — which is exactly the path validateContainmentTree
+	// exists to bind.
+	for name, cls := range map[string]parse.ClassExpr{
+		"Version flag only":      {Version: true, Alias: "v"},
+		"Version flag + RM type": {RMType: "VERSION", Version: true, Alias: "v"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			out, err := mk(cls).Emit()
+			if err != nil {
+				t.Fatalf("Emit: %v", err)
+			}
+			if out != want {
+				t.Errorf("Emit = %q, want %q", out, want)
+			}
+		})
+	}
+}
+
+// TestEmitSelectBindsThePointerTwin — REQ-119. [parse.SelectExpr] is the third
+// sealed interface here whose methods have value receivers.
+//
+// It failed CLOSED (`unsupported SELECT expression *parse.LiteralExpr`), which
+// is safe but still bound the rule to one carrier while the value side accepts
+// `*aql.StringValue` — so a hand-built AST was refused for a shape the SDK
+// otherwise treats as equivalent.
+func TestEmitSelectBindsThePointerTwin(t *testing.T) {
+	mk := func(e parse.SelectExpr) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: e}}},
+			From:   parse.FromClause{Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+		}
+	}
+
+	for name, tc := range map[string]struct{ value, pointer parse.SelectExpr }{
+		"literal": {
+			value:   parse.LiteralExpr{Value: aql.String("x")},
+			pointer: &parse.LiteralExpr{Value: aql.String("x")},
+		},
+		"path": {
+			value: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+				IdentifiedPath: aql.IdentifiedPath{Raw: "c/y"},
+			}},
+			pointer: &parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+				IdentifiedPath: aql.IdentifiedPath{Raw: "c/y"},
+			}},
+		},
+		"function call": {
+			value:   parse.FunctionCall{Name: "COUNT", Star: true},
+			pointer: &parse.FunctionCall{Name: "COUNT", Star: true},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			viaValue, err := mk(tc.value).Emit()
+			if err != nil {
+				t.Fatalf("value shape refused: %v", err)
+			}
+			viaPointer, err := mk(tc.pointer).Emit()
+			if err != nil {
+				t.Fatalf("pointer shape refused: %v", err)
+			}
+			if viaPointer != viaValue {
+				t.Errorf("pointer emitted %q, value emitted %q", viaPointer, viaValue)
+			}
+		})
+	}
+
+	t.Run("typed nil is refused, not panicked", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Emit panicked: %v", r)
+			}
+		}()
+		out, err := mk((*parse.LiteralExpr)(nil)).Emit()
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+		}
+	})
+}
+
+// TestEmitRefusesAnIncompleteNodeInsideARootJunction — REQ-119.
+//
+// The completeness pass walks From.Junction as well as From.Contains, but only
+// the PLACEMENT walk had a root-junction case, so restricting completeness to
+// From.Contains left the suite green while Emit produced `FROM OBSERVATION o OR `.
+func TestEmitRefusesAnIncompleteNodeInsideARootJunction(t *testing.T) {
+	// Root and Junction are mutually exclusive — setting both is refused by an
+	// earlier rule, which would mask this one entirely.
+	root := parse.Containment{
+		ChildJoin: parse.ContainsOr,
+		Children: []parse.Containment{
+			{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+			{Class: parse.ClassExpr{Alias: "broken"}}, // no RM type, no children
+		},
+	}
+	q := &parse.Query{
+		Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+			IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}},
+		}}}},
+		From: parse.FromClause{Junction: &root},
+	}
+	out, err := q.Emit()
+	if err == nil || !strings.Contains(err.Error(), "requires an RM type") {
+		t.Fatalf("err = %v, want the completeness rule (emitted %q)", err, out)
+	}
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+	}
+	if out != "" {
+		t.Errorf("a refused query still emitted %q", out)
+	}
+}
+
+// TestContainmentRefusalsReportTheRuleThatFired — REQ-119 requires completeness
+// to be checked BEFORE placement, and states why: the read side infers a node's
+// KIND from an absent RM type, so in the other order a caller is told about a
+// junction they never wrote.
+//
+// Neither containment test looked past errors.Is(err, ErrInvalidQuery), so the
+// two guards were mutually substitutable as far as CI was concerned and the
+// documented ordering was unpinned — swapping the two passes left the suite
+// green. The tree below trips BOTH rules, so the message identifies the order.
+func TestContainmentRefusalsReportTheRuleThatFired(t *testing.T) {
+	mk := func(c parse.Containment) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+				IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}},
+			}}}},
+			From: parse.FromClause{
+				Root:     parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+				Contains: &c,
+			},
+		}
+	}
+
+	// OBSERVATION carries a ChildJoin (a completeness violation) AND its chain
+	// ends in a junction while a further term follows (a placement violation).
+	both := parse.Containment{Class: parse.ClassExpr{RMType: "SECTION", Alias: "s"}}
+	both.Children = []parse.Containment{
+		{
+			Class:     parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"},
+			ChildJoin: parse.ContainsOr,
+			Children: []parse.Containment{{Children: []parse.Containment{
+				{Class: parse.ClassExpr{RMType: "CLUSTER", Alias: "cl"}},
+				{Class: parse.ClassExpr{RMType: "EVALUATION", Alias: "ev"}},
+			}, ChildJoin: parse.ContainsOr}},
+		},
+		{Class: parse.ClassExpr{RMType: "ACTION", Alias: "a"}},
+	}
+
+	out, err := mk(both).Emit()
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+	}
+	if got := err.Error(); !strings.Contains(got, "ChildJoin") {
+		t.Errorf("completeness must be diagnosed before placement, got %q", got)
+	}
+
+	// And the plain incomplete node still names the rule it broke, rather than
+	// a junction the caller never wrote.
+	incomplete := parse.Containment{Class: parse.ClassExpr{RMType: "SECTION", Alias: "s"}}
+	incomplete.Children = []parse.Containment{{Class: parse.ClassExpr{Alias: "x"}}}
+	_, err = mk(incomplete).Emit()
+	if err == nil || !strings.Contains(err.Error(), "requires an RM type") {
+		t.Errorf("incomplete node reported as %v, want the RM-type rule", err)
+	}
 }

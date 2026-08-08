@@ -36,7 +36,10 @@ type WhereExpr interface {
 // the expression first; a malformed predicate (empty path, nil value,
 // …) returns an error wrapping [ErrInvalidQuery]. A nil expression
 // returns "" with no error (a vacuously-true WHERE — the builder skips
-// the clause in that case).
+// the clause in that case), and so does a typed-nil pointer shape such as
+// `(*Comparison)(nil)`: at the TOP level both denote a clause the caller does
+// not have. Inside a [NotExpr] or a [Junction] the same absence is refused
+// instead — see [DerefWhere] (REQ-119, "absence is positional").
 //
 // This is the public read-side mirror of the internal expr() method:
 // consumers of a parsed [parse.Query] use FormatWhere to round-trip
@@ -58,15 +61,24 @@ func FormatWhere(w WhereExpr) (string, error) {
 	return pred.expr(), nil
 }
 
-// derefWhere normalises a [WhereExpr] to the predicate it denotes, reporting
-// false when it denotes none.
+// DerefWhere normalises a [WhereExpr] to the predicate it denotes, reporting
+// false when it denotes none — an untyped nil, or a nil pointer. It is the
+// [DerefValue] of the predicate vocabulary.
 //
-// The value-receiver problem [DerefValue] solves for values applies to the
-// predicate vocabulary too: expr and validate have value receivers, so
-// `*Comparison` satisfies WhereExpr and calling either on a nil one panics.
-// Every entry point that dispatches on a caller-supplied predicate — the top
-// level, a [NotExpr] operand, a [Junction] term — MUST come through here, or a
-// public boundary crashes instead of refusing.
+// The value-receiver problem is the same one: expr and validate have value
+// receivers, so `*Comparison` satisfies WhereExpr alongside `Comparison`, and a
+// bare type switch that lists only the value shapes silently misses every
+// pointer twin. Any code deciding behaviour from a WhereExpr's concrete type —
+// including the read-side `w.(aql.Comparison)` idiom [Comparison] describes —
+// MUST normalise first, or the same rule will bind one carrier and not the
+// other (REQ-119).
+//
+// Both consequences have bitten this package: calling a value-receiver method
+// on a typed-nil crashes a public boundary, and deciding [Junction]
+// parenthesisation from the raw interface emitted a nested OR without its
+// parentheses — valid AQL asking something else.
+func DerefWhere(w WhereExpr) (WhereExpr, bool) { return derefWhere(w) }
+
 func derefWhere(w WhereExpr) (WhereExpr, bool) {
 	if w == nil {
 		return nil, false
@@ -142,7 +154,10 @@ func (o Operator) known() bool {
 // Comparison is a `path <op> value` predicate. It is the concrete type both
 // the construction helpers ([Eq] / [Ne] / [Gt] / [Ge] / [Lt] / [Le]) and the
 // parser populate; consumers reading a parsed query type-assert
-// `w.(aql.Comparison)` and read the fields directly.
+// `w.(aql.Comparison)` and read the fields directly. That bare assert is safe
+// for a query [parse.ParseQuery] produced, which only ever populates the value
+// shapes; code that also handles hand-assembled predicates MUST route through
+// [DerefWhere] first, since `*Comparison` satisfies [WhereExpr] too.
 //
 // Path is the alias-qualified RM path as it appears in the AQL text (e.g.
 // `e/ehr_status/subject/external_ref/id/value`); Op is one of the [Operator]
@@ -264,6 +279,24 @@ const (
 	OpOr BoolOp = "OR"
 )
 
+// known reports whether b is one of the two junction operators the grammar
+// admits, mirroring [Operator.known] for the predicate side.
+//
+// BoolOp is a named string so a parsed query keeps its wire spelling, which
+// leaves the type open — and unlike Operator, whose zero value at least fails
+// loudly, a [Junction] assembled by hand carries the EMPTY BoolOp by default and
+// emitted two predicates joined by nothing (REQ-119). A non-canonical casing
+// (`"and"`) is refused rather than re-spelled, for the same reason `==` is not
+// silently corrected to `=`.
+func (b BoolOp) known() bool {
+	switch b {
+	case OpAnd, OpOr:
+		return true
+	default:
+		return false
+	}
+}
+
 // Junction is a multi-term boolean junction (`a AND b`, `a OR b OR c`,
 // …). Op is one of the [BoolOp] constants; Terms is the ordered list of
 // operands. Parsed queries flatten same-operator chains: a literal
@@ -280,23 +313,51 @@ type Junction struct {
 func (j Junction) expr() string {
 	parts := make([]string, len(j.Terms))
 	for i, t := range j.Terms {
-		// Parenthesise a nested OR inside an AND to preserve precedence;
-		// a bare comparison or same-operator junction needs no grouping.
-		if inner, ok := t.(Junction); ok && inner.Op == OpOr && j.Op == OpAnd {
-			parts[i] = "(" + t.expr() + ")"
+		// Normalised FIRST, because the parenthesisation rule below decides
+		// from the term's concrete shape and a `*Junction` denotes a junction
+		// exactly as the value shape does. Reading the raw interface emitted a
+		// nested OR without its parentheses — text that parses cleanly and asks
+		// something else, the silent-substitution class (REQ-119).
+		//
+		// A term denoting nothing leaves an empty part rather than being
+		// dropped, so the text breaks loudly instead of quietly losing an arm.
+		// validate refuses one first, so this is unreachable through either
+		// emitter.
+		term, ok := derefWhere(t)
+		if !ok {
 			continue
 		}
-		parts[i] = t.expr()
+		// Parenthesise a nested OR inside an AND to preserve precedence;
+		// a bare comparison or same-operator junction needs no grouping.
+		if inner, isJunction := term.(Junction); isJunction && inner.Op == OpOr && j.Op == OpAnd {
+			parts[i] = "(" + term.expr() + ")"
+			continue
+		}
+		parts[i] = term.expr()
 	}
 	return strings.Join(parts, " "+string(j.Op)+" ")
 }
 
 func (j Junction) validate() error {
+	// The operator is checked exactly as [Comparison] checks its own: the type
+	// is an open named string, so the zero value reaches here from a
+	// hand-assembled tree and emitted `a  b` — two predicates joined by nothing.
+	if !j.Op.known() {
+		return fmt.Errorf("%w: unknown junction operator %q", ErrInvalidQuery, string(j.Op))
+	}
+	// A junction with no terms has no reading, and emits `()` when it sits
+	// inside a NOT or another junction. [And] / [Or] collapse the empty case to
+	// nil before a Junction is built; the struct literal has no such guard,
+	// which is the same constructor-guards-it asymmetry as the terms below.
+	if len(j.Terms) == 0 {
+		return fmt.Errorf("%w: %s junction with no terms", ErrInvalidQuery, string(j.Op))
+	}
 	for i, t := range j.Terms {
 		// A term denoting no predicate is refused, not skipped: dropping an
-		// arm of an AND/OR widens or narrows the result set silently. The
-		// constructors ([And] / [Or]) already drop an UNTYPED nil before a
-		// Junction is built, so reaching here means a hand-assembled tree.
+		// arm of an AND/OR widens or narrows the result set silently. [And] /
+		// [Or] drop an UNTYPED nil before a Junction is built, but they keep a
+		// typed one — `Or((*Comparison)(nil), x)` reaches here — so this binds
+		// the constructor path as well as a hand-assembled tree.
 		term, ok := derefWhere(t)
 		if !ok {
 			return fmt.Errorf("%w: %s junction term %d carries no predicate", ErrInvalidQuery, string(j.Op), i)
@@ -345,15 +406,20 @@ type NotExpr struct {
 }
 
 func (n NotExpr) expr() string {
-	if n.Operand == nil {
+	// Normalised for the same reason [Junction.expr] is: the parenthesisation
+	// below decides from the operand's concrete shape, and `NOT *Junction`
+	// rendered without parentheses re-binds the negation to one arm.
+	operand, ok := derefWhere(n.Operand)
+	if !ok {
+		// validate refuses this first; a bare `NOT` is the loud form.
 		return "NOT"
 	}
 	// Parenthesise any junction operand so the precedence reads
 	// unambiguously regardless of which junctions surround the NOT.
-	if _, ok := n.Operand.(Junction); ok {
-		return "NOT (" + n.Operand.expr() + ")"
+	if _, isJunction := operand.(Junction); isJunction {
+		return "NOT (" + operand.expr() + ")"
 	}
-	return "NOT " + n.Operand.expr()
+	return "NOT " + operand.expr()
 }
 
 func (n NotExpr) validate() error {
@@ -399,11 +465,15 @@ func Exists(path string) WhereExpr { return ExistsExpr{Path: path} }
 // grammar admits three operand forms and exactly ONE of the fields below
 // carries the operand:
 //
-//   - Values — the braced value list (`{'active', 'archived'}`); each
-//     member is any [Value], including a [FuncCall] for the grammar's
-//     `valueListItem : terminologyFunction` alternative.
+//   - Values — the braced value list (`{'active', 'archived'}`). The grammar
+//     is `valueListItem : primitive | PARAMETER | terminologyFunction`, which
+//     is NARROWER than the general value position: a [PathValue] and any
+//     [FuncCall] other than `TERMINOLOGY` have no spelling here and are
+//     refused (REQ-119).
 //   - Terminology — a BARE `TERMINOLOGY('op','api','params')` operand,
-//     with no braces (REQ-117); construct with [MatchesTerminology].
+//     with no braces (REQ-117); construct with [MatchesTerminology]. The
+//     grammar's third alternative is `terminologyFunction`, so no other call
+//     is admitted, whatever the field's [FuncCall] type would allow.
 //   - URI — a braced URI operand (`{uri://…}`), carried verbatim
 //     (REQ-117); construct with [MatchesURI]. A whitespace-only URI counts as
 //     ABSENT — for both validation and emission — so it never shadows a
@@ -467,17 +537,81 @@ func (m MatchesExpr) validate() error {
 		return validateURIOperand(uri, m.Path)
 	}
 	if m.Terminology != nil {
-		return validateValue(*m.Terminology)
+		if err := validateValue(*m.Terminology); err != nil {
+			return err
+		}
+		// `matchesOperand`'s bare alternative is `terminologyFunction`, not the
+		// general `functionCall`, so the field's [FuncCall] type is wider than
+		// the position. Any other call emits `MATCHES LENGTH(…)`, which the
+		// parser rejects (REQ-119).
+		if !isTerminologyCall(*m.Terminology) {
+			return fmt.Errorf("%w: MATCHES on %q carries a bare %s() operand; the grammar admits only %s() there",
+				ErrInvalidQuery, m.Path, strings.ToUpper(strings.TrimSpace(m.Terminology.Name)), TerminologyFunc)
+		}
+		return nil
 	}
 	for i, v := range m.Values {
-		if v == nil {
-			return fmt.Errorf("%w: nil value at index %d in MATCHES on %q", ErrInvalidQuery, i, m.Path)
-		}
-		if err := validateValue(v); err != nil {
+		if err := validateValueListItem(v, m.Path, i); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// isTerminologyCall reports whether f is the grammar's `terminologyFunction`.
+//
+// The name is trimmed as well as folded, matching [FuncCall.token], which emits
+// the trimmed spelling — reading the raw field let ` terminology ` past the
+// arity gate and then emit a call the parser rejects.
+func isTerminologyCall(f FuncCall) bool {
+	return strings.EqualFold(strings.TrimSpace(f.Name), TerminologyFunc)
+}
+
+// validateValueListItem refuses a braced MATCHES member the grammar's
+// `valueListItem : primitive | PARAMETER | terminologyFunction` cannot carry.
+//
+// The general value position (`terminal`) is WIDER, so delegating to
+// validateValue alone admitted a [PathValue] and an arbitrary [FuncCall] —
+// `MATCHES {c/y}` and `MATCHES {LENGTH(c/y)}`, both refused by this SDK's own
+// parser. It is the same argument the TERMINOLOGY arity guard makes, one rule
+// down: where the grammar narrows a position, the shared validator's breadth
+// must not become the operand's (REQ-119).
+func validateValueListItem(v Value, path string, i int) error {
+	inner, ok := derefValue(v)
+	if !ok {
+		return fmt.Errorf("%w: nil value at index %d in MATCHES on %q", ErrInvalidQuery, i, path)
+	}
+	if err := validateValue(inner); err != nil {
+		return err
+	}
+	switch inner.(type) {
+	case StringValue, IntValue, RealValue, BoolValue, NullValue, ParamValue:
+		return nil
+	}
+	if fc, isCall := inner.(FuncCall); isCall && isTerminologyCall(fc) {
+		return nil
+	}
+	return fmt.Errorf("%w: MATCHES on %q carries %T at index %d; the grammar admits a primitive, a parameter or %s() there",
+		ErrInvalidQuery, path, inner, i, TerminologyFunc)
+}
+
+// validateLikeOperand refuses a LIKE pattern outside `likeOperand : STRING |
+// PARAMETER`. Same narrowing argument as [validateValueListItem]: the field is
+// a [Value], the position is two shapes wide.
+func validateLikeOperand(v Value, path string) error {
+	inner, ok := derefValue(v)
+	if !ok {
+		return fmt.Errorf("%w: nil pattern in LIKE on %q", ErrInvalidQuery, path)
+	}
+	if err := validateValue(inner); err != nil {
+		return err
+	}
+	switch inner.(type) {
+	case StringValue, ParamValue:
+		return nil
+	}
+	return fmt.Errorf("%w: LIKE on %q carries %T; the grammar admits only a string literal or a parameter",
+		ErrInvalidQuery, path, inner)
 }
 
 // validateURIOperand refuses a `MATCHES {uri}` operand the grammar's URI token
@@ -784,10 +918,7 @@ func (l LikeExpr) validate() error {
 	if strings.TrimSpace(l.Path) == "" {
 		return fmt.Errorf("%w: empty path in LIKE", ErrInvalidQuery)
 	}
-	if l.Pattern == nil {
-		return fmt.Errorf("%w: nil pattern in LIKE on %q", ErrInvalidQuery, l.Path)
-	}
-	return validateValue(l.Pattern)
+	return validateLikeOperand(l.Pattern, l.Path)
 }
 
 // Like constructs a [LikeExpr].

@@ -319,15 +319,21 @@ func (a *ast) build() (Query, error) {
 
 	// The implicit ehr_id filter from FromEHR AND-combines with any explicit
 	// WHERE predicate so a single canonical WHERE clause results.
-	where := a.effectiveWhere()
-	if where != nil {
+	// `where != nil` is safe only because effectiveWhere has already collapsed
+	// a predicate denoting nothing — including a TYPED nil, whose validate/expr
+	// have value receivers and panic — to a genuine nil (REQ-119). Normalising
+	// again here would be a guard no test could kill, so the rule lives in one
+	// place.
+	if where := a.effectiveWhere(); where != nil {
 		// Reject malformed predicates (nil values, empty paths) before emitting
 		// so the typed builders can never produce invalid AQL (PROBE-021).
 		if err := where.validate(); err != nil {
 			return Query{}, err
 		}
-		// A non-nil predicate that emits nothing (e.g. And() with no terms)
-		// would yield a trailing, syntactically invalid WHERE.
+		// A non-nil predicate that emits nothing would yield a trailing,
+		// syntactically invalid WHERE. Junction.validate now refuses the
+		// term-less junction that used to reach this, so it is a backstop
+		// rather than the primary guard.
 		pred := where.expr()
 		if strings.TrimSpace(pred) == "" {
 			return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
@@ -436,8 +442,10 @@ func validateLimitValue(keyword string, v Value) error {
 			return fmt.Errorf("%w: negative in-text %s (%d)", ErrInvalidQuery, keyword, t.N)
 		}
 	case ParamValue:
-		if strings.TrimSpace(t.Name) == "" {
-			return fmt.Errorf("%w: in-text %s parameter with an empty name", ErrInvalidQuery, keyword)
+		// The same PARAMETER token as any other placeholder position, so the
+		// same guard: `LIMIT $a b` is two tokens and does not re-parse.
+		if err := validateParamName(t.Name); err != nil {
+			return fmt.Errorf("in-text %s: %w", keyword, err)
 		}
 	default:
 		return fmt.Errorf("%w: in-text %s must be an integer or a $parameter, got %T",
@@ -450,12 +458,22 @@ func validateLimitValue(keyword string, v Value) error {
 // explicit WHERE predicate. The ehr_id condition leads so the canonical clause
 // reads `WHERE e/ehr_id/value = $x AND <rest>`.
 func (a *ast) effectiveWhere() WhereExpr {
+	// A predicate denoting nothing is collapsed to a genuine nil BEFORE the
+	// combination, because absence is positional (REQ-119): at the top level it
+	// is simply no clause. Left un-normalised, a typed nil took a third path
+	// again — [And] keeps it as a junction TERM, where absence is correctly
+	// refused — so one input produced three behaviours depending on whether
+	// FromEHR was used.
+	where := a.where
+	if _, ok := derefWhere(where); !ok {
+		where = nil
+	}
 	switch {
-	case a.ehrFilter != nil && a.where != nil:
-		return And(a.ehrFilter, a.where)
+	case a.ehrFilter != nil && where != nil:
+		return And(a.ehrFilter, where)
 	case a.ehrFilter != nil:
 		return a.ehrFilter
 	default:
-		return a.where
+		return where
 	}
 }

@@ -88,8 +88,26 @@ func TestStringLiteralEmitsGrammarEscapes(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		{"O'Brien", `'O\'Brien'`},
 		{`C:\temp`, `'C:\\temp'`},
-		{"a\nb", `'a\nb'`},
 		{"plain", `'plain'`},
+		// All SEVEN C0 controls with an ESCAPE_SEQ spelling, not just \n. Each
+		// round-trips fine when emitted raw, so the round-trip tests assert a
+		// strictly weaker property than the guard enforces — dropping any one
+		// escape left the whole suite green while emitted AQL stopped being
+		// single-line and printable (value.go's stated purpose for the rule).
+		{"a\ab", `'a\ab'`},
+		{"a\bb", `'a\bb'`},
+		{"a\fb", `'a\fb'`},
+		{"a\nb", `'a\nb'`},
+		{"a\rb", `'a\rb'`},
+		{"a\tb", `'a\tb'`},
+		{"a\vb", `'a\vb'`},
+		// A byte beginning no valid UTF-8 sequence has only the OCTAL_ESC
+		// spelling; a genuine U+FFFD rides through verbatim. utf8.RuneError IS
+		// U+FFFD, so only the exact wire form separates the two cases — the
+		// round-trip assertion cannot, since the octal form decodes back to the
+		// same rune.
+		{"a\xffb", `'a\377b'`},
+		{"a\uFFFDb", "'a\uFFFDb'"},
 	} {
 		if got := aql.FormatValue(aql.String(tc.in)); got != tc.want {
 			t.Errorf("FormatValue(%q) = %s, want %s", tc.in, got, tc.want)
@@ -123,6 +141,10 @@ func TestParsedStringEscapesDecode(t *testing.T) {
 		"lone high surrogate": {"'\\ud83d'", "�"},
 		"lone low surrogate":  {"'\\ude00'", "�"},
 		"high then BMP":       {"'\\ud83d\\u0041'", "�A"},
+		// TWO low halves: the leading one is not a high surrogate, so no pair
+		// forms and both decode to U+FFFD. Without this the `hi > 0xDBFF` bound
+		// could be dropped and the pair combined from the wrong half.
+		"low then low": {"'\\ude00\\ude01'", "��"},
 		// `\4`–`\7` lead at most TWO octal digits (OCTAL_ESC : '\\' [0-3] OCTAL
 		// OCTAL | '\\' OCTAL OCTAL | '\\' OCTAL), so a third digit is literal.
 		"octal 2-digit lead": {`'\477'`, "'7"},

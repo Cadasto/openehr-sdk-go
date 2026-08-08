@@ -30,10 +30,11 @@ import (
 //
 // Every shape has a POINTER twin: token has a value receiver, so `*FuncCall`
 // and friends satisfy Value too, and [MatchesExpr.Terminology] is itself a
-// `*FuncCall`. A consumer type-switching over Value MUST therefore either
-// handle `case *aql.FuncCall:` alongside `case aql.FuncCall:` or route through
-// [EqualValues] / the validating emitters, which normalise a pointer to the
-// shape it points at.
+// `*FuncCall`. A consumer type-switching over Value MUST therefore normalise
+// first with [DerefValue] — or, failing that, handle `case *aql.FuncCall:`
+// alongside `case aql.FuncCall:` or route through [EqualValues] / the
+// validating emitters, which normalise for it. [DerefWhere] is the same tool
+// for the [WhereExpr] vocabulary.
 //
 // # Comparability
 //
@@ -121,8 +122,42 @@ func (p ParamValue) token() string { return "$" + p.Name }
 
 // Param constructs a [ParamValue] for the named placeholder. A leading
 // `$` in name is stripped — `Param("$ehr_id")` and `Param("ehr_id")`
-// produce the same value.
+// produce the same value. The name must spell the grammar's PARAMETER token
+// (see [ValidateValue]); it is checked at validate time, not here, so the
+// diagnostic names the query position the placeholder sits in.
 func Param(name string) Value { return ParamValue{Name: strings.TrimPrefix(name, "$")} }
+
+// validateParamName refuses a placeholder the grammar's `PARAMETER : '$'
+// IDENTIFIER_CHAR` cannot carry, where `IDENTIFIER_CHAR : ALPHA_CHAR
+// WORD_CHAR*` — a leading letter followed by letters, digits and underscores.
+//
+// This position had no guard at all, though [Param] is what § REQ-055 rule 4
+// designates as the channel for caller data. Two failure modes followed, and
+// the second is the one that matters: `Param("a b")` emits `$a b`, which the
+// parser rejects, while `Param("p AND c/secret = 1")` emits text that parses
+// CLEANLY as two predicates instead of one — a silent structure change through
+// the very channel the injection guard recommends (REQ-119).
+func validateParamName(name string) error {
+	if name == "" {
+		return fmt.Errorf("%w: parameter with empty name", ErrInvalidQuery)
+	}
+	for i, r := range name {
+		alpha := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if i == 0 {
+			// ALPHA_CHAR leads: `$1x` lexes as `$1` followed by an identifier.
+			if !alpha {
+				return fmt.Errorf("%w: parameter name %q must start with a letter", ErrInvalidQuery, name)
+			}
+			continue
+		}
+		// WORD_CHAR : ALPHANUM_CHAR | '_'
+		if !alpha && (r < '0' || r > '9') && r != '_' {
+			return fmt.Errorf("%w: parameter name %q carries %q; the grammar admits letters, digits and underscore",
+				ErrInvalidQuery, name, r)
+		}
+	}
+	return nil
+}
 
 // StringValue is a string literal. Use [Param] for caller-supplied data;
 // reaching for a literal directly is only safe for compile-time constants.
@@ -233,8 +268,10 @@ type RealValue struct {
 // emitted text is refused with [ErrIncompleteAST] on re-parse.
 //
 // Infinities and NaN have no AQL literal at all; they render as the Go
-// spellings, which the grammar rejects, so [validateValue] refuses them before
-// any supported path can emit one.
+// spellings, and only `+Inf` / `-Inf` are then rejected. `NaN` and a bare `Inf`
+// lex as IDENTIFIER and re-parse as a [PathValue] — a silent type substitution
+// rather than a loud refusal, which is why [validateValue] refuses all of them
+// before any supported path can emit one.
 func (v RealValue) token() string {
 	s := strconv.FormatFloat(v.F, 'f', -1, 64)
 	if strings.Contains(s, ".") || math.IsInf(v.F, 0) || math.IsNaN(v.F) {
@@ -396,9 +433,15 @@ func validateValue(v Value) error {
 		if strings.TrimSpace(t.Raw) == "" {
 			return fmt.Errorf("%w: path value with empty path text", ErrInvalidQuery)
 		}
+	case ParamValue:
+		if err := validateParamName(t.Name); err != nil {
+			return err
+		}
 	case RealValue:
-		// AQL has no literal for either, and 'f' formatting renders them as
-		// the Go spellings (`+Inf`, `NaN`) — text no backend can parse.
+		// AQL has no literal for either. 'f' formatting renders them as the Go
+		// spellings, and only `+Inf` / `-Inf` are then REJECTED: `NaN` and a
+		// bare `Inf` lex as IDENTIFIER and come back as a PathValue, so the
+		// worse half of this is a silent substitution, not a loud refusal.
 		if math.IsInf(t.F, 0) || math.IsNaN(t.F) {
 			return fmt.Errorf("%w: real literal %v has no AQL spelling", ErrInvalidQuery, t.F)
 		}
@@ -411,7 +454,7 @@ func validateValue(v Value) error {
 		// arity and the argument types are fixed, so any other shape emits
 		// text the parser rejects. [Terminology] always builds it correctly;
 		// this catches a hand-assembled FuncCall that borrowed the name.
-		if strings.EqualFold(t.Name, TerminologyFunc) {
+		if isTerminologyCall(t) {
 			if len(t.Args) != 3 {
 				return fmt.Errorf("%w: %s() takes exactly 3 string arguments, got %d",
 					ErrInvalidQuery, TerminologyFunc, len(t.Args))

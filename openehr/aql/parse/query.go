@@ -17,6 +17,7 @@ package parse
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -96,6 +97,9 @@ func (l IntLimit) token() string { return strconv.Itoa(l.N) }
 // ParamLimit is a parameter-bound LIMIT / OFFSET value (`LIMIT $n`).
 // Name carries the placeholder identifier WITHOUT the leading `$`.
 type ParamLimit struct {
+	// Name is the placeholder identifier WITHOUT the leading `$`, as in
+	// [aql.ParamValue.Name] — token re-attaches the dollar on the wire, so a
+	// name that carries one emits `$$n` and is refused rather than corrected.
 	Name string
 }
 
@@ -470,6 +474,12 @@ func (q *Query) Emit() (string, error) {
 	if len(q.OrderBy) > 0 {
 		sb.WriteString(" ORDER BY ")
 		for i, t := range q.OrderBy {
+			// `orderByExpr : identifiedPath order=(…)?` — an empty path emits
+			// `ORDER BY  ASC`, which the parser rejects. REQ-119 binds the value
+			// guards to EVERY position Emit renders, not the WHERE clause alone.
+			if strings.TrimSpace(t.Path.Raw) == "" {
+				return "", fmt.Errorf("%w: ORDER BY term %d has an empty path", aql.ErrInvalidQuery, i)
+			}
 			if i > 0 {
 				sb.WriteString(", ")
 			}
@@ -484,16 +494,63 @@ func (q *Query) Emit() (string, error) {
 	if q.Offset != nil && q.Limit == nil {
 		return "", fmt.Errorf("%w: OFFSET without LIMIT", aql.ErrInvalidQuery)
 	}
-	if q.Limit != nil {
-		sb.WriteString(" LIMIT ")
-		sb.WriteString(q.Limit.token())
+	limit, err := emitLimitValue("LIMIT", q.Limit)
+	if err != nil {
+		return "", err
 	}
-	if q.Offset != nil {
-		sb.WriteString(" OFFSET ")
-		sb.WriteString(q.Offset.token())
+	offset, err := emitLimitValue("OFFSET", q.Offset)
+	if err != nil {
+		return "", err
 	}
+	sb.WriteString(limit)
+	sb.WriteString(offset)
 
 	return sb.String(), nil
+}
+
+// emitLimitValue renders an in-text paging operand, refusing one the grammar's
+// `limitValue : INTEGER | PARAMETER` cannot carry. An absent clause emits "".
+//
+// [LimitExpr] is a third sealed interface whose methods have value receivers,
+// so `*IntLimit` satisfies it alongside `IntLimit` and `q.Limit != nil` waved a
+// TYPED nil through to a panicking token() — the same pointer-twin defect
+// REQ-119 closes for aql.Value and aql.WhereExpr. The operand checks mirror
+// aql's validateLimitValue, which [aql.Builder] has always applied: Emit
+// refusing what Build refuses is the read/write parity the rest of this file
+// exists to provide.
+func emitLimitValue(keyword string, v LimitExpr) (string, error) {
+	if v == nil {
+		return "", nil
+	}
+	rv := reflect.ValueOf(v)
+	for rv.Kind() == reflect.Pointer {
+		if rv.IsNil() {
+			return "", fmt.Errorf("%w: in-text %s carries no value", aql.ErrInvalidQuery, keyword)
+		}
+		rv = rv.Elem()
+	}
+	inner, ok := rv.Interface().(LimitExpr)
+	if !ok {
+		return "", fmt.Errorf("%w: in-text %s has an unsupported shape %T", aql.ErrInvalidQuery, keyword, v)
+	}
+	switch t := inner.(type) {
+	case IntLimit:
+		if t.N < 0 {
+			return "", fmt.Errorf("%w: negative in-text %s (%d)", aql.ErrInvalidQuery, keyword, t.N)
+		}
+	case ParamLimit:
+		// The same PARAMETER token as any other placeholder, checked through
+		// the same guard so `LIMIT $a b` cannot reach the wire. The name is
+		// checked RAW rather than stripped of a leading `$`: token re-attaches
+		// one, so accepting `$n` would emit `$$n` — refuse, never re-spell.
+		if err := aql.ValidateValue(aql.ParamValue{Name: t.Name}); err != nil {
+			return "", fmt.Errorf("in-text %s: %w", keyword, err)
+		}
+	default:
+		// Fail-closed on an additive shape, as [LimitExpr]'s own contract requires.
+		return "", fmt.Errorf("%w: unsupported in-text %s expression %T", aql.ErrInvalidQuery, keyword, inner)
+	}
+	return " " + keyword + " " + inner.token(), nil
 }
 
 func emitSelectItem(item SelectItem) (string, error) {
@@ -555,6 +612,25 @@ func validateSelectTerminology(v FunctionCall) error {
 }
 
 func emitSelectExpr(e SelectExpr) (string, error) {
+	// [SelectExpr] is the third sealed interface in this subsystem whose methods
+	// have value receivers, so `*LiteralExpr` satisfies it alongside
+	// `LiteralExpr`. The switch below lists the value shapes, which made the
+	// pointer twin fall to the default arm: fail-CLOSED, so it refused rather
+	// than mis-emitting, but it still bound the rule to one carrier while the
+	// value side accepts `*aql.StringValue` (REQ-119). Normalised here so both
+	// carriers behave alike, and a typed nil is refused rather than panicking.
+	if e != nil {
+		rv := reflect.ValueOf(e)
+		for rv.Kind() == reflect.Pointer {
+			if rv.IsNil() {
+				return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
+			}
+			rv = rv.Elem()
+		}
+		if inner, ok := rv.Interface().(SelectExpr); ok {
+			e = inner
+		}
+	}
 	switch v := e.(type) {
 	case PathExpr:
 		return v.Raw, nil
@@ -799,8 +875,15 @@ func validateContainmentTree(from FromClause) error {
 
 // isContainmentJunction reports whether a node is a pure boolean
 // grouping — operands only, no class of its own (REQ-117).
+//
+// [ClassExpr.Version] counts as a class exactly as it does in checkComplete
+// above and in [emitClassExpr], which treats it as authoritative and ignores
+// RMType. Reading RMType alone reclassified a `VERSION v` node as a grouping
+// and emitted `CONTAINS (COMPOSITION c)` — valid AQL that parses cleanly with
+// one element of the chain gone (REQ-119). The extractor always sets
+// RMType: "VERSION" as well, so this bound only the hand-built path.
 func isContainmentJunction(c Containment) bool {
-	return c.Class.RMType == "" && len(c.Children) > 0
+	return c.Class.RMType == "" && !c.Class.Version && len(c.Children) > 0
 }
 
 // emitContainmentOperands renders a junction node's operands joined by its

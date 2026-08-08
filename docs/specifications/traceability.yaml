@@ -1315,11 +1315,14 @@ requirements:
       # PROBE-090 — emit -> parse -> equal value across every value kind, the
       # twice-through fixed point, and the grammar confrontations.
       - openehr/aql/parse/literal_roundtrip_test.go
-      # Emit-side parity: the SELECT value positions, the containment
-      # refusals, and the URI guard vs the grammar.
+      # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
+      # containment refusals and the order they fire in, the URI guard vs the
+      # grammar, and the pointer twin of every sealed set the emitters dispatch
+      # on (aql.WhereExpr, parse.SelectExpr, parse.LimitExpr).
       - openehr/aql/parse/emit_parity_test.go
-      # Write-side refusals (URI, function name, TERMINOLOGY arity), the
-      # pointer shapes, and the EqualValues contract.
+      # Write-side refusals (URI, function name, TERMINOLOGY arity, the narrow
+      # LIKE / MATCHES operand slots, the PARAMETER spelling, the junction
+      # operator and arity), the pointer shapes, and the EqualValues contract.
       - openehr/aql/value_test.go
       # The canonical-form change: the builder golden that carried the SQL
       # doubling now carries the ESCAPE_SEQ spelling.
