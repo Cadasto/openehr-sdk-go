@@ -35,7 +35,11 @@ func (b *Builder) Select(cols ...SelectField) *Builder {
 // From("COMPOSITION", "c"). Use [Builder.FromEHR] for the common ehr_id-scoped
 // case.
 func (b *Builder) From(rmType, alias string) *Builder {
-	b.ast.from = &fromClause{rmType: rmType, alias: alias}
+	// Trimmed like [Col]: a blank part must collapse to the empty string so
+	// build's presence check refuses it — written verbatim, `From("   ", "c")`
+	// emitted `FROM     c`, which RE-PARSES as an alias-less class named `c`:
+	// the alias silently became the RM type (REQ-119's substitution class).
+	b.ast.from = &fromClause{rmType: strings.TrimSpace(rmType), alias: strings.TrimSpace(alias)}
 	b.ast.ehrFilter = nil // re-scoping the source drops any prior FromEHR filter
 	return b
 }
@@ -49,6 +53,7 @@ func (b *Builder) From(rmType, alias string) *Builder {
 // AQL; this builder emits the WHERE form so the EHR scope composes uniformly
 // with other conditions in one clause.
 func (b *Builder) FromEHR(alias string, id Value) *Builder {
+	alias = strings.TrimSpace(alias) // as in From; also keeps the ehr_id path below clean
 	b.ast.from = &fromClause{rmType: "EHR", alias: alias}
 	b.ast.ehrFilter = nil // reset first so FromEHR(alias, nil) clears a prior filter
 	if id != nil {
@@ -89,7 +94,10 @@ func (b *Builder) Where(e WhereExpr) *Builder {
 
 // OrderBy appends an ORDER BY term.
 func (b *Builder) OrderBy(path string, dir Direction) *Builder {
-	b.ast.orderBy = append(b.ast.orderBy, orderTerm{path: path, dir: dir})
+	// Trimmed like [Col] so a blank path collapses to "" and build refuses it
+	// — written verbatim it emitted `ORDER BY  ASC`, a syntax error the
+	// grammar's `orderByExpr : identifiedPath …` has no reading for.
+	b.ast.orderBy = append(b.ast.orderBy, orderTerm{path: strings.TrimSpace(path), dir: dir})
 	return b
 }
 
@@ -219,6 +227,11 @@ func (d Direction) keyword() string {
 	return "ASC"
 }
 
+// known mirrors [BoolOp.known] and the TopDir vocabulary check: keyword()
+// spells any other value as ASC, so an out-of-vocabulary Direction must be
+// refused before it is silently re-directed (REQ-119's substitution class).
+func (d Direction) known() bool { return d == Ascending || d == Descending }
+
 type orderTerm struct {
 	path string
 	dir  Direction
@@ -269,6 +282,18 @@ func (a *ast) build() (Query, error) {
 	}
 	if a.from.rmType == "" || a.from.alias == "" {
 		return Query{}, fmt.Errorf("%w: FROM requires an RM type and alias", ErrInvalidQuery)
+	}
+	// ORDER BY was the one clause whose operands build wrote unchecked while
+	// parse.Query.Emit refused them — the Build/Emit write-path fork REQ-119
+	// closed for WHERE (REQ-055's builder guarantee, PROBE-021).
+	for _, t := range a.orderBy {
+		if t.path == "" {
+			return Query{}, fmt.Errorf("%w: empty ORDER BY path", ErrInvalidQuery)
+		}
+		if !t.dir.known() {
+			return Query{}, fmt.Errorf("%w: ORDER BY direction %d is outside the ASC/DESC vocabulary; "+
+				"emitting would silently re-direct it to ASC", ErrInvalidQuery, t.dir)
+		}
 	}
 	// REQ-117: a containment term is a whole expression (chain, negation,
 	// junction), so alias uniqueness and the class-completeness rule are
