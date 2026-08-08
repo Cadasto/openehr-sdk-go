@@ -569,8 +569,11 @@ func (m MatchesExpr) validate() error {
 		// the position. Any other call emits `MATCHES LENGTH(…)`, which the
 		// parser rejects (REQ-119).
 		if !isTerminologyCall(*m.Terminology) {
+			// asciiUpper, not strings.ToUpper: the name is provably ASCII here
+			// (validateValue held the alphabet above), but the Unicode fold is
+			// the banned idiom, and the safe site should spell the safe form.
 			return fmt.Errorf("%w: MATCHES on %q carries a bare %s() operand; the grammar admits only %s() there",
-				ErrInvalidQuery, m.Path, strings.ToUpper(strings.TrimSpace(m.Terminology.Name)), TerminologyFunc)
+				ErrInvalidQuery, m.Path, asciiUpper(strings.TrimSpace(m.Terminology.Name)), TerminologyFunc)
 		}
 		return nil
 	}

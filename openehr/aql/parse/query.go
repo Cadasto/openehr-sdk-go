@@ -659,8 +659,28 @@ func validateSelectTerminology(v FunctionCall) error {
 // counting rows instead of path values — the substitution class), and
 // `MIN(DISTINCT x)` / `MAX(*)` / `COUNT()` emitted text this SDK's own parser
 // rejects.
+// asciiUpper upper-cases the ASCII letters of s and leaves every other byte
+// alone — the parse-side twin of the aql package's helper, spelled here
+// because a function name must NEVER pass through strings.ToUpper: its
+// Unicode mapping folds some non-ASCII letters INTO the ASCII alphabet
+// (ı → I), turning a spelling the lexer cannot tokenise into a legal-looking
+// one.
+func asciiUpper(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' {
+			return r - ('a' - 'A')
+		}
+		return r
+	}, s)
+}
+
 func validateSelectFuncShape(v FunctionCall) error {
-	name := strings.ToUpper(strings.TrimSpace(v.Name))
+	// asciiUpper, not strings.ToUpper: the emit arm has already held the name
+	// to the identifier alphabet (ValidateSelectFuncName runs first), so the
+	// fold is unreachable — but ToUpper("mın") == "MIN" would hand
+	// IsAggregateFunc a laundered spelling if that ordering ever changed,
+	// which is the exact idiom the aql package purged.
+	name := asciiUpper(strings.TrimSpace(v.Name))
 	if !aql.IsAggregateFunc(name) {
 		// General `functionCall`: any terminals as arguments (each validated
 		// on emission), but no DISTINCT and no star — the grammar has no
