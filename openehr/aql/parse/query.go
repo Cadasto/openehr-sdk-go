@@ -913,6 +913,17 @@ func validateContainmentTree(from FromClause) error {
 					"node (no class of its own), and emission would silently drop it",
 					aql.ErrInvalidQuery, c.Class.RMType)
 			}
+		} else {
+			// ContainsJoin.String() spells any out-of-vocabulary join as AND —
+			// and AND vs OR changes the result set, the same silent
+			// re-spelling refused for OrderDir, TOP and the WHERE BoolOp.
+			// Class nodes are already covered by the != 0 arm above.
+			switch c.ChildJoin {
+			case ContainsAnd, ContainsOr:
+			default:
+				return fmt.Errorf("%w: containment junction join %d is outside the AND/OR vocabulary; "+
+					"emitting would silently join with AND", aql.ErrInvalidQuery, int(c.ChildJoin))
+			}
 		}
 		for _, ch := range c.Children {
 			if err := checkComplete(ch); err != nil {

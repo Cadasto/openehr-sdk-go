@@ -572,6 +572,78 @@ func TestEmitRefusesUngrammaticalAggregateShapes(t *testing.T) {
 	}
 }
 
+// TestEmitRefusesAnOutOfVocabularyContainsJoin — [parse.ContainsJoin.String]
+// spells any value outside {ContainsAnd, ContainsOr} as AND, and AND vs OR
+// changes the RESULT SET: a hand-built junction carrying ContainsJoin(7)
+// emitted a valid query joining with AND, err == nil — the same silent
+// re-spelling refused for OrderDir, SELECT TOP and the WHERE BoolOp. This was
+// the last emission vocabulary with a total spelling on a validating path
+// (aql's write-side containsJoin is private and constructor-fed, so Build
+// cannot carry an out-of-vocabulary join).
+func TestEmitRefusesAnOutOfVocabularyContainsJoin(t *testing.T) {
+	sel := parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+		IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}},
+	}}}}
+	junction := func(j parse.ContainsJoin) parse.Containment {
+		return parse.Containment{
+			ChildJoin: j,
+			Children: []parse.Containment{
+				{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+				{Class: parse.ClassExpr{RMType: "EVALUATION", Alias: "ev"}},
+			},
+		}
+	}
+
+	// Both junction positions: the FROM-root junction and one nested below a
+	// class — the walk covers them through different entry points.
+	for name, q := range map[string]*parse.Query{
+		"root junction": {
+			Select: sel,
+			From:   parse.FromClause{Junction: func() *parse.Containment { j := junction(parse.ContainsJoin(7)); return &j }()},
+		},
+		"nested junction": {
+			Select: sel,
+			From: parse.FromClause{
+				Root:     parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+				Contains: func() *parse.Containment { j := junction(parse.ContainsJoin(7)); return &j }(),
+			},
+		},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := q.Emit()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+			}
+		})
+	}
+
+	// Positive controls: both vocabulary members emit and hold the text fixed
+	// point, so a tightened guard fails here rather than shipping.
+	for name, j := range map[string]parse.ContainsJoin{"AND": parse.ContainsAnd, "OR": parse.ContainsOr} {
+		t.Run("accepted/"+name, func(t *testing.T) {
+			q := &parse.Query{
+				Select: sel,
+				From: parse.FromClause{
+					Root:     parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+					Contains: func() *parse.Containment { jn := junction(j); return &jn }(),
+				},
+			}
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit refused a legal %s junction: %v", name, err)
+			}
+			doc, err := parse.ParseQuery(out)
+			if err != nil {
+				t.Fatalf("emitted %q does not re-parse: %v", out, err)
+			}
+			again, err := doc.Emit()
+			if err != nil || again != out {
+				t.Errorf("not a text fixed point: %q -> %q (err %v)", out, again, err)
+			}
+		})
+	}
+}
+
 // TestEmitRefusesDualClassOperands — [parse.ClassExpr.Archetype] and
 // [parse.ClassExpr.Predicate] are the two mutually exclusive spellings of the
 // ONE bracket position, and the emitter renders whichever its switch reaches
