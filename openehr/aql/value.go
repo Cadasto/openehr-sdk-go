@@ -3,7 +3,6 @@ package aql
 import (
 	"fmt"
 	"math"
-	"reflect"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -71,20 +70,60 @@ type Value interface {
 //
 // A pointer is compared as the shape it points at, so `&FuncCall{…}` equals the
 // equivalent `FuncCall{…}`; a nil value — untyped, or a typed-nil pointer —
-// equals only another nil value. The shape check is reflective rather than a
-// type switch so a shape added later (the set is additive) is compared correctly
-// the day it lands, instead of silently reporting unequal to itself until
-// someone remembers to extend a switch.
+// equals only another nil value. The shape check is [sameShape]: the type
+// comparison must be explicit because tokens alone conflate shapes
+// (`PathValue{Raw: "true"}` and `BoolValue{B: true}` both spell `true`).
 func EqualValues(a, b Value) bool {
 	av, aok := derefValue(a)
 	bv, bok := derefValue(b)
 	if !aok || !bok {
 		return aok == bok
 	}
-	if reflect.TypeOf(av) != reflect.TypeOf(bv) {
+	if !sameShape(av, bv) {
 		return false
 	}
 	return av.token() == bv.token()
+}
+
+// sameShape reports whether two values carry the same concrete value shape,
+// normalising each first so both carriers of a shape count as that shape.
+// Exhaustive over the sealed set; the dispatch tripwire's case-coverage sweep
+// fails the build when a shape lands without its row here, which is what lets
+// this be a plain switch instead of reflection (the idiom spec bans the
+// latter).
+func sameShape(a, b Value) bool {
+	a, aok := derefValue(a)
+	b, bok := derefValue(b)
+	if !aok || !bok {
+		return false
+	}
+	switch a.(type) {
+	case StringValue:
+		_, ok := b.(StringValue)
+		return ok
+	case IntValue:
+		_, ok := b.(IntValue)
+		return ok
+	case RealValue:
+		_, ok := b.(RealValue)
+		return ok
+	case BoolValue:
+		_, ok := b.(BoolValue)
+		return ok
+	case NullValue:
+		_, ok := b.(NullValue)
+		return ok
+	case ParamValue:
+		_, ok := b.(ParamValue)
+		return ok
+	case PathValue:
+		_, ok := b.(PathValue)
+		return ok
+	case FuncCall:
+		_, ok := b.(FuncCall)
+		return ok
+	}
+	return false
 }
 
 // derefValue normalises a [Value] to its value shape, reporting false when
@@ -95,28 +134,53 @@ func EqualValues(a, b Value) bool {
 // pointer"). [MatchesExpr.Terminology] is a `*FuncCall`, so its zero value is
 // exactly that pointer; normalising here keeps every caller — validation,
 // equality — total over the shapes the API can hand them.
-func derefValue(v Value) (Value, bool) { return derefAs(v) }
-
-// derefAs is the one pointer-normalisation body behind [derefValue] and
-// [derefWhere] (and, spelled identically, the parse package's SelectExpr and
-// LimitExpr derefs): every sealed vocabulary in this subsystem has value
-// receivers, so each has the same pointer-twin problem and MUST get the same
-// answer. One body per package, thin wrappers per vocabulary — a fifth
-// hand-rolled copy is how the rule drifts.
-func derefAs[T any](v T) (T, bool) {
-	var zero T
-	rv := reflect.ValueOf(v)
-	if !rv.IsValid() {
-		return zero, false // untyped nil interface
-	}
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return zero, false
+//
+// One pointer level suffices: a value-receiver method set promotes to `*T`
+// but never to `**T`, so no deeper indirection can satisfy the interface.
+// The switch is exhaustive over the sealed set (plus each shape's pointer
+// twin) and the dispatch tripwire's case-coverage sweep fails the build when
+// a shape lands without its two cases — which is what lets this be a plain
+// switch instead of reflection (the idiom spec bans the latter). An unknown
+// shape falls through to false: refused, never waved through as a raw
+// pointer.
+func derefValue(v Value) (Value, bool) {
+	switch x := v.(type) {
+	case StringValue, IntValue, RealValue, BoolValue, NullValue, ParamValue, PathValue, FuncCall:
+		return x, true
+	case *StringValue:
+		if x != nil {
+			return *x, true
 		}
-		rv = rv.Elem()
+	case *IntValue:
+		if x != nil {
+			return *x, true
+		}
+	case *RealValue:
+		if x != nil {
+			return *x, true
+		}
+	case *BoolValue:
+		if x != nil {
+			return *x, true
+		}
+	case *NullValue:
+		if x != nil {
+			return *x, true
+		}
+	case *ParamValue:
+		if x != nil {
+			return *x, true
+		}
+	case *PathValue:
+		if x != nil {
+			return *x, true
+		}
+	case *FuncCall:
+		if x != nil {
+			return *x, true
+		}
 	}
-	inner, ok := rv.Interface().(T)
-	return inner, ok
+	return nil, false // untyped nil, a typed-nil pointer, or an unlearned shape
 }
 
 // ParamValue is a named placeholder. Name is the placeholder identifier
@@ -577,20 +641,28 @@ func validateFuncName(name string) error { return checkFuncName(name, false) }
 func ValidateSelectFuncName(name string) error { return checkFuncName(name, true) }
 
 func checkFuncName(name string, allowAggregates bool) error {
-	n := strings.ToUpper(strings.TrimSpace(name))
-	if n == "" {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
 		return fmt.Errorf("%w: function call with empty name", ErrInvalidQuery)
 	}
 	// IDENTIFIER : ALPHA_CHAR WORD_CHAR* — a letter, then letters/digits/`_`.
-	if !asciiLetter(n[0]) {
+	// The alphabet runs over the ORIGINAL bytes, not the ToUpper'd copy: Go's
+	// Unicode case mapping folds non-ASCII letters INTO the ASCII alphabet
+	// (ı → I, ſ → S), so checking the upper-cased text accepted names whose
+	// as-written spelling the lexer cannot tokenise — and the SELECT side
+	// emits the name as written.
+	if !asciiLetter(trimmed[0]) {
 		return fmt.Errorf("%w: function name %q does not start with a letter", ErrInvalidQuery, name)
 	}
-	for i := range len(n) {
-		if c := n[i]; !wordChar(c) {
+	for i := range len(trimmed) {
+		if c := trimmed[i]; !wordChar(c) {
 			return fmt.Errorf("%w: function name %q carries %q, which no AQL identifier admits",
 				ErrInvalidQuery, name, string([]byte{c}))
 		}
 	}
+	// Case-insensitive positions (reserved words, aggregates) compare on the
+	// canonical upper-case form — safe now that the alphabet held above.
+	n := strings.ToUpper(trimmed)
 	if reservedNonFuncWords[n] && (!allowAggregates || !aggregateFuncWords[n]) {
 		where := "in a value position"
 		if allowAggregates {

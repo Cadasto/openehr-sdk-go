@@ -59,10 +59,15 @@ type TopClause struct {
 	Dir TopDir
 }
 
-// token is the canonical wire form — `TOP 5`, `TOP 5 BACKWARD`. Keywords
+// wire is the canonical wire form — `TOP 5`, `TOP 5 BACKWARD`. Keywords
 // are upper-cased regardless of source casing, and the direction is
 // omitted when unspecified.
-func (t TopClause) token() string {
+//
+// Deliberately NOT named token: that is [Value]'s marker method, and carrying
+// it made TopClause satisfy Value structurally — accepted by the compiler
+// anywhere a Value goes, refused only at run time as an out-of-catalogue
+// shape. A TOP clause is not a value position; the compiler should say so.
+func (t TopClause) wire() string {
 	out := "TOP " + strconv.Itoa(t.N)
 	if d := t.Dir.String(); d != "" {
 		out += " " + d
@@ -78,5 +83,5 @@ func FormatTop(t *TopClause) string {
 	if t == nil {
 		return ""
 	}
-	return t.token()
+	return t.wire()
 }

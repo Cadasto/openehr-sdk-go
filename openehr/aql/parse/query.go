@@ -428,14 +428,20 @@ func (q *Query) Emit() (string, error) {
 		}
 	}
 
-	// FROM
-	if q.From.Junction == nil && q.From.Root.RMType == "" {
+	// FROM. Root presence is `RMType != "" || Version`, exactly as the
+	// containment walk counts a class node: ParseQuery sets BOTH fields on a
+	// VERSION root, but a hand-built {Version: true} alone is the same class
+	// (`classExprOperand : … | VERSION …`), and keying on RMType alone both
+	// refused it as missing and — worse — silently DROPPED it beside a
+	// junction (REQ-119's substitution class).
+	rootPresent := q.From.Root.RMType != "" || q.From.Root.Version
+	if q.From.Junction == nil && !rootPresent {
 		return "", fmt.Errorf("%w: missing FROM root", aql.ErrInvalidQuery)
 	}
 	// A junction root and a single root are mutually exclusive: the
 	// grammar has no `(A OR B) CONTAINS C` form, so emitting both would
 	// produce text the parser rejects (REQ-117).
-	if q.From.Junction != nil && (q.From.Root.RMType != "" || q.From.Contains != nil) {
+	if q.From.Junction != nil && (rootPresent || q.From.Contains != nil) {
 		return "", fmt.Errorf("%w: FROM sets both a root class and a root junction", aql.ErrInvalidQuery)
 	}
 	if dup := duplicateAlias(q.From); dup != "" {

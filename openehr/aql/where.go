@@ -78,7 +78,40 @@ func FormatWhere(w WhereExpr) (string, error) {
 // parentheses — valid AQL asking something else.
 func DerefWhere(w WhereExpr) (WhereExpr, bool) { return derefWhere(w) }
 
-func derefWhere(w WhereExpr) (WhereExpr, bool) { return derefAs(w) }
+// derefWhere is [derefValue] for the WHERE vocabulary: same exhaustive
+// value-plus-pointer-twin switch, same fail-closed default, same case-coverage
+// hold by the dispatch tripwire.
+func derefWhere(w WhereExpr) (WhereExpr, bool) {
+	switch x := w.(type) {
+	case Comparison, Junction, NotExpr, ExistsExpr, MatchesExpr, LikeExpr:
+		return x, true
+	case *Comparison:
+		if x != nil {
+			return *x, true
+		}
+	case *Junction:
+		if x != nil {
+			return *x, true
+		}
+	case *NotExpr:
+		if x != nil {
+			return *x, true
+		}
+	case *ExistsExpr:
+		if x != nil {
+			return *x, true
+		}
+	case *MatchesExpr:
+		if x != nil {
+			return *x, true
+		}
+	case *LikeExpr:
+		if x != nil {
+			return *x, true
+		}
+	}
+	return nil, false // untyped nil, a typed-nil pointer, or an unlearned shape
+}
 
 // FormatValue renders an [aql.Value] to canonical AQL text (the same
 // emission the Builder uses internally). Mirrors [FormatWhere] for the value

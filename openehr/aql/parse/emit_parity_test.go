@@ -409,6 +409,11 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 		}},
 		"projected TERMINOLOGY star":     parse.FunctionCall{Name: "TERMINOLOGY", Star: true},
 		"projected TERMINOLOGY distinct": parse.FunctionCall{Name: "TERMINOLOGY", Distinct: true, Args: selectLits("a", "b", "c")},
+		// ı upper-cases to ASCII `I`, so an alphabet walk over the ToUpper'd
+		// name accepted a spelling the lexer cannot tokenise — and SELECT
+		// emits the name AS WRITTEN (`SELECT ı('a')`, token recognition
+		// error, err == nil).
+		"projected name that only case-folds to ASCII": parse.FunctionCall{Name: "ı", Args: selectLits("a")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			out, err := mk(e).Emit()
@@ -570,6 +575,90 @@ func TestEmitRefusesUngrammaticalAggregateShapes(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestLowercaseProjectedFunctionNameEmitsAndReparses — the alphabet fix for
+// case-folding names (see TestFuncNameAlphabetRunsOnTheOriginalSpelling) must
+// not smuggle in case SENSITIVITY: a lower-case ASCII name lexes as written.
+// It is deliberately not in the fixed-point loop above — Emit writes the name
+// as written while the read side canonicalises to upper case, so `upper`
+// re-emits as `UPPER`; this pins that read-side canonicalisation instead.
+func TestLowercaseProjectedFunctionNameEmitsAndReparses(t *testing.T) {
+	q := &parse.Query{
+		Select: parse.SelectClause{Items: []parse.SelectItem{{
+			Expr: parse.FunctionCall{Name: "upper", Args: selectLits("a")},
+		}}},
+		From: parse.FromClause{Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+	}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("Emit refused a lower-case function name: %v", err)
+	}
+	doc, err := parse.ParseQuery(out)
+	if err != nil {
+		t.Fatalf("emitted %q does not re-parse: %v", out, err)
+	}
+	fc, ok := doc.Select.Items[0].Expr.(parse.FunctionCall)
+	if !ok || fc.Name != "UPPER" {
+		t.Fatalf("re-parsed projection = %#v, want FunctionCall named UPPER (read-side canonical form)",
+			doc.Select.Items[0].Expr)
+	}
+}
+
+// TestEmitCountsAVersionRootAsPresent — REQ-119.
+//
+// FROM-root presence keyed on `RMType != ""` alone, but [ParseQuery] is the
+// only writer that pairs RMType "VERSION" with the Version flag: a hand-built
+// `ClassExpr{Version: true}` is the same grammar class (`classExprOperand :
+// … | VERSION …`) with the flag as its only marker. Keying on RMType both
+// refused it standing alone ("missing FROM root") and — the substitution
+// class — silently DROPPED it beside a junction, emitting only the junction
+// with err == nil. Presence is now `RMType != "" || Version`, exactly as the
+// containment walk has always counted a class node.
+func TestEmitCountsAVersionRootAsPresent(t *testing.T) {
+	sel := parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+		IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "v/x"}},
+	}}}}
+
+	t.Run("version root beside a junction is refused, not dropped", func(t *testing.T) {
+		q := &parse.Query{
+			Select: sel,
+			From: parse.FromClause{
+				Root: parse.ClassExpr{Version: true, Alias: "v"},
+				Junction: &parse.Containment{
+					ChildJoin: parse.ContainsOr,
+					Children: []parse.Containment{
+						{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c1"}},
+						{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c2"}},
+					},
+				},
+			},
+		}
+		out, err := q.Emit()
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q — the VERSION root would be silently dropped)",
+				err, out)
+		}
+	})
+
+	t.Run("version root alone emits and round-trips", func(t *testing.T) {
+		q := &parse.Query{Select: sel, From: parse.FromClause{Root: parse.ClassExpr{Version: true, Alias: "v"}}}
+		out, err := q.Emit()
+		if err != nil {
+			t.Fatalf("Emit refused a legal VERSION root: %v", err)
+		}
+		doc, err := parse.ParseQuery(out)
+		if err != nil {
+			t.Fatalf("emitted %q does not re-parse: %v", out, err)
+		}
+		if !doc.From.Root.Version || doc.From.Root.RMType != "VERSION" {
+			t.Fatalf("re-parsed root = %+v, want the VERSION class", doc.From.Root)
+		}
+		again, err := doc.Emit()
+		if err != nil || again != out {
+			t.Errorf("not a text fixed point: %q -> %q (err %v)", out, again, err)
+		}
+	})
 }
 
 // TestEmitRefusesAnOutOfVocabularyContainsJoin — [parse.ContainsJoin.String]

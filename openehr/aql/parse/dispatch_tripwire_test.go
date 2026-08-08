@@ -193,3 +193,148 @@ func TestSealedVocabularyDispatchSitesNormalise(t *testing.T) {
 			"DerefLimitExpr (or the package-local deref*) before deciding behaviour from a concrete shape (REQ-119)", v)
 	}
 }
+
+// TestDerefSwitchesCoverEveryShape holds the normalisers themselves closed.
+//
+// The deref helpers are plain type switches — the idiom spec bans reflection —
+// which reopens the objection reflection answered: a shape added later is
+// normalised only if someone remembers to extend the switch, and a missed case
+// falls to the fail-closed default, refusing the new shape's pointer twin on
+// one carrier only. This sweep removes the "remembers": it derives each
+// vocabulary's shape set from the marker-method receivers (as the tripwire
+// above does) and fails when a deref switch is missing a shape's case in
+// EITHER carrier form. [aql.EqualValues]'s shape comparison is held the same
+// way, value form only (it runs on normalised values).
+func TestDerefSwitchesCoverEveryShape(t *testing.T) {
+	const aqlDir = "../../aql"
+	fset := token.NewFileSet()
+	fileDirs := map[*ast.File]string{}
+	var files []*ast.File
+	for _, dir := range []string{aqlDir, "."} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+				continue
+			}
+			f, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, 0)
+			if err != nil {
+				t.Fatalf("parse %s: %v", name, err)
+			}
+			files = append(files, f)
+			fileDirs[f] = dir
+		}
+	}
+
+	// Derive each vocabulary's shapes from its own marker method. `token` is
+	// shared by Value and LimitExpr shapes, so it counts only in the aql
+	// package, where LimitExpr's types do not live.
+	vocab := map[string]map[string]bool{
+		"Value": {}, "WhereExpr": {}, "SelectExpr": {}, "LimitExpr": {},
+	}
+	for _, f := range files {
+		for _, decl := range f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv == nil || len(fd.Recv.List) == 0 {
+				continue
+			}
+			rt := fd.Recv.List[0].Type
+			if star, ok := rt.(*ast.StarExpr); ok {
+				rt = star.X
+			}
+			id, ok := rt.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			switch fd.Name.Name {
+			case "isSelectExpr":
+				vocab["SelectExpr"][id.Name] = true
+			case "isLimitExpr":
+				vocab["LimitExpr"][id.Name] = true
+			case "validate":
+				vocab["WhereExpr"][id.Name] = true
+			case "token":
+				if fileDirs[f] == aqlDir {
+					vocab["Value"][id.Name] = true
+				}
+			}
+		}
+	}
+	for name, min := range map[string]int{"Value": 8, "WhereExpr": 6, "SelectExpr": 4, "LimitExpr": 2} {
+		if len(vocab[name]) < min {
+			t.Fatalf("derived only %d %s shapes (floor %d) — the marker derivation has gone blind",
+				len(vocab[name]), name, min)
+		}
+	}
+
+	// The switches under coverage: function name → the vocabulary it must
+	// exhaust, and whether the pointer twin case is required too.
+	targets := map[string]struct {
+		vocab    string
+		pointers bool
+	}{
+		"derefValue":      {"Value", true},
+		"derefWhere":      {"WhereExpr", true},
+		"DerefSelectExpr": {"SelectExpr", true},
+		"DerefLimitExpr":  {"LimitExpr", true},
+		"sameShape":       {"Value", false},
+	}
+	seen := map[string]bool{}
+	for _, f := range files {
+		for _, decl := range f.Decls {
+			fd, ok := decl.(*ast.FuncDecl)
+			if !ok || fd.Recv != nil || fd.Body == nil {
+				continue
+			}
+			want, watched := targets[fd.Name.Name]
+			if !watched {
+				continue
+			}
+			seen[fd.Name.Name] = true
+			valueCases, pointerCases := map[string]bool{}, map[string]bool{}
+			ast.Inspect(fd.Body, func(n ast.Node) bool {
+				ts, ok := n.(*ast.TypeSwitchStmt)
+				if !ok {
+					return true
+				}
+				for _, stmt := range ts.Body.List {
+					cc, ok := stmt.(*ast.CaseClause)
+					if !ok {
+						continue
+					}
+					for _, ce := range cc.List {
+						if star, ok := ce.(*ast.StarExpr); ok {
+							if id, ok := star.X.(*ast.Ident); ok {
+								pointerCases[id.Name] = true
+							}
+							continue
+						}
+						if id, ok := ce.(*ast.Ident); ok {
+							valueCases[id.Name] = true
+						}
+					}
+				}
+				return true
+			})
+			for shape := range vocab[want.vocab] {
+				if !valueCases[shape] {
+					t.Errorf("%s is missing `case %s:` — a %s shape it no longer normalises",
+						fd.Name.Name, shape, want.vocab)
+				}
+				if want.pointers && !pointerCases[shape] {
+					t.Errorf("%s is missing `case *%s:` — the pointer twin would fall to the fail-closed "+
+						"default and bind the rule to one carrier (REQ-119)", fd.Name.Name, shape)
+				}
+			}
+		}
+	}
+	for name := range targets {
+		if !seen[name] {
+			t.Errorf("deref switch %s not found — if it was renamed, update this sweep so the "+
+				"case-coverage hold keeps watching it", name)
+		}
+	}
+}

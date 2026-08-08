@@ -521,6 +521,50 @@ func TestTerminologyGuardTrimsTheName(t *testing.T) {
 	}
 }
 
+// TestFuncNameAlphabetRunsOnTheOriginalSpelling — REQ-119.
+//
+// checkFuncName upper-cased the name BEFORE its alphabet walk, and Go's
+// Unicode case mapping folds some non-ASCII letters INTO the ASCII alphabet
+// (ı → I, ſ → S) — so a name whose as-written spelling the lexer cannot
+// tokenise passed validation. The SELECT side emits the name as written
+// (`SELECT ı('a')`, token recognition error); the value side emits the
+// upper-cased fold, which parses but is a silent respelling. Both sides share
+// this check, so the alphabet now runs over the original bytes. [aql.Func]
+// canonicalising its (documented case-insensitive) name at INTAKE is the
+// constructor twin of [aql.Param] stripping `$` and is unaffected.
+func TestFuncNameAlphabetRunsOnTheOriginalSpelling(t *testing.T) {
+	for _, name := range []string{"ı", "ſlice", "lengţh"} {
+		t.Run(name, func(t *testing.T) {
+			v := aql.FuncCall{Name: name, Args: []aql.Value{aql.String("a")}}
+			if err := aql.ValidateValue(v); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("ValidateValue(FuncCall %q) = %v, want ErrInvalidQuery", name, err)
+			}
+			if err := aql.ValidateSelectFuncName(name); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("ValidateSelectFuncName(%q) = %v, want ErrInvalidQuery", name, err)
+			}
+		})
+	}
+	// Lower-case ASCII names lex fine as written and must stay accepted on
+	// both sides — the alphabet change must not smuggle in case sensitivity.
+	for _, name := range []string{"length", "Concat", "count"} {
+		t.Run(name, func(t *testing.T) {
+			v := aql.FuncCall{Name: name, Args: []aql.Value{aql.String("a")}}
+			if name == "count" {
+				// COUNT is an aggregate: reserved in a value position,
+				// admitted in SELECT — the split checkFuncName exists for.
+				if err := aql.ValidateValue(v); !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Errorf("ValidateValue(FuncCall %q) = %v, want ErrInvalidQuery", name, err)
+				}
+			} else if err := aql.ValidateValue(v); err != nil {
+				t.Errorf("ValidateValue(FuncCall %q) = %v, want nil", name, err)
+			}
+			if err := aql.ValidateSelectFuncName(name); err != nil {
+				t.Errorf("ValidateSelectFuncName(%q) = %v, want nil", name, err)
+			}
+		})
+	}
+}
+
 // TestJunctionValidatesItsOperatorAndArity — REQ-119.
 //
 // [aql.Comparison] has always checked its operator; [aql.Junction] never checked
