@@ -1326,6 +1326,18 @@ requirements:
       # splice verbatim (issue #96): the guard's accept set confronted with the
       # vendored lexer, and the Emit- and Build-side refusals at all four.
       - openehr/aql/parse/identifier_parity_test.go
+      # The class BRACKET position the emitters splice verbatim (issue #99).
+      # Three files because three distinct claims are made about it: that a
+      # predicate survives extraction unmangled (identity, not parseability),
+      # that the two sub-grammars one field feeds get two accept sets, and
+      # that the guard agrees with the parser in BOTH directions over a
+      # GENERATED corpus — the position has no token names to walk.
+      - openehr/aql/parse/predicate_parity_test.go
+      - openehr/aql/parse/predicate_guard_test.go
+      - openehr/aql/parse/predicate_confrontation_test.go
+      # The exported half, which a write path outside openehr/aql calls to
+      # hold the same line.
+      - openehr/aql/predicate_test.go
       # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
       # containment refusals and the order they fire in, the URI guard vs the
       # grammar, and the pointer twin of every sealed set the emitters dispatch

@@ -524,7 +524,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				// verbatim so the emitter round-trips it, and expose a
 				// structured {path, op, value} when it is a simple
 				// comparison (REQ-113).
-				ce.Predicate = trimBrackets(pp.GetText())
+				ce.Predicate = trimBrackets(sourceText(pp))
 				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
 		}
@@ -536,7 +536,10 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		if vp := v.VersionPredicate(); vp != nil {
 			ce.HasPredicate = true
-			ce.Predicate = trimBrackets(vp.GetText())
+			// `versionPredicate` excludes its brackets (they belong to
+			// classExprOperand), unlike `pathPredicate` which includes them —
+			// trimBrackets is a no-op here and is kept off deliberately.
+			ce.Predicate = sourceText(vp)
 		}
 		return ce
 	}
@@ -817,12 +820,12 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 // Document.Paths and Query SELECT/WHERE/ORDER BY by equality.
 func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) IdentifiedPath {
 	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clause}
-	ip.Raw = c.GetText()
+	ip.Raw = sourceText(c)
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}
 	if pp := c.PathPredicate(); pp != nil {
-		ip.Predicate = trimBrackets(pp.GetText())
+		ip.Predicate = trimBrackets(sourceText(pp))
 	}
 	if op := c.ObjectPath(); op != nil {
 		ip.Segments = segmentsFromObjectPath(op)
@@ -846,7 +849,7 @@ func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
 			seg.Name = id.GetText()
 		}
 		if pp := part.PathPredicate(); pp != nil {
-			seg.Predicate = trimBrackets(pp.GetText())
+			seg.Predicate = trimBrackets(sourceText(pp))
 		}
 		segs = append(segs, seg)
 	}
@@ -854,7 +857,7 @@ func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
 }
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
-	return c.GetText()
+	return sourceText(c)
 }
 
 // standingComparison lifts a class standing predicate's standardPredicate
@@ -877,7 +880,7 @@ func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if v == nil {
 		return nil
 	}
-	raw := op.GetText()
+	raw := sourceText(op)
 	parsed := aql.IdentifiedPath{Segments: segmentsFromObjectPath(op), Raw: raw}
 	return &aql.Comparison{Path: raw, Op: aql.Operator(cmp.GetText()), Val: v, ParsedPath: &parsed}
 }

@@ -161,7 +161,7 @@ func (e *extractor) EnterClassExpression(c *gen.ClassExpressionContext) {
 				ce.ParamArchetype = true
 			}
 		default:
-			ce.Predicate = trimBrackets(pp.GetText())
+			ce.Predicate = trimBrackets(sourceText(pp))
 		}
 	}
 	e.classes = append(e.classes, ce)
@@ -174,7 +174,8 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 	}
 	if vp := c.VersionPredicate(); vp != nil {
 		ce.HasPredicate = true
-		ce.Predicate = trimBrackets(vp.GetText())
+		// See extractClassExprOperand: versionPredicate carries no brackets.
+		ce.Predicate = sourceText(vp)
 	}
 	e.classes = append(e.classes, ce)
 }
@@ -191,12 +192,12 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 		return
 	}
 	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clauseOf(c)}
-	ip.Raw = c.GetText()
+	ip.Raw = sourceText(c)
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}
 	if pp := c.PathPredicate(); pp != nil {
-		ip.Predicate = trimBrackets(pp.GetText())
+		ip.Predicate = trimBrackets(sourceText(pp))
 	}
 	if op := c.ObjectPath(); op != nil {
 		for _, part := range op.AllPathPart() {
@@ -205,7 +206,7 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 				seg.Name = id.GetText()
 			}
 			if pp := part.PathPredicate(); pp != nil {
-				seg.Predicate = trimBrackets(pp.GetText())
+				seg.Predicate = trimBrackets(sourceText(pp))
 			}
 			ip.Segments = append(ip.Segments, seg)
 		}

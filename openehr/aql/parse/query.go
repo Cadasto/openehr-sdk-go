@@ -1118,6 +1118,27 @@ func checkClassOperands(c ClassExpr) error {
 		return fmt.Errorf("%w: class %q carries a blank standing predicate; emission would write "+
 			"empty brackets, which no path predicate admits", aql.ErrInvalidQuery, c.RMType)
 	}
+	// [ClassExpr.Predicate] feeds TWO grammar positions, and [emitClassExpr]
+	// picks between them on the same flag this switch does:
+	//
+	//	VERSION variable=IDENTIFIER? ('[' versionPredicate ']')?   <- c.Version
+	//	IDENTIFIER variable=IDENTIFIER? pathPredicate?             <- otherwise
+	//
+	// `versionPredicate : LATEST_VERSION | ALL_VERSIONS | standardPredicate`
+	// admits no node predicate, so validating the field uniformly is wrong in
+	// BOTH directions at once: `VERSION v[at0001]` reaches the wire and the
+	// parser rejects it, while `VERSION v[LATEST_VERSION]` — which the
+	// extractor itself produces — would be refused. The second is this REQ's
+	// own tightening failure, so the split is not an optimisation.
+	if c.Predicate != "" {
+		if c.Version {
+			if err := aql.ValidateVersionPredicate(c.Predicate); err != nil {
+				return fmt.Errorf("VERSION class predicate: %w", err)
+			}
+		} else if err := aql.ValidatePathPredicate(c.Predicate); err != nil {
+			return fmt.Errorf("class %q predicate: %w", c.RMType, err)
+		}
+	}
 	// PredicateComparison is the STRUCTURED reading of the same bracket
 	// [ClassExpr.Predicate] holds verbatim, and the verbatim text is what
 	// emission renders — the field pair is lossless only while both are set.
