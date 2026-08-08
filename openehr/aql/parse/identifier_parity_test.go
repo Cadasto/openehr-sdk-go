@@ -533,6 +533,19 @@ func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
 				Path: "ehr_id/value", Op: aql.OpEq, Val: aql.Param("id"),
 			},
 		}}),
+		// The emptiness EDGE of the predicate position — separate from the
+		// structured-comparison rule above, and reachable WITHOUT one: the
+		// emitter brackets any non-empty field, so a blank one emits `[   ]`,
+		// which the parser rejects. Not the sub-grammar guard deferred to #99.
+		"blank standing predicate": mk(parse.FromClause{Root: parse.ClassExpr{
+			RMType: "EHR", Alias: "e", HasPredicate: true, Predicate: "   ",
+		}}),
+		"blank standing predicate with a comparison": mk(parse.FromClause{Root: parse.ClassExpr{
+			RMType: "EHR", Alias: "e", HasPredicate: true, Predicate: "\t",
+			PredicateComparison: &aql.Comparison{
+				Path: "ehr_id/value", Op: aql.OpEq, Val: aql.Param("id"),
+			},
+		}}),
 	} {
 		t.Run("refused/"+name, func(t *testing.T) {
 			out, err := q.Emit()
@@ -672,6 +685,10 @@ func TestArchetypeIDGuardAgreesOverGeneratedHRIDs(t *testing.T) {
 // whitespace, and the guard then runs on what is left — so this is a widening
 // of the builder's accept set by exactly one harmless equivalence, not a hole.
 // Asserted here so the spec's claim stays honest in both directions.
+//
+// Parity is over the normalised string with ONE documented exception, and the
+// exception is asserted in the loop rather than omitted from the corpus:
+// `VERSION` differs by CARRIER, not by spelling.
 func TestBuildEmitParityModuloTrim(t *testing.T) {
 	pathItem := parse.SelectItem{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
 		IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"},
@@ -689,9 +706,35 @@ func TestBuildEmitParityModuloTrim(t *testing.T) {
 		"COMPOSITION", "  COMPOSITION  ", "\tCOMPOSITION\n", "COMPOSITION c",
 		"AND", "ORDER", "LENGTH", "at0001", "AT0001", "true", "false",
 		"x1", "1x", "a-b", "a_b", "", "   ", "c, c/y", "$p",
+		"VERSION", "  VERSION  ", "version",
 	}
 	for _, s := range corpus {
 		trimmed := strings.TrimSpace(s)
+
+		// `VERSION` is the ONE string the two paths legitimately disagree on in
+		// the RM-type position, and it disagrees by CARRIER rather than by
+		// spelling: parse.ClassExpr has a Version flag, so an unflagged
+		// `RMType: "VERSION"` is refused there (it would re-parse WITH the flag,
+		// an AST the caller did not write), while the builder has no flag and
+		// the spelling is its carrier. Asserted rather than skipped — a claim of
+		// parity that quietly omits its own exception is the overclaim this test
+		// exists to prevent.
+		if strings.EqualFold(trimmed, "VERSION") {
+			t.Run("RM type asymmetry/"+s, func(t *testing.T) {
+				if _, err := aql.NewBuilder().Select(aql.Col("c/x")).From(s, "c").Build(); err != nil {
+					t.Errorf("Build(%q) = %v, want accepted — the builder's carrier is the spelling", s, err)
+				}
+				if emits(parse.ClassExpr{RMType: trimmed, Alias: "c"}) {
+					t.Errorf("Emit(RMType: %q) accepted without the Version flag — it would "+
+						"re-parse with the flag set", trimmed)
+				}
+				if !emits(parse.ClassExpr{RMType: trimmed, Alias: "c", Version: true}) {
+					t.Errorf("Emit(RMType: %q, Version: true) refused — the flagged form is what "+
+						"ParseQuery produces", trimmed)
+				}
+			})
+			continue
+		}
 
 		t.Run("RM type/"+s, func(t *testing.T) {
 			_, buildErr := aql.NewBuilder().Select(aql.Col("c/x")).From(s, "c").Build()

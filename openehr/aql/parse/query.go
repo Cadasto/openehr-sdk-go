@@ -1102,6 +1102,22 @@ func checkClassOperands(c ClassExpr) error {
 		return fmt.Errorf("%w: class %q flags a $param archetype predicate but carries no parameter, "+
 			"so emission would write no predicate at all", aql.ErrInvalidQuery, c.RMType)
 	}
+	// A predicate that is PRESENT must have content. [emitClassExpr] writes the
+	// brackets whenever the field is non-empty, so a blank one emits `[ ]` —
+	// text no `pathPredicate` reading admits, and the parser rejects it:
+	//
+	//	{RMType: "EHR", Alias: "e", Predicate: "   "}  ->  FROM EHR e[   ]
+	//
+	// This is the emptiness EDGE of the predicate position, not the guard
+	// deferred to issue #99: that one needs a `standardPredicate |
+	// nodePredicate` sub-grammar validator, whereas "is there any content at
+	// all" is decidable here and is the one thing about this position that a
+	// token-level check settles. The extractor cannot produce it — a parsed
+	// bracket always carries a form — so nothing ParseQuery emits is refused.
+	if c.Predicate != "" && strings.TrimSpace(c.Predicate) == "" {
+		return fmt.Errorf("%w: class %q carries a blank standing predicate; emission would write "+
+			"empty brackets, which no path predicate admits", aql.ErrInvalidQuery, c.RMType)
+	}
 	// PredicateComparison is the STRUCTURED reading of the same bracket
 	// [ClassExpr.Predicate] holds verbatim, and the verbatim text is what
 	// emission renders — the field pair is lossless only while both are set.
@@ -1114,6 +1130,12 @@ func checkClassOperands(c ClassExpr) error {
 	// can add or remove text — this one carries the filter itself. The
 	// extractor sets the text first and derives the comparison from it, so the
 	// pair is never half-populated on the read side.
+	//
+	// `== ""` and not a trimmed compare: the blank case is already refused
+	// above, so trimming here would overlap that rule, and the overlapping part
+	// would be unkillable by mutation. The two rules are orthogonal — "present
+	// means non-blank" and "structured means also verbatim" — and each fails
+	// its own named test.
 	if c.PredicateComparison != nil && c.Predicate == "" {
 		return fmt.Errorf("%w: class %q carries a structured predicate comparison but no predicate "+
 			"text; emission renders the verbatim form, so the comparison would be dropped",
