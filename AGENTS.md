@@ -10,7 +10,7 @@ A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`. **
 |---|---|
 | Module path | `github.com/cadasto/openehr-sdk-go` |
 | License | MIT |
-| Go version | `1.26.x` (current stable line, floor `1.26.0`) |
+| Go version | `1.26.x` (current stable line, floor `1.26.0` — [REQ-002](docs/specifications/packaging.md#req-002--go-version)) |
 | openEHR REST | `1.1.0-development` |
 | Status | **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md) |
 
@@ -75,6 +75,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Format / lint:** `make fmt` (gofumpt + goimports via `golangci-lint fmt`) and `make lint` (golangci-lint v2 + `modernize` / `errorlint`), both pinned in the [Makefile](Makefile); `make ci` gates them.
 - **Idioms:** `context.Context` first on every I/O method; inject `*http.Client` (never allocate one); functional options; package-level functions as the primary surface; generics only to remove a reflection hop; **no reflection** and no inheritance emulation (concrete structs + `typereg` for `_type` decoding).
 - **Errors:** wrap with `fmt.Errorf("…: %w", err)`; typed sentinels at boundaries; no panics in library code.
+- **Tests:** stdlib `testing` only — no assertion libraries — plus helpers in [`testkit/`](testkit/); behaviour tests for a public surface belong in the external `_test` package, so they exercise what consumers can reach. Guards carry the bar their spec sets — typically *removing the guard MUST fail a named test*.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …).
 
 **CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. **One single-sentence bullet (~35 words max) per artefact class** — artefact + scope + key REQ/PROBE only; **no API inventories, method/type enumerations, or per-REQ breakdowns** (those live in `traceability.yaml`, commits, PR bodies). The release-summary line is one sentence. Err short — release notes are generated verbatim from the block, and a longer entry is a defect, not thoroughness. Pre-1.0: only `### Added` is used.
@@ -86,6 +87,7 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Task | Command |
 |---|---|
 | Discover all targets | `make help` |
+| Diagnose the environment | `make doctor` — host Go, Docker, and which toolchain the Makefile will actually use |
 | **Full PR / CI gate** | `make ci` — see [docs/ci.md](docs/ci.md) |
 | Format / check | `make fmt` / `make fmt-check` |
 | Vet / lint | `make vet` / `make lint` |
@@ -98,7 +100,16 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 | FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored upstream EHRbase FLAT corpus (PROBE-086's input) against its `MANIFEST.txt`; runs under `make ci`. `make flat-conformance-check` adds an upstream-drift report (needs network; dev helper, not a gate). Never hand-edit a vendored fixture: being byte-identical to upstream is its whole value |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
 
-Test framework is stdlib `testing` + helpers in `testkit/`. Runtime dependencies are kept deliberately minimal and reviewed; the current set is: **OpenTelemetry** (tracing, confined to `transport/`), **antlr4-go** (AQL parser, `openehr/aql/parse`), and — adopted for SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — **`golang.org/x/oauth2`** and **`github.com/coreos/go-oidc/v3`**; the latter also requires **`go-jose/v4`**, which `auth/jwtbearer` + `smart` import directly for JWS signing — all scoped to `auth/` and `smart/` — see [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
+**Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
+
+| Dependency | Scope |
+|---|---|
+| **OpenTelemetry** | tracing, confined to `transport/` |
+| **antlr4-go** | the AQL parser, `openehr/aql/parse` |
+| **`golang.org/x/oauth2`**, **`github.com/coreos/go-oidc/v3`** | SMART/auth crypto correctness ([ADR 0009](docs/adr/0009-smart-auth-library-scope.md)) — scoped to `auth/` and `smart/` |
+| **`go-jose/v4`** | required transitively by go-oidc; `auth/jwtbearer` + `smart` also import it directly for JWS signing |
+
+Rationale and the wider picture: [architecture.md § Dependencies](docs/architecture.md#dependencies). Conformance probes (`testkit/probes/…`) run via `make test`; inventory in [conformance.md](docs/specifications/conformance.md).
 
 **Recommended agent tooling:** the **go-coding** plugin (Go skills + the `go-reviewer` agent), **gopls-lsp** (code intelligence), and **codebase-memory-mcp** (structural exploration / impact) — see [ai-workflow.md § Recommended tooling](docs/ai-workflow.md#recommended-tooling-claude-code--cursor).
 
@@ -116,4 +127,5 @@ Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-J
 - Duplicating normative REQ prose in `REQ.md` — the registry is index-only; canonical text lives in the topic specs.
 - `internal/bmmgen` and `internal/bmmdiff` — generator tooling, not public API; structural changes need rationale in [architecture.md](docs/architecture.md) and [ADR 0002](docs/adr/0002-bmm-codegen-decisions.md).
 - Module path — locked at `github.com/cadasto/openehr-sdk-go` (REQ-001).
+- The `go.mod` `go` directive — the minor line's `.0` patch, never the toolchain patch you happen to run (REQ-002): a mid-line floor makes every consumer and CI image on an earlier patch fetch a new toolchain, breaking air-gapped builds. Dev-image pins ([Dockerfile](Dockerfile)) move independently.
 - REQ-NNN / PROBE-NNN / STRAND-NN identifiers — **stable** once published; never renumber or reuse.
