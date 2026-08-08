@@ -1322,6 +1322,10 @@ requirements:
       # twice-through fixed point, both string delimiters, the fuzz target,
       # and the grammar confrontations.
       - openehr/aql/parse/literal_roundtrip_test.go
+      # The single-token IDENTIFIER / ARCHETYPE_HRID positions the emitters
+      # splice verbatim (issue #96): the guard's accept set confronted with the
+      # vendored lexer, and the Emit- and Build-side refusals at all four.
+      - openehr/aql/parse/identifier_parity_test.go
       # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
       # containment refusals and the order they fire in, the URI guard vs the
       # grammar, and the pointer twin of every sealed set the emitters dispatch

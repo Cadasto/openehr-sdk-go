@@ -304,6 +304,35 @@ func (c Containment) validateTree(seen map[string]bool) error {
 		if c.rmType == "" || c.alias == "" {
 			return fmt.Errorf("%w: CONTAINS requires an RM type and alias", ErrInvalidQuery)
 		}
+		// The three verbatim positions of a containment, held to the same rule
+		// (*parse.Query).Emit applies to the AST it reads (issue #96).
+		// As in Build: `VERSION` is classExprOperand's other ALTERNATIVE, and
+		// this carrier has no flag for it, so the spelling is the carrier.
+		// Refusing it made `EHR e CONTAINS VERSION v CONTAINS COMPOSITION c` —
+		// ordinary AQL the parser and Emit both round-trip — unbuildable.
+		if err := validateRMTypeToken(c.rmType); err != nil {
+			return fmt.Errorf("CONTAINS RM type: %w", err)
+		}
+		// …and that alternative takes no archetype predicate: `versionPredicate`
+		// has no archetype form, so emitting one produces text the parser
+		// rejects, breaking REQ-055's promise that Build output is valid AQL.
+		// The Emit-side rule for the same shape is in checkClassOperands.
+		if strings.EqualFold(c.rmType, "VERSION") && c.archetypeID != "" {
+			return fmt.Errorf("%w: a VERSION class expression takes no archetype predicate (%q)",
+				ErrInvalidQuery, c.archetypeID)
+		}
+		if err := ValidateIdentifier(c.alias); err != nil {
+			return fmt.Errorf("CONTAINS alias: %w", err)
+		}
+		if c.archetypeID != "" {
+			if name, isParam := strings.CutPrefix(c.archetypeID, "$"); isParam {
+				if err := validateParamName(name); err != nil {
+					return fmt.Errorf("CONTAINS archetype parameter: %w", err)
+				}
+			} else if err := ValidateArchetypeID(c.archetypeID); err != nil {
+				return fmt.Errorf("CONTAINS archetype: %w", err)
+			}
+		}
 		if seen[c.alias] {
 			return fmt.Errorf("%w: duplicate alias %q", ErrInvalidQuery, c.alias)
 		}
