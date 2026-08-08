@@ -186,7 +186,10 @@ func (j containsJoin) keyword() string {
 }
 
 // isJunction reports whether c is a pure boolean grouping — operands only,
-// no class of its own. Mirrors parse's isContainmentJunction.
+// no class of its own. The parse-side counterpart is isContainmentJunction,
+// which cannot store a kind (its struct is public, built by hand) and so
+// INFERS it — from an absent RMType, with a Version carve-out this side does
+// not need because [Class] never constructs a class-less node.
 func (c Containment) isJunction() bool { return c.kind == kindJunction }
 
 // chainEndsInJunction reports whether the CONTAINS chain rooted at c ENDS in
@@ -287,9 +290,12 @@ func (c Containment) emitOperands() string {
 // validateTree walks the containment tree and reports the first structural
 // defect: a class node missing its RM type or alias, any alias already
 // recorded in seen (aliases are query-scoped, so two branches of a junction
-// may not reuse one), and a junction in a non-final chain position. Mirrors
-// parse's duplicateAlias walk so the read and write sides refuse the same
-// trees.
+// may not reuse one), and a junction in a non-final chain position. The
+// read-side counterparts are parse's validateContainmentTree (structure) and
+// duplicateAlias (aliases) — the same refusals with ONE documented asymmetry:
+// the alias requirement here is a write-side ergonomic choice, not a grammar
+// rule, so Emit deliberately does not mirror it (an alias-less
+// `CONTAINS OBSERVATION` is valid AQL the parser accepts).
 func (c Containment) validateTree(seen map[string]bool) error {
 	if c.invalid != nil {
 		return c.invalid

@@ -434,6 +434,11 @@ func (ex *astExtractor) extractContainment(c gen.IContainsExprContext) *Containm
 		for _, op := range operands {
 			child := ex.extractContainment(op)
 			if child == nil {
+				// Defensive: a dropped operand would emit `A` where the
+				// source said `A OR B` — one arm of the junction silently
+				// gone, the substitution class this file must surface as a
+				// gap instead (REQ-119).
+				ex.incomplete("containment operand %q is outside the catalogue", op.GetText())
 				continue
 			}
 			// REQ-117: flatten a same-operator operand so `A OR B OR C`
@@ -507,6 +512,12 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 					// token; ParamArchetype is the typed signal.
 					ce.Archetype = p.GetText()
 					ce.ParamArchetype = true
+				} else {
+					// Defensive: `archetypePredicate : ARCHETYPE_HRID |
+					// PARAMETER` — both handled. Leaving Archetype empty with
+					// HasPredicate set would silently drop the predicate, a
+					// row filter, from emission.
+					ex.incomplete("archetype predicate %q is outside the catalogue", ap.GetText())
 				}
 			default:
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
@@ -529,6 +540,10 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		return ce
 	}
+	// Defensive: both classExprOperand alternatives are handled above. The
+	// zero ClassExpr is refused loudly at Emit (validateContainmentTree), but
+	// the gap belongs at PARSE time, where every sibling records it.
+	ex.incomplete("class expression %q is outside the catalogue", c.GetText())
 	return ClassExpr{}
 }
 
@@ -543,6 +558,11 @@ func (ex *astExtractor) extractWhereClause(c gen.IWhereClauseContext) aql.WhereE
 			return ex.extractWhereExpr(we)
 		}
 	}
+	// Defensive: a whereClause always carries a whereExpr child against the
+	// current grammar. Returning nil WITHOUT the gap would silently emit the
+	// query with its WHERE gone — a wider result set, err == nil — which is
+	// the exact failure the file header promises cannot happen.
+	ex.incomplete("WHERE clause %q carries no expression the catalogue models", c.GetText())
 	return nil
 }
 
@@ -554,6 +574,10 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 		// NOT applies to the next WhereExpr operand.
 		ops := c.AllWhereExpr()
 		if len(ops) == 0 {
+			// Defensive: `NOT whereExpr` always carries its operand. A nil
+			// return here erased the whole predicate silently (see
+			// extractWhereClause above).
+			ex.incomplete("NOT in %q carries no operand", c.GetText())
 			return nil
 		}
 		return aql.Not(ex.extractWhereExpr(ops[0]))
@@ -575,10 +599,15 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 			// is ONE [aql.Junction] with three terms — the documented
 			// shared-vocabulary contract — rather than the parser's
 			// left-nested pair-of-pairs. Emission is unaffected (a nested
-			// same-operator junction needs no parentheses).
-			if inner, ok := t.(aql.Junction); ok && inner.Op == join {
-				terms = append(terms, inner.Terms...)
-				continue
+			// same-operator junction needs no parentheses). The extractor
+			// only ever builds value shapes, so DerefWhere is a pass-through
+			// here — used anyway so every shape decision in the subsystem
+			// goes through one door (the dispatch-site tripwire checks that).
+			if norm, ok := aql.DerefWhere(t); ok {
+				if inner, isJunction := norm.(aql.Junction); isJunction && inner.Op == join {
+					terms = append(terms, inner.Terms...)
+					continue
+				}
 			}
 			terms = append(terms, t)
 		}
@@ -597,6 +626,9 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 	if ie := c.IdentifiedExpr(); ie != nil {
 		return ex.extractIdentifiedExpr(ie)
 	}
+	// Defensive: every whereExpr alternative is handled above. A silent nil
+	// here would drop the predicate (or one junction arm) from the model.
+	ex.incomplete("WHERE expression %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -1096,12 +1128,21 @@ var aqlEscapeChar = map[byte]byte{
 	'a': '\a', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v',
 }
 
-// stripSurroundingQuotes peels a single set of single-quote delimiters
-// from a DATE/TIME/DATETIME lexer token (`'2026-01-01T00:00:00'` →
-// `2026-01-01T00:00:00`). Used so the emitter's StringValue.token
-// re-quotes cleanly instead of producing triple-quoted text.
+// stripSurroundingQuotes peels one set of quote delimiters from a
+// DATE/TIME/DATETIME lexer token (`'2026-01-01T00:00:00'` →
+// `2026-01-01T00:00:00`), so the emitter's StringValue.token re-quotes
+// cleanly instead of producing triple-quoted text.
+//
+// BOTH delimiters, because the three tokens admit both — `DATETIME :
+// SYM_SINGLE_QUOTE … | SYM_DOUBLE_QUOTE ISO8601_DATE_TIME SYM_DOUBLE_QUOTE`
+// (AqlLexer.g4). Peeling single quotes only made a double-quoted temporal
+// literal round-trip with its quotes EMBEDDED in the value — `= "2026-…"`
+// re-emitted as `'"2026-…"'`, a comparison that matches nothing, err == nil
+// (REQ-119's silent class; the sibling unquoteAQLString always handled both).
+// The token body is an ISO-8601 datetime, so it can contain neither delimiter
+// and needs no unescaping.
 func stripSurroundingQuotes(s string) string {
-	if len(s) >= 2 && s[0] == '\'' && s[len(s)-1] == '\'' {
+	if len(s) >= 2 && ((s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"')) {
 		return s[1 : len(s)-1]
 	}
 	return s
@@ -1199,7 +1240,14 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		}
 		if tf := it.TerminologyFunction(); tf != nil {
 			out = append(out, aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)})
+			continue
 		}
+		// Defensive: `valueListItem : primitive | PARAMETER |
+		// terminologyFunction`, all handled above. Skipping an unmodelled
+		// member would emit a NARROWER list than the source — valid AQL
+		// matching fewer values, silently — so a widened grammar must land
+		// here as a gap instead.
+		ex.incomplete("MATCHES member %q is outside the catalogue", it.GetText())
 	}
 	if len(out) == 0 {
 		// The grammar requires at least one valueListItem, so an empty

@@ -503,6 +503,180 @@ func TestEmitValidatesSelectValuePositions(t *testing.T) {
 	}
 }
 
+// TestEmitRefusesUngrammaticalAggregateShapes — [aql.ValidateSelectFuncName]
+// admits the aggregate NAMES; `aggregateFunctionCall` also fixes their SHAPE —
+// `COUNT '(' (DISTINCT? identifiedPath | '*') ')' | (MIN|MAX|SUM|AVG) '('
+// identifiedPath ')'` — and the general `functionCall` admits neither DISTINCT
+// nor `*` at all. Unvalidated, the emitter's body switch PICKED A WINNER:
+// `COUNT{Star, Args}` emitted `COUNT(*)` with the argument silently gone
+// (valid AQL counting rows instead of path values — the substitution class),
+// and the rest emitted text this SDK's own parser rejects.
+func TestEmitRefusesUngrammaticalAggregateShapes(t *testing.T) {
+	mk := func(e parse.SelectExpr) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: e}}},
+			From:   parse.FromClause{Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+		}
+	}
+	path := func(raw string) parse.SelectExpr {
+		return parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: raw}}}
+	}
+	for name, e := range map[string]parse.SelectExpr{
+		// The silent pair: a star beside arguments or DISTINCT — emitting the
+		// star alone dropped them with err == nil.
+		"COUNT star beside argument": parse.FunctionCall{Name: "COUNT", Star: true, Args: []parse.SelectExpr{path("c/uid/value")}},
+		"COUNT star beside DISTINCT": parse.FunctionCall{Name: "COUNT", Star: true, Distinct: true},
+		// The loud set: emitted before, refused by the parser after.
+		"MIN star":               parse.FunctionCall{Name: "MIN", Star: true},
+		"MIN DISTINCT":           parse.FunctionCall{Name: "MIN", Distinct: true, Args: []parse.SelectExpr{path("c/x")}},
+		"COUNT no args":          parse.FunctionCall{Name: "COUNT"},
+		"COUNT two args":         parse.FunctionCall{Name: "COUNT", Args: []parse.SelectExpr{path("c/a"), path("c/b")}},
+		"MAX literal arg":        parse.FunctionCall{Name: "MAX", Args: []parse.SelectExpr{parse.LiteralExpr{Value: aql.Int(1)}}},
+		"SUM two args":           parse.FunctionCall{Name: "SUM", Args: []parse.SelectExpr{path("c/a"), path("c/b")}},
+		"non-aggregate DISTINCT": parse.FunctionCall{Name: "LENGTH", Distinct: true, Args: []parse.SelectExpr{path("c/x")}},
+		"non-aggregate star":     parse.FunctionCall{Name: "LENGTH", Star: true},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := mk(e).Emit()
+			if err == nil {
+				t.Fatalf("Emit produced %q with err == nil", out)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+	// Every legal aggregate shape must still emit, re-parse, and reach a text
+	// fixed point — the guard narrows to the grammar, not past it.
+	for name, e := range map[string]parse.SelectExpr{
+		"COUNT star":     parse.FunctionCall{Name: "COUNT", Star: true},
+		"COUNT path":     parse.FunctionCall{Name: "COUNT", Args: []parse.SelectExpr{path("c/uid/value")}},
+		"COUNT DISTINCT": parse.FunctionCall{Name: "COUNT", Distinct: true, Args: []parse.SelectExpr{path("c/uid/value")}},
+		"MIN path":       parse.FunctionCall{Name: "MIN", Args: []parse.SelectExpr{path("c/x")}},
+		"pointer arg":    parse.FunctionCall{Name: "AVG", Args: []parse.SelectExpr{&parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}}}}},
+	} {
+		t.Run("emits/"+name, func(t *testing.T) {
+			out, err := mk(e).Emit()
+			if err != nil {
+				t.Fatalf("Emit refused a legal aggregate: %v", err)
+			}
+			doc, err := parse.ParseQuery(out)
+			if err != nil {
+				t.Fatalf("emitted %q does not re-parse: %v", out, err)
+			}
+			again, err := doc.Emit()
+			if err != nil || again != out {
+				t.Errorf("not a text fixed point: %q -> %q (err %v)", out, again, err)
+			}
+		})
+	}
+}
+
+// TestEmitRefusesDualClassOperands — [parse.ClassExpr.Archetype] and
+// [parse.ClassExpr.Predicate] are the two mutually exclusive spellings of the
+// ONE bracket position, and the emitter renders whichever its switch reaches
+// first: setting both silently dropped the standing predicate — a row FILTER —
+// so the emitted query returned MORE rows than the AST asked for, err == nil.
+// The same dual-operand rule already guards [aql.Comparison] (Path vs Left)
+// and [aql.MatchesExpr] (three operand forms); ClassExpr was the third type
+// with two spellings of one position and no twin of the rule.
+func TestEmitRefusesDualClassOperands(t *testing.T) {
+	dual := parse.ClassExpr{
+		RMType: "COMPOSITION", Alias: "c", HasPredicate: true,
+		Archetype: "openEHR-EHR-COMPOSITION.encounter.v1", Predicate: "uid/value=$u",
+	}
+	sel := parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+		IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/uid/value"}},
+	}}}}
+
+	for name, from := range map[string]parse.FromClause{
+		"FROM root": {Root: dual},
+		"nested CONTAINS": {
+			Root:     parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+			Contains: &parse.Containment{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o", HasPredicate: true, Archetype: "openEHR-EHR-OBSERVATION.bp.v1", Predicate: "name/value=$n"}},
+		},
+		"junction operand": {
+			Junction: &parse.Containment{ChildJoin: parse.ContainsOr, Children: []parse.Containment{
+				{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c1"}},
+				{Class: dual},
+			}},
+		},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			q := &parse.Query{Select: sel, From: from}
+			out, err := q.Emit()
+			if err == nil {
+				t.Fatalf("Emit produced %q with err == nil; the standing predicate was silently dropped", out)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+	// One spelling at a time stays emittable and round-trips.
+	for name, root := range map[string]parse.ClassExpr{
+		"archetype only": {RMType: "COMPOSITION", Alias: "c", HasPredicate: true, Archetype: "openEHR-EHR-COMPOSITION.encounter.v1"},
+		"predicate only": {RMType: "COMPOSITION", Alias: "c", HasPredicate: true, Predicate: "uid/value=$u"},
+	} {
+		t.Run("emits/"+name, func(t *testing.T) {
+			q := &parse.Query{Select: sel, From: parse.FromClause{Root: root}}
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit refused a single-operand class: %v", err)
+			}
+			if _, err := parse.ParseQuery(out); err != nil {
+				t.Errorf("emitted %q does not re-parse: %v", out, err)
+			}
+		})
+	}
+}
+
+// TestEmitRefusesBareParameterProjection — `columnExpr : identifiedPath |
+// primitive | aggregateFunctionCall | functionCall` has NO PARAMETER
+// alternative, while a function ARGUMENT is a `terminal`, which has. The
+// refusal is therefore POSITIONAL: `SELECT $p` emitted text the parser
+// rejects, while `SELECT CONCAT('a', $p)` is legal and must stay so. Also
+// pins the empty-path refusal beside it — the one path position in the
+// subsystem that had no emptiness check (`SELECT  FROM …`, err == nil).
+func TestEmitRefusesBareParameterProjection(t *testing.T) {
+	mk := func(e parse.SelectExpr) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: e}}},
+			From:   parse.FromClause{Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+		}
+	}
+	for name, e := range map[string]parse.SelectExpr{
+		"bare parameter":        parse.LiteralExpr{Value: aql.Param("p")},
+		"pointer-carried param": parse.LiteralExpr{Value: &aql.ParamValue{Name: "p"}},
+		"pointer literal param": &parse.LiteralExpr{Value: aql.Param("p")},
+		"empty path projection": parse.PathExpr{},
+		"blank path projection": parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "   "}}},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := mk(e).Emit()
+			if err == nil {
+				t.Fatalf("Emit produced %q with err == nil; ParseQuery cannot read that back", out)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+		})
+	}
+	t.Run("emits/parameter as function argument", func(t *testing.T) {
+		q := mk(parse.FunctionCall{Name: "CONCAT", Args: []parse.SelectExpr{
+			parse.LiteralExpr{Value: aql.String("a")},
+			parse.LiteralExpr{Value: aql.Param("p")},
+		}})
+		out, err := q.Emit()
+		if err != nil {
+			t.Fatalf("Emit refused the legal argument position: %v", err)
+		}
+		if _, err := parse.ParseQuery(out); err != nil {
+			t.Errorf("emitted %q does not re-parse: %v", out, err)
+		}
+	})
+}
+
 // selectLits wraps string literals as projected SELECT items.
 func selectLits(ss ...string) []parse.SelectExpr {
 	out := make([]parse.SelectExpr, 0, len(ss))

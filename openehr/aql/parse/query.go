@@ -17,7 +17,6 @@ package parse
 
 import (
 	"fmt"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -275,12 +274,19 @@ type Containment struct {
 	// value when the node is a pure boolean grouping (Children only).
 	Class ClassExpr
 
-	// Children are nested CONTAINS terms below this node. Multiple
-	// children imply a boolean junction via ChildJoin.
+	// Children's meaning depends on the node KIND. On a JUNCTION node (zero
+	// Class), they are the boolean operands joined by ChildJoin. On a CLASS
+	// node, they are the flattened CONTAINS chain below it, in order — each
+	// child follows the previous with a CONTAINS keyword, so `[o, ev]` under
+	// `s` emits `s CONTAINS o CONTAINS ev`, NOT a junction. (Note the chain
+	// SHAPE is not stable under re-parse: the parser nests a linear chain as
+	// single children — `s→[o→[ev]]` — while emission flattens; the TEXT is
+	// identical either way, which is what Emit guarantees.)
 	Children []Containment
 
-	// ChildJoin is the boolean combinator across Children. Defaults
-	// to [ContainsAnd]; only meaningful when len(Children) > 1.
+	// ChildJoin is the boolean combinator across a JUNCTION node's Children.
+	// Defaults to [ContainsAnd]. On a class node it must be zero — a join
+	// there has no emittable spelling, and Emit refuses it.
 	ChildJoin ContainsJoin
 
 	// Negated is true for `NOT CONTAINS …` / `NOT <term>` forms.
@@ -522,16 +528,9 @@ func emitLimitValue(keyword string, v LimitExpr) (string, error) {
 	if v == nil {
 		return "", nil
 	}
-	rv := reflect.ValueOf(v)
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return "", fmt.Errorf("%w: in-text %s carries no value", aql.ErrInvalidQuery, keyword)
-		}
-		rv = rv.Elem()
-	}
-	inner, ok := rv.Interface().(LimitExpr)
+	inner, ok := DerefLimitExpr(v)
 	if !ok {
-		return "", fmt.Errorf("%w: in-text %s has an unsupported shape %T", aql.ErrInvalidQuery, keyword, v)
+		return "", fmt.Errorf("%w: in-text %s carries no value", aql.ErrInvalidQuery, keyword)
 	}
 	switch t := inner.(type) {
 	case IntLimit:
@@ -554,6 +553,23 @@ func emitLimitValue(keyword string, v LimitExpr) (string, error) {
 }
 
 func emitSelectItem(item SelectItem) (string, error) {
+	// A parameter is refused at the TOP of a projection and nowhere deeper:
+	// `columnExpr : identifiedPath | primitive | aggregateFunctionCall |
+	// functionCall` has no PARAMETER alternative, while a function ARGUMENT is
+	// a `terminal`, which has — `SELECT $p FROM …` is a syntax error and
+	// `SELECT CONCAT('a', $p) FROM …` is not. The check is positional, so it
+	// lives on the item rather than in [emitSelectExpr], which both positions
+	// share.
+	if expr, ok := DerefSelectExpr(item.Expr); ok {
+		if lit, isLit := expr.(LiteralExpr); isLit {
+			if inner, ok := aql.DerefValue(lit.Value); ok {
+				if _, isParam := inner.(aql.ParamValue); isParam {
+					return "", fmt.Errorf("%w: a bare parameter is not a SELECT projection; "+
+						"the grammar admits one only inside a function call", aql.ErrInvalidQuery)
+				}
+			}
+		}
+	}
 	s, err := emitSelectExpr(item.Expr)
 	if err != nil {
 		return "", err
@@ -589,24 +605,83 @@ func validateSelectTerminology(v FunctionCall) error {
 			aql.ErrInvalidQuery, aql.TerminologyFunc, len(v.Args))
 	}
 	for i, a := range v.Args {
-		lit, ok := a.(LiteralExpr)
+		// BOTH carriers normalise before their shape check: the SelectExpr
+		// wrapper (`*LiteralExpr` is a literal too) and the Value inside it
+		// (`*aql.StringValue` is a string literal too). Asserting either raw
+		// shape bound the rule to one carrier — the second was this
+		// function's own defect one round earlier (REQ-119).
+		expr, ok := DerefSelectExpr(a)
 		if !ok {
-			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
-				aql.ErrInvalidQuery, aql.TerminologyFunc, i, a)
+			return fmt.Errorf("%w: %s() argument %d has no value", aql.ErrInvalidQuery, aql.TerminologyFunc, i)
 		}
-		// Normalise before the shape check: a `*aql.StringValue` is a string
-		// literal too, and the value-position guard (aql.ValidateValue) already
-		// accepts one, so matching the value shape alone made the SAME rule
-		// bind one carrier and not the other (REQ-119, "every shape, including
-		// its pointer twin").
+		lit, isLit := expr.(LiteralExpr)
+		if !isLit {
+			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
+				aql.ErrInvalidQuery, aql.TerminologyFunc, i, expr)
+		}
 		arg, ok := aql.DerefValue(lit.Value)
 		if !ok {
 			return fmt.Errorf("%w: %s() argument %d has no value", aql.ErrInvalidQuery, aql.TerminologyFunc, i)
 		}
 		if _, isString := arg.(aql.StringValue); !isString {
 			return fmt.Errorf("%w: %s() argument %d is %T; the grammar admits only string literals",
-				aql.ErrInvalidQuery, aql.TerminologyFunc, i, lit.Value)
+				aql.ErrInvalidQuery, aql.TerminologyFunc, i, arg)
 		}
+	}
+	return nil
+}
+
+// validateSelectFuncShape holds a projected [FunctionCall]'s SHAPE — its
+// Star / Distinct flags and, for an aggregate, its argument list — to the
+// grammar rule that admits the name (REQ-119).
+//
+// [aql.ValidateSelectFuncName] admits the aggregate NAMES because SELECT
+// reaches `aggregateFunctionCall`; that rule also fixes their shape —
+// `COUNT '(' (DISTINCT? identifiedPath | '*') ')' | (MIN|MAX|SUM|AVG) '('
+// identifiedPath ')'` — while the general `functionCall` admits neither
+// DISTINCT nor `*` at all. Unvalidated, the emitter picked a winner: a Star
+// beside Args emitted `COUNT(*)` with the argument SILENTLY GONE (valid AQL
+// counting rows instead of path values — the substitution class), and
+// `MIN(DISTINCT x)` / `MAX(*)` / `COUNT()` emitted text this SDK's own parser
+// rejects.
+func validateSelectFuncShape(v FunctionCall) error {
+	name := strings.ToUpper(strings.TrimSpace(v.Name))
+	if !aql.IsAggregateFunc(name) {
+		// General `functionCall`: any terminals as arguments (each validated
+		// on emission), but no DISTINCT and no star — the grammar has no
+		// spelling for either outside `aggregateFunctionCall`.
+		if v.Star || v.Distinct {
+			return fmt.Errorf("%w: %s() admits neither DISTINCT nor a star argument",
+				aql.ErrInvalidQuery, name)
+		}
+		return nil
+	}
+	if v.Star {
+		// `COUNT(*)` is the only star form, and it is the WHOLE argument
+		// list: a Star beside Args or DISTINCT must be refused, never
+		// resolved by dropping the loser.
+		if name != "COUNT" {
+			return fmt.Errorf("%w: %s(*) is not in the grammar; only COUNT takes a star", aql.ErrInvalidQuery, name)
+		}
+		if v.Distinct || len(v.Args) > 0 {
+			return fmt.Errorf("%w: COUNT(*) admits neither DISTINCT nor arguments beside the star; "+
+				"emitting the star alone would silently drop them", aql.ErrInvalidQuery)
+		}
+		return nil
+	}
+	if v.Distinct && name != "COUNT" {
+		return fmt.Errorf("%w: DISTINCT inside %s() is not in the grammar; only COUNT(DISTINCT path) is",
+			aql.ErrInvalidQuery, name)
+	}
+	if len(v.Args) != 1 {
+		return fmt.Errorf("%w: %s() takes exactly one path argument, got %d", aql.ErrInvalidQuery, name, len(v.Args))
+	}
+	arg, ok := DerefSelectExpr(v.Args[0])
+	if !ok {
+		return fmt.Errorf("%w: %s() argument has no value", aql.ErrInvalidQuery, name)
+	}
+	if _, isPath := arg.(PathExpr); !isPath {
+		return fmt.Errorf("%w: %s() takes an identified path, not %T", aql.ErrInvalidQuery, name, arg)
 	}
 	return nil
 }
@@ -620,19 +695,21 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 	// value side accepts `*aql.StringValue` (REQ-119). Normalised here so both
 	// carriers behave alike, and a typed nil is refused rather than panicking.
 	if e != nil {
-		rv := reflect.ValueOf(e)
-		for rv.Kind() == reflect.Pointer {
-			if rv.IsNil() {
-				return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
-			}
-			rv = rv.Elem()
+		inner, ok := DerefSelectExpr(e)
+		if !ok {
+			return "", fmt.Errorf("%w: nil SELECT expression", aql.ErrInvalidQuery)
 		}
-		if inner, ok := rv.Interface().(SelectExpr); ok {
-			e = inner
-		}
+		e = inner
 	}
 	switch v := e.(type) {
 	case PathExpr:
+		// The one path position in the subsystem that had no emptiness check —
+		// `SELECT  FROM …` emitted with err == nil. Same rule as
+		// Comparison.validate and the ORDER BY guard; the TEXT of a non-empty
+		// path stays verbatim by contract (REQ-055 rule 3).
+		if strings.TrimSpace(v.Raw) == "" {
+			return "", fmt.Errorf("%w: SELECT path expression with empty path text", aql.ErrInvalidQuery)
+		}
 		return v.Raw, nil
 	case StarExpr:
 		// REQ-117: an explicit star item inside a mixed projection list.
@@ -667,6 +744,9 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 		// projected call is modelled by this type rather than by [aql.FuncCall],
 		// so [aql.ValidateValue]'s arity check does not reach it.
 		if err := validateSelectTerminology(v); err != nil {
+			return "", err
+		}
+		if err := validateSelectFuncShape(v); err != nil {
 			return "", err
 		}
 		var body string
@@ -816,6 +896,9 @@ func validateContainmentTree(from FromClause) error {
 			if c.Class.RMType == "" && !c.Class.Version {
 				return fmt.Errorf("%w: CONTAINS requires an RM type (or VERSION)", aql.ErrInvalidQuery)
 			}
+			if err := checkClassOperands(c.Class); err != nil {
+				return err
+			}
 			if c.ChildJoin != 0 {
 				return fmt.Errorf("%w: class containment %q carries a ChildJoin; a join belongs to a junction "+
 					"node (no class of its own), and emission would silently drop it",
@@ -828,6 +911,11 @@ func validateContainmentTree(from FromClause) error {
 			}
 		}
 		return nil
+	}
+	// The FROM root is a ClassExpr outside the containment walk, so its
+	// bracket operands are checked here or nowhere.
+	if err := checkClassOperands(from.Root); err != nil {
+		return err
 	}
 	for _, root := range []*Containment{from.Junction, from.Contains} {
 		if root == nil {
@@ -871,6 +959,26 @@ func validateContainmentTree(from FromClause) error {
 		return err
 	}
 	return walk(from.Contains)
+}
+
+// checkClassOperands refuses a [ClassExpr] whose bracket position carries two
+// spellings at once: [ClassExpr.Archetype] and [ClassExpr.Predicate] are the
+// grammar's two mutually exclusive readings of the ONE `[...]` predicate, and
+// [emitClassExpr] renders whichever its switch reaches first — so setting both
+// silently dropped the standing predicate, a row FILTER, and the emitted query
+// returned more rows than the AST asked for (REQ-119's substitution class).
+// The same dual-operand rule already guards [aql.Comparison] (Path vs Left)
+// and [aql.MatchesExpr] (its three operand forms); this is the third type with
+// two spellings of one position. The extractor never sets both (the grammar's
+// `pathPredicate` is one or the other); this binds the direct-construction
+// path.
+func checkClassOperands(c ClassExpr) error {
+	if c.Archetype != "" && c.Predicate != "" {
+		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a standing predicate (%q); "+
+			"the bracket position carries exactly one, and emission would silently drop the predicate",
+			aql.ErrInvalidQuery, c.RMType, c.Archetype, c.Predicate)
+	}
+	return nil
 }
 
 // isContainmentJunction reports whether a node is a pure boolean

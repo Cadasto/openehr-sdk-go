@@ -319,27 +319,28 @@ func (a *ast) build() (Query, error) {
 
 	// The implicit ehr_id filter from FromEHR AND-combines with any explicit
 	// WHERE predicate so a single canonical WHERE clause results.
-	// `where != nil` is safe only because effectiveWhere has already collapsed
-	// a predicate denoting nothing — including a TYPED nil, whose validate/expr
-	// have value receivers and panic — to a genuine nil (REQ-119). Normalising
-	// again here would be a guard no test could kill, so the rule lives in one
-	// place.
-	if where := a.effectiveWhere(); where != nil {
-		// Reject malformed predicates (nil values, empty paths) before emitting
-		// so the typed builders can never produce invalid AQL (PROBE-021).
-		if err := where.validate(); err != nil {
-			return Query{}, err
-		}
-		// A non-nil predicate that emits nothing would yield a trailing,
-		// syntactically invalid WHERE. Junction.validate now refuses the
-		// term-less junction that used to reach this, so it is a backstop
-		// rather than the primary guard.
-		pred := where.expr()
-		if strings.TrimSpace(pred) == "" {
-			return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
-		}
+	//
+	// Rendered through [FormatWhere] — the SAME validate-then-emit sequence
+	// parse.Query.Emit uses — so the subsystem has exactly one WHERE emission
+	// path. Build and Emit previously each ran their own validate()+expr()
+	// pair; they agreed, but a two-copy sequence is how the typed-nil and
+	// parenthesisation defects kept splitting between the write paths
+	// (REQ-119). effectiveWhere still owns the FromEHR combining and the
+	// collapse of a predicate denoting nothing.
+	where := a.effectiveWhere()
+	pred, err := FormatWhere(where)
+	if err != nil {
+		return Query{}, err
+	}
+	switch {
+	case strings.TrimSpace(pred) != "":
 		sb.WriteString(" WHERE ")
 		sb.WriteString(pred)
+	case where != nil:
+		// A present predicate that renders nothing would yield a trailing,
+		// syntactically invalid WHERE. Junction.validate refuses the term-less
+		// junction that used to reach this, so it is a backstop.
+		return Query{}, fmt.Errorf("%w: empty WHERE predicate", ErrInvalidQuery)
 	}
 
 	if len(a.orderBy) > 0 {
@@ -434,9 +435,17 @@ func (a *ast) validateTop(inline bool) error {
 // setter (or a new [Value] shape) refuses loudly instead of emitting AQL the
 // grammar rejects.
 func validateLimitValue(keyword string, v Value) error {
-	switch t := v.(type) {
-	case nil:
+	if v == nil {
 		return nil // clause absent
+	}
+	// Normalised like every other dispatch site (REQ-119): the setters only
+	// store value shapes today, but this switch must not become the one place
+	// a pointer twin is refused as "not an integer or a $parameter".
+	inner, ok := derefValue(v)
+	if !ok {
+		return fmt.Errorf("%w: in-text %s carries a nil %T", ErrInvalidQuery, keyword, v)
+	}
+	switch t := inner.(type) {
 	case IntValue:
 		if t.N < 0 {
 			return fmt.Errorf("%w: negative in-text %s (%d)", ErrInvalidQuery, keyword, t.N)

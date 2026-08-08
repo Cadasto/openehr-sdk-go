@@ -1312,8 +1312,15 @@ requirements:
       - openehr/aql/parse
     probes: [PROBE-090]
     tests:
+      # The two STRUCTURAL guards: a source-level tripwire failing any new
+      # un-normalised dispatch site on a sealed vocabulary, and the
+      # position x kind x carrier sweep (whatever a position accepts must
+      # round-trip to an equal value; both carriers get the same answer).
+      - openehr/aql/parse/dispatch_tripwire_test.go
+      - openehr/aql/parse/value_position_parity_test.go
       # PROBE-090 — emit -> parse -> equal value across every value kind, the
-      # twice-through fixed point, and the grammar confrontations.
+      # twice-through fixed point, both string delimiters, the fuzz target,
+      # and the grammar confrontations.
       - openehr/aql/parse/literal_roundtrip_test.go
       # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
       # containment refusals and the order they fire in, the URI guard vs the

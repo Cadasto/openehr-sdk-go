@@ -123,6 +123,14 @@ func TestInlinePagingRefusals(t *testing.T) {
 		"empty in-text limit param name":        base().LimitInlineParam(""),
 		"empty in-text offset param name":       base().LimitInline(10).OffsetInlineParam("  "),
 		"empty in-text offset param dollaronly": base().LimitInline(10).OffsetInlineParam("$"),
+		// Malformed non-empty names, refused by the PARAMETER-token guard.
+		// The three rows above pass under the pre-REQ-119 emptiness check
+		// too, so without these the guard's delegation to validateParamName
+		// was mutation-survivable on the Builder channel: reverting it left
+		// the suite green while `LIMIT $a b` reached the wire.
+		"spaced in-text limit param name":     base().LimitInlineParam("a b"),
+		"injecting in-text offset param name": base().LimitInline(10).OffsetInlineParam("n OFFSET 1"),
+		"hyphenated in-text limit param name": base().LimitInlineParam("row-count"),
 	}
 	for name, b := range tests {
 		t.Run(name, func(t *testing.T) {

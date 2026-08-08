@@ -95,18 +95,27 @@ func EqualValues(a, b Value) bool {
 // pointer"). [MatchesExpr.Terminology] is a `*FuncCall`, so its zero value is
 // exactly that pointer; normalising here keeps every caller — validation,
 // equality — total over the shapes the API can hand them.
-func derefValue(v Value) (Value, bool) {
-	if v == nil {
-		return nil, false
-	}
+func derefValue(v Value) (Value, bool) { return derefAs(v) }
+
+// derefAs is the one pointer-normalisation body behind [derefValue] and
+// [derefWhere] (and, spelled identically, the parse package's SelectExpr and
+// LimitExpr derefs): every sealed vocabulary in this subsystem has value
+// receivers, so each has the same pointer-twin problem and MUST get the same
+// answer. One body per package, thin wrappers per vocabulary — a fifth
+// hand-rolled copy is how the rule drifts.
+func derefAs[T any](v T) (T, bool) {
+	var zero T
 	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return zero, false // untyped nil interface
+	}
 	for rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
-			return nil, false
+			return zero, false
 		}
 		rv = rv.Elem()
 	}
-	inner, ok := rv.Interface().(Value)
+	inner, ok := rv.Interface().(T)
 	return inner, ok
 }
 
@@ -423,8 +432,17 @@ func validateValue(v Value) error {
 	// panic in token(). See [derefValue].
 	inner, ok := derefValue(v)
 	if !ok {
+		// An untyped nil is refused exactly like a typed-nil pointer: the two
+		// denote the same absence ([EqualValues] says so), and no value
+		// POSITION admits an absent operand — unlike a top-level [WhereExpr],
+		// a value slot has no legal empty spelling, so [FormatValue]'s ""
+		// would be embedded as invalid AQL. Passing one was the last
+		// nil/typed-nil asymmetry on the exported check-then-format recipe
+		// this doc blesses. Every in-package caller refuses a nil with its
+		// own position-named diagnostic before delegating here, so only the
+		// exported [ValidateValue] observes this arm.
 		if v == nil {
-			return nil // a nil Value is the callers' own business (see MatchesExpr.validate)
+			return fmt.Errorf("%w: nil value", ErrInvalidQuery)
 		}
 		return fmt.Errorf("%w: nil %T value", ErrInvalidQuery, v)
 	}
@@ -520,6 +538,16 @@ var reservedNonFuncWords = map[string]bool{
 // name check must therefore admit them; a value-position one must not.
 var aggregateFuncWords = map[string]bool{
 	"COUNT": true, "MIN": true, "MAX": true, "SUM": true, "AVG": true,
+}
+
+// IsAggregateFunc reports whether name (case-insensitively) is one of the
+// grammar's `aggregateFunctionCall` names — COUNT, MIN, MAX, SUM, AVG. These
+// are admissible in SELECT alone, and their argument SHAPE is fixed by that
+// rule rather than by the general `functionCall`; the parse-side emitter uses
+// this to hold a projected aggregate to its own rule (REQ-119) without
+// duplicating the name set.
+func IsAggregateFunc(name string) bool {
+	return aggregateFuncWords[strings.ToUpper(strings.TrimSpace(name))]
 }
 
 // asciiLetter and wordChar spell the grammar's ALPHA_CHAR and WORD_CHAR

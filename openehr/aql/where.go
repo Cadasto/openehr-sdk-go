@@ -3,7 +3,6 @@ package aql
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 )
 
@@ -13,8 +12,8 @@ import (
 // same concrete types ([Comparison] / [Junction]) — the read AST and the
 // write AST share one vocabulary (REQ-113). Concrete-type
 // fields are intended for read access; mutating an expression already
-// passed to [FormatWhere] / [Builder.Build] is undefined (the emitter
-// caches a `validate()` outcome the mutation would invalidate).
+// passed to [FormatWhere] / [Builder.Build] is undefined (both validate and
+// then emit as two steps, so a mutation between them emits unvalidated text).
 //
 // Use [FormatWhere] to render a [WhereExpr] to canonical AQL text (e.g.
 // when emitting a parsed [parse.Query] back to a string).
@@ -79,20 +78,7 @@ func FormatWhere(w WhereExpr) (string, error) {
 // parentheses — valid AQL asking something else.
 func DerefWhere(w WhereExpr) (WhereExpr, bool) { return derefWhere(w) }
 
-func derefWhere(w WhereExpr) (WhereExpr, bool) {
-	if w == nil {
-		return nil, false
-	}
-	rv := reflect.ValueOf(w)
-	for rv.Kind() == reflect.Pointer {
-		if rv.IsNil() {
-			return nil, false
-		}
-		rv = rv.Elem()
-	}
-	inner, ok := rv.Interface().(WhereExpr)
-	return inner, ok
-}
+func derefWhere(w WhereExpr) (WhereExpr, bool) { return derefAs(w) }
 
 // FormatValue renders an [aql.Value] to canonical AQL text (the same
 // emission the Builder uses internally). Mirrors [FormatWhere] for the value
@@ -190,7 +176,11 @@ type Comparison struct {
 }
 
 func (c Comparison) expr() string {
-	return c.leftToken() + " " + string(c.Op) + " " + c.Val.token()
+	// Both operands render through the total [FormatValue], not token()
+	// directly, so expr cannot panic regardless of how it is reached — the
+	// same treatment leftToken already had. validate refuses a nil/typed-nil
+	// Val on every supported path, so the "" case is unreachable there.
+	return c.leftToken() + " " + string(c.Op) + " " + FormatValue(c.Val)
 }
 
 // leftToken renders the left operand: the structured [Comparison.Left]
@@ -494,19 +484,20 @@ func (m MatchesExpr) expr() string {
 	switch {
 	case m.Terminology != nil:
 		// Bare terminology operand — the grammar's `matchesOperand :
-		// terminologyFunction` alternative takes no braces.
-		return m.Path + " MATCHES " + m.Terminology.token()
+		// terminologyFunction` alternative takes no braces. FormatValue, not
+		// token(): every leaf emitter renders operands through the total
+		// formatter so no reachable or future path can panic here.
+		return m.Path + " MATCHES " + FormatValue(m.Terminology)
 	case uri != "":
 		// Emitted trimmed, consistent with the [MatchesURI] constructor.
 		return m.Path + " MATCHES {" + uri + "}"
 	}
 	parts := make([]string, len(m.Values))
 	for i, v := range m.Values {
-		if v == nil {
-			parts[i] = ""
-			continue
-		}
-		parts[i] = v.token()
+		// A member denoting nothing renders as an empty part — loudly broken
+		// text, never a silently shorter list; validate refuses it first on
+		// every supported path.
+		parts[i] = FormatValue(v)
 	}
 	return m.Path + " MATCHES {" + strings.Join(parts, ", ") + "}"
 }
@@ -576,6 +567,16 @@ func isTerminologyCall(f FuncCall) bool {
 // parser. It is the same argument the TERMINOLOGY arity guard makes, one rule
 // down: where the grammar narrows a position, the shared validator's breadth
 // must not become the operand's (REQ-119).
+//
+// A [BoolValue] is refused even though `primitive` NAMES the BOOLEAN token:
+// BOOLEAN is lexically dead — IDENTIFIER is declared first
+// (AqlLexer.g4:168 vs :232) and wins the equal-length tie, so `true` always
+// lexes as an identifier. A comparison position survives that because
+// `terminal` admits `identifiedPath` and the extractor maps the keyword back
+// to a [BoolValue]; the braced list has no path alternative, so `{true}` has
+// NO reading and `MATCHES {true}` is a syntax error. The same
+// declaration-order shadowing drives [reservedNonFuncWords] and the TERM_CODE
+// refusal in [validateURIOperand]; this is its third position.
 func validateValueListItem(v Value, path string, i int) error {
 	inner, ok := derefValue(v)
 	if !ok {
@@ -585,8 +586,12 @@ func validateValueListItem(v Value, path string, i int) error {
 		return err
 	}
 	switch inner.(type) {
-	case StringValue, IntValue, RealValue, BoolValue, NullValue, ParamValue:
+	case StringValue, IntValue, RealValue, NullValue, ParamValue:
 		return nil
+	case BoolValue:
+		return fmt.Errorf("%w: MATCHES on %q carries a boolean at index %d; the BOOLEAN token is shadowed by "+
+			"IDENTIFIER in the SDK grammar profile, so a braced boolean member never lexes — compare with `= true` instead",
+			ErrInvalidQuery, path, i)
 	}
 	if fc, isCall := inner.(FuncCall); isCall && isTerminologyCall(fc) {
 		return nil
@@ -712,28 +717,17 @@ func validateURIOperand(uri, path string) error {
 //
 // `TERM_CODE_CHAR : NAME_CHAR | '.'` admits no `:` and no `/`, which is why
 // `a::/b` and `a:::b` stay URIs while `SNOMED-CT::73211009` does not.
+// The rule deliberately handles only TERM_CODE's BARE form. The grammar's two
+// optional groups — the parenthesised qualifier (`SNOMED-CT(2026)::…`) and the
+// trailing `|display|` name — cannot reach this function: a `(` before the
+// first `:` fails [schemeChar] and a `|` is in no URI component alphabet, so
+// both spellings are refused as unspellable URIs before the shadow check runs
+// (the parity corpus in emit_parity_test.go pins that ordering). Handling them
+// here would be dead code, which is worse than absent code — it reads as a
+// reachable branch and invites re-review.
 func termCodeShadows(s string) bool {
-	if display, ok := strings.CutSuffix(s, "|"); ok {
-		// The optional trailing `'|' ~[|[\]]+ '|'` display name.
-		head, inner, found := strings.Cut(display, "|")
-		if !found || inner == "" || strings.ContainsAny(inner, "|[]") {
-			return false
-		}
-		s = head
-	}
 	head, code, ok := strings.Cut(s, "::")
-	if !ok {
-		return false
-	}
-	if open := strings.IndexByte(head, '('); open >= 0 {
-		// The optional parenthesised `( '(' TERM_CODE_CHAR+ ')' )` qualifier.
-		closed, ok := strings.CutSuffix(head[open+1:], ")")
-		if !ok || !allTermCodeChars(closed) {
-			return false
-		}
-		head = head[:open]
-	}
-	return allTermCodeChars(head) && allTermCodeChars(code)
+	return ok && allTermCodeChars(head) && allTermCodeChars(code)
 }
 
 func allTermCodeChars(s string) bool {
@@ -887,8 +881,13 @@ func Matches(path string, values ...Value) WhereExpr {
 // TERMINOLOGY(operation, api, params)` predicate — the bare
 // terminology-function operand form (REQ-117).
 func MatchesTerminology(path, operation, api, params string) WhereExpr {
-	fc := Terminology(operation, api, params).(FuncCall)
-	return MatchesExpr{Path: path, Terminology: &fc}
+	// Constructed directly rather than asserting Terminology()'s result back
+	// to its concrete shape — the one raw type assertion left in this package
+	// would otherwise need an allowlist entry in the dispatch-site tripwire.
+	return MatchesExpr{Path: path, Terminology: &FuncCall{
+		Name: TerminologyFunc,
+		Args: []Value{StringValue{S: operation}, StringValue{S: api}, StringValue{S: params}},
+	}}
 }
 
 // MatchesURI constructs the `<path> MATCHES {uri}` predicate — the URI
@@ -908,10 +907,9 @@ type LikeExpr struct {
 }
 
 func (l LikeExpr) expr() string {
-	if l.Pattern == nil {
-		return l.Path + " LIKE "
-	}
-	return l.Path + " LIKE " + l.Pattern.token()
+	// FormatValue is total over nil and typed-nil patterns, rendering "" —
+	// loudly broken text; validate refuses both first on every supported path.
+	return l.Path + " LIKE " + FormatValue(l.Pattern)
 }
 
 func (l LikeExpr) validate() error {

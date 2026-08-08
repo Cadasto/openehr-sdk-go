@@ -13,6 +13,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 ### Added
 
 - **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value now round-trips. **Changes emitted AQL** for a literal carrying `'` or `\` and for a whole-valued real (`2` → `2.0`), so pinned goldens need regenerating.
+- **AQL write paths refuse what they used to emit broken (REQ-119).** *Breaking:* `Build`/`FormatWhere`/`Emit` now return `ErrInvalidQuery` for malformed parameter names, reserved function names, wrong `TERMINOLOGY` arity, unspellable `MATCHES {uri}` operands, and ungrammatical aggregate shapes.
 
 ## [0.19.0] - 2026-08-06
 

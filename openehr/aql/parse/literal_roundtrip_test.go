@@ -89,6 +89,11 @@ func TestStringLiteralEmitsGrammarEscapes(t *testing.T) {
 		{"O'Brien", `'O\'Brien'`},
 		{`C:\temp`, `'C:\\temp'`},
 		{"plain", `'plain'`},
+		// `?` and `*` have IDENTITY escapes (`\?`, `\*`) the token admits, so
+		// escaping them would still round-trip — this exact-wire row is what
+		// pins that they ride RAW, per the canonical form.
+		{"a?b*c", `'a?b*c'`},
+		{`say "hi"`, `'say "hi"'`},
 		// All SEVEN C0 controls with an ESCAPE_SEQ spelling, not just \n. Each
 		// round-trips fine when emitted raw, so the round-trip tests assert a
 		// strictly weaker property than the guard enforces — dropping any one
@@ -448,13 +453,10 @@ func TestNonFiniteRealRefused(t *testing.T) {
 			if err == nil {
 				t.Fatal("emitted a non-finite real, want ErrInvalidQuery")
 			}
-			// REQ-119 requires the refusal to WRAP ErrInvalidQuery, which a
-			// message substring cannot establish.
+			// The sentinel is the contract; the message wording is not — a
+			// prose pin here broke on every reword without adding assurance.
 			if !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Errorf("err = %v, want ErrInvalidQuery", err)
-			}
-			if !strings.Contains(err.Error(), "no AQL spelling") {
-				t.Errorf("err = %v, want the no-AQL-spelling refusal", err)
 			}
 		})
 	}
@@ -586,4 +588,95 @@ func TestReservedFuncNamesTrackTheGrammar(t *testing.T) {
 		t.Fatalf("only %d candidate names checked — the filter is too aggressive", checked)
 	}
 	t.Logf("checked %d grammar token names against the reserved list", checked)
+}
+
+// TestDoubleQuotedStringDecodes — the STRING token admits BOTH delimiters
+// (`"..."` alongside `'...'`), and unquoteAQLString has always handled both —
+// but no test asserted the VALUE. The one corpus row carrying a double-quoted
+// literal asserts emit-idempotence, which stays green even if the `"` branch
+// corrupts the value: quotes embedded in the string reach a fixed point too.
+// Deleting that branch passed the whole suite while every double-quoted
+// literal came back with its delimiters inside the value.
+func TestDoubleQuotedStringDecodes(t *testing.T) {
+	for name, tc := range map[string]struct{ lit, want string }{
+		"plain":            {`"dq"`, "dq"},
+		"apostrophe":       {`"O'Brien"`, "O'Brien"},
+		"escaped dquote":   {`"say \"hi\""`, `say "hi"`},
+		"escapes":          {`"a\nb"`, "a\nb"},
+		"empty":            {`""`, ""},
+		"single unchanged": {`'sq'`, "sq"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseWhereString(tc.lit)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("decoded %q, want %q", got, tc.want)
+			}
+			// The canonical re-emission is single-quoted either way.
+			wire := aql.FormatValue(aql.String(got))
+			second, err := parseWhereString(wire)
+			if err != nil || second != tc.want {
+				t.Errorf("re-emission %s decoded %q err=%v, want %q", wire, second, err, tc.want)
+			}
+		})
+	}
+}
+
+// TestDoubleQuotedTemporalLiteralRoundTrips — the DATE / TIME / DATETIME
+// tokens admit both delimiters too, and stripSurroundingQuotes peeled single
+// quotes only: `= "2026-01-01T00:00:00"` re-emitted as
+// `'"2026-01-01T00:00:00"'` — the quotes EMBEDDED in the comparison value, a
+// predicate that matches nothing, err == nil (REQ-119's silent class, found
+// by review after the string sibling was fixed).
+func TestDoubleQuotedTemporalLiteralRoundTrips(t *testing.T) {
+	for name, tc := range map[string]struct{ lit, want string }{
+		"datetime": {`"2026-01-01T00:00:00"`, "2026-01-01T00:00:00"},
+		"date":     {`"2026-01-01"`, "2026-01-01"},
+		"time":     {`"00:00:00"`, "00:00:00"},
+		"single":   {`'2026-01-01T00:00:00'`, "2026-01-01T00:00:00"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseWhereString(tc.lit)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("decoded %q, want %q — delimiters must never enter the value", got, tc.want)
+			}
+			wire := aql.FormatValue(aql.String(got))
+			if strings.ContainsAny(wire, `"`) {
+				t.Errorf("re-emission %s still carries a double quote", wire)
+			}
+			if second, err := parseWhereString(wire); err != nil || second != tc.want {
+				t.Errorf("re-emission %s decoded %q err=%v, want %q", wire, second, err, tc.want)
+			}
+		})
+	}
+}
+
+// FuzzStringLiteralRoundTrip is the committed form of the adversarial sweep
+// the review rounds ran by hand: for ANY byte string, the emitted literal
+// must re-parse to exactly the input. The seeds cover the classes that were
+// wrong at least once — quotes, backslashes, C0 controls, invalid UTF-8,
+// truncated multi-byte runes, escape-lookalike text.
+func FuzzStringLiteralRoundTrip(f *testing.F) {
+	for _, seed := range []string{
+		"", "plain", "O'Brien", `C:\temp`, `say "hi"`, "a\nb\tc",
+		"\x00\x1f\x7f", "\x80\x80", "\xF0\x9F", "tail\\", `\'\\`,
+		"a\\u0041b", "\xF0\x9F\x98\x80", "Grüße — 日本語", "\ufffd",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, s string) {
+		wire := aql.FormatValue(aql.String(s))
+		got, err := parseWhereString(wire)
+		if err != nil {
+			t.Fatalf("String(%q) emitted %s, which does not parse: %v", s, wire, err)
+		}
+		if got != s {
+			t.Fatalf("round trip changed the value\n  in:  %q (% x)\n  wire: %s\n  out: %q (% x)", s, s, wire, got, got)
+		}
+	})
 }

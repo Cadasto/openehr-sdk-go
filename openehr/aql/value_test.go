@@ -209,6 +209,14 @@ func TestSelectFuncNameAdmitsAggregates(t *testing.T) {
 // so one `&` bypassed every value guard, and a typed-nil pointer PANICKED inside
 // FormatWhere and EqualValues rather than being refused.
 func TestPointerShapedValuesAreValidated(t *testing.T) {
+	// The exported recipe is check-then-format: [aql.ValidateValue]'s pass
+	// must therefore never green-light a value [aql.FormatValue] renders as
+	// "", or the recipe embeds nothing into hand-assembled AQL silently. An
+	// untyped nil used to pass while the typed-nil twin was refused — the
+	// same value ([aql.EqualValues] says so) getting two answers by carrier.
+	if err := aql.ValidateValue(nil); !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("ValidateValue(nil) = %v, want ErrInvalidQuery — FormatValue(nil) renders %q", err, aql.FormatValue(nil))
+	}
 	for name, v := range map[string]aql.Value{
 		"&FuncCall reserved name": &aql.FuncCall{Name: "COUNT", Args: []aql.Value{aql.Path("o/y")}},
 		"&RealValue +Inf":         &aql.RealValue{F: math.Inf(1)},
@@ -436,6 +444,14 @@ func TestNarrowOperandSlotsRefuseAWiderValue(t *testing.T) {
 		for name, v := range map[string]aql.Value{
 			"path":          aql.Path("c/y"),
 			"function call": aql.Func("LENGTH", aql.Path("c/y")),
+			// `primitive` NAMES the BOOLEAN token, but BOOLEAN is shadowed by
+			// IDENTIFIER (declared first), so `{true}` never lexes: the
+			// emitted MATCHES was a syntax error to this SDK's own parser.
+			// This row previously sat in the accepted map — a hand-written
+			// list pinning the wrong behaviour in the one package that cannot
+			// confront the grammar; the position sweep in
+			// parse/emit_parity_test.go now decides admissibility per position.
+			"boolean": aql.Bool(false),
 		} {
 			t.Run("refused/"+name, func(t *testing.T) {
 				if _, err := aql.FormatWhere(aql.Matches("c/x", v)); !errors.Is(err, aql.ErrInvalidQuery) {
@@ -454,7 +470,6 @@ func TestNarrowOperandSlotsRefuseAWiderValue(t *testing.T) {
 			"string":      aql.String("a"),
 			"integer":     aql.Int(5),
 			"real":        aql.Real(2.5),
-			"boolean":     aql.Bool(false),
 			"null":        aql.Null(),
 			"parameter":   aql.Param("p"),
 			"terminology": terminology,
