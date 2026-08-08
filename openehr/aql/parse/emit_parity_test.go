@@ -1236,6 +1236,34 @@ func TestEmitSelectBindsThePointerTwin(t *testing.T) {
 			value:   parse.FunctionCall{Name: "COUNT", Star: true},
 			pointer: &parse.FunctionCall{Name: "COUNT", Star: true},
 		},
+		// The cases above twin the TOP-LEVEL carrier, which emitSelectExpr
+		// normalises once at its head — they cannot see a nested position
+		// that skips its own deref. The two rows below pin the argument
+		// positions, and TERMINOLOGY is the one this test must hold alone:
+		// validateSelectTerminology derefs twice (the SelectExpr wrapper and
+		// the Value inside it), so dropping either call leaves another
+		// `deref*` in the function and the function-granular source tripwire
+		// stays quiet. Only this byte-identity check fails then.
+		"TERMINOLOGY pointer-carrier args": {
+			value: parse.FunctionCall{Name: "TERMINOLOGY", Args: selectLits("expand", "//fhir", "url=x")},
+			pointer: parse.FunctionCall{Name: "TERMINOLOGY", Args: []parse.SelectExpr{
+				&parse.LiteralExpr{Value: aql.String("expand")},
+				&parse.LiteralExpr{Value: aql.String("//fhir")},
+				&parse.LiteralExpr{Value: aql.String("url=x")},
+			}},
+		},
+		"aggregate pointer-carrier arg": {
+			value: parse.FunctionCall{Name: "AVG", Args: []parse.SelectExpr{
+				parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+					IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"},
+				}},
+			}},
+			pointer: parse.FunctionCall{Name: "AVG", Args: []parse.SelectExpr{
+				&parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+					IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"},
+				}},
+			}},
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			viaValue, err := mk(tc.value).Emit()
