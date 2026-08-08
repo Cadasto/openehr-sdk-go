@@ -1130,9 +1130,13 @@ func checkClassOperands(c ClassExpr) error {
 	// parser rejects it, while `VERSION v[LATEST_VERSION]` — which the
 	// extractor itself produces — would be refused. The second is this REQ's
 	// own tightening failure, so the split is not an optimisation.
-	if c.Predicate != "" && c.Version {
-		if err := aql.ValidateVersionPredicate(c.Predicate); err != nil {
-			return fmt.Errorf("VERSION class predicate: %w", err)
+	if c.Predicate != "" {
+		if c.Version {
+			if err := aql.ValidateVersionPredicate(c.Predicate); err != nil {
+				return fmt.Errorf("VERSION class predicate: %w", err)
+			}
+		} else if err := aql.ValidatePathPredicate(c.Predicate); err != nil {
+			return fmt.Errorf("class %q predicate: %w", c.RMType, err)
 		}
 	}
 	// PredicateComparison is the STRUCTURED reading of the same bracket

@@ -104,6 +104,99 @@ func TestEmitVersionPredicateHoldsItsOwnSubGrammar(t *testing.T) {
 	})
 }
 
+// TestEmitClassPredicateRefusesBracketEscape is issue #99's own case: the class
+// bracket is spliced verbatim, so text that terminates it early re-parses as a
+// DIFFERENT query with no error.
+//
+// The condition is exact rather than approximate. Emission writes
+// `"[" + Predicate + "]"`, so the only way the text changes the query's
+// STRUCTURE is by escaping that bracket; anything that stays inside can at
+// worst be a malformed predicate, which the parser rejects loudly and which
+// REQ-119 deliberately does not make a refusal.
+func TestEmitClassPredicateRefusesBracketEscape(t *testing.T) {
+	const base = "SELECT c/x FROM COMPOSITION c"
+
+	t.Run("refuses text that escapes the bracket", func(t *testing.T) {
+		for _, tc := range []struct {
+			name string
+			text string
+		}{
+			{"issue_99_containment_splice", "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"},
+			{"bare_close", "a/b='c']"},
+			{"close_then_where", "at0001] WHERE c/secret = 1"},
+			// An unclosed `[` is a substitution too, not merely a loud error:
+			// the emitter's own `]` closes the INNER bracket, leaving the
+			// outer one to close on whatever `]` appears later in the query.
+			{"unclosed_open", "a[at0001"},
+			// An unterminated literal swallows the emitter's `]` as content
+			// and runs on into the following clause.
+			{"unterminated_string", "a/b='c"},
+			{"unterminated_dq_string", `a/b="c`},
+			{"unterminated_regex", "a/b MATCHES {/re"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				out, err := emitWithPredicate(t, base, tc.text)
+				if err == nil {
+					t.Fatalf("Emit with predicate %q = %q, want an error: the text escapes its bracket", tc.text, out)
+				}
+				if !errors.Is(err, aql.ErrInvalidQuery) {
+					t.Errorf("error %v does not wrap ErrInvalidQuery", err)
+				}
+			})
+		}
+	})
+
+	t.Run("accepts every bracket the grammar makes content", func(t *testing.T) {
+		// The POSITIVE CONTROL: each of these carries a bracket or quote that
+		// a naive scan miscounts, and each is legal AQL. A tightened guard
+		// fails here rather than in some consumer's query.
+		for _, tc := range []struct {
+			name string
+			text string
+		}{
+			{"nested_path_predicate", "a[at0001]/b='c'"},
+			{"nested_twice", "a[at0001]/b[at0002]/c='d'"},
+			{"bracket_in_regex_class", "a/b MATCHES {/[0-9]+/}"},
+			{"brace_in_regex_quantifier", "a/b MATCHES {/a{2}/}"},
+			{"regex_with_flags", "a/b MATCHES {/re/; 'i'}"},
+			{"bracket_inside_string", "a/b=']'"},
+			{"escaped_quote_then_bracket", `a/b='it\'s]'`},
+			{"node_and", "a/b='c' AND d/e='f'"},
+			{"at_code_with_name", "at0001,'name'"},
+			{"param", "$p"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				out, err := emitWithPredicate(t, base, tc.text)
+				if err != nil {
+					t.Fatalf("Emit with predicate %q = %v; want it accepted", tc.text, err)
+				}
+				if _, err := parse.ParseQuery(out); err != nil {
+					t.Errorf("emitted %q does not re-parse: %v", out, err)
+				}
+			})
+		}
+	})
+}
+
+// TestEmitClassPredicateGuardRefusesNothingTheParserAccepts is the tightening
+// control stated as a PROPERTY rather than a list: every predicate the parser
+// reads back must survive emission. This is the claim that separates the
+// bracket-escape scan from the conservative sub-grammar approximation REQ-119
+// warns against, so it is asserted over the whole round-trip corpus.
+func TestEmitClassPredicateGuardRefusesNothingTheParserAccepts(t *testing.T) {
+	for _, tc := range predicateCorpus {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q) = %v", tc.in, err)
+			}
+			if _, err := q.Emit(); err != nil {
+				t.Errorf("the guard refused %q, which ParseQuery accepts: %v", tc.in, err)
+			}
+		})
+	}
+}
+
 // TestEmitVersionPredicateRefusalNamesThePosition keeps the diagnostic useful:
 // a caller who wrote a node predicate needs to be told the VERSION bracket is a
 // different position, not merely that something was invalid.
