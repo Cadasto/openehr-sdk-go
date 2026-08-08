@@ -1079,6 +1079,15 @@ func TestEmitValidatesPagingAndOrderPositions(t *testing.T) {
 				q.Limit, q.Offset = parse.IntLimit{N: 5}, parse.IntLimit{N: -1}
 			},
 			"empty ORDER BY path": func(q *parse.Query) { q.OrderBy = []parse.OrderTerm{{}} },
+			// OrderDir.String() spells any other value as ASC — the silently
+			// re-directed sort Build refuses since Direction.known(); the read
+			// side must refuse its own carrier of the same vocabulary.
+			"out-of-vocabulary ORDER BY direction": func(q *parse.Query) {
+				q.OrderBy = []parse.OrderTerm{{
+					Path: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/y"}},
+					Dir:  parse.OrderDir(7),
+				}}
+			},
 		} {
 			t.Run(name, func(t *testing.T) {
 				q := base(t)

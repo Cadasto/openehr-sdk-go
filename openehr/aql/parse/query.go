@@ -486,6 +486,15 @@ func (q *Query) Emit() (string, error) {
 			if strings.TrimSpace(t.Path.Raw) == "" {
 				return "", fmt.Errorf("%w: ORDER BY term %d has an empty path", aql.ErrInvalidQuery, i)
 			}
+			// String() spells any out-of-vocabulary direction as ASC — a
+			// silently re-directed sort. Refuse instead, mirroring the SELECT
+			// TOP guard above and [aql.Builder]'s build-time twin.
+			switch t.Dir {
+			case OrderAsc, OrderDesc:
+			default:
+				return "", fmt.Errorf("%w: ORDER BY term %d direction %d is outside the ASC/DESC vocabulary; "+
+					"emitting would silently re-direct it to ASC", aql.ErrInvalidQuery, i, int(t.Dir))
+			}
 			if i > 0 {
 				sb.WriteString(", ")
 			}
