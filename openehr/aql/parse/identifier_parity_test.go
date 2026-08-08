@@ -294,6 +294,24 @@ func TestEmitRefusesIdentifierSplice(t *testing.T) {
 			RMType: "COMPOSITION", Alias: "c",
 			Archetype: "arch", ParamArchetype: true,
 		}),
+		// The `PARAMETER` alternative's own spelling. Without these three the
+		// [aql.ValidateValue] call past the `$` prefix check is UNPINNED —
+		// deleting it left the whole aql suite green, so the guard was
+		// documented rather than tested. The splice row is the one that
+		// matters: `$p AND c/secret = 1` is the shape REQ-055 rule 4 routes
+		// caller data through.
+		"archetype param malformed name": mk(pathItem, parse.ClassExpr{
+			RMType: "COMPOSITION", Alias: "c",
+			Archetype: "$1bad", ParamArchetype: true,
+		}),
+		"archetype param splice": mk(pathItem, parse.ClassExpr{
+			RMType: "COMPOSITION", Alias: "c",
+			Archetype: "$p AND c/secret = 1", ParamArchetype: true,
+		}),
+		"archetype param bare $": mk(pathItem, parse.ClassExpr{
+			RMType: "COMPOSITION", Alias: "c",
+			Archetype: "$", ParamArchetype: true,
+		}),
 	} {
 		t.Run("refused/"+name, func(t *testing.T) {
 			out, err := q.Emit()
@@ -376,6 +394,16 @@ func TestBuilderRefusesIdentifierSplice(t *testing.T) {
 				Contains(aql.Archetype("OBSERVATION", "o",
 					"openEHR-EHR-OBSERVATION.x.v1] CONTAINS CLUSTER[openEHR-EHR-CLUSTER.y.v1")).Build()
 		},
+		// As on the Emit side: without these the builder's own validateParamName
+		// call is unpinned — deleting it left the whole aql suite green.
+		"Contains archetype param malformed": func() (aql.Query, error) {
+			return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+				Contains(aql.Archetype("OBSERVATION", "o", "$1bad")).Build()
+		},
+		"Contains archetype param splice": func() (aql.Query, error) {
+			return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+				Contains(aql.Archetype("OBSERVATION", "o", "$p AND c/secret = 1")).Build()
+		},
 	} {
 		t.Run("refused/"+name, func(t *testing.T) {
 			q, err := build()
@@ -403,6 +431,12 @@ func TestBuilderRefusesIdentifierSplice(t *testing.T) {
 					Contains(aql.Archetype("OBSERVATION", "o",
 						"openEHR-EHR-OBSERVATION.blood_pressure.v1")).Build()
 			},
+			// The `$param` alternative must stay buildable — the anti-tightening
+			// half of the three refusals above.
+			"contains $param archetype": func() (aql.Query, error) {
+				return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+					Contains(aql.Archetype("OBSERVATION", "o", "$arch")).Build()
+			},
 			"from EHR": func() (aql.Query, error) {
 				return aql.NewBuilder().Select(aql.Col("e/x")).FromEHR("e", aql.Param("id")).Build()
 			},
@@ -418,4 +452,259 @@ func TestBuilderRefusesIdentifierSplice(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestEmitRefusesFieldsItWouldSilentlyDrop — the OTHER direction of REQ-119's
+// substitution class, and the one the identifier guards made reachable.
+//
+// The guards above refuse text that emits as MORE query than the AST holds.
+// These refuse an AST that emits as LESS: a field [emitClassExpr] never reads
+// is worse than an unguarded one, because `checkClassOperands` VALIDATES
+// `Archetype` before the VERSION branch discards it — so a malformed id is
+// reported while a well-formed one vanishes. The guard's own success is what
+// hid the loss:
+//
+//	{Version: true, Alias: "v", Archetype: "…encounter.v1"}
+//	-> FROM VERSION v      err == nil, a row filter gone
+//
+// Every row here emitted cleanly at 97732e5.
+func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
+	pathItem := parse.SelectItem{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+		IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"},
+	}}}
+	mk := func(from parse.FromClause) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{pathItem}},
+			From:   from,
+		}
+	}
+	junction := func() *parse.Containment {
+		return &parse.Containment{ChildJoin: parse.ContainsOr, Children: []parse.Containment{
+			{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "a"}},
+			{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "b"}},
+		}}
+	}
+
+	for name, q := range map[string]*parse.Query{
+		// `VERSION variable=IDENTIFIER? ('[' versionPredicate ']')?` has no
+		// RM-type identifier and no archetype slot, so both fields are dropped.
+		"VERSION carries an RM type": mk(parse.FromClause{Root: parse.ClassExpr{
+			Version: true, RMType: "COMPOSITION", Alias: "v",
+		}}),
+		"VERSION carries an archetype": mk(parse.FromClause{Root: parse.ClassExpr{
+			Version: true, RMType: "VERSION", Alias: "v",
+			Archetype: "openEHR-EHR-COMPOSITION.encounter.v1",
+		}}),
+		"VERSION carries a $param archetype": mk(parse.FromClause{Root: parse.ClassExpr{
+			Version: true, RMType: "VERSION", Alias: "v",
+			Archetype: "$arch", ParamArchetype: true,
+		}}),
+		"VERSION flags $param with no carrier": mk(parse.FromClause{Root: parse.ClassExpr{
+			Version: true, RMType: "VERSION", Alias: "v", ParamArchetype: true,
+		}}),
+		// The flag declares the bracket to BE `archetypePredicate`'s PARAMETER
+		// alternative; with no parameter to render, no bracket is written at all.
+		"class flags $param with no carrier": mk(parse.FromClause{Root: parse.ClassExpr{
+			RMType: "COMPOSITION", Alias: "c", ParamArchetype: true,
+		}}),
+		// Beside a junction the root is never passed to emitClassExpr, so its
+		// fields are dropped rather than refused — including splice text the
+		// identifier guards would otherwise catch.
+		"root junction beside a root alias": mk(parse.FromClause{
+			Root: parse.ClassExpr{Alias: "ghost"}, Junction: junction(),
+		}),
+		"root junction beside a root archetype": mk(parse.FromClause{
+			Root:     parse.ClassExpr{Archetype: "openEHR-EHR-COMPOSITION.encounter.v1"},
+			Junction: junction(),
+		}),
+		"root junction beside a root archetype splice": mk(parse.FromClause{
+			Root:     parse.ClassExpr{Archetype: "x.v1] CONTAINS OBSERVATION[y.v1"},
+			Junction: junction(),
+		}),
+		"root junction beside a root predicate": mk(parse.FromClause{
+			Root: parse.ClassExpr{Predicate: "ehr_id/value=$x"}, Junction: junction(),
+		}),
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := q.Emit()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+			}
+			if out != "" {
+				t.Errorf("a refused query still emitted %q", out)
+			}
+		})
+	}
+
+	// Positive controls. `FROM VERSION v` round-trips with RMType "VERSION" AND
+	// the flag set — the extractor pairs them, so that one spelling must stay
+	// accepted or every VERSION query the parser produces becomes unemittable.
+	// The junction rows are the anti-tightening half of the whole-value root
+	// check: the parser leaves Root wholly zero there, and if it ever stops
+	// doing so these fail rather than the refusals above silently widening.
+	t.Run("accepted", func(t *testing.T) {
+		for _, q := range []string{
+			"SELECT c/x FROM VERSION v",
+			"SELECT c/x FROM VERSION",
+			"SELECT c/x FROM VERSION v[LATEST_VERSION]",
+			"SELECT c/x FROM VERSION v[ALL_VERSIONS]",
+			"SELECT c/x FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c",
+			"SELECT c/x FROM COMPOSITION c1 OR COMPOSITION c2",
+			"SELECT c/x FROM COMPOSITION c1 AND OBSERVATION o1",
+			"SELECT c/x FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]",
+			"SELECT c/x FROM COMPOSITION c[$arch]",
+			"SELECT c/x FROM EHR e[ehr_id/value=$id] CONTAINS COMPOSITION c",
+		} {
+			t.Run(q, func(t *testing.T) {
+				doc, err := parse.ParseQuery(q)
+				if err != nil {
+					t.Fatalf("ParseQuery: %v", err)
+				}
+				out, err := doc.Emit()
+				if err != nil {
+					t.Fatalf("Emit refused AQL that ParseQuery accepted: %v", err)
+				}
+				if out != q {
+					t.Errorf("Emit = %q, want the canonical input %q", out, q)
+				}
+			})
+		}
+	})
+}
+
+// TestArchetypeIDGuardAgreesOverGeneratedHRIDs is the mechanical half of
+// [TestArchetypeIDGuardTracksTheGrammar].
+//
+// That test walks a hand-written corpus, which is exactly the "list a
+// maintainer must remember to update" this file exists to avoid — fine for the
+// named traps, useless for the branches nobody thought of. This one GENERATES
+// the cross product of the four `ARCHETYPE_HRID` fragments, legal and illegal
+// spellings of each, and asserts guard-parser agreement over all of it. The
+// percent-encoded namespace (`LABEL : ALPHA_CHAR (NAME_CHAR | URI_PCT_ENCODED)*`)
+// is the branch the hand corpus missed entirely.
+func TestArchetypeIDGuardAgreesOverGeneratedHRIDs(t *testing.T) {
+	namespaces := []string{
+		"", "org::", "org.example::", "org.example.sub::",
+		"org%2Eexample::", "org%2e::", "a-b::", "a_b::",
+		// Illegal: a digit-led label, an empty label, a truncated escape,
+		// a non-hex escape, an empty namespace.
+		"1bad::", "org..x::", "org%2::", "org%zz::", "::",
+	}
+	roots := []string{
+		"openEHR-EHR-OBSERVATION", "a-b-c", "a_1-b2-c3",
+		// Illegal: two segments, four segments, a digit-led segment.
+		"openEHR-EHR", "a-b-c-d", "1a-b-c",
+	}
+	concepts := []string{
+		"x", "blood_pressure", "x-y", "x_1",
+		// Illegal as ARCHETYPE_CONCEPT_ID (ALPHA_CHAR NAME_CHAR*): digit-led,
+		// empty, and one carrying the '.' that only the version may introduce.
+		"1x", "", "x.y",
+	}
+	versions := []string{
+		"v1", "v0", "v1.0.2", "v1-rc", "v1-rc.2", "v1-alpha", "v1-alpha.3",
+		// Illegal: no digits, doubled 'v', missing 'v', dangling separators,
+		// a non-numeric revision.
+		"v", "vv1", "1", "v1.", "v1-rc.", "v1-beta", "v1-rc.x",
+	}
+
+	var checked, mismatched int
+	for _, ns := range namespaces {
+		for _, root := range roots {
+			for _, concept := range concepts {
+				for _, version := range versions {
+					id := ns + root + "." + concept + "." + version
+					checked++
+
+					guardErr := aql.ValidateArchetypeID(id)
+					survives := false
+					if doc, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c[" + id + "]"); err == nil {
+						survives = doc.From.Root.Archetype == id && doc.From.Contains == nil
+					}
+					if (guardErr == nil) == survives {
+						continue
+					}
+					mismatched++
+					if mismatched > 10 {
+						continue // report a sample, not a wall
+					}
+					if guardErr == nil {
+						t.Errorf("aql.ValidateArchetypeID accepts %q, but it does not come back "+
+							"as one archetype predicate on that id — the guard is too permissive", id)
+					} else {
+						t.Errorf("aql.ValidateArchetypeID refuses %q (%v), but it round-trips "+
+							"intact — the guard is too strict", id, guardErr)
+					}
+				}
+			}
+		}
+	}
+	if mismatched > 10 {
+		t.Errorf("%d further mismatches suppressed", mismatched-10)
+	}
+	// A generator that stops producing cases would pass silently otherwise.
+	if checked < 3000 {
+		t.Errorf("swept only %d HRIDs; the generator has lost its cross product", checked)
+	}
+	t.Logf("guard and parser agree on %d generated HRIDs", checked)
+}
+
+// TestBuildEmitParityModuloTrim pins the exact sense in which the two write
+// paths "refuse the same strings" (REQ-119).
+//
+// [aql.Builder] NORMALISES leading and trailing whitespace on intake before
+// applying the guard — pre-existing, documented behaviour whose own reason is
+// REQ-119, since `From("   ", "c")` once emitted `FROM     c`, re-parsing with
+// the alias as the RM type. So the two paths do NOT refuse the same strings;
+// they refuse the same NORMALISED strings, and the untrimmed spelling is the
+// one place they legitimately disagree.
+//
+// Trimming cannot manufacture a splice — it only removes surrounding
+// whitespace, and the guard then runs on what is left — so this is a widening
+// of the builder's accept set by exactly one harmless equivalence, not a hole.
+// Asserted here so the spec's claim stays honest in both directions.
+func TestBuildEmitParityModuloTrim(t *testing.T) {
+	pathItem := parse.SelectItem{Expr: parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+		IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"},
+	}}}
+	emits := func(root parse.ClassExpr) bool {
+		q := &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{pathItem}},
+			From:   parse.FromClause{Root: root},
+		}
+		_, err := q.Emit()
+		return err == nil
+	}
+
+	corpus := []string{
+		"COMPOSITION", "  COMPOSITION  ", "\tCOMPOSITION\n", "COMPOSITION c",
+		"AND", "ORDER", "LENGTH", "at0001", "AT0001", "true", "false",
+		"x1", "1x", "a-b", "a_b", "", "   ", "c, c/y", "$p",
+	}
+	for _, s := range corpus {
+		trimmed := strings.TrimSpace(s)
+
+		t.Run("RM type/"+s, func(t *testing.T) {
+			_, buildErr := aql.NewBuilder().Select(aql.Col("c/x")).From(s, "c").Build()
+			if built, emitted := buildErr == nil, emits(parse.ClassExpr{RMType: trimmed, Alias: "c"}); built != emitted {
+				t.Errorf("Build(%q) ok=%v (%v) but Emit(RMType: %q) ok=%v — "+
+					"the paths disagree on the NORMALISED string", s, built, buildErr, trimmed, emitted)
+			}
+		})
+
+		// The alias half skips what trims to empty: an absent alias is the
+		// grammar's anonymous class, which Emit accepts and Build refuses. That
+		// asymmetry is a documented write-side ergonomic choice (REQ-119
+		// § Emit-side structural parity), not a guard disagreement.
+		if trimmed == "" {
+			continue
+		}
+		t.Run("alias/"+s, func(t *testing.T) {
+			_, buildErr := aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", s).Build()
+			if built, emitted := buildErr == nil, emits(parse.ClassExpr{RMType: "COMPOSITION", Alias: trimmed}); built != emitted {
+				t.Errorf("Build(alias %q) ok=%v (%v) but Emit(Alias: %q) ok=%v — "+
+					"the paths disagree on the NORMALISED string", s, built, buildErr, trimmed, emitted)
+			}
+		})
+	}
 }

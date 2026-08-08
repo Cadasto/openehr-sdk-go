@@ -441,7 +441,16 @@ func (q *Query) Emit() (string, error) {
 	// A junction root and a single root are mutually exclusive: the
 	// grammar has no `(A OR B) CONTAINS C` form, so emitting both would
 	// produce text the parser rejects (REQ-117).
-	if q.From.Junction != nil && (rootPresent || q.From.Contains != nil) {
+	//
+	// Keyed on ANY data in Root rather than on a class being present, because
+	// beside a junction [emitClassExpr] is never called for the root at all:
+	// a lone alias, archetype or standing predicate there is DROPPED, not
+	// refused — including the splice text the identifier guards exist to
+	// catch, which reached the wire as an entirely absent term. The parser
+	// leaves Root WHOLLY zero on a junction root, so this refuses nothing
+	// ParseQuery produces; that is what makes checking the whole value safe
+	// where checking `RMType != "" || Version` was merely narrow.
+	if q.From.Junction != nil && (q.From.Root.carriesData() || q.From.Contains != nil) {
 		return "", fmt.Errorf("%w: FROM sets both a root class and a root junction", aql.ErrInvalidQuery)
 	}
 	if dup := duplicateAlias(q.From); dup != "" {
@@ -826,6 +835,21 @@ func emitSelectExpr(e SelectExpr) (string, error) {
 	return "", fmt.Errorf("%w: unsupported SELECT expression %T", aql.ErrInvalidQuery, e)
 }
 
+// carriesData reports whether the class expression holds anything a caller
+// wrote, as opposed to being the zero value a struct field carries when it is
+// simply unused (the FROM root beside a root junction, which the parser leaves
+// wholly zero).
+//
+// [Position] is source metadata rather than query content, so it is zeroed
+// first; everything else is compared BY VALUE against the zero ClassExpr, so a
+// field added later is covered the day it lands rather than the day someone
+// remembers to extend a list. A future field that is not comparable stops this
+// compiling, which is the loud failure rather than a silent gap.
+func (c ClassExpr) carriesData() bool {
+	c.Pos = Position{}
+	return c != ClassExpr{}
+}
+
 func emitClassExpr(c ClassExpr) string {
 	if c.Version {
 		out := "VERSION"
@@ -1037,6 +1061,46 @@ func checkClassOperands(c ClassExpr) error {
 		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a standing predicate (%q); "+
 			"the bracket position carries exactly one, and emission would silently drop the predicate",
 			aql.ErrInvalidQuery, c.RMType, c.Archetype, c.Predicate)
+	}
+	// VERSION is a SEPARATE `classExprOperand` alternative, not a class that
+	// happens to be named "VERSION": `VERSION variable=IDENTIFIER? ('['
+	// versionPredicate ']')?` has no RM-type identifier and no archetype slot,
+	// and [emitClassExpr] writes neither field. A value in either is therefore
+	// DROPPED rather than refused — the same substitution class as the dual
+	// bracket above, in its drop direction, and reached through the very guard
+	// that validates an archetype id before the emitter discards it:
+	//
+	//	{Version: true, Alias: "v", Archetype: "…encounter.v1"}
+	//	-> FROM VERSION v      err == nil, a row filter gone
+	//
+	// `RMType: "VERSION"` is the one spelling that is not a drop: the extractor
+	// always pairs it with the flag, so it is that flag's own carrier and says
+	// exactly what the text says. Any other RM type names a class the emitted
+	// text does not mention.
+	if c.Version {
+		if c.RMType != "" && !strings.EqualFold(c.RMType, "VERSION") {
+			return fmt.Errorf("%w: VERSION class expression also carries RM type %q; "+
+				"the VERSION alternative has no RM-type slot, so emission would drop it",
+				aql.ErrInvalidQuery, c.RMType)
+		}
+		if c.Archetype != "" {
+			return fmt.Errorf("%w: VERSION class expression also carries an archetype predicate (%q); "+
+				"`versionPredicate` has no archetype alternative, so emission would drop it",
+				aql.ErrInvalidQuery, c.Archetype)
+		}
+		// No separate ParamArchetype arm: with a parameter the check above
+		// fires, without one the no-carrier check below does, so a third
+		// branch here is unreachable as a sole guard — no mutation can kill
+		// it, and this REQ requires every guard be mutation-detectable.
+	}
+	// ParamArchetype declares the bracket to BE `archetypePredicate`'s
+	// `PARAMETER` alternative, so an empty Archetype leaves that declaration
+	// with no token to render and [emitClassExpr] writes no bracket at all —
+	// the predicate the AST announced disappears. The extractor sets the two
+	// together or neither.
+	if c.ParamArchetype && c.Archetype == "" {
+		return fmt.Errorf("%w: class %q flags a $param archetype predicate but carries no parameter, "+
+			"so emission would write no predicate at all", aql.ErrInvalidQuery, c.RMType)
 	}
 	// The single-token positions [emitClassExpr] splices VERBATIM (issue #96).
 	// Unguarded, `Alias: "c CONTAINS OBSERVATION o"` emitted a whole extra
