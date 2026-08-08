@@ -1102,6 +1102,23 @@ func checkClassOperands(c ClassExpr) error {
 		return fmt.Errorf("%w: class %q flags a $param archetype predicate but carries no parameter, "+
 			"so emission would write no predicate at all", aql.ErrInvalidQuery, c.RMType)
 	}
+	// PredicateComparison is the STRUCTURED reading of the same bracket
+	// [ClassExpr.Predicate] holds verbatim, and the verbatim text is what
+	// emission renders — the field pair is lossless only while both are set.
+	// Alone, the comparison is a row filter no emitter reads:
+	//
+	//	{RMType: "EHR", Alias: "e", PredicateComparison: &{ehr_id/value = $id}}
+	//	-> FROM EHR e          err == nil, the bracket gone
+	//
+	// Unlike HasPredicate — a flag that carries no content, so no value of it
+	// can add or remove text — this one carries the filter itself. The
+	// extractor sets the text first and derives the comparison from it, so the
+	// pair is never half-populated on the read side.
+	if c.PredicateComparison != nil && c.Predicate == "" {
+		return fmt.Errorf("%w: class %q carries a structured predicate comparison but no predicate "+
+			"text; emission renders the verbatim form, so the comparison would be dropped",
+			aql.ErrInvalidQuery, c.RMType)
+	}
 	// The single-token positions [emitClassExpr] splices VERBATIM (issue #96).
 	// Unguarded, `Alias: "c CONTAINS OBSERVATION o"` emitted a whole extra
 	// containment term that re-parses cleanly — REQ-119's silent-substitution

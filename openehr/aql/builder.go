@@ -286,7 +286,10 @@ func (a *ast) build() (Query, error) {
 	// Both are IDENTIFIER positions emitted verbatim, so they get the same
 	// refusal (*parse.Query).Emit applies — Build/Emit parity from day one
 	// rather than one write path hardened and the other left open (issue #96).
-	if err := ValidateIdentifier(a.from.rmType); err != nil {
+	// The RM type goes through [validateRMTypeToken] rather than the bare
+	// guard: `VERSION` is classExprOperand's other ALTERNATIVE, and this
+	// carrier has no flag to hold it, so the spelling itself is the carrier.
+	if err := validateRMTypeToken(a.from.rmType); err != nil {
 		return Query{}, fmt.Errorf("FROM RM type: %w", err)
 	}
 	if err := ValidateIdentifier(a.from.alias); err != nil {

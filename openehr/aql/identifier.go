@@ -97,6 +97,36 @@ func ValidateIdentifier(name string) error {
 	return nil
 }
 
+// validateRMTypeToken applies [ValidateIdentifier] to a class's RM-TYPE
+// position, admitting the one spelling that is not an identifier there:
+// `VERSION`.
+//
+// The guard itself is right to refuse the word everywhere — `classExprOperand`
+// has `VERSION variable=IDENTIFIER? …` as its own ALTERNATIVE beside the
+// `IDENTIFIER …` form, so no identifier position admits it, and an alias
+// spelled `VERSION` stays refused. But the RM-type position is where the write
+// paths SPELL that alternative, and the two carriers differ:
+//
+//   - [parse.ClassExpr] has a Version FLAG. There the flag is authoritative and
+//     the string must not be a second, contradictory carrier, so an unflagged
+//     `RMType: "VERSION"` is refused: it emits text that re-parses WITH the flag
+//     set, an AST the caller did not write.
+//   - The builder has no such field. Here the spelling IS the carrier, so there
+//     is no contradiction to refuse — and refusing it left the builder unable to
+//     express `FROM VERSION v` or `CONTAINS VERSION v` at all, text both
+//     ParseQuery and Emit round-trip. That is a Build/Emit parity break in the
+//     TIGHTENING direction, which this REQ guards against as squarely as the
+//     splice it was closing.
+//
+// A VERSION class takes no archetype predicate; that rule binds its callers,
+// which carry the archetype field this one does not see.
+func validateRMTypeToken(rmType string) error {
+	if strings.EqualFold(rmType, "VERSION") {
+		return nil
+	}
+	return ValidateIdentifier(rmType)
+}
+
 // isCodeToken reports whether s lexes as `ID_CODE : 'id' CODE_STR` or
 // `AT_CODE : 'at' CODE_STR`, both declared before IDENTIFIER.
 //

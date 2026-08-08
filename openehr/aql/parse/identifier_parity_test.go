@@ -524,6 +524,15 @@ func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
 		"root junction beside a root predicate": mk(parse.FromClause{
 			Root: parse.ClassExpr{Predicate: "ehr_id/value=$x"}, Junction: junction(),
 		}),
+		// The structured reading of the bracket without the verbatim text the
+		// emitter actually renders. Unlike HasPredicate — a flag carrying no
+		// content — this one carries the row filter itself.
+		"structured predicate with no text": mk(parse.FromClause{Root: parse.ClassExpr{
+			RMType: "EHR", Alias: "e", HasPredicate: true,
+			PredicateComparison: &aql.Comparison{
+				Path: "ehr_id/value", Op: aql.OpEq, Val: aql.Param("id"),
+			},
+		}}),
 	} {
 		t.Run("refused/"+name, func(t *testing.T) {
 			out, err := q.Emit()
@@ -704,6 +713,90 @@ func TestBuildEmitParityModuloTrim(t *testing.T) {
 			if built, emitted := buildErr == nil, emits(parse.ClassExpr{RMType: "COMPOSITION", Alias: trimmed}); built != emitted {
 				t.Errorf("Build(alias %q) ok=%v (%v) but Emit(Alias: %q) ok=%v — "+
 					"the paths disagree on the NORMALISED string", s, built, buildErr, trimmed, emitted)
+			}
+		})
+	}
+}
+
+// TestBuilderExpressesTheVersionAlternative — the anti-tightening control for
+// the one carve-out in the RM-type position.
+//
+// `VERSION` is not an identifier, and [aql.ValidateIdentifier] refuses it
+// everywhere, which is correct. But `classExprOperand` has `VERSION
+// variable=IDENTIFIER? …` as its own ALTERNATIVE, and the two write paths
+// carry it differently: [parse.ClassExpr] has a Version FLAG, so there an
+// unflagged `RMType: "VERSION"` is refused (it would re-parse WITH the flag,
+// an AST the caller did not write); the builder has no such field, so there
+// the spelling IS the carrier and nothing contradicts it.
+//
+// Guarding the position without that distinction made `EHR e CONTAINS VERSION
+// v CONTAINS COMPOSITION c` unbuildable — ordinary AQL both ParseQuery and
+// Emit round-trip, and buildable before the guard landed. This is what a
+// positive control is for.
+func TestBuilderExpressesTheVersionAlternative(t *testing.T) {
+	for name, tc := range map[string]struct {
+		build func() (aql.Query, error)
+		want  string
+	}{
+		"FROM VERSION": {
+			build: func() (aql.Query, error) {
+				return aql.NewBuilder().Select(aql.Col("v/x")).From("VERSION", "v").Build()
+			},
+			want: "SELECT v/x FROM VERSION v",
+		},
+		"CONTAINS VERSION": {
+			build: func() (aql.Query, error) {
+				return aql.NewBuilder().Select(aql.Col("c/x")).FromEHR("e", nil).
+					Contains(aql.Class("VERSION", "v").Contains(aql.Class("COMPOSITION", "c"))).Build()
+			},
+			want: "SELECT c/x FROM EHR e CONTAINS VERSION v CONTAINS COMPOSITION c",
+		},
+		// The lexer's keyword fragments are case-insensitive, so this is the
+		// same alternative and must not be refused for its spelling.
+		"lower-case spelling": {
+			build: func() (aql.Query, error) {
+				return aql.NewBuilder().Select(aql.Col("v/x")).From("version", "v").Build()
+			},
+			want: "SELECT v/x FROM version v",
+		},
+	} {
+		t.Run("built/"+name, func(t *testing.T) {
+			q, err := tc.build()
+			if err != nil {
+				t.Fatalf("Build refused a VERSION class expression: %v", err)
+			}
+			if q.Q != tc.want {
+				t.Errorf("Build = %q, want %q", q.Q, tc.want)
+			}
+			if _, err := parse.ParseQuery(q.Q); err != nil {
+				t.Errorf("Build emitted %q, which does not parse: %v", q.Q, err)
+			}
+		})
+	}
+
+	// The carve-out is for the RM-TYPE position only, and the alternative it
+	// admits carries no archetype: `versionPredicate` has no archetype form, so
+	// emitting one would break REQ-055's promise that Build output is valid AQL.
+	for name, build := range map[string]func() (aql.Query, error){
+		"VERSION as a class alias": func() (aql.Query, error) {
+			return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "VERSION").Build()
+		},
+		"VERSION as a CONTAINS alias": func() (aql.Query, error) {
+			return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+				Contains(aql.Class("OBSERVATION", "VERSION")).Build()
+		},
+		"VERSION carrying an archetype": func() (aql.Query, error) {
+			return aql.NewBuilder().Select(aql.Col("c/x")).From("COMPOSITION", "c").
+				Contains(aql.Archetype("VERSION", "v", "openEHR-EHR-COMPOSITION.encounter.v1")).Build()
+		},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			q, err := build()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery (built %q)", err, q.Q)
+			}
+			if q.Q != "" {
+				t.Errorf("a refused build still produced %q", q.Q)
 			}
 		})
 	}
