@@ -542,7 +542,21 @@ func TestFuncNameAlphabetRunsOnTheOriginalSpelling(t *testing.T) {
 			if err := aql.ValidateSelectFuncName(name); !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Errorf("ValidateSelectFuncName(%q) = %v, want ErrInvalidQuery", name, err)
 			}
+			// The CONSTRUCTOR must not launder the same name: Func's intake
+			// canonicalisation is ASCII-only, so a non-ASCII spelling reaches
+			// the validator as written and is refused — strings.ToUpper here
+			// would fold ı into I and hand back a validating value.
+			if err := aql.ValidateValue(aql.Func(name, aql.String("a"))); !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("ValidateValue(Func(%q)) = %v, want ErrInvalidQuery", name, err)
+			}
 		})
+	}
+	// The same fold misclassified aggregates: ToUpper("mın") == "MIN".
+	if aql.IsAggregateFunc("mın") {
+		t.Error(`IsAggregateFunc("mın") = true; the Unicode fold laundered a non-identifier into MIN`)
+	}
+	if !aql.IsAggregateFunc("min") || !aql.IsAggregateFunc(" Count ") {
+		t.Error("IsAggregateFunc rejects ASCII spellings it must accept")
 	}
 	// Lower-case ASCII names lex fine as written and must stay accepted on
 	// both sides — the alphabet change must not smuggle in case sensitivity.

@@ -436,13 +436,31 @@ func (f FuncCall) token() string {
 		}
 		parts = append(parts, arg.token())
 	}
-	return strings.ToUpper(strings.TrimSpace(f.Name)) + "(" + strings.Join(parts, ", ") + ")"
+	return asciiUpper(strings.TrimSpace(f.Name)) + "(" + strings.Join(parts, ", ") + ")"
 }
 
-// Func constructs a [FuncCall] with the given (case-insensitive) name and
-// argument list.
+// Func constructs a [FuncCall] with the given (ASCII case-insensitive) name
+// and argument list. The name is canonicalised to upper case at intake — the
+// constructor twin of [Param] stripping `$` — but only over ASCII letters: a
+// name outside the identifier alphabet is stored as written and refused at
+// validate time, never respelled into a legal-looking one.
 func Func(name string, args ...Value) Value {
-	return FuncCall{Name: strings.ToUpper(strings.TrimSpace(name)), Args: args}
+	return FuncCall{Name: asciiUpper(strings.TrimSpace(name)), Args: args}
+}
+
+// asciiUpper upper-cases the ASCII letters of s and leaves every other byte
+// alone. strings.ToUpper is NOT a substitute anywhere a function name is
+// canonicalised or compared: its Unicode mapping folds some non-ASCII letters
+// INTO the ASCII alphabet (ı → I, ſ → S), turning a name the lexer cannot
+// tokenise into a legal-looking spelling instead of leaving it for the
+// alphabet check to refuse.
+func asciiUpper(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' {
+			return r - ('a' - 'A')
+		}
+		return r
+	}, s)
 }
 
 // TerminologyFunc is the canonical name of the AQL terminology function.
@@ -551,7 +569,7 @@ func validateValue(v Value) error {
 		}
 		for i, a := range t.Args {
 			if a == nil {
-				return fmt.Errorf("%w: nil argument at index %d in %s()", ErrInvalidQuery, i, strings.ToUpper(t.Name))
+				return fmt.Errorf("%w: nil argument at index %d in %s()", ErrInvalidQuery, i, asciiUpper(t.Name))
 			}
 			if err := validateValue(a); err != nil {
 				return err
@@ -611,7 +629,7 @@ var aggregateFuncWords = map[string]bool{
 // this to hold a projected aggregate to its own rule (REQ-119) without
 // duplicating the name set.
 func IsAggregateFunc(name string) bool {
-	return aggregateFuncWords[strings.ToUpper(strings.TrimSpace(name))]
+	return aggregateFuncWords[asciiUpper(strings.TrimSpace(name))]
 }
 
 // asciiLetter and wordChar spell the grammar's ALPHA_CHAR and WORD_CHAR
