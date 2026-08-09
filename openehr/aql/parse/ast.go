@@ -174,8 +174,10 @@ func (e *extractor) EnterVersionClassExpr(c *gen.VersionClassExprContext) {
 	}
 	if vp := c.VersionPredicate(); vp != nil {
 		ce.HasPredicate = true
-		// See extractClassExprOperand: versionPredicate carries no brackets.
-		ce.Predicate = sourceText(vp)
+		// Spanned over the ENCLOSING brackets — see bracketInterior. The
+		// versionPredicate production excludes them, so a child-rule span drops
+		// whatever padding, comment or line break sits between.
+		ce.Predicate = bracketInterior(c.SYM_LEFT_BRACKET(), c.SYM_RIGHT_BRACKET(), vp)
 	}
 	e.classes = append(e.classes, ce)
 }

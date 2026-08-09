@@ -43,8 +43,22 @@ func TestValidatePathPredicate(t *testing.T) {
 		{"unclosed_open", "a[at0001", true, "the emitted `]` closes the INNER bracket"},
 		{"unterminated_string", "a/b='c", true, "the emitted `]` becomes literal content"},
 		{"unterminated_dq", `a/b="c`, true, "the other delimiter"},
-		{"unterminated_regex", "a/b MATCHES {/re", true, "an unclosed regex swallows the `]`"},
-		{"brace_not_a_regex", "a/b MATCHES {x}", true, "`{` is reachable only as CONTAINED_REGEX"},
+		// CONTAINED_REGEX matches as a whole token or the `{` is SYM_LEFT_CURLY,
+		// so neither of these escapes anything: both are CONTAINED malformations
+		// the parser rejects loudly, and § The class predicate positions reserves
+		// refusal for the silent mode. Both were pinned as refusals and both
+		// refused text `[a/b MATCHES {/re]` proves is loud, not substituted.
+		{"brace_not_a_regex", "a/b MATCHES {x}", false, "`{` that starts no regex is ordinary content"},
+		{"regex_body_unclosed", "a/b MATCHES {/re", false, "the token cannot complete, so `{` is SYM_LEFT_CURLY"},
+		{"regex_escaped_slash", `a/b MATCHES {/\/}`, false, "a body ending in a backslash is legal"},
+		{"term_code_name_quote", "at0001,SNOMED::73211009|Crohn's disease|", false, "`~[|[\\]]+` admits an apostrophe"},
+		{"term_code_name_brace", "at0001,X::1|dose{2}|", false, "and a brace"},
+		{"term_code_name_bracket", "at0001,X::1|a]b|", true, "but NOT a bracket, so the `]` is a delimiter"},
+		{"comment_unterminated", "a/b='c' -- x", true, "the emitted `]` falls inside the comment"},
+		{"comment_bare_unterminated", "a/b='c'--", true, "the `--`/EOF form, still open in the query"},
+		{"comment_closed", "a/b='c' -- x\n", false, "a newline closes it inside the text"},
+		{"comment_hides_bracket", "at0001 -- ]\n AND a/b='c'", false, "a `]` inside a closed comment is not a delimiter"},
+		{"double_dash_not_a_comment", "a/b='c'--]", true, "`--x` is SYM_DOUBLE_DASH, so the `]` is real"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

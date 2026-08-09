@@ -237,6 +237,30 @@ func sourceText(c antlr.ParserRuleContext) string {
 	return c.GetText()
 }
 
+// bracketInterior returns the source text BETWEEN a context's enclosing
+// bracket tokens, so nothing the lexer skips between the bracket and the
+// child rule is lost.
+//
+// `versionPredicate` is the case that needs it: unlike `pathPredicate` its
+// production excludes the brackets, so a span over the child rule's own first
+// and last tokens starts AFTER any padding and ends BEFORE it. `VERSION
+// v[ LATEST_VERSION ]` came back `LATEST_VERSION`, which re-emits as
+// `[LATEST_VERSION]` — a round trip that parses but is not IDENTITY, and this
+// REQ requires identity at every position re-emitted verbatim.
+func bracketInterior(lbrack, rbrack antlr.TerminalNode, inner antlr.ParserRuleContext) string {
+	if lbrack == nil || rbrack == nil {
+		return sourceText(inner)
+	}
+	o, c := lbrack.GetSymbol(), rbrack.GetSymbol()
+	if o == nil || c == nil || o.GetInputStream() == nil {
+		return sourceText(inner)
+	}
+	if o.GetStop()+1 > c.GetStart()-1 {
+		return ""
+	}
+	return o.GetInputStream().GetTextFromInterval(antlr.NewInterval(o.GetStop()+1, c.GetStart()-1))
+}
+
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
 	out := FunctionCall{Name: aggregateName(c)}
 	if c.DISTINCT() != nil {
@@ -536,10 +560,11 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		if vp := v.VersionPredicate(); vp != nil {
 			ce.HasPredicate = true
-			// `versionPredicate` excludes its brackets (they belong to
-			// classExprOperand), unlike `pathPredicate` which includes them —
-			// trimBrackets is a no-op here and is kept off deliberately.
-			ce.Predicate = sourceText(vp)
+			// Spanned over the ENCLOSING brackets, not the child rule: see
+			// bracketInterior. `versionPredicate` excludes its brackets (they
+			// belong to classExprOperand), so a child-rule span drops the
+			// padding, comments and line breaks between them.
+			ce.Predicate = bracketInterior(v.SYM_LEFT_BRACKET(), v.SYM_RIGHT_BRACKET(), vp)
 		}
 		return ce
 	}

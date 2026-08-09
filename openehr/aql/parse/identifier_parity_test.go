@@ -536,7 +536,8 @@ func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
 		// The emptiness EDGE of the predicate position — separate from the
 		// structured-comparison rule above, and reachable WITHOUT one: the
 		// emitter brackets any non-empty field, so a blank one emits `[   ]`,
-		// which the parser rejects. Not the sub-grammar guard deferred to #99.
+		// which the parser rejects. Orthogonal to the bracket-ESCAPE scan:
+		// blank text escapes nothing, and text that escapes is never blank.
 		"blank standing predicate": mk(parse.FromClause{Root: parse.ClassExpr{
 			RMType: "EHR", Alias: "e", HasPredicate: true, Predicate: "   ",
 		}}),

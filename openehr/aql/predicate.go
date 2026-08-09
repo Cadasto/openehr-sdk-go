@@ -66,7 +66,7 @@ func ValidateVersionPredicate(text string) error {
 	if err := ValidatePathPredicate(text); err != nil {
 		return err
 	}
-	body := strings.TrimSpace(text)
+	body := stripPredicateTrivia(text)
 	if strings.EqualFold(body, "LATEST_VERSION") || strings.EqualFold(body, "ALL_VERSIONS") {
 		return nil
 	}
@@ -152,12 +152,44 @@ func scanPredicate(text string) predicateScan {
 			}
 			i = j
 		case '{':
-			j, ok := skipPredicateRegex(text, i)
-			if !ok {
-				sc.unterminated = "contained regex"
-				return sc
+			// `CONTAINED_REGEX` matches as a WHOLE token or not at all — ANTLR
+			// takes the longest match, and when the token cannot complete, the
+			// `{` falls back to `SYM_LEFT_CURLY` and a later `]` stays a real
+			// delimiter. Verified: `[a/b MATCHES {/re]` is a LOUD error, not a
+			// substitution. So a `{` that begins no complete regex is ordinary
+			// CONTENT, and refusing it would refuse a contained malformation,
+			// which this REQ reserves for the parser.
+			if j, ok := skipContainedRegex(text, i); ok {
+				i = j
+				continue
 			}
-			i = j
+			i++
+		case ':':
+			// `TERM_CODE : TERM_CODE_CHAR+ … '::' TERM_CODE_CHAR+ ('|' … '|')?`
+			// with `TERM_CODE_CHAR : NAME_CHAR | '.'`, and NAME_CHAR admits '-'.
+			// So a `--` INSIDE a term code is not a comment: maximal munch takes
+			// both dashes into the code. Consuming the tail here is what keeps
+			// `at0001,X::1--` — which the parser reads back unchanged — from
+			// being refused, while `at0001--` (no code, so the dashes ARE a
+			// comment) still is.
+			if i+1 < len(text) && text[i+1] == ':' {
+				j := i + 2
+				for j < len(text) && termCodeChar(text[j]) {
+					j++
+				}
+				// The display-name section, if any. It is reached ONLY from
+				// here: `|` occurs in no other predicate construct, so a
+				// standalone case for it was unreachable and no mutation could
+				// kill it.
+				if j < len(text) && text[j] == '|' {
+					if k, ok := skipTermCodeName(text, j); ok {
+						j = k
+					}
+				}
+				i = j
+				continue
+			}
+			i++
 		case '[':
 			depth++
 			i++
@@ -177,15 +209,23 @@ func scanPredicate(text string) predicateScan {
 			}
 			i++
 		case '-':
-			// A comment (`-- …` to end of line) is SKIPPED by the lexer, not
-			// put on a hidden channel, so it survives in the source text the
-			// extractor now reads. Stepping over it keeps a `]` inside a
-			// comment from being counted as a delimiter.
-			if n := commentLen(text, i); n > 0 {
-				i += n
+			// A comment is SKIPPED by the lexer, not put on a hidden channel, so
+			// it survives in the source text the extractor reads. Stepping over
+			// it keeps a `]` inside a comment from being counted — but only when
+			// a NEWLINE closes it inside this text. Closed by the end of the text
+			// it is not closed at all: the text is spliced into the middle of a
+			// query, so the run continues to the next newline THERE, swallowing
+			// the emitter's own `]` exactly as an unterminated literal would.
+			n, closed := commentRun(text, i)
+			if n == 0 {
+				i++
 				continue
 			}
-			i++
+			if !closed {
+				sc.unterminated = "comment"
+				return sc
+			}
+			i += n
 		default:
 			i++
 		}
@@ -194,6 +234,35 @@ func scanPredicate(text string) predicateScan {
 		sc.escapes = true
 	}
 	return sc
+}
+
+// skipTermCodeName steps over `TERM_CODE`'s optional trailing display name,
+// `'|' ~[|[\]]+ '|'`, and reports whether one is there.
+//
+// The content class excludes both brackets, so a `]` before the closing `|`
+// means this is NOT that section and the `]` is a real delimiter — verified:
+// `c[at0001,X::1|a] CONTAINS …` is a loud token-recognition error, so falling
+// through to ordinary scanning is both safe and correct.
+// termCodeChar spells `TERM_CODE_CHAR : NAME_CHAR | '.'`, i.e. a word
+// character, '-' or '.'.
+func termCodeChar(c byte) bool {
+	return c == '_' || c == '-' || c == '.' ||
+		(c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func skipTermCodeName(s string, i int) (int, bool) {
+	for j := i + 1; j < len(s); j++ {
+		switch s[j] {
+		case '|':
+			if j == i+1 {
+				return 0, false // `~[|[\]]+` needs at least one character
+			}
+			return j + 1, true
+		case '[', ']':
+			return 0, false
+		}
+	}
+	return 0, false
 }
 
 // skipPredicateString steps over a STRING token starting at the delimiter, and
@@ -213,40 +282,61 @@ func skipPredicateString(s string, i int) (int, bool) {
 	return 0, false
 }
 
-// skipPredicateRegex steps over `CONTAINED_REGEX : '{' WS* SLASH_REGEX WS*
-// (';' WS* STRING)? WS* '}'`, and reports whether it was well formed.
+// skipContainedRegex matches `CONTAINED_REGEX : '{' WS* SLASH_REGEX WS*
+// (';' WS* STRING)? WS* '}'` as a WHOLE token, and reports whether one is
+// there.
 //
-// The `}` cannot simply be searched for: `SLASH_REGEX_CHAR : ~[/\n\r] | …`
-// admits `}` inside the pattern (`{/a{2}/}`), so the regex body has to be
-// stepped over on its own terms. A `{` that begins no well-formed
-// CONTAINED_REGEX is reported as unterminated — safe, because `pathPredicate`
-// reaches `{` through `objectPath MATCHES CONTAINED_REGEX` and nowhere else, so
-// no text ParseQuery accepts is refused by it.
-func skipPredicateRegex(s string, i int) (int, bool) {
-	j := skipPredicateSpace(s, i+1)
+// Whole-token or nothing is the point. ANTLR takes the longest match, so a `{`
+// that cannot complete the production is simply `SYM_LEFT_CURLY` and every
+// character after it — a `]` included — is lexed on its own terms. Reporting
+// such a `{` as an unterminated region refused text that escapes nothing:
+// `a/b MATCHES {x}` is a CONTAINED malformation, which § The class predicate
+// positions requires be left to the parser.
+//
+// The `}` cannot simply be searched for: `SLASH_REGEX_CHAR : ~[/\n\r] |
+// ESCAPE_SEQ | '\\/'` admits `}` inside the pattern (`{/a{2}/}`), so the body
+// is stepped over on its own terms.
+func skipContainedRegex(s string, i int) (int, bool) {
+	j := skipRegexSpace(s, i+1)
 	if j >= len(s) || s[j] != '/' {
 		return 0, false
 	}
-	j++
-	closed := false
-	for ; j < len(s); j++ {
-		if s[j] == '\\' {
-			j++
-			continue
-		}
-		if s[j] == '/' {
-			j++
-			closed = true
-			break
-		}
-	}
-	if !closed {
+	end := regexBodyEnd(s, j+1)
+	if end < 0 {
 		return 0, false
 	}
-	j = skipPredicateSpace(s, j)
-	// The optional `; 'flags'` tail.
+	return regexTail(s, end+1)
+}
+
+// regexBodyEnd returns the index of the `/` closing `SLASH_REGEX`'s body, or -1.
+//
+// A backslash consumes the character after it, covering both `ESCAPE_SEQ` and
+// the explicit `'\\/'` alternative that keeps an escaped slash from closing the
+// body. `~[/\n\r]` excludes the line breaks, so a body carrying one is no body
+// at all.
+func regexBodyEnd(s string, start int) int {
+	for j := start; j < len(s); j++ {
+		switch s[j] {
+		case '\n', '\r':
+			return -1
+		case '\\':
+			j++
+		case '/':
+			if j == start {
+				return -1 // SLASH_REGEX_CHAR+ needs at least one character
+			}
+			return j
+		}
+	}
+	return -1
+}
+
+// regexTail matches the token's remainder after the body's closing `/`:
+// `WS* (';' WS* STRING)? WS* '}'`.
+func regexTail(s string, j int) (int, bool) {
+	j = skipRegexSpace(s, j)
 	if j < len(s) && s[j] == ';' {
-		j = skipPredicateSpace(s, j+1)
+		j = skipRegexSpace(s, j+1)
 		if j >= len(s) || (s[j] != '\'' && s[j] != '"') {
 			return 0, false
 		}
@@ -254,7 +344,7 @@ func skipPredicateRegex(s string, i int) (int, bool) {
 		if j, ok = skipPredicateString(s, j); !ok {
 			return 0, false
 		}
-		j = skipPredicateSpace(s, j)
+		j = skipRegexSpace(s, j)
 	}
 	if j >= len(s) || s[j] != '}' {
 		return 0, false
@@ -262,35 +352,67 @@ func skipPredicateRegex(s string, i int) (int, bool) {
 	return j + 1, true
 }
 
-// skipPredicateSpace steps over what the lexer discards between tokens — `WS`
-// and a `--` comment — so the regex scan above lines up with the real one.
-func skipPredicateSpace(s string, i int) int {
-	for i < len(s) {
-		switch s[i] {
-		case ' ', '\t', '\r', '\n':
-			i++
-		case '-':
-			n := commentLen(s, i)
-			if n == 0 {
-				return i
-			}
-			i += n
-		default:
-			return i
-		}
+// skipRegexSpace steps over the `WS*` inside `CONTAINED_REGEX`. WHITESPACE
+// ONLY: the region is a single lexer TOKEN, so a `COMMENT` — itself a token —
+// cannot occur inside it, and skipping one here would model a stream the lexer
+// never produces.
+func skipRegexSpace(s string, i int) int {
+	for i < len(s) && (s[i] == ' ' || s[i] == '\t' || s[i] == '\r' || s[i] == '\n') {
+		i++
 	}
 	return i
 }
 
-// commentLen returns the length of the `COMMENT` token starting at i, or 0 when
-// none does. The grammar spells it `'--' ' ' ~[\r\n]* (…)` or `'--' (…)`, i.e.
-// a double dash running to the end of the line (or of the input).
-func commentLen(s string, i int) int {
+// commentRun returns the length of the `COMMENT` run starting at i (0 when
+// none does) and whether a NEWLINE closed it inside this text.
+//
+// The grammar is `COMMENT : '--' ' ' ~[\r\n]* ('\r'? '\n' | EOF) | '--' ('\r'?
+// '\n' | EOF)`, and both halves matter:
+//
+//   - The SPACE is mandatory in the first alternative. `--x` is no comment at
+//     all but `SYM_DOUBLE_DASH`, so the characters after it — a `]` included —
+//     are ordinary tokens. Treating it as a comment skipped a real delimiter.
+//   - EOF means the end of the QUERY, not the end of this text. A run that no
+//     newline closes here goes on to close somewhere in the emitted query,
+//     which is why the caller refuses it rather than stepping over it.
+func commentRun(s string, i int) (int, bool) {
 	if i+1 >= len(s) || s[i] != '-' || s[i+1] != '-' {
-		return 0
+		return 0, false
 	}
-	if nl := strings.IndexAny(s[i:], "\r\n"); nl >= 0 {
-		return nl
+	rest := s[i+2:]
+	switch {
+	case rest == "":
+		return len(s) - i, false // closed only by the query's own EOF
+	case rest[0] == '\n':
+		return 3, true
+	case rest[0] == '\r':
+		if len(rest) > 1 && rest[1] == '\n' {
+			return 4, true
+		}
+		return 0, false // a lone '\r' does not close a COMMENT
+	case rest[0] != ' ':
+		return 0, false // SYM_DOUBLE_DASH, not a comment
 	}
-	return len(s) - i
+	if nl := strings.IndexByte(s[i:], '\n'); nl >= 0 {
+		return nl + 1, true
+	}
+	return len(s) - i, false
+}
+
+// stripPredicateTrivia removes the comment runs the lexer discards, so a
+// keyword comparison sees what the parser sees. `LATEST_VERSION -- note\n` is
+// the same token stream as `LATEST_VERSION`, and trimming whitespace alone
+// refused it.
+func stripPredicateTrivia(text string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		if n, closed := commentRun(text, i); n > 0 && closed {
+			i += n
+			b.WriteByte(' ')
+			continue
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+	return strings.TrimSpace(b.String())
 }

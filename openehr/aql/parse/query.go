@@ -1108,11 +1108,13 @@ func checkClassOperands(c ClassExpr) error {
 	//
 	//	{RMType: "EHR", Alias: "e", Predicate: "   "}  ->  FROM EHR e[   ]
 	//
-	// This is the emptiness EDGE of the predicate position, not the guard
-	// deferred to issue #99: that one needs a `standardPredicate |
-	// nodePredicate` sub-grammar validator, whereas "is there any content at
-	// all" is decidable here and is the one thing about this position that a
-	// token-level check settles. The extractor cannot produce it — a parsed
+	// This is the emptiness EDGE of the predicate position, orthogonal to the
+	// bracket-ESCAPE scan beside it: blank text escapes nothing, and text that
+	// escapes is never blank, so the two rules cover disjoint ground and each
+	// fails its own named test. The remaining residual is neither — a full
+	// `standardPredicate | nodePredicate` validator, which would catch LOUD
+	// malformations contained inside the brackets and is recorded in REQ-119
+	// § Out of scope. The extractor cannot produce a blank one — a parsed
 	// bracket always carries a form — so nothing ParseQuery emits is refused.
 	if c.Predicate != "" && strings.TrimSpace(c.Predicate) == "" {
 		return fmt.Errorf("%w: class %q carries a blank standing predicate; emission would write "+

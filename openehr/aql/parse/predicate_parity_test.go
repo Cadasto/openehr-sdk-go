@@ -51,11 +51,32 @@ var predicateCorpus = []struct {
 	{"class_param", "SELECT c/x FROM COMPOSITION c[$p]"},
 	{"class_standard_cmp", "SELECT e/x FROM EHR e[ehr_id/value=$id]"},
 	{"class_nested_bracket", "SELECT c/x FROM COMPOSITION c[a[at0001]/b='c']"},
+	// TERM_CODE's display-name section, `'|' ~[|[\]]+ '|'`. Its content excludes
+	// brackets and NOTHING else, so an apostrophe in a coded term — ordinary
+	// clinical AQL, and the shape of half the SNOMED CT display names in use —
+	// is content, not a string delimiter. Absent from the corpus, that read
+	// refused a query ParseQuery had just produced.
+	{"class_term_code", "SELECT c/x FROM COMPOSITION c[at0001,SNOMED-CT::22298006]"},
+	{"class_term_code_name", "SELECT c/x FROM COMPOSITION c[at0001,SNOMED-CT::22298006|myocardial infarction|]"},
+	{"class_term_code_quote", "SELECT c/x FROM COMPOSITION c[at0001,SNOMED-CT::22298006|Barrett's oesophagus|]"},
+	{"class_term_code_brace", "SELECT c/x FROM COMPOSITION c[at0001,SNOMED-CT::22298006|dose{2}|]"},
+	// A regex body ending in a backslash: `SLASH_REGEX_CHAR` makes a bare `\` an
+	// ordinary body character, so the following `/` closes the body.
+	{"class_regex_trailing_escape", `SELECT c/x FROM COMPOSITION c[a/b MATCHES {/\/}]`},
 
 	// --- VERSION position: versionPredicate's three alternatives ---
 	{"version_latest", "SELECT v/data FROM VERSION v[LATEST_VERSION]"},
 	{"version_all", "SELECT v/data FROM VERSION v[ALL_VERSIONS]"},
 	{"version_standard", "SELECT v/data FROM VERSION v[commit_audit/time_committed > '2020']"},
+	// The VERSION bracket belongs to `classExprOperand`, not to
+	// `versionPredicate`, so a span over the child rule alone starts after the
+	// padding and ends before it. These rows are identity only while the
+	// extractor spans the ENCLOSING brackets — and they are what makes the
+	// keyword check's trivia-tolerance load-bearing rather than incidental.
+	{"version_padded", "SELECT v/data FROM VERSION v[ LATEST_VERSION ]"},
+	{"version_padded_all", "SELECT v/data FROM VERSION v[  ALL_VERSIONS  ]"},
+	{"version_comment", "SELECT v/data FROM VERSION v[LATEST_VERSION -- note\n]"},
+	{"version_standard_padded", "SELECT v/data FROM VERSION v[ commit_audit/time_committed > '2020' ]"},
 
 	// --- source formatting rides through verbatim ---
 	// The lexer SKIPS whitespace and comments (they are discarded, not put on

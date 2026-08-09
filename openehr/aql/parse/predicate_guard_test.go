@@ -132,7 +132,8 @@ func TestEmitClassPredicateRefusesBracketEscape(t *testing.T) {
 			// and runs on into the following clause.
 			{"unterminated_string", "a/b='c"},
 			{"unterminated_dq_string", `a/b="c`},
-			{"unterminated_regex", "a/b MATCHES {/re"},
+			{"unterminated_comment", "a/b='c' -- x"},
+			{"term_code_name_carrying_a_bracket", "at0001,X::1|a]b|"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				out, err := emitWithPredicate(t, base, tc.text)
@@ -207,5 +208,79 @@ func TestEmitVersionPredicateRefusalNamesThePosition(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "VERSION") {
 		t.Errorf("error %q does not mention the VERSION position", err)
+	}
+}
+
+// TestEmitClassPredicateAcceptsLoudMalformations pins the negative space the
+// generated confrontation structurally cannot reach.
+//
+// REQ-119 reserves refusal for the SILENT mode: text that stays inside its
+// brackets can at worst be a malformed predicate, which the parser rejects
+// loudly, and § The class predicate positions requires such text NOT be
+// refused. The confrontation's no-tightening arm cannot check that — it fires
+// only when the splice round-trips, and by definition none of these do. So the
+// rule needs a control of its own or it is enforced by nothing.
+//
+// Every row here was REFUSED before the scanner distinguished a region that can
+// consume the emitted `]` from one that merely fails to lex.
+func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
+	const base = "SELECT c/x FROM COMPOSITION c[at0002]"
+
+	for _, tc := range []struct{ name, text, why string }{
+		{"bare words", "a b c", "no delimiter at all, just not a predicate"},
+		{"brace that starts no regex", "a/b MATCHES {x}", "`{` falls back to SYM_LEFT_CURLY"},
+		{"regex body never closes", "a/b MATCHES {/re", "the token cannot complete, so nothing is consumed"},
+		{"regex closes but the token does not", "a/b MATCHES {/re/", "same: no CONTAINED_REGEX, no swallowing"},
+		{"double dash is not a comment", "a/b='c'--x", "`--x` is SYM_DOUBLE_DASH; the `]` stays a delimiter"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := aql.ValidatePathPredicate(tc.text); err != nil {
+				t.Fatalf("guard refused a CONTAINED malformation (%s): %v", tc.why, err)
+			}
+			out, err := emitWithPredicate(t, base, tc.text)
+			if err != nil {
+				t.Fatalf("Emit refused it: %v", err)
+			}
+			if !strings.Contains(out, "["+tc.text+"]") {
+				t.Errorf("Emit = %q, which does not carry the predicate verbatim", out)
+			}
+			// …and the whole point of admitting it: the parser is the one that
+			// says no, LOUDLY, where the caller sees it.
+			if _, err := parse.ParseQuery(out); err == nil {
+				t.Errorf("emitted %q parses cleanly — this row no longer tests a "+
+					"loud malformation and needs replacing", out)
+			}
+		})
+	}
+}
+
+// TestEmitClassPredicateGuardsEveryClassPosition — the guard is reached through
+// the containment walk as well as the FROM root, and every test above writes
+// only the root. A refactor that split the two paths would not be caught.
+func TestEmitClassPredicateGuardsEveryClassPosition(t *testing.T) {
+	const escape = "a/b='c'] CONTAINS OBSERVATION x[d/e='f'"
+
+	for _, tc := range []struct {
+		name string
+		set  func(q *parse.Query)
+	}{
+		{"FROM root", func(q *parse.Query) { q.From.Root.Predicate = escape }},
+		{"CONTAINS class", func(q *parse.Query) { q.From.Contains.Class.Predicate = escape }},
+		{"nested CONTAINS class", func(q *parse.Query) {
+			q.From.Contains.Children[0].Class.Predicate = escape
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery(
+				"SELECT c/x FROM COMPOSITION c CONTAINS OBSERVATION o CONTAINS CLUSTER cl")
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			tc.set(q)
+			out, err := q.Emit()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("err = %v, want ErrInvalidQuery (emitted %q)", err, out)
+			}
+		})
 	}
 }

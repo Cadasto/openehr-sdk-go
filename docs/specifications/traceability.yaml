@@ -1297,10 +1297,10 @@ requirements:
     # the structural reason, and it is why PROBE-090 asserts round-trip IDENTITY
     # (and, for a source literal, TWICE) rather than mere parseability.
     #
-    # NO PLAN: implementation-aligned fix-up per README § Source of truth — this
-    # closes the residuals reported on PR #87 and left open there, so the spec
-    # section and this entry land in the same PR as the code. No plan document
-    # exists or is needed.
+    # Implementation-aligned fix-up per README § Source of truth for its first
+    # cycles — the residuals reported on PR #87 — so the spec section and this
+    # entry landed in the same PRs as the code. The class-predicate splice
+    # (issue #99) was large enough to plan, and that plan is mapped below.
     #
     # WIRE-VISIBLE (classified semver-minor in the canonical section, and in
     # wire.md § REQ-055 where the canonical write form lives): a literal
@@ -1310,6 +1310,7 @@ requirements:
     packages:
       - openehr/aql
       - openehr/aql/parse
+    plans: [docs/plans/archive/2026-08-08-aql-class-predicate-splice-and-source-text.md]
     probes: [PROBE-090]
     tests:
       # The two STRUCTURAL guards: a source-level tripwire failing any new
