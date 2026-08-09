@@ -109,6 +109,20 @@ func TestValidateVersionPredicate(t *testing.T) {
 		// or not the escape scan runs and the row tests nothing. That is what
 		// the previous spelling did.
 		{"escapes_bracket", "commit_audit/time > '2020'] CONTAINS COMPOSITION c[at0001", true},
+		// `versionPredicate` has no junction alternative, so a top-level AND /
+		// OR / MATCHES is never legal here — unlike the class position, where
+		// nodePredicate makes it lawful. REQ-119 § Amends the VERSION position.
+		{"junction_and", "a/b='c' AND d/e='f'", true},
+		{"junction_or", "a/b='c' OR d/e='f'", true},
+		{"junction_lowercase", "a/b='c' and d/e='f'", true},
+		{"junction_matches", "a/b MATCHES {/re/}", true},
+		// …and the anti-tightening half: the letters alone are not the keyword.
+		{"path_containing_and", "a/brand > 1", false},
+		{"path_prefixed_by_and", "a/android = 1", false},
+		{"path_prefixed_by_or", "a/order = 1", false},
+		{"path_containing_and_underscored", "a/b_and_c = 1", false},
+		{"keyword_inside_a_literal", "a/b = 'x AND y'", false},
+		{"keyword_inside_a_nested_bracket", "a[b='c' AND d='e']/f = 1", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -70,7 +70,13 @@ func ValidateVersionPredicate(text string) error {
 	if strings.EqualFold(body, "LATEST_VERSION") || strings.EqualFold(body, "ALL_VERSIONS") {
 		return nil
 	}
-	if scanPredicate(text).topLevelCmp {
+	sc := scanPredicate(text)
+	if sc.topLevelJunction != "" {
+		return fmt.Errorf("%w: VERSION predicate %q joins operands with %q; `versionPredicate` is "+
+			"`LATEST_VERSION | ALL_VERSIONS | standardPredicate` and has no junction alternative, "+
+			"so this emits text the parser rejects", ErrInvalidQuery, text, sc.topLevelJunction)
+	}
+	if sc.topLevelCmp {
 		return nil
 	}
 	return fmt.Errorf("%w: VERSION predicate %q is neither LATEST_VERSION, ALL_VERSIONS, "+
@@ -135,6 +141,11 @@ type predicateScan struct {
 	// topLevelCmp reports a COMPARISON_OPERATOR outside every literal, regex
 	// and nested bracket — the necessary condition for `standardPredicate`.
 	topLevelCmp bool
+	// topLevelJunction names the nodePredicate-only keyword found outside every
+	// literal, regex, comment, term code and nested bracket ("" when none).
+	// `versionPredicate` has no junction alternative, so one there is never
+	// legal — see [ValidateVersionPredicate].
+	topLevelJunction string
 }
 
 // scanPredicate walks the bracket text once. It is a lexical scan, not a parse:
@@ -227,6 +238,17 @@ func scanPredicate(text string) predicateScan {
 			}
 			i += n
 		default:
+			// A nodePredicate-only keyword at the TOP level. Matched on word
+			// boundaries so a path segment merely CONTAINING the letters —
+			// `a/brand > 1`, `a/android = 1`, `a/b_and_c = 1` — is not
+			// mistaken for one.
+			if depth == 0 {
+				if kw := junctionKeywordAt(text, i); kw != "" {
+					sc.topLevelJunction = kw
+					i += len(kw)
+					continue
+				}
+			}
 			i++
 		}
 	}
@@ -243,6 +265,29 @@ func scanPredicate(text string) predicateScan {
 // means this is NOT that section and the `]` is a real delimiter — verified:
 // `c[at0001,X::1|a] CONTAINS …` is a loud token-recognition error, so falling
 // through to ordinary scanning is both safe and correct.
+// junctionKeywordAt returns the nodePredicate-only keyword beginning at i, or
+// "". `nodePredicate` reaches AND, OR and MATCHES; `versionPredicate` reaches
+// none of them.
+//
+// The match is case-insensitive (the lexer builds keywords from
+// case-insensitive letter fragments) and bounded on BOTH sides by a non-word
+// character, so `a/brand > 1` and `a/b_and_c = 1` — both legal — do not match.
+func junctionKeywordAt(s string, i int) string {
+	if i > 0 && wordChar(s[i-1]) {
+		return ""
+	}
+	for _, kw := range []string{"MATCHES", "AND", "OR"} {
+		if len(s)-i < len(kw) || !strings.EqualFold(s[i:i+len(kw)], kw) {
+			continue
+		}
+		if j := i + len(kw); j < len(s) && wordChar(s[j]) {
+			continue
+		}
+		return s[i : i+len(kw)]
+	}
+	return ""
+}
+
 // termCodeChar spells `TERM_CODE_CHAR : NAME_CHAR | '.'`, i.e. a word
 // character, '-' or '.'.
 func termCodeChar(c byte) bool {
