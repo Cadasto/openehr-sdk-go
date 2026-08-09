@@ -123,7 +123,7 @@ Lives in `openehr/aql` with no lexer import, so REQ-013 holds.
 | Phase 1 — source text at every re-emitted position | done |
 | Phase 2 — position split (`VERSION` vs class) | done |
 | Phase 3 — bracket-escape scan | done |
-| Phase 4 — grammar confrontation, positive controls, mutation checks | done — 2954 generated cases, 699 accepted / 2255 refused |
+| Phase 4 — grammar confrontation, positive controls, mutation checks | done — but the first corpus (2954 cases, 699 accepted / 2255 refused) was **vacuous**: 0 cases parsed as a *different* query, so the soundness arm could not fail for any guard. Rebuilt on the PR #100 review round to rail on that property — 12719 cases against each of two bases (4503 accepted / 8216 refused), 89 discriminating splices — and it then found a sixth defect on its own |
 | Spec / registry updated (REQ-119 §, `traceability.yaml`, CHANGELOG) | done |
 | `make spec-check` | done — OK |
 | `make ci` | done — 0 lint issues, all tests pass |
