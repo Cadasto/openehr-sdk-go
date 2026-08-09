@@ -40,6 +40,7 @@ package aql
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -56,12 +57,20 @@ import (
 // out of case-insensitive letter fragments (`LATEST_VERSION : L A T E S T '_'
 // V E R S I O N`), so `latest_version` is the same token.
 //
-// For `standardPredicate : objectPath COMPARISON_OPERATOR pathPredicateOperand`
-// the check is the NECESSARY condition — a top-level comparison operator —
-// rather than a parse of the production. That direction is the safe one: no
-// standard predicate lacks the operator, so nothing ParseQuery accepts is
-// refused, and text that carries one but is malformed anyway stays a loud
-// parser error.
+// This position is held to its whole PRODUCTION rather than to a necessary
+// condition, and is the one place REQ-119 refuses a LOUD malformation: the
+// three alternatives are two keywords and one comparison, so what the position
+// admits STRUCTURALLY is decidable in a single pass and the closure clause
+// governs. `standardPredicate : objectPath COMPARISON_OPERATOR
+// pathPredicateOperand` is therefore checked as exactly ONE top-level
+// comparison operator with a non-blank operand on each side — `= 1` and
+// `a/b = 1 b = 2` are shapes no `versionPredicate` has.
+//
+// Its OPERANDS are a different matter and stay loud. `objectPath` recurses —
+// `pathPart : IDENTIFIER pathPredicate?` reaches `nodePredicate`, which reaches
+// `objectPath` again — so deciding whether `NOT a/b` is a legal left operand
+// costs the sub-grammar parser § The class predicate positions refuses to
+// build. The SHAPE is decided here; the operands are left to the parser.
 func ValidateVersionPredicate(text string) error {
 	if err := ValidatePathPredicate(text); err != nil {
 		return err
@@ -71,17 +80,27 @@ func ValidateVersionPredicate(text string) error {
 		return nil
 	}
 	sc := scanPredicate(text)
-	if sc.topLevelJunction != "" {
+	switch {
+	case sc.topLevelJunction != "":
 		return fmt.Errorf("%w: VERSION predicate %q joins operands with %q; `versionPredicate` is "+
 			"`LATEST_VERSION | ALL_VERSIONS | standardPredicate` and has no junction alternative, "+
 			"so this emits text the parser rejects", ErrInvalidQuery, text, sc.topLevelJunction)
+	case sc.topLevelCmps == 0:
+		return fmt.Errorf("%w: VERSION predicate %q is neither LATEST_VERSION, ALL_VERSIONS, "+
+			"nor a `<path> <op> <operand>` comparison; `versionPredicate` admits no node predicate, "+
+			"so this emits text the parser rejects", ErrInvalidQuery, text)
+	case sc.topLevelCmps > 1:
+		return fmt.Errorf("%w: VERSION predicate %q carries %d top-level comparison operators; "+
+			"`standardPredicate` is ONE `objectPath COMPARISON_OPERATOR pathPredicateOperand` and "+
+			"`versionPredicate` has no junction alternative to join two, so this emits text the "+
+			"parser rejects", ErrInvalidQuery, text, sc.topLevelCmps)
+	case stripPredicateTrivia(text[:sc.cmpAt]) == "" || stripPredicateTrivia(text[sc.cmpEnd:]) == "":
+		return fmt.Errorf("%w: VERSION predicate %q leaves one side of its comparison operator "+
+			"empty; `standardPredicate` requires an `objectPath` before it and a "+
+			"`pathPredicateOperand` after it, so this emits text the parser rejects",
+			ErrInvalidQuery, text)
 	}
-	if sc.topLevelCmp {
-		return nil
-	}
-	return fmt.Errorf("%w: VERSION predicate %q is neither LATEST_VERSION, ALL_VERSIONS, "+
-		"nor a `<path> <op> <operand>` comparison; `versionPredicate` admits no node predicate, "+
-		"so this emits text the parser rejects", ErrInvalidQuery, text)
+	return nil
 }
 
 // ValidatePathPredicate refuses bracket text that can ESCAPE the brackets the
@@ -93,8 +112,11 @@ func ValidateVersionPredicate(text string) error {
 //	Predicate: "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"
 //	  -> FROM COMPOSITION c[a/b='c'] CONTAINS OBSERVATION o[d/e='f']
 //
-// Three states make a bracket NOT a delimiter, and the scan tracks each so the
-// guard neither miscounts nor refuses legal text:
+// FIVE states make a character not the delimiter it looks like, and the scan
+// tracks each so the guard neither miscounts nor refuses legal text. The list
+// is over THAT property rather than over "states in which a bracket is
+// content": stated the narrower way it licensed a real defect, because a region
+// can be transparent to a quote while opaque to a bracket.
 //
 //   - A string literal. `[` and `]` inside `'…'` / `"…"` are content. An
 //     UNTERMINATED one is refused, because the emitter's own `]` would fall
@@ -102,7 +124,17 @@ func ValidateVersionPredicate(text string) error {
 //     silent substitution rather than a loud error.
 //   - A contained regex. `SLASH_REGEX_CHAR : ~[/\n\r] | ESCAPE_SEQ | '\\/'`
 //     admits both brackets freely, so `a/b MATCHES {/[0-9]+/}` must not be
-//     counted.
+//     counted. It is matched as a WHOLE token or not at all — see
+//     [skipContainedRegex].
+//   - A comment. `COMMENT` is SKIPPED rather than channelled, so it survives
+//     into the source text and a `]` inside one is not a delimiter. One that no
+//     newline closes INSIDE the text is refused — see [commentRun].
+//   - A `TERM_CODE` display name. `('|' ~[|[\]]+ '|')?` excludes the brackets
+//     and NOTHING else, so it is transparent to quotes, braces and dashes and
+//     must be stepped over whole: reading the apostrophe in
+//     `at0001,SNOMED-CT::22298006|Barrett's oesophagus|` as a string delimiter
+//     refused a query ParseQuery had just produced. `TERM_CODE_CHAR` admits
+//     `-`, so a `--` inside a term code is likewise not a comment.
 //   - A nested path predicate. `objectPath` is `pathPart (‘/’ pathPart)*` and
 //     `pathPart : IDENTIFIER pathPredicate?`, so `a[at0001]/b='c'` is a legal
 //     predicate carrying a BALANCED bracket pair.
@@ -111,9 +143,6 @@ func ValidateVersionPredicate(text string) error {
 // loud error: the emitter's `]` closes the INNER bracket and the outer one then
 // swallows text up to whatever `]` appears later in the query, which is a
 // substitution again.
-//
-// `TERM_CODE`'s trailing `|…|` section needs no case of its own — the grammar
-// spells its content `~[|[\]]+`, which already excludes both brackets.
 func ValidatePathPredicate(text string) error {
 	sc := scanPredicate(text)
 	switch {
@@ -138,9 +167,12 @@ type predicateScan struct {
 	// unterminated names the construct left open ("" when none), which makes
 	// the emitted `]` content rather than a delimiter.
 	unterminated string
-	// topLevelCmp reports a COMPARISON_OPERATOR outside every literal, regex
-	// and nested bracket — the necessary condition for `standardPredicate`.
-	topLevelCmp bool
+	// topLevelCmps counts the COMPARISON_OPERATORs outside every literal,
+	// regex, comment, term code and nested bracket, and cmpAt/cmpEnd bound the
+	// FIRST of them. `standardPredicate` is ONE comparison, so the COUNT — not
+	// merely the presence — is what decides the shape.
+	topLevelCmps  int
+	cmpAt, cmpEnd int
 	// topLevelJunction names the nodePredicate-only keyword found outside every
 	// literal, regex, comment, term code and nested bracket ("" when none).
 	// `versionPredicate` has no junction alternative, so one there is never
@@ -214,11 +246,20 @@ func scanPredicate(text string) predicateScan {
 		case '=', '<', '>':
 			// COMPARISON_OPERATOR is `= != > >= < <=`; every spelling carries
 			// one of these three, and `!` occurs in no other token, so testing
-			// them alone is the same set.
-			if depth == 0 {
-				sc.topLevelCmp = true
+			// them alone is the same set. `<=` and `>=` are ONE operator, so
+			// the trailing `=` MUST NOT be counted a second time — counted
+			// twice, `a/b <= 1` reads as two comparisons and is refused.
+			n := 1
+			if (c == '<' || c == '>') && i+1 < len(text) && text[i+1] == '=' {
+				n = 2
 			}
-			i++
+			if depth == 0 {
+				if sc.topLevelCmps == 0 {
+					sc.cmpAt, sc.cmpEnd = i, i+n
+				}
+				sc.topLevelCmps++
+			}
+			i += n
 		case '-':
 			// A comment is SKIPPED by the lexer, not put on a hidden channel, so
 			// it survives in the source text the extractor reads. Stepping over
@@ -258,13 +299,6 @@ func scanPredicate(text string) predicateScan {
 	return sc
 }
 
-// skipTermCodeName steps over `TERM_CODE`'s optional trailing display name,
-// `'|' ~[|[\]]+ '|'`, and reports whether one is there.
-//
-// The content class excludes both brackets, so a `]` before the closing `|`
-// means this is NOT that section and the `]` is a real delimiter — verified:
-// `c[at0001,X::1|a] CONTAINS …` is a loud token-recognition error, so falling
-// through to ordinary scanning is both safe and correct.
 // junctionKeywordAt returns the nodePredicate-only keyword beginning at i, or
 // "". `nodePredicate` reaches AND, OR and MATCHES; `versionPredicate` reaches
 // none of them.
@@ -295,6 +329,13 @@ func termCodeChar(c byte) bool {
 		(c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 }
 
+// skipTermCodeName steps over `TERM_CODE`'s optional trailing display name,
+// `'|' ~[|[\]]+ '|'`, and reports whether one is there.
+//
+// The content class excludes both brackets, so a `]` before the closing `|`
+// means this is NOT that section and the `]` is a real delimiter — verified:
+// `c[at0001,X::1|a] CONTAINS …` is a loud token-recognition error, so falling
+// through to ordinary scanning is both safe and correct.
 func skipTermCodeName(s string, i int) (int, bool) {
 	for j := i + 1; j < len(s); j++ {
 		switch s[j] {
@@ -346,34 +387,64 @@ func skipContainedRegex(s string, i int) (int, bool) {
 	if j >= len(s) || s[j] != '/' {
 		return 0, false
 	}
-	end := regexBodyEnd(s, j+1)
-	if end < 0 {
-		return 0, false
-	}
-	return regexTail(s, end+1)
-}
-
-// regexBodyEnd returns the index of the `/` closing `SLASH_REGEX`'s body, or -1.
-//
-// A backslash consumes the character after it, covering both `ESCAPE_SEQ` and
-// the explicit `'\\/'` alternative that keeps an escaped slash from closing the
-// body. `~[/\n\r]` excludes the line breaks, so a body carrying one is no body
-// at all.
-func regexBodyEnd(s string, start int) int {
-	for j := start; j < len(s); j++ {
-		switch s[j] {
-		case '\n', '\r':
-			return -1
-		case '\\':
-			j++
-		case '/':
-			if j == start {
-				return -1 // SLASH_REGEX_CHAR+ needs at least one character
-			}
-			return j
+	// Longest first, because ANTLR takes the longest match and the body can
+	// close at more than one place.
+	for _, end := range regexBodyEnds(s, j+1) {
+		if k, ok := regexTail(s, end+1); ok {
+			return k, true
 		}
 	}
-	return -1
+	return 0, false
+}
+
+// regexBodyEnds returns every index at which `SLASH_REGEX`'s body can close,
+// LONGEST first.
+//
+// A backslash is read BOTH ways, and committing to one of them refused a regex
+// the parser accepts. `~[/\n\r]` admits a backslash as an ORDINARY character
+// while `ESCAPE_SEQ` and `'\\/'` consume the character after it, so in
+// `{/]\/}` the escaped reading cannot complete the token and the ordinary one
+// closes the body at the very next `/` — and ANTLR takes whichever reading
+// yields the longest token. Always consuming the character after a backslash
+// made that regex unwritable.
+//
+// The reachable boundary set is walked rather than every `/` being treated as
+// a candidate, because a bare `/` is NOT a body character: `~[/\n\r]` excludes
+// it and only `'\\/'` puts one inside. Treating them all as candidates would
+// read `{/a/b/}` — which the lexer resolves to SYM_LEFT_CURLY — as a regex and
+// step over a `]` that is a real delimiter, which is the silent direction.
+func regexBodyEnds(s string, start int) []int {
+	reachable := make([]bool, len(s)+1)
+	reachable[start] = true
+	var ends []int
+	for p := start; p < len(s); p++ {
+		if !reachable[p] {
+			continue
+		}
+		switch c := s[p]; c {
+		case '\n', '\r':
+			// `~[/\n\r]` excludes the line breaks and no escape spells one, so
+			// the body cannot continue through here.
+		case '/':
+			if p > start { // SLASH_REGEX_CHAR+ needs at least one character
+				ends = append(ends, p)
+			}
+		default:
+			reachable[p+1] = true // `~[/\n\r]`
+			if c == '\\' && p+1 < len(s) && regexEscapeChar(s[p+1]) {
+				reachable[p+2] = true // ESCAPE_SEQ | '\\/'
+			}
+		}
+	}
+	slices.Reverse(ends)
+	return ends
+}
+
+// regexEscapeChar spells the character a backslash may consume inside a regex
+// body: `ESCAPE_SEQ : '\\' ['"?abfnrtv\\*]`, plus `SLASH_REGEX_CHAR`'s own
+// `'\\/'` alternative.
+func regexEscapeChar(c byte) bool {
+	return strings.IndexByte(`'"?abfnrtv\*/`, c) >= 0
 }
 
 // regexTail matches the token's remainder after the body's closing `/`:
@@ -417,6 +488,13 @@ func skipRegexSpace(s string, i int) int {
 //   - The SPACE is mandatory in the first alternative. `--x` is no comment at
 //     all but `SYM_DOUBLE_DASH`, so the characters after it — a `]` included —
 //     are ordinary tokens. Treating it as a comment skipped a real delimiter.
+//   - The BODY is `~[\r\n]*`, which excludes a lone carriage return as much as
+//     a newline. Only `'\r'? '\n'` closes the token, so `-- x\r]` is
+//     SYM_DOUBLE_DASH and the `]` after it is a delimiter — searching the body
+//     for the next `\n` alone read one comment where the lexer sees none, in
+//     both directions at once: it stepped over a real `]`, and it reported a
+//     text ENDING at the `\r` as an unterminated comment when the parser
+//     merely rejects it loudly.
 //   - EOF means the end of the QUERY, not the end of this text. A run that no
 //     newline closes here goes on to close somewhere in the emitted query,
 //     which is why the caller refuses it rather than stepping over it.
@@ -438,16 +516,25 @@ func commentRun(s string, i int) (int, bool) {
 	case rest[0] != ' ':
 		return 0, false // SYM_DOUBLE_DASH, not a comment
 	}
-	if nl := strings.IndexByte(s[i:], '\n'); nl >= 0 {
-		return nl + 1, true
+	body := rest[1:] // `~[\r\n]*`, then `'\r'? '\n'`
+	switch n := strings.IndexAny(body, "\r\n"); {
+	case n < 0:
+		return len(s) - i, false // no terminator here: the run closes in the emitted query
+	case body[n] == '\n':
+		return len("-- ") + n + 1, true
+	case n+1 < len(body) && body[n+1] == '\n':
+		return len("-- ") + n + 2, true
+	default:
+		return 0, false // the body ended on a lone '\r', which closes nothing
 	}
-	return len(s) - i, false
 }
 
-// stripPredicateTrivia removes the comment runs the lexer discards, so a
-// keyword comparison sees what the parser sees. `LATEST_VERSION -- note\n` is
-// the same token stream as `LATEST_VERSION`, and trimming whitespace alone
-// refused it.
+// stripPredicateTrivia removes what the lexer SKIPS, so a comparison against
+// the text sees what the parser sees. `LATEST_VERSION -- note\n` is the same
+// token stream as `LATEST_VERSION`, and trimming whitespace alone refused it.
+//
+// Each run becomes a SPACE rather than nothing, because skipped trivia still
+// separates the tokens around it.
 func stripPredicateTrivia(text string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -456,8 +543,33 @@ func stripPredicateTrivia(text string) string {
 			b.WriteByte(' ')
 			continue
 		}
+		if n := bomRun(text, i); n > 0 {
+			i += n
+			b.WriteByte(' ')
+			continue
+		}
 		b.WriteByte(text[i])
 		i++
 	}
 	return strings.TrimSpace(b.String())
+}
+
+// bomRun returns the length of the `UNICODE_BOM` run starting at i, or 0.
+//
+// `UNICODE_BOM` is skipped like `WS` and `COMMENT` and is NOT anchored to the
+// start of input, so `VERSION v[<BOM>LATEST_VERSION]` is a query ParseQuery
+// produces and whose predicate this package must therefore accept.
+//
+// Two of the vendored rule's three alternatives are upstream spelling quirks
+// rather than BOMs — ANTLR's `\u` escape takes exactly four hex digits, so
+// `'\uEFBBBF'` is U+EFBB followed by the letters `BF`, and `'\u0000FEFF'`
+// is NUL followed by `FEFF`. They are matched as WRITTEN, because the lexer
+// skips what the rule says and not what its comment labels it.
+func bomRun(s string, i int) int {
+	for _, form := range []string{"\uFEFF", "\uEFBB" + "BF", "\x00" + "FEFF"} {
+		if strings.HasPrefix(s[i:], form) {
+			return len(form)
+		}
+	}
+	return 0
 }

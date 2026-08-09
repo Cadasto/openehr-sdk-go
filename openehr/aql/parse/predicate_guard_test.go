@@ -68,6 +68,16 @@ func TestEmitVersionPredicateHoldsItsOwnSubGrammar(t *testing.T) {
 			"commit_audit/time_committed > '2020'",
 			"commit_audit/time_committed>'2020'",
 			"commit_audit/committer/name = $who",
+			// Every COMPARISON_OPERATOR spelling. `<=` and `>=` are ONE
+			// operator, and a shape check that counts their characters reads
+			// two comparisons and refuses AQL the parser accepts.
+			"commit_audit/time_committed <= '2020'",
+			"commit_audit/time_committed >= '2020'",
+			"commit_audit/time_committed < '2020'",
+			// An operator inside a literal or a nested bracket is not a
+			// top-level one.
+			"commit_audit/description = 'a=b'",
+			"commit_audit[at0001]/time_committed = '2020'",
 		} {
 			out, err := emitWithPredicate(t, base, ok)
 			if err != nil {
@@ -76,6 +86,31 @@ func TestEmitVersionPredicateHoldsItsOwnSubGrammar(t *testing.T) {
 			}
 			if _, err := parse.ParseQuery(out); err != nil {
 				t.Errorf("emitted %q does not re-parse: %v", out, err)
+			}
+		}
+	})
+
+	t.Run("refuses a shape standardPredicate does not have", func(t *testing.T) {
+		// REQ-119 holds this position to its whole PRODUCTION, not to the
+		// necessary condition a top-level comparison operator gives: with three
+		// non-recursive alternatives the position's SHAPE is decidable in one
+		// pass, so the closure clause governs and none of these may reach the
+		// wire. Each is accepted in the CLASS position, where `nodePredicate`
+		// makes the same text lawful or merely loud.
+		for _, bad := range []string{
+			"= 1",           // no objectPath before the operator
+			"a/b =",         // no pathPredicateOperand after it
+			"a/b = 1 = 2",   // two operators, and no junction alternative to join them
+			"a/b = 1 b = 2", // two comparisons juxtaposed
+		} {
+			out, err := emitWithPredicate(t, base, bad)
+			if err == nil {
+				t.Errorf("Emit with VERSION predicate %q = %q, want an error; `standardPredicate` is "+
+					"ONE `objectPath COMPARISON_OPERATOR pathPredicateOperand`", bad, out)
+				continue
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("Emit with VERSION predicate %q: error %v does not wrap ErrInvalidQuery", bad, err)
 			}
 		}
 	})
@@ -134,6 +169,9 @@ func TestEmitClassPredicateRefusesBracketEscape(t *testing.T) {
 			{"unterminated_dq_string", `a/b="c`},
 			{"unterminated_comment", "a/b='c' -- x"},
 			{"term_code_name_carrying_a_bracket", "at0001,X::1|a]b|"},
+			// The comment body cannot span a lone CR, so the `]` after one is
+			// the class bracket's own delimiter and the text escapes.
+			{"bare_cr_does_not_extend_the_comment", "a/b='c' -- x\r] AND d/e='f'\n"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				out, err := emitWithPredicate(t, base, tc.text)
@@ -232,6 +270,7 @@ func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
 		{"regex body never closes", "a/b MATCHES {/re", "the token cannot complete, so nothing is consumed"},
 		{"regex closes but the token does not", "a/b MATCHES {/re/", "same: no CONTAINED_REGEX, no swallowing"},
 		{"double dash is not a comment", "a/b='c'--x", "`--x` is SYM_DOUBLE_DASH; the `]` stays a delimiter"},
+		{"comment body ending on a bare CR", "a/b='c' -- x\r", "`~[\\r\\n]*` stops at the CR and only `'\\r'? '\\n'` closes the token, so this is SYM_DOUBLE_DASH and nothing is left open"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := aql.ValidatePathPredicate(tc.text); err != nil {

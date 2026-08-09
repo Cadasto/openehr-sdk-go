@@ -51,6 +51,15 @@ func TestValidatePathPredicate(t *testing.T) {
 		{"brace_not_a_regex", "a/b MATCHES {x}", false, "`{` that starts no regex is ordinary content"},
 		{"regex_body_unclosed", "a/b MATCHES {/re", false, "the token cannot complete, so `{` is SYM_LEFT_CURLY"},
 		{"regex_escaped_slash", `a/b MATCHES {/\/}`, false, "a body ending in a backslash is legal"},
+		// A backslash reads BOTH ways. Read as `'\\/'` the token cannot
+		// complete and the `]` would be counted; read as `~[/\n\r]` the next
+		// `/` closes the body and the whole thing is one CONTAINED_REGEX, which
+		// is what the parser does — ANTLR takes the longest match.
+		{"regex_bracket_then_escaped_slash", `a/b MATCHES {/]\/}`, false, "the longest match makes the `]` regex content"},
+		// …and the converse, which is why every `/` cannot simply be treated as
+		// a candidate body end: a BARE `/` is no body character, so this token
+		// cannot complete at all and the `]` is a real delimiter.
+		{"brace_with_a_bare_slash", "a/b MATCHES {/a/]/}", true, "`{` falls back to SYM_LEFT_CURLY, so the `]` closes the bracket"},
 		{"term_code_name_quote", "at0001,SNOMED::73211009|Crohn's disease|", false, "`~[|[\\]]+` admits an apostrophe"},
 		{"term_code_name_brace", "at0001,X::1|dose{2}|", false, "and a brace"},
 		{"term_code_name_bracket", "at0001,X::1|a]b|", true, "but NOT a bracket, so the `]` is a delimiter"},
@@ -59,6 +68,12 @@ func TestValidatePathPredicate(t *testing.T) {
 		{"comment_closed", "a/b='c' -- x\n", false, "a newline closes it inside the text"},
 		{"comment_hides_bracket", "at0001 -- ]\n AND a/b='c'", false, "a `]` inside a closed comment is not a delimiter"},
 		{"double_dash_not_a_comment", "a/b='c'--]", true, "`--x` is SYM_DOUBLE_DASH, so the `]` is real"},
+		// The body is `~[\r\n]*` and only `'\r'? '\n'` closes the token, so a
+		// body ending on a lone CR is no comment at all. Both directions of
+		// that were wrong while the body was searched for the next `\n`:
+		{"comment_body_bare_cr", "a/b='c' -- x\r", false, "no comment, so nothing is unterminated — a LOUD malformation"},
+		{"comment_bare_cr_then_bracket", "a/b='c' -- x\r] AND d/e='f'\n", true, "…and the `]` after it is a real delimiter"},
+		{"comment_crlf", "a/b='c' -- x\r\n", false, "`'\\r'? '\\n'` is the closing form"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -123,6 +138,46 @@ func TestValidateVersionPredicate(t *testing.T) {
 		{"path_containing_and_underscored", "a/b_and_c = 1", false},
 		{"keyword_inside_a_literal", "a/b = 'x AND y'", false},
 		{"keyword_inside_a_nested_bracket", "a[b='c' AND d='e']/f = 1", false},
+		// A comment is the third region the keyword must not fire inside. The
+		// other two the amendment names — a regex and a top-level TERM_CODE —
+		// are structurally unreachable HERE: `versionPredicate` has no MATCHES
+		// alternative, and `pathPredicateOperand` is
+		// `primitive | objectPath | PARAMETER | ID_CODE | AT_CODE`, with
+		// TERM_CODE in none of them. Both are reachable only inside a nested
+		// bracket, where the depth test already covers them.
+		{"keyword_inside_a_comment", "a/b = 1 -- x AND y\n", false},
+		{"term_code_inside_a_nested_bracket", "a[at0001,X::1|x AND y|]/b = 1", false},
+
+		// The SHAPE of `standardPredicate : objectPath COMPARISON_OPERATOR
+		// pathPredicateOperand` — exactly one top-level operator with an
+		// operand on each side. REQ-119 § The class predicate positions holds
+		// this position to its whole production, so these are refused here
+		// though the equivalent text stays loud in the class position.
+		{"missing_left_operand", "= 1", true},
+		{"missing_right_operand", "a/b =", true},
+		{"two_comparisons", "a/b = 1 = 2", true},
+		{"juxtaposed_comparisons", "a/b = 1 b = 2", true},
+		// …and the anti-tightening half. `<=` and `>=` are ONE operator; a scan
+		// that counts their characters reads two comparisons and refuses AQL
+		// the parser accepts.
+		{"operator_le", "a/b <= 1", false},
+		{"operator_ge", "a/b >= 1", false},
+		{"operator_ne", "a/b != 1", false},
+		{"operator_lt", "a/b < 1", false},
+		{"operator_inside_a_literal", "a/b = 'x=y'", false},
+		{"operator_inside_a_nested_bracket", "a[c=1]/b = 2", false},
+		// The line the amendment draws: the position's SHAPE is decided, its
+		// OPERANDS are not. `NOT a/b` is a malformed objectPath, and deciding
+		// that costs the sub-grammar parser this REQ refuses to build —
+		// `pathPart` reaches `nodePredicate`, which reaches `objectPath` again.
+		// So it stays a LOUD parser error, and this row says so on purpose.
+		{"malformed_operand_stays_loud", "NOT a/b = 1", false},
+
+		// `UNICODE_BOM` is skipped anywhere, not only at the start of input, so
+		// the keyword comparison must see through it — the extractor produces
+		// this text from a query that parses.
+		{"bom_prefix", "\uFEFFLATEST_VERSION", false},
+		{"bom_suffix", "LATEST_VERSION\uFEFF", false},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
