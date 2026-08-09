@@ -104,8 +104,11 @@ func TestValidateVersionPredicate(t *testing.T) {
 		// A near-miss keyword must not pass on a prefix match.
 		{"keyword_prefix", "LATEST_VERSIONS", true},
 		{"keyword_suffix", "XLATEST_VERSION", true},
-		// The escape scan still applies here.
-		{"escapes_bracket", "LATEST_VERSION] CONTAINS COMPOSITION c[at0001", true},
+		// The escape scan still applies here — and the row must carry a
+		// top-level comparison operator, or the KEYWORD arm refuses it whether
+		// or not the escape scan runs and the row tests nothing. That is what
+		// the previous spelling did.
+		{"escapes_bracket", "commit_audit/time > '2020'] CONTAINS COMPOSITION c[at0001", true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

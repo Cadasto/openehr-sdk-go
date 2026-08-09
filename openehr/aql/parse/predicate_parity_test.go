@@ -21,6 +21,8 @@ package parse_test
 // mangled predicate can parse perfectly well as something else.
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
@@ -151,4 +153,82 @@ func TestPredicateRoundTripIsIdempotent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPredicateSourceTextIsIdenticalOnBothExtractors — the SDK has TWO
+// extractors over the same tree, and the fidelity fix had to land in both.
+//
+// [parse.Parse] builds the flat [parse.Document] view (the lint-only path,
+// REQ-113 Tier 1) through `ast.go`; [parse.ParseQuery] builds the structured
+// AST through `extract_query.go`. They are separate walks of the same parse
+// tree, so a source-text rule applied to one and not the other is exactly the
+// half-bound shape this REQ keeps paying for — and the whole corpus below only
+// ever exercised the structured one.
+func TestPredicateSourceTextIsIdenticalOnBothExtractors(t *testing.T) {
+	for _, tc := range predicateCorpus {
+		t.Run(tc.name, func(t *testing.T) {
+			structured, err := parse.ParseQuery(tc.in)
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			flat, err := parse.Parse(tc.in)
+			if err != nil {
+				t.Fatalf("Parse: %v", err)
+			}
+
+			// Same classes, in the same order, carrying the same bracket text.
+			var want []string
+			for _, c := range structuredClasses(structured) {
+				want = append(want, c.RMType+"|"+c.Alias+"|"+c.Predicate+"|"+c.Archetype)
+			}
+			var got []string
+			for _, c := range flat.Classes {
+				got = append(got, c.RMType+"|"+c.Alias+"|"+c.Predicate+"|"+c.Archetype)
+			}
+			if !slices.Equal(want, got) {
+				t.Errorf("the two extractors disagree about the class predicates\n"+
+					"  ParseQuery: %q\n  Parse:      %q", want, got)
+			}
+
+			// The path positions too. Document.Paths is the flat view's own
+			// walk and has no structured counterpart to diff against, so the
+			// property is asserted directly: text read from the CHARACTER
+			// stream is a substring of the source, and a token-stream
+			// concatenation — which drops the whitespace between keyword
+			// tokens — is not.
+			for _, ip := range flat.Paths {
+				if !strings.Contains(tc.in, ip.Raw) {
+					t.Errorf("Parse read path %q, which does not occur verbatim in the source; "+
+						"the flat extractor is still reading the TOKEN stream", ip.Raw)
+				}
+				if ip.Predicate != "" && !strings.Contains(tc.in, ip.Predicate) {
+					t.Errorf("Parse read path predicate %q, which does not occur verbatim "+
+						"in the source", ip.Predicate)
+				}
+			}
+		})
+	}
+}
+
+// structuredClasses flattens the structured FROM tree in source order.
+func structuredClasses(q *parse.Query) []parse.ClassExpr {
+	var out []parse.ClassExpr
+	var walk func(c *parse.Containment)
+	walk = func(c *parse.Containment) {
+		if c == nil {
+			return
+		}
+		if c.Class.RMType != "" || c.Class.Version {
+			out = append(out, c.Class)
+		}
+		for i := range c.Children {
+			walk(&c.Children[i])
+		}
+	}
+	if q.From.Root.RMType != "" || q.From.Root.Version {
+		out = append(out, q.From.Root)
+	}
+	walk(q.From.Junction)
+	walk(q.From.Contains)
+	return out
 }

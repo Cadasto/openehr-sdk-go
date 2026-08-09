@@ -20,6 +20,16 @@ package parse_test
 //     fails loudly — which REQ-119 permits, since the caller sees the error
 //     the moment they read their own query back — or returns the SAME
 //     predicate text.
+// One alternative of `pathPredicate` is structurally OUTSIDE this corpus, and
+// silently so unless said here: for `archetypePredicate` (`ARCHETYPE_HRID |
+// PARAMETER`) the extractor routes the text to ClassExpr.Archetype /
+// ParamArchetype and leaves Predicate empty, so the fidelity oracle below —
+// which compares the re-parsed Predicate to the text — reads every such case as
+// unfaithful. Adding an HRID or `$p` fragment therefore produces FALSE soundness
+// failures rather than coverage. Those two alternatives are guarded by
+// aql.ValidateArchetypeID and aql.ValidateValue and confronted in
+// identifier_parity_test.go instead.
+//
 //   - NO TIGHTENING. If the guard REFUSES, the splice must genuinely have been
 //     unfaithful. A refusal of text the parser reads back unchanged is the
 //     tightening failure REQ-119 guards against as squarely as the splice, and
