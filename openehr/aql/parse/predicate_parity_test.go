@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -65,6 +66,17 @@ var predicateCorpus = []struct {
 	// A regex body ending in a backslash: `SLASH_REGEX_CHAR` makes a bare `\` an
 	// ordinary body character, so the following `/` closes the body.
 	{"class_regex_trailing_escape", `SELECT c/x FROM COMPOSITION c[a/b MATCHES {/\/}]`},
+	// …and the same backslash with a BRACKET in front of it. This row is the
+	// one that fails when the scan commits to reading `\/` as an escaped slash:
+	// under that single reading the token cannot complete, the `{` becomes
+	// ordinary content, and the `]` inside the body is counted as the class
+	// bracket's delimiter — refusing a regex ParseQuery accepts.
+	{"class_regex_bracket_then_escape", `SELECT c/x FROM COMPOSITION c[a/b MATCHES {/]\/}]`},
+	// A standing comparison whose objectPath carries WHITESPACE inside a nested
+	// predicate. The class bracket re-emits from ClassExpr.Predicate, so this
+	// row is identity either way; what it pins is aql.Comparison.Path, which no
+	// other row can distinguish from a token-stream concatenation.
+	{"class_standing_cmp_spaced_path", "SELECT c/x FROM COMPOSITION c[a[at0001, 'n']/b = 'c']"},
 
 	// --- VERSION position: versionPredicate's three alternatives ---
 	{"version_latest", "SELECT v/data FROM VERSION v[LATEST_VERSION]"},
@@ -79,6 +91,10 @@ var predicateCorpus = []struct {
 	{"version_padded_all", "SELECT v/data FROM VERSION v[  ALL_VERSIONS  ]"},
 	{"version_comment", "SELECT v/data FROM VERSION v[LATEST_VERSION -- note\n]"},
 	{"version_standard_padded", "SELECT v/data FROM VERSION v[ commit_audit/time_committed > '2020' ]"},
+	// `UNICODE_BOM` is skipped like WS and COMMENT and is not anchored to the
+	// start of input, so this is a query ParseQuery produces — and the keyword
+	// comparison must see through it or the extractor's own output is refused.
+	{"version_bom", "SELECT v/data FROM VERSION v[\uFEFFLATEST_VERSION]"},
 
 	// --- source formatting rides through verbatim ---
 	// The lexer SKIPS whitespace and comments (they are discarded, not put on
@@ -95,6 +111,10 @@ var predicateCorpus = []struct {
 	// Guarding these against splice stays out of scope by REQ-055 rule 3;
 	// not CORRUPTING them is extraction fidelity, the opposite direction.
 	{"path_select", "SELECT c/items[a/b='c' AND d/e='f']/value FROM COMPOSITION c"},
+	// `identifiedPath : IDENTIFIER pathPredicate? …` — the predicate on the
+	// ROOT identifier is a different extraction site from a segment's, and no
+	// other row puts whitespace in it.
+	{"path_root_predicate", "SELECT c[a/b='c' AND d/e='f']/value FROM COMPOSITION c"},
 	{"path_segment_deep", "SELECT c/content[at0001]/items[a/b='c' OR d/e='f']/value FROM COMPOSITION c"},
 	{"path_where", "SELECT c/x FROM COMPOSITION c WHERE c/items[a/b='c' AND d/e='f']/v = 1"},
 	{"path_order_by", "SELECT c/x FROM COMPOSITION c ORDER BY c/items[a/b='c' AND d/e='f']/v ASC"},
@@ -205,9 +225,86 @@ func TestPredicateSourceTextIsIdenticalOnBothExtractors(t *testing.T) {
 					t.Errorf("Parse read path predicate %q, which does not occur verbatim "+
 						"in the source", ip.Predicate)
 				}
+				// A SEGMENT's predicate is its own extraction site, reached
+				// through a different context than the root's. Asserting the
+				// root alone left both extractors' segment sites free to fall
+				// back to the token stream.
+				for _, seg := range ip.Segments {
+					if seg.Predicate != "" && !strings.Contains(tc.in, seg.Predicate) {
+						t.Errorf("Parse read path segment predicate %q, which does not occur "+
+							"verbatim in the source", seg.Predicate)
+					}
+				}
+			}
+
+			// The STRUCTURED extractor's own path sites. The class diff above
+			// covers only ClassExpr, and flat.Paths covers only the flat view,
+			// so a SELECT path read from the token stream by ParseQuery alone
+			// showed up in neither.
+			//
+			// With these, every sourceText site that can DIFFER from GetText()
+			// fails a named test when it is swapped. The four that do not are
+			// equivalent by construction rather than untested: the two
+			// bare-keyword literal sites (`bareKeywordLiteral` accepts a single
+			// IDENTIFIER, whose token text is its source span) and
+			// bracketInterior's two nil-token fallbacks (the production emits
+			// both brackets whenever the child rule is present).
+			for _, item := range structured.Select.Items {
+				pe, ok := item.Expr.(parse.PathExpr)
+				if !ok {
+					continue
+				}
+				if !strings.Contains(tc.in, pe.Raw) {
+					t.Errorf("ParseQuery read SELECT path %q, which does not occur verbatim "+
+						"in the source", pe.Raw)
+				}
+				if pe.Predicate != "" && !strings.Contains(tc.in, pe.Predicate) {
+					t.Errorf("ParseQuery read SELECT path predicate %q, which does not occur "+
+						"verbatim in the source", pe.Predicate)
+				}
+				for _, seg := range pe.Segments {
+					if seg.Predicate != "" && !strings.Contains(tc.in, seg.Predicate) {
+						t.Errorf("ParseQuery read SELECT path segment predicate %q, which does "+
+							"not occur verbatim in the source", seg.Predicate)
+					}
+				}
+			}
+
+			// The STANDING COMPARISON's own path. It is lifted out of the same
+			// class bracket, but re-emission reads ClassExpr.Predicate, so no
+			// round-trip row can reach this site: it is read-side API and needs
+			// its own assertion or a token-stream fallback here is invisible.
+			for _, c := range structuredClasses(structured) {
+				pc := c.PredicateComparison
+				if pc == nil {
+					continue
+				}
+				if !strings.Contains(tc.in, pc.Path) {
+					t.Errorf("ParseQuery lifted standing-comparison path %q, which does not occur "+
+						"verbatim in the source", pc.Path)
+				}
+				if pc.ParsedPath != nil && !strings.Contains(tc.in, pc.ParsedPath.Raw) {
+					t.Errorf("ParseQuery lifted standing-comparison ParsedPath.Raw %q, which does "+
+						"not occur verbatim in the source", pc.ParsedPath.Raw)
+				}
+				for _, seg := range structuredSegments(pc) {
+					if seg.Predicate != "" && !strings.Contains(tc.in, seg.Predicate) {
+						t.Errorf("ParseQuery lifted standing-comparison segment predicate %q, "+
+							"which does not occur verbatim in the source", seg.Predicate)
+					}
+				}
 			}
 		})
 	}
+}
+
+// structuredSegments returns a standing comparison's decomposed path segments,
+// or nil when it carries none.
+func structuredSegments(c *aql.Comparison) []aql.PathSegment {
+	if c.ParsedPath == nil {
+		return nil
+	}
+	return c.ParsedPath.Segments
 }
 
 // structuredClasses flattens the structured FROM tree in source order.

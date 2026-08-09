@@ -74,6 +74,8 @@ var predicateFragments = []string{
 	",X::1|n's|", // quote-, brace- and dash-transparent content
 	",X::1|a]b|", // …but bracket-OPAQUE, so this `]` IS a delimiter
 	`{/\/}`,      // a regex body ending in a backslash
+	`{/]\/}`,     // …with a BRACKET the escaped reading would expose
+	"{/a/]/}",    // a bare `/` is no body char, so this `{` starts no regex
 	"{x}",        // a `{` that starts no regex: SYM_LEFT_CURLY, ordinary content
 }
 
@@ -84,15 +86,28 @@ var predicateFragments = []string{
 // produce trailing garbage, which is a LOUD error the arm permits. Two
 // properties are needed for the arm to be live — something AFTER the bracket to
 // be swallowed, and a NEWLINE later in the query for a comment run to resume on.
+// The BOTH-POSITIONS requirement is a property of the bases too. One struct
+// field feeds two sub-grammars, so a corpus spliced only into a class bracket
+// confronts only ValidatePathPredicate; PROBE-090 asks for the generated
+// confrontation at the VERSION bracket as well, and the guards there differ —
+// `versionPredicate` is held to its whole production, so the VERSION base's
+// accept set is a strict subset of the class one and the tightening arm has
+// something else to say.
+//
+// seed is the bracket text the base query is PARSED with, before the generated
+// text replaces it: it must be valid in the position, which `at0002` is not in
+// a VERSION bracket.
 var predicateBases = []struct {
 	name    string
 	prefix  string
+	seed    string
 	suffix  string
 	shapeOK func(q *parse.Query) bool
 }{
 	{
 		name:   "bare",
 		prefix: "SELECT c/x FROM COMPOSITION c",
+		seed:   "at0002",
 		shapeOK: func(q *parse.Query) bool {
 			return q.From.Contains == nil && q.Where == nil
 		},
@@ -100,7 +115,17 @@ var predicateBases = []struct {
 	{
 		name:   "tailed and multi-line",
 		prefix: "SELECT c/x FROM COMPOSITION c",
+		seed:   "at0002",
 		suffix: " CONTAINS OBSERVATION o[at0001\n] WHERE c/y = 1",
+		shapeOK: func(q *parse.Query) bool {
+			return q.From.Contains != nil && q.Where != nil
+		},
+	},
+	{
+		name:   "VERSION, tailed and multi-line",
+		prefix: "SELECT v/x FROM VERSION v",
+		seed:   "LATEST_VERSION",
+		suffix: " CONTAINS COMPOSITION c[at0001\n] WHERE v/y = 1",
 		shapeOK: func(q *parse.Query) bool {
 			return q.From.Contains != nil && q.Where != nil
 		},
@@ -124,7 +149,7 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 				}
 				checked++
 
-				emitted, emitErr := emitWithPredicate(t, base.prefix+"[at0002]"+base.suffix, text)
+				emitted, emitErr := emitWithPredicate(t, base.prefix+"["+base.seed+"]"+base.suffix, text)
 
 				// What the naive splice WOULD have produced — the oracle both
 				// directions are measured against.
@@ -161,7 +186,6 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 						"  error %v", text, emitErr)
 				}
 			}
-			totalDiscriminating += discriminating
 			t.Logf("confronted %d generated predicates: %d accepted, %d refused; "+
 				"%d splices parse, of which %d parse as a DIFFERENT query",
 				checked, accepted, refused, live, discriminating)
@@ -176,16 +200,23 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 				t.Errorf("only %d of %d generated splices parse at all; the oracle has almost nothing "+
 					"to discriminate", live, checked)
 			}
+			// The rail that was missing, and the one that matters — asserted
+			// per BASE, because a base that cannot discriminate contributes
+			// nothing however well the others do. Counting guard VERDICTS says
+			// nothing about whether the oracle can DISCRIMINATE: a corpus whose
+			// splices either round-trip or fail to parse leaves the soundness
+			// arm unable to fire for any guard implementation, while still
+			// reporting a healthy accept/refuse split and a large case count.
+			if discriminating == 0 {
+				t.Errorf("no generated splice parses as a DIFFERENT query in this base, so the "+
+					"soundness arm cannot fail here for ANY guard; the base needs something after "+
+					"the bracket to swallow and a later newline (%d of %d parsed at all)", live, checked)
+			}
+			totalDiscriminating += discriminating
 		})
 	}
-	// The rail that was missing, and the one that matters. Counting guard
-	// VERDICTS says nothing about whether the oracle can DISCRIMINATE: a corpus
-	// whose splices either round-trip or fail to parse leaves the soundness arm
-	// unable to fire for any guard implementation, while still reporting a
-	// healthy accept/refuse split and a large case count.
 	if totalDiscriminating == 0 {
-		t.Errorf("no generated splice parses as a DIFFERENT query, so the soundness arm cannot fail " +
-			"for ANY guard; the bases need something after the bracket to swallow and a later newline")
+		t.Error("no base discriminates at all")
 	}
 }
 
