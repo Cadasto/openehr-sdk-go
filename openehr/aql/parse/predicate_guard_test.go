@@ -273,6 +273,7 @@ func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
 		// TestEmitRefusesARegexThatCompletesAcrossTheBracket below.
 		{"regex closes but the token does not", "a/b MATCHES {/re/", "the tail admits only WS, `;`, a STRING or `}`, so a `]` kills it"},
 		{"double dash is not a comment", "a/b='c'--x", "`--x` is SYM_DOUBLE_DASH; the `]` stays a delimiter"},
+		{"double dash at the end of the text", "a/b='c'--", "the BARE alternative needs its terminator immediately and the next byte is `]`, so this is SYM_DOUBLE_DASH too"},
 		{"comment body ending on a bare CR", "a/b='c' -- x\r", "`~[\\r\\n]*` stops at the CR and only `'\\r'? '\\n'` closes the token, so this is SYM_DOUBLE_DASH and nothing is left open"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

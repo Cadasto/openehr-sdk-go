@@ -549,9 +549,17 @@ func skipRegexSpace(s string, i int) int {
 //     both directions at once: it stepped over a real `]`, and it reported a
 //     text ENDING at the `\r` as an unterminated comment when the parser
 //     merely rejects it loudly.
-//   - EOF means the end of the QUERY, not the end of this text. A run that no
-//     newline closes here goes on to close somewhere in the emitted query,
-//     which is why the caller refuses it rather than stepping over it.
+//   - EOF is the end of the QUERY, not the end of this text — but only the BODY
+//     alternative can reach it. A `'-- ' body` run that no newline closes here
+//     goes on to close somewhere in the emitted query, absorbing the emitter's
+//     own `]` on the way, which is why the caller refuses it. The BARE
+//     alternative cannot: its terminator has to come IMMEDIATELY, and the byte
+//     after the predicate is always `]` — never EOF and never a line break — so
+//     a text ENDING at `--` starts no COMMENT at all. Reading the two
+//     alternatives alike refused `a/b='c'--`, whose emission is a contained
+//     LOUD malformation (verified: `no viable alternative`, under every suffix
+//     including one carrying a later newline), and § The class predicate
+//     positions forbids refusing those.
 func commentRun(s string, i int) (int, bool) {
 	if i+1 >= len(s) || s[i] != '-' || s[i+1] != '-' {
 		return 0, false
@@ -559,7 +567,9 @@ func commentRun(s string, i int) (int, bool) {
 	rest := s[i+2:]
 	switch {
 	case rest == "":
-		return len(s) - i, false // closed only by the query's own EOF
+		// `'--' ('\r'? '\n' | EOF)` with `]` coming next: SYM_DOUBLE_DASH, and
+		// the `]` after it is a real delimiter.
+		return 0, false
 	case rest[0] == '\n':
 		return 3, true
 	case rest[0] == '\r':

@@ -97,7 +97,17 @@ func TestValidatePathPredicate(t *testing.T) {
 		// string delimiter. The parser reads this back unchanged.
 		{"term_code_dotted_code_with_name", "at0001,ICD10::E11.9|Barrett's oesophagus|", false, "`TERM_CODE_CHAR` admits `.` as well as `-`"},
 		{"comment_unterminated", "a/b='c' -- x", true, "the emitted `]` falls inside the comment"},
-		{"comment_bare_unterminated", "a/b='c'--", true, "the `--`/EOF form, still open in the query"},
+		// The two COMMENT alternatives diverge at the END of the text, and reading
+		// them alike over-refused the bare one. `'-- ' body` has a `~[\r\n]*` that
+		// absorbs the emitted `]` and closes on a later newline in the QUERY — a
+		// substitution, so it stays refused. `'--' ('\r'? '\n' | EOF)` needs its
+		// terminator immediately, and the next byte is always `]`, so no COMMENT
+		// starts at all: SYM_DOUBLE_DASH, and the `]` is a real delimiter.
+		// The pair is the point — the first row is why the arm exists, the second
+		// is why it must not cover both.
+		{"comment_body_unterminated_at_end", "a/b='c'-- ", true, "the body swallows the emitted `]`"},
+		{"comment_bare_dash_dash_at_end", "a/b='c'--", false, "`]` closes no bare COMMENT, so this is loud"},
+		{"comment_bare_dash_dash_after_code", "at0001--", false, "…and with no literal before it"},
 		{"comment_closed", "a/b='c' -- x\n", false, "a newline closes it inside the text"},
 		{"comment_hides_bracket", "at0001 -- ]\n AND a/b='c'", false, "a `]` inside a closed comment is not a delimiter"},
 		{"double_dash_not_a_comment", "a/b='c'--]", true, "`--x` is SYM_DOUBLE_DASH, so the `]` is real"},
