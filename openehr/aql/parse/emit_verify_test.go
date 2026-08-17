@@ -412,19 +412,21 @@ func TestEmitNeverReturnsUnparseableText(t *testing.T) {
 	}
 }
 
-// TestEmitVerificationPinsEachCarriedCoordinate is the per-slot soundness
-// table § Emission verified after emission requires: for every coordinate the
-// skeleton carries, one substitution that preserves everything BEFORE it and
-// diverges exactly there — so removing that slot from the skeleton fails a
-// named row (the REQ's mutation rule, per coordinate rather than per call
-// site).
+// TestEmitVerificationPinsEachCarriedCoordinate is the end-to-end half of the
+// per-slot soundness table § Emission verified after emission requires: one
+// substitution per splice-REACHABLE coordinate, preserving everything BEFORE
+// it and diverging exactly there — so removing that slot from the skeleton
+// fails a named row (the REQ's mutation rule, per coordinate rather than per
+// call site).
 //
 // The vector is a SELECT item's Raw path — spliced verbatim by REQ-055 rule
 // 3's contract — whose payload re-writes the query's tail and comments out the
 // genuine one. That vector is exempt from the per-position guards BY the rule-3
 // contract, which is exactly what makes it the right probe for the WHOLE-QUERY
-// oracle: every coordinate after the projection can be counterfeited through
-// it.
+// oracle. It starts AFTER the SELECT keyword's own modifiers, so it can only
+// ADD text there (the DISTINCT row) and cannot rewrite a `TOP` the hand side
+// already carries; the coordinates no splice reaches are pinned one-by-one at
+// the unit level instead, by TestSkeletonDistinguishesEveryCoordinate.
 func TestEmitVerificationPinsEachCarriedCoordinate(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -436,19 +438,90 @@ func TestEmitVerificationPinsEachCarriedCoordinate(t *testing.T) {
 			"containment connective flipped AND to OR",
 			"SELECT c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev)",
 			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o OR EVALUATION ev) --",
-			"from.connective",
+			"from.contains.junction",
 		},
 		{
 			"junction group negation dropped",
 			"SELECT c/x FROM COMPOSITION c NOT CONTAINS (OBSERVATION o AND EVALUATION ev)",
 			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev) --",
-			"from.connective",
+			"from.contains.junction",
 		},
 		{
 			"junction rewritten as a chain",
 			"SELECT c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev)",
 			"c/x FROM COMPOSITION c CONTAINS OBSERVATION o CONTAINS EVALUATION ev --",
-			"from.connective",
+			"from.contains.junction",
+		},
+		{
+			// The regrouping the in-order connective sequence could not see:
+			// both parenthesisations read [CONTAINS, AND, OR] as a sequence,
+			// while the structural skeleton keeps the OR at its coordinate.
+			"junction operands re-grouped under the other operator",
+			"SELECT c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND (EVALUATION ev OR INSTRUCTION i))",
+			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev) OR INSTRUCTION i --",
+			"from.contains.junction",
+		},
+		{
+			// The deepest form: SAME top operator, same class sequence, same
+			// connective multiset — only the association moved.
+			"mixed association re-grouped under the same top operator",
+			"SELECT c/x FROM COMPOSITION c CONTAINS ((OBSERVATION o AND EVALUATION ev) OR INSTRUCTION i)",
+			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o OR (EVALUATION ev AND INSTRUCTION i)) --",
+			"from.contains.op[0].junction",
+		},
+		{
+			"DISTINCT injected",
+			"SELECT c/x FROM COMPOSITION c",
+			"DISTINCT c/x FROM COMPOSITION c --",
+			"select.distinct",
+		},
+		{
+			"FROM root class rewritten",
+			"SELECT c/x FROM COMPOSITION c",
+			"c/x FROM EHR c --",
+			"from.root",
+		},
+		{
+			"contained class rewritten",
+			"SELECT c/x FROM COMPOSITION c CONTAINS OBSERVATION o",
+			"c/x FROM COMPOSITION c CONTAINS EVALUATION o --",
+			"from.contains.class",
+		},
+		{
+			"WHERE clause dropped",
+			"SELECT c/x FROM COMPOSITION c WHERE c/a = 1",
+			"c/x FROM COMPOSITION c --",
+			"where.presence",
+		},
+		{
+			"WHERE junction flipped AND to OR",
+			"SELECT c/x FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2",
+			"c/x FROM COMPOSITION c WHERE c/a = 1 OR c/b = 2 --",
+			"where.junction",
+		},
+		{
+			"WHERE leaf comparison rewritten",
+			"SELECT c/x FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2",
+			"c/x FROM COMPOSITION c WHERE c/a = 1 AND c/b >= 2 --",
+			"where.term[1]",
+		},
+		{
+			"ORDER BY direction flipped",
+			"SELECT c/x FROM COMPOSITION c ORDER BY c/x DESC",
+			"c/x FROM COMPOSITION c ORDER BY c/x ASC --",
+			"orderBy[0].direction",
+		},
+		{
+			"ORDER BY path rewritten",
+			"SELECT c/x FROM COMPOSITION c ORDER BY c/x DESC",
+			"c/x FROM COMPOSITION c ORDER BY c/y DESC --",
+			"orderBy[0].path text",
+		},
+		{
+			"OFFSET dropped",
+			"SELECT c/x FROM COMPOSITION c LIMIT 10 OFFSET 5",
+			"c/x FROM COMPOSITION c LIMIT 10 --",
+			"offset",
 		},
 		{
 			"projection alias rewritten",
@@ -564,5 +637,24 @@ func TestEmitVerificationCollapsesTheStarEncodings(t *testing.T) {
 	}
 	if !strings.Contains(out, "SELECT *") {
 		t.Fatalf("emitted %q, want a bare star projection", out)
+	}
+
+	// The flag's OTHER ignored spelling: `Star: true` BESIDE populated items.
+	// The emitter renders the items and never consults the flag, and the
+	// re-parse reads the flag back false — so the skeleton must take the
+	// EFFECTIVE star, not the raw field, or this legal query is refused.
+	// (This is the row that fails if the emptiness half of that reduction is
+	// dropped.)
+	q2, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	q2.Select.Star = true
+	out2, err := q2.Emit()
+	if err != nil {
+		t.Fatalf("Star beside populated items was refused (tightening): %v", err)
+	}
+	if strings.Contains(out2, "*") {
+		t.Fatalf("emitted %q; the emitter renders the items, never the ignored flag", out2)
 	}
 }

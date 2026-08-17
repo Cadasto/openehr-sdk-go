@@ -25,12 +25,17 @@ package parse
 //     carriers a constructed AST leaves zero. Comparing fields refused most of
 //     the hand-built corpus.
 //
-// So the comparison is over an encoding-INDEPENDENT skeleton: the trees are
-// FLATTENED into ordered leaf sequences, which is exactly the freedom the
-// parser has (how it nests) factored out, and each leaf is reduced to the
-// tokens `Emit` actually renders. A substitution cannot preserve that skeleton
-// — to change the query's meaning it must add or remove a class expression, a
-// projection, or a predicate leaf — and re-nesting cannot break it.
+// So the comparison is over an encoding-INDEPENDENT skeleton: each tree is
+// reduced to its structure with ONLY the freedom the parser legitimately has
+// factored out — a same-operator junction chain is spliced flat and a one-term
+// junction reduces to its term, because those are the encodings the emitted
+// text erases — while nesting under a DIFFERENT operator stays in the
+// coordinate, because `a AND (b OR c)` and `(a AND b) OR c` are different
+// texts. Each leaf is reduced to the tokens `Emit` actually renders. A
+// substitution cannot preserve that skeleton — to change the query's meaning
+// it must add or remove a class expression, a projection, or a predicate
+// leaf, or move one across an operator — and a legal re-encoding cannot break
+// it.
 //
 // This does not settle the `WhereExpr` equality question § Out of scope defers
 // ("is `a AND b` equal to `b AND a`?"). Leaves are compared POSITIONALLY, which
@@ -195,84 +200,120 @@ func skeletonOf(q *Query) []slot {
 	return s
 }
 
-// classSlots flattens the FROM tree into its class expressions in source order,
-// followed by the CONNECTIVE sequence read between adjacent classes.
+// classSlots reduces the FROM tree to its structural skeleton: the root class,
+// then the containment tree with junction operators and negation kept AT their
+// coordinate, exactly as [whereSlots] keeps the WHERE tree's.
 //
-// Flattening is the point: `A AND (B OR C)` and a hand-built tree that nests
-// the same three classes differently emit the same text and MUST compare equal,
-// while a swallowed `CONTAINS` term removes a class from the sequence and MUST
-// NOT.
-//
-// The connectives are carried IN-ORDER — for a junction, its keyword read
-// between each adjacent pair of its operands' flattened leaves — because that
-// reading is stable under exactly the re-nestings one text admits:
-// `AND(AND(a,b),c)` and `AND(a,b,c)` both read [AND, AND], while `a AND b OR c`
-// and its precedence tree both read [AND, OR]. A PER-NODE join slot was tried
-// and refused legal re-nestings (the containment tree's node count differs
-// between encodings of one text); the earlier ground for carrying no join at
-// all — that the keyword is written from `ChildJoin`, never spliced — was
-// one-sided: the RE-PARSED side's join comes from the emitted text, which a
-// path-position splice can counterfeit, flipping `AND` to `OR` over the same
-// class sequence. Negation rides on the connective too (`NOT CONTAINS`, and a
-// negated junction operand the emitter cannot even render), so a flipped or
-// dropped `NOT` cannot pass as the same query.
+// Only the encodings one text erases are factored out — a same-`ChildJoin`
+// junction nested in its parent is spliced into the operand list, and a
+// one-term junction reduces to its term (the keyword never reaches the text).
+// Nesting under a DIFFERENT operator is structural and stays in the
+// coordinate: `o AND (ev OR i)` is not `(o AND ev) OR i`. An IN-ORDER
+// connective sequence was carried first and could not see that difference —
+// both parenthesisations read [CONTAINS, AND, OR] — so a path-position splice
+// re-grouped the operands with err == nil, the same soundness hole whose
+// keyword-flip form the sequence had just closed.
 func classSlots(q *Query) []slot {
-	var classes, conns []slot
-	n, k := 0, 0
-	conn := func(edge string) {
-		if edge == "" {
-			return // the root position has no incoming connective
-		}
-		conns = append(conns, slot{"from.connective[" + strconv.Itoa(k) + "]", edge})
-		k++
-	}
-	var walk func(c *Containment, incoming string)
-	walk = func(c *Containment, incoming string) {
-		if c == nil {
-			return
-		}
-		// A junction node carries no class of its own — only operands — so it
-		// contributes no class slot: its FIRST operand arrives on the junction's
-		// own incoming edge and every later one on the join keyword. Negation is
-		// the CHILD's flag and is applied by the edge computation below, exactly
-		// once, whichever node kind it decorates.
-		if classToken(c.Class) == "" && len(c.Children) > 0 {
-			for i := range c.Children {
-				edge := incoming
-				if i > 0 {
-					edge = c.ChildJoin.String()
-				}
-				if c.Children[i].Negated {
-					edge = "NOT " + edge
-				}
-				walk(&c.Children[i], edge)
-			}
-			return
-		}
-		if tok := classToken(c.Class); tok != "" {
-			conn(incoming)
-			classes = append(classes, slot{"from.class[" + strconv.Itoa(n) + "]", tok})
-			n++
-		}
-		for i := range c.Children {
-			edge := "CONTAINS"
-			if c.Children[i].Negated {
-				edge = "NOT CONTAINS"
-			}
-			walk(&c.Children[i], edge)
-		}
-	}
-	classes = append(classes, slot{"from.root", classToken(q.From.Root)})
-	n++
+	s := []slot{{"from.root", classToken(q.From.Root)}}
 	if c := q.From.Contains; c != nil {
-		edge := "CONTAINS"
-		if c.Negated {
-			edge = "NOT CONTAINS"
-		}
-		walk(c, edge)
+		s = append(s, containSlots(*c, "from.contains", edgeToken(*c))...)
 	}
-	walk(q.From.Junction, "")
-	return append(classes, conns...)
+	if j := q.From.Junction; j != nil {
+		s = append(s, containSlots(*j, "from", "")...)
+	}
+	return s
+}
+
+// containSlots reduces one containment node reached through edge — the
+// spelled connective (`CONTAINS` / `NOT CONTAINS`), or "" for a junction
+// operand, whose position carries no keyword of its own. The edge rides in
+// the slot TOKEN rather than in a slot of its own so a dropped `NOT` and a
+// re-grouped operand both surface at the node's coordinate.
+//
+// A class node's Children are a CHAIN, and the chain has its own erased
+// encoding: `A CONTAINS B CONTAINS C` is one text whether the tree holds the
+// tail flat (`A.Children = [B, C]`) or nested (`A.[B.[C]]`) — [emitContainment]
+// renders every bracketing identically — so chain elements are flattened to
+// sequential coordinates. A junction may only END a chain (validated), and a
+// one-term junction's parentheses vanish from the text, so its term continues
+// the SAME chain.
+func containSlots(c Containment, at, edge string) []slot {
+	if isContainmentJunction(c) {
+		terms := flattenContainmentJunction(c)
+		// A one-term junction renders as its term alone, so it must reduce to
+		// that term's slots on the incoming edge — [whereSlots]'s own collapse.
+		// The parser never builds one; a hand-built tree can. The junction's
+		// own Negated (a legal `NOT CONTAINS` group) moves onto the term, whose
+		// operand position could not carry one of its own.
+		if len(terms) == 1 && !terms[0].Negated {
+			t := terms[0]
+			t.Negated = c.Negated
+			return containSlots(t, at, edge)
+		}
+		s := []slot{{at + ".junction", edge + "|" + c.ChildJoin.String()}}
+		for i, t := range terms {
+			opEdge := ""
+			if t.Negated {
+				// No spelling negates a junction OPERAND (`NOT` belongs to
+				// `CONTAINS`), and [validateContainmentTree] refuses the flag
+				// before emission; carried anyway so the skeleton stays total.
+				opEdge = "NOT"
+			}
+			s = append(s, containSlots(t, at+".op["+strconv.Itoa(i)+"]", opEdge)...)
+		}
+		return s
+	}
+	s := []slot{{at + ".class", edge + "|" + classToken(c.Class)}}
+	j := 0
+	var chain func(ch Containment)
+	chain = func(ch Containment) {
+		if isContainmentJunction(ch) {
+			if terms := flattenContainmentJunction(ch); len(terms) == 1 && !terms[0].Negated {
+				t := terms[0]
+				t.Negated = ch.Negated
+				chain(t)
+				return
+			}
+			s = append(s, containSlots(ch, at+".chain["+strconv.Itoa(j)+"]", edgeToken(ch))...)
+			j++
+			return
+		}
+		s = append(s, slot{at + ".chain[" + strconv.Itoa(j) + "].class", edgeToken(ch) + "|" + classToken(ch.Class)})
+		j++
+		for i := range ch.Children {
+			chain(ch.Children[i])
+		}
+	}
+	for i := range c.Children {
+		chain(c.Children[i])
+	}
+	return s
+}
+
+// edgeToken spells the connective through which a containment CHILD is
+// reached — the reading [emitContainment] renders for the child's Negated flag.
+func edgeToken(c Containment) string {
+	if c.Negated {
+		return "NOT CONTAINS"
+	}
+	return "CONTAINS"
+}
+
+// flattenContainmentJunction expands the operands of c that are themselves
+// junctions on the SAME join, recursively — the associativity the emitted text
+// already erases — mirroring [flattenJunction] on the WHERE side. A NEGATED
+// operand junction never merges: its flag has no spelling and must stay at a
+// coordinate of its own rather than vanish into the parent's operand list.
+func flattenContainmentJunction(c Containment) []Containment {
+	out := make([]Containment, 0, len(c.Children))
+	for _, ch := range c.Children {
+		if isContainmentJunction(ch) && ch.ChildJoin == c.ChildJoin && !ch.Negated {
+			out = append(out, flattenContainmentJunction(ch)...)
+			continue
+		}
+		out = append(out, ch)
+	}
+	return out
 }
 
 // classToken reduces a class expression to what emitClassExpr renders, and

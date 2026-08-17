@@ -41,6 +41,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -125,12 +126,14 @@ var predicateBases = []struct {
 	prefix  string
 	seed    string
 	suffix  string
+	guard   func(string) error // the per-position guard the base's bracket is held by
 	shapeOK func(q *parse.Query) bool
 }{
 	{
 		name:   "bare",
 		prefix: "SELECT c/x FROM COMPOSITION c",
 		seed:   "at0002",
+		guard:  aql.ValidatePathPredicate,
 		shapeOK: func(q *parse.Query) bool {
 			return q.From.Contains == nil && q.Where == nil
 		},
@@ -140,6 +143,7 @@ var predicateBases = []struct {
 		prefix: "SELECT c/x FROM COMPOSITION c",
 		seed:   "at0002",
 		suffix: " CONTAINS OBSERVATION o[at0001\n] WHERE c/y = 1",
+		guard:  aql.ValidatePathPredicate,
 		shapeOK: func(q *parse.Query) bool {
 			return q.From.Contains != nil && q.Where != nil
 		},
@@ -149,6 +153,7 @@ var predicateBases = []struct {
 		prefix: "SELECT v/x FROM VERSION v",
 		seed:   "LATEST_VERSION",
 		suffix: " CONTAINS COMPOSITION c[at0001\n] WHERE v/y = 1",
+		guard:  aql.ValidateVersionPredicate,
 		shapeOK: func(q *parse.Query) bool {
 			return q.From.Contains != nil && q.Where != nil
 		},
@@ -198,6 +203,24 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 						// shape the SOUNDNESS arm can ever fire on.
 						discriminating++
 					}
+				}
+
+				// The guard's OWN verdict, confronted with the parser DIRECTLY.
+				// Routing through Emit alone stopped proving anything about the
+				// guard once § Emission verified after emission landed: with the
+				// guard disabled outright, Emit still refused every
+				// discriminating splice at its verification step, both
+				// whole-query arms below stayed vacuous, and this test passed
+				// (verified by mutation). The whole-query arms are kept — they
+				// hold Emit — but the guard's parser agreement is held here.
+				guardErr := base.guard(text)
+				if guardErr == nil && reparseErr == nil && !faithful {
+					t.Errorf("guard ACCEPTED %q, but the naive splice parses as a DIFFERENT query\n"+
+						"  spliced %q", text, spliced)
+				}
+				if guardErr != nil && faithful {
+					t.Errorf("guard REFUSED %q, but the parser reads it back unchanged — a tightening "+
+						"failure\n  error %v", text, guardErr)
 				}
 
 				if emitErr == nil {
@@ -347,6 +370,20 @@ func TestVersionPredicateShapeAgreesWithTheParser(t *testing.T) {
 		faithful := reparseErr == nil &&
 			reparsed.From.Root.Predicate == text &&
 			reparsed.From.Contains != nil && reparsed.Where != nil
+
+		// The guard's own verdict, held directly against the parser — the
+		// shared corpus above says why Emit alone stopped proving this. Both
+		// directions are total here because the operands are legal by
+		// construction: accepted text must read back as the SAME query.
+		guardErr := aql.ValidateVersionPredicate(text)
+		if guardErr == nil && (reparseErr != nil || !faithful) {
+			t.Errorf("VERSION guard ACCEPTED %q, but the naive splice does not read back as the same "+
+				"query\n  spliced %q\n  parse error %v", text, spliced, reparseErr)
+		}
+		if guardErr != nil && faithful {
+			t.Errorf("VERSION guard REFUSED %q, but the parser reads it back unchanged — a tightening "+
+				"failure\n  error %v", text, guardErr)
+		}
 
 		if emitErr != nil {
 			refused++

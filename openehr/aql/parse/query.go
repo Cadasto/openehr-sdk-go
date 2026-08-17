@@ -1006,6 +1006,30 @@ func validateContainmentTree(from FromClause) error {
 				return fmt.Errorf("%w: containment junction join %d is outside the AND/OR vocabulary; "+
 					"emitting would silently join with AND", aql.ErrInvalidQuery, int(c.ChildJoin))
 			}
+			// A junction node renders only its operands and the keyword —
+			// nothing of its own Class — so class data parked there has no
+			// wire form and emitted with err == nil while the filter it names
+			// was gone (REQ-119's substitution class). RMType and Version are
+			// zero by [isContainmentJunction]'s definition; HasPredicate is a
+			// content-free read-side flag, exempt for the same reason the
+			// class arm never validates it.
+			if c.Class.Alias != "" || c.Class.Archetype != "" || c.Class.ParamArchetype ||
+				c.Class.Predicate != "" || c.Class.PredicateComparison != nil {
+				return fmt.Errorf("%w: containment junction node carries class data (an alias, "+
+					"archetype, or standing predicate); a junction renders only its operands, so "+
+					"emission would silently drop it", aql.ErrInvalidQuery)
+			}
+			// `NOT` belongs to a CONTAINS keyword (`containsExpr : … NOT?
+			// CONTAINS …`), so no spelling negates a junction OPERAND — the
+			// parser sets Negated only on a chained subtree — and emission
+			// wrote the operand with its negation silently gone.
+			for i := range c.Children {
+				if c.Children[i].Negated {
+					return fmt.Errorf("%w: containment junction operand %d is negated; no grammar "+
+						"position spells NOT on a junction operand (NOT belongs to CONTAINS), so "+
+						"emission would silently drop the negation", aql.ErrInvalidQuery, i)
+				}
+			}
 		}
 		for _, ch := range c.Children {
 			if err := checkComplete(ch); err != nil {
@@ -1025,6 +1049,15 @@ func validateContainmentTree(from FromClause) error {
 		if err := checkClassOperands(from.Root); err != nil {
 			return err
 		}
+	}
+	// The root junction's own Negated has the same no-spelling problem as an
+	// operand's (checked per node above): nothing precedes the FROM root to
+	// carry a NOT, [Query.Emit] renders the operands directly, and the parser
+	// never sets the flag there — so it emitted with the negation silently
+	// gone rather than refused.
+	if from.Junction != nil && from.Junction.Negated {
+		return fmt.Errorf("%w: FROM root junction is negated; no grammar position spells NOT "+
+			"before the FROM root, so emission would silently drop the negation", aql.ErrInvalidQuery)
 	}
 	for _, root := range []*Containment{from.Junction, from.Contains} {
 		if root == nil {

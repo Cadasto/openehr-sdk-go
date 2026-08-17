@@ -1368,6 +1368,10 @@ requirements:
       # parser is free to re-nest still accepted (the arm a field-by-field
       # comparison fails).
       - openehr/aql/parse/emit_verify_test.go
+      # The white-box half: the fail-closed switch arms an external test cannot
+      # reach, and the per-slot census — one row per skeleton coordinate,
+      # covering the slots no splice vector reaches end-to-end.
+      - openehr/aql/parse/emit_verify_internal_test.go
       # The read-side consequence: verbatim predicate text reaches the lint's
       # Layer-3 OPT resolution, which compares it to a node id. Pins that
       # trivia inside the bracket does not change the answer, and that
