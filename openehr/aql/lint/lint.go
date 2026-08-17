@@ -165,7 +165,7 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 		}
 		issues = append(issues, Issue{
 			Code:     "aql_unknown_alias",
-			Path:     p.Raw,
+			Path:     displayPath(p),
 			Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias),
 			Severity: Error,
 		})

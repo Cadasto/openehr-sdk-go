@@ -548,6 +548,48 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 
 // --- REQ-119 fallout: verbatim predicate text vs Layer-3 resolution ----------
 
+// TestLintIssuePathIsCanonical — [lint.Issue.Path] is what a line-oriented
+// report prints, and since REQ-119 the parsed path text is VERBATIM, so
+// setting it from `p.Raw` put a predicate's comment and its raw newline into
+// a single-line diagnostic. Both localised issue sites render through
+// displayPath instead: trivia normalised, the alias and every value byte kept.
+func TestLintIssuePathIsCanonical(t *testing.T) {
+	find := func(r lint.Result, code string) *lint.Issue {
+		for i := range r.Issues {
+			if r.Issues[i].Code == code {
+				return &r.Issues[i]
+			}
+		}
+		return nil
+	}
+
+	t.Run("unknown alias (Layer 2)", func(t *testing.T) {
+		r := lint.LintString("SELECT x/items[at0001 -- note\n]/value FROM OBSERVATION o", nil)
+		is := find(r, "aql_unknown_alias")
+		if is == nil {
+			t.Fatalf("no aql_unknown_alias issue: %v", codes(r))
+		}
+		if want := "x/items[at0001]/value"; is.Path != want {
+			t.Errorf("Issue.Path = %q, want %q", is.Path, want)
+		}
+	})
+
+	t.Run("path not in template (Layer 3)", func(t *testing.T) {
+		c := mustCompile(t, "nested.en.v1")
+		q := "SELECT s/items[at0000]/activities[at0001]/description[at0000]" +
+			"/items[at0002 -- pick\n]/bogus FROM SECTION s[openEHR-EHR-SECTION.nested.v1]"
+		r := lint.LintString(q, &lint.Options{Compiled: c})
+		is := find(r, "aql_path_not_in_template")
+		if is == nil {
+			t.Fatalf("no aql_path_not_in_template issue: %v (the row must diverge or it tests nothing)", codes(r))
+		}
+		want := "s/items[at0000]/activities[at0001]/description[at0000]/items[at0002]/bogus"
+		if is.Path != want {
+			t.Errorf("Issue.Path = %q, want %q", is.Path, want)
+		}
+	})
+}
+
 // TestLintLayer3ResolvesPredicatesThroughTrivia is the regression for the one
 // cross-package consequence of REQ-119 making the read side report bracket text
 // VERBATIM: Layer 3 selects a compiled OPT child by comparing the segment

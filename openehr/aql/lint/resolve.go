@@ -71,7 +71,7 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 		if divergedAll {
 			issues = append(issues, Issue{
 				Code: "aql_path_not_in_template",
-				Path: p.Raw,
+				Path: displayPath(p),
 				Detail: fmt.Sprintf(
 					"segment %q not found under %s (path may still resolve at the CDR)",
 					bad, ce.Archetype,

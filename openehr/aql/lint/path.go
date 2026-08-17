@@ -33,7 +33,32 @@ type Path struct {
 	// display name the lexer skips nothing — see [aql.StripPredicateTrivia]).
 	// Since REQ-119 the source text is verbatim, so building the suffix by
 	// concatenation put `/items[at0001 -- note\n]` into a line-oriented report.
+	// Localised diagnostics reach this form through [displayPath], which is
+	// what sets [Issue.Path].
 	Suffix string
+}
+
+// displayPath renders an identified path for a DIAGNOSTIC: the alias, its
+// root predicate (if any) and the segments, in [Path.Suffix]'s canonical form
+// with the alias restored. [Issue.Path] is what a line-oriented report prints,
+// and since REQ-119 the parsed text is VERBATIM — rendering `p.Raw` put a
+// predicate's comment and its newline into a single-line report. The verbatim
+// text stays on the AST ([aql.IdentifiedPath.Raw]) for round-trip; a
+// diagnostic names the path, it does not re-emit it.
+func displayPath(p parse.IdentifiedPath) string {
+	norm, err := Normalise(p)
+	if err != nil {
+		return p.Raw // no alias: nothing structural to render, and Raw is all there is
+	}
+	var sb strings.Builder
+	sb.WriteString(p.Alias)
+	if pred := aql.StripPredicateTrivia(p.Predicate); pred != "" {
+		sb.WriteByte('[')
+		sb.WriteString(pred)
+		sb.WriteByte(']')
+	}
+	sb.WriteString(norm.Suffix)
+	return sb.String()
 }
 
 // Normalise strips the alias from an identified path and yields the canonical
