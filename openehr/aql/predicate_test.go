@@ -287,8 +287,20 @@ func TestValidateVersionPredicate(t *testing.T) {
 
 // TestValidatePredicateErrorsNameTheText keeps a refusal actionable: the caller
 // gets the offending text back, not only a category.
+// TestValidatePredicateErrorsNameTheText pins BOTH halves of the diagnostic
+// contract, which pull against each other.
+//
+// A refusal must name the predicate, or a caller assembling several cannot tell
+// which one was refused — that is why this test exists. But the class standing
+// predicate is where openEHR carries the identifiable root, and these errors are
+// the return value of Build / Emit, i.e. what a consuming CDR logs. So the text
+// is named STRUCTURALLY: every delimiter and path survives, and the content of
+// each opaque region is elided. The rules these guards enforce are all about
+// delimiters, so nothing diagnostic is lost with the values.
 func TestValidatePredicateErrorsNameTheText(t *testing.T) {
 	const bad = "a/b='c'] CONTAINS OBSERVATION o[d/e='f'"
+	// …with the literal content elided, which is what the error must carry.
+	const redacted = "a/b='…'] CONTAINS OBSERVATION o[d/e='…"
 	for name, err := range map[string]error{
 		"path":    aql.ValidatePathPredicate(bad),
 		"version": aql.ValidateVersionPredicate(bad),
@@ -296,8 +308,71 @@ func TestValidatePredicateErrorsNameTheText(t *testing.T) {
 		if err == nil {
 			t.Fatalf("%s: want an error", name)
 		}
-		if !strings.Contains(err.Error(), bad) {
-			t.Errorf("%s: error %q does not quote the refused text", name, err)
+		if !strings.Contains(err.Error(), redacted) {
+			t.Errorf("%s: error %q does not name the refused text structurally (want %q)",
+				name, err, redacted)
 		}
+	}
+}
+
+// TestPredicateErrorsDoNotEchoValues is the other half: the identifiers a real
+// class predicate carries MUST NOT reach the error string. Each case is a
+// refusal whose text carries a value no log should acquire.
+func TestPredicateErrorsDoNotEchoValues(t *testing.T) {
+	for _, tc := range []struct{ name, text, secret string }{
+		// The commonest refusal, on the position that carries the EHR id.
+		{"unterminated ehr_id", `ehr_id/value='9d3d4d80-1111-2222-3333-444455556666`, "9d3d4d80-1111-2222-3333-444455556666"},
+		{"national id beside an escape", `subject/external_ref/id/value='NHS-4857773456' AND x/y='`, "NHS-4857773456"},
+		{"version uid", `uid/value='b6b1c0d2::openEHRSys.example.com::1' AND z='`, "b6b1c0d2"},
+		// The other opaque regions: a regex body, a comment and a TERM_CODE
+		// display name are all free text a caller wrote.
+		{"regex body", `a/b MATCHES {/NHS-4857773456/} AND x/y='`, "4857773456"},
+		{"comment body", "at0001 -- patient Ann Example\n AND x/y='", "Ann Example"},
+		{"term code display name", `at0001,ICD10::E11.9|Ann Example's diabetes| AND x/y='`, "Ann Example"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := aql.ValidatePathPredicate(tc.text)
+			if err == nil {
+				t.Fatalf("ValidatePathPredicate(%q) = nil; this row must be a REFUSAL or it "+
+					"tests nothing", tc.text)
+			}
+			if strings.Contains(err.Error(), tc.secret) {
+				t.Errorf("error echoes a value that must stay out of the log stream:\n  %v", err)
+			}
+			// …and it is still diagnostic: the position and the rule are named.
+			if !strings.Contains(err.Error(), "predicate") {
+				t.Errorf("error no longer names the position: %v", err)
+			}
+		})
+	}
+}
+
+// TestRedactPredicateValuesKeepsStructure holds the renderer itself: structure
+// through, content out, and an unterminated region keeps its opener so the
+// diagnostic still shows what was left open.
+func TestRedactPredicateValuesKeepsStructure(t *testing.T) {
+	for _, tc := range []struct{ name, in, want string }{
+		{"no values at all", "at0001", "at0001"},
+		{"paths and operators survive", "a/b/c >= 1", "a/b/c >= 1"},
+		{"string content elided", "ehr_id/value='abc-123'", "ehr_id/value='…'"},
+		{"both delimiters", `a/b="abc" AND c/d='ef'`, `a/b="…" AND c/d='…'`},
+		{"empty literal is left alone", "a/b=''", "a/b=''"},
+		{"unterminated keeps its opener", "a/b='abc", "a/b='…"},
+		{"nested bracket is structure", "a[at0001]/b='x'", "a[at0001]/b='…'"},
+		{"regex interior elided", "a/b MATCHES {/[0-9]+/}", "a/b MATCHES {…}"},
+		{"unterminated regex", "a/b MATCHES {/abc", "a/b MATCHES {…"},
+		{"brace that starts no regex is content", "a/b MATCHES {x}", "a/b MATCHES {x}"},
+		{"comment body elided, terminator kept", "at0001 -- note\n", "at0001 -- …\n"},
+		{"comment CRLF terminator kept", "at0001 -- note\r\n", "at0001 -- …\r\n"},
+		{"bare comment has no body", "at0001--\n", "at0001--\n"},
+		{"term code kept, display name elided", "at0001,ICD10::E11.9|Crohn's disease|", "at0001,ICD10::E11.9|…|"},
+		{"term code without a name", "at0001,ICD10::E11.9", "at0001,ICD10::E11.9"},
+		{"escape inside a literal", `a/b='it\'s'`, `a/b='…'`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := aql.RedactPredicateValues(tc.in); got != tc.want {
+				t.Errorf("RedactPredicateValues(%q)\n  = %q\n  want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }

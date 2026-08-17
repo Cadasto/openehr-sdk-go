@@ -83,21 +83,21 @@ func ValidateVersionPredicate(text string) error {
 	case sc.topLevelJunction != "":
 		return fmt.Errorf("%w: VERSION predicate %q joins operands with %q; `versionPredicate` is "+
 			"`LATEST_VERSION | ALL_VERSIONS | standardPredicate` and has no junction alternative, "+
-			"so this emits text the parser rejects", ErrInvalidQuery, text, sc.topLevelJunction)
+			"so this emits text the parser rejects", ErrInvalidQuery, RedactPredicateValues(text), sc.topLevelJunction)
 	case sc.topLevelCmps == 0:
 		return fmt.Errorf("%w: VERSION predicate %q is neither LATEST_VERSION, ALL_VERSIONS, "+
 			"nor a `<path> <op> <operand>` comparison; `versionPredicate` admits no node predicate, "+
-			"so this emits text the parser rejects", ErrInvalidQuery, text)
+			"so this emits text the parser rejects", ErrInvalidQuery, RedactPredicateValues(text))
 	case sc.topLevelCmps > 1:
 		return fmt.Errorf("%w: VERSION predicate %q carries %d top-level comparison operators; "+
 			"`standardPredicate` is ONE `objectPath COMPARISON_OPERATOR pathPredicateOperand` and "+
 			"`versionPredicate` has no junction alternative to join two, so this emits text the "+
-			"parser rejects", ErrInvalidQuery, text, sc.topLevelCmps)
+			"parser rejects", ErrInvalidQuery, RedactPredicateValues(text), sc.topLevelCmps)
 	case StripPredicateTrivia(text[:sc.cmpAt]) == "" || StripPredicateTrivia(text[sc.cmpEnd:]) == "":
 		return fmt.Errorf("%w: VERSION predicate %q leaves one side of its comparison operator "+
 			"empty; `standardPredicate` requires an `objectPath` before it and a "+
 			"`pathPredicateOperand` after it, so this emits text the parser rejects",
-			ErrInvalidQuery, text)
+			ErrInvalidQuery, RedactPredicateValues(text))
 	}
 	return nil
 }
@@ -151,11 +151,11 @@ func ValidatePathPredicate(text string) error {
 	case sc.unterminated != "":
 		return fmt.Errorf("%w: predicate %q leaves a %s unterminated; the emitted `]` would fall "+
 			"inside it and the predicate would run on into the following clause",
-			ErrInvalidQuery, text, sc.unterminated)
+			ErrInvalidQuery, RedactPredicateValues(text), sc.unterminated)
 	case sc.escapes:
 		return fmt.Errorf("%w: predicate %q is not bracket-balanced; splicing it would terminate "+
 			"the class predicate early and re-parse as a different query",
-			ErrInvalidQuery, text)
+			ErrInvalidQuery, RedactPredicateValues(text))
 	}
 	return nil
 }
@@ -591,6 +591,123 @@ func commentRun(s string, i int) (int, bool) {
 	default:
 		return 0, false // the body ended on a lone '\r', which closes nothing
 	}
+}
+
+// RedactPredicateValues renders predicate bracket text for a DIAGNOSTIC, with
+// the content of every opaque region replaced by an ellipsis and all of the
+// structure kept:
+//
+//	ehr_id/value='9d3d…6666' AND x/y='   ->   ehr_id/value='…' AND x/y='…
+//
+// A refused predicate has to be named or the caller cannot tell WHICH one a
+// builder assembling several was refused. But the class standing predicate is
+// where openEHR carries the identifiable root — `[ehr_id/value='…']`,
+// `[uid/value='…']`, `[subject/external_ref/id/value='…']` — and these errors
+// are the return value of `Build` and `(*parse.Query).Emit`, i.e. the thing a
+// consuming CDR logs and ships to an error tracker. Reproducing the body
+// verbatim moved a patient identifier out of the request and into the log
+// stream, where retention and access are a different question. Structure alone
+// diagnoses the defect: every rule these guards enforce is about delimiters.
+//
+// The elided regions are exactly the states [ValidatePathPredicate]'s scan
+// already tracks as CONTENT rather than as delimiters — a string literal, a
+// contained regex, a comment body and a `TERM_CODE` display name — minus the
+// nested bracket, which IS structure. Deriving the list that way rather than
+// writing a second one is deliberate: a region the scan learns to step over is
+// a region a caller's data can sit in, so the two lists cannot drift apart.
+// Paths, operators, node codes, term codes and numeric literals are structure
+// and ride through unchanged.
+//
+// An UNTERMINATED region — the commonest refusal — elides to the end of the
+// text and keeps its opening delimiter, so the diagnostic still shows what was
+// left open.
+func RedactPredicateValues(text string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		switch c := text[i]; c {
+		case '\'', '"':
+			if j, ok := skipPredicateString(text, i); ok {
+				elideRegion(&b, text[i:j], 1, 1) // '…'
+				i = j
+				continue
+			}
+			elideRegion(&b, text[i:], 1, 0) // '… — unterminated, runs to the end
+			return b.String()
+		case '{':
+			// The braces are kept and the interior dropped whole rather than
+			// spelled `{/…/}`: a complete token may carry WS and a `;'flags'`
+			// tail, and a diagnostic that invents a shape the text does not have
+			// is worse than one that says only "a regex region was here".
+			if j, open := skipContainedRegex(text, i); j > 0 {
+				elideRegion(&b, text[i:j], 1, 1) // {…}
+				i = j
+				continue
+			} else if open {
+				elideRegion(&b, text[i:], 1, 0) // {… — never closed here
+				return b.String()
+			}
+			b.WriteByte(c) // SYM_LEFT_CURLY: ordinary content, not a region
+			i++
+		case '-':
+			n, closed := commentRun(text, i)
+			if n == 0 {
+				b.WriteByte(c)
+				i++
+				continue
+			}
+			// `--` is kept, and so is the terminator, because it is what closes
+			// the token: eliding it would render a closed comment as an open one.
+			lead := 2
+			if len(text) > i+2 && text[i+2] == ' ' {
+				lead = 3
+			}
+			tail := 0
+			if closed {
+				tail = 1
+				if n >= 2 && text[i+n-2] == '\r' {
+					tail = 2
+				}
+			}
+			elideRegion(&b, text[i:i+n], lead, tail)
+			i += n
+		case ':':
+			// A term CODE is structure; only its display name is free text.
+			if i+1 < len(text) && text[i+1] == ':' {
+				j := i + 2
+				for j < len(text) && termCodeChar(text[j]) {
+					j++
+				}
+				b.WriteString(text[i:j])
+				if j < len(text) && text[j] == '|' {
+					if k, ok := skipTermCodeName(text, j); ok {
+						elideRegion(&b, text[j:k], 1, 1) // |…|
+						j = k
+					}
+				}
+				i = j
+				continue
+			}
+			b.WriteByte(c)
+			i++
+		default:
+			b.WriteByte(c)
+			i++
+		}
+	}
+	return b.String()
+}
+
+// elideRegion writes region with its interior replaced by one ellipsis, keeping
+// lead bytes at the front and tail bytes at the back. An already-empty interior
+// is left alone, so `”` does not become `'…'`.
+func elideRegion(b *strings.Builder, region string, lead, tail int) {
+	if len(region) <= lead+tail {
+		b.WriteString(region)
+		return
+	}
+	b.WriteString(region[:lead])
+	b.WriteString("…")
+	b.WriteString(region[len(region)-tail:])
 }
 
 // StripPredicateTrivia removes what the lexer SKIPS from predicate bracket

@@ -1060,7 +1060,7 @@ func checkClassOperands(c ClassExpr) error {
 	if c.Archetype != "" && c.Predicate != "" {
 		return fmt.Errorf("%w: class %q sets both an archetype (%q) and a standing predicate (%q); "+
 			"the bracket position carries exactly one, and emission would silently drop the predicate",
-			aql.ErrInvalidQuery, c.RMType, c.Archetype, c.Predicate)
+			aql.ErrInvalidQuery, c.RMType, c.Archetype, aql.RedactPredicateValues(c.Predicate))
 	}
 	// VERSION is a SEPARATE `classExprOperand` alternative, not a class that
 	// happens to be named "VERSION": `VERSION variable=IDENTIFIER? ('['
