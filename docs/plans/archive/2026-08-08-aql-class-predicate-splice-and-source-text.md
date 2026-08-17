@@ -92,7 +92,9 @@ Emission writes `"[" + Predicate + "]"`, so the **only** way the text alters the
 - every `'…'` / `"…"` literal is terminated — an unterminated one swallows the emitter's own `]` and runs into the following clause, which is a silent substitution rather than a loud one;
 - every `{/…/}` regex is terminated — `SLASH_REGEX_CHAR : ~[/\n\r] | ESCAPE_SEQ | '\\/'` admits `[` and `]` freely, so a character class must not be counted.
 
-A backslash skips one byte (`ESCAPE_SEQ`, `UTF8CHAR` and `OCTAL_ESC` all begin `\`). `TERM_CODE`'s trailing `|…|` section needs no special case: its content is `~[|[\]]+`, which excludes both brackets.
+A backslash skips one byte (`ESCAPE_SEQ`, `UTF8CHAR` and `OCTAL_ESC` all begin `\`).
+
+> **Superseded in review.** This part planned THREE opaque states and asserted that "`TERM_CODE`'s trailing `|…|` section needs no special case: its content is `~[|[\]]+`, which excludes both brackets". That sentence is false and licensed a real defect: the class excludes the brackets and *nothing else*, so it is transparent to quotes and the apostrophe in `SNOMED-CT::22298006|Barrett's oesophagus|` was read as a string delimiter. The landed scan tracks FIVE states — the three above plus a `COMMENT` and a `TERM_CODE` display name — and refuses any region whose END the supplied text does not fix. Read the rule from [clinical-modeling.md § The class predicate positions](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission), not from this part.
 
 Lives in `openehr/aql` with no lexer import, so REQ-013 holds.
 
@@ -125,7 +127,7 @@ Lives in `openehr/aql` with no lexer import, so REQ-013 holds.
 | Phase 1 — source text at every re-emitted position | done |
 | Phase 2 — position split (`VERSION` vs class) | done |
 | Phase 3 — bracket-escape scan | done |
-| Phase 4 — grammar confrontation, positive controls, mutation checks | done — 2954 generated cases, 699 accepted / 2255 refused |
+| Phase 4 — grammar confrontation, positive controls, mutation checks | done — the corpus is generated, two-sided and railed per base; the case counts are logged by the test rather than recorded here, since a fragment added later rots a number in this table |
 | Spec / registry updated (REQ-119 §, `traceability.yaml`, CHANGELOG) | done |
 | `make spec-check` | done — OK |
 | `make ci` | done — 0 lint issues, all tests pass |
@@ -182,6 +184,8 @@ Lives in `openehr/aql` with no lexer import, so REQ-013 holds.
 - **Emitted text now carries the caller's formatting, including comments.** The lexer `skip`s whitespace *and* comments rather than channelling them, so both survive in the character stream. A `--` comment's terminating newline rides through with it, which is what keeps it from swallowing the remainder of the emitted query. Pinned as corpus cases (`fmt_newline`, `fmt_comment`) rather than left to be discovered.
 - **The confrontation property is two-sided.** A one-sided sweep would have passed with a guard that refuses everything (no substitution possible) or accepts everything (no tightening possible). The generated test asserts both directions and additionally fails if the corpus collapses or goes one-sided, so a generator that stops generating cannot pass quietly.
 - **Mutation-detectability was verified by mutating, not asserted.** Each of the three guards was removed in turn and the failing test names recorded in the implementing commits.
+- **The review rounds moved two rules and grew the scan.** The VERSION position went from a necessary condition to its whole `versionPredicate` production (one top-level comparison operator — `!=` included, which is ONE token — with a non-blank operand each side, and no junction); skipped trivia came to mean every rule the lexer skips, `UNICODE_BOM` among them; the scan grew a `COMMENT` and a `TERM_CODE` state; longest-match inside a regex was resolved over the whole TOKEN rather than its body; and a regex body still open at the end of the text is now refused, because it completes across the emitter's `]` and swallowed a whole `CONTAINS` term. The spec carries all of it; this plan is delivery history.
+- **The read side has consumers that COMPARE the text, not only re-emit it.** Making extraction verbatim was planned for emission fidelity and also changed what `openehr/aql/lint` matches against a compiled OPT node id, so `[ at0001 ]` stopped resolving and Layer 3 reported a false path divergence. `aql.StripPredicateTrivia` is exported so the comparison side shares one trivia model instead of growing a second.
 - **No builder intake exists, as predicted.** Confirmed against [`aql.Containment`](../../../openehr/aql/containment.go): the write side models a class as RM type, alias and archetype id. Recorded in the REQ rather than closed by adding a field.
 
 ## Deferred
