@@ -79,6 +79,8 @@ The set is defined by a property — *is this text re-emitted verbatim?* — not
 
 ### Part 2 — the position split
 
+> **Superseded in review.** This part held the VERSION bracket to a NECESSARY condition — "carries a top-level `COMPARISON_OPERATOR`" — which accepts `= 1` and `a/b = 1 AND c/d = 2`, shapes `versionPredicate` does not have, and both reached the parser to reject. The landed rule holds the position to its whole PRODUCTION: one of the two keywords, or exactly ONE top-level comparison with a non-blank operand on each side, with top-level junctions refused. Read the rule from [clinical-modeling.md § The class predicate positions](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission), not from this part.
+
 `checkClassOperands` must dispatch on `c.Version`, because the field feeds the two grammars above:
 
 - **`Version == true`** → the text is `LATEST_VERSION` or `ALL_VERSIONS` (case-insensitive: the lexer builds both from case-insensitive letter fragments), **or** carries a top-level `COMPARISON_OPERATOR` outside literals, brackets and regexes — the necessary condition for `standardPredicate`. Refuses `VERSION v[at0001]`; accepts every `standardPredicate` and both keywords.
@@ -147,6 +149,8 @@ Lives in `openehr/aql` with no lexer import, so REQ-013 holds.
 **Definition of done:** every predicate form in the corpus emits text that re-parses, and re-parses to the same text (identity, not merely parseability). No test asserts the collapsed spelling.
 
 ### Phase 2 — the position split
+
+> **Superseded in review.** Same pre-amendment "top-level comparison operator" necessary condition as § Design Part 2 — see the banner there. The landed guard is `aql.ValidateVersionPredicate`, holding the whole production.
 
 **Tasks:**
 
