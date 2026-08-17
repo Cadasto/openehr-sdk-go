@@ -348,6 +348,15 @@ func (d OrderDir) String() string {
 // the canonical form across both entry points is pinned by PROBE-020
 // (Builder) and the round-trip suites here (parse).
 //
+// Emit VERIFIES its own output before returning it (REQ-119, issue #103): the
+// text is re-parsed and compared against q on an encoding-independent skeleton,
+// so emitted AQL that does not parse, or that parses as a DIFFERENT query, is
+// refused rather than returned. This costs one extra parse per call and is the
+// one guard that reaches a token boundary depending on text no single position
+// contains — see [Query.verifyEmitted]. Note that text idempotence alone does
+// NOT imply it: a bracket that terminates early absorbs the text it swallowed
+// verbatim, so re-emitting reproduces the identical string.
+//
 // Idempotence property: ParseQuery(Emit(q)).Emit() == q.Emit() for any
 // q produced by [ParseQuery] — since REQ-117 (and REQ-118, which added the
 // deprecated `SELECT TOP` carrier) the catalogue is the whole SDK grammar
@@ -535,7 +544,15 @@ func (q *Query) Emit() (string, error) {
 	sb.WriteString(limit)
 	sb.WriteString(offset)
 
-	return sb.String(), nil
+	// REQ-119 (issue #103): the closure verified AFTER emission, over the whole
+	// query. The per-position guards each decide from the text handed to them,
+	// which cannot reach a `CONTAINED_REGEX` whose token boundary depends on
+	// text the predicate does not contain — see [Query.verifyEmitted].
+	out := sb.String()
+	if err := q.verifyEmitted(out); err != nil {
+		return "", err
+	}
+	return out, nil
 }
 
 // emitLimitValue renders an in-text paging operand, refusing one the grammar's
@@ -1084,7 +1101,7 @@ func checkClassOperands(c ClassExpr) error {
 		// the very defect this branch refuses. ASCII keywords fold ASCII-only;
 		// see aql's asciiKeyword for the derivation.
 		if c.RMType != "" &&
-			!(len(c.RMType) == len("VERSION") && strings.EqualFold(c.RMType, "VERSION")) {
+			(len(c.RMType) != len("VERSION") || !strings.EqualFold(c.RMType, "VERSION")) {
 			return fmt.Errorf("%w: VERSION class expression also carries RM type %q; "+
 				"the VERSION alternative has no RM-type slot, so emission would drop it",
 				aql.ErrInvalidQuery, c.RMType)
