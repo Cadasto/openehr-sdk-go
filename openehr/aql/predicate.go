@@ -379,19 +379,25 @@ func termCodeChar(c byte) bool {
 // means this is NOT that section and the `]` is a real delimiter — verified:
 // `c[at0001,X::1|a] CONTAINS …` is a loud token-recognition error, so falling
 // through to ordinary scanning is both safe and correct.
+//
+// On failure the int is where the walk STOPPED — the `[` or `]` that proved the
+// section absent, the empty interior's own `|`, or len(s). The scan ignores it
+// (the bytes are rescanned as ordinary content), but [RedactPredicateValues]
+// must not: the bytes walked are the display name the caller MEANT, i.e. value
+// content, whether or not a closing `|` ever made them a token.
 func skipTermCodeName(s string, i int) (int, bool) {
 	for j := i + 1; j < len(s); j++ {
 		switch s[j] {
 		case '|':
 			if j == i+1 {
-				return 0, false // `~[|[\]]+` needs at least one character
+				return j, false // `~[|[\]]+` needs at least one character
 			}
 			return j + 1, true
 		case '[', ']':
-			return 0, false
+			return j, false
 		}
 	}
-	return 0, false
+	return len(s), false
 }
 
 // skipPredicateString steps over a STRING token starting at the delimiter, and
@@ -620,7 +626,11 @@ func commentRun(s string, i int) (int, bool) {
 //
 // An UNTERMINATED region — the commonest refusal — elides to the end of the
 // text and keeps its opening delimiter, so the diagnostic still shows what was
-// left open.
+// left open. A display name is elided whether or not its closing `|` ever
+// arrived: a `]` inside `|…` means the section never became a token and the
+// scan treats the bytes as ordinary — but they are still the display name the
+// caller MEANT, and rendering them verbatim is the leak this function exists
+// to prevent.
 func RedactPredicateValues(text string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -679,10 +689,19 @@ func RedactPredicateValues(text string) string {
 				}
 				b.WriteString(text[i:j])
 				if j < len(text) && text[j] == '|' {
-					if k, ok := skipTermCodeName(text, j); ok {
+					// Elided on FAILURE too. A `]` (or the end of the text)
+					// before the closing `|` means no display name ever became
+					// a token — but the bytes walked are still the display name
+					// the caller MEANT, and a refused `at0001,X::1|Ann Example]`
+					// echoed them verbatim. The failure byte itself is a real
+					// delimiter and stays; the scan rescans from it.
+					k, ok := skipTermCodeName(text, j)
+					if ok {
 						elideRegion(&b, text[j:k], 1, 1) // |…|
-						j = k
+					} else {
+						elideRegion(&b, text[j:k], 1, 0) // |… — never closed
 					}
+					j = k
 				}
 				i = j
 				continue

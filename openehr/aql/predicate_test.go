@@ -329,6 +329,10 @@ func TestPredicateErrorsDoNotEchoValues(t *testing.T) {
 		{"regex body", `a/b MATCHES {/NHS-4857773456/} AND x/y='`, "4857773456"},
 		{"comment body", "at0001 -- patient Ann Example\n AND x/y='", "Ann Example"},
 		{"term code display name", `at0001,ICD10::E11.9|Ann Example's diabetes| AND x/y='`, "Ann Example"},
+		// A display name the caller MEANT but that never became a token: the
+		// `]` lands before the closing `|`, which is itself the refusal — and
+		// the very branch that once echoed the walked bytes verbatim.
+		{"malformed term code display name", `at0001,ICD10::E11.9|Ann Example]`, "Ann Example"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := aql.ValidatePathPredicate(tc.text)
@@ -367,6 +371,11 @@ func TestRedactPredicateValuesKeepsStructure(t *testing.T) {
 		{"bare comment has no body", "at0001--\n", "at0001--\n"},
 		{"term code kept, display name elided", "at0001,ICD10::E11.9|Crohn's disease|", "at0001,ICD10::E11.9|…|"},
 		{"term code without a name", "at0001,ICD10::E11.9", "at0001,ICD10::E11.9"},
+		// A display name that never became a token is still value content. The
+		// failing byte is a real delimiter and survives; the walked bytes do not.
+		{"malformed display name before a bracket", "at0001,X::1|Ann Example]", "at0001,X::1|…]"},
+		{"malformed display name at the end", "at0001,X::1|Ann Example", "at0001,X::1|…"},
+		{"empty display name is no region at all", "at0001,X::1||", "at0001,X::1||"},
 		{"escape inside a literal", `a/b='it\'s'`, `a/b='…'`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

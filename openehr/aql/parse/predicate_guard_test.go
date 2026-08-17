@@ -377,3 +377,46 @@ func TestEmitClassPredicateGuardsEveryClassPosition(t *testing.T) {
 		})
 	}
 }
+
+// TestEmitPredicateErrorsDoNotEchoValues — the guard errors above are the
+// return value of (*Query).Emit, i.e. the thing a consuming CDR logs and ships
+// to an error tracker, and the class standing predicate is where openEHR
+// carries the identifiable root. openehr/aql's own tests hold the validators;
+// this holds the EMIT paths that wrap them — the guard refusal and the
+// dual-operand refusal, whose error renders the predicate itself — to the same
+// line: the predicate is named STRUCTURALLY, never with its values.
+func TestEmitPredicateErrorsDoNotEchoValues(t *testing.T) {
+	const secret = "9d3d4d80-1111-2222-3333-444455556666"
+
+	t.Run("guard refusal", func(t *testing.T) {
+		_, err := emitWithPredicate(t,
+			"SELECT c/x FROM COMPOSITION c[ehr_id/value='replaced']",
+			"ehr_id/value='"+secret)
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery", err)
+		}
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("Emit error echoes a value that must stay out of the log stream:\n  %v", err)
+		}
+		if !strings.Contains(err.Error(), "ehr_id/value='…") {
+			t.Errorf("Emit error no longer names the refused predicate structurally: %v", err)
+		}
+	})
+
+	t.Run("dual-operand refusal", func(t *testing.T) {
+		q, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c[ehr_id/value='replaced']")
+		if err != nil {
+			t.Fatalf("ParseQuery: %v", err)
+		}
+		q.From.Root.Archetype = "openEHR-EHR-COMPOSITION.encounter.v1"
+		q.From.Root.Predicate = "ehr_id/value='" + secret + "'"
+		q.From.Root.PredicateComparison = nil
+		_, err = q.Emit()
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery", err)
+		}
+		if strings.Contains(err.Error(), secret) {
+			t.Errorf("Emit error echoes a value that must stay out of the log stream:\n  %v", err)
+		}
+	})
+}
