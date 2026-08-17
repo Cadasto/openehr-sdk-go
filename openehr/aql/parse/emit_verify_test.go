@@ -313,8 +313,11 @@ func TestEmitVerificationRefusesAnUnmodelledShape(t *testing.T) {
 	if !errors.Is(err, aql.ErrInvalidQuery) {
 		t.Errorf("err = %v, want ErrInvalidQuery", err)
 	}
-	if !strings.Contains(err.Error(), "where") {
-		t.Errorf("err = %v, want a WHERE coordinate", err)
+	if !strings.Contains(err.Error(), "where.presence") {
+		// The arm that fires, named exactly: an out-of-package shape renders
+		// nothing, so presence catches it. A bare "where" also matched the
+		// unmodelled arm's message, letting either arm's deletion pass unseen.
+		t.Errorf("err = %v, want the where.presence coordinate", err)
 	}
 }
 
@@ -325,17 +328,35 @@ type unmodelledWhere struct{ aql.WhereExpr }
 // TestEmitSyntaxRefusalKeepsItsSentinel pins the machine-readable half of the
 // re-parse arm: a caller branches on the sentinel, not on message text, and the
 // parser's own message — which echoes the offending source — never rides along.
+//
+// The fixture is a CONTAINED loud malformation (`a b c`): the per-position
+// guard accepts it by design (§ The class predicate positions reserves refusal
+// for the silent mode), so the refusal below can only come from the re-parse
+// arm of verifyEmitted. An earlier spelling used an unterminated string, which
+// the guard refused BEFORE any text was built — the test passed without ever
+// reaching the arm it pins, and deleting the ErrSyntax wrap kept the suite
+// green.
 func TestEmitSyntaxRefusalKeepsItsSentinel(t *testing.T) {
-	const secret = "a/b='shhh]"
-	_, err := emitWithPredicate(t, "SELECT c/x FROM COMPOSITION c", secret)
+	const contained = "a b c"
+	if verr := aql.ValidatePathPredicate(contained); verr != nil {
+		t.Fatalf("fixture invalid: the guard refused %q (%v); this test must reach the "+
+			"re-parse arm, not a per-position guard", contained, verr)
+	}
+	_, err := emitWithPredicate(t, "SELECT c/x FROM COMPOSITION c", contained)
 	if err == nil {
 		t.Fatal("Emit accepted text that cannot re-parse")
 	}
 	if !errors.Is(err, aql.ErrInvalidQuery) {
 		t.Errorf("err = %v, want ErrInvalidQuery", err)
 	}
-	if strings.Contains(err.Error(), "shhh") {
-		t.Errorf("err = %v leaks the predicate's value content", err)
+	if !errors.Is(err, aql.ErrSyntax) {
+		t.Errorf("err = %v, want aql.ErrSyntax riding along (the branchable sentinel)", err)
+	}
+	if !strings.Contains(err.Error(), "does not re-parse") {
+		t.Errorf("err = %v, want the re-parse arm's own wording", err)
+	}
+	if strings.Contains(err.Error(), "a b c") {
+		t.Errorf("err = %v echoes the offending source text", err)
 	}
 }
 
@@ -388,5 +409,160 @@ func TestEmitNeverReturnsUnparseableText(t *testing.T) {
 	if emitted == 0 || refused == 0 {
 		t.Errorf("corpus is one-sided: %d emitted, %d refused — it can no longer show "+
 			"the verification both accepting and refusing", emitted, refused)
+	}
+}
+
+// TestEmitVerificationPinsEachCarriedCoordinate is the per-slot soundness
+// table § Emission verified after emission requires: for every coordinate the
+// skeleton carries, one substitution that preserves everything BEFORE it and
+// diverges exactly there — so removing that slot from the skeleton fails a
+// named row (the REQ's mutation rule, per coordinate rather than per call
+// site).
+//
+// The vector is a SELECT item's Raw path — spliced verbatim by REQ-055 rule
+// 3's contract — whose payload re-writes the query's tail and comments out the
+// genuine one. That vector is exempt from the per-position guards BY the rule-3
+// contract, which is exactly what makes it the right probe for the WHOLE-QUERY
+// oracle: every coordinate after the projection can be counterfeited through
+// it.
+func TestEmitVerificationPinsEachCarriedCoordinate(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		base string // parsed to build the AST the payload then betrays
+		raw  string // the SELECT item Raw payload; `--` comments out the genuine tail
+		at   string // the coordinate the divergence must be reported at
+	}{
+		{
+			"containment connective flipped AND to OR",
+			"SELECT c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev)",
+			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o OR EVALUATION ev) --",
+			"from.connective",
+		},
+		{
+			"junction group negation dropped",
+			"SELECT c/x FROM COMPOSITION c NOT CONTAINS (OBSERVATION o AND EVALUATION ev)",
+			"c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev) --",
+			"from.connective",
+		},
+		{
+			"junction rewritten as a chain",
+			"SELECT c/x FROM COMPOSITION c CONTAINS (OBSERVATION o AND EVALUATION ev)",
+			"c/x FROM COMPOSITION c CONTAINS OBSERVATION o CONTAINS EVALUATION ev --",
+			"from.connective",
+		},
+		{
+			"projection alias rewritten",
+			"SELECT c/x AS col FROM COMPOSITION c",
+			"c/x AS forged FROM COMPOSITION c --",
+			"select.items[0].alias",
+		},
+		{
+			"projection column added",
+			"SELECT c/x FROM COMPOSITION c",
+			"c/x, c/uid/value FROM COMPOSITION c --",
+			"select item count",
+		},
+		{
+			"projection star flipped on",
+			"SELECT c/x FROM COMPOSITION c",
+			"* FROM COMPOSITION c --",
+			"select.star",
+		},
+		{
+			"ORDER BY dropped",
+			"SELECT c/x FROM COMPOSITION c ORDER BY c/x DESC",
+			"c/x FROM COMPOSITION c --",
+			"order by term count",
+		},
+		{
+			"LIMIT dropped",
+			"SELECT c/x FROM COMPOSITION c LIMIT 10",
+			"c/x FROM COMPOSITION c --",
+			"limit",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery(tc.base)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", tc.base, err)
+			}
+			q.Select.Items[0].Expr = parse.PathExpr{IdentifiedPath: parse.IdentifiedPath{
+				IdentifiedPath: aql.IdentifiedPath{Raw: tc.raw},
+			}}
+			out, err := q.Emit()
+			if err == nil {
+				t.Fatalf("the substitution emitted silently: %s", out)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+			if !strings.Contains(err.Error(), tc.at) {
+				t.Errorf("refused at the wrong coordinate:\n  err  %v\n  want %s", err, tc.at)
+			}
+		})
+	}
+}
+
+// TestEmitVerificationAcceptsPaddedCarriers is the anti-tightening arm for the
+// path-carrying slots: the primary constructors do not trim, the emitters
+// render the padding, and the parser's span strips it on read-back — one
+// ENCODING of the trimmed text, which MUST emit. Each row failed before
+// pathToken normalised the slot ends.
+func TestEmitVerificationAcceptsPaddedCarriers(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		build func(q *parse.Query)
+	}{
+		{"padded comparison LHS", func(q *parse.Query) {
+			q.Where = aql.Eq(" c/a ", aql.Int(1))
+		}},
+		{"newline-padded comparison LHS", func(q *parse.Query) {
+			q.Where = aql.Eq("c/a\n", aql.Int(1))
+		}},
+		{"padded EXISTS path", func(q *parse.Query) {
+			q.Where = aql.Exists(" c/a ")
+		}},
+		{"padded LIKE path", func(q *parse.Query) {
+			q.Where = aql.Like(" c/a ", aql.String("x%"))
+		}},
+		{"padded MATCHES path", func(q *parse.Query) {
+			q.Where = aql.Matches(" c/a ", aql.Int(1))
+		}},
+		{"padded ORDER BY raw path", func(q *parse.Query) {
+			q.OrderBy = []parse.OrderTerm{{Path: parse.IdentifiedPath{
+				IdentifiedPath: aql.IdentifiedPath{Raw: " c/uid/value "},
+			}}}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c")
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			tc.build(q)
+			if _, err := q.Emit(); err != nil {
+				t.Errorf("a padded carrier was refused (tightening): %v", err)
+			}
+		})
+	}
+}
+
+// TestEmitVerificationCollapsesTheStarEncodings — `SELECT *` has two AST
+// spellings: the bare `Star` flag and a sole unaliased [parse.StarExpr] item.
+// The emitted text is identical and re-parses as the FLAG form, so both MUST
+// reduce to the same skeleton; comparing the encodings refused the item form.
+func TestEmitVerificationCollapsesTheStarEncodings(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	q.Select.Star = false
+	q.Select.Items = []parse.SelectItem{{Expr: parse.StarExpr{}}}
+	out, err := q.Emit()
+	if err != nil {
+		t.Fatalf("a sole StarExpr item was refused (tightening): %v", err)
+	}
+	if !strings.Contains(out, "SELECT *") {
+		t.Fatalf("emitted %q, want a bare star projection", out)
 	}
 }

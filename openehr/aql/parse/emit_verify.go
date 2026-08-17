@@ -78,16 +78,13 @@ func (q *Query) verifyEmitted(out string) error {
 		return fmt.Errorf("%w: emitted AQL does not re-parse", aql.ErrInvalidQuery)
 	}
 	sa, sb := skeletonOf(q), skeletonOf(re)
-	// Fail CLOSED on a shape the skeleton cannot model, BEFORE comparing: an
-	// unmodelled slot compares equal to itself, so a vocabulary shape added
-	// without teaching this file would make the oracle silently blind at that
-	// coordinate rather than refuse.
-	for _, s := range append(sa, sb...) {
-		if shape, found := strings.CutPrefix(s.token, unmodelledPrefix); found {
-			return fmt.Errorf("%w: emission cannot be verified — %s carries %s, a shape the "+
-				"closure check does not model; teach openehr/aql/parse/emit_verify.go",
-				aql.ErrInvalidQuery, s.at, shape)
-		}
+	// Fail CLOSED before comparing — see [checkModelled]. Two calls rather than
+	// one over a concatenation, which aliased sa's backing array.
+	if err := checkModelled(sa); err != nil {
+		return err
+	}
+	if err := checkModelled(sb); err != nil {
+		return err
 	}
 	if at, ok := diffSlots(sa, sb); !ok {
 		return fmt.Errorf("%w: emitted AQL re-parses as a DIFFERENT query — the two differ at "+
@@ -139,8 +136,20 @@ func skeletonOf(q *Query) []slot {
 	// carries its star as a [StarExpr] item instead). Comparing the raw flag
 	// refused `{Star: true, Items: […]}`, whose emitted text says exactly what
 	// the emitter chose — the same reasoning that keeps `HasPredicate` out of
-	// [classToken].
-	add("select.star", strconv.FormatBool(q.Select.Star && len(q.Select.Items) == 0))
+	// [classToken]. A SOLE unaliased [StarExpr] item is the bare star's OTHER
+	// encoding: it emits `SELECT *`, which re-parses as `{Star: true}` with no
+	// items, so comparing the encodings refused a query whose text is legal —
+	// both reduce to the flag form here.
+	items := q.Select.Items
+	star := q.Select.Star && len(items) == 0
+	if len(items) == 1 && items[0].Alias == "" {
+		if d, ok := DerefSelectExpr(items[0].Expr); ok {
+			if _, isStar := d.(StarExpr); isStar {
+				star, items = true, nil
+			}
+		}
+	}
+	add("select.star", strconv.FormatBool(star))
 	if t := q.Select.Top; t != nil {
 		add("select.top", strconv.Itoa(t.N)+"/"+t.Dir.String())
 	}
@@ -150,14 +159,14 @@ func skeletonOf(q *Query) []slot {
 	// substitution has to change to add or drop a column. Per-item value
 	// closure is REQ-119's value-position property, held by PROBE-090's own
 	// suites rather than restated here.
-	add("select item count", strconv.Itoa(len(q.Select.Items)))
+	add("select item count", strconv.Itoa(len(items)))
 	// Each item's AS alias, which emission renders and which names a result
 	// column an ORDER BY key may bind to. The item's EXPRESSION is deliberately
 	// not tokenised: the SELECT vocabulary re-encodes (a parsed call over a
 	// literal argument is not the shape a hand-built one carries), and an item
 	// whose path TEXT changes its kind is the path-splice class § Out of scope
 	// defers by REQ-055 rule 3, not this closure's business.
-	for i, it := range q.Select.Items {
+	for i, it := range items {
 		add("select.items["+strconv.Itoa(i)+"].alias", it.Alias)
 	}
 
@@ -178,58 +187,92 @@ func skeletonOf(q *Query) []slot {
 	for i, t := range q.OrderBy {
 		at := "orderBy[" + strconv.Itoa(i) + "]"
 		add(at+".direction", t.Dir.String())
-		add(at+".path text", t.Path.Raw)
+		// Edge whitespace normalised — see [pathToken].
+		add(at+".path text", strings.TrimSpace(t.Path.Raw))
 	}
 	add("limit", limitToken(q.Limit))
 	add("offset", limitToken(q.Offset))
 	return s
 }
 
-// classSlots flattens the FROM tree into its class expressions in source order.
+// classSlots flattens the FROM tree into its class expressions in source order,
+// followed by the CONNECTIVE sequence read between adjacent classes.
 //
 // Flattening is the point: `A AND (B OR C)` and a hand-built tree that nests
 // the same three classes differently emit the same text and MUST compare equal,
 // while a swallowed `CONTAINS` term removes a class from the sequence and MUST
 // NOT.
+//
+// The connectives are carried IN-ORDER — for a junction, its keyword read
+// between each adjacent pair of its operands' flattened leaves — because that
+// reading is stable under exactly the re-nestings one text admits:
+// `AND(AND(a,b),c)` and `AND(a,b,c)` both read [AND, AND], while `a AND b OR c`
+// and its precedence tree both read [AND, OR]. A PER-NODE join slot was tried
+// and refused legal re-nestings (the containment tree's node count differs
+// between encodings of one text); the earlier ground for carrying no join at
+// all — that the keyword is written from `ChildJoin`, never spliced — was
+// one-sided: the RE-PARSED side's join comes from the emitted text, which a
+// path-position splice can counterfeit, flipping `AND` to `OR` over the same
+// class sequence. Negation rides on the connective too (`NOT CONTAINS`, and a
+// negated junction operand the emitter cannot even render), so a flipped or
+// dropped `NOT` cannot pass as the same query.
 func classSlots(q *Query) []slot {
-	var s []slot
-	n := 0
-	var walk func(c *Containment)
-	walk = func(c *Containment) {
+	var classes, conns []slot
+	n, k := 0, 0
+	conn := func(edge string) {
+		if edge == "" {
+			return // the root position has no incoming connective
+		}
+		conns = append(conns, slot{"from.connective[" + strconv.Itoa(k) + "]", edge})
+		k++
+	}
+	var walk func(c *Containment, incoming string)
+	walk = func(c *Containment, incoming string) {
 		if c == nil {
 			return
 		}
 		// A junction node carries no class of its own — only operands — so it
-		// contributes no slot and its children are spliced in at this level.
-		//
-		// Its `ChildJoin` is deliberately NOT carried, and this is the one place
-		// the skeleton is knowingly narrower than "everything Emit renders".
-		// Unlike a WHERE junction, the containment tree's node COUNT differs
-		// between encodings of one text — the parser groups a flattened chain its
-		// own way — so a join slot has no stable position to sit at and refused
-		// legal re-nestings. Nothing the substitution class can do reaches it
-		// either: an escaping bracket absorbs the text that FOLLOWS it, which
-		// removes class expressions (caught by this sequence), whereas a join
-		// keyword is written by the emitter from `ChildJoin` itself and is not
-		// spliced from any field.
-		if tok := classToken(c.Class); tok != "" {
-			// Negation renders as `NOT CONTAINS`, which INVERTS the term: carried
-			// on the class slot so a flipped flag cannot pass as the same query.
-			if c.Negated {
-				tok = "NOT " + tok
+		// contributes no class slot: its FIRST operand arrives on the junction's
+		// own incoming edge and every later one on the join keyword. Negation is
+		// the CHILD's flag and is applied by the edge computation below, exactly
+		// once, whichever node kind it decorates.
+		if classToken(c.Class) == "" && len(c.Children) > 0 {
+			for i := range c.Children {
+				edge := incoming
+				if i > 0 {
+					edge = c.ChildJoin.String()
+				}
+				if c.Children[i].Negated {
+					edge = "NOT " + edge
+				}
+				walk(&c.Children[i], edge)
 			}
-			s = append(s, slot{"from.class[" + strconv.Itoa(n) + "]", tok})
+			return
+		}
+		if tok := classToken(c.Class); tok != "" {
+			conn(incoming)
+			classes = append(classes, slot{"from.class[" + strconv.Itoa(n) + "]", tok})
 			n++
 		}
 		for i := range c.Children {
-			walk(&c.Children[i])
+			edge := "CONTAINS"
+			if c.Children[i].Negated {
+				edge = "NOT CONTAINS"
+			}
+			walk(&c.Children[i], edge)
 		}
 	}
-	s = append(s, slot{"from.root", classToken(q.From.Root)})
+	classes = append(classes, slot{"from.root", classToken(q.From.Root)})
 	n++
-	walk(q.From.Contains)
-	walk(q.From.Junction)
-	return s
+	if c := q.From.Contains; c != nil {
+		edge := "CONTAINS"
+		if c.Negated {
+			edge = "NOT CONTAINS"
+		}
+		walk(c, edge)
+	}
+	walk(q.From.Junction, "")
+	return append(classes, conns...)
 }
 
 // classToken reduces a class expression to what emitClassExpr renders, and
@@ -308,13 +351,13 @@ func whereSlots(w aql.WhereExpr, at string) []slot {
 		if lhs == "" {
 			lhs = aql.FormatValue(x.Left)
 		}
-		return []slot{{at, "cmp|" + lhs + "|" + string(x.Op) + "|" + aql.FormatValue(x.Val)}}
+		return []slot{{at, "cmp|" + pathToken(lhs) + "|" + string(x.Op) + "|" + pathToken(aql.FormatValue(x.Val))}}
 	case aql.ExistsExpr:
-		return []slot{{at, "exists|" + x.Path}}
+		return []slot{{at, "exists|" + pathToken(x.Path)}}
 	case aql.LikeExpr:
-		return []slot{{at, "like|" + x.Path + "|" + aql.FormatValue(x.Pattern)}}
+		return []slot{{at, "like|" + pathToken(x.Path) + "|" + aql.FormatValue(x.Pattern)}}
 	case aql.MatchesExpr:
-		return []slot{{at, "matches|" + x.Path + "|" + matchesOperands(x)}}
+		return []slot{{at, "matches|" + pathToken(x.Path) + "|" + matchesOperands(x)}}
 	}
 	// Fail CLOSED — see [unmodelledPrefix]. The type name discriminates, so two
 	// instances of an unlearned shape cannot compare equal.
@@ -326,6 +369,32 @@ func whereSlots(w aql.WhereExpr, at string) []slot {
 // of an unlearned shape compare equal, leaving the oracle blind at exactly the
 // coordinate a newly added vocabulary shape occupies.
 const unmodelledPrefix = "unmodelled:"
+
+// pathToken normalises a path (or formatted operand) for a skeleton slot: the
+// EDGE whitespace only. The emitters render a path verbatim (REQ-055 rule 3)
+// while the parser's source span strips the padding, so an untrimmed carrier —
+// `aql.Eq(" c/a ", …)`, a padded `OrderTerm.Path.Raw` — is one ENCODING of the
+// trimmed text, not a different query, and comparing it raw refused legal
+// queries built with the primary constructors (which do not trim). Interior
+// bytes ride through untouched: trimming only the ends cannot mask a splice.
+func pathToken(s string) string {
+	return strings.TrimSpace(s)
+}
+
+// checkModelled refuses a skeleton carrying a slot the reduction could not
+// model, BEFORE any comparison: an unmodelled slot compares equal to itself,
+// so a vocabulary shape added without teaching this file would make the oracle
+// silently blind at that coordinate rather than refuse.
+func checkModelled(s []slot) error {
+	for _, x := range s {
+		if shape, found := strings.CutPrefix(x.token, unmodelledPrefix); found {
+			return fmt.Errorf("%w: emission cannot be verified — %s carries %s, a shape the "+
+				"closure check does not model; teach openehr/aql/parse/emit_verify.go",
+				aql.ErrInvalidQuery, x.at, shape)
+		}
+	}
+	return nil
+}
 
 // wherePresence distinguishes the three states of the WHERE slot that all render
 // the same nothing, so absence cannot alias unreadability. See the call site.
