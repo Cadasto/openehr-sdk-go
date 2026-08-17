@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	tcimpl "github.com/cadasto/openehr-sdk-go/internal/templatecompile"
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -118,10 +119,20 @@ func pathDivergence(node *tcimpl.CompiledNode, segs []parse.PathSegment) (bad st
 // a predicate matching a child's node id (at-/id-code), that child is taken;
 // otherwise the first child is taken deterministically (lenient first-child,
 // mirroring template.OperationalTemplate.NodeAt).
+//
+// The predicate is compared with the lexer's SKIPPED trivia removed, because
+// REQ-119 made the read side report bracket text VERBATIM: `events[ at0001 ]`
+// and `events[at0001\n]` now arrive with their padding, where `GetText()` once
+// dropped it. Compared raw, the named child became unreachable and the lenient
+// fallback silently descended a SIBLING — which turned a valid path into an
+// `aql_path_not_in_template` warning wherever the siblings differ structurally.
+// REQ-109 § Layer 3 calls this descent "predicate-aware" and warns only on
+// high-confidence divergence, so the normalisation belongs to the COMPARISON,
+// not to the reported text ([Path.Segments] stays verbatim).
 func pickChild(children []*tcimpl.CompiledNode, predicate string) *tcimpl.CompiledNode {
-	if predicate != "" {
+	if id := aql.StripPredicateTrivia(predicate); id != "" {
 		for _, child := range children {
-			if child.NodeID() == predicate {
+			if child.NodeID() == id {
 				return child
 			}
 		}
