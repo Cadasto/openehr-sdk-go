@@ -2,8 +2,10 @@ package parse_test
 
 // REQ-119 · PROBE-090 — issue #99.
 //
-// predicate_confrontation_test.go holds [aql.ValidatePathPredicate] to the
-// grammar it was hand-derived from, over a GENERATED corpus.
+// predicate_confrontation_test.go holds [aql.ValidatePathPredicate] AND
+// [aql.ValidateVersionPredicate] — through the class and VERSION brackets
+// respectively — to the grammar they were hand-derived from, over a GENERATED
+// corpus.
 //
 // REQ-119 § Acceptance forbids a hand-written corpus where a position has no
 // token NAMES to walk, and this position has none: the guard's subject is
@@ -77,6 +79,18 @@ var predicateFragments = []string{
 	`{/]\/}`,     // …with a BRACKET the escaped reading would expose
 	"{/a/]/}",    // a bare `/` is no body char, so this `{` starts no regex
 	"{x}",        // a `{` that starts no regex: SYM_LEFT_CURLY, ordinary content
+	// `CONTAINED_REGEX`'s optional `(';' WS* STRING)?` TAIL. Every regex
+	// fragment above stops at the body, so no concatenation could reach the
+	// tail — and the token-boundary defect lived there: a SHORTER body whose
+	// tail runs further yields the LONGER token, which is the one the lexer
+	// takes. Spelled whole for the same reason the display-name fragment is.
+	`{/a\/;'x/}'}`, // a shorter body reaching past a longer one via its tail
+	`{/]/; 'i'}`,   // a bracket the tail must keep inside the token
+	"{/x",          // a body still OPEN at the end of the text
+	// `!=` is ONE operator (`SYM_NE`), and its `!` is the byte the operator
+	// must open at — counted at the `=`, the `!` reads as a left operand.
+	"!=",
+	"!",
 }
 
 // predicateBases are the query shapes the corpus is spliced into.
@@ -97,6 +111,15 @@ var predicateFragments = []string{
 // seed is the bracket text the base query is PARSED with, before the generated
 // text replaces it: it must be valid in the position, which `at0002` is not in
 // a VERSION bracket.
+//
+// This corpus deliberately carries JUNK operands (`!!a/b='c'`, `{`, `--`), so
+// its arms are the two below and no more. "Accepted text must re-parse" cannot
+// be asserted over it at either position: in the class position a contained
+// malformation is permitted to be refused LOUDLY by the parser, and in the
+// VERSION position the operands are exempt too — § The class predicate positions
+// decides that position's SHAPE and leaves its OPERANDS loud. The closure claim
+// for the VERSION shape therefore needs a corpus whose operands are legal BY
+// CONSTRUCTION; that is TestVersionPredicateShapeAgreesWithTheParser below.
 var predicateBases = []struct {
 	name    string
 	prefix  string
@@ -154,6 +177,14 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 				// What the naive splice WOULD have produced — the oracle both
 				// directions are measured against.
 				spliced := base.prefix + "[" + text + "]" + base.suffix
+				// …and the oracle is only ABOUT the emitted text while the two
+				// agree. Nothing else asserts that, so a later change to how
+				// Emit renders the clause would silently re-point every arm
+				// below at a different string.
+				if emitErr == nil && emitted != spliced {
+					t.Fatalf("the oracle no longer describes what Emit produces:\n  emitted %q\n  spliced %q",
+						emitted, spliced)
+				}
 				reparsed, reparseErr := parse.ParseQuery(spliced)
 				faithful := reparseErr == nil &&
 					reparsed.From.Root.Predicate == text &&
@@ -189,7 +220,10 @@ func TestPredicateGuardAgreesWithTheParser(t *testing.T) {
 			t.Logf("confronted %d generated predicates: %d accepted, %d refused; "+
 				"%d splices parse, of which %d parse as a DIFFERENT query",
 				checked, accepted, refused, live, discriminating)
-			if checked < 500 {
+			// Sized to the real corpus (depth 3 over the fragment list) rather
+			// than to a token amount: at 500 this passed at depth 2, so a
+			// generator regression surfaced only as a downstream symptom.
+			if checked < 10_000 {
 				t.Errorf("corpus collapsed to %d cases; the generator is no longer generating", checked)
 			}
 			if accepted == 0 || refused == 0 {
@@ -235,4 +269,119 @@ func generatedPredicates(n int) []string {
 		cur = next
 	}
 	return out
+}
+
+// versionOperandCorpus generates `versionPredicate` candidates whose OPERANDS
+// are legal by construction, which is what makes the closure claim assertable
+// there.
+//
+// The shared corpus above cannot carry it: its fragments are chosen for scanner
+// states, so most concatenations have junk operands (`!!a/b='c'`), and § The
+// class predicate positions leaves an operand-level malformation LOUD even at
+// this position. Its arms therefore stop at "never a DIFFERENT query", and a
+// hole in the SHAPE rule — which the § does decide — slips through: `!= 1`
+// passed validation and `VERSION v[!= 1]` did not parse, invisibly, because the
+// soundness arm only fires when the emitted text parses AND differs.
+//
+// Crossing legal `objectPath` spellings with every COMPARISON_OPERATOR spelling
+// and legal `pathPredicateOperand`s removes that escape hatch: every accepted
+// case must re-parse, full stop. The shape violations are then added
+// deliberately — a missing operand, two comparisons, a junction — so the refusal
+// side is exercised by the same generator rather than by a hand list.
+func versionOperandCorpus() []string {
+	lefts := []string{"a", "a/b", "commit_audit/time_committed", "a[at0001]/b", "a[b='c']/d"}
+	ops := []string{"=", "!=", ">", ">=", "<", "<="}
+	rights := []string{"1", "-1", "1.5", "'c'", `"c"`, "$p", "at0001", "id9", "a/b"}
+	pads := []string{"", " ", "  ", "\t", "\n", " -- note\n"}
+
+	var out []string
+	for _, l := range lefts {
+		for _, o := range ops {
+			for _, r := range rights {
+				for _, p := range pads {
+					// The whole production, padded with every trivia form.
+					out = append(out, l+p+o+p+r)
+					// …and the shapes the production does NOT have, each built
+					// from the same legal parts so only the SHAPE is at fault.
+					out = append(out,
+						p+o+p+r,             // no objectPath before the operator
+						l+p+o+p,             // no pathPredicateOperand after it
+						l+p+o+p+r+p+o+p+r,   // two comparisons, no junction to join them
+						l+p+o+p+r+" AND "+l, // a junction the position has no alternative for
+						l+p+o+p+r+" OR "+l,
+					)
+				}
+			}
+		}
+	}
+	// The two keyword alternatives, which must survive every trivia form.
+	for _, kw := range []string{"LATEST_VERSION", "ALL_VERSIONS", "latest_version"} {
+		for _, p := range pads {
+			out = append(out, p+kw+p)
+		}
+	}
+	return out
+}
+
+// TestVersionPredicateShapeAgreesWithTheParser confronts the VERSION guard over
+// the legal-operand corpus, where BOTH directions are total: accepted text must
+// re-parse (closure — no loud-operand exemption applies, the operands are legal)
+// and refused text must not be text the parser reads back unchanged.
+func TestVersionPredicateShapeAgreesWithTheParser(t *testing.T) {
+	const (
+		prefix = "SELECT v/x FROM VERSION v"
+		seed   = "LATEST_VERSION"
+		suffix = " CONTAINS COMPOSITION c[at0001\n] WHERE v/y = 1"
+	)
+
+	var checked, accepted, refused int
+	for _, text := range versionOperandCorpus() {
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		checked++
+
+		emitted, emitErr := emitWithPredicate(t, prefix+"["+seed+"]"+suffix, text)
+		spliced := prefix + "[" + text + "]" + suffix
+		reparsed, reparseErr := parse.ParseQuery(spliced)
+		faithful := reparseErr == nil &&
+			reparsed.From.Root.Predicate == text &&
+			reparsed.From.Contains != nil && reparsed.Where != nil
+
+		if emitErr != nil {
+			refused++
+			// NO TIGHTENING, unchanged in meaning from the shared corpus.
+			if faithful {
+				t.Errorf("VERSION guard REFUSED %q, but the parser reads it back unchanged\n  error %v",
+					text, emitErr)
+			}
+			continue
+		}
+		accepted++
+		// CLOSURE. Every operand here is legal, so the only thing that can make
+		// the emitted query unparseable is the SHAPE — which this position is
+		// held to. `loud` is not an available answer.
+		if _, err := parse.ParseQuery(emitted); err != nil {
+			t.Errorf("VERSION guard ACCEPTED %q, but the emitted query does not parse — the operands "+
+				"are legal by construction, so this is a SHAPE the production does not have\n"+
+				"  emitted %q\n  error %v", text, emitted, err)
+			continue
+		}
+		// …and IDENTITY, so an accepted case cannot quietly become another query.
+		if !faithful {
+			t.Errorf("VERSION guard ACCEPTED %q, but the emitted query re-parses as a DIFFERENT query\n"+
+				"  emitted %q\n  root predicate %q", text, emitted, reparsed.From.Root.Predicate)
+		}
+	}
+
+	t.Logf("confronted %d generated VERSION predicates: %d accepted, %d refused", checked, accepted, refused)
+	if checked < 5_000 {
+		t.Errorf("corpus collapsed to %d cases; the generator is no longer generating", checked)
+	}
+	// Two-sided by construction: the whole production is generated beside the
+	// shapes it does not have, so a guard that always answers the same way fails.
+	if accepted == 0 || refused == 0 {
+		t.Errorf("corpus is one-sided (%d accepted, %d refused); it cannot detect a guard that "+
+			"always answers the same way", accepted, refused)
+	}
 }

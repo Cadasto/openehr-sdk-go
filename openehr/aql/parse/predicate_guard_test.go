@@ -267,8 +267,11 @@ func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
 	for _, tc := range []struct{ name, text, why string }{
 		{"bare words", "a b c", "no delimiter at all, just not a predicate"},
 		{"brace that starts no regex", "a/b MATCHES {x}", "`{` falls back to SYM_LEFT_CURLY"},
-		{"regex body never closes", "a/b MATCHES {/re", "the token cannot complete, so nothing is consumed"},
-		{"regex closes but the token does not", "a/b MATCHES {/re/", "same: no CONTAINED_REGEX, no swallowing"},
+		// `{/re` is deliberately NOT here any more: its body is still open at the
+		// end of the text, so it can absorb the emitted `]` and close later in
+		// the query — a silent substitution, pinned by
+		// TestEmitRefusesARegexThatCompletesAcrossTheBracket below.
+		{"regex closes but the token does not", "a/b MATCHES {/re/", "the tail admits only WS, `;`, a STRING or `}`, so a `]` kills it"},
 		{"double dash is not a comment", "a/b='c'--x", "`--x` is SYM_DOUBLE_DASH; the `]` stays a delimiter"},
 		{"comment body ending on a bare CR", "a/b='c' -- x\r", "`~[\\r\\n]*` stops at the CR and only `'\\r'? '\\n'` closes the token, so this is SYM_DOUBLE_DASH and nothing is left open"},
 	} {
@@ -290,6 +293,56 @@ func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
 					"loud malformation and needs replacing", out)
 			}
 		})
+	}
+}
+
+// TestEmitRefusesARegexThatCompletesAcrossTheBracket is the CROSS-PREDICATE
+// silent substitution, and the one failure mode a per-predicate guard can only
+// see by reasoning about what comes AFTER the text it is given.
+//
+// `SLASH_REGEX_CHAR : ~[/\n\r] | …` admits `]`, so a regex body still open at
+// the end of the predicate does not stop at the emitter's own `]` — it runs on
+// through the rest of the emitted query and closes at the next `/` … `}`. Here
+// the completing `/}` lives in a COMMENT inside the CONTAINED class's predicate,
+// which is itself perfectly legal text. Neither predicate is faulty alone; the
+// pair is, which is why this is a query-level regression test and not a row in
+// the tables above.
+//
+// Before the scanner reported an open body, this emitted with err == nil and
+// re-parsed as a single COMPOSITION — the whole `CONTAINS OBSERVATION` term
+// absorbed into the regex.
+func TestEmitRefusesARegexThatCompletesAcrossTheBracket(t *testing.T) {
+	const base = "SELECT c/x FROM COMPOSITION c[at0002] CONTAINS OBSERVATION o[at0003] WHERE c/y = 1"
+
+	q, err := parse.ParseQuery(base)
+	if err != nil {
+		t.Fatalf("ParseQuery(%q) = %v", base, err)
+	}
+	if q.From.Contains == nil {
+		t.Fatal("base carries no containment; the test cannot show one being swallowed")
+	}
+	q.From.Root.Predicate = `a/b MATCHES {/x`
+	q.From.Root.PredicateComparison = nil
+	q.From.Contains.Class.Predicate = "at0001 -- /}\n"
+	q.From.Contains.Class.PredicateComparison = nil
+
+	out, err := q.Emit()
+	if err == nil {
+		// Not merely "it parses": name the substitution, so a future change that
+		// makes it loud rather than silent still reports something accurate.
+		reparsed, perr := parse.ParseQuery(out)
+		if perr == nil && reparsed.From.Contains == nil {
+			t.Fatalf("Emit accepted an open regex body and the emitted query SILENTLY lost its "+
+				"containment\n  emitted %q\n  root predicate came back %q",
+				out, reparsed.From.Root.Predicate)
+		}
+		t.Fatalf("Emit accepted an open regex body; emitted %q (reparse err %v)", out, perr)
+	}
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("Emit error = %v, want it to wrap aql.ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "contained regex") {
+		t.Errorf("Emit error = %v, want it to name the region left open", err)
 	}
 }
 
