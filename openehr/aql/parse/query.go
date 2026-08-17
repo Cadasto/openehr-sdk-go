@@ -379,6 +379,14 @@ func (d OrderDir) String() string {
 // SELECT projection, an OFFSET without LIMIT, a duplicate alias …), or
 // [aql.ErrIncompleteAST] when the AST came from an extractor-
 // incomplete parse.
+//
+// The verification step adds two more, both also wrapping
+// [aql.ErrInvalidQuery] so a caller's existing branch still catches them:
+// [aql.ErrSyntax] rides along when the emitted text does not re-parse (the
+// parser's own message is deliberately NOT wrapped — it echoes the offending
+// source text), and [aql.ErrIncompleteAST] rides along when the emitted text
+// re-parses into an AST the extractor cannot fully model. In both cases
+// [aql.ErrInvalidQuery] is the dominant sentinel: the emission was refused.
 func (q *Query) Emit() (string, error) {
 	if q == nil {
 		return "", fmt.Errorf("%w: nil query", aql.ErrInvalidQuery)

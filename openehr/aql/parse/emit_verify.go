@@ -77,30 +77,45 @@ func (q *Query) verifyEmitted(out string) error {
 		}
 		return fmt.Errorf("%w: emitted AQL does not re-parse", aql.ErrInvalidQuery)
 	}
-	if at, ok := diffSkeleton(q, re); !ok {
-		return fmt.Errorf("%w: emitted AQL re-parses as a DIFFERENT query (%s); a spliced "+
-			"field terminated its own bracket or token early", aql.ErrInvalidQuery, at)
+	sa, sb := skeletonOf(q), skeletonOf(re)
+	// Fail CLOSED on a shape the skeleton cannot model, BEFORE comparing: an
+	// unmodelled slot compares equal to itself, so a vocabulary shape added
+	// without teaching this file would make the oracle silently blind at that
+	// coordinate rather than refuse.
+	for _, s := range append(sa, sb...) {
+		if shape, found := strings.CutPrefix(s.token, unmodelledPrefix); found {
+			return fmt.Errorf("%w: emission cannot be verified — %s carries %s, a shape the "+
+				"closure check does not model; teach openehr/aql/parse/emit_verify.go",
+				aql.ErrInvalidQuery, s.at, shape)
+		}
+	}
+	if at, ok := diffSlots(sa, sb); !ok {
+		return fmt.Errorf("%w: emitted AQL re-parses as a DIFFERENT query — the two differ at "+
+			"%s (a spliced field may have terminated its bracket or token early, or the AST "+
+			"carries a field emission drops)", aql.ErrInvalidQuery, at)
 	}
 	return nil
 }
 
-// diffSkeleton reports whether two queries carry the same encoding-independent
-// skeleton, and on a difference the value-free coordinate at which they part.
-func diffSkeleton(a, b *Query) (string, bool) {
-	if a == nil || b == nil {
-		return "query presence", a == b
-	}
-	sa, sb := skeletonOf(a), skeletonOf(b)
+// diffSlots reports whether two skeletons agree, and on a difference the
+// value-free coordinate at which they part.
+//
+// A length difference is reported at the first slot the shorter side lacks:
+// [skeletonOf] emits a fixed set of slots unconditionally (the SELECT flags,
+// `from.root`, the counts, `limit`, `offset`), so a divergence in the variable
+// middle always shows up as a coordinate mismatch first, and a bare length
+// difference means one side ran out of tree.
+func diffSlots(sa, sb []slot) (string, bool) {
 	for i, fa := range sa {
 		if i >= len(sb) {
-			return fa.at + " lost", false
+			return fa.at + " (lost)", false
 		}
 		if fb := sb[i]; fa.at != fb.at || fa.token != fb.token {
 			return fa.at, false
 		}
 	}
 	if len(sb) > len(sa) {
-		return sb[len(sa)].at + " gained", false
+		return sb[len(sa)].at + " (gained)", false
 	}
 	return "", true
 }
@@ -119,7 +134,13 @@ func skeletonOf(q *Query) []slot {
 	add := func(at, token string) { s = append(s, slot{at, token}) }
 
 	add("select.distinct", strconv.FormatBool(q.Select.Distinct))
-	add("select.star", strconv.FormatBool(q.Select.Star))
+	// The EFFECTIVE star, not the flag: the emitter renders `*` only for the
+	// bare form and ignores `Star` once `Items` is populated (a mixed projection
+	// carries its star as a [StarExpr] item instead). Comparing the raw flag
+	// refused `{Star: true, Items: […]}`, whose emitted text says exactly what
+	// the emitter chose — the same reasoning that keeps `HasPredicate` out of
+	// [classToken].
+	add("select.star", strconv.FormatBool(q.Select.Star && len(q.Select.Items) == 0))
 	if t := q.Select.Top; t != nil {
 		add("select.top", strconv.Itoa(t.N)+"/"+t.Dir.String())
 	}
@@ -130,8 +151,27 @@ func skeletonOf(q *Query) []slot {
 	// closure is REQ-119's value-position property, held by PROBE-090's own
 	// suites rather than restated here.
 	add("select item count", strconv.Itoa(len(q.Select.Items)))
+	// Each item's AS alias, which emission renders and which names a result
+	// column an ORDER BY key may bind to. The item's EXPRESSION is deliberately
+	// not tokenised: the SELECT vocabulary re-encodes (a parsed call over a
+	// literal argument is not the shape a hand-built one carries), and an item
+	// whose path TEXT changes its kind is the path-splice class § Out of scope
+	// defers by REQ-055 rule 3, not this closure's business.
+	for i, it := range q.Select.Items {
+		add("select.items["+strconv.Itoa(i)+"].alias", it.Alias)
+	}
 
 	s = append(s, classSlots(q)...)
+	// WHERE PRESENCE is its own slot, and it must be, because absence and
+	// UNREADABILITY render the same nothing. `Emit` gates on `q.Where != nil` —
+	// an INTERFACE nil — and [aql.FormatWhere] returns ("", nil) for a value it
+	// cannot read, by documented design. So a typed-nil `*aql.Comparison` (the
+	// classic Go trap: `func f() *aql.Comparison { return nil }` assigned to the
+	// interface) emitted the query with its WHERE clause silently GONE. Without
+	// this slot both sides reduce to no leaves and the skeletons compare equal —
+	// the guard swallowing exactly the class it exists to catch, and at the
+	// position that carries the `ehr_id` scoping filter.
+	add("where.presence", wherePresence(q.Where))
 	s = append(s, whereSlots(q.Where, "where")...)
 
 	add("order by term count", strconv.Itoa(len(q.OrderBy)))
@@ -160,8 +200,24 @@ func classSlots(q *Query) []slot {
 			return
 		}
 		// A junction node carries no class of its own — only operands — so it
-		// contributes nothing and its children are spliced in at this level.
+		// contributes no slot and its children are spliced in at this level.
+		//
+		// Its `ChildJoin` is deliberately NOT carried, and this is the one place
+		// the skeleton is knowingly narrower than "everything Emit renders".
+		// Unlike a WHERE junction, the containment tree's node COUNT differs
+		// between encodings of one text — the parser groups a flattened chain its
+		// own way — so a join slot has no stable position to sit at and refused
+		// legal re-nestings. Nothing the substitution class can do reaches it
+		// either: an escaping bracket absorbs the text that FOLLOWS it, which
+		// removes class expressions (caught by this sequence), whereas a join
+		// keyword is written by the emitter from `ChildJoin` itself and is not
+		// spliced from any field.
 		if tok := classToken(c.Class); tok != "" {
+			// Negation renders as `NOT CONTAINS`, which INVERTS the term: carried
+			// on the class slot so a flipped flag cannot pass as the same query.
+			if c.Negated {
+				tok = "NOT " + tok
+			}
 			s = append(s, slot{"from.class[" + strconv.Itoa(n) + "]", tok})
 			n++
 		}
@@ -191,16 +247,28 @@ func classToken(c ClassExpr) string {
 	if rm == "" && c.Alias == "" && c.Archetype == "" && c.Predicate == "" {
 		return ""
 	}
-	bracket := c.Archetype
-	if bracket == "" {
-		bracket = c.Predicate
+	// The VERSION branch renders `Predicate` and never `Archetype`, where the
+	// class branch prefers `Archetype`. The divergence is unreachable only
+	// because `checkClassOperands` refuses a VERSION class carrying an archetype
+	// first; mirrored here so the token cannot drift if that guard moves.
+	bracket := c.Predicate
+	if !c.Version && c.Archetype != "" {
+		bracket = c.Archetype
 	}
 	return rm + "|" + c.Alias + "|" + bracket
 }
 
-// whereSlots flattens a predicate tree into its LEAVES in order, so junction
-// nesting and arity — where the parser has encoding freedom — do not enter the
-// comparison, while a leaf added or removed does.
+// whereSlots reduces a predicate tree to its operator and its LEAVES in order.
+//
+// A same-operator chain is FLATTENED first: `AND(AND(a,b),c)` and `AND(a,b,c)`
+// emit the same text — [aql.FormatWhere] renders no parentheses for an
+// associative chain, and `aql.And` / `aql.Or` do not flatten on construction,
+// so incremental composition produces the nested form — so they MUST reduce to
+// the same slots. Nesting under a DIFFERENT operator is structural and stays in
+// the coordinate, since `a AND (b OR c)` is not `(a AND b) OR c`.
+//
+// The operator itself is a slot: `a AND b` and `a OR b` have identical leaves
+// and are different queries.
 //
 // Both sides route through [aql.DerefWhere] before any shape is read, so a
 // pointer-carried twin reduces to the same token as its value form (REQ-119's
@@ -208,22 +276,39 @@ func classToken(c ClassExpr) string {
 func whereSlots(w aql.WhereExpr, at string) []slot {
 	d, ok := aql.DerefWhere(w)
 	if !ok {
-		// Absent WHERE and an unreadable one both render nothing; the emitter's
-		// own validation refuses the latter before this runs.
+		// A top-level absent WHERE renders nothing and reduces to no slots on
+		// both sides, which is positional. Inside a composite, the emitter's own
+		// validation refuses an unreadable term before this runs
+		// ("AND junction term N carries no predicate").
 		return nil
 	}
 	switch x := d.(type) {
 	case aql.Junction:
-		var s []slot
-		for i, t := range x.Terms {
-			s = append(s, whereSlots(t, at+".leaf["+strconv.Itoa(i)+"]")...)
+		terms := flattenJunction(x)
+		// A one-term junction renders as its term alone — no operator reaches the
+		// text — so it must reduce to that term's slots. `Junction.validate`
+		// accepts one term and only the `aql.And` / `aql.Or` constructors collapse
+		// it, so a struct literal reaches here.
+		if len(terms) == 1 {
+			return whereSlots(terms[0], at)
+		}
+		s := []slot{{at + ".junction", string(x.Op)}}
+		for i, t := range terms {
+			s = append(s, whereSlots(t, at+".term["+strconv.Itoa(i)+"]")...)
 		}
 		return s
 	case aql.NotExpr:
 		return append([]slot{{at + ".not", "NOT"}}, whereSlots(x.Operand, at+".operand")...)
 	case aql.Comparison:
-		return []slot{{at, "cmp|" + x.Path + "|" + string(x.Op) + "|" +
-			aql.FormatValue(x.Left) + "|" + aql.FormatValue(x.Val)}}
+		// The LHS has TWO carriers — `Path` for a path, `Left` for a call — and
+		// the parser always reports a path LHS in `Path` while `aql.Compare` can
+		// put one in `Left`. Both render the same text, so the carrier is
+		// normalised away exactly as [classToken] does for Archetype/Predicate.
+		lhs := x.Path
+		if lhs == "" {
+			lhs = aql.FormatValue(x.Left)
+		}
+		return []slot{{at, "cmp|" + lhs + "|" + string(x.Op) + "|" + aql.FormatValue(x.Val)}}
 	case aql.ExistsExpr:
 		return []slot{{at, "exists|" + x.Path}}
 	case aql.LikeExpr:
@@ -231,25 +316,69 @@ func whereSlots(w aql.WhereExpr, at string) []slot {
 	case aql.MatchesExpr:
 		return []slot{{at, "matches|" + x.Path + "|" + matchesOperands(x)}}
 	}
-	return []slot{{at, "unknown"}}
+	// Fail CLOSED — see [unmodelledPrefix]. The type name discriminates, so two
+	// instances of an unlearned shape cannot compare equal.
+	return []slot{{at, fmt.Sprintf("%s%T", unmodelledPrefix, d)}}
 }
 
-func matchesOperands(m aql.MatchesExpr) string {
-	if m.URI != "" {
-		return "{" + m.URI + "}"
+// unmodelledPrefix marks a slot the skeleton could not model. It exists so the
+// verification fails CLOSED: a constant token would make two DIFFERENT instances
+// of an unlearned shape compare equal, leaving the oracle blind at exactly the
+// coordinate a newly added vocabulary shape occupies.
+const unmodelledPrefix = "unmodelled:"
+
+// wherePresence distinguishes the three states of the WHERE slot that all render
+// the same nothing, so absence cannot alias unreadability. See the call site.
+func wherePresence(w aql.WhereExpr) string {
+	if w == nil {
+		return "absent"
 	}
-	if m.Terminology != nil {
-		args := make([]string, len(m.Terminology.Args))
-		for i, a := range m.Terminology.Args {
-			args[i] = aql.FormatValue(a)
+	if _, ok := aql.DerefWhere(w); !ok {
+		return "unreadable"
+	}
+	return "present"
+}
+
+// flattenJunction expands the terms of j that are themselves junctions on the
+// SAME operator, recursively — the associativity the emitted text already
+// erases.
+func flattenJunction(j aql.Junction) []aql.WhereExpr {
+	out := make([]aql.WhereExpr, 0, len(j.Terms))
+	for _, t := range j.Terms {
+		if d, ok := aql.DerefWhere(t); ok {
+			if inner, isJunction := d.(aql.Junction); isJunction && inner.Op == j.Op {
+				out = append(out, flattenJunction(inner)...)
+				continue
+			}
 		}
-		return strings.ToUpper(m.Terminology.Name) + "(" + strings.Join(args, ",") + ")"
+		out = append(out, t)
+	}
+	return out
+}
+
+// matchesOperands reduces a MATCHES operand, and MUST mirror
+// [aql.MatchesExpr]'s own renderer rather than re-deciding the same three-way
+// choice: `Terminology` wins over a URI, and the URI's emptiness test is
+// TrimSpace — not `!= ""` — because a whitespace-only URI is not an operand and
+// the value list is what renders. Deciding it independently refused
+// `MATCHES TERMINOLOGY(…)` and `MATCHES { uri://a }`, both of which validate and
+// emit correctly.
+//
+// The operand is reduced through the SAME total formatter the emitter uses, so
+// the skeleton cannot disagree with the text that was just written.
+func matchesOperands(m aql.MatchesExpr) string {
+	uri := strings.TrimSpace(m.URI)
+	switch {
+	case m.Terminology != nil:
+		return aql.FormatValue(m.Terminology)
+	case uri != "":
+		return "{" + uri + "}"
 	}
 	vals := make([]string, len(m.Values))
 	for i, v := range m.Values {
 		vals[i] = aql.FormatValue(v)
 	}
-	return "{" + strings.Join(vals, ",") + "}"
+	return "{" + strings.Join(vals, ", ") + "}"
 }
 
 // limitToken reduces a LIMIT / OFFSET slot, routing through [DerefLimitExpr]
@@ -265,5 +394,5 @@ func limitToken(l LimitExpr) string {
 	case ParamLimit:
 		return "$" + x.Name
 	}
-	return "unknown"
+	return fmt.Sprintf("%s%T", unmodelledPrefix, d)
 }

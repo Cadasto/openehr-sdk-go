@@ -167,14 +167,186 @@ func TestEmitVerificationAcceptsEveryReNestedEncoding(t *testing.T) {
 	}
 }
 
-// TestEmitVerificationIsMutationDetectable pins the REQ's mutation rule for
-// this guard by naming what must fail if the verification call is deleted from
-// Emit: TestEmitRefusesACrossBracketRegexSubstitution above, and the loud rows
-// of TestEmitClassPredicateAcceptsLoudMalformations, which now assert that Emit
-// surfaces the parser's verdict rather than emitting text it cannot read.
+// TestEmitVerificationFactorsOutWhereEncodings is the WHERE half of the
+// anti-tightening arm, and every row here was a real refusal before it existed.
 //
-// The check here is the property those depend on and which no other test states
-// directly: Emit NEVER returns text that fails to re-parse.
+// [aql.FormatWhere] renders no parentheses for a same-operator chain and the
+// parser reads one back flat, while `aql.And` / `aql.Or` do NOT flatten on
+// construction. So `aql.And(parsedWhere, extraFilter)` — the canonical
+// inject-a-tenant-filter rewrite, and the population REQ-119 § binds — produces
+// a nested tree whose emitted text is byte-identical to the flat form's.
+func TestEmitVerificationFactorsOutWhereEncodings(t *testing.T) {
+	eq := func(p string, n int64) aql.WhereExpr {
+		return aql.Comparison{Path: p, Op: aql.OpEq, Val: aql.IntValue{N: n}}
+	}
+	const base = "SELECT c/uid/value FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2"
+
+	for _, tc := range []struct {
+		name  string
+		where func(parsed aql.WhereExpr) aql.WhereExpr
+		want  string
+		why   string
+	}{
+		{
+			"and of a parsed and junction",
+			func(p aql.WhereExpr) aql.WhereExpr { return aql.And(p, eq("c/z", 9)) },
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2 AND c/z = 9",
+			"the rewrite pattern parse.Query is mutable for",
+		},
+		{
+			"right-nested same operator",
+			func(aql.WhereExpr) aql.WhereExpr {
+				return aql.And(eq("c/a", 1), aql.And(eq("c/b", 2), eq("c/z", 9)))
+			},
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2 AND c/z = 9",
+			"associativity the emitted text erases",
+		},
+		{
+			"single-term junction",
+			func(aql.WhereExpr) aql.WhereExpr {
+				return aql.Junction{Op: aql.OpAnd, Terms: []aql.WhereExpr{eq("c/a", 1)}}
+			},
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a = 1",
+			"Junction.validate accepts one term; only the constructors collapse it",
+		},
+		{
+			"path LHS on the Left carrier",
+			func(aql.WhereExpr) aql.WhereExpr {
+				return aql.Compare(aql.Path("c/a"), aql.OpEq, aql.Path("c/b"))
+			},
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a = c/b",
+			"the parser reports a path LHS in Path; aql.Compare can put one in Left",
+		},
+		{
+			"terminology operand with an untrimmed name",
+			func(aql.WhereExpr) aql.WhereExpr {
+				return aql.MatchesExpr{Path: "c/a", Terminology: &aql.FuncCall{
+					Name: " terminology ",
+					Args: []aql.Value{aql.String("openehr"), aql.String("compo"), aql.String("x")},
+				}}
+			},
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a MATCHES TERMINOLOGY('openehr', 'compo', 'x')",
+			"the operand renderer trims; a skeleton that re-decides the choice refused it",
+		},
+		{
+			"whitespace-only URI falls through to the value list",
+			func(aql.WhereExpr) aql.WhereExpr {
+				return aql.MatchesExpr{Path: "c/a", URI: "  ", Values: []aql.Value{aql.Int(1), aql.Int(2)}}
+			},
+			"SELECT c/uid/value FROM COMPOSITION c WHERE c/a MATCHES {1, 2}",
+			"MatchesExpr.expr tests TrimSpace, not != \"\"",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := parse.ParseQuery(base)
+			if err != nil {
+				t.Fatalf("ParseQuery: %v", err)
+			}
+			q.Where = tc.where(q.Where)
+			out, err := q.Emit()
+			if err != nil {
+				t.Fatalf("Emit refused a legal WHERE encoding (%s): %v", tc.why, err)
+			}
+			if out != tc.want {
+				t.Errorf("Emit = %q, want %q", out, tc.want)
+			}
+			// And the three write paths must agree on the same predicate, which
+			// is what § The emission closure property requires.
+			if _, err := aql.FormatWhere(q.Where); err != nil {
+				t.Errorf("FormatWhere refused what Emit accepted: %v", err)
+			}
+		})
+	}
+}
+
+// TestEmitRefusesADroppedWhereClause is the other direction at the same slot:
+// absence and UNREADABILITY render the same nothing, so without a presence
+// coordinate they alias and a dropped WHERE passes as the same query.
+//
+// The trap is ordinary Go: a constructor returning a typed nil pointer lands in
+// the interface as non-nil, `Emit` gates on the interface, and
+// [aql.FormatWhere] renders "" for a value it cannot read — by design. The
+// clause silently disappeared, which at this position is the `ehr_id` scoping
+// filter.
+func TestEmitRefusesADroppedWhereClause(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	var typedNil *aql.Comparison
+	q.Where = typedNil
+
+	out, err := q.Emit()
+	if err == nil {
+		t.Fatalf("Emit produced %q with err == nil; the WHERE clause was dropped silently", out)
+	}
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "where.presence") {
+		t.Errorf("err = %v, want the where.presence coordinate", err)
+	}
+}
+
+// TestEmitVerificationRefusesAnUnmodelledShape holds the skeleton FAIL-CLOSED on
+// a WhereExpr it cannot read.
+//
+// A shape from outside the sealed set is reachable because the marker method is
+// promoted through embedding, and it renders NOTHING — [aql.FormatWhere] returns
+// "" for a value it cannot read. So it is refused at `where.presence` rather
+// than at the unmodelled-token arm, which stands behind it for a future
+// IN-package shape that dereferences cleanly but has no case here. Either way the
+// refusal is the point: a constant token would make two different instances
+// compare equal and the oracle would go blind at exactly the coordinate a newly
+// added shape occupies — in the file that exists to be the last line of defence.
+func TestEmitVerificationRefusesAnUnmodelledShape(t *testing.T) {
+	q, err := parse.ParseQuery("SELECT c/uid/value FROM COMPOSITION c WHERE c/a = 1")
+	if err != nil {
+		t.Fatalf("ParseQuery: %v", err)
+	}
+	q.Where = unmodelledWhere{}
+
+	out, err := q.Emit()
+	if err == nil {
+		t.Fatalf("Emit produced %q for a WhereExpr the skeleton cannot model", out)
+	}
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("err = %v, want ErrInvalidQuery", err)
+	}
+	if !strings.Contains(err.Error(), "where") {
+		t.Errorf("err = %v, want a WHERE coordinate", err)
+	}
+}
+
+// unmodelledWhere satisfies [aql.WhereExpr] from outside the sealed set, which
+// is reachable because the marker method is promoted through embedding.
+type unmodelledWhere struct{ aql.WhereExpr }
+
+// TestEmitSyntaxRefusalKeepsItsSentinel pins the machine-readable half of the
+// re-parse arm: a caller branches on the sentinel, not on message text, and the
+// parser's own message — which echoes the offending source — never rides along.
+func TestEmitSyntaxRefusalKeepsItsSentinel(t *testing.T) {
+	const secret = "a/b='shhh]"
+	_, err := emitWithPredicate(t, "SELECT c/x FROM COMPOSITION c", secret)
+	if err == nil {
+		t.Fatal("Emit accepted text that cannot re-parse")
+	}
+	if !errors.Is(err, aql.ErrInvalidQuery) {
+		t.Errorf("err = %v, want ErrInvalidQuery", err)
+	}
+	if strings.Contains(err.Error(), "shhh") {
+		t.Errorf("err = %v leaks the predicate's value content", err)
+	}
+}
+
+// TestEmitNeverReturnsUnparseableText pins the property the soundness rows rest
+// on and which no other test states directly: Emit NEVER returns text that fails
+// to re-parse.
+//
+// The REQ's mutation rule is satisfied for this guard by deleting the
+// verifyEmitted call from Emit, which fails this test,
+// TestEmitRefusesACrossBracketRegexSubstitution above, and the loud rows of
+// TestEmitClassPredicateAcceptsLoudMalformations.
 func TestEmitNeverReturnsUnparseableText(t *testing.T) {
 	// A corpus of predicates spanning the scanner's states, each spliced into a
 	// base carrying material after the bracket — the shape a substitution needs.
@@ -209,7 +381,7 @@ func TestEmitNeverReturnsUnparseableText(t *testing.T) {
 		}
 		emitted++
 		if _, err := parse.ParseQuery(out); err != nil {
-			t.Errorf("Emit returned text that does not re-parse for predicate %d: %v", len(p), err)
+			t.Errorf("Emit returned text that does not re-parse for predicate %q: %v", p, err)
 		}
 	}
 	// The corpus must exercise BOTH outcomes, or the property above is vacuous.
