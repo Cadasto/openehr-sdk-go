@@ -121,7 +121,11 @@ func ValidateIdentifier(name string) error {
 // A VERSION class takes no archetype predicate; that rule binds its callers,
 // which carry the archetype field this one does not see.
 func validateRMTypeToken(rmType string) error {
-	if strings.EqualFold(rmType, "VERSION") {
+	// ASCII-gated fold: a Unicode fold-equal spelling (`VERſION`) is NOT the
+	// keyword — the lexer's fragments are ASCII — and falling through to
+	// [ValidateIdentifier] refuses it, where the bare fold accepted a token
+	// the parser cannot read. See [asciiKeyword].
+	if asciiKeyword(rmType, "VERSION") {
 		return nil
 	}
 	return ValidateIdentifier(rmType)

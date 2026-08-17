@@ -170,6 +170,12 @@ func TestValidateVersionPredicate(t *testing.T) {
 		// A near-miss keyword must not pass on a prefix match.
 		{"keyword_prefix", "LATEST_VERSIONS", true},
 		{"keyword_suffix", "XLATEST_VERSION", true},
+		// …nor on a Unicode fold. The lexer's fragments are ASCII (`S : [sS]`),
+		// so `ſ` (U+017F, simple-folds to `s`) fails token recognition — a
+		// bare strings.EqualFold accepted both spellings and emitted text the
+		// parser rejects. Removing asciiKeyword's length gate fails these two.
+		{"keyword_unicode_fold", "LATEſT_VERSION", true},
+		{"keyword_unicode_fold_all", "ALL_VERſIONS", true},
 		// The escape scan still applies here — and the row must carry a
 		// top-level comparison operator, or the KEYWORD arm refuses it whether
 		// or not the escape scan runs and the row tests nothing. That is what

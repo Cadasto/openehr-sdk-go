@@ -30,7 +30,12 @@ package aql
 //     is exactly what [ValidatePathPredicate] refuses.
 //   - Text that stays inside its brackets can at worst be a malformed
 //     predicate, which the parser rejects LOUDLY. REQ-119 reserves refusal for
-//     the silent mode, so a contained malformation is left to the parser.
+//     the silent mode, so a contained malformation is left to the parser. One
+//     recorded exception escapes BOTH classes: a regex token that completes
+//     here AND leaves its body reachable (`{/a\/}`) forms a longer token under
+//     a cooperating suffix — a whole-query property no per-predicate scan can
+//     decide (REQ-119 § Out of scope; issue #103 tracks the verify-after-emit
+//     closure).
 //
 // The rules are hand-derived because `openehr/aql` may not import the generated
 // lexer (REQ-013 — the dependency runs the other way), and are held honest
@@ -54,7 +59,9 @@ import (
 //
 // The keyword test is case-INSENSITIVE because the lexer builds both keywords
 // out of case-insensitive letter fragments (`LATEST_VERSION : L A T E S T '_'
-// V E R S I O N`), so `latest_version` is the same token.
+// V E R S I O N`), so `latest_version` is the same token. The fragments are
+// ASCII (`S : [sS]`), so the fold is held to that alphabet — see
+// [asciiKeyword] for the spelling Unicode folding wrongly admitted.
 //
 // This position is held to its whole PRODUCTION rather than to a necessary
 // condition, and is the one place REQ-119 refuses a LOUD malformation: the
@@ -75,7 +82,7 @@ func ValidateVersionPredicate(text string) error {
 		return err
 	}
 	body := StripPredicateTrivia(text)
-	if strings.EqualFold(body, "LATEST_VERSION") || strings.EqualFold(body, "ALL_VERSIONS") {
+	if asciiKeyword(body, "LATEST_VERSION") || asciiKeyword(body, "ALL_VERSIONS") {
 		return nil
 	}
 	sc := scanPredicate(text)
@@ -363,6 +370,23 @@ func junctionKeywordAt(s string, i int) string {
 		return s[i : i+len(kw)]
 	}
 	return ""
+}
+
+// asciiKeyword reports whether s spells the ASCII keyword kw under the
+// lexer's own case rule.
+//
+// The fold is held to ASCII BY LENGTH: the grammar builds its keywords from
+// case-insensitive ASCII letter fragments (`S : [sS]`), while
+// [strings.EqualFold] folds the full Unicode simple-fold set — so
+// `LATEſT_VERSION` (U+017F LATIN SMALL LETTER LONG S, which folds to `s`) was
+// EqualFold-equal to the keyword while the lexer fails it with a
+// token-recognition error, and the guard emitted text the parser rejects.
+// Every rune outside ASCII is more than one byte, so byte-length equality
+// with the ASCII keyword forces every folded pair ASCII. [junctionKeywordAt]
+// needs no gate for the same reason in reverse: it folds a slice of exactly
+// len(kw) BYTES, in which a multi-byte rune leaves too few runes to match.
+func asciiKeyword(s, kw string) bool {
+	return len(s) == len(kw) && strings.EqualFold(s, kw)
 }
 
 // termCodeChar spells `TERM_CODE_CHAR : NAME_CHAR | '.'`, i.e. a word

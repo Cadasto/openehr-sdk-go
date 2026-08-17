@@ -662,19 +662,6 @@ func validateSelectTerminology(v FunctionCall) error {
 	return nil
 }
 
-// validateSelectFuncShape holds a projected [FunctionCall]'s SHAPE — its
-// Star / Distinct flags and, for an aggregate, its argument list — to the
-// grammar rule that admits the name (REQ-119).
-//
-// [aql.ValidateSelectFuncName] admits the aggregate NAMES because SELECT
-// reaches `aggregateFunctionCall`; that rule also fixes their shape —
-// `COUNT '(' (DISTINCT? identifiedPath | '*') ')' | (MIN|MAX|SUM|AVG) '('
-// identifiedPath ')'` — while the general `functionCall` admits neither
-// DISTINCT nor `*` at all. Unvalidated, the emitter picked a winner: a Star
-// beside Args emitted `COUNT(*)` with the argument SILENTLY GONE (valid AQL
-// counting rows instead of path values — the substitution class), and
-// `MIN(DISTINCT x)` / `MAX(*)` / `COUNT()` emitted text this SDK's own parser
-// rejects.
 // asciiUpper upper-cases the ASCII letters of s and leaves every other byte
 // alone — the parse-side twin of the aql package's helper, spelled here
 // because a function name must NEVER pass through strings.ToUpper: its
@@ -690,6 +677,19 @@ func asciiUpper(s string) string {
 	}, s)
 }
 
+// validateSelectFuncShape holds a projected [FunctionCall]'s SHAPE — its
+// Star / Distinct flags and, for an aggregate, its argument list — to the
+// grammar rule that admits the name (REQ-119).
+//
+// [aql.ValidateSelectFuncName] admits the aggregate NAMES because SELECT
+// reaches `aggregateFunctionCall`; that rule also fixes their shape —
+// `COUNT '(' (DISTINCT? identifiedPath | '*') ')' | (MIN|MAX|SUM|AVG) '('
+// identifiedPath ')'` — while the general `functionCall` admits neither
+// DISTINCT nor `*` at all. Unvalidated, the emitter picked a winner: a Star
+// beside Args emitted `COUNT(*)` with the argument SILENTLY GONE (valid AQL
+// counting rows instead of path values — the substitution class), and
+// `MIN(DISTINCT x)` / `MAX(*)` / `COUNT()` emitted text this SDK's own parser
+// rejects.
 func validateSelectFuncShape(v FunctionCall) error {
 	// asciiUpper, not strings.ToUpper: the emit arm has already held the name
 	// to the identifier alphabet (ValidateSelectFuncName runs first), so the
@@ -1078,7 +1078,13 @@ func checkClassOperands(c ClassExpr) error {
 	// exactly what the text says. Any other RM type names a class the emitted
 	// text does not mention.
 	if c.Version {
-		if c.RMType != "" && !strings.EqualFold(c.RMType, "VERSION") {
+		// Byte-length gate on the fold: `VERſION` is Unicode-fold-equal to the
+		// keyword but is NOT the flag's carrier spelling — [emitClassExpr]
+		// writes its own literal `VERSION`, so those bytes would be DROPPED,
+		// the very defect this branch refuses. ASCII keywords fold ASCII-only;
+		// see aql's asciiKeyword for the derivation.
+		if c.RMType != "" &&
+			!(len(c.RMType) == len("VERSION") && strings.EqualFold(c.RMType, "VERSION")) {
 			return fmt.Errorf("%w: VERSION class expression also carries RM type %q; "+
 				"the VERSION alternative has no RM-type slot, so emission would drop it",
 				aql.ErrInvalidQuery, c.RMType)
