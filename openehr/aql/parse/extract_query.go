@@ -237,6 +237,30 @@ func sourceText(c antlr.ParserRuleContext) string {
 	return c.GetText()
 }
 
+// bracketInterior returns the source text BETWEEN a context's enclosing
+// bracket tokens, so nothing the lexer skips between the bracket and the
+// child rule is lost.
+//
+// `versionPredicate` is the case that needs it: unlike `pathPredicate` its
+// production excludes the brackets, so a span over the child rule's own first
+// and last tokens starts AFTER any padding and ends BEFORE it. `VERSION
+// v[ LATEST_VERSION ]` came back `LATEST_VERSION`, which re-emits as
+// `[LATEST_VERSION]` — a round trip that parses but is not IDENTITY, and this
+// REQ requires identity at every position re-emitted verbatim.
+func bracketInterior(lbrack, rbrack antlr.TerminalNode, inner antlr.ParserRuleContext) string {
+	if lbrack == nil || rbrack == nil {
+		return sourceText(inner)
+	}
+	o, c := lbrack.GetSymbol(), rbrack.GetSymbol()
+	if o == nil || c == nil || o.GetInputStream() == nil {
+		return sourceText(inner)
+	}
+	if o.GetStop()+1 > c.GetStart()-1 {
+		return ""
+	}
+	return o.GetInputStream().GetTextFromInterval(antlr.NewInterval(o.GetStop()+1, c.GetStart()-1))
+}
+
 func (ex *astExtractor) extractAggregateFunctionCall(c gen.IAggregateFunctionCallContext) FunctionCall {
 	out := FunctionCall{Name: aggregateName(c)}
 	if c.DISTINCT() != nil {
@@ -524,7 +548,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 				// verbatim so the emitter round-trips it, and expose a
 				// structured {path, op, value} when it is a simple
 				// comparison (REQ-113).
-				ce.Predicate = trimBrackets(pp.GetText())
+				ce.Predicate = trimBrackets(sourceText(pp))
 				ce.PredicateComparison = standingComparison(pp.StandardPredicate())
 			}
 		}
@@ -536,7 +560,11 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 		}
 		if vp := v.VersionPredicate(); vp != nil {
 			ce.HasPredicate = true
-			ce.Predicate = trimBrackets(vp.GetText())
+			// Spanned over the ENCLOSING brackets, not the child rule: see
+			// bracketInterior. `versionPredicate` excludes its brackets (they
+			// belong to classExprOperand), so a child-rule span drops the
+			// padding, comments and line breaks between them.
+			ce.Predicate = bracketInterior(v.SYM_LEFT_BRACKET(), v.SYM_RIGHT_BRACKET(), vp)
 		}
 		return ce
 	}
@@ -817,12 +845,12 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 // Document.Paths and Query SELECT/WHERE/ORDER BY by equality.
 func extractIdentifiedPath(c gen.IIdentifiedPathContext, clause Clause) IdentifiedPath {
 	ip := IdentifiedPath{Pos: posOf(c.GetStart()), Clause: clause}
-	ip.Raw = c.GetText()
+	ip.Raw = sourceText(c)
 	if id := c.IDENTIFIER(); id != nil {
 		ip.Alias = id.GetText()
 	}
 	if pp := c.PathPredicate(); pp != nil {
-		ip.Predicate = trimBrackets(pp.GetText())
+		ip.Predicate = trimBrackets(sourceText(pp))
 	}
 	if op := c.ObjectPath(); op != nil {
 		ip.Segments = segmentsFromObjectPath(op)
@@ -846,7 +874,7 @@ func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
 			seg.Name = id.GetText()
 		}
 		if pp := part.PathPredicate(); pp != nil {
-			seg.Predicate = trimBrackets(pp.GetText())
+			seg.Predicate = trimBrackets(sourceText(pp))
 		}
 		segs = append(segs, seg)
 	}
@@ -854,7 +882,7 @@ func segmentsFromObjectPath(op gen.IObjectPathContext) []aql.PathSegment {
 }
 
 func pathRaw(c gen.IIdentifiedPathContext) string {
-	return c.GetText()
+	return sourceText(c)
 }
 
 // standingComparison lifts a class standing predicate's standardPredicate
@@ -877,7 +905,7 @@ func standingComparison(sp gen.IStandardPredicateContext) *aql.Comparison {
 	if v == nil {
 		return nil
 	}
-	raw := op.GetText()
+	raw := sourceText(op)
 	parsed := aql.IdentifiedPath{Segments: segmentsFromObjectPath(op), Raw: raw}
 	return &aql.Comparison{Path: raw, Op: aql.Operator(cmp.GetText()), Val: v, ParsedPath: &parsed}
 }
