@@ -403,6 +403,24 @@ func TestEmitPredicateErrorsDoNotEchoValues(t *testing.T) {
 		}
 	})
 
+	t.Run("malformed display name", func(t *testing.T) {
+		// The failure ARM of the display-name walk: the `]` lands before the
+		// closing `|`, so the section never became a token — the branch that
+		// once echoed the walked bytes verbatim.
+		_, err := emitWithPredicate(t,
+			"SELECT c/x FROM COMPOSITION c[ehr_id/value='replaced']",
+			"at0001,ICD10::E11.9|Ann Example]")
+		if !errors.Is(err, aql.ErrInvalidQuery) {
+			t.Fatalf("err = %v, want ErrInvalidQuery", err)
+		}
+		if strings.Contains(err.Error(), "Ann Example") {
+			t.Errorf("Emit error echoes a value that must stay out of the log stream:\n  %v", err)
+		}
+		if !strings.Contains(err.Error(), "|…]") {
+			t.Errorf("Emit error no longer names the refused predicate structurally: %v", err)
+		}
+	})
+
 	t.Run("dual-operand refusal", func(t *testing.T) {
 		q, err := parse.ParseQuery("SELECT c/x FROM COMPOSITION c[ehr_id/value='replaced']")
 		if err != nil {

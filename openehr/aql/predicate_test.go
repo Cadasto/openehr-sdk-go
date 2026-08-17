@@ -376,6 +376,16 @@ func TestStripPredicateTrivia(t *testing.T) {
 		{"open regex body is content to the end", "a/b MATCHES {/x -- y", "a/b MATCHES {/x -- y"},
 		{"dashes inside a term code are content", "at0001,X::1--", "at0001,X::1--"},
 		{"display name rides through", "at0001,X::1|Ann  -- Example\n|", "at0001,X::1|Ann  -- Example\n|"},
+		// A display name that never became a token: the walk fails at the `]`
+		// and the bytes are rescanned as ordinary text, exactly as the escape
+		// scan reads them — which makes the `-- ` an (unclosed) comment run,
+		// trivia to the end. NOT how RedactPredicateValues renders the same
+		// bytes (it elides them as the display name the caller MEANT); the two
+		// functions answer different questions, and this row pins the split so
+		// neither side drifts silently. Unreachable from parsed input: the
+		// escape scan refuses this text (unterminated comment) before any
+		// consumer compares it.
+		{"failed display name is rescanned as ordinary text", "at0001,X::1|Ann -- Example]", "at0001,X::1|Ann"},
 		// …while the SAME bytes outside any region are trivia.
 		{"bare double dash is content", "a/b--", "a/b--"},
 	} {
