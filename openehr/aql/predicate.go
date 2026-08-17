@@ -729,13 +729,26 @@ func elideRegion(b *strings.Builder, region string, lead, tail int) {
 	b.WriteString(region[len(region)-tail:])
 }
 
-// StripPredicateTrivia removes what the lexer SKIPS from predicate bracket
-// text — `WS`, `COMMENT` and `UNICODE_BOM` — so that a comparison against the
-// text sees what the PARSER sees. `LATEST_VERSION -- note\n` is the same token
-// stream as `LATEST_VERSION`, and trimming whitespace alone refused it.
+// StripPredicateTrivia normalises what the lexer SKIPS out of predicate
+// bracket text — `WS`, `COMMENT` and `UNICODE_BOM` — so that a comparison
+// against the text sees what the PARSER sees. `LATEST_VERSION -- note\n` is
+// the same token stream as `LATEST_VERSION`, and trimming whitespace alone
+// refused it.
 //
-// Each run becomes a SPACE rather than nothing, because skipped trivia still
-// separates the tokens around it; the result is then trimmed.
+// Each interior trivia RUN — whitespace, comments and BOMs together — becomes
+// ONE space, because skipped trivia still separates the tokens around it;
+// leading and trailing runs are dropped. So `a/b =\n\t 1` and `a/b = 1` are
+// the same text, and what this function returns never carries a raw line
+// break, an AQL comment or a BOM that the lexer would have skipped — the
+// canonical path suffix `openehr/aql/lint` renders rests on exactly that.
+//
+// The walk is lexer-state-AWARE, over the same regions [ValidatePathPredicate]'s
+// scan steps over: a string literal, a contained regex token, a term code and
+// its display name ride through VERBATIM, because inside those regions the
+// lexer skips nothing — a `-- note\n` inside `'…'` is string CONTENT, and
+// rewriting it would alter the value the predicate carries, not its trivia. A
+// region left open at the end of the text (an unterminated literal, an open
+// regex body) is content to the end for the same reason.
 //
 // It is exported because the read side now reports predicate text VERBATIM
 // (REQ-119 § The emission closure property), so every consumer that COMPARES
@@ -746,21 +759,90 @@ func elideRegion(b *strings.Builder, region string, lead, tail int) {
 // trivia a second time in the consumer is what this export exists to prevent.
 func StripPredicateTrivia(text string) string {
 	var b strings.Builder
-	for i := 0; i < len(text); {
-		if n, closed := commentRun(text, i); n > 0 && closed {
-			i += n
+	pending := false // an interior trivia run collapses to one space
+	content := func(s string) {
+		if pending && b.Len() > 0 {
 			b.WriteByte(' ')
-			continue
 		}
-		if n := bomRun(text, i); n > 0 {
-			i += n
-			b.WriteByte(' ')
-			continue
-		}
-		b.WriteByte(text[i])
-		i++
+		pending = false
+		b.WriteString(s)
 	}
-	return strings.TrimSpace(b.String())
+	for i := 0; i < len(text); {
+		switch c := text[i]; c {
+		case ' ', '\t', '\r', '\n':
+			// The lexer's `WS : [ \t\r\n]+`, one byte at a time — adjacent
+			// comments and BOMs fold into the same pending run.
+			pending = true
+			i++
+		case '\'', '"':
+			j, ok := skipPredicateString(text, i)
+			if !ok {
+				content(text[i:]) // unterminated: content to the end
+				return b.String()
+			}
+			content(text[i:j])
+			i = j
+		case '{':
+			// A complete CONTAINED_REGEX is ONE token — the `WS*` inside it
+			// belongs to the token, not to the skipped channel, so the whole
+			// span rides through untouched. See [skipContainedRegex] for why a
+			// `{` completing no token is ordinary content.
+			j, open := skipContainedRegex(text, i)
+			switch {
+			case j > 0:
+				content(text[i:j])
+				i = j
+			case open:
+				content(text[i:]) // open body: content to the end
+				return b.String()
+			default:
+				content("{")
+				i++
+			}
+		case ':':
+			// A term code and its display name, stepped over whole exactly as
+			// [scanPredicate] steps: `TERM_CODE_CHAR` admits `-`, so a `--`
+			// inside the code is not a comment, and the display-name class
+			// `~[|[\]]+` admits spaces, dashes and line breaks as CONTENT.
+			if i+1 < len(text) && text[i+1] == ':' {
+				j := i + 2
+				for j < len(text) && termCodeChar(text[j]) {
+					j++
+				}
+				if j < len(text) && text[j] == '|' {
+					if k, ok := skipTermCodeName(text, j); ok {
+						j = k
+					}
+				}
+				content(text[i:j])
+				i = j
+				continue
+			}
+			content(":")
+			i++
+		case '-':
+			// A COMMENT run is trivia whether or not a newline closed it here:
+			// the lexer skips it either way, the closed one at its newline and
+			// the open one at whatever ends the surrounding query. `--x` and a
+			// `\r`-ended body are SYM_DOUBLE_DASH — content, not a comment.
+			if n, _ := commentRun(text, i); n > 0 {
+				pending = true
+				i += n
+				continue
+			}
+			content("-")
+			i++
+		default:
+			if n := bomRun(text, i); n > 0 {
+				pending = true
+				i += n
+				continue
+			}
+			content(text[i : i+1])
+			i++
+		}
+	}
+	return b.String()
 }
 
 // bomRun returns the length of the `UNICODE_BOM` run starting at i, or 0.

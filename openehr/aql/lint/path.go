@@ -25,11 +25,14 @@ type Path struct {
 	Segments []parse.PathSegment
 	// Suffix is the canonical alias-free path; "" for a bare alias.
 	//
-	// CANONICAL means the lexer's skipped trivia is removed from each segment
-	// predicate, so the two spellings of one path share a suffix and a
-	// diagnostic can never carry a raw newline or an AQL comment. Since REQ-119
-	// the source text is verbatim, so building the suffix by concatenation put
-	// `/items[at0001 -- note\n]` into a line-oriented report.
+	// CANONICAL means the lexer's skipped trivia is normalised out of each
+	// segment predicate — one space per interior run, ends dropped — so
+	// spellings of one path that differ only in trivia share a suffix, and no
+	// skipped newline or AQL comment reaches a line-oriented report. A VALUE's
+	// own bytes ride through verbatim (inside a string literal or a term-code
+	// display name the lexer skips nothing — see [aql.StripPredicateTrivia]).
+	// Since REQ-119 the source text is verbatim, so building the suffix by
+	// concatenation put `/items[at0001 -- note\n]` into a line-oriented report.
 	Suffix string
 }
 

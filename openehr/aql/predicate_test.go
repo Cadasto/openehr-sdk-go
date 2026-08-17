@@ -351,6 +351,42 @@ func TestPredicateErrorsDoNotEchoValues(t *testing.T) {
 	}
 }
 
+// TestStripPredicateTrivia holds the trivia model itself, on both of its
+// edges. Trivia — WS, COMMENT, UNICODE_BOM, exactly what the lexer skips — is
+// collapsed to one interior space per run and dropped at the ends, so the
+// canonical form carries no raw line break and no comment. And ONLY trivia:
+// inside a string literal, a contained regex, a term code or its display name
+// the lexer skips nothing, so those bytes ride through verbatim — a `--` in a
+// string is value content, and "stripping" it would alter the value.
+func TestStripPredicateTrivia(t *testing.T) {
+	for _, tc := range []struct{ name, in, want string }{
+		{"empty", "", ""},
+		{"bare node id", "at0001", "at0001"},
+		{"edge padding dropped", " \t at0001 \n ", "at0001"},
+		{"interior run collapses to one space", "a/b =\n\t 1", "a/b = 1"},
+		{"CRLF is one run", "a/b\r\n= 1", "a/b = 1"},
+		{"comment is trivia", "LATEST_VERSION -- note\n", "LATEST_VERSION"},
+		{"comment inside collapses with its padding", "a/b -- note\n = 1", "a/b = 1"},
+		{"comment no newline closes is trivia to the end", "at0001 -- note", "at0001"},
+		{"BOM is trivia", "\uFEFFLATEST_VERSION", "LATEST_VERSION"},
+		// The opaque regions: the lexer skips NOTHING inside them.
+		{"string content rides through", "name/value='x -- not a comment\n y'", "name/value='x -- not a comment\n y'"},
+		{"unterminated string is content to the end", "a/b='x -- y\n", "a/b='x -- y\n"},
+		{"regex token rides through whole", "a/b MATCHES { /x{2}/ }", "a/b MATCHES { /x{2}/ }"},
+		{"open regex body is content to the end", "a/b MATCHES {/x -- y", "a/b MATCHES {/x -- y"},
+		{"dashes inside a term code are content", "at0001,X::1--", "at0001,X::1--"},
+		{"display name rides through", "at0001,X::1|Ann  -- Example\n|", "at0001,X::1|Ann  -- Example\n|"},
+		// …while the SAME bytes outside any region are trivia.
+		{"bare double dash is content", "a/b--", "a/b--"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := aql.StripPredicateTrivia(tc.in); got != tc.want {
+				t.Errorf("StripPredicateTrivia(%q)\n  = %q\n  want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 // TestRedactPredicateValuesKeepsStructure holds the renderer itself: structure
 // through, content out, and an unterminated region keeps its opener so the
 // diagnostic still shows what was left open.

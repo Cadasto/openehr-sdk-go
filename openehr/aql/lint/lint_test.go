@@ -585,26 +585,31 @@ func TestLintLayer3ResolvesPredicatesThroughTrivia(t *testing.T) {
 }
 
 // TestLintPathSuffixIsCanonical — [lint.Path.Suffix] is documented canonical and
-// is what a diagnostic renders, so it must not carry a raw newline or an AQL
-// comment now that the source text is verbatim.
+// is what a diagnostic renders, so no skipped trivia — a raw newline, a run of
+// padding, an AQL comment — may survive into it now that the source text is
+// verbatim. Trivia BETWEEN tokens collapses to one space, not to nothing:
+// `[a/b =\n 1]` names the same predicate as `[a/b = 1]`, never `[a/b=1]`.
 func TestLintPathSuffixIsCanonical(t *testing.T) {
-	const want = "/items[at0001]/value"
-	for _, src := range []string{
-		"SELECT o/items[at0001]/value FROM OBSERVATION o",
-		"SELECT o/items[ at0001 ]/value FROM OBSERVATION o",
-		"SELECT o/items[at0001\n]/value FROM OBSERVATION o",
-		"SELECT o/items[at0001 -- note\n]/value FROM OBSERVATION o",
+	for _, tc := range []struct{ src, want string }{
+		{"SELECT o/items[at0001]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[ at0001 ]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[at0001\n]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[at0001 -- note\n]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		// Interior trivia collapses to ONE space — a raw newline inside the
+		// predicate must not reach the line-oriented report.
+		{"SELECT o/items[a/b =\n 1]/value FROM OBSERVATION o", "/items[a/b = 1]/value"},
+		{"SELECT o/items[a/b -- note\n = 1]/value FROM OBSERVATION o", "/items[a/b = 1]/value"},
 	} {
-		doc := mustParse(t, src)
+		doc := mustParse(t, tc.src)
 		if len(doc.Paths) == 0 {
-			t.Fatalf("Parse(%q) reported no paths", src)
+			t.Fatalf("Parse(%q) reported no paths", tc.src)
 		}
 		got, err := lint.Normalise(doc.Paths[0])
 		if err != nil {
 			t.Fatalf("Normalise: %v", err)
 		}
-		if got.Suffix != want {
-			t.Errorf("Suffix = %q, want %q (src %q)", got.Suffix, want, src)
+		if got.Suffix != tc.want {
+			t.Errorf("Suffix = %q, want %q (src %q)", got.Suffix, tc.want, tc.src)
 		}
 		// …while the SEGMENTS stay verbatim, which is what round-trip needs.
 		if len(got.Segments) == 0 || got.Segments[0].Predicate == "" {
