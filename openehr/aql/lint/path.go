@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
 
@@ -19,9 +20,16 @@ var ErrEmptyPath = errors.New("lint: identified path has no alias")
 type Path struct {
 	// Alias is the original root binding (e.g. "o").
 	Alias string
-	// Segments are the path steps after the alias, copied from the source.
+	// Segments are the path steps after the alias, copied from the source —
+	// predicate text VERBATIM, exactly as the read side reports it (REQ-119).
 	Segments []parse.PathSegment
 	// Suffix is the canonical alias-free path; "" for a bare alias.
+	//
+	// CANONICAL means the lexer's skipped trivia is removed from each segment
+	// predicate, so the two spellings of one path share a suffix and a
+	// diagnostic can never carry a raw newline or an AQL comment. Since REQ-119
+	// the source text is verbatim, so building the suffix by concatenation put
+	// `/items[at0001 -- note\n]` into a line-oriented report.
 	Suffix string
 }
 
@@ -36,9 +44,11 @@ func Normalise(p parse.IdentifiedPath) (Path, error) {
 	for _, seg := range p.Segments {
 		sb.WriteByte('/')
 		sb.WriteString(seg.Name)
-		if seg.Predicate != "" {
+		// Trivia-stripped: see [Path.Suffix]. The verbatim text stays on
+		// Segments, which is what Layer 3 walks.
+		if pred := aql.StripPredicateTrivia(seg.Predicate); pred != "" {
 			sb.WriteByte('[')
-			sb.WriteString(seg.Predicate)
+			sb.WriteString(pred)
 			sb.WriteByte(']')
 		}
 	}

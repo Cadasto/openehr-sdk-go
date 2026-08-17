@@ -545,3 +545,70 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 		t.Errorf("Document.Top = %+v, want nil (an unrepresentable count must not become a bound)", *doc.Top)
 	}
 }
+
+// --- REQ-119 fallout: verbatim predicate text vs Layer-3 resolution ----------
+
+// TestLintLayer3ResolvesPredicatesThroughTrivia is the regression for the one
+// cross-package consequence of REQ-119 making the read side report bracket text
+// VERBATIM: Layer 3 selects a compiled OPT child by comparing the segment
+// predicate against its node id, and `[ at0001 ]` used to arrive
+// whitespace-collapsed from `GetText()`.
+//
+// Compared raw, the named child becomes unreachable and the lenient first-child
+// fallback descends a SIBLING. nested.en.v1 is the fixture that makes that
+// observable rather than merely wrong: under `description[at0000]/items` the
+// children are at0002 (which carries `value`) and at0000 (which carries
+// `items`), so resolving to the wrong one turns a valid path into an
+// `aql_path_not_in_template` warning. REQ-109 § Layer 3 calls this descent
+// "predicate-aware" and warns only on high-confidence structural divergence.
+func TestLintLayer3ResolvesPredicatesThroughTrivia(t *testing.T) {
+	c := mustCompile(t, "nested.en.v1")
+	const arch = "openEHR-EHR-SECTION.nested.v1"
+
+	for _, tc := range []struct{ name, segment string }{
+		{"no trivia", "items[at0000]"},
+		{"padded", "items[ at0000 ]"},
+		{"newline", "items[at0000\n]"},
+		{"comment", "items[at0000 -- pick the cluster\n]"},
+		{"bom", "items[\uFEFFat0000]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := "SELECT s/items[at0000]/activities[at0001]/description[at0000]/" +
+				tc.segment + "/items[at0001]/value FROM SECTION s[" + arch + "]"
+			r := lint.LintString(q, &lint.Options{Compiled: c})
+			if has(r, "aql_path_not_in_template") {
+				t.Errorf("trivia inside the predicate changed Layer-3 resolution: %v\n  query %q",
+					codes(r), q)
+			}
+		})
+	}
+}
+
+// TestLintPathSuffixIsCanonical — [lint.Path.Suffix] is documented canonical and
+// is what a diagnostic renders, so it must not carry a raw newline or an AQL
+// comment now that the source text is verbatim.
+func TestLintPathSuffixIsCanonical(t *testing.T) {
+	const want = "/items[at0001]/value"
+	for _, src := range []string{
+		"SELECT o/items[at0001]/value FROM OBSERVATION o",
+		"SELECT o/items[ at0001 ]/value FROM OBSERVATION o",
+		"SELECT o/items[at0001\n]/value FROM OBSERVATION o",
+		"SELECT o/items[at0001 -- note\n]/value FROM OBSERVATION o",
+	} {
+		doc := mustParse(t, src)
+		if len(doc.Paths) == 0 {
+			t.Fatalf("Parse(%q) reported no paths", src)
+		}
+		got, err := lint.Normalise(doc.Paths[0])
+		if err != nil {
+			t.Fatalf("Normalise: %v", err)
+		}
+		if got.Suffix != want {
+			t.Errorf("Suffix = %q, want %q (src %q)", got.Suffix, want, src)
+		}
+		// …while the SEGMENTS stay verbatim, which is what round-trip needs.
+		if len(got.Segments) == 0 || got.Segments[0].Predicate == "" {
+			t.Fatalf("Segments lost the predicate: %+v", got.Segments)
+		}
+	}
+}
