@@ -282,6 +282,12 @@ func TestEmitRefusesIdentifierSplice(t *testing.T) {
 		// carrier for that grammar alternative.
 		"RM type VERSION without the flag": mk(pathItem,
 			parse.ClassExpr{RMType: "VERSION", Alias: "v"}),
+		// A Unicode fold of the keyword is neither the keyword (the lexer's
+		// fragments are ASCII, so `ſ` fails token recognition) nor a legal
+		// IDENTIFIER — the ASCII-gated fold in validateRMTypeToken sends it to
+		// ValidateIdentifier, where the bare fold once emitted it verbatim.
+		"RM type unicode fold of VERSION": mk(pathItem,
+			parse.ClassExpr{RMType: "VERſION", Alias: "v"}),
 		"archetype splice": mk(pathItem, parse.ClassExpr{
 			RMType: "COMPOSITION", Alias: "c",
 			Archetype: "openEHR-EHR-COMPOSITION.x.v1] CONTAINS OBSERVATION[openEHR-EHR-OBSERVATION.y.v1",
@@ -491,6 +497,12 @@ func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
 		"VERSION carries an RM type": mk(parse.FromClause{Root: parse.ClassExpr{
 			Version: true, RMType: "COMPOSITION", Alias: "v",
 		}}),
+		// A fold-equal spelling is NOT the flag's carrier: emitClassExpr writes
+		// its own literal `VERSION`, so `VERſION`'s bytes would be dropped —
+		// the bare EqualFold read it as the carrier and dropped it silently.
+		"VERSION carries a fold-equal RM type": mk(parse.FromClause{Root: parse.ClassExpr{
+			Version: true, RMType: "VERſION", Alias: "v",
+		}}),
 		"VERSION carries an archetype": mk(parse.FromClause{Root: parse.ClassExpr{
 			Version: true, RMType: "VERSION", Alias: "v",
 			Archetype: "openEHR-EHR-COMPOSITION.encounter.v1",
@@ -536,7 +548,8 @@ func TestEmitRefusesFieldsItWouldSilentlyDrop(t *testing.T) {
 		// The emptiness EDGE of the predicate position — separate from the
 		// structured-comparison rule above, and reachable WITHOUT one: the
 		// emitter brackets any non-empty field, so a blank one emits `[   ]`,
-		// which the parser rejects. Not the sub-grammar guard deferred to #99.
+		// which the parser rejects. Orthogonal to the bracket-ESCAPE scan:
+		// blank text escapes nothing, and text that escapes is never blank.
 		"blank standing predicate": mk(parse.FromClause{Root: parse.ClassExpr{
 			RMType: "EHR", Alias: "e", HasPredicate: true, Predicate: "   ",
 		}}),

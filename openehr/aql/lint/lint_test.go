@@ -545,3 +545,117 @@ func TestLintTopWithUnrepresentableCount(t *testing.T) {
 		t.Errorf("Document.Top = %+v, want nil (an unrepresentable count must not become a bound)", *doc.Top)
 	}
 }
+
+// --- REQ-119 fallout: verbatim predicate text vs Layer-3 resolution ----------
+
+// TestLintIssuePathIsCanonical — [lint.Issue.Path] is what a line-oriented
+// report prints, and since REQ-119 the parsed path text is VERBATIM, so
+// setting it from `p.Raw` put a predicate's comment and its raw newline into
+// a single-line diagnostic. Both localised issue sites render through
+// displayPath instead: trivia normalised, the alias and every value byte kept.
+func TestLintIssuePathIsCanonical(t *testing.T) {
+	find := func(r lint.Result, code string) *lint.Issue {
+		for i := range r.Issues {
+			if r.Issues[i].Code == code {
+				return &r.Issues[i]
+			}
+		}
+		return nil
+	}
+
+	t.Run("unknown alias (Layer 2)", func(t *testing.T) {
+		r := lint.LintString("SELECT x/items[at0001 -- note\n]/value FROM OBSERVATION o", nil)
+		is := find(r, "aql_unknown_alias")
+		if is == nil {
+			t.Fatalf("no aql_unknown_alias issue: %v", codes(r))
+		}
+		if want := "x/items[at0001]/value"; is.Path != want {
+			t.Errorf("Issue.Path = %q, want %q", is.Path, want)
+		}
+	})
+
+	t.Run("path not in template (Layer 3)", func(t *testing.T) {
+		c := mustCompile(t, "nested.en.v1")
+		q := "SELECT s/items[at0000]/activities[at0001]/description[at0000]" +
+			"/items[at0002 -- pick\n]/bogus FROM SECTION s[openEHR-EHR-SECTION.nested.v1]"
+		r := lint.LintString(q, &lint.Options{Compiled: c})
+		is := find(r, "aql_path_not_in_template")
+		if is == nil {
+			t.Fatalf("no aql_path_not_in_template issue: %v (the row must diverge or it tests nothing)", codes(r))
+		}
+		want := "s/items[at0000]/activities[at0001]/description[at0000]/items[at0002]/bogus"
+		if is.Path != want {
+			t.Errorf("Issue.Path = %q, want %q", is.Path, want)
+		}
+	})
+}
+
+// TestLintLayer3ResolvesPredicatesThroughTrivia is the regression for the one
+// cross-package consequence of REQ-119 making the read side report bracket text
+// VERBATIM: Layer 3 selects a compiled OPT child by comparing the segment
+// predicate against its node id, and `[ at0001 ]` used to arrive
+// whitespace-collapsed from `GetText()`.
+//
+// Compared raw, the named child becomes unreachable and the lenient first-child
+// fallback descends a SIBLING. nested.en.v1 is the fixture that makes that
+// observable rather than merely wrong: under `description[at0000]/items` the
+// children are at0002 (which carries `value`) and at0000 (which carries
+// `items`), so resolving to the wrong one turns a valid path into an
+// `aql_path_not_in_template` warning. REQ-109 § Layer 3 calls this descent
+// "predicate-aware" and warns only on high-confidence structural divergence.
+func TestLintLayer3ResolvesPredicatesThroughTrivia(t *testing.T) {
+	c := mustCompile(t, "nested.en.v1")
+	const arch = "openEHR-EHR-SECTION.nested.v1"
+
+	for _, tc := range []struct{ name, segment string }{
+		{"no trivia", "items[at0000]"},
+		{"padded", "items[ at0000 ]"},
+		{"newline", "items[at0000\n]"},
+		{"comment", "items[at0000 -- pick the cluster\n]"},
+		{"bom", "items[\uFEFFat0000]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := "SELECT s/items[at0000]/activities[at0001]/description[at0000]/" +
+				tc.segment + "/items[at0001]/value FROM SECTION s[" + arch + "]"
+			r := lint.LintString(q, &lint.Options{Compiled: c})
+			if has(r, "aql_path_not_in_template") {
+				t.Errorf("trivia inside the predicate changed Layer-3 resolution: %v\n  query %q",
+					codes(r), q)
+			}
+		})
+	}
+}
+
+// TestLintPathSuffixIsCanonical — [lint.Path.Suffix] is documented canonical and
+// is what a diagnostic renders, so no skipped trivia — a raw newline, a run of
+// padding, an AQL comment — may survive into it now that the source text is
+// verbatim. Trivia BETWEEN tokens collapses to one space, not to nothing:
+// `[a/b =\n 1]` names the same predicate as `[a/b = 1]`, never `[a/b=1]`.
+func TestLintPathSuffixIsCanonical(t *testing.T) {
+	for _, tc := range []struct{ src, want string }{
+		{"SELECT o/items[at0001]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[ at0001 ]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[at0001\n]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		{"SELECT o/items[at0001 -- note\n]/value FROM OBSERVATION o", "/items[at0001]/value"},
+		// Interior trivia collapses to ONE space — a raw newline inside the
+		// predicate must not reach the line-oriented report.
+		{"SELECT o/items[a/b =\n 1]/value FROM OBSERVATION o", "/items[a/b = 1]/value"},
+		{"SELECT o/items[a/b -- note\n = 1]/value FROM OBSERVATION o", "/items[a/b = 1]/value"},
+	} {
+		doc := mustParse(t, tc.src)
+		if len(doc.Paths) == 0 {
+			t.Fatalf("Parse(%q) reported no paths", tc.src)
+		}
+		got, err := lint.Normalise(doc.Paths[0])
+		if err != nil {
+			t.Fatalf("Normalise: %v", err)
+		}
+		if got.Suffix != tc.want {
+			t.Errorf("Suffix = %q, want %q (src %q)", got.Suffix, tc.want, tc.src)
+		}
+		// …while the SEGMENTS stay verbatim, which is what round-trip needs.
+		if len(got.Segments) == 0 || got.Segments[0].Predicate == "" {
+			t.Fatalf("Segments lost the predicate: %+v", got.Segments)
+		}
+	}
+}

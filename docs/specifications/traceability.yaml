@@ -1297,19 +1297,31 @@ requirements:
     # the structural reason, and it is why PROBE-090 asserts round-trip IDENTITY
     # (and, for a source literal, TWICE) rather than mere parseability.
     #
-    # NO PLAN: implementation-aligned fix-up per README § Source of truth — this
-    # closes the residuals reported on PR #87 and left open there, so the spec
-    # section and this entry land in the same PR as the code. No plan document
-    # exists or is needed.
+    # Implementation-aligned fix-up per README § Source of truth for its first
+    # cycles — the residuals reported on PR #87 — so the spec section and this
+    # entry landed in the same PRs as the code. The class-predicate splice
+    # (issue #99) was large enough to plan, and that plan is mapped below.
     #
-    # WIRE-VISIBLE (classified semver-minor in the canonical section, and in
-    # wire.md § REQ-055 where the canonical write form lives): a literal
+    # WIRE-VISIBLE (all three classified semver-minor in the canonical section,
+    # and in wire.md § REQ-055 where the canonical write form lives): a literal
     # carrying `'` or `\` and a whole-valued real (`2` -> `2.0`) emit
-    # differently from v0.19.0. Recorded in the CHANGELOG.
+    # differently from v0.19.0, and predicate/path text is now re-emitted
+    # VERBATIM rather than whitespace-collapsed — so emitted AQL carries the
+    # caller's own spacing, line breaks and comments. The third is visible on
+    # the READ side too (IdentifiedPath.Raw, PathSegment.Predicate,
+    # ClassExpr.Predicate), so a consumer that COMPARES that text instead of
+    # re-emitting it normalises through aql.StripPredicateTrivia — exported for
+    # exactly that, after the verbatim switch made openehr/aql/lint's template
+    # resolution miss a padded node id and report a false path divergence.
+    # Recorded in the CHANGELOG.
     implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
+      # The verbatim read side reaches the lint's Layer-3 OPT resolution, which
+      # COMPARES predicate text rather than re-emitting it.
+      - openehr/aql/lint
+    plans: [docs/plans/archive/2026-08-08-aql-class-predicate-splice-and-source-text.md]
     probes: [PROBE-090]
     tests:
       # The two STRUCTURAL guards: a source-level tripwire failing any new
@@ -1326,6 +1338,23 @@ requirements:
       # splice verbatim (issue #96): the guard's accept set confronted with the
       # vendored lexer, and the Emit- and Build-side refusals at all four.
       - openehr/aql/parse/identifier_parity_test.go
+      # The class BRACKET position the emitters splice verbatim (issue #99).
+      # Three files because three distinct claims are made about it: that a
+      # predicate survives extraction unmangled (identity, not parseability),
+      # that the two sub-grammars one field feeds get two accept sets, and
+      # that the guard agrees with the parser in BOTH directions over a
+      # GENERATED corpus — the position has no token names to walk.
+      - openehr/aql/parse/predicate_parity_test.go
+      - openehr/aql/parse/predicate_guard_test.go
+      - openehr/aql/parse/predicate_confrontation_test.go
+      # The exported half, which a write path outside openehr/aql calls to
+      # hold the same line.
+      - openehr/aql/predicate_test.go
+      # The read-side consequence: verbatim predicate text reaches the lint's
+      # Layer-3 OPT resolution, which compares it to a node id. Pins that
+      # trivia inside the bracket does not change the answer, and that
+      # lint.Path.Suffix stays canonical (no raw newline in a diagnostic).
+      - openehr/aql/lint/lint_test.go
       # Emit-side parity: the SELECT / paging / ORDER BY value positions, the
       # containment refusals and the order they fire in, the URI guard vs the
       # grammar, and the pointer twin of every sealed set the emitters dispatch
