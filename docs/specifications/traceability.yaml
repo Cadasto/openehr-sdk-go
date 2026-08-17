@@ -1314,6 +1314,15 @@ requirements:
     # exactly that, after the verbatim switch made openehr/aql/lint's template
     # resolution miss a padded node id and report a false path divergence.
     # Recorded in the CHANGELOG.
+    #
+    # AMENDED for issue #103: Emit now confronts its own output with the parser
+    # before returning it (§ Emission verified after emission). Two consumer-
+    # visible consequences, both in the CHANGELOG: Emit costs a second parse,
+    # and it refuses text it once returned — the loud malformations the
+    # per-position guards deliberately admit now surface the PARSER's verdict
+    # instead of reaching the caller as unparseable AQL. The guards' own accept
+    # sets are unchanged, so aql.ValidatePathPredicate still accepts a contained
+    # malformation; only the emitter's contract narrowed.
     implementation: landed
     packages:
       - openehr/aql
@@ -1350,6 +1359,13 @@ requirements:
       # The exported half, which a write path outside openehr/aql calls to
       # hold the same line.
       - openehr/aql/predicate_test.go
+      # The closure verified AFTER emission (issue #103) — the one arm no
+      # per-position rule can reach, because the token boundary depends on text
+      # the position does not contain. Both directions: the cross-bracket
+      # substitution refused on the STRUCTURAL arm, and the AST ENCODINGS the
+      # parser is free to re-nest still accepted (the arm a field-by-field
+      # comparison fails).
+      - openehr/aql/parse/emit_verify_test.go
       # The read-side consequence: verbatim predicate text reaches the lint's
       # Layer-3 OPT resolution, which compares it to a node id. Pins that
       # trivia inside the bracket does not change the answer, and that

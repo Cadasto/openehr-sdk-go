@@ -14,6 +14,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 - **Re-parseable canonical AQL emission (REQ-119, PROBE-090).** Every emitted value and predicate round-trips; **changes emitted AQL** for escaped strings, whole-valued reals (`2` → `2.0`), and predicate and path text, now preserved verbatim rather than whitespace-collapsed.
 - **AQL write paths refuse previously emitted invalid AQL (REQ-119).** *Breaking:* validating `Build` / `FormatWhere` / `Emit` return `ErrInvalidQuery` where they once wrote structure-changing or unparseable text — see `traceability.yaml`.
+- **`(*parse.Query).Emit` verifies its own output (REQ-119, PROBE-090).** *Breaking:* it re-parses and structurally compares before returning, costing one extra parse and refusing text that does not re-parse or re-parses as a different query.
 
 ## [0.19.0] - 2026-08-06
 
