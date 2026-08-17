@@ -1316,11 +1316,13 @@ requirements:
     # Recorded in the CHANGELOG.
     #
     # AMENDED for issue #103: Emit now confronts its own output with the parser
-    # before returning it (§ Emission verified after emission). Two consumer-
-    # visible consequences, both in the CHANGELOG: Emit costs a second parse,
-    # and it refuses text it once returned — the loud malformations the
-    # per-position guards deliberately admit now surface the PARSER's verdict
-    # instead of reaching the caller as unparseable AQL. The guards' own accept
+    # before returning it (§ Emission verified after emission). The consumer-
+    # visible consequences, folded into one CHANGELOG bullet: Emit costs a
+    # second parse, and it refuses what it once returned — the loud
+    # malformations the per-position guards deliberately admit (now surfaced
+    # as the PARSER's verdict), a WHERE whose expression renders nothing
+    # (a typed-nil carrier once emitted with the clause silently GONE), and
+    # a vocabulary shape the skeleton cannot model (fail-closed). The guards' own accept
     # sets are unchanged, so aql.ValidatePathPredicate still accepts a contained
     # malformation; only the emitter's contract narrowed.
     implementation: landed
