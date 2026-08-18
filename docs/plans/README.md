@@ -24,6 +24,16 @@ Three independent plans, specified first (REQ-141 / REQ-094 amendment / REQ-142+
 
 Phase 0 (the REQ-082 normative prose — mode selection, the probe result contract, per-mode rules, cross-mode precedence) landed 2026-08-18 alongside [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), which holds the recording-format fork open until there is a capture to judge it against. Eight probes and [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 are gated on this plan, and REQ-082 is one of the three [`v1.0.0` gate](../releases.md#v100-gate) conditions.
 
+### Model & diagnostics asks (2026-08-18)
+
+Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. Proposed ids: REQ-124 in the RM-behavioural headroom; REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is left free for the transport-overflow band raised in PR #107's review).
+
+| Plan | Scope | Covers (proposed) | Probe (proposed) |
+|---|---|---|---|
+| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, ancestors, conformance, concrete descendants) + inheritance-aware attribute lookup | REQ-124 (builds on REQ-041/042/045) | PROBE-094 |
+| [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | Typed node/segment/class predicate model beside the verbatim text | REQ-160 (builds on REQ-113/117/119) | PROBE-095 |
+| [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | Structured drop-channel records + lint spans, with a value-free field contract | REQ-161 (builds on REQ-109/113) | PROBE-096 |
+
 ### Ecosystem fit-gap delivery (2026-07-16)
 
 Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opens a new "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
