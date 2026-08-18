@@ -689,6 +689,16 @@ requirements:
     packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
     # PROBE-086 is Sandbox-only (in-repo parity property; Cassette/Live out of
     # scope) — listed as the documented partial its Satisfies line declares.
+    #
+    # `partial` is the whole story here: the three-mode mandate has one mode.
+    # Cassette has no recorder, no replayer, and no corpus — testkit/cassettes/
+    # holds fixture BODIES, not exchanges (§ Vendored fixtures) — and Live has
+    # no endpoint or credential path. `sandbox/` is a reserved name with no
+    # code; the probe tests stand up a hand-written httptest server each. The
+    # 2026-08-18 pass specified the missing contract (mode selection, the
+    # shared result type, per-mode rules, cross-mode precedence) and opened
+    # STRAND-11 for the recording format; implementation is phased in the plan.
+    plans: [docs/plans/2026-08-18-probe-runnability.md]
     probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086]
 
   - id: REQ-100
