@@ -8,9 +8,12 @@
 //
 // Conformance probes are the openEHR wire-conformance contract:
 // defined once, implemented in each language, exercised against
-// sandbox, recorded cassette, or a live deployment.
+// sandbox, a replayed recording, or a live deployment (REQ-082).
 //
-// Vendored fixtures live under testkit/cassettes/ (templates/,
-// compositions/, rm/, its_rest/). Provenance is indexed by vendor in
-// testkit/cassettes/README.md. Resolve paths via testkit/fixtures.
+// Vendored fixture documents live under testkit/cassettes/ (templates/,
+// compositions/, rm/, its_rest/) — request and response BODIES, not
+// replayable HTTP exchanges, despite the directory name. Provenance is
+// indexed by vendor in testkit/cassettes/README.md. Resolve paths via
+// testkit/fixtures. REQ-082 Cassette-mode recordings are a different
+// artefact and land under testkit/recordings/ when that mode is built.
 package testkit
