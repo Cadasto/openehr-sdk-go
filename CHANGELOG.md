@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-08-18
+
+Twentieth `v0.x` minor — REQ-119 closes AQL emission under re-parsing, so every value and predicate the SDK writes it can read back as what it meant. **Breaking:** the AQL write paths refuse text they once emitted, and predicate and path text now emits verbatim.
+
 ### Added
 
 - **Re-parseable, verified canonical AQL emission (REQ-119, PROBE-090).** Every emitted value and predicate round-trips — **changes emitted AQL** for escaped strings, whole-valued reals, and verbatim predicate/path text. *Breaking:* the AQL write paths now return `ErrInvalidQuery` where they once wrote structure-changing or unparseable text.
