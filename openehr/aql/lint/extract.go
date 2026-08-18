@@ -50,7 +50,7 @@ func Extract(doc *parse.Document) Metadata {
 		if ce.Alias != "" {
 			md.Aliases[ce.Alias] = ce
 		}
-		if ce.Archetype != "" && !seen[ce.Archetype] {
+		if ce.Archetype != "" && !ce.ParamArchetype && !seen[ce.Archetype] {
 			seen[ce.Archetype] = true
 			md.Archetypes = append(md.Archetypes, ce.Archetype)
 		}

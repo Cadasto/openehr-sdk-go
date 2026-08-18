@@ -287,6 +287,18 @@ func TestLintArchetypeNotInTemplate(t *testing.T) {
 	}
 }
 
+// REQ-109 Layer 3: [$arch] is bind-time scope, not a missing HRID.
+func TestLintParamArchetypeNotInTemplateClean(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT c FROM COMPOSITION c[$arch]",
+		&lint.Options{Compiled: c},
+	)
+	if has(r, "aql_archetype_not_in_template") {
+		t.Fatalf("ParamArchetype must not raise aql_archetype_not_in_template, got %v", codes(r))
+	}
+}
+
 func TestLintArchetypeInTemplateClean(t *testing.T) {
 	c := mustCompile(t, "vital_signs")
 	r := lint.LintString(
