@@ -697,8 +697,10 @@ func validateURIOperand(uri, path string) error {
 		return bad("whose scheme does not start with a letter", "scheme")
 	}
 	for i := range len(scheme) {
-		if c := scheme[i]; !schemeChar(c) {
-			return bad("with an invalid scheme character", string([]byte{c}))
+		if !schemeChar(scheme[i]) {
+			// The offset, never the byte: one character of the operand is
+			// still URI text, which the refusal MUST NOT reproduce.
+			return bad("with an invalid scheme character", fmt.Sprintf("byte %d", i))
 		}
 	}
 
@@ -712,11 +714,16 @@ func validateURIOperand(uri, path string) error {
 			return bad("with a second", "'#' — URI_FRAGMENT admits none")
 		}
 		if err := checkURIRun(frag, uriQueryByte); err != nil {
-			return bad("whose fragment is unspellable", "fragment")
+			// Every helper diagnosis below is value-free by construction (an
+			// offset or a grammar-rule name, never operand bytes), so passing
+			// it through keeps the coordinate — which sub-component, where —
+			// at zero echo cost. Discarding it for a bare component name made
+			// port vs host vs userinfo indistinguishable.
+			return bad("whose fragment is unspellable", err)
 		}
 	}
 	if err := checkURIRun(query, uriQueryByte); err != nil {
-		return bad("whose query is unspellable", "query")
+		return bad("whose query is unspellable", err)
 	}
 
 	// URI_HIER_PART : '//' URI_AUTHORITY URI_PATH_ABEMPTY | URI_PATH_ABSOLUTE
@@ -730,11 +737,11 @@ func validateURIOperand(uri, path string) error {
 			authority, hier = authority[:slash], authority[slash:]
 		}
 		if err := checkURIAuthority(authority); err != nil {
-			return bad("whose authority is unspellable", "authority")
+			return bad("whose authority is unspellable", err)
 		}
 	}
 	if err := checkURIRun(hier, uriPathByte); err != nil {
-		return bad("whose path is unspellable", "path")
+		return bad("whose path is unspellable", err)
 	}
 	// Spellable as a URI is necessary but not sufficient: the operand is lexed
 	// on its own between the braces, and TERM_CODE is declared BEFORE URI
@@ -871,7 +878,10 @@ func checkURIRun(s string, admits func(byte) bool) error {
 			i += 3
 			continue
 		} else if !admits(c) {
-			return fmt.Errorf("%q is outside the alphabet of this position", string([]byte{c}))
+			// The offset, never the byte — these messages surface through
+			// [validateURIOperand]'s diagnostics, which MUST NOT reproduce
+			// URI text.
+			return fmt.Errorf("byte %d is outside the alphabet of this position", i)
 		}
 		i++
 	}
