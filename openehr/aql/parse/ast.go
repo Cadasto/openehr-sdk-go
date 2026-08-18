@@ -51,13 +51,15 @@ type ClassExpr struct {
 	// Alias is the binding variable (e.g. "o"), or "" when anonymous.
 	Alias string
 	// Archetype is the literal archetype HRID from a containment predicate
-	// (e.g. "openEHR-EHR-OBSERVATION.blood_pressure.v1"), or "" when the
-	// class carries no archetype predicate (or it is a $param — see
-	// ParamArchetype).
+	// (e.g. "openEHR-EHR-OBSERVATION.blood_pressure.v1"), the `$param`
+	// placeholder text when ParamArchetype is true (e.g. "$arch"), or ""
+	// when the class carries no archetype predicate. Callers MUST consult
+	// ParamArchetype before treating Archetype as a literal HRID.
 	Archetype string
 	// ParamArchetype is true when the archetype predicate is a $param
 	// placeholder (`[$arch]`) rather than a literal HRID — identifiable
-	// scope deferred to bind time.
+	// scope deferred to bind time. When true, Archetype still carries the
+	// placeholder text (not "").
 	ParamArchetype bool
 	// Version is true for a VERSION class expression (version machinery,
 	// distinct from a clinical RM class).

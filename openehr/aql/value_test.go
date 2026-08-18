@@ -11,6 +11,7 @@ package aql_test
 import (
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -25,27 +26,60 @@ import (
 // something different, so no round-trip, golden, or parser check downstream
 // can catch it. Refusal at validation is the only place it is visible.
 func TestMatchesURIRefusesUnspellableOperand(t *testing.T) {
-	for name, uri := range map[string]string{
-		"brace injection": "uri://a} OR c/y MATCHES {uri://b",
-		"closing brace":   "http://example.org/x}",
-		"opening brace":   "http://example.org/{x}",
-		"no scheme":       "not a uri at all",
-		"empty scheme":    "://example.org",
-		"digit scheme":    "1http://example.org",
-		"space in path":   "http://example.org/a b",
-		"backslash":       `http://example.org/a\b`,
-		"newline":         "http://example.org/a\nb",
-		"angle bracket":   "http://example.org/<x>",
-		"pipe":            "http://example.org/a|b",
-		"scheme bad char": "ht_tp://example.org",
+	// Each row pins BOTH halves of the diagnostic contract (REQ-119): the
+	// refusal names the path and the structural reason (`reason` is the
+	// component or condition token that must appear), and reproduces no URI
+	// text (`leak` is a distinctive substring of THIS operand that must not —
+	// a whole-operand Contains cannot see a component- or byte-level echo).
+	for name, tc := range map[string]struct {
+		uri, reason, leak string
+	}{
+		"brace injection": {"uri://a} OR c/y MATCHES {uri://b", "authority", "uri://a"},
+		"closing brace":   {"http://example.org/x}", "path", "example.org"},
+		"opening brace":   {"http://example.org/{x}", "path", "example.org"},
+		"no scheme":       {"not a uri at all", "no scheme", "not a uri"},
+		"empty scheme":    {"://example.org", "no scheme", "example.org"},
+		"digit scheme":    {"1http://example.org", "scheme", "1http"},
+		"space in path":   {"http://example.org/a b", "path", "example.org"},
+		"backslash":       {`http://example.org/a\b`, "path", "example.org"},
+		"newline":         {"http://example.org/a\nb", "path", "example.org"},
+		"angle bracket":   {"http://example.org/<x>", "path", "example.org"},
+		"pipe":            {"http://example.org/a|b", "path", "example.org"},
+		// The leak here is the single offending BYTE, not a longer substring:
+		// this branch once echoed exactly one character of the operand, which
+		// no whole- or component-substring assertion can see.
+		"scheme bad char":   {"ht_tp://example.org", "scheme character", "_"},
+		"space in fragment": {"http://example.org/p#a b", "fragment", "example.org"},
+		"space in query":    {"http://example.org/p?a b", "query", "example.org"},
+		"non-digit port":    {"http://example.org:12ab/x", "port", "example.org"},
+		"space in userinfo": {"http://a b@example.org/", "userinfo", "example.org"},
+		"short IPv6 group":  {"http://[1::2]/x", "IPv6", "[1::2]"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := aql.FormatWhere(aql.MatchesURI("c/x", uri))
+			_, err := aql.FormatWhere(aql.MatchesURI("c/x", tc.uri))
 			if err == nil {
-				t.Fatalf("emitted MATCHES {%s} unrefused", uri)
+				t.Fatalf("emitted MATCHES {%s} unrefused", tc.uri)
 			}
 			if !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, `"c/x"`) {
+				t.Errorf("diagnostic does not name the path: %v", err)
+			}
+			if !strings.Contains(msg, tc.reason) {
+				t.Errorf("diagnostic does not name the structural reason %q: %v", tc.reason, err)
+			}
+			if strings.Contains(msg, tc.leak) {
+				t.Errorf("diagnostic echoed operand text %q: %v", tc.leak, err)
+			}
+			if strings.Contains(msg, tc.uri) {
+				t.Errorf("URI refuse diagnostic echoed the operand %q: %v", tc.uri, err)
+			}
+			// %q-escaped forms (backslash, newline) also MUST NOT appear —
+			// a raw Contains(uri) misses them when the diagnostic used %q.
+			if strings.Contains(msg, strconv.Quote(tc.uri)) {
+				t.Errorf("URI refuse diagnostic echoed quoted operand %s: %v", strconv.Quote(tc.uri), err)
 			}
 		})
 	}

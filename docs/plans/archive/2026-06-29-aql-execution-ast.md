@@ -3,7 +3,7 @@
 **Date:** 2026-06-29
 **Status:** Landed (PR #58, 2026-06-30)
 **Owner:** SDK maintainers
-**Covers:** **REQ-113** (structured AQL AST — read side) — extends [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (parse + lint) and the write-side [REQ-055](../../specifications/wire.md#req-055--aql-query) (Builder / verb-functions / `WhereExpr` / `Value`). The two sides converge on one introspectable expression vocabulary.
+**Covers:** **REQ-113** (structured AQL AST — read side) — extends [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (parse + lint) and the write-side [REQ-055](../../specifications/wire.md#req-055--wire-boundary) (Builder / verb-functions / `WhereExpr` / `Value`). The two sides converge on one introspectable expression vocabulary.
 **Probes:** **PROBE-080** (round-trip property pinned by `openehr/aql/parse/roundtrip_test.go` — emitter idempotence + canonical-input preservation across the v1 catalogue, mirroring the existing PROBE-020 emitter contract).
 **Implementation:** landed — both tiers (Tier-1 `Document.Tree()` interim accessor + Tier-2 `parse.Query` structured AST) shipped in PR #58; out-of-catalogue shapes surface as `aql.ErrIncompleteAST` per review feedback.
 **Depends on:** REQ-109 parse infrastructure landed (`openehr/aql/parse/parse.go`, `parse/gen/`); REQ-055 Builder + `WhereExpr`/`Value` landed (`openehr/aql/`).

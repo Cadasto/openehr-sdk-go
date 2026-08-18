@@ -546,6 +546,8 @@ requirements:
     plans:
       - docs/plans/archive/2026-05-15-rest-api-client.md
       - docs/plans/archive/2026-05-21-aql-builders.md
+      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/aql/aql_test.go
@@ -559,7 +561,9 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/query, openehr/client/definition]
-    plans: [docs/plans/archive/2026-05-15-rest-api-client.md]
+    plans:
+      - docs/plans/archive/2026-05-15-rest-api-client.md
+      - docs/plans/archive/2026-06-29-stored-query-rest-conformance.md
     notes: "POST exec scopes via openehr-ehr-id header (GET uses ehr_id query param); PutStoredQuery recovers {name,version} from Location header. Verified by query/execute.go, definition/stored_query.go; PROBE-078/079 deferred."
     tests:
       - openehr/client/query/query_test.go
@@ -743,7 +747,9 @@ requirements:
       - internal/templatecompile
       - testkit/probes/aql
     probes: [PROBE-028]
-    plans: [docs/plans/archive/2026-06-15-aql-lint.md]
+    plans:
+      - docs/plans/archive/2026-06-15-aql-lint.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -1219,6 +1225,7 @@ requirements:
       - testkit/probes/aql/probes_test.go
     plans:
       - docs/plans/archive/2026-08-04-aql-expressivity-completion.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
 
   - id: REQ-118
     title: Deprecated SELECT TOP clause and literal source text
@@ -1332,7 +1339,9 @@ requirements:
       # The verbatim read side reaches the lint's Layer-3 OPT resolution, which
       # COMPARES predicate text rather than re-emitting it.
       - openehr/aql/lint
-    plans: [docs/plans/archive/2026-08-08-aql-class-predicate-splice-and-source-text.md]
+    plans:
+      - docs/plans/archive/2026-08-08-aql-class-predicate-splice-and-source-text.md
+      - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
     probes: [PROBE-090]
     tests:
       # The two STRUCTURAL guards: a source-level tripwire failing any new

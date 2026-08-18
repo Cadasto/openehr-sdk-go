@@ -313,6 +313,58 @@ func TestRealEmitsDecimalNotation(t *testing.T) {
 	}
 }
 
+// REQ-055 rule 4: placeholder keys carry no leading $.
+func TestBindStripsLeadingDollar(t *testing.T) {
+	q, err := aql.NewBuilder().
+		Select(aql.Col("e")).
+		FromEHR("e", aql.Param("$id")).
+		Bind("$id", "x").
+		Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := q.Parameters["id"]; !ok || v != "x" {
+		t.Fatalf("Parameters[id] = %v (present %t), want \"x\"", v, ok)
+	}
+	if _, ok := q.Parameters["$id"]; ok {
+		t.Fatalf("Parameters still keyed with $: %v", q.Parameters)
+	}
+
+	// The two spellings address ONE key, and a later call replaces the
+	// earlier value — the documented last-write-wins.
+	q2, err := aql.NewBuilder().
+		Select(aql.Col("e")).
+		FromEHR("e", aql.Param("id")).
+		Bind("id", "first").
+		Bind("$id", "second").
+		Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(q2.Parameters) != 1 || q2.Parameters["id"] != "second" {
+		t.Fatalf("Parameters = %v, want the one key id=second (last write wins)", q2.Parameters)
+	}
+}
+
+// REQ-055 rule 4 — empty post-strip Bind name (PARAMETER needs a leading letter).
+func TestBindEmptyNameRefusedAtBuild(t *testing.T) {
+	for name, key := range map[string]string{"bare dollar": "$", "empty": ""} {
+		t.Run(name, func(t *testing.T) {
+			_, err := aql.NewBuilder().
+				Select(aql.Col("e")).
+				FromEHR("e", nil).
+				Bind(key, "x").
+				Build()
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Fatalf("Build() err = %v, want ErrInvalidQuery for Bind(%q)", err, key)
+			}
+			if !strings.Contains(err.Error(), "empty parameter name") {
+				t.Errorf("err = %v, want the empty-name rule", err)
+			}
+		})
+	}
+}
+
 func readGolden(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "wire", name))

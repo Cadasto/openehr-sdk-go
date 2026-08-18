@@ -245,6 +245,36 @@ func TestLintFromArchetypeWarning(t *testing.T) {
 	}
 }
 
+// TestLintSelectStarWarns — REQ-109 Layer 2 / SDK-AQL-002: bare and mixed
+// SELECT * raise aql_select_star as Warning (OK stays true).
+func TestLintSelectStarWarns(t *testing.T) {
+	for name, q := range map[string]string{
+		"bare":     "SELECT * FROM EHR e",
+		"mixed":    "SELECT *, e/ehr_id/value FROM EHR e",
+		"distinct": "SELECT DISTINCT * FROM EHR e",
+		"top":      "SELECT TOP 5 * FROM EHR e",
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := lint.LintString(q, nil)
+			if !has(r, "aql_select_star") {
+				t.Fatalf("want aql_select_star Warning, got %v", codes(r))
+			}
+			if !r.OK() {
+				t.Fatalf("Warning must not flip OK: %v", codes(r))
+			}
+		})
+	}
+}
+
+// TestLintCountStarDoesNotWarnSelectStar — REQ-109 / SDK-AQL-002: COUNT(*)
+// is official QUERY aggregate syntax, not the SELECT * relaxation.
+func TestLintCountStarDoesNotWarnSelectStar(t *testing.T) {
+	r := lint.LintString("SELECT COUNT(*) FROM EHR e", nil)
+	if has(r, "aql_select_star") {
+		t.Fatalf("COUNT(*) must not raise aql_select_star, got %v", codes(r))
+	}
+}
+
 func TestLintUnboundParam(t *testing.T) {
 	q := aql.NewQuery(
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +
@@ -284,6 +314,38 @@ func TestLintArchetypeNotInTemplate(t *testing.T) {
 	)
 	if r.OK() || !has(r, "aql_archetype_not_in_template") {
 		t.Fatalf("want aql_archetype_not_in_template, got %v", codes(r))
+	}
+}
+
+// REQ-109 Layer 3: [$arch] is bind-time scope, not a missing HRID.
+func TestLintParamArchetypeNotInTemplateClean(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT c FROM COMPOSITION c[$arch]",
+		&lint.Options{Compiled: c},
+	)
+	if has(r, "aql_archetype_not_in_template") {
+		t.Fatalf("ParamArchetype must not raise aql_archetype_not_in_template, got %v", codes(r))
+	}
+	if !r.OK() {
+		t.Fatalf("ParamArchetype lint must stay OK, got %v", codes(r))
+	}
+}
+
+// REQ-109 Layer 3: a path under a $param archetype MUST NOT raise
+// aql_path_not_in_template — identifiable scope is deferred to bind time
+// (ParamArchetype), so Layer 3 has no literal HRID to walk under.
+func TestLintPathUnderParamArchetypeClean(t *testing.T) {
+	c := mustCompile(t, "vital_signs")
+	r := lint.LintString(
+		"SELECT c/x FROM COMPOSITION c[$arch]",
+		&lint.Options{Compiled: c},
+	)
+	if has(r, "aql_path_not_in_template") {
+		t.Fatalf("path under $param archetype must not raise aql_path_not_in_template, got %v", codes(r))
+	}
+	if has(r, "aql_archetype_not_in_template") {
+		t.Fatalf("ParamArchetype must not raise aql_archetype_not_in_template, got %v", codes(r))
 	}
 }
 

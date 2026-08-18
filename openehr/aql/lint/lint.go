@@ -140,10 +140,10 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	return Result{Issues: issues}
 }
 
-// shapeIssues runs the Layer-2 (AST-only) checks: alias binding and
-// identifiable-scope. SELECT/FROM presence is guaranteed by a successful
-// parse (the grammar requires both), so no aql_select / aql_from issue can
-// arise here.
+// shapeIssues runs the Layer-2 (AST-only) checks: alias binding,
+// identifiable scope, the SELECT * relaxation warning, and the TOP-clause
+// pair. SELECT/FROM presence is guaranteed by a successful parse (the
+// grammar requires both), so no aql_select / aql_from issue can arise here.
 func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 	var issues []Issue
 
@@ -178,6 +178,16 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 		issues = append(issues, Issue{
 			Code:     "aql_from_archetype",
 			Detail:   "FROM/CONTAINS names no archetype, $param, VERSION, or EHR scope",
+			Severity: Warning,
+		})
+	}
+
+	// aql_select_star — bare/mixed SELECT * is the SDK-AQL-002 relaxation;
+	// official QUERY 1.1.0 requires explicit columns (COUNT(*) is not this).
+	if doc.Star {
+		issues = append(issues, Issue{
+			Code:     "aql_select_star",
+			Detail:   "SELECT * is an SDK grammar-profile relaxation (SDK-AQL-002); official QUERY 1.1.0 requires explicit columns",
 			Severity: Warning,
 		})
 	}

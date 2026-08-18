@@ -63,6 +63,14 @@ func TestExtractMetadata(t *testing.T) {
 	}
 }
 
+// REQ-109: a $param archetype predicate is not a literal HRID.
+func TestExtractSkipsParamArchetype(t *testing.T) {
+	md := lint.Extract(mustParse(t, "SELECT c FROM COMPOSITION c[$arch]"))
+	if len(md.Archetypes) != 0 {
+		t.Fatalf("Archetypes = %v, want none (ParamArchetype)", md.Archetypes)
+	}
+}
+
 // TestExtractDoesNotAliasDocumentSlices ensures mutating Metadata paths does
 // not corrupt the parsed document.
 func TestExtractDoesNotAliasDocumentSlices(t *testing.T) {

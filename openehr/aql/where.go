@@ -683,8 +683,8 @@ func validateLikeOperand(v Value, path string) error {
 // MATCHES predicate on the same URI.
 func validateURIOperand(uri, path string) error {
 	bad := func(what string, detail any) error {
-		return fmt.Errorf("%w: MATCHES on %q carries a URI %s (%v): %q",
-			ErrInvalidQuery, path, what, detail, uri)
+		return fmt.Errorf("%w: MATCHES on %q carries a URI %s (%v)",
+			ErrInvalidQuery, path, what, detail)
 	}
 	// URI_SCHEME : ALPHA_CHAR ( ALPHA_CHAR | DIGIT | '+' | '-' | '.' )* — an
 	// absent scheme is the commonest way a caller passes something that is not
@@ -694,11 +694,13 @@ func validateURIOperand(uri, path string) error {
 		return bad("operand", "no scheme")
 	}
 	if !asciiLetter(scheme[0]) {
-		return bad("whose scheme does not start with a letter", scheme)
+		return bad("whose scheme does not start with a letter", "scheme")
 	}
 	for i := range len(scheme) {
-		if c := scheme[i]; !schemeChar(c) {
-			return bad("with an invalid scheme character", string([]byte{c}))
+		if !schemeChar(scheme[i]) {
+			// The offset, never the byte: one character of the operand is
+			// still URI text, which the refusal MUST NOT reproduce.
+			return bad("with an invalid scheme character", fmt.Sprintf("byte %d", i))
 		}
 	}
 
@@ -712,6 +714,11 @@ func validateURIOperand(uri, path string) error {
 			return bad("with a second", "'#' — URI_FRAGMENT admits none")
 		}
 		if err := checkURIRun(frag, uriQueryByte); err != nil {
+			// Every helper diagnosis below is value-free by construction (an
+			// offset or a grammar-rule name, never operand bytes), so passing
+			// it through keeps the coordinate — which sub-component, where —
+			// at zero echo cost. Discarding it for a bare component name made
+			// port vs host vs userinfo indistinguishable.
 			return bad("whose fragment is unspellable", err)
 		}
 	}
@@ -801,7 +808,7 @@ func checkURIAuthority(authority string) error {
 		}
 		port, isPort := strings.CutPrefix(tail, ":")
 		if !isPort {
-			return fmt.Errorf("%q follows the IP literal; only \":\" port may", tail)
+			return errors.New(`trailing text after IP literal; only ":" port may`)
 		}
 		return checkURIPort(port)
 	}
@@ -826,22 +833,22 @@ func checkURIAuthority(authority string) error {
 func checkURIIPv6(lit string) error {
 	left, right, ok := strings.Cut(lit, "::")
 	if !ok {
-		return fmt.Errorf("IPv6 literal %q carries no \"::\", which URI_IPV6_LITERAL requires", lit)
+		return errors.New(`IPv6 literal carries no "::", which URI_IPV6_LITERAL requires`)
 	}
 	if strings.Contains(right, "::") {
-		return fmt.Errorf("IPv6 literal %q carries more than one \"::\"", lit)
+		return errors.New(`IPv6 literal carries more than one "::"`)
 	}
 	for _, half := range []string{left, right} {
 		if half == "" {
-			return fmt.Errorf("IPv6 literal %q omits a group; URI_IPV6_LITERAL requires a quad either side of \"::\"", lit)
+			return errors.New(`IPv6 literal omits a group; URI_IPV6_LITERAL requires a quad either side of "::"`)
 		}
 		for quad := range strings.SplitSeq(half, ":") {
 			if len(quad) != 4 {
-				return fmt.Errorf("IPv6 literal %q carries %q; URI_IPV6_LITERAL admits only 4-digit hex quads", lit, quad)
+				return errors.New("IPv6 literal carries a non-4-digit group; URI_IPV6_LITERAL admits only 4-digit hex quads")
 			}
 			for i := range len(quad) {
 				if !hexDigit(quad[i]) {
-					return fmt.Errorf("IPv6 literal %q carries a non-hex digit in %q", lit, quad)
+					return errors.New("IPv6 literal carries a non-hex digit")
 				}
 			}
 		}
@@ -853,7 +860,7 @@ func checkURIIPv6(lit string) error {
 func checkURIPort(port string) error {
 	for i := range len(port) {
 		if c := port[i]; c < '0' || c > '9' {
-			return fmt.Errorf("port %q is not URI_PORT : DIGIT*", port)
+			return errors.New("port is not URI_PORT : DIGIT*")
 		}
 	}
 	return nil
@@ -866,12 +873,15 @@ func checkURIRun(s string, admits func(byte) bool) error {
 	for i := 0; i < len(s); {
 		if c := s[i]; c == '%' {
 			if i+2 >= len(s) || !hexDigit(s[i+1]) || !hexDigit(s[i+2]) {
-				return fmt.Errorf("%q is not URI_PCT_ENCODED : '%%' HEX_DIGIT HEX_DIGIT", s[i:min(i+3, len(s))])
+				return errors.New("not URI_PCT_ENCODED : '%' HEX_DIGIT HEX_DIGIT")
 			}
 			i += 3
 			continue
 		} else if !admits(c) {
-			return fmt.Errorf("%q is outside the alphabet of this position", string([]byte{c}))
+			// The offset, never the byte — these messages surface through
+			// [validateURIOperand]'s diagnostics, which MUST NOT reproduce
+			// URI text.
+			return fmt.Errorf("byte %d is outside the alphabet of this position", i)
 		}
 		i++
 	}

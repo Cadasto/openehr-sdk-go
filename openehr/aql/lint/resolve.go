@@ -34,8 +34,15 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 	// false-positive policy.
 	for _, p := range md.Paths {
 		ce, ok := md.Aliases[p.Alias]
-		if !ok || ce.Archetype == "" {
-			continue // unbound (Layer 2) or no literal archetype to anchor to
+		if !ok || ce.Archetype == "" || ce.ParamArchetype {
+			// Unbound (Layer 2), no archetype, or $param. A $param carries no
+			// literal subtree to walk — the CDR resolves the bound scope at
+			// execution (PROBE-021). The ParamArchetype arm is belt-and-braces:
+			// Archetype holds the placeholder text ("$arch"), which no compiled
+			// index can match, so the len(roots)==0 continue below would absorb
+			// the case anyway — but through the wrong reason ("archetype
+			// absent"), and only while that lookup stays a miss.
+			continue
 		}
 		roots := c.AllByArchetypeID(ce.Archetype)
 		if len(roots) == 0 {

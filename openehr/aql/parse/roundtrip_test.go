@@ -391,10 +391,11 @@ func TestEmitUnrenderableTopClause(t *testing.T) {
 }
 
 // TestParseQuerySurfacesIncompleteAST pins the RESIDUAL catalogue gap after
-// REQ-117: an integer literal that cannot be represented in the AST
-// (LIMIT / OFFSET beyond Go `int`) still surfaces aql.ErrIncompleteAST on
+// REQ-117: a numeric literal that cannot be represented in the AST
+// (LIMIT / OFFSET beyond Go `int`, integer VALUE beyond int64, REAL /
+// scientific REAL beyond float64) still surfaces aql.ErrIncompleteAST on
 // ParseQuery and still refuses to render on Emit, rather than silently
-// dropping the clause.
+// dropping the clause or degrading to +Inf.
 // PROBE-087
 func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 	cases := []struct {
@@ -408,6 +409,24 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 		{"select_literal_overflow", "SELECT 99999999999999999999 FROM EHR e", "out of range"},
 		{"comparison_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x > 99999999999999999999", "out of range"},
 		{"matches_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {99999999999999999999}", "out of range"},
+		// Real-valued literals beyond float64: same residual 1 class as
+		// integer overflow — refuse, never degrade to +Inf (REQ-117 /
+		// PROBE-087). `1e400` lexes as SCI_INTEGER (REAL needs a dot;
+		// SCI_REAL is `1.0e400`); all three token shapes share one
+		// conversion, and each is named here so the arm cannot be split
+		// without a row noticing.
+		{"sci_integer_overflow", "SELECT e FROM EHR e WHERE e/x > 1e400", "out of range"},
+		{"sci_integer_overflow_select", "SELECT 1e400 FROM EHR e", "out of range"},
+		{"sci_real_overflow", "SELECT e FROM EHR e WHERE e/x > 1.0e400", "out of range"},
+		{"matches_sci_integer_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {1e400}", "out of range"},
+		// UNDERFLOW is the half ParseFloat does NOT flag: it returns (0, nil)
+		// below the smallest subnormal, so before this row `> 1e-400` parsed
+		// cleanly and emitted `> 0.0` — a predicate flipped across the zero
+		// boundary with err == nil at every layer. Same residual, refused the
+		// same way.
+		{"sci_integer_underflow", "SELECT e FROM EHR e WHERE e/x > 1e-400", "out of range"},
+		{"sci_real_underflow", "SELECT e FROM EHR e WHERE e/x > 1.0e-400", "out of range"},
+		{"matches_underflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {1e-400}", "out of range"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -433,6 +452,28 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 			// re-review).
 			if _, eerr := q.Emit(); !errors.Is(eerr, aql.ErrIncompleteAST) {
 				t.Errorf("Emit on incomplete AST: want ErrIncompleteAST, got %v", eerr)
+			}
+		})
+	}
+}
+
+// TestTinyRealLiteralsStayRepresentable is the underflow refusal's
+// anti-tightening control: a SUBNORMAL is representable and a zero-mantissa
+// literal IS zero, whatever its exponent — neither is residual 1, and refusing
+// either would reject text the parser reads back as the same value.
+func TestTinyRealLiteralsStayRepresentable(t *testing.T) {
+	for name, in := range map[string]string{
+		"subnormal":              "SELECT e FROM EHR e WHERE e/x > 1e-310",
+		"zero_mantissa_exponent": "SELECT e FROM EHR e WHERE e/x > 0.0e100",
+		"plain_zero":             "SELECT e FROM EHR e WHERE e/x > 0.0",
+	} {
+		t.Run(name, func(t *testing.T) {
+			q, err := parse.ParseQuery(in)
+			if err != nil {
+				t.Fatalf("ParseQuery(%q): %v", in, err)
+			}
+			if _, err := q.Emit(); err != nil {
+				t.Fatalf("Emit refused a representable literal (tightening): %v", err)
 			}
 		})
 	}

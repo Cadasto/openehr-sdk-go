@@ -57,7 +57,11 @@ type Document struct {
 
 	// Distinct is true for SELECT DISTINCT.
 	Distinct bool
-	// Star is true for a bare SELECT * (SDK-AQL-002 relaxation).
+	// Star is true when the projection carries a `*` ITEM — both bare
+	// `SELECT *` and mixed forms such as `SELECT *, e/ehr_id/value` (the
+	// SDK-AQL-002 relaxation REQ-109's aql_select_star warns on). It is NOT
+	// set for `COUNT(*)`: that star belongs to the aggregate call
+	// ([FunctionCall.Star]), not the projection.
 	Star bool
 	// NumSelect is the number of SELECT projection items.
 	NumSelect int

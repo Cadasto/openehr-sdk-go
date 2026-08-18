@@ -6,9 +6,12 @@
 // openehr/validation (the dependency arrow is validation → lint).
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
-// lint-clean query MAY still be rejected on execution, and the SDK grammar
-// profile deliberately admits some non-conformant forms (e.g. SELECT *), so
-// "lint-clean" never means "spec-conformant".
+// lint-clean query MAY still be rejected on execution. The SDK grammar
+// profile (ADR 0007) carries documented divergences from official QUERY
+// 1.1.0 — SDK-AQL-001 spells the string function CONTAINS_STR and REJECTS
+// the spec spelling CONTAINS(a,b) (shadowed by the containment operator);
+// SDK-AQL-002 admits SELECT *; see resources/aql/grammar/DIVERGENCES.md —
+// so "lint-clean" never means "spec-conformant" in either direction.
 package lint
 
 import (
@@ -50,7 +53,7 @@ func Extract(doc *parse.Document) Metadata {
 		if ce.Alias != "" {
 			md.Aliases[ce.Alias] = ce
 		}
-		if ce.Archetype != "" && !seen[ce.Archetype] {
+		if ce.Archetype != "" && !ce.ParamArchetype && !seen[ce.Archetype] {
 			seen[ce.Archetype] = true
 			md.Archetypes = append(md.Archetypes, ce.Archetype)
 		}
