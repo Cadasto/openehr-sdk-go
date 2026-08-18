@@ -7,7 +7,8 @@ import (
 
 // Severity is the typed severity attached to every [Issue]. [ValidateComposition]
 // emits [Error] only in v1. [ValidateAQL] may also emit [Warning] for REQ-109
-// advisories (aql_from_archetype, aql_unused_param, aql_path_not_in_template).
+// advisories (e.g. aql_from_archetype, aql_select_star; the lint codes pass
+// through verbatim, so the full set is REQ-109's Layer-2/3 catalogue).
 type Severity int
 
 const (
@@ -16,9 +17,9 @@ const (
 	Error Severity = iota
 
 	// Warning is an advisory issue that does NOT make a [Result]
-	// not-OK. [ValidateAQL] emits it for REQ-109 advisories
-	// (aql_from_archetype, aql_unused_param, aql_path_not_in_template);
-	// [ValidateComposition] emits only [Error] in v1.
+	// not-OK. [ValidateAQL] emits it for REQ-109 advisories (e.g.
+	// aql_from_archetype, aql_select_star — the full set is REQ-109's
+	// catalogue); [ValidateComposition] emits only [Error] in v1.
 	Warning
 )
 

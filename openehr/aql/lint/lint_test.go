@@ -249,8 +249,10 @@ func TestLintFromArchetypeWarning(t *testing.T) {
 // SELECT * raise aql_select_star as Warning (OK stays true).
 func TestLintSelectStarWarns(t *testing.T) {
 	for name, q := range map[string]string{
-		"bare":  "SELECT * FROM EHR e",
-		"mixed": "SELECT *, e/ehr_id/value FROM EHR e",
+		"bare":     "SELECT * FROM EHR e",
+		"mixed":    "SELECT *, e/ehr_id/value FROM EHR e",
+		"distinct": "SELECT DISTINCT * FROM EHR e",
+		"top":      "SELECT TOP 5 * FROM EHR e",
 	} {
 		t.Run(name, func(t *testing.T) {
 			r := lint.LintString(q, nil)

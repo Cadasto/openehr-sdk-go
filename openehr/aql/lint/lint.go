@@ -140,10 +140,10 @@ func Lint(doc *parse.Document, opts *Options) Result {
 	return Result{Issues: issues}
 }
 
-// shapeIssues runs the Layer-2 (AST-only) checks: alias binding and
-// identifiable-scope. SELECT/FROM presence is guaranteed by a successful
-// parse (the grammar requires both), so no aql_select / aql_from issue can
-// arise here.
+// shapeIssues runs the Layer-2 (AST-only) checks: alias binding,
+// identifiable scope, the SELECT * relaxation warning, and the TOP-clause
+// pair. SELECT/FROM presence is guaranteed by a successful parse (the
+// grammar requires both), so no aql_select / aql_from issue can arise here.
 func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 	var issues []Issue
 

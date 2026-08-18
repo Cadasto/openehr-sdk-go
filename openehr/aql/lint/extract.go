@@ -7,10 +7,11 @@
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
 // lint-clean query MAY still be rejected on execution. The SDK grammar
-// profile (ADR 0007) deliberately admits documented non-conformant forms —
-// SDK-AQL-001 (CONTAINS vs CONTAINS_STR) and SDK-AQL-002 (SELECT *); see
-// resources/aql/grammar/DIVERGENCES.md — so "lint-clean" never means
-// "spec-conformant".
+// profile (ADR 0007) carries documented divergences from official QUERY
+// 1.1.0 — SDK-AQL-001 spells the string function CONTAINS_STR and REJECTS
+// the spec spelling CONTAINS(a,b) (shadowed by the containment operator);
+// SDK-AQL-002 admits SELECT *; see resources/aql/grammar/DIVERGENCES.md —
+// so "lint-clean" never means "spec-conformant" in either direction.
 package lint
 
 import (
