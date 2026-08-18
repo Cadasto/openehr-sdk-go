@@ -57,7 +57,7 @@
 
 - [ ] **Step 0a:** In the landed-state paragraph ("All three write-path modes are landed…"), replace the clause "returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body" with "reports an empty body as `NoRepresentationError` wrapping `transport.ErrInvalidShape`" — one contract per path, no contradiction with the new MUSTs.
 
-- [ ] **Step 0b:** Append the amendment verbatim after that paragraph:
+- [ ] **Step 0b:** Append the amendment verbatim after that paragraph (proposed SPEC text — it lands in `transport.md` § REQ-094 together with the code, and only then):
 
 > **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper that reports false for a typed-nil pointer, a bare-nil interface, and an interface holding a typed-nil pointer, and true for any populated resource. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
 >

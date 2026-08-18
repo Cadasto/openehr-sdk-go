@@ -123,6 +123,9 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
   over every `nodePredicate` alternative in `AqlParser.g4` — including
   trivia-carrying spellings (whitespace, `--` comments) and escaped names —
   asserting the structured components and the untouched `Raw`.
+- Negative space: a form outside the structured kinds is nil-`Parsed` and a
+  member of the enumerated unstructured set — never a best-effort partial
+  structure; `Raw` stays verbatim (REQ-119) on every path.
 - Each phase names its verification command.
 
 ## Definition of Done

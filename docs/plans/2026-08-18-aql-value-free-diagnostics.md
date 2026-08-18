@@ -109,6 +109,10 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
   corpus that reaches **every** drop site and a representative lint-issue set,
   assert (a) a record exists per drop, (b) no structured field contains any
   substring of the input's value spans, (c) spans point at the offending text.
+- Negative space: an unknown `ConstructKind` is a fail-closed switch case for
+  readers (closed enum); a drop with no record is a defect, not a gap; the
+  value-free fields never fall back to embedding source text when attribution
+  is hard.
 - Each phase names its verification command.
 
 ## Definition of Done

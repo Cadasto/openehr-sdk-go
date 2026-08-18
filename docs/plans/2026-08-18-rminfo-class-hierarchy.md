@@ -117,6 +117,9 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 - PROBE-094 (or the id Phase 0 allocates) is defined in `conformance.md` (Draft):
   the generated hierarchy answers are equivalent to a fresh reduction of the
   pinned BMM (classes, ancestry, abstractness, per-class declarations).
+- Negative space: unknown class ≠ abstract class ≠ concrete class with no
+  descendants — three distinguishable answers, never conflated; `DeclaredOn` on
+  an attribute the class does not carry reports not-found rather than guessing.
 - Each phase names its verification command.
 
 ## Definition of Done
@@ -134,7 +137,7 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 | REQ § + registry row (Phase 0) | |
 | PROBE defined in `conformance.md` (Draft) | |
 | Generator + `ClassMeta` extension + regenerated tables | |
-| `Hierarchy` interface + `ResolveAttribute` | |
+| `Hierarchy` interface + `DeclaredOn` | |
 | Tests with `// REQ-` / `// PROBE-` comments | |
 | `make spec-check` | |
 | `make ci` | |
@@ -165,8 +168,9 @@ drift test red when a field is hand-edited.
 
 1. Implement `Hierarchy` on the default lookup (BFS up for `ConformsTo`, walk for
    `ConcreteDescendants`; sorted, copied results).
-2. Implement `ResolveAttribute` (ancestry walk, most-derived declaration wins,
-   deterministic ancestor order).
+2. Implement `DeclaredOn` (ancestry walk from rmType toward the root; the first
+   class whose BMM declaration carries the attribute wins — the declaration
+   *site*, not a re-resolution the flattened maps already provide).
 3. Table-driven tests: LOCATABLE-inherited attributes, abstract expansion of
    `ENTRY`/`CARE_ENTRY`, unknown-class behaviour, dead-end abstract classes.
 

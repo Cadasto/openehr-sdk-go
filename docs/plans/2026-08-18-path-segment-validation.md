@@ -229,8 +229,16 @@ func TestDoRejectsTraversalPath(t *testing.T) {
 func TestDoRejectsSmuggledSeparator(t *testing.T) {
 	// ehr_id="foo/bar" interpolated into the path: every segment is legal,
 	// only the count betrays it — 5 path segments vs 4 in the route template.
-	// Reuse the tripwire server/client from TestDoRejectsTraversalPath.
-	_, err := c.Do(t.Context(), &Request{
+	var hits int
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		hits++
+	}))
+	t.Cleanup(srv.Close)
+	c, err := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.Do(t.Context(), &Request{
 		Method: http.MethodGet,
 		Path:   "/ehr/foo/bar/contribution/x",
 		Route:  "/ehr/{ehr_id}/contribution/{contribution_uid}",
@@ -250,10 +258,10 @@ func TestDoRejectsSmuggledSeparator(t *testing.T) {
 - [ ] **Step 7: Confirm it fails** (currently `joinTarget` issues the request)
 
 ```
-go test ./transport/ -run TestDoRejectsTraversalPath -count=1
+go test ./transport/ -run 'TestDoRejectsTraversalPath|TestDoRejectsSmuggledSeparator' -count=1
 ```
 
-Expected: FAIL — `hits != 0` or missing sentinel.
+Expected: FAIL for both — `hits != 0` or missing sentinel.
 
 - [ ] **Step 8: Enforce both checks before the URL is built**
 
@@ -302,7 +310,7 @@ EOF
 
 - [ ] **Step 11: Leaf httptest** — `composition.Get` with a traversal `ehrID` returns the sentinel and the server sees zero requests. Cite `// REQ-150`.
 
-- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives one path-interpolating call per `openehr/client` leaf package (composition, directory, ehrstatus, contribution, itemtags, query, definition, demographic — enumerate the driven calls in the probe file's doc comment) with a traversal id each. Per REQ-080 the probe asserts fail-closed behaviour only: non-nil error and zero captured requests — **no** sentinel-identity assertions (those live in `transport/path_test.go`). Status in `conformance.md`: Draft → Implemented (Sandbox).
+- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives one path-interpolating call per `openehr/client` leaf package (composition, directory, ehrstatus, contribution, itemtags, query, definition, demographic — enumerate the driven calls in the probe file's doc comment) with **two** hostile inputs each: a traversal id (`a/../../…`) and a separator-smuggling id (`foo/bar` — legal segments, wrong arity against the leaf's `Route`). Per REQ-080 the probe asserts fail-closed behaviour only: non-nil error and zero captured requests — **no** sentinel-identity assertions (those live in `transport/path_test.go`). Status in `conformance.md`: Draft → Implemented (Sandbox).
 
 - [ ] **Step 13: Flip REQ-150 to landed** in `REQ.md` + `traceability.yaml` (packages, tests, probes). Archive this plan.
 
