@@ -179,6 +179,27 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
+## STRAND-11 — Probe recording format: HAR or a purpose-built YAML
+
+**Status:** Open — opened by the [REQ-082 specification pass](../plans/2026-08-18-probe-runnability.md).
+
+**Question:** what serialisation do Cassette-mode recordings use — the HTTP Archive standard (`.har`), or a purpose-built YAML schema of this SDK's own?
+
+**Why it's open:** REQ-082 previously said "`.har` or `.yaml`" and left the choice unmade, which is why no recorder exists. The requirement now states what a recording MUST carry (provenance, capture-time redaction, order-preserving normalised matching) independently of its encoding, so phases 1–2 of the arc are unblocked; the encoding is only decidable with a capture in hand.
+
+**The trade-off:**
+
+- **HAR** is a published standard with an existing tool ecosystem (browser devtools, mitmproxy, Charles all export it), which matters because a probe definition is meant to be implementable in any language — a PHP implementation of the same probe could replay the same corpus. Against it: HAR is verbose, diffs poorly under review, models browser concerns this SDK has no use for (timings, cache, `pageref`), and has no native slot for the provenance and redaction attestation REQ-082 requires — both would become extension fields.
+- **Purpose-built YAML** carries provenance and redaction natively, reviews well in a pull request (which is load-bearing: a reviewer must be able to *see* that a recording captured from a real CDR contains no bearer token and no patient data), and matches how this tree already pins vendored corpora. Against it: a bespoke schema, no external tooling, and cross-language portability that rests on the schema being documented well enough for a second implementation.
+
+**Evidence needed:** one real capture against a live CDR, serialised both ways, reviewed as a diff. The auditability question is empirical — whether a reviewer can actually spot an unredacted field — and it cannot be settled by reasoning about the formats.
+
+**Resolution form:** ADR-NNNN, taken when Cassette mode is implemented (phase 3 of the plan). Until then no recorder exists to prejudge it.
+
+**Implementation gate:** blocked on access to a live openEHR deployment to record from — the same dependency that defers phases 3–4.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -193,3 +214,4 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-08](#strand-08--cadasto-extras-boundary-criteria-conditional-extraction) | Cadasto-extras extraction | Open (long-term) | REQ-010, REQ-011 |
 | [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query `fetch`) | Open (deferred) | REQ-059, REQ-095, REQ-099 |
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
+| [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | Open | REQ-082 |

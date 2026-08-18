@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
+
 ## [0.20.0] - 2026-08-18
 
 Twentieth `v0.x` minor — REQ-119 closes AQL emission under re-parsing, so every value and predicate the SDK writes it can read back as what it meant. **Breaking:** the AQL write paths refuse text they once emitted, and predicate and path text now emits verbatim.

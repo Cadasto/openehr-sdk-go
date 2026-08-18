@@ -55,8 +55,8 @@ Generic openEHR primitives. No application-specific healthcare models live here.
 | `openehr/client/admin/` | Admin API — EHR physical delete, administrative-lifecycle operations (upstream Status: development). Distinct from `cadasto/admin/` (Cadasto-platform admin). |
 | `smart/` | Application-level SMART AppContext (patient, user, encounter, launch parameters) and App Registration helpers. Distinct from `auth/smart` (OAuth2 flow). |
 | `smart/discovery/` | Service catalog resolver. |
-| `sandbox/` | In-memory and recorded-fixture transports implementing the same client interfaces as the production REST clients. |
-| `testkit/` | Test doubles, fluent builders, clock abstraction, JWKS fixture, recorder/replay, conformance-probe runner. Vendored conformance cassettes under `testkit/cassettes/` (`templates/`, `compositions/`, `rm/`, `its_rest/`); path resolution in `testkit/fixtures/`; corpus-scale parity harnesses under `testkit/conformance/` (a probe's shared runner plus its counted-exclusion census — e.g. `webtemplate/` for PROBE-086). Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
+| `sandbox/` | **Reserved, not yet implemented.** Will hold the in-memory and replayed-recording transports backing REQ-082's Sandbox and Cassette modes, implementing the same client interfaces as the production REST clients. |
+| `testkit/` | Conformance probes (`testkit/probes/`), vendored fixtures, and fixture-path resolution. The doubles, builders, clock abstraction, JWKS fixture, recorder/replay, and probe **runner** this row once listed do not exist yet — the runner is REQ-082 phase 1. Vendored fixture documents under `testkit/cassettes/` (`templates/`, `compositions/`, `rm/`, `its_rest/`); path resolution in `testkit/fixtures/`; corpus-scale parity harnesses under `testkit/conformance/` (a probe's shared runner plus its counted-exclusion census — e.g. `webtemplate/` for PROBE-086). Named `testkit/` (not `testing/`) to avoid `testing` package collision. |
 
 ### Cadasto extras
 
@@ -197,7 +197,7 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). The mapping of changes 
 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
 
-- All REQs in this catalog are `Status: Stable`.
+- Every REQ in [REQ.md](REQ.md) is `Impl. landed` or `deprecated` — the per-REQ axis, with `deprecated` terminal (it satisfies the gate rather than blocking it). `Status:` is a per-**file** promise per [README.md § Status header](README.md#status-header); promoting each spec file `Draft → Stable` is part of the cut, not a precondition for it.
 - The openEHR wire-conformance probe suite in `conformance.md` passes.
 - A reference openEHR deployment passes the probe suite.
 

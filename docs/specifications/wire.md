@@ -111,7 +111,7 @@ Numeric magnitudes are serialised as IEEE 754 double-precision JSON numbers. The
 
 Some upstream producers (notably legacy CDR exporters) emit `Real` / `Integer` magnitudes as quoted decimal strings. The SDK adopts **asymmetric tolerance**: encode is strict (numbers only); decode accepts either a JSON number or a quoted decimal string. The full rule and its rationale live in [`docs/adr/0004-numeric-wire-tolerance.md`](../adr/0004-numeric-wire-tolerance.md). The asymmetric profile is part of the openEHR wire contract this SDK follows (REQ-080).
 
-Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
+Golden canonical-JSON composition inputs for codec and PROBE-030 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)). Example: `compositions/BMI.json` for quoted-number magnitudes ([ADR 0004](../adr/0004-numeric-wire-tolerance.md)).
 
 ### Polymorphic substitution
 
@@ -145,7 +145,7 @@ Canonical ordering for XML **MUST** mirror the JSON profile (see [`docs/plans/ar
 
 XML is a second-class format on the wire today (REST 1.1.0-development is JSON-first), but several integration scenarios pin to XML for legacy reasons. The SDK supports it without forcing it.
 
-Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (same layout as REQ-052; see [Vendored cassettes](conformance.md#vendored-cassettes-testkitcassettes)).
+Golden canonical-XML inputs for codec and PROBE-033 live under `testkit/cassettes/compositions/` and `testkit/cassettes/rm/` (same layout as REQ-052; see [Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)).
 
 ## Simplified formats
 
@@ -356,5 +356,5 @@ Out of v1 scope:
 | Stored AQL | REQ-057 | `openehr/client/definition/`, `openehr/client/query/` |
 | openEHR custom header family | REQ-059 | `transport/` (option API), `openehr/client/*` (typed per-method options) |
 | OpenAPI authoritative source | REQ-095 | `testkit/cassettes/its_rest/` (records upstream commit) |
-| Shared RM / OPT cassettes | REQ-052, REQ-056, REQ-082 | `testkit/cassettes/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md) |
+| Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/cassettes/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)) |
 | Transport (OTel, retry, TLS, errors, Prefer) | REQ-090–094 | [transport.md](transport.md) → `transport/`, `smart/discovery/` |

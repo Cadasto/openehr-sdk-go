@@ -38,9 +38,11 @@ While on `v0.x`: **minor** bumps may break the public API (release notes list ev
 
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
-1. All REQs in [`REQ.md`](specifications/REQ.md) at `Status: Stable`.
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `deprecated` — no `partial`, no `planned`. (`deprecated` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
 2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
+
+Promoting each spec file `Status: Draft → Stable` is then part of the `v1.0.0` cut, not a fourth precondition — `Status:` is a per-**file** stability promise ([README.md § Status header](specifications/README.md#status-header)), whereas whether a requirement is *built* is the per-REQ `Impl.` column condition 1 gates on.
 
 Until then we ship `v0.x` adopter slices; current progress is in [`docs/roadmap.md`](roadmap.md).
 

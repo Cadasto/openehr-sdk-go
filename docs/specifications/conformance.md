@@ -7,7 +7,7 @@ The conformance probe suite for this SDK. Covers openEHR wire conformance (REQ-0
 A **conformance probe** is an executable assertion that the SDK exercises against either:
 
 - the sandbox transport (`sandbox/`),
-- a recorded HTTP cassette, or
+- a replayed recording (`testkit/recordings/`), or
 - a live Cadasto reference deployment,
 
 to verify wire-level conformance to openEHR REST + SMART-on-openEHR.
@@ -31,15 +31,71 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 
 ### REQ-082 — Runnability
 
-Every probe **MUST** be runnable in three modes:
+Every probe that asserts against a **backend** **MUST** be runnable in three modes:
 
-| Mode | Backend | Use |
-|---|---|---|
-| **Sandbox** | `sandbox/` in-memory transport | Fast unit tests; CI default |
-| **Cassette** | Recorded `.har` or `.yaml` fixture | Deterministic CI against captured real-deployment traffic |
-| **Live** | A reference openEHR deployment | Pre-release verification against a real backend |
+| Mode | Backend | Artefact | Use |
+|---|---|---|---|
+| **Sandbox** | `sandbox/` in-memory transport | none | Fast unit tests; CI default |
+| **Cassette** | a replayed **recording** | `testkit/recordings/` | Deterministic CI against captured real-deployment traffic |
+| **Live** | a reference openEHR deployment | none | Pre-release verification against a real backend |
 
-The probe definition is the single source; the runner picks the backend at invocation time. The same probe MUST pass in all three modes (with cassette recording done once against the live backend).
+The probe definition is the single source; the runner picks the backend at invocation time.
+
+**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 9 of the 60 catalog entries are in-repo by construction.
+
+For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 15 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
+
+A **recording** is a captured HTTP exchange — method, URL, request and response headers, status, and both bodies. It is a different artefact from the vendored **fixture documents** under `testkit/cassettes/` (§ Vendored fixtures below), which are bodies only and carry no exchange. The two **MUST NOT** share a directory: a fixture is hand-curated input, a recording is captured evidence, and only the second can go stale against a deployment.
+
+#### Mode selection belongs to the runner, never to the probe
+
+A backend-facing probe **MUST** receive an already-configured client and **MUST NOT** observe which mode it runs in (an in-repo probe receives no client — there is nothing to configure) — no mode parameter, no environment read, no type assertion on the transport. A probe that cannot be written without knowing its backend is asserting something other than wire behaviour, and **MUST** be reformulated rather than given an escape hatch.
+
+The runner **MUST** expose a single entry point taking the mode plus that mode's backend configuration, and **MUST** be able to run the whole catalog, a named subset, or one probe. Selecting a mode the invocation cannot satisfy (Cassette with no recording for a probe, Live with no endpoint) **MUST** fail loudly; it **MUST NOT** silently fall back to another mode.
+
+#### The probe contract
+
+Every probe **MUST** report through one shared result type with a single canonical home, carrying the `PROBE-NNN` id, the mode, the status, and a detail string. Per-package copies of that type **MUST NOT** exist — a probe result compared across modes has to be the same type in every package, or the runner cannot aggregate it.
+
+Status is the closed set `pass` / `fail` / `skip`:
+
+- `skip` **MUST** name the unmet precondition in its detail, and **MUST NOT** be reported or counted as a pass.
+- The runner's summary **MUST** distinguish "every probe passed" from "some probes skipped". A run whose probes all skipped **MUST NOT** read as green — vacuous success is the failure mode this rule exists to prevent, the same reasoning [PROBE-086](#probe-086--upstream-flat-serialisation-parity) applies to an empty compared set.
+
+Every backend-facing probe **MUST** declare its effect as **read-only** or **mutating**, as an **Effect** field in its catalog entry — part of the probe's definition here, not a runner-side annotation.
+
+The catalog predates this field and no entry carries one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
+
+#### Sandbox mode
+
+The `sandbox/` transport **MUST** serve every backend-facing probe in the catalog without a network listener or credentials (an in-repo probe reaches no transport), and **MUST** be reachable by SDK consumers testing their own applications — it is a published building block, not test-only scaffolding (REQ-013: no `auth/` or live-transport dependency).
+
+Sandbox state **MUST** be per-run and isolated: two probes running against one sandbox instance **MUST NOT** observe each other's writes unless the probe definition says they share an EHR.
+
+#### Cassette mode
+
+The recording **encoding** is deliberately not fixed here: whether recordings are HTTP Archive (`.har`) or a purpose-built YAML schema is open as [STRAND-11](research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), to be resolved by ADR against a real capture. Every rule below binds regardless of the encoding chosen.
+
+Recordings are checked-in evidence and are held to the same standard as any vendored corpus:
+
+- A recording **MUST** carry its provenance — the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be discarded rather than replayed.
+- Recordings **MUST** be redacted **at capture time**, never at review time. Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. A recording **MUST** record that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
+- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use.
+- An unmatched request **MUST** fail the probe. The replayer **MUST NOT** pass a request through to a network, and **MUST NOT** synthesise a plausible response — a recording with a gap is a recording that must be recaptured.
+- Where one probe issues the same normalised request more than once and expects different responses (a write followed by a read of what it wrote), the recording **MUST** preserve exchange order and the replayer **MUST** consume matches in that order.
+
+#### Live mode
+
+- A **read-only** probe **MAY** run against any reachable deployment.
+- A **mutating** probe **MUST** be self-scoping: it creates the resources it needs, derived from a per-run identifier, and **MUST NOT** depend on server state it did not create. A probe requiring a pre-seeded EHR **MUST** `skip` when that precondition is absent rather than fail.
+- The runner **MUST** refuse to execute mutating probes in Live mode without an explicit per-invocation opt-in. Writing to a deployment **MUST** be something the operator asked for, never a default that a mode flag turned on.
+- Cleanup is best-effort — a deployment may forbid deletion. The per-run identifier **MUST** appear in every resource a mutating probe creates, so anything it leaves behind is attributable and removable by hand.
+
+#### Cross-mode agreement
+
+The same probe **MUST** reach the same verdict in every mode it is exercised in, with recording captured once against the live backend. A probe that passes in Sandbox and fails on replay indicates the sandbox models the deployment wrongly; **the recording is authoritative and the sandbox MUST be corrected**, never the reverse. A `skip` for an absent precondition is not a disagreement.
+
+For a backend-facing probe, a mode absent from its **Modes** line is an open gap in this requirement rather than a defect in the probe. An in-repo probe reaching no server in any mode is neither.
 
 ### REQ-083 — Cadasto platform API conformance
 
@@ -47,7 +103,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 - The authority is the Cadasto platform's API definition (its OpenAPI document where one exists) or, failing that, recorded fixtures from a reference Cadasto deployment.
 - `cadasto/*` probes assert the SDK's request/response wire shape against that contract — **not** against any other SDK. This is the first-party replacement for the retired cross-SDK parity check (REQ-081): the platform is the authority, so a divergence both SDKs shared can no longer pass silently.
-- Cassettes live under `testkit/cassettes/cadasto/`; per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
+- Vendored fixture documents live under `testkit/cassettes/cadasto/` (bodies and reference responses, not REQ-082 Cassette-mode recordings — [§ Vendored fixtures](#vendored-fixtures-testkitcassettes)); per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
 
 **Status: planned.** The `cadasto/*` surfaces are Phase 4; the conformance fixtures land with them.
 
@@ -63,7 +119,9 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 **Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
 
-### Vendored cassettes (`testkit/cassettes/`)
+### Vendored fixtures (`testkit/cassettes/`)
+
+This tree holds **fixture documents** — bodies, not exchanges. It is not the Cassette-mode recording corpus (REQ-082); the directory name predates that distinction and is kept because paths resolve through [`testkit/fixtures`](../../testkit/fixtures/).
 
 Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
 
@@ -84,7 +142,7 @@ testkit/cassettes/
 | `templates/` + `compositions/` | Operational template + canonical instance for a `template_id` | PROBE-022–027, PROBE-030 (JSON), PROBE-033 (XML when paired) |
 | `rm/` | RM root samples without a paired OPT (ehrbase COMPOSITION/EHR_STATUS/FOLDER, leaf `DV_QUANTITY`, …) | PROBE-030, PROBE-033 |
 | `submissions/` | CONTRIBUTION create payloads for the EHR contribution client (not `rm.Contribution` decode) | contribution client tests (REQ-059) |
-| `its_rest/` | Recorded HTTP request/response shapes | PROBE-010+, discovery probes (REQ-095) |
+| `its_rest/` | ITS-REST request and response **bodies** (no method, URL, headers, or status — see REQ-082) | PROBE-010+, discovery probes (REQ-095) |
 
 Discovery for PROBE-030 / PROBE-033 walks `compositions/` and `rm/` via [`fixtures.ListCompositionJSON`](../../testkit/fixtures/discover.go) and [`fixtures.ListRMXML`](../../testkit/fixtures/discover.go). Templates with JSON or XML on disk but known codec gaps **MAY** be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work.
 
@@ -98,8 +156,9 @@ The catalog is the normative list. Each entry has:
 - **Title** — one-line description.
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
-- **Modes** — Sandbox / Cassette / Live.
-- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
+- **Modes** — Sandbox / Cassette / Live for a backend-facing probe, or In-repo for a probe that reaches no server in any mode (REQ-082). For a backend-facing probe this line is the authoritative record of which modes it supports today.
+- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is not yet populated.
+- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Authentication and discovery
@@ -450,9 +509,9 @@ client scenarios to SDK coverage:
 - **Title:** For each body in the pinned upstream EHRbase FLAT conformance corpus, decoding it and re-encoding it through the SDK's REQ-053 codec reproduces the upstream FLAT — same path set, same leaf values — over the subset of the corpus that the codec models, with everything outside that subset counted rather than waived.
 - **Preconditions:** The commit-pinned corpus at [`testkit/cassettes/flat-conformance/`](../../testkit/cassettes/flat-conformance/) — the `conformance_ehrbase.de.v0` OPT plus 34 `ehrbase_conformance_*.json` FLAT bodies from `composition/flat/simSDT/conformance/`, integrity-checked against `MANIFEST.txt` by `make flat-conformance-verify` (the offline gate `make ci` runs; `make flat-conformance-check` adds a network upstream-drift report) (Apache-2.0; provenance in [`THIRD_PARTY_LICENSES.md`](../../testkit/cassettes/THIRD_PARTY_LICENSES.md)). Resolved via `fixtures.FlatConformanceOpt` / `ListFlatConformance`.
 - **Wire assertion:** Not backend-facing — an in-repo parity property. `template.ParseFile` + `templatecompile.Compile` + `webtemplate.Build`, then per fixture `simplified.UnmarshalFlat(upstream, wt, WithTemplate(c))` + `simplified.MarshalFlat`. The comparison is scoped to the **modelled subset** — the upstream keys left after (a) removing what the codec refuses on decode and (b) holding a **named allow-list** of composition-level metadata out on *both* sides. That allow-list carries two different things and MUST distinguish them. **Respellings** — `language`, `territory`, `composer|name`, `composer_self`, `context/start_time` and `context/setting`, which REQ-053 reads and writes as the `ctx/` short forms (`ctx/language`, `ctx/composer_name`, `ctx/time`, `ctx/setting|code` + `|value`) where upstream writes real paths: comparing across the two spellings would report every such key as **Missing**, since the `ctx/` key the encoder wrote in its place is itself skipped on the emitted side and so never surfaces as Extra. The hold-out is therefore **suffix-aware**, not per-path: the composer's `external_ref` suffixes (`composer|id`, `|id_scheme`, `|id_namespace`) are not respellings and MUST NOT be held out — decode refuses them (`PARTY_PROXY`), which is exactly where the census should show them, in the excluded set. `context/setting` was this list's one documented **waiver** of a real encode-side drop while `ctx/setting` emission was deferred; with that emission landed (REQ-053, [ADR 0015](../adr/0015-flat-metadata-spelling.md)'s left-open gap closed) it is an ordinary respelling — the real path decodes, re-encodes as `ctx/setting|code` + `|value`, and its keys are held out on both sides exactly like `context/start_time`. The hold-out therefore carries **no waiver**: every held-out spelling MUST resolve to an accepted alias or a terminology witness. The hold-out allow-list MUST stay in step with the codec's accepted-alias table, and that agreement MUST be enforced mechanically rather than by review: the harness derives its expected hold-out from the codec's exported alias accessors (`simplified.MetadataAliasSpellings` / `MetadataWitnessSpellings`) and asserts the reverse direction as well — every held-out spelling MUST resolve to an accepted alias or a terminology witness (the waiver class is empty since `ctx/setting` emission landed, and MUST stay empty — a new waiver is a spec decision, not a harness edit). So an alias accepted on decode but missing from the hold-out (a spurious Missing) and a hold-out with no alias behind it (a real key silently suppressed) both fail the harness's own tests rather than being caught by eye. The hold-out MUST stay an explicit allow-list rather than a prefix test: `context/other_context` carries archetyped data and MUST NOT be held out, and `category` MUST be compared — it is a template-constrained Web Template leaf riding its own FLAT path, spelled identically on both sides, not composition metadata. Within that subset the re-encode MUST reproduce the upstream path set with equal leaf values: a dropped, invented, or altered key is a failure, and there MUST NOT be a tolerated-drop list — an upstream key that decodes and then does not re-encode is a defect, not a skip. The excluded set MUST be derived from the codec's own decode refusals rather than hand-maintained, so that closing a gap widens coverage without a list to update; each refusal MUST remove only what it names, so a single unmodelled `|suffix` does not withdraw the modelled suffixes beside it. Excluded and compared counts MUST be pinned per fixture — in the harness package's own tests, which own that ratchet — so the unmodelled surface can shrink deliberately but never grow unnoticed. Independently of the pins, a fixture that compares **nothing** MUST fail: exact agreement over an empty compared set is vacuous, so a total coverage collapse MUST NOT read as a pass. This is strictly stronger than [PROBE-076](#probe-076--flat--structured-composition-round-trip), whose input is the SDK's *own* output and so cannot catch a path this SDK never emits, a suffix it names differently, or a leaf it silently drops — the upstream-conformance follow-up PROBE-076's scope limit names.
-- **Modes:** In-repo (parity property against vendored fixtures; no backend). Cassette / Live are out of scope, so REQ-082 runnability is only partially satisfied.
-- **Status:** Implemented (Sandbox) — harness at [`testkit/conformance/webtemplate/`](../../testkit/conformance/webtemplate/) (one sub-test per corpus fixture in `runner_test.go`), probe wrapper at [`probe_086_upstream_flat_parity.go`](../../testkit/probes/serialize/probe_086_upstream_flat_parity.go), run by `TestProbe086`. The probe is **exact** on what it compares — a dropped, invented, or altered key inside the modelled subset fails, with no tolerated-drop list — and contributes the **coverage floor**: it fails a fixture that compared zero keys, which `Report.Clean` would otherwise report as vacuously clean. The per-fixture excluded/compared **ratchet** is the harness package's own pins in `runner_test.go`, not the probe's; that is what keeps the unmodelled surface shrinking deliberately and never growing silently. The measured census — modelled-subset size, refusal inventory, root causes, and what would move the number — lives in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md), regenerated with the harness's `-census` flag; its first-run catch (a silent encode-side data loss, fixed in `rmpath` under REQ-121) is recorded in the plan close-out. Cassette/Live modes remain out of scope, so REQ-082 is a documented partial.
-- **Satisfies:** REQ-080 (advances); exercises REQ-053 and REQ-106; REQ-082 partial (Sandbox-only).
+- **Modes:** In-repo (parity property against vendored fixtures; no backend) — REQ-082's declared class for a probe that asserts no wire exchange, not a mode shortfall.
+- **Status:** Implemented (Sandbox) — harness at [`testkit/conformance/webtemplate/`](../../testkit/conformance/webtemplate/) (one sub-test per corpus fixture in `runner_test.go`), probe wrapper at [`probe_086_upstream_flat_parity.go`](../../testkit/probes/serialize/probe_086_upstream_flat_parity.go), run by `TestProbe086`. The probe is **exact** on what it compares — a dropped, invented, or altered key inside the modelled subset fails, with no tolerated-drop list — and contributes the **coverage floor**: it fails a fixture that compared zero keys, which `Report.Clean` would otherwise report as vacuously clean. The per-fixture excluded/compared **ratchet** is the harness package's own pins in `runner_test.go`, not the probe's; that is what keeps the unmodelled surface shrinking deliberately and never growing silently. The measured census — modelled-subset size, refusal inventory, root causes, and what would move the number — lives in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md), regenerated with the harness's `-census` flag; its first-run catch (a silent encode-side data loss, fixed in `rmpath` under REQ-121) is recorded in the plan close-out.
+- **Satisfies:** REQ-080 (advances); exercises REQ-053 and REQ-106.
 
 #### PROBE-089 — Underscore-attribute round-trip
 
@@ -460,7 +519,7 @@ client scenarios to SDK coverage:
 - **Preconditions:** The PROBE-086 corpus (underscore keys are ~60% of its 1824 keys), plus SDK-authored per-family fixtures against the vendored OPTs covering each row of the REQ-140 grammar table — including recursion (`_feeder_audit/…/provider/_identifier:N`, `dv_multimedia/_thumbnail`), `_null_flavour` beside an absent bare value, and the deliberate refusals.
 - **Wire assertion:** In-repo, not backend-facing. Per grammar family: (a) **decode** — a FLAT body carrying the family's keys decodes into the typed RM attribute (never a `|raw` detour), and re-encoding reproduces the input byte-for-byte; (b) **encode** — a composition populated with the attribute emits exactly the family's key set: no silent drop, and no `|raw` fallback where the grammar carries the value; (c) **refusals** — the composer `external_ref` / composer `_identifier:N`, `_instruction_details`, and `_wf_definition` keys fail with typed errors naming the key, and MUST NOT decode-and-drop; (d) **STRUCTURED** — the same fixtures interconvert FLAT ↔ STRUCTURED preserving the underscore vocabulary (`_`-keys as members, arrays for `:N`). The PROBE-086 census MUST move in step: the `path not in web template` excluded family shrinks by the landed underscore keys and the per-fixture compared/excluded pins are re-baselined in the same change — a landed family whose corpus keys stay excluded is a failure of this probe, not a census footnote.
 - **Modes:** In-repo (Sandbox); no backend.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_089_underscore_round_trip.go`](../../testkit/probes/serialize/probe_089_underscore_round_trip.go), run by `TestProbe089` (14 SDK-authored per-family fixtures, one per grammar-table row, against the vendored corpus OPT) and `TestProbe089Refusals` (the deliberate exclusions), with `TestProbe089FrameworkMisuse` separating "could not run" from "the codec is wrong". What each leg pins: **(a)** byte-exactness over the *whole* fixture body, so a family cannot be carried at the cost of a key beside it; **(b)** the decoded composition goes out through canonical JSON and back before the re-encode, which is what makes this an encode assertion rather than a second reading of (a) — an underscore value parked anywhere the canonical form does not model vanishes there — and the emitted family key set must match exactly, with a `|raw` at a base the grammar carries reported as its own failure; **(c)** each exclusion must fail with the sentinel its boundary declares and name the offending key, a successful decode being the decode-and-drop this REQ forbids; **(d)** the OPT-free interconversion must carry the `_` vocabulary as array-valued members and the OPT-driven STRUCTURED round-trip must return the same FLAT. The census movement (a) requires is recorded in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) — 360 → 1466 compared keys over Phases C0–C3, with the per-fixture pins re-baselined in each landing commit. The probe's bite is verified by mutation, not assumed: disabling the LOCATABLE owner walk fails 8 fixtures and disabling the value-decoration emitter 5, so deleting the behaviour fails the probe and not only a package test. Cassette/Live modes are out of scope, so REQ-082 is a documented partial.
+- **Status:** Implemented (Sandbox) — [`testkit/probes/serialize/probe_089_underscore_round_trip.go`](../../testkit/probes/serialize/probe_089_underscore_round_trip.go), run by `TestProbe089` (14 SDK-authored per-family fixtures, one per grammar-table row, against the vendored corpus OPT) and `TestProbe089Refusals` (the deliberate exclusions), with `TestProbe089FrameworkMisuse` separating "could not run" from "the codec is wrong". What each leg pins: **(a)** byte-exactness over the *whole* fixture body, so a family cannot be carried at the cost of a key beside it; **(b)** the decoded composition goes out through canonical JSON and back before the re-encode, which is what makes this an encode assertion rather than a second reading of (a) — an underscore value parked anywhere the canonical form does not model vanishes there — and the emitted family key set must match exactly, with a `|raw` at a base the grammar carries reported as its own failure; **(c)** each exclusion must fail with the sentinel its boundary declares and name the offending key, a successful decode being the decode-and-drop this REQ forbids; **(d)** the OPT-free interconversion must carry the `_` vocabulary as array-valued members and the OPT-driven STRUCTURED round-trip must return the same FLAT. The census movement (a) requires is recorded in [`SKIPPED.md`](../../testkit/conformance/webtemplate/SKIPPED.md) — 360 → 1466 compared keys over Phases C0–C3, with the per-fixture pins re-baselined in each landing commit. The probe's bite is verified by mutation, not assumed: disabling the LOCATABLE owner walk fails 8 fixtures and disabling the value-decoration emitter 5, so deleting the behaviour fails the probe and not only a package test.
 - **Satisfies:** REQ-140; advances REQ-080 (census); exercises REQ-053.
 
 ### Canonical JSON and formats
@@ -495,7 +554,7 @@ client scenarios to SDK coverage:
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
-- **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored cassettes](#vendored-cassettes-testkitcassettes)).
+- **Preconditions:** A reference Composition XML fixture under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored fixtures](#vendored-fixtures-testkitcassettes)).
 - **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).
