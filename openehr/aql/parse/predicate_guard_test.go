@@ -277,21 +277,37 @@ func TestEmitClassPredicateAcceptsLoudMalformations(t *testing.T) {
 		{"comment body ending on a bare CR", "a/b='c' -- x\r", "`~[\\r\\n]*` stops at the CR and only `'\\r'? '\\n'` closes the token, so this is SYM_DOUBLE_DASH and nothing is left open"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			// The per-position GUARD still accepts: its rule is bracket ESCAPE,
+			// and a contained malformation escapes nothing. This half is
+			// unchanged by issue #103 and is what keeps the guard from being
+			// tightened into a sub-grammar validator.
 			if err := aql.ValidatePathPredicate(tc.text); err != nil {
 				t.Fatalf("guard refused a CONTAINED malformation (%s): %v", tc.why, err)
 			}
+			// Emit, however, now confronts its own output with the parser
+			// (REQ-119 § Emission verified after emission, issue #103), so it
+			// SURFACES the parser's verdict instead of handing back text this
+			// SDK cannot read. The loud exemption was a concession to the
+			// guard's limits — a hand-derived validator would have to
+			// approximate the grammar — and verification has no such limit.
 			out, err := emitWithPredicate(t, base, tc.text)
-			if err != nil {
-				t.Fatalf("Emit refused it: %v", err)
+			if err == nil {
+				t.Fatalf("Emit produced %q; the verification step must refuse text "+
+					"that does not re-parse (%s)", out, tc.why)
 			}
-			if !strings.Contains(out, "["+tc.text+"]") {
-				t.Errorf("Emit = %q, which does not carry the predicate verbatim", out)
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
 			}
-			// …and the whole point of admitting it: the parser is the one that
-			// says no, LOUDLY, where the caller sees it.
-			if _, err := parse.ParseQuery(out); err == nil {
-				t.Errorf("emitted %q parses cleanly — this row no longer tests a "+
-					"loud malformation and needs replacing", out)
+			// The REPARSE arm, not the skeleton arm: the difference matters,
+			// since only the latter is the silent substitution class.
+			if !strings.Contains(err.Error(), "does not re-parse") {
+				t.Errorf("err = %v, want the re-parse arm — a loud malformation is "+
+					"the parser's verdict, not a structural divergence", err)
+			}
+			// The predicate MUST NOT be echoed into the diagnostic: this
+			// position carries the identifiable root.
+			if strings.Contains(err.Error(), tc.text) {
+				t.Errorf("err = %v leaks the predicate text verbatim", err)
 			}
 		})
 	}

@@ -1550,3 +1550,121 @@ func TestContainmentRefusalsReportTheRuleThatFired(t *testing.T) {
 		t.Errorf("incomplete node reported as %v, want the RM-type rule", err)
 	}
 }
+
+// TestEmitRefusesImpureJunctionNodes — a junction node renders only its
+// operands and the keyword, so data parked anywhere else on it has no wire
+// form. [isContainmentJunction] classifies on RMType/Version/Children alone,
+// so a junction whose Class carries a standing predicate or a $param flag
+// skipped the class-operand checks AND rendered nothing — `err == nil` with
+// the filter gone (REQ-119's substitution class; PROBE-090's converse rule:
+// a field emission never renders in the given shape is refused, not dropped).
+// Negation is the same hole at two positions the grammar cannot spell: the
+// FROM root junction (nothing precedes it to carry a NOT) and a junction
+// OPERAND (`NOT` belongs to a CONTAINS keyword).
+func TestEmitRefusesImpureJunctionNodes(t *testing.T) {
+	mk := func(from parse.FromClause) *parse.Query {
+		return &parse.Query{
+			Select: parse.SelectClause{Items: []parse.SelectItem{{Expr: parse.PathExpr{
+				IdentifiedPath: parse.IdentifiedPath{IdentifiedPath: aql.IdentifiedPath{Raw: "c/x"}},
+			}}}},
+			From: from,
+		}
+	}
+	operands := func() []parse.Containment {
+		return []parse.Containment{
+			{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+			{Class: parse.ClassExpr{RMType: "EVALUATION", Alias: "ev"}},
+		}
+	}
+	nested := func(class parse.ClassExpr) parse.FromClause {
+		return parse.FromClause{
+			Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"},
+			Contains: &parse.Containment{
+				ChildJoin: parse.ContainsOr,
+				Class:     class,
+				Children:  operands(),
+			},
+		}
+	}
+
+	for name, tc := range map[string]struct {
+		from parse.FromClause
+		rule string // the diagnostic must name the rule, not just the sentinel
+	}{
+		"standing predicate comparison on a junction": {
+			nested(parse.ClassExpr{PredicateComparison: &aql.Comparison{
+				Path: "ehr_id/value", Op: aql.OpEq, Val: aql.StringValue{S: "x"},
+			}}),
+			"class data",
+		},
+		"$param archetype flag on a junction": {
+			nested(parse.ClassExpr{ParamArchetype: true}),
+			"class data",
+		},
+		"alias on a junction": {
+			nested(parse.ClassExpr{Alias: "zz"}),
+			"class data",
+		},
+		"archetype on a junction": {
+			nested(parse.ClassExpr{Archetype: "openEHR-EHR-OBSERVATION.bp.v1"}),
+			"class data",
+		},
+		"predicate text on a junction": {
+			nested(parse.ClassExpr{Predicate: "at0001"}),
+			"class data",
+		},
+		"negated FROM root junction": {
+			parse.FromClause{Junction: &parse.Containment{
+				Negated: true, ChildJoin: parse.ContainsAnd, Children: operands(),
+			}},
+			"root junction is negated",
+		},
+		"negated junction operand": {
+			parse.FromClause{Junction: &parse.Containment{
+				ChildJoin: parse.ContainsAnd,
+				Children: []parse.Containment{
+					{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+					{Negated: true, Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+				},
+			}},
+			"operand 1 is negated",
+		},
+	} {
+		t.Run("refused/"+name, func(t *testing.T) {
+			out, err := mk(tc.from).Emit()
+			if err == nil {
+				t.Fatalf("Emit produced %q; the junction's extra data has no wire form", out)
+			}
+			if !errors.Is(err, aql.ErrInvalidQuery) {
+				t.Errorf("err = %v, want ErrInvalidQuery", err)
+			}
+			if !strings.Contains(err.Error(), tc.rule) {
+				t.Errorf("err = %v, want the junction-purity rule (%q)", err, tc.rule)
+			}
+		})
+	}
+
+	// The positive control: the same trees WITHOUT the extra data emit and
+	// round-trip, so the purity rules cannot be tightened into refusing pure
+	// junctions.
+	for name, from := range map[string]parse.FromClause{
+		"pure nested junction": nested(parse.ClassExpr{}),
+		"pure root junction": {Junction: &parse.Containment{
+			ChildJoin: parse.ContainsAnd,
+			Children: []parse.Containment{
+				{Class: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}},
+				{Class: parse.ClassExpr{RMType: "OBSERVATION", Alias: "o"}},
+			},
+		}},
+	} {
+		t.Run("emits/"+name, func(t *testing.T) {
+			out, err := mk(from).Emit()
+			if err != nil {
+				t.Fatalf("Emit refused a pure junction (tightening): %v", err)
+			}
+			if _, err := parse.ParseQuery(out); err != nil {
+				t.Errorf("emitted %q does not re-parse: %v", out, err)
+			}
+		})
+	}
+}

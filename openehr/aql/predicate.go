@@ -34,8 +34,8 @@ package aql
 //     recorded exception escapes BOTH classes: a regex token that completes
 //     here AND leaves its body reachable (`{/a\/}`) forms a longer token under
 //     a cooperating suffix — a whole-query property no per-predicate scan can
-//     decide (REQ-119 § Out of scope; issue #103 tracks the verify-after-emit
-//     closure).
+//     decide, CLOSED at the query level by REQ-119 § Emission verified after
+//     emission (openehr/aql/parse/emit_verify.go), not here.
 //
 // The rules are hand-derived because `openehr/aql` may not import the generated
 // lexer (REQ-013 — the dependency runs the other way), and are held honest
