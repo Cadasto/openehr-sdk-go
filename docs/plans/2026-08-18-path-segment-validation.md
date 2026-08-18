@@ -3,13 +3,13 @@
 **Date:** 2026-08-18
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** [REQ-141](../specifications/transport.md#req-141--path-parameter-segment-validation); encoding half remains [REQ-095](../specifications/wire.md#req-095)
+**Covers:** [REQ-150](../specifications/transport.md#req-150--path-parameter-segment-validation); encoding half remains [REQ-095](../specifications/wire.md#req-095)
 **Probes:** [PROBE-091](../specifications/conformance.md#probe-091--path-parameter-traversal-is-refused) (Draft)
 **Implementation:** planned
 **Depends on:** landed REQ-095 single-encode contract (`transport` is the only path encoder)
 **Defers:** a breaking `PathSegment` named type on every leaf; validating the service base URL
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Execution:** work the phases in order and the steps within a phase sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** The transport refuses a decoded path segment that would change the request URI (`.`, `..`, empty, `\`, control characters) and issues no HTTP request.
 
@@ -22,23 +22,23 @@
 - `context.Context` first on every I/O method (REQ-020).
 - No reflection (REQ-024). Wrap errors with `fmt.Errorf("…: %w", err)` (REQ-025).
 - Leaf clients MUST NOT call `url.PathEscape` on path parameters (REQ-095).
-- Cite `REQ-141` / `PROBE-091` in tests and `doc.go`.
+- Cite `REQ-150` / `PROBE-091` in tests and `doc.go`.
 - Do not mention any external consumer or review artefact in commits, plans, or spec prose.
 
 ## Definition of Ready
 
 Implementation may start when:
 
-- **`Covers:`** lists REQ-141 (and REQ-095 as the encoding sibling).
-- Canonical normative prose exists ([transport.md § REQ-141](../specifications/transport.md#req-141--path-parameter-segment-validation) + registry row).
+- **`Covers:`** lists REQ-150 (and REQ-095 as the encoding sibling).
+- Canonical normative prose exists ([transport.md § REQ-150](../specifications/transport.md#req-150--path-parameter-segment-validation) + registry row).
 - No ADR is required (non-breaking enforcement at the existing encoder).
 - Phases name verification: `go test ./transport/ ./openehr/client/...`, `make spec-check`, `make ci`.
-- Negative space is REQ-141: traversal / empty / `\` / control-character segments fail closed with no request.
+- Negative space is REQ-150: traversal / empty / `\` / control-character segments fail closed with no request.
 
 ## Definition of Done
 
-- Code and tests land with `// REQ-141` / `// PROBE-091` citations.
-- `traceability.yaml` and the REQ.md **Impl.** column for REQ-141 move `planned → landed`.
+- Code and tests land with `// REQ-150` / `// PROBE-091` citations.
+- `traceability.yaml` and the REQ.md **Impl.** column for REQ-150 move `planned → landed`.
 - PROBE-091 **Status:** Draft → Implemented (Sandbox).
 - `make spec-check` and `make ci` pass.
 - Plan archived under [`archive/`](archive/).
@@ -47,9 +47,9 @@ Implementation may start when:
 
 | Step | Status |
 |---|---|
-| Spec / registry (REQ-141, PROBE-091 Draft) | done in this change |
+| Spec / registry (REQ-150, PROBE-091 Draft) | done in this change |
 | Code | |
-| Tests with `// REQ-141` / `// PROBE-091` comments | |
+| Tests with `// REQ-150` / `// PROBE-091` comments | |
 | `make spec-check` | |
 | `make ci` | |
 
@@ -70,7 +70,7 @@ Implementation may start when:
 - [ ] **Step 1: Write the failing tests**
 
 ```go
-// REQ-141
+// REQ-150
 func TestValidPathSegment(t *testing.T) {
 	cases := []struct {
 		in      string
@@ -128,7 +128,7 @@ Add to `transport/errors.go`:
 ```go
 // ErrInvalidPathSegment indicates a decoded Request.Path segment is empty,
 // `.` / `..`, contains `\` or a control character, or (for ValidPathSegment)
-// contains `/`. Wrapped with ErrInvalidConfig at the join step (REQ-141).
+// contains `/`. Wrapped with ErrInvalidConfig at the join step (REQ-150).
 ErrInvalidPathSegment = errors.New("transport: invalid path segment")
 ```
 
@@ -142,7 +142,7 @@ import (
 	"strings"
 )
 
-// ValidPathSegment reports whether s is a single decoded path parameter (REQ-141).
+// ValidPathSegment reports whether s is a single decoded path parameter (REQ-150).
 func ValidPathSegment(s string) error {
 	if s == "" || s == "." || s == ".." {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, ErrInvalidPathSegment)
@@ -155,7 +155,7 @@ func ValidPathSegment(s string) error {
 	return nil
 }
 
-// ValidRequestPath validates a decoded Request.Path (REQ-141). The leading
+// ValidRequestPath validates a decoded Request.Path (REQ-150). The leading
 // empty segment of an absolute path is ignored.
 func ValidRequestPath(path string) error {
 	for i, seg := range strings.Split(path, "/") {
@@ -170,7 +170,7 @@ func ValidRequestPath(path string) error {
 }
 ```
 
-Use `r < 0x20 || r == 0x7F` in the loop — do not leave the placeholder comment in the landed file. Do **not** wrap twice if `ValidPathSegment` already wraps `ErrInvalidConfig`.
+Wrapping rule: `ValidPathSegment` builds the one error chain carrying both sentinels; `ValidRequestPath` and `joinTarget` return that error **unchanged** — the chain wraps `ErrInvalidConfig` exactly once.
 
 - [ ] **Step 4: Re-run the helper tests**
 
@@ -187,7 +187,7 @@ git add transport/path.go transport/path_test.go transport/errors.go
 git commit -m "$(cat <<'EOF'
 feat(transport): add path-segment validation helpers
 
-REQ-141: ValidPathSegment / ValidRequestPath refuse traversal
+REQ-150: ValidPathSegment / ValidRequestPath refuse traversal
 segments before any request is built.
 EOF
 )"
@@ -198,7 +198,7 @@ EOF
 **Files:**
 
 - Modify: `transport/client.go` (`joinTarget`)
-- Modify: `transport/request.go` (godoc — drop the “ids contain no `/`” assumption; point at REQ-141)
+- Modify: `transport/request.go` (godoc — drop the “ids contain no `/`” assumption; point at REQ-150)
 - Test: `transport/path_test.go` (Do / joinTarget cases)
 
 - [ ] **Step 6: Write the failing Do test**
@@ -226,10 +226,9 @@ func TestDoRejectsTraversalPath(t *testing.T) {
 	}
 }
 
-func TestDoStillSingleEncodesSpace(t *testing.T) {
-	// keep the REQ-095 space case green after the new check
-}
 ```
+
+`transport/path_encoding_test.go` already pins the REQ-095 single-encode behaviour (spaced template id → one `%20` on the wire). Do **not** duplicate it here — re-run it in Step 9 to prove the new check does not break it. Add a case there only if it lacks a joined `Do`-level assertion that a spaced id still issues exactly one request.
 
 - [ ] **Step 7: Confirm it fails** (currently `joinTarget` issues the request)
 
@@ -268,7 +267,7 @@ git add transport/client.go transport/request.go transport/path_test.go
 git commit -m "$(cat <<'EOF'
 feat(transport): refuse illegal path segments in joinTarget
 
-REQ-141: a traversal or control-character segment returns
+REQ-150: a traversal or control-character segment returns
 ErrInvalidPathSegment and never hits the wire.
 EOF
 )"
@@ -282,11 +281,11 @@ EOF
 - Modify: the package's `*_test.go` harness (follow PROBE-072)
 - Test: one leaf httptest in `openehr/client/ehr/composition/` (`ehr_id = "a/../../definition/query/evil"`)
 
-- [ ] **Step 11: Leaf httptest** — `composition.Get` with a traversal `ehrID` returns the sentinel and the server sees zero requests. Cite `// REQ-141`.
+- [ ] **Step 11: Leaf httptest** — `composition.Get` with a traversal `ehrID` returns the sentinel and the server sees zero requests. Cite `// REQ-150`.
 
-- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives every path-interpolating leaf (or a representative set plus a tree-walk tripwire listing those leaves). Status in `conformance.md`: Draft → Implemented (Sandbox).
+- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives one path-interpolating call per `openehr/client` leaf package (composition, directory, ehrstatus, contribution, itemtags, query, definition, demographic — enumerate the driven calls in the probe file's doc comment) with a traversal id each. Per REQ-080 the probe asserts fail-closed behaviour only: non-nil error and zero captured requests — **no** sentinel-identity assertions (those live in `transport/path_test.go`). Status in `conformance.md`: Draft → Implemented (Sandbox).
 
-- [ ] **Step 13: Flip REQ-141 to landed** in `REQ.md` + `traceability.yaml` (packages, tests, probes). Archive this plan.
+- [ ] **Step 13: Flip REQ-150 to landed** in `REQ.md` + `traceability.yaml` (packages, tests, probes). Archive this plan.
 
 - [ ] **Step 14: Verify**
 
@@ -300,6 +299,6 @@ Expected: PASS.
 
 ## Mapping to specs
 
-- [transport.md § REQ-141](../specifications/transport.md#req-141--path-parameter-segment-validation)
+- [transport.md § REQ-150](../specifications/transport.md#req-150--path-parameter-segment-validation)
 - [wire.md § REQ-095](../specifications/wire.md#req-095) — encode-once sibling
 - [REQ.md](../specifications/REQ.md) — registry row

@@ -3,7 +3,7 @@
 **Date:** 2026-08-18
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** **REQ-160** (structured node predicates) — proposed; needs a **new band**: the clinical-modeling band (100–119) is exhausted per the [numbering policy](../specifications/REQ.md#numbering-policy), which requires the next band to be allocated there first. Proposed: **160–169 "AQL structured model & diagnostics"**, deliberately leaving 150–159 free for the transport-overflow band raised in PR #107's review (finding F2). Phase 0 settles both.
+**Covers:** **REQ-160** (structured node predicates) — proposed; needs a **new band**: the clinical-modeling band (100–119) is exhausted per the [numbering policy](../specifications/REQ.md#numbering-policy), which requires the next band to be allocated there first. Proposed: **160–169 "AQL structured model & diagnostics"** — 150–159 is the transport extension band (first allocation REQ-150), so 160 is the next free decade. Phase 0 settles this plan's band.
 **Verifies / builds on:** landed [REQ-113](../specifications/clinical-modeling.md) (structured read AST; `aql.IdentifiedPath`/`PathSegment`, `ClassExpr.PredicateComparison`), [REQ-117](../specifications/clinical-modeling.md) (expression-catalogue completion), [REQ-119](../specifications/clinical-modeling.md) (re-parseable emission; verbatim predicate text; `aql.StripPredicateTrivia`)
 **Probes:** **PROBE-095** (proposed; allocated in Phase 0) — predicate structuring corpus over the grammar's `nodePredicate` forms
 **Implementation:** planned

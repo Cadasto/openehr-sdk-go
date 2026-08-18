@@ -8,13 +8,14 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 
-Three independent plans, specified first (REQ-141 / REQ-094 amendment / REQ-142+143). Implement A, then B, then C.
+Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Implementation order: path-segment validation, then contribution read (it unblocks commit → read-back conformance coverage), then the write-result contract, then template list filters. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
 
 | Plan | Scope | Covers | Probe |
 |---|---|---|---|
-| [2026-08-18-path-segment-validation.md](2026-08-18-path-segment-validation.md) | Transport refuses illegal decoded path segments | REQ-141 (builds on REQ-095 encode-once) | PROBE-091 |
+| [2026-08-18-path-segment-validation.md](2026-08-18-path-segment-validation.md) | Transport refuses illegal decoded path segments | REQ-150 (builds on REQ-095 encode-once) | PROBE-091 |
+| [2026-08-18-contribution-get.md](2026-08-18-contribution-get.md) | `contribution.Get` — the missing read half of the contribution round-trip | REQ-142 | PROBE-092 |
 | [2026-08-18-write-result-contract.md](2026-08-18-write-result-contract.md) | Typed-nil success body + committed-but-unusable representation | REQ-094 (implementation-aligned) | package tests (PROBE-061/071 unchanged) |
-| [2026-08-18-contribution-get-and-template-list-filters.md](2026-08-18-contribution-get-and-template-list-filters.md) | `contribution.Get`; `ListTemplates` ITS-REST filters | REQ-142, REQ-143 | PROBE-092, PROBE-093 |
+| [2026-08-18-template-list-filters.md](2026-08-18-template-list-filters.md) | `ListTemplates` ITS-REST filters (emission-only probe) | REQ-143 | PROBE-093 |
 
 ### Probe runnability — the sandbox transport and the three-mode runner (2026-08-18)
 
@@ -26,7 +27,7 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 ### Model & diagnostics asks (2026-08-18)
 
-Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. Proposed ids: REQ-124 in the RM-behavioural headroom; REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is left free for the transport-overflow band raised in PR #107's review).
+Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. Proposed ids: REQ-124 in the RM-behavioural headroom; REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is the transport extension band — first allocation REQ-150).
 
 | Plan | Scope | Covers (proposed) | Probe (proposed) |
 |---|---|---|---|

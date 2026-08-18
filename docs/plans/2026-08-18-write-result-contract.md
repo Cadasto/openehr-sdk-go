@@ -3,13 +3,13 @@
 **Date:** 2026-08-18
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (implementation-aligned amendment)
+**Covers:** [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (implementation-aligned amendment — the normative delta is carried in this plan under [Spec delta](#phase-0--spec-delta-same-pr-as-the-code) and lands in `transport.md` in the same PR as the code, never ahead of it)
 **Probes:** none new — package tests only (PROBE-061/071 stay the representation-decode probes)
 **Implementation:** planned (amendment on a landed REQ)
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
 **Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
+> **Execution:** work the phases in order and the steps within a phase sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
 
 **Goal:** Callers can tell “no body, write succeeded” from “write committed, body unusable” without inspecting `WireError` or correlating a parallel metadata value, and without treating a typed-nil resource as present.
 
@@ -26,7 +26,7 @@
 
 ## Definition of Ready
 
-- Canonical REQ-094 amendment is in [transport.md](../specifications/transport.md#req-094--prefer-response-shape-negotiation).
+- The REQ-094 amendment text is final (Phase 0 below carries it verbatim); `transport.md` is edited in this plan's PR, not before.
 - No ADR (the success path stays `err == nil` for identifier/minimal).
 - Verification: `go test ./openehr/client/ehr/... ./openehr/client/ehr/contribution/ -count=1`, `make spec-check`, `make ci`.
 - Negative space: a 409 stays `*WireError`; an empty representation after 2xx is `*NoRepresentationError`, never a silent nil success.
@@ -43,13 +43,35 @@
 
 | Step | Status |
 |---|---|
-| REQ-094 § amended | done in this change |
+| Phase 0: REQ-094 § amended (same PR as the code) | |
 | Code | |
 | Tests with `// REQ-094` comments | |
 | `make spec-check` | |
 | `make ci` | |
 
 ## Phases
+
+### Phase 0 — Spec delta (same PR as the code)
+
+`transport.md` § REQ-094 is **implementation-aligned**: the spec edit and the code below ride one PR. Apply both edits to [transport.md § REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) in this plan's first commit; `make spec-check` gates the pair.
+
+- [ ] **Step 0a:** In the landed-state paragraph ("All three write-path modes are landed…"), replace the clause "returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body" with "reports an empty body as `NoRepresentationError` wrapping `transport.ErrInvalidShape`" — one contract per path, no contradiction with the new MUSTs.
+
+- [ ] **Step 0b:** Append the amendment verbatim after that paragraph:
+
+> **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper that reports false for a typed-nil pointer, a bare-nil interface, and an interface holding a typed-nil pointer, and true for any populated resource. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
+>
+> **Committed write, unusable representation.** After a successful HTTP response (2xx), when `Prefer: return=representation` was sent and the body is empty or does not decode as the expected resource, the write **MUST** be reported as a typed `NoRepresentationError` that:
+>
+> - carries the version metadata that proves the commit (including `VersionUID` when the server supplied it);
+> - wraps the cause (`ErrInvalidShape` for an empty body; the decoder's error otherwise);
+> - is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value.
+>
+> A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** return `NoRepresentationError` for a non-2xx response. The existing `(resource, metadata, error)` triple **MUST** still populate metadata on this path so current callers do not break.
+>
+> The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
+
+- [ ] **Step 0c:** Same commit: `traceability.yaml` REQ-094 — replace the "Amendment planned" note with the landed facts (tests list grows in Phase 2); `docs/roadmap.md` REQ-094 row — drop the "Amendment planned" clause. Registry Impl. stays `landed` throughout.
 
 ### Phase 1 — `HasResource` and `NoRepresentationError`
 
@@ -115,12 +137,16 @@ go test ./openehr/client/ehr/ -run 'TestHasResource|TestNoRepresentationErrorAs'
 - [ ] **Step 3: Implement**
 
 ```go
+// HasResource reports whether a write returned a usable resource (REQ-094).
+// False for a bare-nil interface, a typed-nil RM pointer, and an interface
+// holding one; true otherwise. Comparing any(v) against a boxed zero value
+// would panic for an uncomparable T — compare against untyped nil only.
 func HasResource[T any](v T) bool {
-	var zero T
-	if any(v) == any(zero) {
+	a := any(v)
+	if a == nil {
 		return false
 	}
-	return !rm.IsTypedNil(v)
+	return !rm.IsTypedNil(a)
 }
 
 type NoRepresentationError struct {
