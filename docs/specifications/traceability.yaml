@@ -687,8 +687,8 @@ requirements:
     status: draft
     implementation: partial
     packages: [testkit, testkit/cassettes, testkit/fixtures, testkit/probes/serialize, testkit/probes/versioned, testkit/probes/definition, testkit/probes/discovery, testkit/probes/template]
-    # PROBE-086 is Sandbox-only (in-repo parity property; Cassette/Live out of
-    # scope) — listed as the documented partial its Satisfies line declares.
+    # PROBE-086 is In-repo (parity property; REQ-082's declared Modes class
+    # for a probe that asserts no wire exchange — not a mode shortfall).
     #
     # `partial` is the whole story here: the three-mode mandate has one mode.
     # Cassette has no recorder, no replayer, and no corpus — testkit/cassettes/
@@ -1826,8 +1826,9 @@ requirements:
     # over an empty set). The per-fixture excluded/compared ratchet lives in
     # the harness's own runner_test.go pins, not in the probe.
     # The inventory and what would move it:
-    # testkit/conformance/webtemplate/SKIPPED.md. Cassette/Live modes remain
-    # out of scope, so REQ-082 stays a documented partial.
+    # testkit/conformance/webtemplate/SKIPPED.md. PROBE-086 is In-repo by
+    # declaration (REQ-082's Modes class); REQ-082's own `partial` is the
+    # unbuilt runner, not this probe.
     implementation: partial
     packages:
       - testkit/probes

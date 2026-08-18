@@ -25,6 +25,7 @@ Implementation may start when:
 
 - **`Covers:`** names REQ-082 — done; the normative prose (mode selection, probe contract, per-mode rules, cross-mode agreement) lands with this plan.
 - The recording-format fork is *recorded rather than settled* — STRAND-11, gated on a live capture. Phases 1–2 do not depend on it.
+- REQ-082's fail-closed clauses are normative and name their refusal paths — an unsatisfiable mode fails loudly, an all-skipped run is not green, a `skip` is never a pass, an unclassified **Effect** is `mutating` — so phase 1 can pin each with a named test (the DoD lists them).
 - Phases below name concrete tasks and their verification command.
 
 ## Definition of Done
@@ -33,7 +34,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 - One shared probe result type with a single canonical home; the 11 byte-identical per-package copies deleted.
 - A runner that executes the catalog, a subset, or one probe, in Sandbox mode, and whose summary distinguishes pass from skip.
-- `sandbox/` serves every catalog probe with no network listener and no credentials, and the hand-rolled `httptest` servers in `testkit/probes/**` are gone.
+- `sandbox/` serves every backend-facing catalog probe with no network listener and no credentials, and the hand-rolled `httptest` servers in `testkit/probes/**` are gone (in-repo probes reach no transport and are out of this bullet's scope).
 - **REQ-082's refusals are each pinned by a named test**, since a fail-closed rule nobody exercises is a fail-open rule with good intentions:
   - a run whose probes all skipped exits non-zero and does **not** report green;
   - selecting a mode the invocation cannot satisfy fails loudly rather than falling back to another mode;

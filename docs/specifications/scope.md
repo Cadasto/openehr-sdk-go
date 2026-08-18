@@ -20,8 +20,8 @@ What the `openehr-sdk-go` v1 surface includes and excludes. Out-of-scope items a
 | Auth providers — alternative grants | Client Credentials, JWT Bearer; abstracted under `auth.TokenSource` |
 | Service discovery | First-class `ServiceCatalog`, cached, refresh-able, with hand-built catalogs for non-discovering backends ([service-discovery.md](service-discovery.md)) |
 | Cadasto-platform extras | Cadasto Extra API, **Datamap V2** (REQ-058), minimal MPI search (preview), Admin endpoints, Care aggregates — shipped in the same module under `cadasto/` ([module-layout.md § Cadasto extras](module-layout.md#cadasto-extras)) |
-| Sandbox + recorded fixtures | In-memory and cassette-replay transports for hermetic SDK-consumer tests |
-| Testkit + conformance probes | Test doubles, fluent builders, the openEHR conformance-probe runner ([conformance.md](conformance.md)) |
+| Sandbox + recorded fixtures | In-memory and recording-replay transports for hermetic SDK-consumer tests — specified ([conformance.md § REQ-082](conformance.md#req-082--runnability)), not yet built: `sandbox/` is reserved and recordings land under `testkit/recordings/` |
+| Testkit + conformance probes | Conformance probes, vendored fixture documents, and fixture-path resolution under `testkit/` ([conformance.md](conformance.md)); the probe runner is REQ-082 phase 1 |
 | openEHR wire conformance | The probe suite verifies wire-level correctness against the openEHR spec (REQ-080) |
 | Examples per primary use case | Worked example programs under `cmd/examples/` for benchmark, seeder, MCP, federator |
 

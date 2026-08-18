@@ -120,7 +120,7 @@ A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `op
 The in-memory transport that will back REQ-082's Sandbox mode, implementing the same client interfaces as the production REST clients, for hermetic tests in SDK consumers. **Not yet implemented** — `sandbox/` is a reserved name holding only a package comment; probe tests stand up a hand-written `httptest` server each.
 
 **Testkit**
-The package `testkit/` carrying test doubles, fluent builders, recorder/replay helpers, and the conformance-probe runner.
+The package tree `testkit/` carrying the conformance probes (`testkit/probes/`), vendored fixture documents (`testkit/cassettes/`), fixture-path resolution (`testkit/fixtures/`), and corpus-scale conformance harnesses (`testkit/conformance/`). The doubles, builders, recorder/replay helpers, and probe runner once listed here do not exist yet — the runner is REQ-082 phase 1.
 
 **Cut line**
 A package-tree boundary that nothing on the upstream side may import from. The `cadasto/` subtree is the load-bearing cut line for v1 (REQ-010, REQ-011).
