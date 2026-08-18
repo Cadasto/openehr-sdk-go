@@ -191,8 +191,11 @@ func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
 
 // Bind supplies a value for a named placeholder introduced via [Param]; it
 // populates [Query.Parameters] on the built query. A leading `$` in name is
-// stripped, as in [Param]. Binding is optional — the emitted string carries
-// `$name` regardless.
+// stripped, as in [Param], so `Bind("$id", …)` and `Bind("id", …)` address the
+// SAME key — a later call with the same effective name replaces the earlier
+// value. Binding is optional — the emitted string carries `$name` regardless —
+// but a bind whose stripped name is empty is refused at [Builder.Build]: no
+// placeholder can ever match it, so the value could only be shipped dead.
 func (b *Builder) Bind(name string, value any) *Builder {
 	name = strings.TrimPrefix(name, "$")
 	if b.ast.params == nil {
@@ -408,6 +411,14 @@ func (a *ast) build() (Query, error) {
 		sb.WriteString(a.offsetInline.token())
 	}
 
+	// A bind whose stripped name is empty matches no PARAMETER (the grammar
+	// requires a leading letter), so the value would ride to the CDR keyed by
+	// "" — dead weight at best, surfaced only if the caller happens to lint.
+	// `Bind("$")` and `Bind("")` are always defects; refuse loudly.
+	if _, ok := a.params[""]; ok {
+		return Query{}, fmt.Errorf("%w: Bind with an empty parameter name (after stripping a "+
+			"leading '$'); no placeholder can match it", ErrInvalidQuery)
+	}
 	// Clone so the built query does not alias the builder's internal map.
 	return Query{Q: sb.String(), Offset: a.offset, Fetch: a.limit, Parameters: maps.Clone(a.params)}, nil
 }
