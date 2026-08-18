@@ -245,6 +245,23 @@ func TestLintFromArchetypeWarning(t *testing.T) {
 	}
 }
 
+func TestLintSelectStarWarns(t *testing.T) {
+	r := lint.LintString("SELECT * FROM EHR e", nil)
+	if !has(r, "aql_select_star") {
+		t.Fatalf("want aql_select_star Warning, got %v", codes(r))
+	}
+	if !r.OK() {
+		t.Fatalf("Warning must not flip OK: %v", codes(r))
+	}
+}
+
+func TestLintCountStarDoesNotWarnSelectStar(t *testing.T) {
+	r := lint.LintString("SELECT COUNT(*) FROM EHR e", nil)
+	if has(r, "aql_select_star") {
+		t.Fatalf("COUNT(*) must not raise aql_select_star, got %v", codes(r))
+	}
+}
+
 func TestLintUnboundParam(t *testing.T) {
 	q := aql.NewQuery(
 		"SELECT o FROM EHR e CONTAINS OBSERVATION o[openEHR-EHR-OBSERVATION.blood_pressure.v1] " +

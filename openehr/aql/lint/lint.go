@@ -182,6 +182,16 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 		})
 	}
 
+	// aql_select_star — bare/mixed SELECT * is the SDK-AQL-002 relaxation;
+	// official QUERY 1.1.0 requires explicit columns (COUNT(*) is not this).
+	if doc.Star {
+		issues = append(issues, Issue{
+			Code:     "aql_select_star",
+			Detail:   "SELECT * is an SDK grammar-profile relaxation (SDK-AQL-002); official QUERY 1.1.0 requires explicit columns",
+			Severity: Warning,
+		})
+	}
+
 	issues = append(issues, topIssues(doc)...)
 	return issues
 }

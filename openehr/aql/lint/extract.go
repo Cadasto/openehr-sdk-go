@@ -6,9 +6,11 @@
 // openehr/validation (the dependency arrow is validation → lint).
 //
 // The CDR remains the execute-time semantic authority (PROBE-021): a
-// lint-clean query MAY still be rejected on execution, and the SDK grammar
-// profile deliberately admits some non-conformant forms (e.g. SELECT *), so
-// "lint-clean" never means "spec-conformant".
+// lint-clean query MAY still be rejected on execution. The SDK grammar
+// profile (ADR 0007) deliberately admits documented non-conformant forms —
+// SDK-AQL-001 (CONTAINS vs CONTAINS_STR) and SDK-AQL-002 (SELECT *); see
+// resources/aql/grammar/DIVERGENCES.md — so "lint-clean" never means
+// "spec-conformant".
 package lint
 
 import (
