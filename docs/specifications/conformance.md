@@ -7,7 +7,7 @@ The conformance probe suite for this SDK. Covers openEHR wire conformance (REQ-0
 A **conformance probe** is an executable assertion that the SDK exercises against either:
 
 - the sandbox transport (`sandbox/`),
-- a recorded HTTP cassette, or
+- a replayed recording (`testkit/recordings/`), or
 - a live Cadasto reference deployment,
 
 to verify wire-level conformance to openEHR REST + SMART-on-openEHR.
@@ -33,13 +33,61 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 
 Every probe **MUST** be runnable in three modes:
 
-| Mode | Backend | Use |
-|---|---|---|
-| **Sandbox** | `sandbox/` in-memory transport | Fast unit tests; CI default |
-| **Cassette** | Recorded `.har` or `.yaml` fixture | Deterministic CI against captured real-deployment traffic |
-| **Live** | A reference openEHR deployment | Pre-release verification against a real backend |
+| Mode | Backend | Artefact | Use |
+|---|---|---|---|
+| **Sandbox** | `sandbox/` in-memory transport | none | Fast unit tests; CI default |
+| **Cassette** | a replayed **recording** | `testkit/recordings/` | Deterministic CI against captured real-deployment traffic |
+| **Live** | a reference openEHR deployment | none | Pre-release verification against a real backend |
 
-The probe definition is the single source; the runner picks the backend at invocation time. The same probe MUST pass in all three modes (with cassette recording done once against the live backend).
+The probe definition is the single source; the runner picks the backend at invocation time.
+
+A **recording** is a captured HTTP exchange — method, URL, request and response headers, status, and both bodies. It is a different artefact from the vendored **fixture documents** under `testkit/cassettes/` (§ Vendored fixtures below), which are bodies only and carry no exchange. The two **MUST NOT** share a directory: a fixture is hand-curated input, a recording is captured evidence, and only the second can go stale against a deployment.
+
+#### Mode selection belongs to the runner, never to the probe
+
+A probe **MUST** receive an already-configured client and **MUST NOT** observe which mode it runs in — no mode parameter, no environment read, no type assertion on the transport. A probe that cannot be written without knowing its backend is asserting something other than wire behaviour, and **MUST** be reformulated rather than given an escape hatch.
+
+The runner **MUST** expose a single entry point taking the mode plus that mode's backend configuration, and **MUST** be able to run the whole catalog, a named subset, or one probe. Selecting a mode the invocation cannot satisfy (Cassette with no recording for a probe, Live with no endpoint) **MUST** fail loudly; it **MUST NOT** silently fall back to another mode.
+
+#### The probe contract
+
+Every probe **MUST** report through one shared result type with a single canonical home, carrying the `PROBE-NNN` id, the mode, the status, and a detail string. Per-package copies of that type are **MUST NOT** — a probe result compared across modes has to be the same type in every package, or the runner cannot aggregate it.
+
+Status is the closed set `pass` / `fail` / `skip`:
+
+- `skip` **MUST** name the unmet precondition in its detail, and **MUST NOT** be reported or counted as a pass.
+- The runner's summary **MUST** distinguish "every probe passed" from "some probes skipped". A run whose probes all skipped **MUST NOT** read as green — vacuous success is the failure mode this rule exists to prevent, the same reasoning [PROBE-086](#probe-086--upstream-flat-serialisation-parity) applies to an empty compared set.
+
+Every probe **MUST** declare its effect on the backend as **read-only** or **mutating**. The declaration is part of the probe's definition here, not a runner-side annotation.
+
+#### Sandbox mode
+
+The `sandbox/` transport **MUST** serve every probe in the catalog without a network listener or credentials, and **MUST** be reachable by SDK consumers testing their own applications — it is a published building block, not test-only scaffolding (REQ-013: no `auth/` or live-transport dependency).
+
+Sandbox state **MUST** be per-run and isolated: two probes running against one sandbox instance **MUST NOT** observe each other's writes unless the probe definition says they share an EHR.
+
+#### Cassette mode
+
+Recordings are checked-in evidence and are held to the same standard as any vendored corpus:
+
+- A recording **MUST** carry its provenance — the deployment it came from, the date, and the SDK commit that captured it. A recording whose provenance cannot be stated **MUST** be discarded rather than replayed.
+- Recordings **MUST** be redacted **at capture time**, never at review time. Credentials (`Authorization`, cookies, tokens, client secrets, JWKS private material) and patient-identifying data **MUST NOT** reach disk. A recording **MUST** record that redaction ran, so an unredacted capture is detectable rather than merely unlikely.
+- Replay matching **MUST** be on a normalised request key — method, path, and the headers and body fields the probe's assertion depends on — **not** byte-exact equality: a capture necessarily carries timestamps, generated UUIDs, and `ETag` values that differ on every run, and byte-exact matching would make every recording single-use.
+- An unmatched request **MUST** fail the probe. The replayer **MUST NOT** pass a request through to a network, and **MUST NOT** synthesise a plausible response — a recording with a gap is a recording that must be recaptured.
+- Where one probe issues the same normalised request more than once and expects different responses (a write followed by a read of what it wrote), the recording **MUST** preserve exchange order and the replayer **MUST** consume matches in that order.
+
+#### Live mode
+
+- A **read-only** probe **MAY** run against any reachable deployment.
+- A **mutating** probe **MUST** be self-scoping: it creates the resources it needs, derived from a per-run identifier, and **MUST NOT** depend on server state it did not create. A probe requiring a pre-seeded EHR **MUST** `skip` when that precondition is absent rather than fail.
+- The runner **MUST** refuse to execute mutating probes in Live mode without an explicit per-invocation opt-in. Writing to a deployment **MUST** be something the operator asked for, never a default that a mode flag turned on.
+- Cleanup is best-effort — a deployment may forbid deletion. The per-run identifier **MUST** appear in every resource a mutating probe creates, so anything it leaves behind is attributable and removable by hand.
+
+#### Cross-mode agreement
+
+The same probe **MUST** reach the same verdict in every mode it is exercised in, with recording captured once against the live backend. A probe that passes in Sandbox and fails on replay indicates the sandbox models the deployment wrongly; **the recording is authoritative and the sandbox MUST be corrected**, never the reverse. A `skip` for an absent precondition is not a disagreement.
+
+Not every probe is exercised in all three modes today; the per-probe **Status** lines in the catalog below record where each one actually runs, and a mode listed as pending is a gap in this requirement, not in the probe.
 
 ### REQ-083 — Cadasto platform API conformance
 
@@ -63,7 +111,9 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 **Status:** landed (`cadasto/admin`). Distinct from the ITS-REST Admin client (`openehr/client/admin`). Platform-API conformance fixtures remain Phase 4 per above.
 
-### Vendored cassettes (`testkit/cassettes/`)
+### Vendored fixtures (`testkit/cassettes/`)
+
+This tree holds **fixture documents** — bodies, not exchanges. It is not the Cassette-mode recording corpus (REQ-082); the directory name predates that distinction and is kept because paths resolve through [`testkit/fixtures`](../../testkit/fixtures/).
 
 Serialization and clinical-modeling probes that need reference RM bytes or OPT bodies **MUST** use the checked-in tree under `testkit/cassettes/`. Paths **MUST** be resolved via [`testkit/fixtures`](../../testkit/fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`) — not hard-coded legacy directory names.
 
@@ -84,7 +134,7 @@ testkit/cassettes/
 | `templates/` + `compositions/` | Operational template + canonical instance for a `template_id` | PROBE-022–027, PROBE-030 (JSON), PROBE-033 (XML when paired) |
 | `rm/` | RM root samples without a paired OPT (ehrbase COMPOSITION/EHR_STATUS/FOLDER, leaf `DV_QUANTITY`, …) | PROBE-030, PROBE-033 |
 | `submissions/` | CONTRIBUTION create payloads for the EHR contribution client (not `rm.Contribution` decode) | contribution client tests (REQ-059) |
-| `its_rest/` | Recorded HTTP request/response shapes | PROBE-010+, discovery probes (REQ-095) |
+| `its_rest/` | ITS-REST request and response **bodies** (no method, URL, headers, or status — see REQ-082) | PROBE-010+, discovery probes (REQ-095) |
 
 Discovery for PROBE-030 / PROBE-033 walks `compositions/` and `rm/` via [`fixtures.ListCompositionJSON`](../../testkit/fixtures/discover.go) and [`fixtures.ListRMXML`](../../testkit/fixtures/discover.go). Templates with JSON or XML on disk but known codec gaps **MAY** be listed in `compositionJSONExcluded`, `compositionXMLExcluded`, or `rmJSONExcluded` in that package so probes stay green while the files remain available for template and validation work.
 
