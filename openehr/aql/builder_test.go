@@ -346,9 +346,7 @@ func TestBindStripsLeadingDollar(t *testing.T) {
 	}
 }
 
-// A bind whose stripped name is empty can never match a placeholder (the
-// grammar's PARAMETER requires a leading letter), so Build refuses it rather
-// than shipping a dead value keyed by "".
+// REQ-055 rule 4 — empty post-strip Bind name (PARAMETER needs a leading letter).
 func TestBindEmptyNameRefusedAtBuild(t *testing.T) {
 	for name, key := range map[string]string{"bare dollar": "$", "empty": ""} {
 		t.Run(name, func(t *testing.T) {

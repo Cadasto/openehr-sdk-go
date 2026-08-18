@@ -194,8 +194,9 @@ func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
 // stripped, as in [Param], so `Bind("$id", …)` and `Bind("id", …)` address the
 // SAME key — a later call with the same effective name replaces the earlier
 // value. Binding is optional — the emitted string carries `$name` regardless —
-// but a bind whose stripped name is empty is refused at [Builder.Build]: no
-// placeholder can ever match it, so the value could only be shipped dead.
+// but a bind whose stripped name is empty is refused at [Builder.Build]
+// (REQ-055 rule 4): no placeholder can ever match it, so the value could
+// only be shipped dead.
 func (b *Builder) Bind(name string, value any) *Builder {
 	name = strings.TrimPrefix(name, "$")
 	if b.ast.params == nil {
@@ -206,7 +207,8 @@ func (b *Builder) Bind(name string, value any) *Builder {
 }
 
 // Build emits the canonical [Query]. It returns an error wrapping
-// [ErrInvalidQuery] if the query has no projection or no source.
+// [ErrInvalidQuery] if the query has no projection or no source, or if a
+// [Bind] name is empty after stripping a leading `$` (REQ-055 rule 4).
 func (b *Builder) Build() (Query, error) { return b.ast.build() }
 
 // SelectField is one entry in the SELECT projection list. Construct with [Col].
