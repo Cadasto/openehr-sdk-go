@@ -197,7 +197,7 @@ The SDK follows **Semantic Versioning 2.0.0** (REQ-004). The mapping of changes 
 
 `v0.x` is in motion until the openEHR-core surface and conformance probe set stabilise. `v1.0.0` lands when:
 
-- All REQs in this catalog are `Status: Stable`.
+- Every REQ in [REQ.md](REQ.md) is `Impl. landed` — the per-REQ axis. (`Status:` is a per-**file** promise per [README.md § Status header](README.md#status-header); promoting each spec file `Draft → Stable` is part of the cut, not a precondition for it.)
 - The openEHR wire-conformance probe suite in `conformance.md` passes.
 - A reference openEHR deployment passes the probe suite.
 
