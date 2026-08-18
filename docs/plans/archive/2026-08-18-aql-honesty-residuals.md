@@ -371,13 +371,13 @@ go test ./openehr/aql/lint/ ./testkit/probes/aql/ -count=1
 
 ### Task 7: Traceability hygiene (same PR)
 
-- [ ] Add this plan (then, on close-out, its `archive/` path) to `plans:` on REQ-055, REQ-109, REQ-117, REQ-119.
-- [ ] Add the new test files to those rows' `tests:` lists.
-- [ ] Also fold the review's map nits if touching those rows anyway:
+- [x] Add this plan (then, on close-out, its `archive/` path) to `plans:` on REQ-055, REQ-109, REQ-117, REQ-119.
+- [x] Add the new test files to those rows' `tests:` lists.
+- [x] Also fold the review's map nits if touching those rows anyway:
   - `docs/plans/archive/2026-06-29-stored-query-rest-conformance.md` onto REQ-055 and REQ-057 `plans:`
   - Repair archived `Covers` hrefs `#req-055--aql-query` → `#req-055--wire-boundary` in `archive/2026-06-29-aql-execution-ast.md` and `archive/2026-06-29-stored-query-rest-conformance.md`
-- [ ] `make spec-check` — expect OK.
-- [ ] Archive this plan (`git mv` to `docs/plans/archive/`) and update `docs/plans/README.md`.
+- [x] `make spec-check` — expect OK.
+- [x] Archive this plan (`git mv` to `docs/plans/archive/`) and update `docs/plans/README.md`.
 
 ---
 

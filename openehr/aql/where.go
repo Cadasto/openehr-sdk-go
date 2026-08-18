@@ -694,7 +694,7 @@ func validateURIOperand(uri, path string) error {
 		return bad("operand", "no scheme")
 	}
 	if !asciiLetter(scheme[0]) {
-		return bad("whose scheme does not start with a letter", scheme)
+		return bad("whose scheme does not start with a letter", "scheme")
 	}
 	for i := range len(scheme) {
 		if c := scheme[i]; !schemeChar(c) {
@@ -712,11 +712,11 @@ func validateURIOperand(uri, path string) error {
 			return bad("with a second", "'#' — URI_FRAGMENT admits none")
 		}
 		if err := checkURIRun(frag, uriQueryByte); err != nil {
-			return bad("whose fragment is unspellable", err)
+			return bad("whose fragment is unspellable", "fragment")
 		}
 	}
 	if err := checkURIRun(query, uriQueryByte); err != nil {
-		return bad("whose query is unspellable", err)
+		return bad("whose query is unspellable", "query")
 	}
 
 	// URI_HIER_PART : '//' URI_AUTHORITY URI_PATH_ABEMPTY | URI_PATH_ABSOLUTE
@@ -730,11 +730,11 @@ func validateURIOperand(uri, path string) error {
 			authority, hier = authority[:slash], authority[slash:]
 		}
 		if err := checkURIAuthority(authority); err != nil {
-			return bad("whose authority is unspellable", err)
+			return bad("whose authority is unspellable", "authority")
 		}
 	}
 	if err := checkURIRun(hier, uriPathByte); err != nil {
-		return bad("whose path is unspellable", err)
+		return bad("whose path is unspellable", "path")
 	}
 	// Spellable as a URI is necessary but not sufficient: the operand is lexed
 	// on its own between the braces, and TERM_CODE is declared BEFORE URI
@@ -801,7 +801,7 @@ func checkURIAuthority(authority string) error {
 		}
 		port, isPort := strings.CutPrefix(tail, ":")
 		if !isPort {
-			return fmt.Errorf("%q follows the IP literal; only \":\" port may", tail)
+			return errors.New(`trailing text after IP literal; only ":" port may`)
 		}
 		return checkURIPort(port)
 	}
@@ -826,22 +826,22 @@ func checkURIAuthority(authority string) error {
 func checkURIIPv6(lit string) error {
 	left, right, ok := strings.Cut(lit, "::")
 	if !ok {
-		return fmt.Errorf("IPv6 literal %q carries no \"::\", which URI_IPV6_LITERAL requires", lit)
+		return errors.New(`IPv6 literal carries no "::", which URI_IPV6_LITERAL requires`)
 	}
 	if strings.Contains(right, "::") {
-		return fmt.Errorf("IPv6 literal %q carries more than one \"::\"", lit)
+		return errors.New(`IPv6 literal carries more than one "::"`)
 	}
 	for _, half := range []string{left, right} {
 		if half == "" {
-			return fmt.Errorf("IPv6 literal %q omits a group; URI_IPV6_LITERAL requires a quad either side of \"::\"", lit)
+			return errors.New(`IPv6 literal omits a group; URI_IPV6_LITERAL requires a quad either side of "::"`)
 		}
 		for quad := range strings.SplitSeq(half, ":") {
 			if len(quad) != 4 {
-				return fmt.Errorf("IPv6 literal %q carries %q; URI_IPV6_LITERAL admits only 4-digit hex quads", lit, quad)
+				return errors.New("IPv6 literal carries a non-4-digit group; URI_IPV6_LITERAL admits only 4-digit hex quads")
 			}
 			for i := range len(quad) {
 				if !hexDigit(quad[i]) {
-					return fmt.Errorf("IPv6 literal %q carries a non-hex digit in %q", lit, quad)
+					return errors.New("IPv6 literal carries a non-hex digit")
 				}
 			}
 		}
@@ -853,7 +853,7 @@ func checkURIIPv6(lit string) error {
 func checkURIPort(port string) error {
 	for i := range len(port) {
 		if c := port[i]; c < '0' || c > '9' {
-			return fmt.Errorf("port %q is not URI_PORT : DIGIT*", port)
+			return errors.New("port is not URI_PORT : DIGIT*")
 		}
 	}
 	return nil
@@ -866,7 +866,7 @@ func checkURIRun(s string, admits func(byte) bool) error {
 	for i := 0; i < len(s); {
 		if c := s[i]; c == '%' {
 			if i+2 >= len(s) || !hexDigit(s[i+1]) || !hexDigit(s[i+2]) {
-				return fmt.Errorf("%q is not URI_PCT_ENCODED : '%%' HEX_DIGIT HEX_DIGIT", s[i:min(i+3, len(s))])
+				return errors.New("not URI_PCT_ENCODED : '%' HEX_DIGIT HEX_DIGIT")
 			}
 			i += 3
 			continue

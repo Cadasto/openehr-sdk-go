@@ -34,8 +34,9 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 	// false-positive policy.
 	for _, p := range md.Paths {
 		ce, ok := md.Aliases[p.Alias]
-		if !ok || ce.Archetype == "" {
-			continue // unbound (Layer 2) or no literal archetype to anchor to
+		if !ok || ce.Archetype == "" || ce.ParamArchetype {
+			// unbound (Layer 2), no archetype, or $param — scope deferred to bind time
+			continue
 		}
 		roots := c.AllByArchetypeID(ce.Archetype)
 		if len(roots) == 0 {

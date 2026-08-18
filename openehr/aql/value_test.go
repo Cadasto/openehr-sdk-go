@@ -11,6 +11,7 @@ package aql_test
 import (
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -49,6 +50,11 @@ func TestMatchesURIRefusesUnspellableOperand(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), uri) {
 				t.Errorf("URI refuse diagnostic echoed the operand %q: %v", uri, err)
+			}
+			// %q-escaped forms (backslash, newline) also MUST NOT appear —
+			// a raw Contains(uri) misses them when the diagnostic used %q.
+			if strings.Contains(err.Error(), strconv.Quote(uri)) {
+				t.Errorf("URI refuse diagnostic echoed quoted operand %s: %v", strconv.Quote(uri), err)
 			}
 		})
 	}
