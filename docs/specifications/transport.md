@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094 plus the REQ-096..098 extension range.
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, and REQ-141 (path-parameter segment validation).
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [service-discovery.md](service-discovery.md).
 
@@ -111,6 +111,18 @@ Rules:
 
 All three write-path modes are landed across `composition` / `directory` / `ehr_status`: `representation` decodes the bare resource (REQ-094) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
 
+**Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper that reports false for a typed-nil pointer, a bare-nil interface, and an interface holding a typed-nil pointer, and true for any populated resource. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
+
+**Committed write, unusable representation.** After a successful HTTP response (2xx), when `Prefer: return=representation` was sent and the body is empty or does not decode as the expected resource, the write **MUST** be reported as a typed `NoRepresentationError` that:
+
+- carries the version metadata that proves the commit (including `VersionUID` when the server supplied it);
+- wraps the cause (`ErrInvalidShape` for an empty body; the decoder's error otherwise);
+- is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value.
+
+A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** return `NoRepresentationError` for a non-2xx response. The existing `(resource, metadata, error)` triple **MUST** still populate metadata on this path so current callers do not break.
+
+The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
+
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr)
 
 ---
@@ -186,6 +198,37 @@ Out of scope:
 
 ---
 
+## REQ-141 — Path-parameter segment validation
+
+`REQ-095` makes the transport the single canonical path *encoder*. This requirement makes it the single path-*segment validator* as well. Encoding without validation leaves every caller owning a class of request-URI mutation that the type system cannot see.
+
+Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL). The path is split on `/`; the leading empty segment of an absolute path is ignored. Each remaining segment **MUST** be non-empty and **MUST NOT**:
+
+- be `.` or `..`;
+- contain `\`;
+- contain a control character (bytes `< 0x20` or `DEL` `0x7F`).
+
+A space or any other percent-encodable octet **MUST** be accepted — encoding remains the transport's job (REQ-095). Validation **MUST** run on the decoded path the transport already requires. A literal `%2e%2e` that was not decoded is an ordinary segment, not a separator.
+
+A violation **MUST**:
+
+- return `ErrInvalidPathSegment` wrapped with `ErrInvalidConfig` (so `errors.Is(err, ErrInvalidConfig)` still means the request never left the process);
+- issue **no** HTTP request.
+
+The SDK **MUST** export the same checks as package functions so a caller constructing a raw `Request` can preflight:
+
+- `ValidPathSegment(s string) error` — one interpolated identifier (a `/` in `s` is a violation);
+- `ValidRequestPath(path string) error` — the whole decoded `Request.Path`; the transport's join step **MUST** use this.
+
+Leaf clients **MUST NOT** re-implement the check. Well-formed openEHR identifiers **MUST** pass. The SDK **MUST NOT** treat “openEHR ids contain no `/`” as a data assumption.
+
+Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL.
+
+- **Lives in:** [`transport/`](../../transport)
+- **Probes:** PROBE-091 (Draft)
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -197,3 +240,4 @@ Out of scope:
 | REQ-094 | `transport/`, `openehr/client/*` |
 | REQ-096 | `transport/` |
 | REQ-098 | `transport/` |
+| REQ-141 | `transport/`, `openehr/client/*` |

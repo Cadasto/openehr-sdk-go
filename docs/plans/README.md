@@ -6,6 +6,16 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### Client path safety, write-result contract, and missing leaves (2026-08-18)
+
+Three independent plans, specified first (REQ-141 / REQ-094 amendment / REQ-142+143). Implement A, then B, then C.
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-18-path-segment-validation.md](2026-08-18-path-segment-validation.md) | Transport refuses illegal decoded path segments | REQ-141 (builds on REQ-095 encode-once) | PROBE-091 |
+| [2026-08-18-write-result-contract.md](2026-08-18-write-result-contract.md) | Typed-nil success body + committed-but-unusable representation | REQ-094 (implementation-aligned) | package tests (PROBE-061/071 unchanged) |
+| [2026-08-18-contribution-get-and-template-list-filters.md](2026-08-18-contribution-get-and-template-list-filters.md) | `contribution.Get`; `ListTemplates` ITS-REST filters | REQ-142, REQ-143 | PROBE-092, PROBE-093 |
+
 ### Probe runnability — the sandbox transport and the three-mode runner (2026-08-18)
 
 | Plan | Scope | Covers | Probe |
