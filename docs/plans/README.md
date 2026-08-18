@@ -31,7 +31,7 @@ Three independent draft plans. Each authors its REQ spec prose in a Phase 0 befo
 
 | Plan | Scope | Covers (proposed) | Probe (proposed) |
 |---|---|---|---|
-| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, ancestors, conformance, concrete descendants) + inheritance-aware attribute lookup | REQ-124 (builds on REQ-041/042/045) | PROBE-094 |
+| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, ancestors, conformance, concrete descendants) + declaration-site attribute lookup | REQ-124 (builds on REQ-041/042/045) | PROBE-094 |
 | [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | Typed node/segment/class predicate model beside the verbatim text | REQ-160 (builds on REQ-113/117/119) | PROBE-095 |
 | [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | Structured drop-channel records + lint spans, with a value-free field contract | REQ-161 (builds on REQ-109/113) | PROBE-096 |
 

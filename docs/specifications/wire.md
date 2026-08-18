@@ -354,7 +354,7 @@ The leaf's repository interface **MUST** include the same read.
 | `offset` | `WithOffset` | 0-based; an explicit `0` **MUST** be sent |
 | `fetch` | `WithFetch` | An explicit `0` **MUST** be sent |
 
-Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers.
+Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface grows the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`) — and the CHANGELOG **MUST** name that interface change.
 
 ## Transport cross-cutting concerns
 

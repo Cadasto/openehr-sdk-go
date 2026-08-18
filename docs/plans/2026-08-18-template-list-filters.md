@@ -34,7 +34,8 @@
 
 ## Definition of Done
 
-- Filtered `ListTemplates` landed with `// REQ-143` / `// PROBE-093` citations.
+- Filtered `ListTemplates` landed with `// REQ-143` / `// PROBE-093` citations; `Repository` carries the same variadic signature.
+- CHANGELOG `### Added` notes the filters and the `Repository` interface growth.
 - `traceability.yaml` + REQ.md Impl. `planned → landed` for REQ-143.
 - PROBE-093 Draft → Implemented (Sandbox).
 - `make spec-check` and `make ci` pass.
@@ -73,6 +74,8 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 ```
 
 Use `*Set` boolean flags for offset/fetch exactly as `query.ExecuteOption` does, so an explicit `WithOffset(0)` is distinguishable from unset.
+
+`Repository.ListTemplates` (template.go) grows the same trailing `...ListOption` — source-compatible for callers, a **compile-time break for interface implementers** (precedent: `UploadTemplate`'s `...UploadOption` already in the interface). The CHANGELOG `### Added` entry names the interface growth.
 
 - [ ] **Step 1: Failing tests** — each option appears as its named query key on the captured URL; combined options; `WithOffset(0)` / `WithFetch(0)` present on the wire; no options → empty query; negative offset/fetch → `ErrInvalidConfig`, zero requests. Test against `FormatADL14` only — it is the sole registered `TemplateFormat`.
 

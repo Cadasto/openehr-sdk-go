@@ -714,7 +714,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** A path parameter that is `.` or `..`, is empty, or contains `/`, `\`, or a control character is refused before any HTTP request is issued, on every path-interpolating leaf package.
 - **Preconditions:** A transport client whose `*http.Client` records whether any request was issued (httptest or a tripwire RoundTripper).
-- **Wire assertion:** For each leaf package that interpolates a path parameter, at least one hostile input (`a/../../definition/query/evil`, `..`, a backslash-bearing id, a control character) fails with a non-nil error and the captured request count is zero — the call fails closed with no bytes on the wire. A well-formed id that only needs percent-encoding (a space or dots in a template id, `Blood Pressure.v1`) still issues exactly one request whose path is encoded once (REQ-095). Sentinel identity (`ErrInvalidPathSegment`, `ErrInvalidConfig`) is pinned by `transport/` unit tests, not by this probe (REQ-080: no error-type assertions in probes).
+- **Wire assertion:** For each leaf package that interpolates a path parameter, at least one hostile input (`a/../../definition/query/evil`, `..`, a separator-smuggling id `foo/bar` on a `Route`-set request, a backslash-bearing id, a control character) fails with a non-nil error and the captured request count is zero — the call fails closed with no bytes on the wire. A well-formed id that only needs percent-encoding (a space or dots in a template id, `Blood Pressure.v1`) still issues exactly one request whose path is encoded once (REQ-095). Sentinel identity (`ErrInvalidPathSegment`, `ErrInvalidConfig`) is pinned by `transport/` unit tests, not by this probe (REQ-080: no error-type assertions in probes).
 - **Modes:** Sandbox.
 - **Status:** Draft — defined ahead of implementation; see [2026-08-18-path-segment-validation](../plans/2026-08-18-path-segment-validation.md).
 - **Satisfies:** REQ-150.
@@ -723,7 +723,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** `GET /ehr/{ehr_id}/contribution/{contribution_uid}` is issued by the contribution read leaf and the 200 body decodes as the persisted `CONTRIBUTION`.
 - **Preconditions:** A known EHR id and contribution uid; a sandbox server returning a canonical-JSON contribution body (or 404).
-- **Wire assertion:** The captured request method and path match the ITS-REST template; a 200 decodes to the contribution type (version metadata is **not** asserted — the pin defines only `Content-Type` on `200_CONTRIBUTION`); empty ids issue no request; a 404 maps to `ErrNotFound`.
+- **Wire assertion:** The captured request method and path match the ITS-REST template; a 200 decodes to the contribution type (version metadata is **not** asserted — the pin defines only `Content-Type` on `200_CONTRIBUTION`); empty ids issue no request; a 404 fails with a non-nil error. Sentinel identity (`ErrNotFound`, `ErrInvalidConfig`) is pinned by `contribution` unit tests, not by this probe (REQ-080).
 - **Modes:** Sandbox.
 - **Status:** Draft — defined ahead of implementation; see [2026-08-18-contribution-get](../plans/2026-08-18-contribution-get.md).
 - **Satisfies:** REQ-142.
@@ -732,7 +732,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 - **Title:** `ListTemplates` emits the ITS-REST list query parameters `template_id`, `concept`, `version`, `offset`, and `fetch` when the corresponding options are set, and omits them when unset.
 - **Preconditions:** A sandbox Definition server on `GET /definition/template/adl1.4` (the only `TemplateFormat` v1 registers; the pin's ADL 2 list operation shares the same five parameter components).
-- **Wire assertion:** Each option appears as the named query key; an explicit `WithOffset(0)` / `WithFetch(0)` is present on the wire; a negative offset or fetch returns `ErrInvalidConfig` with no request; no options yields an empty query. The response still decodes as the existing template-metadata slice.
+- **Wire assertion:** Each option appears as the named query key; an explicit `WithOffset(0)` / `WithFetch(0)` is present on the wire; a negative offset or fetch fails with a non-nil error and no request (sentinel identity is pinned by `definition` unit tests, not by this probe — REQ-080); no options yields an empty query. The response still decodes as the existing template-metadata slice.
 - **Modes:** Sandbox.
 - **Status:** Draft — defined ahead of implementation; see [2026-08-18-template-list-filters](../plans/2026-08-18-template-list-filters.md).
 - **Satisfies:** REQ-143.

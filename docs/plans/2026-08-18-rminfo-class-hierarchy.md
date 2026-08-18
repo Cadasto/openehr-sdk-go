@@ -1,4 +1,4 @@
-# Plan — RM class hierarchy and inheritance-aware attribute lookup (`rminfo`)
+# Plan — RM class hierarchy and declaration-site attribute lookup (`rminfo`)
 
 **Date:** 2026-08-18
 **Status:** Draft
@@ -21,9 +21,12 @@ Reference Model raises, not only the flat attribute questions it answers today:
   behind AQL `CONTAINS`, polymorphic slot fit, and validation walkers)
 - *Which concrete classes does naming an abstract class denote?* (abstract-class
   expansion: `ENTRY` → its concrete subtypes, per the pinned BMM)
-- *What does attribute `x` resolve to on class `C`, through inheritance?*
-  (`COMPOSITION.name` is declared on `LOCATABLE`; today's `AttributeRMType`
-  answers only per-class declarations)
+- *Where is attribute `x` declared?* The generated per-class maps are already
+  inheritance-**flattened** — `AttributeRMType("COMPOSITION", "name")` answers
+  today because the generator folds `LOCATABLE`'s attributes into every
+  descendant — but the fold erases the declaration *site*; a reader
+  distinguishing own vs inherited attributes (BMM-faithful re-serialisation,
+  schema diffing) cannot recover it
 
 Consumers: any AQL-executing backend (class-expression expansion and containment
 conformance), the SDK's own validation walkers, demographic PARTY reasoning, and a
@@ -32,7 +35,9 @@ future template-aware AQL lint layer.
 ## Motivation
 
 Because `rminfo.Lookup` exposes no ancestry, no abstractness, no descendant
-expansion, and no inheritance-aware attribute resolution, any AQL-executing
+expansion, and no attribute declaration-site information (its flattened maps
+answer the resolved question but erase where an attribute comes from), any
+AQL-executing
 module built on this SDK has to assemble its own BMM reducer, code generator,
 generated hierarchy/property tables, and a model-equivalence test —
 type-switching over `bmm.Class` and `bmm.Property` variants exactly as the
@@ -52,7 +57,7 @@ resources/bmm/ (pinned, REQ-041)
 openehr/rm/rminfo
   ClassMeta        + Ancestors []string, Abstract bool   (generated)
   Hierarchy        new optional interface (precedent: AttributeLister)
-  ResolveAttribute inheritance-aware lookup over the same tables
+  DeclaredOn       declaration-site lookup beside the flattened maps
 ```
 
 Sketch (final shape is Phase 0 / review material, not normative here):
@@ -76,10 +81,12 @@ type Hierarchy interface {
     ConcreteDescendants(rmType string) []string
 }
 
-// ResolveAttribute resolves attrName against rmType and everything it
-// inherits — most-derived declaration wins. The existing AttributeRMType /
-// IsContainer stay per-class-declaration; this is the ancestry-walking form.
-func ResolveAttribute(rmType, attrName string) (AttrMeta, bool)
+// DeclaredOn returns the class that declares attrName as seen from
+// rmType — rmType itself, or the nearest ancestor whose BMM class
+// declares it. The flattened AttributeRMType / IsContainer /
+// RequiredAttributes maps already answer the inheritance-RESOLVED
+// question and are unchanged; this recovers the site the fold erases.
+func DeclaredOn(rmType, attrName string) (declaringClass string, ok bool)
 ```
 
 Design constraints carried over from the landed package:
@@ -90,6 +97,10 @@ Design constraints carried over from the landed package:
 - **Deterministic answers** — sorted ancestor/descendant slices; returned slices
   are copies, never the backing arrays of package state.
 - **No reflection** (REQ-024); stdlib-only, no new dependencies.
+- **The flattened maps stay flattened.** The generator keeps folding ancestor
+  attributes into every class's map — `RequiredAttributes` and the REQ-112
+  validation walkers depend on the resolved view. Hierarchy data is additive;
+  no table shrinks to own-only declarations.
 - Unknown class ≠ abstract class ≠ concrete class with no descendants — the three
   answers stay distinguishable, because a caller refusing a query needs to say
   *which* it is.

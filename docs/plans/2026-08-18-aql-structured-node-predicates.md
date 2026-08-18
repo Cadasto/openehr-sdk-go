@@ -80,12 +80,25 @@ type ParamPredicate struct{ Name string }
 
 // ComparisonPredicate: the standing form — reuses the existing structured
 // aql.Comparison (REQ-113/REQ-117 vocabulary), so WHERE and predicate
-// comparisons share one model.
+// comparisons share one model. NOTE: parse.ClassExpr.PredicateComparison
+// (REQ-113, landed) already carries exactly this at the class position;
+// two carriers of one fact is a rejected outcome — see the Phase 0 rule.
 type ComparisonPredicate struct{ Comparison Comparison }
 ```
 
 Rules the spec section must pin (Phase 0):
 
+- **One carrier per fact at the class position**: `parse.ClassExpr.PredicateComparison`
+  (landed, REQ-113) already holds the standing comparison. Phase 0 decides —
+  either `Parsed` subsumes it (with a documented migration/deprecation path for
+  the existing field) or the standing field remains the sole class-position
+  carrier and `Parsed` covers only segment predicates. Shipping both, populated
+  in parallel, is drift by construction and is rejected up front.
+- **Compound forms get an explicit disposition**: the grammar's `nodePredicate`
+  also admits junction (`AND` / `OR`) and `MATCHES` shapes — e.g.
+  `[at0001 and name/value=$x]`. Phase 0 either adds kinds for them or lists
+  them in the enumerated nil-`Parsed` set; leaving them unmentioned is not an
+  option, since a junction is among the shapes readers hit in real queries.
 - **`Parsed` nil is a statement, not an accident**: it means "the SDK does not
   structure this form", and the set of unstructured forms is enumerated in the
   spec — never silently narrowed or widened (the REQ-113 structuring lesson: a

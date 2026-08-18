@@ -102,7 +102,7 @@ go test ./openehr/client/ehr/contribution/ -count=1
 
 Expected: PASS.
 
-- [ ] **Step 3: PROBE-092** (Sandbox) — request shape + 200 decode + 404 → `ErrNotFound`; no version-metadata assertion; per REQ-080 assert wire behaviour, not error types beyond the documented sentinel mapping pinned by unit tests. Flip PROBE-092 Draft → Implemented (Sandbox) in `conformance.md`.
+- [ ] **Step 3: PROBE-092** (Sandbox) — request shape + 200 decode + 404 → non-nil error; no version-metadata assertion; per REQ-080 the probe never asserts sentinel identity — `ErrNotFound` / `ErrInvalidConfig` are pinned by the Step 1 unit tests only. Flip PROBE-092 Draft → Implemented (Sandbox) in `conformance.md`.
 
 - [ ] **Step 4: Close out** — flip REQ-142 to `landed` in `REQ.md` + `traceability.yaml`; update the roadmap Contribution row; archive this plan.
 

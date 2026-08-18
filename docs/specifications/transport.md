@@ -208,6 +208,8 @@ The SDK **MUST** export the same checks as package functions so a caller constru
 - `ValidPathSegment(s string) error` — one interpolated identifier (a `/` in `s` is a violation);
 - `ValidRequestPath(path string) error` — the whole decoded `Request.Path`; the transport's join step **MUST** use this.
 
+`ValidRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch. When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's — a smuggled separator changes the count and mutates the request URI onto a different route. Path-interpolating leaf requests **MUST** set `Route` (every current leaf does; the same field feeds REQ-090 span naming).
+
 Leaf clients **MUST NOT** re-implement the check. Well-formed openEHR identifiers **MUST** pass. The SDK **MUST NOT** treat “openEHR ids contain no `/`” as a data assumption.
 
 Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL.

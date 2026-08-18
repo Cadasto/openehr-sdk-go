@@ -79,10 +79,11 @@ type Issue struct {
     // ... existing fields unchanged ...
     Span Span // NEW: where in the input; zero when not attributable
 }
-// Normative field contract (REQ text, not code):
-//   Code, Severity, Span    — MUST NOT contain source text
-//   Detail, Path            — MAY embed query spellings; consumers with a
-//                             disclosure boundary treat them as value-bearing
+// Field contract for Phase 0 to pin as REQ text (no normative force
+// here — the REQ is unallocated; Phase 0 assigns the RFC-2119 keywords):
+//   Code, Severity, Span    — value-free: never carry source text
+//   Detail, Path            — value-bearing: may embed query spellings; a
+//                             disclosure boundary treats them accordingly
 ```
 
 Rules the spec section must pin (Phase 0):

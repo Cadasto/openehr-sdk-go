@@ -13,7 +13,7 @@
 
 **Goal:** The transport refuses a decoded path segment that would change the request URI (`.`, `..`, empty, `\`, control characters) and issues no HTTP request.
 
-**Architecture:** `ValidRequestPath` walks `Request.Path` segments; `joinTarget` calls it before building the URL. `ValidPathSegment` is the same rule for one interpolated id. New sentinel `ErrInvalidPathSegment` wraps `ErrInvalidConfig`.
+**Architecture:** `ValidRequestPath` walks `Request.Path` segments; the transport calls it once at the request-preparation point before building the URL. The same point compares the segment count of `Request.Path` against `Request.Route` when set — a parameter that *contains* `/` yields well-formed segments, so only the arity mismatch betrays it. `ValidPathSegment` is the per-parameter rule for callers constructing raw requests. New sentinel `ErrInvalidPathSegment` wraps `ErrInvalidConfig`.
 
 **Tech Stack:** Go 1.26; stdlib `net/http/httptest` + `testing`; no new dependencies.
 
@@ -33,7 +33,7 @@ Implementation may start when:
 - Canonical normative prose exists ([transport.md § REQ-150](../specifications/transport.md#req-150--path-parameter-segment-validation) + registry row).
 - No ADR is required (non-breaking enforcement at the existing encoder).
 - Phases name verification: `go test ./transport/ ./openehr/client/...`, `make spec-check`, `make ci`.
-- Negative space is REQ-150: traversal / empty / `\` / control-character segments fail closed with no request.
+- Negative space is REQ-150: traversal / empty / `\` / control-character segments, and a `Route`-arity mismatch (separator smuggled inside a parameter), fail closed with no request.
 
 ## Definition of Done
 
@@ -193,11 +193,11 @@ EOF
 )"
 ```
 
-### Phase 2 — Enforce in `joinTarget`
+### Phase 2 — Enforce at the request-preparation point
 
 **Files:**
 
-- Modify: `transport/client.go` (`joinTarget`)
+- Modify: `transport/client.go` — `joinTarget` sees only `(base, path, query)`; the route-arity half needs `Request.Route`, so enforce both checks at `joinTarget`'s caller where the `*Request` is in scope (or widen `joinTarget`'s signature — implementer's choice, one enforcement site either way)
 - Modify: `transport/request.go` (godoc — drop the “ids contain no `/`” assumption; point at REQ-150)
 - Test: `transport/path_test.go` (Do / joinTarget cases)
 
@@ -226,6 +226,23 @@ func TestDoRejectsTraversalPath(t *testing.T) {
 	}
 }
 
+func TestDoRejectsSmuggledSeparator(t *testing.T) {
+	// ehr_id="foo/bar" interpolated into the path: every segment is legal,
+	// only the count betrays it — 5 path segments vs 4 in the route template.
+	// Reuse the tripwire server/client from TestDoRejectsTraversalPath.
+	_, err := c.Do(t.Context(), &Request{
+		Method: http.MethodGet,
+		Path:   "/ehr/foo/bar/contribution/x",
+		Route:  "/ehr/{ehr_id}/contribution/{contribution_uid}",
+	})
+	if !errors.Is(err, ErrInvalidPathSegment) || !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("err = %v", err)
+	}
+	if hits != 0 {
+		t.Fatalf("issued %d requests, want 0", hits)
+	}
+}
+
 ```
 
 `transport/path_encoding_test.go` already pins the REQ-095 single-encode behaviour (spaced template id → one `%20` on the wire). Do **not** duplicate it here — re-run it in Step 9 to prove the new check does not break it. Add a case there only if it lacks a joined `Do`-level assertion that a spaced id still issues exactly one request.
@@ -238,21 +255,22 @@ go test ./transport/ -run TestDoRejectsTraversalPath -count=1
 
 Expected: FAIL — `hits != 0` or missing sentinel.
 
-- [ ] **Step 8: Call `ValidRequestPath` from `joinTarget`**
+- [ ] **Step 8: Enforce both checks before the URL is built**
+
+At the single request-preparation site (where the `*Request` is in scope):
 
 ```go
-func joinTarget(base *url.URL, path string, query url.Values) (*url.URL, error) {
-	if base == nil {
-		return nil, errors.New("nil base URL")
-	}
-	if err := ValidRequestPath(path); err != nil {
-		return nil, err
-	}
-	// existing join…
+if err := ValidRequestPath(req.Path); err != nil {
+	return nil, err
+}
+if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
+	return nil, fmt.Errorf("%w: %w: path does not match route template arity", ErrInvalidConfig, ErrInvalidPathSegment)
 }
 ```
 
-- [ ] **Step 9: Re-run transport tests including REQ-095 encoding**
+`segmentCount` counts `/`-separated segments ignoring the leading empty one — an unexported helper beside `ValidRequestPath`. A `Route`-less request skips the arity half (`Route` is optional on raw `transport.Do` use); every path-interpolating leaf sets it, which the REQ-150 spec text now requires.
+
+- [ ] **Step 9: Re-run transport tests including REQ-095 encoding and the smuggling case**
 
 ```
 go test ./transport/ -count=1
@@ -265,9 +283,10 @@ Expected: PASS.
 ```
 git add transport/client.go transport/request.go transport/path_test.go
 git commit -m "$(cat <<'EOF'
-feat(transport): refuse illegal path segments in joinTarget
+feat(transport): refuse illegal path segments before the URL is built
 
-REQ-150: a traversal or control-character segment returns
+REQ-150: a traversal or control-character segment, or a path whose
+segment count contradicts the route template, returns
 ErrInvalidPathSegment and never hits the wire.
 EOF
 )"
