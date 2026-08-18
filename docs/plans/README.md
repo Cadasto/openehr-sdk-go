@@ -6,14 +6,6 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
-### AQL honesty residuals (2026-08-18)
-
-Implementation-aligned hardening of landed AQL REQs from the 2026-08-18 status review. No new REQ. Phases 1–4 are the must-fix honesty holes; Phase 5 (profile godoc + optional `aql_select_star` Warning) is optional in the same PR.
-
-| Plan | Scope | Covers | Probe |
-|---|---|---|---|
-| [2026-08-18-aql-honesty-residuals.md](2026-08-18-aql-honesty-residuals.md) | Lint `$param` HRID skip; MATCHES URI diagnostic redaction; `Bind` `$` strip; REAL overflow residual test; optional `SELECT *` Warning + grammar-profile godoc | REQ-109, REQ-119, REQ-117, REQ-055 | PROBE-028 / 087 / 090 (existing) |
-
 ### Ecosystem fit-gap delivery (2026-07-16)
 
 Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opens a new "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
@@ -25,6 +17,8 @@ Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ 
 | [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
 
 The fourth plan in this set — the upstream FLAT parity harness — **landed 2026-08-01 and was archived** ([archive/2026-07-16-web-template-tests-conformance.md](archive/2026-07-16-web-template-tests-conformance.md)): PROBE-086 is Implemented (Sandbox), and REQ-080's roadmap row moved `planned → partial`.
+
+The AQL honesty-residuals plan **landed 2026-08-18 and was archived** ([archive/2026-08-18-aql-honesty-residuals.md](archive/2026-08-18-aql-honesty-residuals.md)): implementation-aligned hardening of landed REQ-109 / 119 / 117 / 055 — lint `$param` HRID skip, MATCHES URI diagnostic redaction, `Bind` `$` strip, REAL overflow residual test, optional `aql_select_star` Warning + grammar-profile godoc. No new REQ; PROBE-028 / 087 / 090 unchanged in contract.
 
 The AQL class-predicate splice plan **landed 2026-08-08 and was archived** ([archive/2026-08-08-aql-class-predicate-splice-and-source-text.md](archive/2026-08-08-aql-class-predicate-splice-and-source-text.md)): REQ-119 closes the § Out of scope deferral recorded for issue #99 — the class and VERSION bracket positions are guarded (the class one on bracket ESCAPE, the VERSION one on its whole `versionPredicate` production), and predicate and path text is read from the character stream so the round trip at those positions is IDENTITY rather than mere parseability. A full `nodePredicate` sub-grammar validator stays deferred for the class position; the regex whose token boundary depends on text after the predicate is CLOSED at the query level by REQ-119 § Emission verified after emission (issue #103).
 

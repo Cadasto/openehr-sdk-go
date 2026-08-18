@@ -1,11 +1,11 @@
 # Plan — AQL honesty residuals (lint, diagnostics, residual test, profile discoverability)
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Landed
 **Owner:** SDK maintainers
-**Covers:** [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (Layer 3 literal-HRID only; optional Layer-2 `aql_select_star` Warning), [REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (MATCHES URI diagnostic redaction), [REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (REAL overflow residual), [REQ-055](../specifications/wire.md#req-055--wire-boundary) (parameter keys carry no leading `$`)
-**Probes:** [PROBE-028](../specifications/conformance.md#probe-028--aql-lint-stability) (must stay exact on existing cassettes), [PROBE-087](../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (residual suite), [PROBE-090](../specifications/conformance.md#probe-090--aql-emission-round-trip-closure) (URI refuse path)
-**Implementation:** planned
+**Covers:** [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (Layer 3 literal-HRID only; optional Layer-2 `aql_select_star` Warning), [REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (MATCHES URI diagnostic redaction), [REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (REAL overflow residual), [REQ-055](../../specifications/wire.md#req-055--wire-boundary) (parameter keys carry no leading `$`)
+**Probes:** [PROBE-028](../../specifications/conformance.md#probe-028--aql-lint-stability) (must stay exact on existing cassettes), [PROBE-087](../../specifications/conformance.md#probe-087--aql-structured-ast-catalogue-completeness) (residual suite), [PROBE-090](../../specifications/conformance.md#probe-090--aql-emission-round-trip-closure) (URI refuse path)
+**Implementation:** landed
 **Depends on:** REQ-055 / 109 / 117 / 119 landed (v0.20.0)
 **Defers:** PATH splice on `Builder.Build` (REQ-119 § Out of scope / REQ-055 rule 3); FROM-root builder junction (REQ-117); full `nodePredicate` validator; PROBE-021 Cassette/Live; PROBE-078 / 079; URI-beyond-lex / `WhereExpr` equality
 
@@ -47,12 +47,12 @@ Implementation may start when:
 
 All of the below land in the **same PR**:
 
-- [ ] Phases 0–4 complete (Phase 5 MAY ship in the same PR; it is not a blocker).
-- [ ] Negative space tested: `$arch` + compiled OPT does not Error; URI refuse path does not echo the URI; `Bind("$n")` keys as `n`; `1e400` surfaces `ErrIncompleteAST`.
-- [ ] Spec amendments from Phase 0 present in the topic files (no second copy in REQ.md).
-- [ ] `traceability.yaml` lists this plan on REQ-055 / 109 / 117 / 119 (and the new tests).
-- [ ] `make spec-check` and `make ci` pass.
-- [ ] Plan flipped to `landed` and `git mv`'d into `docs/plans/archive/`.
+- [x] Phases 0–4 complete (Phase 5 MAY ship in the same PR; it is not a blocker).
+- [x] Negative space tested: `$arch` + compiled OPT does not Error; URI refuse path does not echo the URI; `Bind("$n")` keys as `n`; `1e400` surfaces `ErrIncompleteAST`.
+- [x] Spec amendments from Phase 0 present in the topic files (no second copy in REQ.md).
+- [x] `traceability.yaml` lists this plan on REQ-055 / 109 / 117 / 119 (and the new tests).
+- [x] `make spec-check` and `make ci` pass.
+- [x] Plan flipped to `landed` and `git mv`'d into `docs/plans/archive/`.
 
 ## Files
 
@@ -80,11 +80,11 @@ All of the below land in the **same PR**:
 
 - [ ] **Step 1: Add the three sentences to the canonical §§**
 
-In [§ REQ-109 Layer 3](../specifications/clinical-modeling.md#req-109--aql-static-lint), after the `aql_archetype_not_in_template` row, add one sentence (do not rewrite the table):
+In [§ REQ-109 Layer 3](../../specifications/clinical-modeling.md#req-109--aql-static-lint), after the `aql_archetype_not_in_template` row, add one sentence (do not rewrite the table):
 
 > A `$param` archetype predicate (`[$name]`, `[parse.ClassExpr.ParamArchetype]`) is not a literal HRID and **MUST NOT** raise `aql_archetype_not_in_template`.
 
-In [§ REQ-119 Canonical value spellings — `MATCHES {uri}`](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission), after the existing URI-token paragraph, add:
+In [§ REQ-119 Canonical value spellings — `MATCHES {uri}`](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission), after the existing URI-token paragraph, add:
 
 > A refusal of this operand **MUST** name the path and the structural reason and **MUST NOT** reproduce the URI text — the same diagnostic contract [§ The class predicate positions](#req-119--re-parseable-canonical-aql-emission) already requires of a refused class predicate.
 
@@ -318,7 +318,7 @@ go test ./openehr/aql/parse/ -run 'IncompleteAST|FormerCatalogue|ParseQuery' -co
 
 Not a blocker for Phases 1–4. Two small surfaces:
 
-**5a. Godoc** — `openehr/aql/doc.go` lists `ErrInvalidQuery` / `ErrPathResolution` / `ErrSyntax` and omits `ErrIncompleteAST`. Neither `aql` nor `lint` mentions SDK-AQL-001 (`CONTAINS` vs `CONTAINS_STR`) or SDK-AQL-002 (`SELECT *`). Point at [`resources/aql/grammar/DIVERGENCES.md`](../../resources/aql/grammar/DIVERGENCES.md) and ADR 0007. Do not copy the delta table into godoc.
+**5a. Godoc** — `openehr/aql/doc.go` lists `ErrInvalidQuery` / `ErrPathResolution` / `ErrSyntax` and omits `ErrIncompleteAST`. Neither `aql` nor `lint` mentions SDK-AQL-001 (`CONTAINS` vs `CONTAINS_STR`) or SDK-AQL-002 (`SELECT *`). Point at [`resources/aql/grammar/DIVERGENCES.md`](../../../resources/aql/grammar/DIVERGENCES.md) and ADR 0007. Do not copy the delta table into godoc.
 
 **5b. `aql_select_star` Warning** — only if Phase 0 added the Layer-2 row.
 
@@ -383,9 +383,9 @@ go test ./openehr/aql/lint/ ./testkit/probes/aql/ -count=1
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) — Layer 3 literal HRID; Layer 2 catalogue
-- [clinical-modeling.md § REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) — residual 1
-- [clinical-modeling.md § REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) — diagnostic contract
-- [wire.md § REQ-055](../specifications/wire.md#req-055--wire-boundary) — parameter keys
-- [REQ.md](../specifications/REQ.md) — registry (Impl. stays `landed`)
-- [DIVERGENCES.md](../../resources/aql/grammar/DIVERGENCES.md) · [ADR 0007](../adr/0007-aql-antlr-grammar-profile.md)
+- [clinical-modeling.md § REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) — Layer 3 literal HRID; Layer 2 catalogue
+- [clinical-modeling.md § REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) — residual 1
+- [clinical-modeling.md § REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) — diagnostic contract
+- [wire.md § REQ-055](../../specifications/wire.md#req-055--wire-boundary) — parameter keys
+- [REQ.md](../../specifications/REQ.md) — registry (Impl. stays `landed`)
+- [DIVERGENCES.md](../../../resources/aql/grammar/DIVERGENCES.md) · [ADR 0007](../../adr/0007-aql-antlr-grammar-profile.md)
