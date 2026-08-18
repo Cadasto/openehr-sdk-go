@@ -102,8 +102,8 @@ Rules the spec section must pin (Phase 0):
 Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 
 - The new band and the REQ id are allocated in `REQ.md` (numbering-policy table
-  first, per its own rule; coordinate with the PR #107 F2 transport-overflow
-  allocation).
+  first, per its own rule; 150–159 is the transport extension band since
+  PR #107's round 1, so 160–169 is the next free decade).
 - Canonical normative prose exists: the sum type's kinds, the trivia/delimiter
   rules, the nil-`Parsed` enumeration, and the REQ-119 non-interference clause.
 - PROBE-095 (or the allocated id) is defined in `conformance.md` (Draft): a corpus

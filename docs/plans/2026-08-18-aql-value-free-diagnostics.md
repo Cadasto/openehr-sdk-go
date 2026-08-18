@@ -135,8 +135,9 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 
 ### Phase 0 — Band, spec & registry (the specify gate)
 
-1. Allocate band + REQ id (coordinate with the structured-predicates plan and the
-   PR #107 F2 transport-overflow band).
+1. Allocate band + REQ id (coordinate with the structured-predicates plan;
+   150–159 is the transport extension band since PR #107's round 1, so 160–169
+   is the next free decade).
 2. Sweep the extractor for every `incomplete(...)` site; derive the closed
    `ConstructKind` set from that sweep, not from memory.
 3. Author the canonical section (enums, completeness, field contract); registry

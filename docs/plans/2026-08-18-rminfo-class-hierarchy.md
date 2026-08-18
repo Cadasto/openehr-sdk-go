@@ -99,8 +99,8 @@ Design constraints carried over from the landed package:
 Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 
 - `Covers:` names the allocated REQ id (proposed REQ-124; Phase 0 settles band and
-  home per the numbering policy — note the 150–159 transport-overflow proposal in
-  PR #107's review takes precedence if bands move).
+  home per the numbering policy — the 124–129 headroom is untouched by the
+  150–159 transport extension band PR #107 allocated for REQ-150).
 - Canonical normative prose exists — a spec section + a `REQ.md` registry row —
   including the exact method set and the unknown/abstract/dead-end distinction.
 - PROBE-094 (or the id Phase 0 allocates) is defined in `conformance.md` (Draft):
@@ -132,8 +132,8 @@ Implementation (Phase 1+) may start once **Phase 0 has landed the REQ**:
 
 ### Phase 0 — Spec & registry (the specify gate)
 
-1. Allocate the REQ id and band (proposed: REQ-124 in the 124–129 headroom;
-   coordinate with any transport-overflow band allocation from PR #107).
+1. Allocate the REQ id and band (proposed: REQ-124 in the 124–129 headroom —
+   an existing band, so no numbering-policy table change is needed).
 2. Author the canonical section: the method set above, the compiled-in/no-runtime-BMM
    rule restated by citation (REQ-041/042), and the three-way
    unknown/abstract/no-concrete-descendant distinction as normative behaviour.
