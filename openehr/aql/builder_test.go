@@ -313,6 +313,24 @@ func TestRealEmitsDecimalNotation(t *testing.T) {
 	}
 }
 
+// REQ-055 rule 4: placeholder keys carry no leading $.
+func TestBindStripsLeadingDollar(t *testing.T) {
+	q, err := aql.NewBuilder().
+		Select(aql.Col("e")).
+		FromEHR("e", aql.Param("$id")).
+		Bind("$id", "x").
+		Build()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := q.Parameters["id"]; !ok {
+		t.Fatalf("Parameters keys = %v, want [id]", q.Parameters)
+	}
+	if _, ok := q.Parameters["$id"]; ok {
+		t.Fatalf("Parameters still keyed with $: %v", q.Parameters)
+	}
+}
+
 func readGolden(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("testdata", "wire", name))

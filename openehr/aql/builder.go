@@ -190,9 +190,11 @@ func (b *Builder) TopDirected(n int, dir TopDir) *Builder {
 }
 
 // Bind supplies a value for a named placeholder introduced via [Param]; it
-// populates [Query.Parameters] on the built query. Binding is optional — the
-// emitted string carries `$name` regardless.
+// populates [Query.Parameters] on the built query. A leading `$` in name is
+// stripped, as in [Param]. Binding is optional — the emitted string carries
+// `$name` regardless.
 func (b *Builder) Bind(name string, value any) *Builder {
+	name = strings.TrimPrefix(name, "$")
 	if b.ast.params == nil {
 		b.ast.params = map[string]any{}
 	}
