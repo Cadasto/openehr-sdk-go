@@ -391,10 +391,11 @@ func TestEmitUnrenderableTopClause(t *testing.T) {
 }
 
 // TestParseQuerySurfacesIncompleteAST pins the RESIDUAL catalogue gap after
-// REQ-117: an integer literal that cannot be represented in the AST
-// (LIMIT / OFFSET beyond Go `int`) still surfaces aql.ErrIncompleteAST on
+// REQ-117: a numeric literal that cannot be represented in the AST
+// (LIMIT / OFFSET beyond Go `int`, integer VALUE beyond int64, REAL /
+// scientific REAL beyond float64) still surfaces aql.ErrIncompleteAST on
 // ParseQuery and still refuses to render on Emit, rather than silently
-// dropping the clause.
+// dropping the clause or degrading to +Inf.
 // PROBE-087
 func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 	cases := []struct {
@@ -408,6 +409,10 @@ func TestParseQuerySurfacesIncompleteAST(t *testing.T) {
 		{"select_literal_overflow", "SELECT 99999999999999999999 FROM EHR e", "out of range"},
 		{"comparison_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x > 99999999999999999999", "out of range"},
 		{"matches_literal_overflow", "SELECT o FROM EHR e CONTAINS OBSERVATION o WHERE o/x MATCHES {99999999999999999999}", "out of range"},
+		// REAL / scientific REAL beyond float64: same residual 1 class as
+		// integer overflow — refuse, never degrade to +Inf (REQ-117 / PROBE-087).
+		{"real_overflow", "SELECT e FROM EHR e WHERE e/x > 1e400", "out of range"},
+		{"sci_real_overflow", "SELECT 1e400 FROM EHR e", "out of range"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
