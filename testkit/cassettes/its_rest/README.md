@@ -1,6 +1,8 @@
 # testkit/cassettes/its_rest
 
-Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). Cassettes are checked in so CI does not require a live deployment (REQ-082).
+Vendored fixtures for openEHR REST 1.1.0-development (REQ-050, REQ-095) and the SMART discovery contract (REQ-070..072). Checked in so CI does not require a live deployment.
+
+These are request and response **bodies**, not REQ-082 Cassette-mode recordings — see the [parent README](../README.md).
 
 ## Authoritative source
 

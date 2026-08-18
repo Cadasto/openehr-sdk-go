@@ -111,13 +111,13 @@ The SMART-on-openEHR configuration document advertised by the deployment — typ
 ## SDK internals
 
 **Conformance probe**
-An executable assertion that the SDK exercises against either the sandbox transport, a recorded cassette, or a live deployment, to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)).
+An executable assertion that the SDK exercises against either the sandbox transport, a replayed recording, or a live deployment (REQ-082 — of the three, only in-repo and hand-written-fake execution exists today), to verify wire-level conformance to openEHR REST + SMART-on-openEHR. Each probe has a stable `PROBE-NNN` ID (see [conformance.md](conformance.md)).
 
 **Building-block use case**
 A consumer that imports one core package (`openehr/rm`, `openehr/serialize`, `openehr/validation`, `openehr/aql` models-only, `openehr/template`) without constructing an authenticated client. The SDK's surface MUST support this (REQ-013).
 
 **Sandbox**
-The in-memory + recorded-fixture transport in `sandbox/`, implementing the same client interfaces as the production REST clients. Used for hermetic tests in SDK consumers.
+The in-memory transport that will back REQ-082's Sandbox mode, implementing the same client interfaces as the production REST clients, for hermetic tests in SDK consumers. **Not yet implemented** — `sandbox/` is a reserved name holding only a package comment; probe tests stand up a hand-written `httptest` server each.
 
 **Testkit**
 The package `testkit/` carrying test doubles, fluent builders, recorder/replay helpers, and the conformance-probe runner.

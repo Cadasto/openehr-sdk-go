@@ -31,7 +31,7 @@ The probe suite verifies the SDK against the **openEHR wire contract**, not agai
 
 ### REQ-082 — Runnability
 
-Every probe **MUST** be runnable in three modes:
+Every probe that asserts against a **backend** **MUST** be runnable in three modes:
 
 | Mode | Backend | Artefact | Use |
 |---|---|---|---|
@@ -40,6 +40,10 @@ Every probe **MUST** be runnable in three modes:
 | **Live** | a reference openEHR deployment | none | Pre-release verification against a real backend |
 
 The probe definition is the single source; the runner picks the backend at invocation time.
+
+**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 9 of the 60 catalog entries are in-repo by construction.
+
+For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 15 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
 
 A **recording** is a captured HTTP exchange — method, URL, request and response headers, status, and both bodies. It is a different artefact from the vendored **fixture documents** under `testkit/cassettes/` (§ Vendored fixtures below), which are bodies only and carry no exchange. The two **MUST NOT** share a directory: a fixture is hand-curated input, a recording is captured evidence, and only the second can go stale against a deployment.
 
@@ -51,14 +55,16 @@ The runner **MUST** expose a single entry point taking the mode plus that mode's
 
 #### The probe contract
 
-Every probe **MUST** report through one shared result type with a single canonical home, carrying the `PROBE-NNN` id, the mode, the status, and a detail string. Per-package copies of that type are **MUST NOT** — a probe result compared across modes has to be the same type in every package, or the runner cannot aggregate it.
+Every probe **MUST** report through one shared result type with a single canonical home, carrying the `PROBE-NNN` id, the mode, the status, and a detail string. Per-package copies of that type **MUST NOT** exist — a probe result compared across modes has to be the same type in every package, or the runner cannot aggregate it.
 
 Status is the closed set `pass` / `fail` / `skip`:
 
 - `skip` **MUST** name the unmet precondition in its detail, and **MUST NOT** be reported or counted as a pass.
 - The runner's summary **MUST** distinguish "every probe passed" from "some probes skipped". A run whose probes all skipped **MUST NOT** read as green — vacuous success is the failure mode this rule exists to prevent, the same reasoning [PROBE-086](#probe-086--upstream-flat-serialisation-parity) applies to an empty compared set.
 
-Every probe **MUST** declare its effect on the backend as **read-only** or **mutating**. The declaration is part of the probe's definition here, not a runner-side annotation.
+Every backend-facing probe **MUST** declare its effect as **read-only** or **mutating**, as an **Effect** field in its catalog entry — part of the probe's definition here, not a runner-side annotation.
+
+The catalog predates this field and no entry carries one yet. Until an entry is classified, a probe **MUST** be treated as **mutating**: the unclassified default is the restrictive one, so a writer cannot reach a live deployment merely because nobody got round to labelling it. Populating the catalog is phase 1 of the plan; an in-repo probe needs no declaration, having no backend to affect.
 
 #### Sandbox mode
 
@@ -67,6 +73,8 @@ The `sandbox/` transport **MUST** serve every probe in the catalog without a net
 Sandbox state **MUST** be per-run and isolated: two probes running against one sandbox instance **MUST NOT** observe each other's writes unless the probe definition says they share an EHR.
 
 #### Cassette mode
+
+The recording **encoding** is deliberately not fixed here: whether recordings are HTTP Archive (`.har`) or a purpose-built YAML schema is open as [STRAND-11](research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), to be resolved by ADR against a real capture. Every rule below binds regardless of the encoding chosen.
 
 Recordings are checked-in evidence and are held to the same standard as any vendored corpus:
 
@@ -87,7 +95,7 @@ Recordings are checked-in evidence and are held to the same standard as any vend
 
 The same probe **MUST** reach the same verdict in every mode it is exercised in, with recording captured once against the live backend. A probe that passes in Sandbox and fails on replay indicates the sandbox models the deployment wrongly; **the recording is authoritative and the sandbox MUST be corrected**, never the reverse. A `skip` for an absent precondition is not a disagreement.
 
-Not every probe is exercised in all three modes today; the per-probe **Status** lines in the catalog below record where each one actually runs, and a mode listed as pending is a gap in this requirement, not in the probe.
+For a backend-facing probe, a mode absent from its **Modes** line is an open gap in this requirement rather than a defect in the probe. An in-repo probe reaching no server in any mode is neither.
 
 ### REQ-083 — Cadasto platform API conformance
 
@@ -148,8 +156,9 @@ The catalog is the normative list. Each entry has:
 - **Title** — one-line description.
 - **Preconditions** — what state the system must be in.
 - **Wire assertion** — what's checked at the byte / status level.
-- **Modes** — Sandbox / Cassette / Live.
-- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
+- **Modes** — Sandbox / Cassette / Live for a backend-facing probe, or In-repo for a probe that reaches no server in any mode (REQ-082). For a backend-facing probe this line is the authoritative record of which modes it supports today.
+- **Effect** — read-only or mutating (REQ-082). Absent means *treated as* mutating; the catalog is not yet populated.
+- **Status** — Draft (in this spec), Implemented (in code), Ratified (passes against a reference openEHR deployment), Deferred (the requirement it covers is landed and unit-covered, but this dedicated probe is not written), Deprecated (scheduled removal; may be unrunnable when implementation is already gone pre-v1.0).
 - **Satisfies** — REQ-IDs this probe exercises (inverse of the [REQ registry](REQ.md)).
 
 ### Authentication and discovery
@@ -545,7 +554,7 @@ client scenarios to SDK coverage:
 #### PROBE-033 — Canonical-XML round trip
 
 - **Title:** Decoding a canonical-XML Composition and re-encoding produces byte-identical compact XML (modulo documented element/attribute ordering).
-- **Preconditions:** A reference Composition XML cassette under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored cassettes](#vendored-cassettes-testkitcassettes)).
+- **Preconditions:** A reference Composition XML fixture under `testkit/cassettes/compositions/` or `testkit/cassettes/rm/` (see [Vendored fixtures](#vendored-fixtures-testkitcassettes)).
 - **Wire assertion:** `canxml.Unmarshal → struct → canxml.Marshal` produces output that matches the input after the SDK's compact-XML canonicalisation pass.
 - **Modes:** Sandbox (no network).
 - **Status:** Implemented (Sandbox) — see [`testkit/probes/serialize/probe_033_canxml_round_trip.go`](../../testkit/probes/serialize/probe_033_canxml_round_trip.go).

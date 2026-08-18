@@ -38,7 +38,7 @@ While on `v0.x`: **minor** bumps may break the public API (release notes list ev
 
 Cut when all three hold ([`module-layout.md` § Versioning](specifications/module-layout.md#versioning)):
 
-1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` — no `partial`, no `planned`.
+1. Every REQ in [`REQ.md`](specifications/REQ.md) is `Impl. landed` or `deprecated` — no `partial`, no `planned`. (`deprecated` is terminal: REQ-081 and REQ-097 carry no active requirement and will never land, so a gate demanding `landed` for every row could not be met.)
 2. The openEHR wire-conformance probe suite passes ([REQ-080](specifications/conformance.md#req-080--openehr-wire-conformance)).
 3. A reference openEHR deployment passes the live probe suite ([REQ-082](specifications/conformance.md#req-082--runnability)).
 
