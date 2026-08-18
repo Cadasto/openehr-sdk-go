@@ -6,6 +6,14 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ## Active plans
 
+### AQL honesty residuals (2026-08-18)
+
+Implementation-aligned hardening of landed AQL REQs from the 2026-08-18 status review. No new REQ. Phases 1–4 are the must-fix honesty holes; Phase 5 (profile godoc + optional `aql_select_star` Warning) is optional in the same PR.
+
+| Plan | Scope | Covers | Probe |
+|---|---|---|---|
+| [2026-08-18-aql-honesty-residuals.md](2026-08-18-aql-honesty-residuals.md) | Lint `$param` HRID skip; MATCHES URI diagnostic redaction; `Bind` `$` strip; REAL overflow residual test; optional `SELECT *` Warning + grammar-profile godoc | REQ-109, REQ-119, REQ-117, REQ-055 | PROBE-028 / 087 / 090 (existing) |
+
 ### Ecosystem fit-gap delivery (2026-07-16)
 
 Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opens a new "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
