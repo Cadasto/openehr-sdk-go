@@ -1219,9 +1219,27 @@ func numericPrimitiveAsValue(c gen.INumericPrimitiveContext) aql.Value {
 		return nil
 	}
 	if f, err := strconv.ParseFloat(sign+t.GetText(), 64); err == nil {
+		// UNDERFLOW is the branch ParseFloat does not flag: below the smallest
+		// subnormal it returns (0, nil), so `> 1e-400` silently became `> 0.0`
+		// — a predicate flip across the zero boundary in canonical text, the
+		// degradation REQ-117 residual 1 exists to refuse. Overflow needs no
+		// twin check here: ParseFloat reports it as ErrRange and falls through
+		// to the recorded gap below. A literal that SPELLS zero is not an
+		// underflow, whatever its exponent.
+		if f == 0 && !spellsZero(t.GetText()) {
+			return nil
+		}
 		return aql.RealValue{F: f}
 	}
 	return nil
+}
+
+// spellsZero reports whether a REAL / SCI_INTEGER / SCI_REAL literal's
+// MANTISSA is zero — no nonzero digit before the exponent marker — so `0.0e99`
+// stays a legitimate zero while `1e-400` is an underflow.
+func spellsZero(text string) bool {
+	mantissa, _, _ := strings.Cut(strings.ToLower(text), "e")
+	return !strings.ContainsAny(mantissa, "123456789")
 }
 
 func likeOperandValue(c gen.ILikeOperandContext) aql.Value {

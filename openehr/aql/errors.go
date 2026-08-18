@@ -33,8 +33,10 @@ var ErrSyntax = errors.New("aql: syntax error")
 //
 //   - A numeric literal the value vocabulary cannot represent — a `LIMIT` /
 //     `OFFSET` value beyond Go `int`, a `SELECT TOP` count beyond `int`, an
-//     INTEGER beyond `int64`, or a REAL beyond `float64`, in any value
-//     position (a SELECT literal, a comparison operand, a MATCHES member).
+//     INTEGER beyond `int64`, or a REAL beyond `float64` in either direction
+//     (an overflow, or an underflow collapsing to zero — which ParseFloat
+//     reports as (0, nil), not as a range error), in any value position (a
+//     SELECT literal, a comparison operand, a MATCHES member).
 //     Refused loudly rather than degraded, so the precision loss is never
 //     emitted as canonical text.
 //
