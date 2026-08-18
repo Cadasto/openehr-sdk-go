@@ -126,12 +126,12 @@ func TestEmitVerificationAcceptsEveryReNestedEncoding(t *testing.T) {
 		{
 			"junction operands re-nest",
 			parse.FromClause{Root: parse.ClassExpr{RMType: "COMPOSITION", Alias: "c"}, Contains: &chain},
-			"the parser groups the flattened chain its own way; the class SEQUENCE is what must match",
+			"the parser groups the flattened chain its own way; every bracketing of one chain text reduces to the same slots",
 		},
 		{
 			"FROM-root junction",
 			parse.FromClause{Junction: &rootJunction},
-			"a junction node carries no class of its own, so it contributes no skeleton slot",
+			"a junction node carries no class of its own — only its operator slot and its operands' slots",
 		},
 		{
 			"VERSION class ignores RMType",
@@ -482,6 +482,24 @@ func TestEmitVerificationPinsEachCarriedCoordinate(t *testing.T) {
 			"from.root",
 		},
 		{
+			"FROM root alias rewritten",
+			"SELECT c/x FROM COMPOSITION c",
+			"c/x FROM COMPOSITION d --",
+			"from.root",
+		},
+		{
+			"FROM root standing predicate rewritten",
+			"SELECT c/x FROM COMPOSITION c[at0001]",
+			"c/x FROM COMPOSITION c[at0002] --",
+			"from.root",
+		},
+		{
+			"FROM root archetype rewritten",
+			"SELECT c/x FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]",
+			"c/x FROM COMPOSITION c[openEHR-EHR-COMPOSITION.report.v1] --",
+			"from.root",
+		},
+		{
 			"contained class rewritten",
 			"SELECT c/x FROM COMPOSITION c CONTAINS OBSERVATION o",
 			"c/x FROM COMPOSITION c CONTAINS EVALUATION o --",
@@ -504,6 +522,14 @@ func TestEmitVerificationPinsEachCarriedCoordinate(t *testing.T) {
 			"SELECT c/x FROM COMPOSITION c WHERE c/a = 1 AND c/b = 2",
 			"c/x FROM COMPOSITION c WHERE c/a = 1 AND c/b >= 2 --",
 			"where.term[1]",
+		},
+		{
+			// WHERE's own mixed association, the FROM fix's twin: same leaves,
+			// same operator multiset, only the grouping moved.
+			"WHERE mixed association re-grouped",
+			"SELECT c/x FROM COMPOSITION c WHERE (c/a = 1 AND c/b = 2) OR c/d = 3",
+			"c/x FROM COMPOSITION c WHERE c/a = 1 OR (c/b = 2 AND c/d = 3) --",
+			"where.term[0].junction",
 		},
 		{
 			"ORDER BY direction flipped",

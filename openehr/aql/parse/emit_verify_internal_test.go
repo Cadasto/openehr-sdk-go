@@ -89,6 +89,19 @@ func TestSkeletonDistinguishesEveryCoordinate(t *testing.T) {
 			"select.items[0].alias",
 		},
 		{"from.root", base, "SELECT c/x FROM EHR c", "from.root"},
+		{"from.root alias", base, "SELECT d/x FROM COMPOSITION d", "from.root"},
+		{
+			"from.root standing predicate",
+			"SELECT c/x FROM COMPOSITION c[at0001]",
+			"SELECT c/x FROM COMPOSITION c[at0002]",
+			"from.root",
+		},
+		{
+			"from.root archetype",
+			"SELECT c/x FROM COMPOSITION c[openEHR-EHR-COMPOSITION.encounter.v1]",
+			"SELECT c/x FROM COMPOSITION c[openEHR-EHR-COMPOSITION.report.v1]",
+			"from.root",
+		},
 		{
 			"from.contains.class",
 			base + " CONTAINS OBSERVATION o",
@@ -150,6 +163,12 @@ func TestSkeletonDistinguishesEveryCoordinate(t *testing.T) {
 			base + " WHERE c/a = 1 AND c/b = 2",
 			base + " WHERE c/a = 1 AND c/b = 3",
 			"where.term[1]",
+		},
+		{
+			"where mixed association",
+			base + " WHERE (c/a = 1 AND c/b = 2) OR c/d = 3",
+			base + " WHERE c/a = 1 OR (c/b = 2 AND c/d = 3)",
+			"where.term[0].junction",
 		},
 		{"where.not", base + " WHERE NOT c/a = 1", base + " WHERE c/a = 1", "where.not"},
 		{
