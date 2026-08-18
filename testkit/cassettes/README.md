@@ -2,7 +2,7 @@
 
 Vendored **fixture documents** — OPTs, compositions, RM samples, wire bodies, and reference goldens for codec, validation, and probe tests. Checked in so CI does not require a sibling clone.
 
-**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction; the fixtures are addressed through [`testkit/fixtures`](../fixtures/paths.go), so it is kept rather than renamed.
+**These are not REQ-082 Cassette-mode recordings.** Everything here is a request or response *body*: it carries no method, URL, header, or status code, so none of it can be replayed as an HTTP exchange. The Cassette mode that [REQ-082](../../docs/specifications/conformance.md#req-082--runnability) mandates records whole exchanges and lands under `testkit/recordings/`. The directory name predates that distinction; the fixtures are addressed through [`testkit/fixtures`](../fixtures/paths.go), so it is kept rather than renamed.
 
 ## Layout
 

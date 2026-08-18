@@ -11,7 +11,7 @@
 
 ## Goal
 
-Make the 60-probe catalog runnable the way REQ-082 requires, starting with the two modes that need nothing external. Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
+Make the 60-probe catalog runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
 
 ## Why this is the next conformance step
 
@@ -83,7 +83,7 @@ Scoped to phases 1–2 (what is reachable now):
 
 **Tasks:** endpoint and credential configuration; the mutating-probe opt-in gate; per-run resource scoping; promote PROBE-077 / 078 / 079 out of `Status: Deferred`, implement PROBE-065, and write the four STRAND-09 REST probes.
 
-**Definition of done:** REQ-082 reaches `Impl. landed`; the second and third `v1.0.0` gate conditions become measurable.
+**Definition of done:** REQ-082 reaches `Impl. landed`; the `v1.0.0` gates on the REQ-080 probe suite passing and on a reference deployment passing the live suite (REQ-082) become measurable.
 
 ## Mapping to specs
 

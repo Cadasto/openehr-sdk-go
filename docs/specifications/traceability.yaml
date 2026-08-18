@@ -628,7 +628,7 @@ requirements:
     canonical: docs/specifications/auth.md#req-063--token-refresh
     status: draft
     implementation: landed
-    packages: [auth, auth/smart, transport]
+    packages: [auth, auth/smart, transport, testkit/probes/auth]
     plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
     adrs: [docs/adr/0009-smart-auth-library-scope.md]
     probes: [PROBE-007]

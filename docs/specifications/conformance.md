@@ -103,7 +103,7 @@ The openEHR surface conforms to the openEHR spec (REQ-080). The Cadasto-platform
 
 - The authority is the Cadasto platform's API definition (its OpenAPI document where one exists) or, failing that, recorded fixtures from a reference Cadasto deployment.
 - `cadasto/*` probes assert the SDK's request/response wire shape against that contract — **not** against any other SDK. This is the first-party replacement for the retired cross-SDK parity check (REQ-081): the platform is the authority, so a divergence both SDKs shared can no longer pass silently.
-- Cassettes live under `testkit/cassettes/cadasto/`; per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
+- Vendored fixture documents live under `testkit/cassettes/cadasto/` (bodies and reference responses, not REQ-082 Cassette-mode recordings — [§ Vendored fixtures](#vendored-fixtures-testkitcassettes)); per-fixture provenance (deployment, commit/date) is recorded in that directory's README.
 
 **Status: planned.** The `cadasto/*` surfaces are Phase 4; the conformance fixtures land with them.
 

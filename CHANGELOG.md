@@ -12,7 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
-- **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis. Docs only — no API change.
+- **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
 
 ## [0.20.0] - 2026-08-18
 
