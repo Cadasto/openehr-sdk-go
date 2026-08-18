@@ -47,6 +47,9 @@ func TestMatchesURIRefusesUnspellableOperand(t *testing.T) {
 			if !errors.Is(err, aql.ErrInvalidQuery) {
 				t.Errorf("err = %v, want ErrInvalidQuery", err)
 			}
+			if strings.Contains(err.Error(), uri) {
+				t.Errorf("URI refuse diagnostic echoed the operand %q: %v", uri, err)
+			}
 		})
 	}
 }

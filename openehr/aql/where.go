@@ -683,8 +683,8 @@ func validateLikeOperand(v Value, path string) error {
 // MATCHES predicate on the same URI.
 func validateURIOperand(uri, path string) error {
 	bad := func(what string, detail any) error {
-		return fmt.Errorf("%w: MATCHES on %q carries a URI %s (%v): %q",
-			ErrInvalidQuery, path, what, detail, uri)
+		return fmt.Errorf("%w: MATCHES on %q carries a URI %s (%v)",
+			ErrInvalidQuery, path, what, detail)
 	}
 	// URI_SCHEME : ALPHA_CHAR ( ALPHA_CHAR | DIGIT | '+' | '-' | '.' )* — an
 	// absent scheme is the commonest way a caller passes something that is not
