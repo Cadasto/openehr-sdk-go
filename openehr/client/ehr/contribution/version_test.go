@@ -330,10 +330,11 @@ func TestSubmissionWithWrappedVersions(t *testing.T) {
 }
 
 // TestWrapOriginalVersionNilInputsDoNotPanic is the #114 / REQ-025
-// regression: a nil version pointer or a zero OriginalVersion (nil
-// CommitAudit interface) is caller-constructible. WrapOriginalVersion
-// MUST NOT panic; it yields a wrapper with an empty UpdateAudit so
-// Submission.Validate can reject it.
+// regression: a nil version pointer, a zero OriginalVersion (nil
+// CommitAudit interface), or a CommitAudit holding a typed-nil concrete
+// is caller-constructible. WrapOriginalVersion MUST NOT panic; it
+// yields a wrapper with an empty UpdateAudit so Submission.Validate can
+// reject it.
 func TestWrapOriginalVersionNilInputsDoNotPanic(t *testing.T) {
 	cases := []struct {
 		name string
@@ -341,6 +342,8 @@ func TestWrapOriginalVersionNilInputsDoNotPanic(t *testing.T) {
 	}{
 		{"nil version pointer", nil},
 		{"zero version (nil CommitAudit)", &rm.OriginalVersion[rm.Composition]{}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -375,6 +378,8 @@ func TestWrapImportedVersionNilInputsDoNotPanic(t *testing.T) {
 	}{
 		{"nil version pointer", nil},
 		{"zero version (nil CommitAudit)", &rm.ImportedVersion[rm.Composition]{}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
