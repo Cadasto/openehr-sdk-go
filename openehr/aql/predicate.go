@@ -655,6 +655,14 @@ func commentRun(s string, i int) (int, bool) {
 // scan treats the bytes as ordinary — but they are still the display name the
 // caller MEANT, and rendering them verbatim is the leak this function exists
 // to prevent.
+//
+// It cannot decide what a VALUE is for every reader: it treats a numeric
+// literal as structure, and a disclosure rule that counts a bare magnitude as a
+// value cannot adopt it. Where [PathSegment.Parsed] is populated (REQ-113
+// § Structured node predicates), each component is individually addressable and
+// a reader applies its OWN policy per component rather than accepting this
+// function's. This stays for consumers holding predicate text, and it is what
+// the write-side guards use for their own diagnostics.
 func RedactPredicateValues(text string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -781,6 +789,13 @@ func elideRegion(b *strings.Builder, region string, lead, tail int) {
 // it matches a segment predicate against a compiled OPT node id, and a
 // `[ at0001 ]` that once arrived whitespace-collapsed now does not. Modelling
 // trivia a second time in the consumer is what this export exists to prevent.
+//
+// PREFER [PathSegment.Parsed] where it is available: REQ-113 § Structured node
+// predicates types each component of a segment predicate trivia-free and
+// delimiter-free, so a reader comparing an at-code or a name has nothing to
+// strip. This function stays for consumers holding predicate TEXT — the class
+// position, a predicate assembled by hand, a form a future grammar leaves
+// unstructured.
 func StripPredicateTrivia(text string) string {
 	var b strings.Builder
 	pending := false // an interior trivia run collapses to one space
