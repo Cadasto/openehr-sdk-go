@@ -7,7 +7,7 @@
 **Probes:** none new — package tests only (PROBE-061/071 stay the representation-decode probes)
 **Implementation:** planned (amendment on a landed REQ)
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
-**Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults
+**Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap)
 
 > **Execution:** work the phases in order and the steps within a phase sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
 
@@ -55,7 +55,7 @@
 
 `transport.md` § REQ-094 is **implementation-aligned**: the spec edit and the code below ride one PR. Apply both edits to [transport.md § REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) in this plan's first commit; `make spec-check` gates the pair.
 
-- [ ] **Step 0a:** In the landed-state paragraph ("All three write-path modes are landed…"), replace the clause "returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body" with "reports an empty body as `NoRepresentationError` wrapping `transport.ErrInvalidShape`" — one contract per path, no contradiction with the new MUSTs.
+- [ ] **Step 0a:** In the landed-state paragraph ("All three write-path modes are landed…"), replace the clause "returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body" with "reports an empty body as `NoRepresentationError` wrapping `transport.ErrInvalidShape`" — one contract per path, no contradiction with the new MUSTs. In the `contribution.Commit` sentence, replace "an empty `representation` body is today a silent metadata-only success — closed by the [write-result plan](../plans/2026-08-18-write-result-contract.md) —" with "an empty or undecodable `representation` body is a `NoRepresentationError`" (Phase 2 closes the gap; the `identifier`-slot clause stays — that gap remains deferred).
 
 - [ ] **Step 0b:** Append the amendment verbatim after that paragraph (proposed SPEC text — it lands in `transport.md` § REQ-094 together with the code, and only then):
 

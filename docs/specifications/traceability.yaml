@@ -333,11 +333,16 @@ requirements:
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
     notes: >-
-      All three write-path modes landed: return=representation bare-body decode
-      (PROBE-061/071); return=identifier populates the VersionMetadata
-      identifier slot from the ITS-REST Identifier body (ehr.ResolveIdentifierBody);
-      representation + empty body returns transport.ErrInvalidShape (no silent
-      downgrade) across composition / directory / ehr_status doWrite. Deferred:
+      All three write-path modes landed for the shared WriteResult family
+      (composition / directory / ehr_status / demographic): return=representation
+      bare-body decode (PROBE-061/071); return=identifier populates the
+      VersionMetadata identifier slot from the ITS-REST Identifier body
+      (ehr.ResolveIdentifierBody); representation + empty body returns
+      transport.ErrInvalidShape (no silent downgrade). contribution.Commit
+      carries minimal and the representation decode only: an empty
+      representation body is today a silent metadata-only success (closed by
+      the write-result plan) and the identifier slot is never populated from
+      the body (deferred in that plan). Deferred:
       PROBE-065 minimal->GET identifier round-trip (tracked in the REST client plan).
       Amendment planned (spec delta carried in the plan, lands with the code —
       implementation-aligned): typed-nil HasResource helper and NoRepresentationError
