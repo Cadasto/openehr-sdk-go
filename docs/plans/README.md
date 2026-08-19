@@ -8,14 +8,15 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 
-Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Implementation order: path-segment validation, then contribution read (it unblocks commit → read-back conformance coverage), then the write-result contract, then template list filters. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
+Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Implementation order: path-segment validation, then contribution read (it unblocks commit → read-back conformance coverage), then the write-result contract. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
 
 | Plan | Scope | Covers | Probe |
 |---|---|---|---|
 | [2026-08-18-path-segment-validation.md](2026-08-18-path-segment-validation.md) | Transport refuses illegal decoded path segments | REQ-150 (builds on REQ-095 encode-once) | PROBE-091 |
 | [2026-08-18-contribution-get.md](2026-08-18-contribution-get.md) | `contribution.Get` — the missing read half of the contribution round-trip | REQ-142 | PROBE-092 |
 | [2026-08-18-write-result-contract.md](2026-08-18-write-result-contract.md) | Typed-nil success body + committed-but-unusable representation | REQ-094 (implementation-aligned) | package tests (PROBE-061/071 unchanged) |
-| [2026-08-18-template-list-filters.md](2026-08-18-template-list-filters.md) | `ListTemplates` ITS-REST filters (emission-only probe) | REQ-143 | PROBE-093 |
+
+The template list-filters plan **landed 2026-08-19 and was archived** ([archive/2026-08-18-template-list-filters.md](archive/2026-08-18-template-list-filters.md)): REQ-143 is `landed` and PROBE-093 is Implemented (Sandbox). `ListTemplates` and `definition.Repository` carry a trailing `...ListOption` for the five ITS-REST list parameters; unset options omit their key, an explicit zero offset/fetch reaches the wire, and a negative one fails closed with no request. It was sequenced last in this set and taken out of order — it depends on nothing else here. ADL 2 stays deferred: `FormatADL14` is the only registered `TemplateFormat`, and the pin's ADL 2 list operation references the same five parameter components, so the option set carries over unchanged.
 
 ### Probe runnability — the sandbox transport and the three-mode runner (2026-08-18)
 

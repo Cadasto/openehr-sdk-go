@@ -105,7 +105,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-123 | Temporal data-value helpers | [rm-functions.md § REQ-123](rm-functions.md#req-123--temporal-data-value-helpers) | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) | landed |
 | REQ-142 | Contribution read | [wire.md § REQ-142](wire.md#req-142--contribution-read) | planned |
-| REQ-143 | Template list filters | [wire.md § REQ-143](wire.md#req-143--template-list-filters) | planned |
+| REQ-143 | Template list filters | [wire.md § REQ-143](wire.md#req-143--template-list-filters) | landed |
 | REQ-150 | Path-parameter segment validation | [transport.md § REQ-150](transport.md#req-150--path-parameter-segment-validation) | planned |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).

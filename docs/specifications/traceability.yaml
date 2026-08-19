@@ -1890,10 +1890,21 @@ requirements:
     title: Template list filters
     canonical: docs/specifications/wire.md#req-143--template-list-filters
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/definition]
     probes: [PROBE-093]
-    plans: [docs/plans/2026-08-18-template-list-filters.md]
+    plans: [docs/plans/archive/2026-08-18-template-list-filters.md]
+    tests:
+      - openehr/client/definition/template_test.go
+      - testkit/probes/definition/probes_test.go
+    notes: >-
+      ListTemplates gained a trailing variadic ...ListOption carrying the five
+      ITS-REST list parameters (template_id, concept, version, offset, fetch);
+      unset options omit their key and an explicit zero offset/fetch is sent.
+      Negative offset/fetch fail with ErrInvalidConfig and issue no request --
+      an SDK floor, the pin declares no minimum. Repository.ListTemplates grew
+      the same variadic signature. ADL 2 deferred: FormatADL14 is the only
+      registered TemplateFormat.
 
   - id: REQ-150
     title: Path-parameter segment validation

@@ -1,11 +1,11 @@
 # Plan — Template list filters (`ListTemplates` options)
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** [REQ-143](../specifications/wire.md#req-143--template-list-filters)
 **Probes:** [PROBE-093](../specifications/conformance.md#probe-093--template-list-filters-reach-the-wire) (Draft)
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** landed `ListTemplates` / `query.ExecuteOption` patterns; vendored ITS-REST pin (`definition-validation.openapi.yaml`)
 **Ordering:** after the [contribution-get plan](2026-08-18-contribution-get.md) — that leaf unblocks conformance coverage; this one is additive ergonomics
 **Defers:** ADL 2 (`FormatADL2` does not exist; `TemplateFormat` registers only `FormatADL14` — the pin's ADL 2 list operation references the same five parameter components, so the option set carries over unchanged when ADL 2 support lands); other missing Definition list endpoints
@@ -46,9 +46,9 @@
 | Step | Status |
 |---|---|
 | Spec / registry (REQ-143, PROBE-093 Draft) | done in the spec PR |
-| `ListTemplates` options | |
-| Tests + probe with citations | |
-| `make spec-check` / `make ci` | |
+| `ListTemplates` options | done |
+| Tests + probe with citations | done |
+| `make spec-check` / `make ci` | done |
 
 ## Steps
 
@@ -79,7 +79,7 @@ Two deliberate choices to state in godoc rather than leave as accidents: the opt
 
 `Repository.ListTemplates` (template.go) grows the same trailing `...ListOption` — source-compatible for callers, a **compile-time break for interface implementers** (precedent: `UploadTemplate`'s `...UploadOption` already in the interface). The CHANGELOG `### Added` entry names the interface growth.
 
-- [ ] **Step 1: Failing tests** — each option appears as its named query key on the captured URL; combined options; `WithOffset(0)` / `WithFetch(0)` present on the wire; no options → empty query; negative offset/fetch → `ErrInvalidConfig`, zero requests. Test against `FormatADL14` only — it is the sole registered `TemplateFormat`.
+- [x] **Step 1: Failing tests** — each option appears as its named query key on the captured URL; combined options; `WithOffset(0)` / `WithFetch(0)` present on the wire; no options → empty query; negative offset/fetch → `ErrInvalidConfig`, zero requests. Test against `FormatADL14` only — it is the sole registered `TemplateFormat`.
 
 ```
 go test ./openehr/client/definition/ -run TestListTemplates -count=1
@@ -87,7 +87,7 @@ go test ./openehr/client/definition/ -run TestListTemplates -count=1
 
 Expected: FAIL — `ListOption` undefined.
 
-- [ ] **Step 2: Implement** — resolve options into `listConfig`, reject negatives before building the request, set `req.Query`, keep the existing `[]TemplateMetadata` decode and the existing `format`-selected path. Signature change is variadic-only: existing callers compile unchanged.
+- [x] **Step 2: Implement** — resolve options into `listConfig`, reject negatives before building the request, set `req.Query`, keep the existing `[]TemplateMetadata` decode and the existing `format`-selected path. Signature change is variadic-only: existing callers compile unchanged.
 
 ```
 go test ./openehr/client/definition/ -count=1
@@ -95,11 +95,11 @@ go test ./openehr/client/definition/ -count=1
 
 Expected: PASS.
 
-- [ ] **Step 3: PROBE-093** (Sandbox) — query-string emission assertion per the Global Constraints (never result narrowing). Flip PROBE-093 Draft → Implemented (Sandbox) in `conformance.md`.
+- [x] **Step 3: PROBE-093** (Sandbox) — query-string emission assertion per the Global Constraints (never result narrowing). Flip PROBE-093 Draft → Implemented (Sandbox) in `conformance.md`.
 
-- [ ] **Step 4: Close out** — flip REQ-143 to `landed` in `REQ.md` + `traceability.yaml`; update the roadmap Definition row; archive this plan.
+- [x] **Step 4: Close out** — flip REQ-143 to `landed` in `REQ.md` + `traceability.yaml`; update the roadmap Definition row; archive this plan.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```
 go test ./openehr/client/definition/ ./testkit/probes/definition/ -count=1
