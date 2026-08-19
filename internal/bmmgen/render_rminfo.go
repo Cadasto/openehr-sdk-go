@@ -10,10 +10,16 @@ import (
 )
 
 // RenderRMInfoFile produces the `openehr/rm/rminfo/lookup_gen.go`
-// data table from a planned RM emission. It walks every class in
-// `plan.Classes`, computes the effective property set (own +
+// data table from a planned RM emission. It walks the class universe
+// ([rmInfoUniverse]), computes the effective property set (own +
 // inherited from ancestors, ancestor-order preserved, own overrides
 // parent on same name), and emits a single `defaultData` map literal.
+//
+// Per class it emits both layers rminfo answers over (REQ-048):
+//   - the inheritance-FLATTENED attribute set, plus the `DeclaredIn`
+//     site the fold would otherwise erase;
+//   - the class-graph facts — `Abstract` and `Parents`, the latter
+//     filtered to the universe so the emitted graph stays closed.
 //
 // Returns nil when the target is not the RM target (rminfo is only
 // generated alongside RM). The caller is expected to gate by target
@@ -21,7 +27,10 @@ import (
 //
 // Output is deterministic: outer map keys sorted alphabetically,
 // inner attribute maps sorted alphabetically, AttrOrder preserves
-// the merged BMM declaration order (ancestors first, then own).
+// the merged BMM declaration order (ancestors first, then own), and
+// Parents preserves the BMM ancestor declaration order. Zero-valued
+// `Abstract` / `Parents` keys are omitted rather than emitted false
+// and empty.
 func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 	if plan.Target.GoPackage != "rm" {
 		return nil, nil
@@ -31,29 +40,30 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		className string
 		attrs     map[string]rmAttr
 		order     []string
+		abstract  bool
+		parents   []string
 	}
 
-	classNames := make([]string, 0, len(plan.Classes))
-	for name, pc := range plan.Classes {
-		if pc.External || pc.IsPrimitive {
-			continue
-		}
-		// Only carry classes that actually have an effective
-		// property set — skip enums and pure markers.
-		if _, ok := pc.Class.(*bmm.Enumeration); ok {
-			continue
-		}
-		classNames = append(classNames, name)
+	classNames := rmInfoUniverse(plan)
+	inUniverse := make(map[string]bool, len(classNames))
+	for _, name := range classNames {
+		inUniverse[name] = true
 	}
-	slices.Sort(classNames)
 
 	entries := make([]entry, 0, len(classNames))
 	for _, name := range classNames {
+		// One lookup, passed down: rmInfoUniverse only yields plan keys, so
+		// the class is present by construction, and hoisting it keeps the
+		// two uses from disagreeing about whether they need a guard.
+		pc := plan.Classes[name]
 		attrs, order := effectiveProperties(plan, name)
-		if len(attrs) == 0 {
-			continue
-		}
-		entries = append(entries, entry{className: name, attrs: attrs, order: order})
+		entries = append(entries, entry{
+			className: name,
+			attrs:     attrs,
+			order:     order,
+			abstract:  pc.Class.IsAbstract(),
+			parents:   rmInfoParents(pc, inUniverse),
+		})
 	}
 
 	var body bytes.Buffer
@@ -72,8 +82,8 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 		slices.Sort(innerNames)
 		for _, n := range innerNames {
 			a := e.attrs[n]
-			fmt.Fprintf(&body, "\t\t\t%q: {TypeName: %q, Required: %t, Container: %t},\n",
-				n, a.typeName, a.required, a.container)
+			fmt.Fprintf(&body, "\t\t\t%q: {TypeName: %q, Required: %t, Container: %t, DeclaredIn: %q},\n",
+				n, a.typeName, a.required, a.container, a.declaredIn)
 		}
 		body.WriteString("\t\t},\n")
 		body.WriteString("\t\tAttrOrder: []string{")
@@ -84,6 +94,23 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 			fmt.Fprintf(&body, "%q", n)
 		}
 		body.WriteString("},\n")
+		// Abstract and Parents are emitted only when they carry
+		// information: a false flag and an empty parent list are the
+		// zero values, and omitting them keeps the generated table
+		// readable without changing what it says.
+		if e.abstract {
+			body.WriteString("\t\tAbstract: true,\n")
+		}
+		if len(e.parents) > 0 {
+			body.WriteString("\t\tParents: []string{")
+			for i, n := range e.parents {
+				if i > 0 {
+					body.WriteString(", ")
+				}
+				fmt.Fprintf(&body, "%q", n)
+			}
+			body.WriteString("},\n")
+		}
 		body.WriteString("\t},\n")
 	}
 	body.WriteString("}\n")
@@ -102,6 +129,61 @@ type rmAttr struct {
 	typeName  string
 	required  bool
 	container bool
+	// declaredIn is the class whose BMM declaration this attribute came
+	// from, recorded by the fold in [effectiveProperties] rather than
+	// re-derived afterwards (REQ-048): a second, independent walk could
+	// disagree with the shape fields above, and two answers to "where
+	// does this attribute come from" is the defect being fixed.
+	declaredIn string
+}
+
+// rmInfoUniverse returns the sorted class universe REQ-048 defines: every
+// class in the plan the generator emits a Go type for. Enumerations,
+// primitives, and classes external to the target are out; classes that
+// carry no attributes of their own or inherited (DATA_VALUE, PATHABLE, the
+// support-service interfaces) are IN — a descendant expansion rooted at an
+// abstract class is unanswerable while that class is absent from the table.
+//
+// The wholesale generator exclusions (org.openehr.rm.ehr_extract per
+// REQ-042) never reach here: BuildPlan drops them.
+func rmInfoUniverse(plan *Plan) []string {
+	names := make([]string, 0, len(plan.Classes))
+	for name, pc := range plan.Classes {
+		if pc.External || pc.IsPrimitive {
+			continue
+		}
+		if _, ok := pc.Class.(*bmm.Enumeration); ok {
+			continue
+		}
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	return names
+}
+
+// rmInfoParents returns className's immediate parents in BMM declaration
+// order, filtered to inUniverse and de-duplicated.
+//
+// Filtering is what keeps the emitted graph closed over the universe
+// (REQ-048): what it drops is exactly the excluded kinds — the base schema's
+// primitive_types entries that appear as BMM ancestors (`Any`, `Ordered`,
+// `Interval`, `Iso8601_type` and the four `Iso8601_*` value types) plus the
+// PROPORTION_KIND enumeration. It costs no RM edge, because every class that
+// names one of those also names an RM ancestor beside it (DV_ORDERED is
+// `[DATA_VALUE, Ordered]`, DV_INTERVAL is `[DATA_VALUE, Interval]`,
+// DV_PROPORTION is `[PROPORTION_KIND, DV_AMOUNT]`) and that ancestor survives.
+// Four classes are left with no in-universe ancestor and become roots —
+// PATHABLE, Point_interval, Proper_interval, Iso8601_timezone — each losing a
+// foundation edge, none an RM one. PROBE-094 pins that set.
+func rmInfoParents(pc *PlannedClass, inUniverse map[string]bool) []string {
+	var out []string
+	for _, anc := range pc.Class.Ancestors() {
+		if !inUniverse[anc] || slices.Contains(out, anc) {
+			continue
+		}
+		out = append(out, anc)
+	}
+	return out
 }
 
 // effectiveProperties returns the merged (own + inherited) property
@@ -110,6 +192,10 @@ type rmAttr struct {
 // the most-derived definition wins, but its position in AttrOrder is
 // fixed by the FIRST ancestor that declared it (BMM-spec linearisation
 // rule: redefinition keeps the parent's slot).
+//
+// Each returned attribute also carries the class that supplied it
+// (`rmAttr.declaredIn`), recorded here rather than re-derived later so the
+// site and the shape come from one decision (REQ-048).
 func effectiveProperties(plan *Plan, className string) (map[string]rmAttr, []string) {
 	out := make(map[string]rmAttr)
 	var order []string
@@ -140,7 +226,11 @@ func effectiveProperties(plan *Plan, className string) (map[string]rmAttr, []str
 			if !ok {
 				continue
 			}
-			out[propName] = attr // most-derived wins on shape/required/container.
+			// Most-derived wins on shape/required/container — and on the
+			// declaration site, recorded in the same assignment so the
+			// two cannot drift apart (REQ-048).
+			attr.declaredIn = name
+			out[propName] = attr
 			if !seen[propName] {
 				seen[propName] = true
 				order = append(order, propName)

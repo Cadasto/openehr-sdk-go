@@ -5,12 +5,12 @@
 **Owner:** SDK maintainers
 **Covers:** REQ-104 (slot assertions); REQ-105 (terminology bindings)
 **Implementation:** landed in PR #43
-**Depends on:** [archive/2026-05-22-template-req100-followups.md](archive/2026-05-22-template-req100-followups.md) Phases 1–6 (landed — compiled template, walker, REQ-103 primitives); REQ-101 composition builder and REQ-102 validation (landed)
+**Depends on:** [archive/2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md) Phases 1–6 (landed — compiled template, walker, REQ-103 primitives); REQ-101 composition builder and REQ-102 validation (landed)
 **Defers:** External terminology lookup (live SNOMED/LOINC resolution); full Archie/Linker assertion parity; AOM 2 / ADL 2
 
 ## Goal
 
-Landed the remaining template-modelling REQs from the [REQ-100 follow-up plan](archive/2026-05-22-template-req100-followups.md): stricter local slot-fit checking (REQ-104) and structured terminology surfacing (REQ-105). Phases 1–6 of that plan shipped the foundation; this plan records the deferred tail that PR #43 delivered.
+Landed the remaining template-modelling REQs from the [REQ-100 follow-up plan](2026-05-22-template-req100-followups.md): stricter local slot-fit checking (REQ-104) and structured terminology surfacing (REQ-105). Phases 1–6 of that plan shipped the foundation; this plan records the deferred tail that PR #43 delivered.
 
 ## Delivery triggers
 
@@ -60,5 +60,5 @@ The OPT XSD exposes slot assertions as XML expression trees:
 
 ## References
 
-- Historical delivery detail (Phases 1–6 landed): [archive/2026-05-22-template-req100-followups.md](archive/2026-05-22-template-req100-followups.md)
-- Compiled template foundation: [ADR 0005](../adr/0005-compiled-template-foundation.md)
+- Historical delivery detail (Phases 1–6 landed): [archive/2026-05-22-template-req100-followups.md](2026-05-22-template-req100-followups.md)
+- Compiled template foundation: [ADR 0005](../../adr/0005-compiled-template-foundation.md)

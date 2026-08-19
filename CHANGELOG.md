@@ -17,6 +17,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
 - **Value-free AQL diagnostics (REQ-113, REQ-109, PROBE-096).** `parse.Document.Dropped()` and `lint.Issue.Span` report a finding's kind, clause and position with no query text in any structured field; `parse.Clause` gains four members — an existing exhaustive switch over it gains cases it does not handle.
 - **Structured AQL node predicates (REQ-113, PROBE-095).** `aql.PathSegment.Parsed` types every bracketed path-segment predicate beside its verbatim text — node ids, names, `$param`, comparisons, regex and junctions — with `aql.EqualPredicates` for comparison.
+- **RM meta-model introspection (REQ-048, PROBE-094, STRAND-12/13).** `rminfo` gains a compiled-in class graph — abstractness, parents, ancestors, conformance, concrete-descendant expansion, attribute declaration site — and `KnownRMTypes` widens to every emitted class.
 - **Contribution wrap constructors fail closed (REQ-025).** `WrapOriginalVersion` / `WrapImportedVersion` no longer panic on nil or typed-nil caller input; `Submission.Validate` rejects the resulting empty wrapper, and REQ-025 now mandates non-panicking exported constructors.
 
 ## [0.20.0] - 2026-08-18
