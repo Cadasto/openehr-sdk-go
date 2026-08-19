@@ -3,11 +3,11 @@
 **Date:** 2026-08-18
 **Status:** Done
 **Owner:** SDK maintainers
-**Covers:** [REQ-143](../specifications/wire.md#req-143--template-list-filters)
-**Probes:** [PROBE-093](../specifications/conformance.md#probe-093--template-list-filters-reach-the-wire) (Draft)
+**Covers:** [REQ-143](../../specifications/wire.md#req-143--template-list-filters)
+**Probes:** [PROBE-093](../../specifications/conformance.md#probe-093--template-list-filters-reach-the-wire) (Implemented — Sandbox)
 **Implementation:** landed
 **Depends on:** landed `ListTemplates` / `query.ExecuteOption` patterns; vendored ITS-REST pin (`definition-validation.openapi.yaml`)
-**Ordering:** after the [contribution-get plan](2026-08-18-contribution-get.md) — that leaf unblocks conformance coverage; this one is additive ergonomics
+**Ordering:** after the [contribution-get plan](../2026-08-18-contribution-get.md) — that leaf unblocks conformance coverage; this one is additive ergonomics
 **Defers:** ADL 2 (`FormatADL2` does not exist; `TemplateFormat` registers only `FormatADL14` — the pin's ADL 2 list operation references the same five parameter components, so the option set carries over unchanged when ADL 2 support lands); other missing Definition list endpoints
 
 > **Execution:** work the steps sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
@@ -119,5 +119,5 @@ EOF
 
 ## Mapping to specs
 
-- [wire.md § REQ-143](../specifications/wire.md#req-143--template-list-filters)
+- [wire.md § REQ-143](../../specifications/wire.md#req-143--template-list-filters)
 - ITS-REST pin: `resources/its-rest/definition-validation.openapi.yaml` (`definition_template_adl1.4_list`; parameter components `filter_template_id`, `concept`, `filter_version`, `offset`, `fetch`)

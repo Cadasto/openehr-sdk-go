@@ -12,7 +12,7 @@
 
 > **Execution:** work the steps sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
 
-**Goal:** Callers read a persisted contribution by uid through a typed leaf, without dropping to raw `transport.Do`. This is the missing half of the contribution round-trip: `Commit` landed (PROBE-072) but its effect is not verifiable through the same client — landing `Get` unblocks commit → read-back integration and conformance coverage, which is why this leaf is sequenced before the [template-list-filters plan](2026-08-18-template-list-filters.md).
+**Goal:** Callers read a persisted contribution by uid through a typed leaf, without dropping to raw `transport.Do`. This is the missing half of the contribution round-trip: `Commit` landed (PROBE-072) but its effect is not verifiable through the same client — landing `Get` unblocks commit → read-back integration and conformance coverage, which is why this leaf is sequenced before the [template-list-filters plan](archive/2026-08-18-template-list-filters.md).
 
 **Architecture:** `contribution.Get` mirrors `ehrstatus.Get` (same option-free read shape, same `transport.Decode` leaf idiom).
 

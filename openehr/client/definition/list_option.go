@@ -25,6 +25,12 @@ type listConfig struct {
 // ListOption filters [ListTemplates] through the ITS-REST list query
 // parameters of `definition_template_adl1.4_list` (REQ-143).
 //
+// For the three string filters, an explicit empty value is the same as
+// unset: the key is omitted. That is deliberate and deliberately unlike
+// the paging options, where an explicit zero IS sent — an empty wildcard
+// pattern has no wire meaning, while offset=0 and fetch=0 do. Do not
+// "align" the two behaviours.
+//
 // These options carry unqualified names — WithVersion, WithOffset,
 // WithFetch — where the rest of this package names options after their
 // operation (WithUploadVersion, WithExampleType, WithQueryType). That is

@@ -31,10 +31,10 @@ import (
 //     Sandbox mode); the probe reads length deltas to count requests, so
 //     it MUST NOT be reset between legs.
 //
-// The backend is expected to answer each list call with a template-metadata
-// body; the probe checks the response still decodes (an empty catalog is
-// acceptable — the assertion is that decoding succeeds, not that the
-// deployment holds templates).
+// The backend answers each list call with a template-metadata body; the
+// probe asserts only that the call returns no error. An empty catalog is a
+// pass — ListTemplates yields a nil slice for an empty body or 204, and
+// REQ-143 licenses no assertion that a filtered deployment holds templates.
 func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captured *[]url.Values) (Result, error) {
 	r := Result{Probe: "PROBE-093"}
 	if c == nil {
@@ -67,23 +67,19 @@ func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captu
 
 	// Leg 2 — every option set: each reaches the wire under its pin name.
 	before = len(*captured)
-	list, _, err := definition.ListTemplates(ctx, c, definition.FormatADL14,
+	// A nil slice is not a failure: ListTemplates returns (nil, meta, nil)
+	// for an empty body / 204, which is a legitimately empty catalog. A
+	// decode that genuinely failed comes back as a non-nil error, so err is
+	// the only decode assertion REQ-143 licenses here.
+	if _, _, err := definition.ListTemplates(ctx, c, definition.FormatADL14,
 		definition.WithTemplateID("vital*"),
 		definition.WithConcept("*signs*"),
 		definition.WithVersion("1.2.*"),
 		definition.WithOffset(10),
 		definition.WithFetch(25),
-	)
-	if err != nil {
+	); err != nil {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("filtered list failed: %v", err)
-		return r, nil
-	}
-	if list == nil {
-		// A nil slice is a decode that produced nothing; an empty
-		// non-nil slice is a legitimately empty catalog.
-		r.Status = "fail"
-		r.Detail = "filtered list did not decode into a template-metadata slice"
 		return r, nil
 	}
 	q, ok = lastQuery(captured, before)
@@ -92,13 +88,16 @@ func Probe093TemplateListFilters(ctx context.Context, c *transport.Client, captu
 		r.Detail = "filtered list issued no request"
 		return r, nil
 	}
-	for k, want := range map[string]string{
-		"template_id": "vital*",
-		"concept":     "*signs*",
-		"version":     "1.2.*",
-		"offset":      "10",
-		"fetch":       "25",
+	// Ordered, not a map: a probe's failure detail is diagnostic evidence,
+	// so the first reported mismatch must be reproducible.
+	for _, kv := range []struct{ key, want string }{
+		{"template_id", "vital*"},
+		{"concept", "*signs*"},
+		{"version", "1.2.*"},
+		{"offset", "10"},
+		{"fetch", "25"},
 	} {
+		k, want := kv.key, kv.want
 		if got := q.Get(k); got != want {
 			r.Status = "fail"
 			r.Detail = fmt.Sprintf("query %q = %q, want %q", k, got, want)
