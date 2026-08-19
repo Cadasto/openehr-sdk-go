@@ -395,7 +395,7 @@ const contributionGetBody = `{
 func contributionGetServer(t *testing.T, captured *[]*http.Request, presentUID string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		*captured = append(*captured, r)
+		*captured = append(*captured, r.Clone(r.Context()))
 		if strings.HasSuffix(r.URL.Path, "/contribution/"+presentUID) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)

@@ -265,14 +265,17 @@ func TestGetRejectsInputs(t *testing.T) {
 	}
 }
 
-// TestGet pins the REQ-142 / PROBE-092 request shape and the 200 decode.
-// Per the vendored pin, 200_CONTRIBUTION defines only Content-Type, so
-// no version-metadata assertion is made here.
+// TestGet pins the REQ-142 / PROBE-092 request shape (method, path, and
+// the canonical-JSON Accept) and the 200 decode down to versions[0]'s
+// concrete OBJECT_REF and its fields — the read-side inverse of
+// TestCommitSubmissionShape. Per the vendored pin, 200_CONTRIBUTION
+// defines only Content-Type, so no version-metadata assertion is made
+// here.
 func TestGet(t *testing.T) {
 	const uid = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
 	var captured *http.Request
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		captured = r
+		captured = r.Clone(r.Context())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(contributionGetFixture))
@@ -289,6 +292,9 @@ func TestGet(t *testing.T) {
 	if want := "/openehr/v1/ehr/" + string(ehrIDFixture) + "/contribution/" + uid; captured.URL.Path != want {
 		t.Errorf("path = %q, want %q", captured.URL.Path, want)
 	}
+	if got := captured.Header.Get("Accept"); got != "application/json" {
+		t.Errorf("Accept = %q, want %q (v1 requests canonical JSON only)", got, "application/json")
+	}
 	if out == nil {
 		t.Fatal("nil Contribution on 200")
 	}
@@ -297,6 +303,17 @@ func TestGet(t *testing.T) {
 	}
 	if len(out.Versions) != 1 {
 		t.Fatalf("len(versions) = %d (want 1)", len(out.Versions))
+	}
+	ref, ok := out.Versions[0].(*rm.ObjectRef)
+	if !ok {
+		t.Fatalf("versions[0] = %T, want *rm.ObjectRef", out.Versions[0])
+	}
+	if ref.Namespace != "local" || ref.Type != "COMPOSITION" {
+		t.Errorf("versions[0] namespace/type = %q/%q, want %q/%q", ref.Namespace, ref.Type, "local", "COMPOSITION")
+	}
+	const wantVersionID = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	if got, ok := rm.ObjectIDValue(ref.ID); !ok || got != wantVersionID {
+		t.Errorf("versions[0] id = %q, want %q", got, wantVersionID)
 	}
 	if out.Audit == nil {
 		t.Error("audit not decoded")
