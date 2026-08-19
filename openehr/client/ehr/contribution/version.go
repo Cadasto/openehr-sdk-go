@@ -11,6 +11,9 @@ import (
 // dropping the server-assigned time_committed. Uses the interface's
 // exported accessors (the interface itself is sealed).
 func updateAuditFromLike(a rm.AuditDetailsLike) UpdateAudit {
+	if a == nil {
+		return UpdateAudit{}
+	}
 	ua := UpdateAudit{
 		ChangeType: a.GetChangeType(),
 		Committer:  a.GetCommitter(),
@@ -40,7 +43,12 @@ type OriginalVersion[T any] struct {
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
 // marshal — later mutations to the wrapped Version.CommitAudit are ignored.
+// A nil v, or a v whose CommitAudit is nil, yields an empty UpdateAudit;
+// [Submission.Validate] rejects that (REQ-025 — no panic on caller input).
 func WrapOriginalVersion[T any](v *rm.OriginalVersion[T]) *OriginalVersion[T] {
+	if v == nil {
+		return &OriginalVersion[T]{}
+	}
 	return &OriginalVersion[T]{Version: v, CommitAudit: updateAuditFromLike(v.CommitAudit)}
 }
 
@@ -105,7 +113,12 @@ type ImportedVersion[T any] struct {
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
 // marshal — later mutations to the wrapped Version.CommitAudit are ignored.
+// A nil v, or a v whose CommitAudit is nil, yields an empty UpdateAudit;
+// [Submission.Validate] rejects that (REQ-025 — no panic on caller input).
 func WrapImportedVersion[T any](v *rm.ImportedVersion[T]) *ImportedVersion[T] {
+	if v == nil {
+		return &ImportedVersion[T]{}
+	}
 	return &ImportedVersion[T]{Version: v, CommitAudit: updateAuditFromLike(v.CommitAudit)}
 }
 
