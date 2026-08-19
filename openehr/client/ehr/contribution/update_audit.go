@@ -3,6 +3,7 @@ package contribution
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 )
@@ -57,18 +58,30 @@ type updateAuditJSON struct {
 	Description rm.DVTextLike  `json:"description,omitempty"`
 }
 
+// checkCommitter reports why c cannot serve as a write-side committer, or
+// nil if it can. Bare-nil and typed-nil pointers count as absent. A concrete
+// held by value is rejected because the PartyProxy marshallers use pointer
+// receivers — a value would fall back to reflection encoding and marshal
+// without the `_type` discriminator the abstract committer field requires.
+// Messages name no field path; callers prefix their own.
+func checkCommitter(c rm.PartyProxy) error {
+	if c == nil || rm.IsTypedNil(c) {
+		return errors.New("committer is nil")
+	}
+	switch c.(type) {
+	case *rm.PartyIdentified, *rm.PartyRelated, *rm.PartySelf:
+		return nil
+	default:
+		return fmt.Errorf("committer is a non-pointer %T; PartyProxy concretes must be pointers so their _type is emitted", c)
+	}
+}
+
 // MarshalJSON emits the ITS-REST write-side audit shape. `_type` is the
 // resolved [AuditType] (default AuditTypeAuditDetails); time_committed is
 // never emitted (server-assigned).
-// committerPopulated reports whether c holds a non-nil PartyProxy suitable
-// for the write path. Bare-nil and typed-nil pointers count as absent.
-func committerPopulated(c rm.PartyProxy) bool {
-	return c != nil && !rm.IsTypedNil(c)
-}
-
 func (a UpdateAudit) MarshalJSON() ([]byte, error) {
-	if !committerPopulated(a.Committer) {
-		return nil, errors.New("contribution.UpdateAudit: Committer is required")
+	if err := checkCommitter(a.Committer); err != nil {
+		return nil, fmt.Errorf("contribution.UpdateAudit: %w", err)
 	}
 	t := a.Type
 	if t == "" {
@@ -77,9 +90,8 @@ func (a UpdateAudit) MarshalJSON() ([]byte, error) {
 	// Marshal a *pointer* so addressable fields (e.g. ChangeType, whose
 	// MarshalJSON has a pointer receiver) emit their `_type` discriminator
 	// instead of falling back to reflection — matching the generated
-	// rm.AuditDetails marshaller. Note: Committer must hold a pointer
-	// (e.g. *rm.PartyIdentified) for its own `_type` to be emitted, since
-	// PartyProxy's concrete marshallers also use pointer receivers.
+	// rm.AuditDetails marshaller. Committer is pointer-checked above for
+	// the same reason.
 	return json.Marshal(&updateAuditJSON{
 		Type:        t,
 		SystemID:    a.SystemID,

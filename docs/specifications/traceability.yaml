@@ -1789,6 +1789,7 @@ requirements:
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
+      - openehr/client/ehr/contribution/update_audit_test.go
 
   - id: REQ-026
     title: Goroutine-safe clients

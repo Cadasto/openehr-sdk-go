@@ -147,6 +147,37 @@ func TestSubmissionValidate(t *testing.T) {
 			wantErr: "Submission.Audit: committer is nil",
 		},
 		{
+			name: "rejects batch Audit with non-pointer committer",
+			sub: &contribution.Submission{
+				Audit: contribution.UpdateAudit{
+					Committer: rm.PartySelf{},
+				},
+				Versions: []contribution.CommitVersion{newOriginalVersion()},
+			},
+			wantErr: "Submission.Audit: committer is a non-pointer",
+		},
+		{
+			name: "rejects version commit_audit with non-pointer committer",
+			sub: &contribution.Submission{
+				Audit: newAudit(),
+				Versions: []contribution.CommitVersion{
+					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
+						Version: rm.Version[rm.Composition]{
+							CommitAudit: rm.AuditDetails{
+								Committer:  rm.PartySelf{},
+								ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+								SystemID:   "cdr.example",
+							},
+						},
+						UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
+						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+						Data:           &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"},
+					}),
+				},
+			},
+			wantErr: "commit_audit.committer is a non-pointer",
+		},
+		{
 			name: "rejects version commit_audit with typed-nil committer",
 			sub: &contribution.Submission{
 				Audit: newAudit(),

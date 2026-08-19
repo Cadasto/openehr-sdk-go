@@ -37,8 +37,8 @@ type Submission struct {
 	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
 	// Validate enforces this via an explicit type-switch over the 8 concrete
 	// generic instantiations (no reflection per REQ-024); it also rejects an
-	// empty slice, a nil wrapped Version, and a commit_audit with a nil
-	// Committer.
+	// empty slice, a nil or typed-nil element, a nil wrapped Version, and a
+	// commit_audit whose Committer is absent or held by value.
 	Versions []CommitVersion
 }
 
@@ -57,13 +57,15 @@ type CommitVersion interface {
 // *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
 // rm.Folder, rm.EHRAccess} — the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
-// also required (the spec rejects an empty contribution). Submission.Audit
-// and each version commit_audit MUST have a populated Committer (bare-nil
-// and typed-nil PartyProxy both count as absent). A wrapped version whose
-// Version is nil or whose commit_audit has no Committer is rejected — the
-// empty UpdateAudit [WrapOriginalVersion] / [WrapImportedVersion] produce
-// for nil caller input surfaces here as a typed error rather than as a
-// panic (REQ-025).
+// also required (the spec rejects an empty contribution), and a nil or
+// typed-nil element is rejected outright. Submission.Audit and each
+// version commit_audit MUST carry a populated Committer: bare-nil and
+// typed-nil PartyProxy count as absent, and a concrete held by value is
+// rejected because it cannot emit its `_type` discriminator. A wrapped
+// version whose Version is nil is likewise rejected — the empty wrapper
+// and empty UpdateAudit [WrapOriginalVersion] / [WrapImportedVersion]
+// produce for nil caller input surface here as errors rather than as
+// panics (REQ-025).
 //
 // Implemented as an explicit type-switch over the 8 concrete generic
 // instantiations (no reflection per REQ-024). Other types satisfying
@@ -104,8 +106,9 @@ func (s *Submission) Validate() error {
 }
 
 // writeSideVersion is the unexported inspection seam Validate uses to
-// reject a nil wrapped Version or an empty commit_audit without
-// duplicating the 8-way type switch above.
+// reject a typed-nil wrapper, a nil wrapped Version, or a commit_audit
+// without a usable Committer, without duplicating the 8-way type switch
+// above.
 type writeSideVersion interface {
 	validateWrite(index int) error
 }
@@ -131,17 +134,17 @@ func (v *ImportedVersion[T]) validateWrite(index int) error {
 }
 
 func validateBatchAudit(a UpdateAudit) error {
-	if committerPopulated(a.Committer) {
-		return nil
+	if err := checkCommitter(a.Committer); err != nil {
+		return fmt.Errorf("Submission.Audit: %w", err)
 	}
-	return errors.New("Submission.Audit: committer is nil")
+	return nil
 }
 
 func validateWriteAudit(index int, a UpdateAudit) error {
-	if committerPopulated(a.Committer) {
-		return nil
+	if err := checkCommitter(a.Committer); err != nil {
+		return fmt.Errorf("Submission.Versions[%d]: commit_audit.%w", index, err)
 	}
-	return fmt.Errorf("Submission.Versions[%d]: commit_audit.committer is nil", index)
+	return nil
 }
 
 // submissionJSON is the on-the-wire shape — no `_type` envelope because

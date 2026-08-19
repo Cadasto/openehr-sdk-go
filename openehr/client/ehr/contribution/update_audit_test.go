@@ -243,6 +243,8 @@ func TestSubmissionAuditNoTimeCommitted(t *testing.T) {
 	}
 }
 
+// TestUpdateAuditMarshalRejectsAbsentCommitter pins the marshal-side
+// committer gate: bare-nil and typed-nil PartyProxy both count as absent.
 func TestUpdateAuditMarshalRejectsAbsentCommitter(t *testing.T) {
 	cases := []struct {
 		name string
@@ -254,8 +256,34 @@ func TestUpdateAuditMarshalRejectsAbsentCommitter(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := json.Marshal(tc.a)
-			if err == nil || !strings.Contains(err.Error(), "Committer is required") {
-				t.Errorf("MarshalJSON error = %v; want substring %q", err, "Committer is required")
+			if err == nil || !strings.Contains(err.Error(), "committer is nil") {
+				t.Errorf("MarshalJSON error = %v; want substring %q", err, "committer is nil")
+			}
+		})
+	}
+}
+
+// TestUpdateAuditMarshalRejectsValueCommitter pins the pointer requirement:
+// a PartyProxy concrete held by value satisfies the interface but its
+// (pointer-receiver) MarshalJSON never fires, so the wire JSON would lack
+// the `_type` discriminator the abstract committer field requires. All
+// three sealed concretes must be rejected before marshalling.
+func TestUpdateAuditMarshalRejectsValueCommitter(t *testing.T) {
+	cases := []struct {
+		name string
+		c    rm.PartyProxy
+	}{
+		{"PartyIdentified by value", rm.PartyIdentified{}},
+		{"PartyRelated by value", rm.PartyRelated{}},
+		{"PartySelf by value", rm.PartySelf{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newUpdateAudit()
+			a.Committer = tc.c
+			_, err := json.Marshal(a)
+			if err == nil || !strings.Contains(err.Error(), "non-pointer") {
+				t.Errorf("MarshalJSON error = %v; want substring %q", err, "non-pointer")
 			}
 		})
 	}
