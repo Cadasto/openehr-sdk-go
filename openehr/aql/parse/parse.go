@@ -25,6 +25,21 @@ type Position struct {
 	Col  int
 }
 
+// Span is a half-open source range [Start, End) in the same line/column
+// vocabulary as [Position] — deliberately NOT byte offsets, so that a span, a
+// [SyntaxError] position and an AST node's Pos are directly comparable
+// (REQ-113 § Value-free structured drop records). End is the position just
+// past the last character of the construct.
+//
+// The zero Span means "not attributable".
+type Span struct {
+	Start Position
+	End   Position
+}
+
+// IsZero reports whether the span carries no position.
+func (s Span) IsZero() bool { return s == Span{} }
+
 // SyntaxError is a parse failure at a position. It wraps [aql.ErrSyntax], so
 // callers can branch with errors.Is(err, aql.ErrSyntax).
 type SyntaxError struct {
@@ -54,6 +69,10 @@ type Document struct {
 	queryOnce sync.Once
 	query     *Query
 	queryErr  error
+	// dropped is the value-free record per construct extraction could not
+	// represent (REQ-113 § Value-free structured drop records), populated by
+	// the same lazy pass. Exposed as a copy by [Document.Dropped].
+	dropped []DroppedConstruct
 
 	// Distinct is true for SELECT DISTINCT.
 	Distinct bool
@@ -207,7 +226,7 @@ func (d *Document) Query() *Query {
 		return nil
 	}
 	d.queryOnce.Do(func() {
-		d.query, d.queryErr = extractQuery(d.tree)
+		d.query, d.dropped, d.queryErr = extractQuery(d.tree)
 	})
 	return d.query
 }
@@ -225,7 +244,7 @@ func (d *Document) QueryErr() error {
 		return nil
 	}
 	d.queryOnce.Do(func() {
-		d.query, d.queryErr = extractQuery(d.tree)
+		d.query, d.dropped, d.queryErr = extractQuery(d.tree)
 	})
 	return d.queryErr
 }

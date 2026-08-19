@@ -24,6 +24,19 @@ const (
 	ClauseWhere
 	// ClauseOrderBy is the ORDER BY list.
 	ClauseOrderBy
+	// ClauseFrom is the FROM / CONTAINS tree. Appended after ClauseOrderBy
+	// rather than inserted in clause order: the members above are published
+	// and their numeric values MUST stay put (REQ-113 § The clause axis
+	// reuses the landed enum).
+	ClauseFrom
+	// ClauseLimit is the LIMIT value.
+	ClauseLimit
+	// ClauseOffset is the OFFSET value.
+	ClauseOffset
+	// ClauseTop is the deprecated SELECT TOP clause (REQ-118) — distinct from
+	// ClauseSelect so a diagnostic can name the row-count position rather
+	// than the whole projection.
+	ClauseTop
 )
 
 // String renders the clause name for diagnostics.
@@ -35,8 +48,53 @@ func (c Clause) String() string {
 		return "where"
 	case ClauseOrderBy:
 		return "order by"
+	case ClauseFrom:
+		return "from"
+	case ClauseLimit:
+		return "limit"
+	case ClauseOffset:
+		return "offset"
+	case ClauseTop:
+		return "top"
+	case ClauseUnknown:
+		return "unknown"
 	}
 	return "unknown"
+}
+
+// endOf is the position just past tok's last character. A token whose text
+// spans lines (a string literal carrying a newline) advances the line and
+// restarts the column, so the span stays meaningful instead of reporting a
+// column past the end of the first line.
+func endOf(tok antlr.Token) Position {
+	if tok == nil {
+		return Position{}
+	}
+	text := tok.GetText()
+	if n := strings.Count(text, "\n"); n > 0 {
+		last := text[strings.LastIndex(text, "\n")+1:]
+		return Position{Line: tok.GetLine() + n, Col: 1 + len([]rune(last))}
+	}
+	// ANTLR columns are 0-based; posOf exposes 1-based, and so does this.
+	return Position{Line: tok.GetLine(), Col: tok.GetColumn() + 1 + len([]rune(text))}
+}
+
+// spanAt is the [Span] of whichever ANTLR shape the extractor holds when it
+// records a drop — a rule context, a terminal node, or a bare token. The
+// three share no interface, and a drop site should not have to pick a helper
+// per shape.
+func spanAt(node any) Span {
+	switch n := node.(type) {
+	case nil:
+		return Span{}
+	case antlr.ParserRuleContext:
+		return Span{Start: posOf(n.GetStart()), End: endOf(n.GetStop())}
+	case antlr.TerminalNode:
+		return Span{Start: posOf(n.GetSymbol()), End: endOf(n.GetSymbol())}
+	case antlr.Token:
+		return Span{Start: posOf(n), End: endOf(n)}
+	}
+	return Span{}
 }
 
 // ClassExpr is one class expression bound in the FROM / CONTAINS tree

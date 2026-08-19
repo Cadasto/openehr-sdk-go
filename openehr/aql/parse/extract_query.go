@@ -34,10 +34,43 @@ import (
 // joins the reasons into a single error wrapping ErrIncompleteAST.
 type astExtractor struct {
 	gaps []string
+	// drops is the value-free record per gap — one per incomplete() call,
+	// so the two channels cannot diverge (REQ-113 § Value-free structured
+	// drop records).
+	drops []DroppedConstruct
+	// clause is the top-level clause currently being extracted. Set by
+	// extractQuery around each clause, and by the LIMIT / OFFSET and TOP
+	// value helpers, so a drop recorded deep in a shared helper still names
+	// its clause without threading the clause through every signature.
+	clause Clause
 }
 
-func (e *astExtractor) incomplete(format string, args ...any) {
+// valueGap is why a terminal could not be lifted into the value vocabulary:
+// the value-free Kind for the drop record, and the human-readable Reason for
+// the error text. The two travel together so a call site cannot pair a
+// reachable gap with a defensive kind — which is exactly the mistake the
+// PROBE-096 unreachability arm caught (a WHERE operand out of range reached a
+// site labelled defensive).
+//
+// The zero valueGap means "no gap".
+type valueGap struct {
+	Kind   ConstructKind
+	Reason string
+}
+
+func (g valueGap) ok() bool { return g.Reason == "" }
+
+// incomplete records one construct the extractor could not represent: the
+// existing human-readable reason AND the value-free {kind, clause, span}
+// record beside it. Both are produced here, by one call, because a drop that
+// records a reason but no kind is a defect the source-derived completeness
+// sweep exists to catch — see TestEveryIncompleteSiteRecordsAKind.
+//
+// at is the ANTLR node the drop is about (rule context, terminal node, or
+// token); a nil at yields a zero span rather than an approximated one.
+func (e *astExtractor) incomplete(kind ConstructKind, at any, format string, args ...any) {
 	e.gaps = append(e.gaps, fmt.Sprintf(format, args...))
+	e.drops = append(e.drops, DroppedConstruct{Kind: kind, Clause: e.clause, Span: spanAt(at)})
 }
 
 // err builds the joined ErrIncompleteAST when gaps were recorded.
@@ -54,30 +87,37 @@ func (e *astExtractor) err() error {
 // corresponding fields as their zero values (nil interface for Where /
 // Limit / Offset; empty slice for OrderBy).
 //
-// Returns ([Query], ErrIncompleteAST) when extraction hit a catalogue
-// gap; the [Query] is still populated best-effort for clauses that
-// extracted cleanly. Caller decides whether the partial AST is useful.
-func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
+// Returns ([Query], drops, ErrIncompleteAST) when extraction hit a
+// catalogue gap; the [Query] is still populated best-effort for clauses
+// that extracted cleanly. Caller decides whether the partial AST is
+// useful. The drops carry the same findings value-free, one per gap
+// (REQ-113 § Value-free structured drop records).
+func extractQuery(tree gen.ISelectQueryContext) (*Query, []DroppedConstruct, error) {
 	if tree == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	ex := &astExtractor{}
 	q := &Query{}
 	if sc := tree.SelectClause(); sc != nil {
+		ex.clause = ClauseSelect
 		q.Select = ex.extractSelectClause(sc)
 	}
 	if fc := tree.FromClause(); fc != nil {
+		ex.clause = ClauseFrom
 		q.From = ex.extractFromClause(fc)
 	}
 	if wc := tree.WhereClause(); wc != nil {
+		ex.clause = ClauseWhere
 		q.Where = ex.extractWhereClause(wc)
 	}
 	if oc := tree.OrderByClause(); oc != nil {
+		ex.clause = ClauseOrderBy
 		q.OrderBy = ex.extractOrderBy(oc)
 	}
 	if lc := tree.LimitClause(); lc != nil {
 		q.Limit, q.Offset = ex.extractLimit(lc)
 	}
+	ex.clause = ClauseUnknown
 	err := ex.err()
 	if err != nil {
 		// Record the gap on the AST so [Query.Emit] refuses to
@@ -85,7 +125,7 @@ func extractQuery(tree gen.ISelectQueryContext) (*Query, error) {
 		// this error return.
 		q.incomplete = err
 	}
-	return q, err
+	return q, ex.drops, err
 }
 
 // --- SELECT ----------------------------------------------------------
@@ -132,18 +172,21 @@ func (ex *astExtractor) extractSelectClause(c gen.ISelectClauseContext) SelectCl
 // Returns nil only after recording a gap, so a nil Top can never be read as
 // "the source declared no bound": [Query.Emit] refuses the partial AST.
 func (ex *astExtractor) topClause(c gen.ITopContext) *aql.TopClause {
+	// TOP sits inside SELECT but is its own diagnostic coordinate (REQ-118).
+	ex.clause = ClauseTop
+	defer func() { ex.clause = ClauseSelect }()
 	out := &aql.TopClause{}
 	i := c.INTEGER()
 	if i == nil {
 		// Defensive: `top : TOP INTEGER direction=(FORWARD|BACKWARD)?` makes
 		// the count mandatory, so this is unreachable against the current
 		// profile.
-		ex.incomplete("SELECT TOP %q carries no row count", c.GetText())
+		ex.incomplete(KindUnmodelledConstruct, c, "SELECT TOP %q carries no row count", c.GetText())
 		return nil
 	}
 	n, err := strconv.Atoi(i.GetText())
 	if err != nil {
-		ex.incomplete("SELECT TOP integer literal %q out of range for int (%v)", i.GetText(), err)
+		ex.incomplete(KindNumericOutOfRange, i, "SELECT TOP integer literal %q out of range for int (%v)", i.GetText(), err)
 		return nil
 	}
 	out.N = n
@@ -156,7 +199,7 @@ func (ex *astExtractor) topClause(c gen.ITopContext) *aql.TopClause {
 		default:
 			// Defensive: the label admits FORWARD | BACKWARD only. Record a
 			// gap rather than emit a bound whose direction we dropped.
-			ex.incomplete("SELECT TOP direction %q is outside the catalogue", d.GetText())
+			ex.incomplete(KindUnmodelledConstruct, d, "SELECT TOP direction %q is outside the catalogue", d.GetText())
 			return nil
 		}
 	}
@@ -201,7 +244,7 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 	// Defensive: every columnExpr alternative in the SDK grammar profile is
 	// handled above, so this is unreachable today — record a gap rather
 	// than drop a projection silently if the grammar ever widens.
-	ex.incomplete("SELECT projection %q is outside the catalogue", c.GetText())
+	ex.incomplete(KindUnmodelledConstruct, c, "SELECT projection %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -212,7 +255,7 @@ func (ex *astExtractor) extractColumnExpr(c gen.IColumnExprContext) SelectExpr {
 func (ex *astExtractor) primitiveAsSelectExpr(p gen.IPrimitiveContext) SelectExpr {
 	v := primitiveAsValue(p)
 	if v == nil {
-		ex.incomplete("primitive literal %q is out of range for the value vocabulary", p.GetText())
+		ex.incomplete(KindNumericOutOfRange, p, "primitive literal %q is out of range for the value vocabulary", p.GetText())
 		return nil
 	}
 	// REQ-118: keep the source text — the typed value is canonical, and the
@@ -336,7 +379,7 @@ func (ex *astExtractor) terminalAsSelectExpr(t gen.ITerminalContext) SelectExpr 
 	// functionCall` is fully covered above, so this is unreachable today —
 	// record a gap rather than drop a function argument silently if the grammar
 	// ever widens.
-	ex.incomplete("function argument %q is outside the catalogue", t.GetText())
+	ex.incomplete(KindUnmodelledConstruct, t, "function argument %q is outside the catalogue", t.GetText())
 	return nil
 }
 
@@ -462,7 +505,7 @@ func (ex *astExtractor) extractContainment(c gen.IContainsExprContext) *Containm
 				// source said `A OR B` — one arm of the junction silently
 				// gone, the substitution class this file must surface as a
 				// gap instead (REQ-119).
-				ex.incomplete("containment operand %q is outside the catalogue", op.GetText())
+				ex.incomplete(KindUnmodelledConstruct, op, "containment operand %q is outside the catalogue", op.GetText())
 				continue
 			}
 			// REQ-117: flatten a same-operator operand so `A OR B OR C`
@@ -541,7 +584,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 					// PARAMETER` — both handled. Leaving Archetype empty with
 					// HasPredicate set would silently drop the predicate, a
 					// row filter, from emission.
-					ex.incomplete("archetype predicate %q is outside the catalogue", ap.GetText())
+					ex.incomplete(KindUnmodelledConstruct, ap, "archetype predicate %q is outside the catalogue", ap.GetText())
 				}
 			default:
 				// Standing predicate (e.g. `[ehr_id/value=$x]`) — capture
@@ -571,7 +614,7 @@ func (ex *astExtractor) extractClassExprOperand(c gen.IClassExprOperandContext) 
 	// Defensive: both classExprOperand alternatives are handled above. The
 	// zero ClassExpr is refused loudly at Emit (validateContainmentTree), but
 	// the gap belongs at PARSE time, where every sibling records it.
-	ex.incomplete("class expression %q is outside the catalogue", c.GetText())
+	ex.incomplete(KindUnmodelledConstruct, c, "class expression %q is outside the catalogue", c.GetText())
 	return ClassExpr{}
 }
 
@@ -590,7 +633,7 @@ func (ex *astExtractor) extractWhereClause(c gen.IWhereClauseContext) aql.WhereE
 	// current grammar. Returning nil WITHOUT the gap would silently emit the
 	// query with its WHERE gone — a wider result set, err == nil — which is
 	// the exact failure the file header promises cannot happen.
-	ex.incomplete("WHERE clause %q carries no expression the catalogue models", c.GetText())
+	ex.incomplete(KindUnmodelledConstruct, c, "WHERE clause %q carries no expression the catalogue models", c.GetText())
 	return nil
 }
 
@@ -605,7 +648,7 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 			// Defensive: `NOT whereExpr` always carries its operand. A nil
 			// return here erased the whole predicate silently (see
 			// extractWhereClause above).
-			ex.incomplete("NOT in %q carries no operand", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "NOT in %q carries no operand", c.GetText())
 			return nil
 		}
 		return aql.Not(ex.extractWhereExpr(ops[0]))
@@ -620,7 +663,7 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 		for i, op := range ops {
 			t := ex.extractWhereExpr(op)
 			if t == nil {
-				ex.incomplete("AND/OR junction dropped operand %d (unsupported shape)", i)
+				ex.incomplete(KindUnmodelledConstruct, op, "AND/OR junction dropped operand %d (unsupported shape)", i)
 				continue
 			}
 			// REQ-117: flatten a same-operator operand so `a AND b AND c`
@@ -656,7 +699,7 @@ func (ex *astExtractor) extractWhereExpr(c gen.IWhereExprContext) aql.WhereExpr 
 	}
 	// Defensive: every whereExpr alternative is handled above. A silent nil
 	// here would drop the predicate (or one junction arm) from the model.
-	ex.incomplete("WHERE expression %q is outside the catalogue", c.GetText())
+	ex.incomplete(KindUnmodelledConstruct, c, "WHERE expression %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -670,7 +713,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			path := pathRaw(ip)
 			return aql.Exists(path)
 		}
-		ex.incomplete("EXISTS operand %q is outside the catalogue", c.GetText())
+		ex.incomplete(KindUnmodelledConstruct, c, "EXISTS operand %q is outside the catalogue", c.GetText())
 		return nil
 	}
 	// Parenthesised inner identifiedExpr.
@@ -690,14 +733,14 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			}
 			// Defensive: likeOperand is `STRING | PARAMETER`, both
 			// modelled — a gap here can only mean a widened grammar.
-			ex.incomplete("LIKE operand in %q is outside the catalogue", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "LIKE operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		if c.MATCHES() != nil {
 			if op := c.MatchesOperand(); op != nil {
 				return ex.matchesExpr(path, op)
 			}
-			ex.incomplete("MATCHES operand in %q is outside the catalogue", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "MATCHES operand in %q is outside the catalogue", c.GetText())
 			return nil
 		}
 		// path <op> terminal — the comparison form.
@@ -705,8 +748,8 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			opStr := cmp.GetText()
 			if t := c.Terminal(); t != nil {
 				v, gap := ex.terminalAsValue(t)
-				if gap != "" {
-					ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
+				if !gap.ok() {
+					ex.incomplete(gap.Kind, t, "comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap.Reason)
 					return nil
 				}
 				if v != nil {
@@ -717,7 +760,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 					return aql.Comparison{Path: path, Op: aql.Operator(opStr), Val: v, ParsedPath: &parsed.IdentifiedPath}
 				}
 			}
-			ex.incomplete("comparison %q is outside the catalogue", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "comparison %q is outside the catalogue", c.GetText())
 			return nil
 		}
 	}
@@ -731,24 +774,24 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 			// `functionCall COMPARISON_OPERATOR terminal`, so both are present
 			// after a successful parse — record a gap rather than drop the
 			// predicate silently if the grammar ever widens.
-			ex.incomplete("function-call comparison %q is outside the catalogue (incomplete operator or right operand)", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "function-call comparison %q is outside the catalogue (incomplete operator or right operand)", c.GetText())
 			return nil
 		}
 		v, gap := ex.terminalAsValue(t)
-		if gap != "" {
-			ex.incomplete("comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap)
+		if !gap.ok() {
+			ex.incomplete(gap.Kind, t, "comparison RHS terminal %q is outside the catalogue (%s)", t.GetText(), gap.Reason)
 			return nil
 		}
 		left, gap := ex.functionCallAsValue(fc)
-		if gap != "" {
-			ex.incomplete("function-call WHERE LHS %q is outside the catalogue (%s)", fc.GetText(), gap)
+		if !gap.ok() {
+			ex.incomplete(gap.Kind, fc, "function-call WHERE LHS %q is outside the catalogue (%s)", fc.GetText(), gap.Reason)
 			return nil
 		}
 		if left == nil || v == nil {
 			// Defensive: both lifts return a non-empty gap for anything they
 			// cannot model, so a nil-without-gap can only mean a widened
 			// grammar handed us an operand shape neither recognises.
-			ex.incomplete("function-call comparison %q is outside the catalogue (unrecognised operand)", c.GetText())
+			ex.incomplete(KindUnmodelledConstruct, c, "function-call comparison %q is outside the catalogue (unrecognised operand)", c.GetText())
 			return nil
 		}
 		return aql.Comparison{Op: aql.Operator(cmp.GetText()), Val: v, Left: left}
@@ -756,7 +799,7 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 	// Defensive: every identifiedExpr alternative in the SDK grammar profile is
 	// handled above, so this is unreachable today — record a gap rather than
 	// drop the predicate silently if the grammar ever widens.
-	ex.incomplete("WHERE predicate %q is outside the catalogue", c.GetText())
+	ex.incomplete(KindUnmodelledConstruct, c, "WHERE predicate %q is outside the catalogue", c.GetText())
 	return nil
 }
 
@@ -764,23 +807,29 @@ func (ex *astExtractor) extractIdentifiedExpr(c gen.IIdentifiedExprContext) aql.
 // value — the shape used on both sides of a WHERE comparison and as a
 // nested argument (REQ-117). Returns a non-empty gap reason when an
 // argument is outside the value vocabulary.
-func (ex *astExtractor) functionCallAsValue(c gen.IFunctionCallContext) (aql.Value, string) {
+func (ex *astExtractor) functionCallAsValue(c gen.IFunctionCallContext) (aql.Value, valueGap) {
 	// Grammar alternative `functionCall : terminologyFunction`.
 	if tf := c.TerminologyFunction(); tf != nil {
-		return aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}, ""
+		return aql.FuncCall{Name: aql.TerminologyFunc, Args: terminologyArgs(tf)}, valueGap{}
 	}
 	out := aql.FuncCall{Name: functionName(c)}
 	for _, t := range c.AllTerminal() {
 		v, gap := ex.terminalAsValue(t)
-		if gap != "" {
+		if !gap.ok() {
+			// Propagate the kind, not just the reason: the argument's gap may
+			// be the reachable numeric one.
 			return nil, gap
 		}
 		if v == nil {
-			return nil, fmt.Sprintf("unsupported argument %q", t.GetText())
+			// Defensive: every `terminal` alternative is handled above.
+			return nil, valueGap{
+				Kind:   KindUnmodelledConstruct,
+				Reason: fmt.Sprintf("unsupported argument %q", t.GetText()),
+			}
 		}
 		out.Args = append(out.Args, v)
 	}
-	return out, ""
+	return out, valueGap{}
 }
 
 // --- ORDER BY + LIMIT ------------------------------------------------
@@ -805,12 +854,13 @@ func (ex *astExtractor) extractOrderBy(c gen.IOrderByClauseContext) []OrderTerm 
 }
 
 func (ex *astExtractor) extractLimit(c gen.ILimitClauseContext) (limit, offset LimitExpr) {
-	limit = ex.limitValueAsExpr(c.GetLimit(), "LIMIT")
-	offset = ex.limitValueAsExpr(c.GetOffset(), "OFFSET")
+	limit = ex.limitValueAsExpr(c.GetLimit(), "LIMIT", ClauseLimit)
+	offset = ex.limitValueAsExpr(c.GetOffset(), "OFFSET", ClauseOffset)
 	return
 }
 
-func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string) LimitExpr {
+func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string, at Clause) LimitExpr {
+	ex.clause = at
 	if v == nil {
 		return nil
 	}
@@ -823,7 +873,7 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 		// Integer too large for int (overflow / out of range). Record a
 		// catalogue gap so the clause isn't silently dropped — the
 		// emit-on-partial-AST guard then refuses to render this AST.
-		ex.incomplete("%s integer literal %q out of range for int (%v)", clause, text, err)
+		ex.incomplete(KindNumericOutOfRange, t, "%s integer literal %q out of range for int (%v)", clause, text, err)
 		return nil
 	}
 	if t := v.PARAMETER(); t != nil {
@@ -833,7 +883,7 @@ func (ex *astExtractor) limitValueAsExpr(v gen.ILimitValueContext, clause string
 	// so this is unreachable today. Record a gap rather than drop the whole
 	// clause if the grammar profile ever widens — a dropped LIMIT/OFFSET
 	// silently returns more rows than the source asked for.
-	ex.incomplete("%s value %q is outside the catalogue", clause, v.GetText())
+	ex.incomplete(KindUnmodelledConstruct, v, "%s value %q is outside the catalogue", clause, v.GetText())
 	return nil
 }
 
@@ -939,34 +989,40 @@ func pathPredicateOperandValue(c gen.IPathPredicateOperandContext) aql.Value {
 // [aql.FuncCall]. A non-empty gap string reports a value the vocabulary
 // cannot represent (an out-of-range integer literal) for the caller to
 // record.
-func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, string) {
+func (ex *astExtractor) terminalAsValue(c gen.ITerminalContext) (aql.Value, valueGap) {
 	if c == nil {
-		return nil, ""
+		return nil, valueGap{}
 	}
 	if t := c.PARAMETER(); t != nil {
 		name := strings.TrimPrefix(t.GetText(), "$")
-		return aql.ParamValue{Name: name}, ""
+		return aql.ParamValue{Name: name}, valueGap{}
 	}
 	if p := c.Primitive(); p != nil {
 		v := primitiveAsValue(p)
 		if v == nil {
-			return nil, fmt.Sprintf("literal %q is out of range for the value vocabulary", p.GetText())
+			// REACHABLE by a legal query — the one surviving drop class
+			// (REQ-119 § Amends REQ-117), so it carries the numeric kind and
+			// not the defensive one.
+			return nil, valueGap{
+				Kind:   KindNumericOutOfRange,
+				Reason: fmt.Sprintf("literal %q is out of range for the value vocabulary", p.GetText()),
+			}
 		}
-		return v, ""
+		return v, valueGap{}
 	}
 	if ip := c.IdentifiedPath(); ip != nil {
 		if v, ok := bareKeywordLiteral(ip); ok {
-			return v, ""
+			return v, valueGap{}
 		}
 		// REQ-117: an identified path in a value position — carried as
 		// structured alias + segments, not raw text.
 		parsed := extractIdentifiedPath(ip, ClauseWhere)
-		return aql.PathValue{IdentifiedPath: parsed.IdentifiedPath}, ""
+		return aql.PathValue{IdentifiedPath: parsed.IdentifiedPath}, valueGap{}
 	}
 	if fc := c.FunctionCall(); fc != nil {
 		return ex.functionCallAsValue(fc)
 	}
-	return nil, ""
+	return nil, valueGap{}
 }
 
 // keywordLiteralValue maps a bare literal keyword occupying a value position —
@@ -1274,7 +1330,7 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		if p := it.Primitive(); p != nil {
 			v := primitiveAsValue(p)
 			if v == nil {
-				ex.incomplete("MATCHES value %q is out of range for the value vocabulary", p.GetText())
+				ex.incomplete(KindNumericOutOfRange, p, "MATCHES value %q is out of range for the value vocabulary", p.GetText())
 				continue
 			}
 			out = append(out, v)
@@ -1293,7 +1349,7 @@ func (ex *astExtractor) matchesExpr(path string, c gen.IMatchesOperandContext) a
 		// member would emit a NARROWER list than the source — valid AQL
 		// matching fewer values, silently — so a widened grammar must land
 		// here as a gap instead.
-		ex.incomplete("MATCHES member %q is outside the catalogue", it.GetText())
+		ex.incomplete(KindUnmodelledConstruct, it, "MATCHES member %q is outside the catalogue", it.GetText())
 	}
 	if len(out) == 0 {
 		// The grammar requires at least one valueListItem, so an empty
