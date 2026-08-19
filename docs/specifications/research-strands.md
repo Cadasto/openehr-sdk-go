@@ -216,7 +216,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 **Evidence needed:** whether the openEHR BMM treats a missing `is_abstract` on `P_BMM_INTERFACE` as implicit (in which case every consumer must infer it, and inferring is not second-guessing) or as an oversight in these six declarations. That is a question for the openEHR specifications repository, not for this tree.
 
-**Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer. Until then REQ-048's § *Abstract is the BMM's flag, not a storability verdict* holds and **MUST NOT** be pre-empted in code.
+**Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer. Until then the interim rule is REQ-048's — its § *Abstract is the BMM's flag, not a storability verdict* forbids pre-empting this strand in code.
 
 **Affects:** REQ-048, and REQ-047's divergence-reporting duty.
 
@@ -240,7 +240,7 @@ This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only m
 
 **Evidence needed:** the census this strand cannot assume — every `class_definitions` class with a primitive-mapped ancestor that declares properties, across all primary schemas, not just the one the pinned RM reduction surfaces. Whether `Iso8601_timezone` is a one-off or the visible member of a family decides which option is affordable.
 
-**Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the drop is pinned by name in PROBE-094's completeness arm (`unshippedProperties`) so it cannot grow silently, and it **MUST NOT** be resolved in code ahead of this strand.
+**Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the drop is pinned by name in [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s completeness arm (`unshippedProperties`), whose exemption rule owns the interim prohibition: a drop cannot grow silently, and folding this one in ahead of this strand fails the pin.
 
 **Affects:** REQ-042, REQ-043, REQ-046, REQ-048.
 
