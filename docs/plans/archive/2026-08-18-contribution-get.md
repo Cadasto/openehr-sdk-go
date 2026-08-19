@@ -1,10 +1,10 @@
 # Plan — Contribution read (`contribution.Get`)
 
 **Date:** 2026-08-18
-**Status:** Done (archived)
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** [REQ-142](../../specifications/wire.md#req-142--contribution-read)
-**Probes:** [PROBE-092](../../specifications/conformance.md#probe-092--contribution-read-matches-contribution_get) (Draft)
+**Probes:** [PROBE-092](../../specifications/conformance.md#probe-092--contribution-read-matches-contribution_get) (Implemented — Sandbox)
 **Implementation:** landed
 **Depends on:** landed `ehrstatus.Get` pattern; `transport.Decode`; vendored ITS-REST pin (`ehr-validation.openapi.yaml`, `contribution_get`)
 **Ordering:** [path-segment-validation](2026-08-18-path-segment-validation.md) (REQ-150) **landed** — interpolated ids now get transport-side refusal; nothing here compiles against it
@@ -46,9 +46,9 @@
 | Step | Status |
 |---|---|
 | Spec / registry (REQ-142, PROBE-092 Draft) | done in the spec PR |
-| `contribution.Get` + `Repository` | |
-| Tests + probe with citations | |
-| `make spec-check` / `make ci` | |
+| `contribution.Get` + `Repository` | done |
+| Tests + probe with citations | done |
+| `make spec-check` / `make ci` | done |
 
 ## Steps
 
@@ -63,7 +63,7 @@
 - Produces: `func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error)`
 - `Repository` grows `Get` with the same signature (minus `c`); extend the unexported adapter.
 
-- [ ] **Step 1: Failing tests** — empty `ehrID` / empty uid → `ErrInvalidConfig`, zero requests; 200 canonical JSON decodes to `*rm.Contribution`; 404 → `ErrNotFound`; captured method/path is `GET /ehr/{id}/contribution/{uid}`. Do **not** assert populated version metadata — the pin licenses none on a 200 read.
+- [x] **Step 1: Failing tests** — empty `ehrID` / empty uid → `ErrInvalidConfig`, zero requests; 200 canonical JSON decodes to `*rm.Contribution`; 404 → `ErrNotFound`; captured method/path is `GET /ehr/{id}/contribution/{uid}`. Do **not** assert populated version metadata — the pin licenses none on a 200 read.
 
 ```
 go test ./openehr/client/ehr/contribution/ -run TestGet -count=1
@@ -71,7 +71,7 @@ go test ./openehr/client/ehr/contribution/ -run TestGet -count=1
 
 Expected: FAIL — `Get` undefined.
 
-- [ ] **Step 2: Implement** (mirror `ehrstatus.Get`):
+- [x] **Step 2: Implement** (mirror `ehrstatus.Get`):
 
 ```go
 const routeGet = "/ehr/{ehr_id}/contribution/{contribution_uid}"
@@ -103,11 +103,11 @@ go test ./openehr/client/ehr/contribution/ -count=1
 
 Expected: PASS.
 
-- [ ] **Step 3: PROBE-092** (Sandbox) — request shape + 200 decode + 404 → non-nil error; no version-metadata assertion; per REQ-080 the probe never asserts sentinel identity — `ErrNotFound` / `ErrInvalidConfig` are pinned by the Step 1 unit tests only. Flip PROBE-092 Draft → Implemented (Sandbox) in `conformance.md`.
+- [x] **Step 3: PROBE-092** (Sandbox) — request shape + 200 decode + 404 → non-nil error; no version-metadata assertion; per REQ-080 the probe never asserts sentinel identity — `ErrNotFound` / `ErrInvalidConfig` are pinned by the Step 1 unit tests only. Flip PROBE-092 Draft → Implemented (Sandbox) in `conformance.md`.
 
-- [ ] **Step 4: Close out** — flip REQ-142 to `landed` in `REQ.md` + `traceability.yaml`; update the roadmap Contribution row; archive this plan.
+- [x] **Step 4: Close out** — flip REQ-142 to `landed` in `REQ.md` + `traceability.yaml`; update the roadmap Contribution row; archive this plan.
 
-- [ ] **Step 5: Verify and commit**
+- [x] **Step 5: Verify and commit**
 
 ```
 go test ./openehr/client/ehr/contribution/ ./testkit/probes/versioned/ -count=1

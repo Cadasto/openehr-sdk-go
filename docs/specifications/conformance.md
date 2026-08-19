@@ -772,7 +772,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Wire assertion:** The captured request method and path match the ITS-REST template; a 200 decodes to the contribution type (version metadata is **not** asserted — the pin defines only `Content-Type` on `200_CONTRIBUTION`); empty ids issue no request; a 404 fails with a non-nil error. Sentinel identity (`ErrNotFound`, `ErrInvalidConfig`) is pinned by `contribution` unit tests, not by this probe (REQ-080).
 - **Effect:** read-only (`GET`, no state change).
 - **Modes:** Sandbox.
-- **Status:** Implemented (Sandbox) — [`testkit/probes/versioned/probe_092_contribution_get.go`](../../testkit/probes/versioned/probe_092_contribution_get.go).
+- **Status:** Implemented (Sandbox) — [`testkit/probes/versioned/probe_092_contribution_get.go`](../../testkit/probes/versioned/probe_092_contribution_get.go); harness in [`probes_test.go`](../../testkit/probes/versioned/probes_test.go). Plan: [`docs/plans/archive/2026-08-18-contribution-get.md`](../plans/archive/2026-08-18-contribution-get.md).
 - **Satisfies:** REQ-142.
 
 #### PROBE-093 — Template list filters reach the wire
