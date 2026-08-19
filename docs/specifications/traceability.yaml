@@ -756,6 +756,13 @@ requirements:
     # and a bare boolean literal in any value position (comparison operand, SELECT projection, function argument). No new codes, no severity change,
     # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
     # row and its § in clinical-modeling.md.
+    #
+    # § Value-free lint diagnostics (2026-08-19) adds Issue.Span — a re-export
+    # of parse.Span, NOT a twin, so a lint issue and a dropped construct are
+    # compared rather than converted — and pins normatively which fields are
+    # value-free (Code / Severity / Span) and which may carry query text
+    # (Detail / Path — a path spelling carries its own predicates). No code
+    # added or removed, so PROBE-028's multiset is untouched.
     implementation: landed
     packages:
       - openehr/aql/parse
@@ -765,15 +772,17 @@ requirements:
       - openehr/templatecompile  # REQ-111 — lint.Options.Compiled is the public compiled type
       - internal/templatecompile
       - testkit/probes/aql
-    probes: [PROBE-028]
+    probes: [PROBE-028, PROBE-096]
     plans:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
+      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
       - openehr/aql/parse/imports_test.go
       - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/span_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/validation/aql_test.go
@@ -1066,6 +1075,34 @@ requirements:
     # class-predicate ParsedPath is now populated too (Segments with an empty
     # Alias, mirroring the WHERE side) so a consumer need not re-split the
     # relative predicate path.
+    #
+    # Two sections were added 2026-08-19 and BOTH LANDED the same day —
+    # § Structured node predicates (a typed sum beside the verbatim predicate
+    # text, path-SEGMENT position only; the class position keeps the carriers
+    # above) and § Value-free structured drop records (a {kind, clause, span}
+    # record beside ErrIncompleteAST, with no source text in any field).
+    # Plans below; PROBE-095 / PROBE-096. The branch review then corrected the
+    # predicate section's "empty unstructured set" claim: three
+    # pathPredicateOperand forms are enumerated as unstructured, and the
+    # grammar sweep now descends into that production.
+    #
+    # The drop records LANDED 2026-08-19 (PROBE-096): Document.Dropped(), a
+    # ConstructKind closed over drop CLASSES rather than call sites, Clause
+    # extended append-only, and Span as a line/col pair over Position. Writing
+    # the unreachability arm caught a misclassification — an out-of-range
+    # literal in a WHERE comparison reached a site labelled defensive, because
+    # the gap travelled as a bare string — so the kind now travels with the
+    # reason.
+    #
+    # § Structured node predicates LANDED the same day (PROBE-095):
+    # PathSegment.Parsed carries a sealed sum over the whole pathPredicate
+    # position — node id (± name), archetype HRID (± name), $param,
+    # comparison, MATCHES regex, AND/OR junction — with components
+    # delimiter-free, escape-resolved and trivia-free, plus EqualPredicates as
+    # the panic-free equality the aql.Value comparability trap requires. The
+    # class position is UNCHANGED and keeps the carriers above: two carriers
+    # populated from one source node is drift by construction. Emission reads
+    # Raw only, asserted rather than assumed.
     implementation: landed
     packages:
       - openehr/aql
@@ -1073,15 +1110,21 @@ requirements:
     probes:
       - PROBE-080
       - PROBE-082
+      - PROBE-095
+      - PROBE-096
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/structured_test.go
+      - openehr/aql/parse/dropped_test.go
+      - openehr/aql/parse/predicate_structure_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
+      - docs/plans/archive/2026-08-18-aql-structured-node-predicates.md
+      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
 
   - id: REQ-116
     title: Template-level node naming and name-predicated paths
@@ -1914,3 +1957,4 @@ requirements:
     packages: [transport, openehr/client]
     probes: [PROBE-091]
     plans: [docs/plans/2026-08-18-path-segment-validation.md]
+

@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -24,6 +25,19 @@ const (
 	ClauseWhere
 	// ClauseOrderBy is the ORDER BY list.
 	ClauseOrderBy
+	// ClauseFrom is the FROM / CONTAINS tree. Appended after ClauseOrderBy
+	// rather than inserted in clause order: the members above are published
+	// and their numeric values MUST stay put (REQ-113 § The clause axis
+	// reuses the landed enum).
+	ClauseFrom
+	// ClauseLimit is the LIMIT value.
+	ClauseLimit
+	// ClauseOffset is the OFFSET value.
+	ClauseOffset
+	// ClauseTop is the deprecated SELECT TOP clause (REQ-118) — distinct from
+	// ClauseSelect so a diagnostic can name the row-count position rather
+	// than the whole projection.
+	ClauseTop
 )
 
 // String renders the clause name for diagnostics.
@@ -35,8 +49,78 @@ func (c Clause) String() string {
 		return "where"
 	case ClauseOrderBy:
 		return "order by"
+	case ClauseFrom:
+		return "from"
+	case ClauseLimit:
+		return "limit"
+	case ClauseOffset:
+		return "offset"
+	case ClauseTop:
+		return "top"
+	case ClauseUnknown:
+		return "unknown"
 	}
 	return "unknown"
+}
+
+// endOf is the position just past tok's last character. A token whose text
+// spans lines (a string literal carrying a newline) advances the line and
+// restarts the column, so the span stays meaningful instead of reporting a
+// column past the end of the first line.
+func endOf(tok antlr.Token) Position {
+	if tok == nil {
+		return Position{}
+	}
+	text := tok.GetText()
+	if n := strings.Count(text, "\n"); n > 0 {
+		last := text[strings.LastIndex(text, "\n")+1:]
+		return Position{Line: tok.GetLine() + n, Col: 1 + len([]rune(last))}
+	}
+	// ANTLR columns are 0-based; posOf exposes 1-based, and so does this.
+	return Position{Line: tok.GetLine(), Col: tok.GetColumn() + 1 + len([]rune(text))}
+}
+
+// spanAt is the [Span] of whichever ANTLR shape the extractor holds when it
+// records a drop — a rule context, a terminal node, or a bare token. The
+// three share no interface, and a drop site should not have to pick a helper
+// per shape.
+func spanAt(node any) Span {
+	// An absent node yields a zero span whether the nil arrives untyped or
+	// typed — a typed nil would satisfy the interface cases below and panic
+	// inside the accessor, and a diagnostics helper must not be able to
+	// panic. This is a nil GUARD, not type dispatch (the REQ-024 reflection
+	// rule binds `_type` dispatch).
+	if node == nil {
+		return Span{}
+	}
+	if rv := reflect.ValueOf(node); rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return Span{}
+	}
+	switch n := node.(type) {
+	case antlr.ParserRuleContext:
+		return boundedSpan(posOf(n.GetStart()), endOf(n.GetStop()))
+	case antlr.TerminalNode:
+		return boundedSpan(posOf(n.GetSymbol()), endOf(n.GetSymbol()))
+	case antlr.Token:
+		return boundedSpan(posOf(n), endOf(n))
+	}
+	return Span{}
+}
+
+// boundedSpan keeps the documented [Start, End) contract when the two
+// endpoints were computed independently: a missing endpoint (an epsilon rule
+// match leaving GetStop nil) collapses the span to zero width at the known
+// one rather than producing an inverted range.
+func boundedSpan(start, end Position) Span {
+	switch {
+	case start == (Position{}) && end == (Position{}):
+		return Span{}
+	case start == (Position{}):
+		return Span{Start: end, End: end}
+	case end == (Position{}):
+		return Span{Start: start, End: start}
+	}
+	return Span{Start: start, End: end}
 }
 
 // ClassExpr is one class expression bound in the FROM / CONTAINS tree
@@ -211,6 +295,10 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 			}
 			if pp := part.PathPredicate(); pp != nil {
 				seg.Predicate = trimBrackets(sourceText(pp))
+				// REQ-113 § Structured node predicates: the typed form beside
+				// the verbatim text. Both path extractors populate it, because
+				// their outputs are compared for equality.
+				seg.Parsed = structuredPathPredicate(pp)
 			}
 			ip.Segments = append(ip.Segments, seg)
 		}

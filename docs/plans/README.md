@@ -28,13 +28,11 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 ### Model & diagnostics asks (2026-08-18)
 
-Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. Proposed ids: REQ-124 in the RM-behavioural headroom; REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is the transport extension band — first allocation REQ-150).
+The two AQL plans **landed 2026-08-19 and were archived** ([archive/2026-08-18-aql-structured-node-predicates.md](archive/2026-08-18-aql-structured-node-predicates.md), [archive/2026-08-18-aql-value-free-diagnostics.md](archive/2026-08-18-aql-value-free-diagnostics.md)) — no new requirement ids: each extended the landed requirement that already owned its surface ([REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast), [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint)), and PROBE-095 / PROBE-096 are implemented inline. The grounding story — four plan errors caught by checking the vendored grammar and the extractor before writing code, a fifth caught by a test, and the review round that closed the operand-level gap — is recorded in the archived plans and the [archive README](archive/README.md). The `rminfo` plan is the one still open, and still needs its own spec text written.
 
-| Plan | Scope | Covers (proposed) | Probe (proposed) |
+| Plan | Scope | Covers | Probe |
 |---|---|---|---|
-| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, ancestors, conformance, concrete descendants) + declaration-site attribute lookup | REQ-124 (builds on REQ-041/042/045) | PROBE-094 |
-| [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | Typed node/segment/class predicate model beside the verbatim text | REQ-160 (builds on REQ-113/117/119) | PROBE-095 |
-| [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | Structured drop-channel records + lint spans, with a value-free field contract | REQ-161 (builds on REQ-109/113) | PROBE-096 |
+| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy + declaration-site attribute lookup | REQ-124 (**proposed**) | PROBE-094 (proposed) |
 
 ### Ecosystem fit-gap delivery (2026-07-16)
 

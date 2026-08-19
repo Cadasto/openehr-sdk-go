@@ -35,20 +35,63 @@ func (s Severity) String() string {
 	return fmt.Sprintf("severity(%d)", int(s))
 }
 
+// Span is where in the query an [Issue] applies — the SAME type the parser
+// records a dropped construct with ([parse.Span]), re-exported rather than
+// redefined, so a consumer correlating a lint issue with a
+// [parse.DroppedConstruct] compares spans instead of converting between two
+// structurally-identical types (REQ-109 § Value-free lint diagnostics).
+type Span = parse.Span
+
+// spanOfText is the span a construct of the given text occupies starting at
+// start. Text carrying a newline advances the line and restarts the column, so
+// a multi-line path does not report a column past the end of its first line.
+// A zero start yields the zero Span — an unattributable issue reports that
+// rather than an invented position.
+func spanOfText(start parse.Position, text string) Span {
+	if start == (parse.Position{}) {
+		return Span{}
+	}
+	end := start
+	if n := strings.Count(text, "\n"); n > 0 {
+		end.Line += n
+		end.Col = 1 + len([]rune(text[strings.LastIndex(text, "\n")+1:]))
+	} else {
+		end.Col += len([]rune(text))
+	}
+	return Span{Start: start, End: end}
+}
+
 // Issue is one finding from a lint pass. Lint is collect-all (every issue,
 // not fail-fast). The zero value is not meaningful.
 type Issue struct {
 	// Code is a stable programmatic identifier (e.g. "aql_syntax",
 	// "aql_archetype_not_in_template"). Consumers SHOULD dispatch on Code.
+	//
+	// VALUE-FREE: never carries source text.
 	Code string
 	// Path is the AQL path or class the issue concerns; "" when not
 	// localised.
+	//
+	// VALUE-BEARING: a path spelling carries its own predicates, so
+	// `o/data[at0001, 'Systolic']` is a path AND a value. A disclosure
+	// boundary MUST treat this as query text despite its looking structural.
 	Path string
 	// Detail is a human-readable message (carries ANTLR line/col for
 	// syntax errors).
+	//
+	// VALUE-BEARING: may quote any part of the query.
 	Detail string
 	// Severity classifies the issue.
+	//
+	// VALUE-FREE: never carries source text.
 	Severity Severity
+	// Span locates the issue in the query text handed to [LintString] (or to
+	// [parse.Parse] for [Lint]). The zero Span means the issue is not
+	// attributable to a position; it never falls back to embedding source
+	// text (REQ-109 § Value-free lint diagnostics).
+	//
+	// VALUE-FREE: line and column numbers only.
+	Span Span
 }
 
 // Result aggregates every [Issue] from one [Lint] / [LintString] call.
@@ -97,9 +140,22 @@ func LintString(q string, opts *Options) Result {
 			Code:     "aql_syntax",
 			Detail:   syntaxDetail(err),
 			Severity: Error,
+			Span:     syntaxSpan(err),
 		}}}
 	}
 	return Lint(doc, opts)
+}
+
+// syntaxSpan is the zero-width span at a parse failure's position, or the zero
+// Span when the error carries none. Zero-width because the parser reports where
+// it stopped, not how much text was at fault — an invented end would claim more
+// than the diagnostic knows.
+func syntaxSpan(err error) Span {
+	se, ok := errors.AsType[*parse.SyntaxError](err)
+	if !ok {
+		return Span{}
+	}
+	return Span{Start: se.Pos, End: se.Pos}
 }
 
 // syntaxDetail formats a parse failure for lint consumers. REQ-109 requires
@@ -168,6 +224,9 @@ func shapeIssues(doc *parse.Document, md Metadata) []Issue {
 			Path:     displayPath(p),
 			Detail:   fmt.Sprintf("path alias %q is not bound in FROM/CONTAINS", p.Alias),
 			Severity: Error,
+			// The alias is the path's first token, so Pos starts it: the span
+			// covers the unbound alias itself, not the whole path.
+			Span: spanOfText(p.Pos, p.Alias),
 		})
 	}
 
