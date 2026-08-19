@@ -104,6 +104,9 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-122 | Version-control derived helpers | [rm-functions.md § REQ-122](rm-functions.md#req-122--version-control-derived-helpers) | landed |
 | REQ-123 | Temporal data-value helpers | [rm-functions.md § REQ-123](rm-functions.md#req-123--temporal-data-value-helpers) | landed |
 | REQ-140 | Underscore-prefixed RM attributes (simplified formats) | [wire.md § REQ-140](wire.md#req-140--underscore-prefixed-rm-attributes) | landed |
+| REQ-142 | Contribution read | [wire.md § REQ-142](wire.md#req-142--contribution-read) | planned |
+| REQ-143 | Template list filters | [wire.md § REQ-143](wire.md#req-143--template-list-filters) | planned |
+| REQ-150 | Path-parameter segment validation | [transport.md § REQ-150](transport.md#req-150--path-parameter-segment-validation) | planned |
 
 **Impl.** column: `landed` (code + tests), `partial` (subset), `planned` (spec only), `deprecated` (normative text retained; implementation removed or not shipped — removal target in canonical spec). Detail in [`traceability.yaml`](traceability.yaml).
 
@@ -128,8 +131,9 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Clinical modeling | 100–119 | — (see note) |
 | RM behavioural functions | 120–123 | 124–129 |
 | SDK authoring & client tooling | 130 (reserved) | 131–139 |
-| Wire format — extensions | 140 | 141–149 |
+| Wire format — extensions | 140, 142–143 | 141, 144–149 |
+| Transport — extensions | 150 | 151–159 |
 
 Identifiers **MUST** be stable once published. Renumbering is prohibited.
 
-The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. The clinical-modeling band (100–119) is **exhausted** as of REQ-119: 110–113 and 116–119 are registered, and 114 / 115 are reserved by the [OPT author-validator](../plans/2026-07-16-opt-author-validator.md) and [FLAT author-linter](../plans/2026-07-16-flat-author-linter.md) plans. The next clinical-modeling requirement needs a new band, allocated here first. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130).
+The wire band (050–059) is exhausted; **140–149** continues it for wire-format requirements. **REQ-141 is retired, not free**: it was briefly assigned to the path-validation requirement during PR #107's review and re-homed to the transport band as REQ-150; re-using 141 for an unrelated requirement would make that review history ambiguous, so the wire band continues at 142. The clinical-modeling band (100–119) is **exhausted** as of REQ-119: 110–113 and 116–119 are registered, and 114 / 115 are reserved by the [OPT author-validator](../plans/2026-07-16-opt-author-validator.md) and [FLAT author-linter](../plans/2026-07-16-flat-author-linter.md) plans. The next clinical-modeling requirement needs a new band, allocated here first. **130–139** is reserved for the SDK authoring & client tooling band proposed by the [ContributionBuilder plan](../plans/2026-07-16-contribution-builder.md) (REQ-130). The transport / REST-extension range (096–099) is exhausted; **150–159** continues it for transport requirements (first allocation: REQ-150). **160–169** is proposed — not yet allocated — as an "AQL structured model & diagnostics" band by the [structured-node-predicates](../plans/2026-08-18-aql-structured-node-predicates.md) and [value-free-diagnostics](../plans/2026-08-18-aql-value-free-diagnostics.md) draft plans (proposed REQ-160/161); Phase 0 of whichever lands first allocates it here.

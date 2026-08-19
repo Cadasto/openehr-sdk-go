@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094 plus the REQ-096..098 extension range.
+Normative contract for `transport/` — HTTP wrapping around an injected `*http.Client`, cross-cutting wire hygiene, and REST binding helpers shared by all `openehr/client/*` leaf packages. Covers REQ-090 through REQ-094, the REQ-096..098 extension range, and REQ-150 (path-parameter segment validation).
 
 openEHR resource semantics (Compositions, AQL, canonical codecs) live in [wire.md](wire.md). Service catalog resolution lives in [service-discovery.md](service-discovery.md).
 
@@ -109,9 +109,9 @@ Rules:
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-All three write-path modes are landed across `composition` / `directory` / `ehr_status`: `representation` decodes the bare resource (REQ-094) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
+All three write-path modes are landed for the shared `WriteResult` family (`composition` / `directory` / `ehr_status` / `demographic`): `representation` decodes the bare resource (REQ-094) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. [`contribution.Commit`](../../openehr/client/ehr/contribution/contribution.go) (its own `WithPrefer`) carries `minimal` and the `representation` decode only: an empty `representation` body is today a silent metadata-only success — closed by the [write-result plan](../plans/2026-08-18-write-result-contract.md) — and the `identifier` slot is never populated from the body (deferred; recorded in that plan's Defers). See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
 
-- **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr)
+- **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 
 ---
 
@@ -186,6 +186,43 @@ Out of scope:
 
 ---
 
+## REQ-150 — Path-parameter segment validation
+
+`REQ-095` makes the transport the single canonical path *encoder*. This requirement makes it the single path-*segment validator* as well. Encoding without validation leaves every caller owning a class of request-URI mutation that the type system cannot see.
+
+Before issuing an HTTP request, the transport **MUST** validate the decoded `Request.Path` (not the service base URL). The path is split on `/`; the leading empty segment of an absolute path is ignored. A `Request.Path` of exactly `"/"` — the service root, the System API's only operation (`OPTIONS /`, sent by the landed `system.Capabilities` / `Version` / `Health`) — carries no segments and **MUST** pass. Every remaining segment of any other path **MUST** be non-empty and **MUST NOT**:
+
+- be `.` or `..`;
+- contain `\`;
+- contain a control character (bytes `< 0x20` or `DEL` `0x7F`).
+
+A space or any other percent-encodable octet **MUST** be accepted — encoding remains the transport's job (REQ-095). Validation **MUST** run on the decoded path the transport already requires. A literal `%2e%2e` that was not decoded is an ordinary segment, not a separator.
+
+The transport **MUST NOT** honour a caller-populated `url.URL.RawPath` when building the request URI: the encoded form is derived from the validated decoded path alone (REQ-095), so a pre-encoded spelling cannot bypass validation.
+
+A violation **MUST**:
+
+- return `ErrInvalidPathSegment` wrapped with `ErrInvalidConfig` (so `errors.Is(err, ErrInvalidConfig)` still means the request never left the process);
+- issue **no** HTTP request.
+
+The SDK **MUST** export the same checks as package functions so a caller constructing a raw `Request` can preflight:
+
+- `ValidatePathSegment(s string) error` — one interpolated identifier (a `/` in `s` is a violation);
+- `ValidateRequestPath(path string) error` — the whole decoded `Request.Path`; the transport's join step **MUST** use this.
+
+(The `Validate*`-returns-`error` spelling follows the repo's own precedent — `template.ValidatePath`, `aql.ValidateIdentifier` — where `Valid*` names return `bool`, as in `rm.TimeDefinitions.ValidDay`.)
+
+`ValidateRequestPath` splits on `/`, so an interpolated parameter that *contains* `/` produces well-formed segments that segment inspection alone cannot catch. When `Request.Route` is set, the transport **MUST** therefore also refuse a decoded `Request.Path` whose segment count differs from the route template's — a smuggled separator changes the count and mutates the request URI onto a different route. Path-interpolating leaf requests **MUST** set `Route`, and that sentence is load-bearing rather than observability: the arity rule runs only when `Route` is set, so an unset `Route` silently disables the smuggling defence. The check **MUST** key on the `Route` field itself being non-empty — never on a helper that falls back to `Path` (comparing a path's arity against itself never fires) — and the SDK **MUST** carry a tripwire test asserting that every `transport.Request` literal under `openehr/client/` sets `Route` (every current leaf does; the same field feeds REQ-090 span naming).
+
+Leaf clients **MUST NOT** re-implement the check. Stated as behaviour: a parameter that is a well-formed openEHR identifier satisfies every rule above and passes; a parameter carrying a `/` is refused as a smuggled separator; and validation **MUST** run unconditionally — never skipped on the expectation that openEHR identifiers carry no separator, which is exactly the expectation a hostile identifier exploits.
+
+Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL; the `cadasto/admin` health-probe paths (`WithLivePath` / `WithReadyPath`), which bypass `transport.Do` by design and keep their own non-empty / leading-`/` guard.
+
+- **Lives in:** [`transport/`](../../transport)
+- **Probes:** PROBE-091 (Draft)
+
+---
+
 ## Coverage
 
 | REQ | Package |
@@ -197,3 +234,4 @@ Out of scope:
 | REQ-094 | `transport/`, `openehr/client/*` |
 | REQ-096 | `transport/` |
 | REQ-098 | `transport/` |
+| REQ-150 | `transport/`, `openehr/client/*` |
