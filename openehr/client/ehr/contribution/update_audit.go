@@ -60,8 +60,14 @@ type updateAuditJSON struct {
 // MarshalJSON emits the ITS-REST write-side audit shape. `_type` is the
 // resolved [AuditType] (default AuditTypeAuditDetails); time_committed is
 // never emitted (server-assigned).
+// committerPopulated reports whether c holds a non-nil PartyProxy suitable
+// for the write path. Bare-nil and typed-nil pointers count as absent.
+func committerPopulated(c rm.PartyProxy) bool {
+	return c != nil && !rm.IsTypedNil(c)
+}
+
 func (a UpdateAudit) MarshalJSON() ([]byte, error) {
-	if a.Committer == nil {
+	if !committerPopulated(a.Committer) {
 		return nil, errors.New("contribution.UpdateAudit: Committer is required")
 	}
 	t := a.Type

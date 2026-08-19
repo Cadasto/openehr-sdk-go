@@ -65,24 +65,28 @@ func TestSubmissionValidate(t *testing.T) {
 		{
 			name: "ORIGINAL_VERSION<Composition> ok",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{newOriginalVersion()},
 			},
 		},
 		{
 			name: "ORIGINAL_VERSION<Folder> ok",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{newOriginalVersionFolder()},
 			},
 		},
 		{
 			name: "ORIGINAL_VERSION<EHRAccess> ok",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{newOriginalVersionEHRAccess()},
 			},
 		},
 		{
 			name: "IMPORTED_VERSION<Composition> ok",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{newImportedVersion()},
 			},
 		},
@@ -94,6 +98,7 @@ func TestSubmissionValidate(t *testing.T) {
 		{
 			name: "rejects nil element",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{nil},
 			},
 			wantErr: "is nil",
@@ -101,6 +106,7 @@ func TestSubmissionValidate(t *testing.T) {
 		{
 			name: "rejects non-version type (wrong wrapper)",
 			sub: &contribution.Submission{
+				Audit:    newAudit(),
 				Versions: []contribution.CommitVersion{fakeNonVersion{}},
 			},
 			wantErr: `BMMName="WRONG_TYPE"`,
@@ -108,6 +114,7 @@ func TestSubmissionValidate(t *testing.T) {
 		{
 			name: "rejects OriginalVersion[T] with non-versionable T",
 			sub: &contribution.Submission{
+				Audit: newAudit(),
 				// rm.PartyIdentified is NOT in the spec's
 				// Contribution_create closed set — the wrapper's
 				// BMMName is ORIGINAL_VERSION but the concrete
@@ -121,6 +128,44 @@ func TestSubmissionValidate(t *testing.T) {
 				},
 			},
 			wantErr: "OriginalVersion[",
+		},
+		{
+			name: "rejects batch Audit with nil committer",
+			sub: &contribution.Submission{
+				Versions: []contribution.CommitVersion{newOriginalVersion()},
+			},
+			wantErr: "Submission.Audit: committer is nil",
+		},
+		{
+			name: "rejects batch Audit with typed-nil committer",
+			sub: &contribution.Submission{
+				Audit: contribution.UpdateAudit{
+					Committer: (*rm.PartyIdentified)(nil),
+				},
+				Versions: []contribution.CommitVersion{newOriginalVersion()},
+			},
+			wantErr: "Submission.Audit: committer is nil",
+		},
+		{
+			name: "rejects version commit_audit with typed-nil committer",
+			sub: &contribution.Submission{
+				Audit: newAudit(),
+				Versions: []contribution.CommitVersion{
+					contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
+						Version: rm.Version[rm.Composition]{
+							CommitAudit: rm.AuditDetails{
+								Committer:  (*rm.PartyIdentified)(nil),
+								ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+								SystemID:   "cdr.example",
+							},
+						},
+						UID:            rm.ObjectVersionID{Value: "1::cdr.example::1"},
+						LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+						Data:           &rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"},
+					}),
+				},
+			},
+			wantErr: "commit_audit.committer is nil",
 		},
 	}
 	for _, tc := range tests {
@@ -184,7 +229,7 @@ func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
 					t.Fatalf("constructing Submission panicked: %v", r)
 				}
 			}()
-			sub := &contribution.Submission{Versions: []contribution.CommitVersion{tc.wrap()}}
+			sub := &contribution.Submission{Audit: newAudit(), Versions: []contribution.CommitVersion{tc.wrap()}}
 			err := sub.Validate()
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("error = %v; want substring %q", err, tc.wantErr)
@@ -211,7 +256,7 @@ func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
 					t.Fatalf("Validate panicked: %v", r)
 				}
 			}()
-			sub := &contribution.Submission{Versions: []contribution.CommitVersion{tc.v}}
+			sub := &contribution.Submission{Audit: newAudit(), Versions: []contribution.CommitVersion{tc.v}}
 			err := sub.Validate()
 			if err == nil || !strings.Contains(err.Error(), "typed-nil") {
 				t.Errorf("error = %v; want substring %q", err, "typed-nil")

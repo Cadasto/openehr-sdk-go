@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
@@ -239,5 +240,23 @@ func TestSubmissionAuditNoTimeCommitted(t *testing.T) {
 	}
 	if got := body.Audit["_type"]; got != "AUDIT_DETAILS" {
 		t.Errorf("Submission.audit._type = %v, want AUDIT_DETAILS", got)
+	}
+}
+
+func TestUpdateAuditMarshalRejectsAbsentCommitter(t *testing.T) {
+	cases := []struct {
+		name string
+		a    contribution.UpdateAudit
+	}{
+		{"nil committer", contribution.UpdateAudit{}},
+		{"typed-nil PartyIdentified", contribution.UpdateAudit{Committer: (*rm.PartyIdentified)(nil)}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := json.Marshal(tc.a)
+			if err == nil || !strings.Contains(err.Error(), "Committer is required") {
+				t.Errorf("MarshalJSON error = %v; want substring %q", err, "Committer is required")
+			}
+		})
 	}
 }

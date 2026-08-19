@@ -57,11 +57,13 @@ type CommitVersion interface {
 // *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
 // rm.Folder, rm.EHRAccess} — the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
-// also required (the spec rejects an empty contribution). A wrapped
-// version whose Version is nil or whose commit_audit has no Committer
-// is rejected — the empty UpdateAudit [WrapOriginalVersion] /
-// [WrapImportedVersion] produce for nil caller input surfaces here as
-// a typed error rather than as a panic (REQ-025).
+// also required (the spec rejects an empty contribution). Submission.Audit
+// and each version commit_audit MUST have a populated Committer (bare-nil
+// and typed-nil PartyProxy both count as absent). A wrapped version whose
+// Version is nil or whose commit_audit has no Committer is rejected — the
+// empty UpdateAudit [WrapOriginalVersion] / [WrapImportedVersion] produce
+// for nil caller input surfaces here as a typed error rather than as a
+// panic (REQ-025).
 //
 // Implemented as an explicit type-switch over the 8 concrete generic
 // instantiations (no reflection per REQ-024). Other types satisfying
@@ -72,6 +74,9 @@ type CommitVersion interface {
 func (s *Submission) Validate() error {
 	if len(s.Versions) == 0 {
 		return errors.New("Submission.Versions: empty (Contribution_create requires at least one version)")
+	}
+	if err := validateBatchAudit(s.Audit); err != nil {
+		return err
 	}
 	for i, v := range s.Versions {
 		if v == nil {
@@ -125,11 +130,18 @@ func (v *ImportedVersion[T]) validateWrite(index int) error {
 	return validateWriteAudit(index, v.CommitAudit)
 }
 
-func validateWriteAudit(index int, a UpdateAudit) error {
-	if a.Committer == nil {
-		return fmt.Errorf("Submission.Versions[%d]: commit_audit.committer is nil", index)
+func validateBatchAudit(a UpdateAudit) error {
+	if committerPopulated(a.Committer) {
+		return nil
 	}
-	return nil
+	return errors.New("Submission.Audit: committer is nil")
+}
+
+func validateWriteAudit(index int, a UpdateAudit) error {
+	if committerPopulated(a.Committer) {
+		return nil
+	}
+	return fmt.Errorf("Submission.Versions[%d]: commit_audit.committer is nil", index)
 }
 
 // submissionJSON is the on-the-wire shape — no `_type` envelope because

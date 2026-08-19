@@ -2,6 +2,7 @@ package contribution_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
@@ -364,6 +365,37 @@ func TestWrapOriginalVersionNilInputsDoNotPanic(t *testing.T) {
 			}
 			if tc.in != nil && got.Version != tc.in {
 				t.Errorf("Version pointer not preserved")
+			}
+		})
+	}
+}
+
+// TestWrapVersionMarshalJSONRejectsNilVersion pins the alternate REQ-025
+// fail-closed path: callers who skip Submission.Validate still get a typed
+// error from MarshalJSON when the wrapper has no underlying Version.
+func TestWrapVersionMarshalJSONRejectsNilVersion(t *testing.T) {
+	cases := []struct {
+		name string
+		m    func() ([]byte, error)
+	}{
+		{
+			name: "WrapOriginalVersion(nil)",
+			m: func() ([]byte, error) {
+				return contribution.WrapOriginalVersion[rm.Composition](nil).MarshalJSON()
+			},
+		},
+		{
+			name: "WrapImportedVersion(nil)",
+			m: func() ([]byte, error) {
+				return contribution.WrapImportedVersion[rm.Composition](nil).MarshalJSON()
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.m()
+			if err == nil || !strings.Contains(err.Error(), "Version is nil") {
+				t.Errorf("MarshalJSON error = %v; want substring %q", err, "Version is nil")
 			}
 		})
 	}
