@@ -2,6 +2,7 @@ package rminfo_test
 
 import (
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
@@ -509,4 +510,75 @@ func TestHierarchyTerminatesOnCyclicSyntheticModel(t *testing.T) {
 	if ds, known := h.ConcreteDescendants("A"); !known || !slices.Equal(ds, []string{"A", "B"}) {
 		t.Errorf("ConcreteDescendants(A) = (%v, %t), want ([A B], true)", ds, known)
 	}
+}
+
+// TestHierarchyConcurrentFirstUse — REQ-048. The descendant index is built
+// lazily under a sync.Once, beside the pre-existing KnownRMTypes cache. Two
+// lazy caches on one shared Default is where a data race would live, so the
+// first use is driven from many goroutines at once: this test is written to be
+// meaningful under `go test -race`, and it also catches a Once that publishes a
+// half-built map by returning a wrong answer.
+func TestHierarchyConcurrentFirstUse(t *testing.T) {
+	// A fresh Lookup, so the caches really are cold when the goroutines start.
+	h, ok := rminfo.New(rminfoDefaultDataCopy(t)).(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.New does not implement Hierarchy")
+	}
+	const goroutines = 32
+	got := make([][]string, goroutines)
+	var wg sync.WaitGroup
+	for i := range goroutines {
+		wg.Go(func() {
+			d, _ := h.ConcreteDescendants("ENTRY")
+			got[i] = d
+		})
+	}
+	wg.Wait()
+	want := []string{"ACTION", "ADMIN_ENTRY", "EVALUATION", "INSTRUCTION", "OBSERVATION"}
+	for i, d := range got {
+		if !slices.Equal(d, want) {
+			t.Errorf("goroutine %d saw ConcreteDescendants(ENTRY) = %v, want %v", i, d, want)
+		}
+	}
+}
+
+// rminfoDefaultDataCopy rebuilds a data map equivalent to the generated one,
+// through the public surface, so a test can exercise a COLD Lookup without
+// reaching into package state.
+func rminfoDefaultDataCopy(t *testing.T) map[string]rminfo.ClassMeta {
+	t.Helper()
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement Hierarchy")
+	}
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement AttributeLister")
+	}
+	out := map[string]rminfo.ClassMeta{}
+	for _, class := range rminfo.Default.KnownRMTypes() {
+		abstract, _ := h.IsAbstract(class)
+		parents, _ := h.Parents(class)
+		order := lister.AttributeNames(class)
+		attrs := make(map[string]rminfo.AttrMeta, len(order))
+		required := rminfo.Default.RequiredAttributes(class)
+		for _, attr := range order {
+			typeName, _ := rminfo.Default.AttributeRMType(class, attr)
+			container, _ := rminfo.Default.IsContainer(class, attr)
+			site, _ := h.DeclaredOn(class, attr)
+			attrs[attr] = rminfo.AttrMeta{
+				TypeName:   typeName,
+				Required:   slices.Contains(required, attr),
+				Container:  container,
+				DeclaredIn: site,
+			}
+		}
+		out[class] = rminfo.ClassMeta{
+			Attributes: attrs,
+			AttrOrder:  order,
+			Abstract:   abstract,
+			Parents:    parents,
+		}
+	}
+	return out
 }
