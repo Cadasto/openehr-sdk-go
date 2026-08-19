@@ -298,7 +298,7 @@ func TestDriftDetectionCoversHierarchyFields(t *testing.T) {
 	}{
 		{"Abstract", "Abstract:   true,", "Abstract:  false,"},
 		{"Parents", `Parents:    []string{"OPENEHR_DEFINITIONS"}`, `Parents:    []string{"openehr_definitions"}`},
-		{"DeclaredIn", `DeclaredIn: "LOCATABLE"`, `DeclaredIn: "COMPOSITIO"`},
+		{"DeclaredIn", `DeclaredIn: "LOCATABLE"`, `DeclaredIn: "locatable"`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
