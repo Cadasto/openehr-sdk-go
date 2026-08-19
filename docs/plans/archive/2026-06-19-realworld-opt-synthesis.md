@@ -3,8 +3,8 @@
 **Date:** 2026-06-19  
 **Status:** Landed  
 **Owner:** SDK maintainers  
-**Covers:** [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder), [REQ-103](../specifications/clinical-modeling.md#req-103--primitive-constraint-example-values) (interval leaves), [REQ-110](../specifications/clinical-modeling.md#req-110--validation-v2) (soundness contract)  
-**Probes:** [PROBE-027](../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  
+**Covers:** [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator), [REQ-101](../../specifications/clinical-modeling.md#req-101--generic-opt-driven-composition-builder), [REQ-103](../../specifications/clinical-modeling.md#req-103--primitive-constraint-introspection) (interval leaves), [REQ-110](../../specifications/clinical-modeling.md#req-110--template-driven-validation-beyond-composition) (soundness contract)  
+**Probes:** [PROBE-027](../../specifications/conformance.md#probe-027--generated-instance-validates-clean) — extend corpus after fixes  
 **Implementation:** landed  
 **Depends on:** v0.9.0 public `templatecompile.Compile` bridge (landed)  
 **Consumer:** a consuming CDR project — `TestNewSkeleton_CorpusCoverage` tripwire; closes when `newSkeletonGaps` allow-list shrinks to empty  

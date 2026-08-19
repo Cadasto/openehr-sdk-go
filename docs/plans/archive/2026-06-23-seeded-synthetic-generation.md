@@ -18,11 +18,11 @@
 
 Lands on the shared delivery branch. Scope this pass: **value-fill + seed only**; the `medium` structural level is deferred (it is the bulk of the new structural work and independently useful — see [Deferred](#deferred-follow-up)).
 
-- **Orthogonal `ValueFill` axis** on [`instance.Options`](../../openehr/instance/options.go): `ValueFill ∈ {ExampleFill (default — today's `ExampleValue()` behaviour), RandomFill}`, composable with any `Policy`. No `Synthetic` policy (would conflate structure and values).
+- **Orthogonal `ValueFill` axis** on [`instance.Options`](../../../openehr/instance/options.go): `ValueFill ∈ {ExampleFill (default — today's `ExampleValue()` behaviour), RandomFill}`, composable with any `Policy`. No `Synthetic` policy (would conflate structure and values).
 - **`ValueSource rand.Source` seam**, mirroring the existing `UIDSource`. A fixed source ⇒ byte-reproducible output; nil ⇒ a fresh (time-seeded) source so successive calls differ. Threaded through the `generator` exactly like `UIDSource`.
 - **Generator-internal sampler** (`openehr/instance/sample.go`): draws a value from within each primitive constraint by reading the fields it already carries (`CInteger.Range/List`, `CReal.Range/List`, `CodePhrase.CodeList`, `CDvOrdinal`, `DvQuantity`, `CString`, `CDate*`/temporal), self-verified against the existing `PrimitiveConstraint.Validate(value any)` so output is *valid by construction* (falls back to `ExampleValue()` for the unbounded case or any draw that fails `Validate`). The REQ-103 `PrimitiveConstraint` interface is **unchanged** — no `RandomValue` method is added.
 - `applyPrimitiveExample` routes through the sampler when `ValueFill == RandomFill`, else keeps `ExampleValue()`.
-- Surfaced through [`composition.NewSkeleton`](../../openehr/composition/skeleton.go) as `Option`s (`WithValueFill` / `WithValueSource`, names TBD in impl) so COMPOSITION roots get the mode without dropping to `instance.Generate`.
+- Surfaced through [`composition.NewSkeleton`](../../../openehr/composition/skeleton.go) as `Option`s (`WithValueFill` / `WithValueSource`, names TBD in impl) so COMPOSITION roots get the mode without dropping to `instance.Generate`.
 
 ### Deferred (follow-up)
 
@@ -34,18 +34,18 @@ Give `openehr/instance` (and therefore `composition.NewSkeleton`) a generation m
 
 ## Background — what the contract does and doesn't mandate
 
-The openEHR ITS-REST `GET /definition/template/adl1.4/{template_id}/example` endpoint (development-track; the SDK client landed in the conformance remediation) takes two query parameters — `type` (`input|output`, default `input`) and `detail_level` (`required|medium|complete`, default `required`) — see [resources/its-rest/definition-validation.openapi.yaml](../../resources/its-rest/definition-validation.openapi.yaml) (`example_type` / `example_detail_level`). Two load-bearing facts:
+The openEHR ITS-REST `GET /definition/template/adl1.4/{template_id}/example` endpoint (development-track; the SDK client landed in the conformance remediation) takes two query parameters — `type` (`input|output`, default `input`) and `detail_level` (`required|medium|complete`, default `required`) — see [resources/its-rest/definition-validation.openapi.yaml](../../../resources/its-rest/definition-validation.openapi.yaml) (`example_type` / `example_detail_level`). Two load-bearing facts:
 
 1. **`detail_level` is a *structural* axis, not a value-variation axis.** It controls *which* nodes/occurrences and how deep, not whether leaf *values* differ. `required` ≈ the SDK's current `Minimal` (mandatory nodes); `complete` ≈ the SDK's `Example` (all optional nodes); **`medium` (a representative optional subset) has no SDK equivalent today**.
 2. **The spec disclaims value validity and variation.** It states the example's completeness "are not specified", output "should not be used in production", and "vendors may produce different results." Nothing mandates that a generated `DV_QUANTITY` sit in range, a `DV_CODED_TEXT` draw from its value set, or that values vary between calls. So **constraint-valid, varied value generation is a quality choice the SDK is free to own and document as policy** — it is not an ITS-REST mandate.
 
 ## Current state (verified on `main`, v0.10.0)
 
-- `instance.Options` exposes `Policy` ∈ {`Minimal`, `Example`} and a `UIDSource func() *rm.HierObjectID` seam ([openehr/instance/options.go:10-68](../../openehr/instance/options.go)). `Minimal` materialises mandatory nodes; `Example` adds every optional leaf.
-- **Both policies fill primitive leaves deterministically** from `constraints.PrimitiveConstraint.ExampleValue()` ([generate.go:119-132](../../openehr/instance/generate.go#L119), [generate.go:720-729](../../openehr/instance/generate.go#L720)) — a single representative value. Repeat generation for one OPT is byte-identical in its data leaves.
+- `instance.Options` exposes `Policy` ∈ {`Minimal`, `Example`} and a `UIDSource func() *rm.HierObjectID` seam ([openehr/instance/options.go:10-68](../../../openehr/instance/options.go)). `Minimal` materialises mandatory nodes; `Example` adds every optional leaf.
+- **Both policies fill primitive leaves deterministically** from `constraints.PrimitiveConstraint.ExampleValue()` ([generate.go:119-132](../../../openehr/instance/generate.go#L119), [generate.go:720-729](../../../openehr/instance/generate.go#L720)) — a single representative value. Repeat generation for one OPT is byte-identical in its data leaves.
 - **No `medium` structural level, no random/seeded value fill, no `Synthetic` policy** exist. (`UIDSource` already varies the uid; only that and consumer post-stamping break the byte-identity.)
 
-**Feasibility — the constraint data needed for an in-constraint sampler is already on the compiled OPT.** The `constraints` types carry ranges / lists / value-sets and a self-check `Validate(value any)`: `CInteger{Range NumericRange; List []int64}`, `CodePhrase{CodeList []string}`, and the sibling `CReal` / `CString` / `CDvOrdinal` / `DvQuantity` / `CDate*` types ([openehr/template/constraints/](../../openehr/template/constraints/)). So a "random point in constraint" fill is reachable today without new OPT plumbing.
+**Feasibility — the constraint data needed for an in-constraint sampler is already on the compiled OPT.** The `constraints` types carry ranges / lists / value-sets and a self-check `Validate(value any)`: `CInteger{Range NumericRange; List []int64}`, `CodePhrase{CodeList []string}`, and the sibling `CReal` / `CString` / `CDvOrdinal` / `DvQuantity` / `CDate*` types ([openehr/template/constraints/](../../../openehr/template/constraints/)). So a "random point in constraint" fill is reachable today without new OPT plumbing.
 
 ## The asks (from the inbound report)
 

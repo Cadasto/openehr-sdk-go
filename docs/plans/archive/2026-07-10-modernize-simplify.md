@@ -29,7 +29,7 @@ Close the structural-simplification findings from the 2026-07-10 repo-wide moder
 - [`traceability.yaml`](../../specifications/traceability.yaml) untouched unless files move; Phase 5 updates it for the new generated artifacts and the ADR row in [REQ.md](../../specifications/REQ.md) / [adr/README.md](../../adr/README.md).
 - Phase 5 updates canonical spec prose ([rm-modeling.md](../../specifications/rm-modeling.md)) for the widened `Locatable` contract in the same PR.
 - `make spec-check` and `make ci` pass per phase; Phase 5 additionally `make codegen-verify` and `make test-race`.
-- Plan archived under [`docs/plans/archive/`](archive/).
+- Plan archived under [`docs/plans/archive/`](./).
 
 ## Implementation checklist
 

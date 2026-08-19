@@ -3,9 +3,9 @@
 **Date:** 2026-08-18
 **Status:** Done
 **Owner:** SDK maintainers
-**Covers:** [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — RM meta-model introspection surface.
-**Probes:** [PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) (Implemented) — the generated tables vs an independent reduction of the pinned BMM
-**Verifies / builds on:** landed `openehr/rm/rminfo` (BMM-derived structural lookup, [ADR 0005](../adr/0005-compiled-template-foundation.md)), [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (pinned BMM sources), [REQ-042](../specifications/bmm-conformance.md#req-042--generated-code-drift-detected) (generated code, drift-detected)
+**Covers:** [REQ-048](../../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — RM meta-model introspection surface.
+**Probes:** [PROBE-094](../../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) (Implemented) — the generated tables vs an independent reduction of the pinned BMM
+**Verifies / builds on:** landed `openehr/rm/rminfo` (BMM-derived structural lookup, [ADR 0005](../../adr/0005-compiled-template-foundation.md)), [REQ-041](../../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (pinned BMM sources), [REQ-042](../../specifications/bmm-conformance.md#req-042--generated-code-drift-detected) (generated code, drift-detected)
 **Implementation:** landed
 **Depends on:** `openehr/bmm` loader (REQ-045), the existing `rminfo` generator
 **Defers:** runtime BMM loading (stays forbidden — compiled-in tables only); AOM/AM hierarchy; generic-parameter resolution beyond the root-type reduction `rminfo` already applies; multiple-schema selection
@@ -126,7 +126,7 @@ Design constraints carried over from the landed package:
   validation walkers depend on the resolved view. Hierarchy data is additive;
   no table shrinks to own-only declarations.
 - The three-way distinction the surface must keep is canonical in
-  [bmm-conformance.md § Three answers, never conflated](../specifications/bmm-conformance.md#three-answers-never-conflated)
+  [bmm-conformance.md § Three answers, never conflated](../../specifications/bmm-conformance.md#three-answers-never-conflated)
   — not restated here, because a plan-side paraphrase is how the two drift.
 
 ### How two of the REQ's rules are implemented
@@ -148,16 +148,16 @@ Design constraints carried over from the landed package:
 Met by Phase 0 (landed in this branch):
 
 - [x] `Covers:` names the allocated REQ id — **REQ-048**, in `bmm-conformance.md`.
-- [x] Canonical normative prose exists — [bmm-conformance.md § REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface)
-      plus the [REQ.md](../specifications/REQ.md) registry row — including the
+- [x] Canonical normative prose exists — [bmm-conformance.md § REQ-048](../../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface)
+      plus the [REQ.md](../../specifications/REQ.md) registry row — including the
       question set, the class universe, the graph-closure rule, and the
       unknown/abstract/dead-end distinction.
-- [x] [PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)
+- [x] [PROBE-094](../../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)
       is defined in `conformance.md` (Draft): the generated answers are
       equivalent to an **independent** reduction of the pinned BMM — through the
       `openehr/bmm` loader, deliberately not through the generator's own walk.
 - [x] Negative space is normative in
-      [bmm-conformance.md § Three answers, never conflated](../specifications/bmm-conformance.md#three-answers-never-conflated)
+      [bmm-conformance.md § Three answers, never conflated](../../specifications/bmm-conformance.md#three-answers-never-conflated)
       and in the acceptance criteria there — cited, not restated, so the plan
       cannot drift from it.
 - [x] Each phase names its verification command.
@@ -165,7 +165,7 @@ Met by Phase 0 (landed in this branch):
 ### The home decision (settled)
 
 `bmm-conformance.md` / **REQ-048**, not the proposed REQ-124. The rationale is
-canonical in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy)
+canonical in [REQ.md § Numbering policy](../../specifications/REQ.md#numbering-policy)
 and is not repeated here.
 
 ## Definition of Done
@@ -186,7 +186,7 @@ and is not repeated here.
 | `Hierarchy` interface + `DeclaredOn` | done |
 | Tests with `// REQ-` / `// PROBE-` comments | done |
 | `make spec-check` | done |
-| `make ci` | |
+| `make ci` | done |
 
 ## Phases
 
@@ -221,8 +221,9 @@ and is not repeated here.
    `OPENEHR_DEFINITIONS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, `PATHABLE`,
    `TERMINOLOGY_ACCESS`, `TERMINOLOGY_SERVICE`, `Time_Definitions`. Nothing is
    removed. The delta is pinned by test so a future widening is a deliberate
-   edit; the whole suite (including `openehr/template/optvalidate` and the
-   REQ-112 floor, the two `KnownRMTypes()` consumers) stays green.
+   edit; the whole suite stays green — no non-test code in this tree calls
+   `KnownRMTypes()` (the REQ-112 floor reads the tables through
+   `AttributeLister`), so the widening is additive for every in-tree consumer.
 3. [x] Regenerate; extend the drift coverage to the new generated fields.
 
 **What the parent filter actually drops** (measured against the pinned BMM, not
@@ -295,7 +296,7 @@ each found something a green suite was hiding:
   inherited from the primitive-mapped `Iso8601_type`, and absent from both the
   table and the emitted `rm.ISO8601Timezone` (an empty struct). That is a
   REQ-042/043 emission question, not this surface's, so it is pinned by name in
-  the probe and opened as [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped)
+  the probe and opened as [STRAND-13](../../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped)
   rather than settled here.
 
 **Verification:** `go test ./openehr/rm/rminfo/...` green (19 suites across the
@@ -311,13 +312,13 @@ which the acceptance criteria claimed and nothing asserted.
 1. [x] `traceability.yaml`: `implementation: landed`, tests listed; REQ.md
    **Impl.** column to match. `roadmap.md` row. `doc.go` REQ citations.
 2. [x] CHANGELOG entry (one artefact-class bullet).
-3. Archive the plan (`sdd-archive`) in the implementing PR.
+3. [x] Archive the plan (`sdd-archive`) in the implementing PR.
 
 **Verification:** `make spec-check` and `make ci` green.
 
 ## Mapping to specs
 
-- [docs/specifications/bmm-conformance.md § REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — **canonical prose**
-- [docs/specifications/REQ.md](../specifications/REQ.md) — registry row + numbering-policy note
-- [docs/specifications/conformance.md § PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) — probe definition
+- [docs/specifications/bmm-conformance.md § REQ-048](../../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — **canonical prose**
+- [docs/specifications/REQ.md](../../specifications/REQ.md) — registry row + numbering-policy note
+- [docs/specifications/conformance.md § PROBE-094](../../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) — probe definition
 - REQ-041/042/045 — the disciplines this REQ inherits rather than restates
