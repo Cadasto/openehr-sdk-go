@@ -219,7 +219,7 @@ Leaf clients **MUST NOT** re-implement the check. Stated as behaviour: a paramet
 Out of scope: a breaking `PathSegment` named type on every leaf; validating the service base URL; the `cadasto/admin` health-probe paths (`WithLivePath` / `WithReadyPath`), which bypass `transport.Do` by design and keep their own non-empty / leading-`/` guard.
 
 - **Lives in:** [`transport/`](../../transport)
-- **Probes:** PROBE-091 (Draft)
+- **Probes:** PROBE-091 (Implemented — Sandbox)
 
 ---
 

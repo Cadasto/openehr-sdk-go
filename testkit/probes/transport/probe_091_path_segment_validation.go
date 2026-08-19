@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/admin"
@@ -11,10 +12,12 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/demographic"
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/composition"
+	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/directory"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/ehrstatus"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/query"
 	"github.com/cadasto/openehr-sdk-go/openehr/client/system"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
@@ -50,6 +53,7 @@ const (
 //   - directory.Get                — /ehr/{ehr_id}/directory
 //   - ehrstatus.Get                — /ehr/{ehr_id}/ehr_status
 //   - ehrstatus.GetAtTime          — same, plus a trailing query parameter
+//   - contribution.Commit          — /ehr/{ehr_id}/contribution (a write)
 //   - query.RunStored              — /query/{qualified_query_name}
 //   - definition.GetTemplate       — /definition/template/{format}/{template_id}
 //   - demographic.GetVersionedParty — /demographic/versioned_party/{uid}
@@ -72,17 +76,20 @@ const (
 // by transport/path_test.go and the leaf unit tests, never here.
 //
 // Inputs:
-//   - requests reports how many HTTP requests the backend has received so
-//     far. The caller wires it up (an httptest counter in Sandbox mode);
-//     the probe reads deltas around each call.
-func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, requests func() int) (Result, error) {
+//   - captured returns the ESCAPED path of every request the backend has
+//     received so far, in order. The caller wires it up (an httptest
+//     recorder in Sandbox mode). The probe reads length deltas to count
+//     requests and inspects the last entry to check encode-once (REQ-095),
+//     so it MUST NOT be reset between legs.
+func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, captured func() []string) (Result, error) {
 	r := Result{Probe: "PROBE-091"}
 	if c == nil {
 		return r, errors.New("PROBE-091: nil transport.Client")
 	}
-	if requests == nil {
-		return r, errors.New("PROBE-091: nil request counter")
+	if captured == nil {
+		return r, errors.New("PROBE-091: nil captured-path recorder")
 	}
+	requests := func() int { return len(captured()) }
 
 	for _, leaf := range hostileLeaves() {
 		for _, id := range []string{traversalID, smuggledID, dotDotID, controlID} {
@@ -114,6 +121,15 @@ func Probe091PathSegmentValidation(ctx context.Context, c *transport.Client, req
 	if n := requests() - before; n != 1 {
 		r.Status = "fail"
 		r.Detail = fmt.Sprintf("a well-formed template id issued %d requests, want exactly 1", n)
+		return r, nil
+	}
+	// Encode-once (REQ-095): the space rides as %20, never %2520. Counting
+	// the request is not enough — a double-encoded path is still one request.
+	paths := captured()
+	escaped := paths[len(paths)-1]
+	if strings.Contains(escaped, "%2520") || !strings.Contains(escaped, "%20") {
+		r.Status = "fail"
+		r.Detail = fmt.Sprintf("a well-formed template id reached the wire as %q; want the space encoded exactly once (%%20)", escaped)
 		return r, nil
 	}
 
@@ -162,11 +178,14 @@ func hostileLeaves() []hostileLeaf {
 			return err
 		}},
 		{"ehrstatus.GetAtTime", func(ctx context.Context, c *transport.Client, id string) error {
-			// Stands in for the contribution leaf's shape: an ehr-scoped
-			// path with a trailing query. contribution.Commit is a write
-			// needing a Submission, so driving it here would assert a
-			// second thing (body construction) the probe does not own.
 			_, _, err := ehrstatus.GetAtTime(ctx, c, openehrclient.EHRID(id), time.Unix(0, 0).UTC())
+			return err
+		}},
+		{"contribution.Commit", func(ctx context.Context, c *transport.Client, id string) error {
+			// A write, so it needs a Submission that survives Commit's own
+			// guards -- otherwise the leaf refuses on the body and the probe
+			// would credit a refusal the transport never made.
+			_, _, err := contribution.Commit(ctx, c, openehrclient.EHRID(id), minimalSubmission())
 			return err
 		}},
 		{"query.RunStored", func(ctx context.Context, c *transport.Client, id string) error {
@@ -184,5 +203,32 @@ func hostileLeaves() []hostileLeaf {
 		{"admin.DeleteEHR", func(ctx context.Context, c *transport.Client, id string) error {
 			return admin.DeleteEHR(ctx, c, openehrclient.EHRID(id))
 		}},
+	}
+}
+
+// minimalSubmission is the smallest batch that clears contribution.Commit's
+// own guards (non-nil batch, at least one version of an accepted type), so a
+// refusal can only come from the transport's path check and not from the
+// body. The commit audit must be populated: WrapOriginalVersion reads the
+// wrapped version's CommitAudit through the AuditDetailsLike interface and
+// panics on the zero value.
+func minimalSubmission() *contribution.Submission {
+	committer := "probe"
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	return &contribution.Submission{
+		Versions: []contribution.CommitVersion{
+			contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
+				Version: rm.Version[rm.Composition]{
+					CommitAudit: rm.AuditDetails{
+						SystemID:   "probe.example",
+						Committer:  &rm.PartyIdentified{Name: &committer},
+						ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+					},
+				},
+				UID:            rm.ObjectVersionID{Value: "1::probe.example::1"},
+				LifecycleState: rm.DVCodedText{DVText: rm.DVText{Value: "complete"}, DefiningCode: rm.CodePhrase{CodeString: "532"}},
+				Data:           &comp,
+			}),
+		},
 	}
 }

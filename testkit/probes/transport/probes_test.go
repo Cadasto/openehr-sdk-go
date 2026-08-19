@@ -3,7 +3,7 @@ package transportprobes_test
 import (
 	"net/http"
 	"net/http/httptest"
-	"sync/atomic"
+	"sync"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
@@ -36,9 +36,14 @@ func newClient(t *testing.T, srv *httptest.Server) *transport.Client {
 // fake answers anything it is asked with a body the positive legs can
 // decode; every hostile leg is expected never to reach it (REQ-150).
 func TestProbe091PathSegmentValidation(t *testing.T) {
-	var hits atomic.Int32
+	var (
+		mu       sync.Mutex
+		captured []string
+	)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits.Add(1)
+		mu.Lock()
+		captured = append(captured, r.URL.EscapedPath())
+		mu.Unlock()
 		switch r.Method {
 		case http.MethodOptions:
 			w.Header().Set("Content-Type", "application/json")
@@ -50,19 +55,22 @@ func TestProbe091PathSegmentValidation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	res, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, srv), func() int {
-		return int(hits.Load())
-	})
+	snapshot := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), captured...)
+	}
+	res, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, srv), snapshot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.Status != "pass" {
 		t.Fatalf("PROBE-091 = %s: %s", res.Status, res.Detail)
 	}
-	// Only the two positive legs reach the wire: nine leaves × two hostile
+	// Only the two positive legs reach the wire: ten leaves × four hostile
 	// ids must all fail closed.
-	if n := hits.Load(); n != 2 {
-		t.Errorf("captured %d requests, want 2 (the well-formed template id and the service root)", n)
+	if got := snapshot(); len(got) != 2 {
+		t.Errorf("captured %d requests %v, want 2 (the well-formed template id and the service root)", len(got), got)
 	}
 }
 
@@ -71,10 +79,10 @@ func TestProbe091RejectsMissingInputs(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
 	defer srv.Close()
 
-	if _, err := probes.Probe091PathSegmentValidation(t.Context(), nil, func() int { return 0 }); err == nil {
+	if _, err := probes.Probe091PathSegmentValidation(t.Context(), nil, func() []string { return nil }); err == nil {
 		t.Error("nil client: want an error")
 	}
 	if _, err := probes.Probe091PathSegmentValidation(t.Context(), newClient(t, srv), nil); err == nil {
-		t.Error("nil counter: want an error")
+		t.Error("nil recorder: want an error")
 	}
 }

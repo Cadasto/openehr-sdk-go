@@ -39,8 +39,10 @@ func ValidatePathSegment(s string) error {
 // The transport calls it before building the request URL; a caller
 // assembling a raw [Request] can call it to preflight.
 //
-// The leading empty segment of an absolute path is ignored. A path of
-// exactly "/" is the service root — it carries no segments and passes,
+// The leading empty segment of an absolute path is ignored; an empty path
+// is refused, since it is not the service root but an alias for the bare
+// service base URL. A path of exactly "/" IS the service root — it carries
+// no segments and passes,
 // which is what keeps the System API's only operation (`OPTIONS /`)
 // working. Every remaining segment of any other path goes through
 // [ValidatePathSegment], so a trailing slash fails as an empty segment.
@@ -54,7 +56,10 @@ func ValidateRequestPath(path string) error {
 		return nil
 	}
 	for i, seg := range strings.Split(path, "/") {
-		if i == 0 && seg == "" {
+		// Only an ABSOLUTE path has a leading empty segment to skip. An
+		// empty path is not the service root — it aliases to the service
+		// base URL — so it falls through to the empty-segment refusal.
+		if i == 0 && seg == "" && strings.HasPrefix(path, "/") {
 			continue
 		}
 		if err := ValidatePathSegment(seg); err != nil {

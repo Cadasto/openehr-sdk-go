@@ -25,6 +25,7 @@ func TestValidatePathSegment(t *testing.T) {
 		{"a/b", true},
 		{`a\b`, true},
 		{"a\x00b", true},
+		{"a\x7fb", true},  // DEL — path.go refuses it alongside the C0 range
 		{"%2e%2e", false}, // not decoded — ordinary segment
 	}
 	for _, tc := range cases {
@@ -79,6 +80,28 @@ func TestValidateRequestPathIgnoresLeadingSlash(t *testing.T) {
 	}
 	if err := ValidateRequestPath("/ehr/abc/composition/"); err == nil {
 		t.Fatal("ValidateRequestPath on a trailing empty segment = nil, want an error")
+	}
+	// An empty path is not the service root: it aliases to the bare service
+	// base URL, and only "/" is carved out.
+	if err := ValidateRequestPath(""); err == nil {
+		t.Fatal(`ValidateRequestPath("") = nil, want an error (only "/" is exempt)`)
+	}
+}
+
+// TestSegmentCountNormalisesLeadingSlash pins that the arity comparison is
+// leading-slash agnostic on each side independently, so a Route written
+// without a leading slash cannot produce a spurious off-by-one refusal.
+func TestSegmentCountNormalisesLeadingSlash(t *testing.T) {
+	cases := []struct{ path, route string }{
+		{"/ehr/abc", "/ehr/{ehr_id}"},
+		{"/ehr/abc", "ehr/{ehr_id}"},
+		{"ehr/abc", "/ehr/{ehr_id}"},
+		{"/", "/"},
+	}
+	for _, tc := range cases {
+		if p, r := segmentCount(tc.path), segmentCount(tc.route); p != r {
+			t.Errorf("segmentCount(%q) = %d, segmentCount(%q) = %d; want equal", tc.path, p, tc.route, r)
+		}
 	}
 }
 
