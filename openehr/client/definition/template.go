@@ -254,18 +254,29 @@ func GetTemplate(ctx context.Context, c *transport.Client, templateID string, fo
 }
 
 // ListTemplates returns the deployment's catalog of templates for
-// the given format.
+// the given format, optionally filtered (REQ-143).
+//
+// Filters are the ITS-REST list query parameters — see [WithTemplateID],
+// [WithConcept], [WithVersion], [WithOffset], and [WithFetch]. An unset
+// option contributes no query key, so a call with no options is byte-wise
+// the request this function has always issued. Filtering is applied by the
+// server; the SDK only emits the parameters.
 //
 // Wire: GET /definition/template/{format}.
-func ListTemplates(ctx context.Context, c *transport.Client, format TemplateFormat) ([]TemplateMetadata, *transport.Metadata, error) {
+func ListTemplates(ctx context.Context, c *transport.Client, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {
 	if !format.IsValid() {
 		return nil, nil, fmt.Errorf("definition.ListTemplates: %w: format %q is not supported in v1", transport.ErrInvalidConfig, format)
+	}
+	query, err := resolveListOptions(opts)
+	if err != nil {
+		return nil, nil, fmt.Errorf("definition.ListTemplates: %w", err)
 	}
 	req := &transport.Request{
 		Method: http.MethodGet,
 		Path:   "/definition/template/" + format.PathSegment(),
 		Route:  "/definition/template/{format}",
 		Accept: "application/json",
+		Query:  query,
 	}
 	resp, err := c.Do(ctx, req)
 	if err != nil {
@@ -455,7 +466,7 @@ func extractLastPathSegment(p string) string {
 type Repository interface {
 	UploadTemplate(ctx context.Context, format TemplateFormat, body io.Reader, opts ...UploadOption) (*TemplateMetadata, *transport.Metadata, error)
 	GetTemplate(ctx context.Context, templateID string, format TemplateFormat) ([]byte, *transport.Metadata, error)
-	ListTemplates(ctx context.Context, format TemplateFormat) ([]TemplateMetadata, *transport.Metadata, error)
+	ListTemplates(ctx context.Context, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error)
 	DeleteTemplate(ctx context.Context, templateID string, format TemplateFormat) (*transport.Metadata, error)
 	ExampleComposition(ctx context.Context, templateID string, format TemplateFormat, opts ...ExampleOption) (*rm.Composition, *transport.Metadata, error)
 	PutStoredQuery(ctx context.Context, qualifiedName, aqlText string, opts ...StoreOption) (*StoredQueryMetadata, *transport.Metadata, error)
@@ -478,8 +489,8 @@ func (r *repository) GetTemplate(ctx context.Context, templateID string, format 
 	return GetTemplate(ctx, r.c, templateID, format)
 }
 
-func (r *repository) ListTemplates(ctx context.Context, format TemplateFormat) ([]TemplateMetadata, *transport.Metadata, error) {
-	return ListTemplates(ctx, r.c, format)
+func (r *repository) ListTemplates(ctx context.Context, format TemplateFormat, opts ...ListOption) ([]TemplateMetadata, *transport.Metadata, error) {
+	return ListTemplates(ctx, r.c, format, opts...)
 }
 
 func (r *repository) DeleteTemplate(ctx context.Context, templateID string, format TemplateFormat) (*transport.Metadata, error) {
