@@ -45,15 +45,25 @@ case "$f" in
   *_gen.go) exit 0 ;;
 esac
 
+# A formatter that rejects the file is not a hook failure: Claude Code writes a
+# file in stages, so a half-written *.go legitimately does not parse yet. Left to
+# `set -e` the non-zero gofumpt propagates out of the hook — and a non-zero
+# PostToolUse hook is a blocking error fed back to the model, on an ordinary
+# save. `make fmt` remains the authoritative pass; here we say so and step aside.
+unparsed() {
+  echo "goformat-on-save: ${f##*/} left unformatted (does not parse yet); run 'make fmt' once it compiles" >&2
+  exit 0
+}
+
 # Prefer gofumpt (project standard); fall back to gofmt so files stay at least
 # gofmt-clean until the next `make fmt` upgrades them to gofumpt.
 if command -v gofumpt >/dev/null 2>&1; then
-  gofumpt -w "$f"
+  gofumpt -w "$f" || unparsed
 elif command -v gofmt >/dev/null 2>&1; then
-  gofmt -w -s "$f"
+  gofmt -w -s "$f" || unparsed
 fi
 
 # Import grouping/sorting to match the goimports formatter, when available.
 if command -v goimports >/dev/null 2>&1; then
-  goimports -w "$f"
+  goimports -w "$f" || unparsed
 fi
