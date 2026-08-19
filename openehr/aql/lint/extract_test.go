@@ -120,3 +120,41 @@ func TestNormaliseEmptyAlias(t *testing.T) {
 		t.Errorf("err = %v, want ErrEmptyPath", err)
 	}
 }
+
+// TestExtractNilDocument pins REQ-025: Extract MUST NOT panic on a nil
+// document. `doc, err := parse.Parse(q)` yields a nil doc on a syntax
+// error, so the ordinary calling sequence reaches here — its twin
+// [lint.Lint] has always guarded it. The zero Metadata is returned with
+// a usable (non-nil) Aliases map so callers can index it without a
+// second nil check.
+func TestExtractNilDocument(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Extract(nil) panicked: %v", r)
+		}
+	}()
+	md := lint.Extract(nil)
+	if md.Aliases == nil {
+		t.Error("Aliases map is nil; want an empty, usable map")
+	}
+	if len(md.Aliases) != 0 || len(md.Archetypes) != 0 || len(md.Paths) != 0 ||
+		len(md.Params) != 0 || len(md.SelectAliases) != 0 {
+		t.Errorf("want a zero Metadata, got %+v", md)
+	}
+	if _, ok := md.Aliases["c"]; ok {
+		t.Error("empty metadata reported a binding")
+	}
+}
+
+// TestExtractUnparsedDocument mirrors the nil case for a non-nil but
+// unparsed document — the other shape [lint.Lint] refuses.
+func TestExtractUnparsedDocument(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Extract(unparsed) panicked: %v", r)
+		}
+	}()
+	if md := lint.Extract(&parse.Document{}); md.Aliases == nil {
+		t.Error("Aliases map is nil; want an empty, usable map")
+	}
+}

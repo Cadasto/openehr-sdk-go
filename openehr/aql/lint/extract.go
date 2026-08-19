@@ -45,8 +45,16 @@ type Metadata struct {
 }
 
 // Extract gathers the lint facts from a parsed document. It performs no
-// validation — every check lives in [Lint].
+// validation — every check lives in [Lint]. A nil or unparsed document
+// yields an empty Metadata rather than a panic (REQ-025).
 func Extract(doc *parse.Document) Metadata {
+	// REQ-025: parse.Parse yields a nil doc on a syntax error, so the
+	// ordinary `doc, err := parse.Parse(q)` sequence reaches here with
+	// nothing to read. Return an empty-but-usable Metadata rather than
+	// panicking — the same shapes [Lint] refuses.
+	if doc == nil || !doc.Parsed() {
+		return Metadata{Aliases: map[string]parse.ClassExpr{}}
+	}
 	md := Metadata{Aliases: make(map[string]parse.ClassExpr, len(doc.Classes))}
 	seen := make(map[string]bool)
 	for _, ce := range doc.Classes {
