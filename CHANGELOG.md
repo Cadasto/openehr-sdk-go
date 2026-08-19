@@ -19,7 +19,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 - **Structured AQL node predicates (REQ-113, PROBE-095).** `aql.PathSegment.Parsed` types every bracketed path-segment predicate beside its verbatim text — node ids, names, `$param`, comparisons, regex and junctions — with `aql.EqualPredicates` for comparison.
 - **RM meta-model introspection (REQ-048, PROBE-094, STRAND-12/13).** `rminfo` gains a compiled-in class graph — abstractness, parents, ancestors, conformance, concrete-descendant expansion, attribute declaration site — and `KnownRMTypes` widens to every emitted class.
 - **Contribution read (REQ-142, PROBE-092).** `contribution.Get` reads a persisted contribution by uid and `contribution.Repository` grows the same read — a compile-time break for external implementers.
-- **Contribution wrap constructors fail closed (REQ-025).** `WrapOriginalVersion` / `WrapImportedVersion` no longer panic on nil or typed-nil caller input; `Submission.Validate` rejects the resulting empty wrapper, and REQ-025 now mandates non-panicking exported constructors.
+- **Library code fails closed instead of panicking (REQ-025).** The contribution wrap constructors, `lint.Extract`, `transport.Do` (covering every client leaf) and all 30 variadic-option loops now refuse nil, typed-nil and zero-value caller input rather than dereferencing it; REQ-025 mandates this for exported constructors, with a `Must`-prefix carve-out.
 - **Write-side committer validation hardened (REQ-025).** `Submission.Validate` and `UpdateAudit.MarshalJSON` reject typed-nil and non-pointer `PartyProxy` committers on the batch audit and every version commit_audit, closing the `"committer":null` and missing-`_type` wire escapes.
 
 ## [0.20.0] - 2026-08-18
