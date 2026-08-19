@@ -73,7 +73,9 @@ func WithValidationTime(t time.Time) ValidateOption {
 func LaunchContextFromTokenResponse(ctx context.Context, tr authsmart.TokenResponse, opts ...ValidateOption) (*LaunchContext, error) {
 	cfg := ValidateConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	lc := &LaunchContext{
 		Patient:           tr.Patient,

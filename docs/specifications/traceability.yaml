@@ -1785,11 +1785,24 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr/contribution]
+    packages: [transport, openehr/client/ehr/contribution, openehr/aql/lint, internal]
     tests:
       - openehr/client/ehr/contribution/version_test.go
       - openehr/client/ehr/contribution/submission_test.go
       - openehr/client/ehr/contribution/update_audit_test.go
+      - openehr/aql/lint/extract_test.go
+      - transport/client_test.go
+      - openehr/client/ehr/ehr_test.go
+      - internal/option_guard_test.go
+    notes: >-
+      The no-panic clause is enforced across the caller-constructible axis, not
+      only at the contribution constructors: a typed-nil PartyProxy committer is
+      refused at Validate and marshal, lint.Extract guards a nil/unparsed
+      document, transport.Do guards a nil Client and Request for every
+      Do-routed leaf while the admin probes guard their deliberate Do
+      bypass themselves, and all 30 variadic-option loops skip a nil option
+      — held by an AST tripwire in internal/option_guard_test.go. The clause
+      carries a Must-prefix carve-out for the Go convention.
 
   - id: REQ-026
     title: Goroutine-safe clients

@@ -108,7 +108,9 @@ func New(tokenURL string, assertion AssertionSource, opts ...Option) (*Source, e
 		RefreshThreshold: 30 * time.Second,
 	}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	return FromConfig(cfg)
 }

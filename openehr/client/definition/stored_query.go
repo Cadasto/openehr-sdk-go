@@ -125,7 +125,9 @@ func putStoredQuery(ctx context.Context, c *transport.Client, path, route, op, n
 	}
 	cfg := storeConfig{queryType: QueryTypeAQL}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	q := url.Values{}
 	if cfg.queryType != "" {

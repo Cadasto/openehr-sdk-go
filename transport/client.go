@@ -64,7 +64,9 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 		logger:                  slog.Default(),
 	}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: ServiceCatalog is required (REQ-070)", ErrInvalidConfig)
@@ -112,6 +114,16 @@ func (c *Client) HTTPClient() *http.Client { return c.cfg.httpClient }
 //  6. Parse the response body into Body + Metadata; map the wire
 //     error envelope onto the typed-sentinel hierarchy.
 func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
+	// REQ-025: a nil Client is caller-constructible and reaches here
+	// through every Do-routed leaf, so it fails closed with a typed error
+	// rather than dereferencing. Leaves that bypass Do by design (the
+	// admin probes) carry their own guard.
+	if c == nil {
+		return nil, fmt.Errorf("transport.Do: %w: nil Client", ErrInvalidConfig)
+	}
+	if req == nil {
+		return nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}

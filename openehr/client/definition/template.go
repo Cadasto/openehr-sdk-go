@@ -187,7 +187,9 @@ func UploadTemplate(ctx context.Context, c *transport.Client, format TemplateFor
 	}
 	cfg := uploadConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	req := &transport.Request{
 		Method:      http.MethodPost,
@@ -415,7 +417,9 @@ func ExampleComposition(ctx context.Context, c *transport.Client, templateID str
 	}
 	cfg := exampleConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	if cfg.exampleType != "" && !cfg.exampleType.IsValid() {
 		return nil, nil, fmt.Errorf("definition.ExampleComposition: %w: invalid example type %q", transport.ErrInvalidConfig, cfg.exampleType)

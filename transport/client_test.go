@@ -1192,3 +1192,70 @@ func readCassette(t *testing.T, dir, name string) []byte {
 	}
 	return b
 }
+
+// TestDoNilClient pins REQ-025: a nil *Client is caller-constructible
+// and reachable through every exported leaf (they all call c.Do), so it
+// MUST fail closed with a typed error rather than dereference nil. One
+// guard here closes every leaf at once — a method call on a nil pointer
+// receiver is legal Go, so Do is reached normally.
+func TestDoNilClient(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("(*Client)(nil).Do panicked: %v", r)
+		}
+	}()
+	var c *Client
+	resp, err := c.Do(t.Context(), &Request{Method: http.MethodGet, Path: "/ehr", Route: "/ehr"})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("err = %v; want ErrInvalidConfig", err)
+	}
+	if resp != nil {
+		t.Errorf("resp = %+v; want nil", resp)
+	}
+}
+
+// TestDoNilRequest pins the sibling guard: a nil *Request reaches
+// effectiveServiceID, which reads r.ServiceID and would dereference.
+func TestDoNilRequest(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Do(nil request) panicked: %v", r)
+		}
+	}()
+	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer:   "https://x",
+		Services: map[string]discovery.ServiceEntry{},
+	})
+	c, _ := New(cat, WithHTTPClient(http.DefaultClient))
+	if _, err := c.Do(t.Context(), nil); !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("err = %v; want ErrInvalidConfig", err)
+	}
+}
+
+// TestNewSkipsNilOption pins REQ-025 behaviourally: a caller that builds
+// an option conditionally (`var o Option; if cond { o = WithX() }`) hands
+// New a nil func. It must be skipped, not invoked. internal's AST
+// tripwire holds every option loop to carrying the guard; this pins what
+// the guard does.
+func TestNewSkipsNilOption(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("New with a nil option panicked: %v", r)
+		}
+	}()
+	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer:   "https://x",
+		Services: map[string]discovery.ServiceEntry{},
+	})
+	applied := false
+	c, err := New(cat, nil, WithHTTPClient(http.DefaultClient), func(*config) { applied = true }, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c == nil {
+		t.Fatal("nil client")
+	}
+	if !applied {
+		t.Error("the non-nil option was not applied — the guard skipped too much")
+	}
+}

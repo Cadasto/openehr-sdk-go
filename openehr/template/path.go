@@ -180,7 +180,9 @@ func (t *OperationalTemplate) NodeAt(p Path, opts ...ResolveOption) (Node, error
 	}
 	o := resolveOpts{}
 	for _, opt := range opts {
-		opt(&o)
+		if opt != nil {
+			opt(&o)
+		}
 	}
 	return walkPath(t.root, p.segments, &o, 0)
 }

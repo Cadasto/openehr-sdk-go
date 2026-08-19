@@ -360,3 +360,29 @@ func TestProbeURLOriginOnly(t *testing.T) {
 		t.Errorf("probe URL contains REST API prefix: %q", fullURL)
 	}
 }
+
+// TestNilClientProbesDoNotPanic pins the REQ-025 guard on the probe's
+// deliberate transport.Do bypass: Live/Ready read the catalog directly,
+// so the central nil-Client guard in Do never runs for this leaf and the
+// probe must refuse a nil client itself.
+func TestNilClientProbesDoNotPanic(t *testing.T) {
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"Live", func() error { return admin.Live(t.Context(), nil) }},
+		{"Ready", func() error { return admin.Ready(t.Context(), nil) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("%s with a nil client panicked: %v", tc.name, r)
+				}
+			}()
+			if err := tc.call(); !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("err = %v; want ErrInvalidConfig", err)
+			}
+		})
+	}
+}

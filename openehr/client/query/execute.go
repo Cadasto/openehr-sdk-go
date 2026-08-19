@@ -20,7 +20,9 @@ func Execute(ctx context.Context, c *transport.Client, q aql.Query, opts ...Exec
 	}
 	cfg := executeConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	if cfg.ehrID == "" {
 		cfg.ehrID = q.EHRID
@@ -78,7 +80,9 @@ func runStoredAtVersion(ctx context.Context, c *transport.Client, qualifiedName,
 	}
 	cfg := executeConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	path := "/query/" + name
 	route := "/query/{qualified_query_name}"

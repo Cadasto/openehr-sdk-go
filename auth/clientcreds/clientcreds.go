@@ -156,7 +156,9 @@ func New(clientID, clientSecret, tokenURL string, opts ...Option) (*Source, erro
 		RefreshThreshold: 30 * time.Second,
 	}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	return FromConfig(cfg)
 }
