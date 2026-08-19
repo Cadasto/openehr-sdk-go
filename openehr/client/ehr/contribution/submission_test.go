@@ -130,6 +130,19 @@ func TestSubmissionValidate(t *testing.T) {
 			wantErr: "OriginalVersion[",
 		},
 		{
+			// Pins the index plumbing: the diagnostic names the failing
+			// element, not just element zero.
+			name: "reports the failing element's index",
+			sub: &contribution.Submission{
+				Audit: newAudit(),
+				Versions: []contribution.CommitVersion{
+					newOriginalVersion(),
+					contribution.WrapOriginalVersion[rm.Composition](nil),
+				},
+			},
+			wantErr: "Submission.Versions[1]: Version is nil",
+		},
+		{
 			name: "rejects batch Audit with nil committer",
 			sub: &contribution.Submission{
 				Versions: []contribution.CommitVersion{newOriginalVersion()},
@@ -274,11 +287,12 @@ func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
 // check and the type switch, and must surface as an error, not a panic.
 func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
 	cases := []struct {
-		name string
-		v    contribution.CommitVersion
+		name     string
+		v        contribution.CommitVersion
+		wantType string
 	}{
-		{"typed-nil OriginalVersion", (*contribution.OriginalVersion[rm.Composition])(nil)},
-		{"typed-nil ImportedVersion", (*contribution.ImportedVersion[rm.Composition])(nil)},
+		{"typed-nil OriginalVersion", (*contribution.OriginalVersion[rm.Composition])(nil), "OriginalVersion"},
+		{"typed-nil ImportedVersion", (*contribution.ImportedVersion[rm.Composition])(nil), "ImportedVersion"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -291,6 +305,9 @@ func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
 			err := sub.Validate()
 			if err == nil || !strings.Contains(err.Error(), "typed-nil") {
 				t.Errorf("error = %v; want substring %q", err, "typed-nil")
+			} else if !strings.Contains(err.Error(), tc.wantType) {
+				// The %T in the diagnostic must name the actual wrapper type.
+				t.Errorf("error = %v; want substring %q", err, tc.wantType)
 			}
 		})
 	}
