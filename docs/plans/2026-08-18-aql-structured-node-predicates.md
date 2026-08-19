@@ -132,7 +132,7 @@ package ships `EqualPredicates` beside the landed `aql.EqualValues`. The builder
 
 - ✅ Canonical normative prose exists — the kinds, the trivia/delimiter rules, the unstructured-set enumeration, the comparability restriction, the class-position scope, and the REQ-119 non-interference clause: [clinical-modeling.md § REQ-113 § Structured node predicates](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast). The kinds were enumerated **against the vendored grammar**, which is where the two findings in § Architecture came from.
 - ✅ [PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring) defined (`Status: Draft`): a corpus **generated from** the `pathPredicate` alternatives, every form presented at bracket top level *and* as a junction operand, trivia/escape independence asserted as a property, the five name spellings on both carrying alternatives, and a sweep that fails when the grammar admits a form no kind covers.
-- ✅ Negative space pinned: an unstructured form reports itself unstructured with `Raw` intact and **never** a partial structure; the enumerated unstructured set is empty for the segment position; the class position is unchanged.
+- ✅ Negative space pinned: an unstructured form reports itself unstructured with `Raw` intact and **never** a partial structure; the unstructured set is ENUMERATED in the canonical section (comparison operands the value vocabulary does not carry, and junctions containing one — the branch review corrected this line's original "empty" claim); the class position is unchanged.
 - ✅ Each phase names its verification command.
 
 ## Definition of Done

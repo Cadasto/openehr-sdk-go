@@ -204,6 +204,28 @@ func TestDroppedReturnsACopy(t *testing.T) {
 	}
 }
 
+// TestDropsArriveInSourceOrder pins "reachable from the Document in source
+// order" with a query carrying two drops in different clauses: the SELECT
+// literal precedes the LIMIT literal in the source, so its record comes first
+// and its span starts earlier.
+func TestDropsArriveInSourceOrder(t *testing.T) {
+	t.Parallel()
+	doc, err := parse.Parse("SELECT " + hugeInt + " FROM COMPOSITION c LIMIT " + hugeInt)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	drops := doc.Dropped()
+	if len(drops) != 2 {
+		t.Fatalf("Dropped() = %v; want exactly two records", drops)
+	}
+	if drops[0].Clause != parse.ClauseSelect || drops[1].Clause != parse.ClauseLimit {
+		t.Errorf("clause order = [%v %v]; want [select limit] — source order", drops[0].Clause, drops[1].Clause)
+	}
+	if drops[0].Span.Start.Col >= drops[1].Span.Start.Col {
+		t.Errorf("span order disagrees with source order: %+v then %+v", drops[0].Span, drops[1].Span)
+	}
+}
+
 // TestCleanQueryDropsNothing is the negative control: the assertions above are
 // only meaningful if a well-formed query records nothing.
 func TestCleanQueryDropsNothing(t *testing.T) {

@@ -163,6 +163,76 @@ func itoa(n int) string {
 	return string(b)
 }
 
+// TestAdditivityOverTheCorpus is PROBE-096's additivity arm on the lint
+// surface: adding Span changed no existing Code, Severity, Detail shape, or
+// OK() outcome. The expectations below are the PRE-change behaviour, written
+// down — a drift in any of them is the regression this arm exists to catch.
+func TestAdditivityOverTheCorpus(t *testing.T) {
+	t.Parallel()
+	expect := []struct {
+		name  string
+		query string
+		codes map[string]lint.Severity // exact multiset of issue codes
+		ok    bool
+	}{
+		{
+			name:  "unbound alias",
+			query: "SELECT zz/data[at0001, 'Systolic']/magnitude FROM COMPOSITION c",
+			codes: map[string]lint.Severity{
+				"aql_unknown_alias":  lint.Error,
+				"aql_from_archetype": lint.Warning,
+			},
+			ok: false,
+		},
+		{
+			name:  "syntax error",
+			query: "SELECT c FROM COMPOSITION c WHERE c/x = = 'v'",
+			codes: map[string]lint.Severity{"aql_syntax": lint.Error},
+			ok:    false,
+		},
+		{
+			name:  "deprecated top with limit",
+			query: "SELECT TOP 5 c FROM COMPOSITION c LIMIT 10",
+			codes: map[string]lint.Severity{
+				"aql_deprecated_top": lint.Warning,
+				"aql_top_with_limit": lint.Error,
+				"aql_from_archetype": lint.Warning,
+			},
+			ok: false,
+		},
+		{
+			name:  "clean",
+			query: "SELECT c/uid/value FROM EHR e CONTAINS COMPOSITION c",
+			codes: map[string]lint.Severity{},
+			ok:    true,
+		},
+	}
+	for _, tc := range expect {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			res := lint.LintString(tc.query, nil)
+			if got := res.OK(); got != tc.ok {
+				t.Errorf("OK() = %v; want %v", got, tc.ok)
+			}
+			got := map[string]lint.Severity{}
+			for _, iss := range res.Issues {
+				got[iss.Code] = iss.Severity
+				if iss.Detail == "" {
+					t.Errorf("%s carries an empty Detail; the text surface is unchanged by this REQ", iss.Code)
+				}
+			}
+			if len(got) != len(tc.codes) {
+				t.Fatalf("codes = %v; want %v", got, tc.codes)
+			}
+			for code, sev := range tc.codes {
+				if got[code] != sev {
+					t.Errorf("code %s severity = %v; want %v", code, got[code], sev)
+				}
+			}
+		})
+	}
+}
+
 // TestLintSpanIsTheParseSpanType is the one-type rule: lint.Span and
 // parse.Span must be assignable both ways with no conversion, which is what
 // makes correlating a lint issue with a dropped construct a comparison.

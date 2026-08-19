@@ -67,7 +67,9 @@ func (g valueGap) ok() bool { return g.Reason == "" }
 // sweep exists to catch — see TestEveryIncompleteSiteRecordsAKind.
 //
 // at is the ANTLR node the drop is about (rule context, terminal node, or
-// token); a nil at yields a zero span rather than an approximated one.
+// token); an absent node — a nil interface — yields a zero span rather
+// than an approximated one. Pass the accessor result directly (ANTLR
+// accessors return nil interfaces, never typed nils, when absent).
 func (e *astExtractor) incomplete(kind ConstructKind, at any, format string, args ...any) {
 	e.gaps = append(e.gaps, fmt.Sprintf(format, args...))
 	e.drops = append(e.drops, DroppedConstruct{Kind: kind, Clause: e.clause, Span: spanAt(at)})

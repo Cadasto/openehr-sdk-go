@@ -1076,12 +1076,15 @@ requirements:
     # Alias, mirroring the WHERE side) so a consumer need not re-split the
     # relative predicate path.
     #
-    # PARTIAL since 2026-08-19: two sections were added and are specified but
-    # not yet built — § Structured node predicates (a typed sum beside the
-    # verbatim predicate text, path-SEGMENT position only; the class position
-    # keeps the carriers above) and § Value-free structured drop records (a
-    # {kind, clause, span} record beside ErrIncompleteAST, with no source text
-    # in any field). Plans below; PROBE-095 / PROBE-096.
+    # Two sections were added 2026-08-19 and BOTH LANDED the same day —
+    # § Structured node predicates (a typed sum beside the verbatim predicate
+    # text, path-SEGMENT position only; the class position keeps the carriers
+    # above) and § Value-free structured drop records (a {kind, clause, span}
+    # record beside ErrIncompleteAST, with no source text in any field).
+    # Plans below; PROBE-095 / PROBE-096. The branch review then corrected the
+    # predicate section's "empty unstructured set" claim: three
+    # pathPredicateOperand forms are enumerated as unstructured, and the
+    # grammar sweep now descends into that production.
     #
     # The drop records LANDED 2026-08-19 (PROBE-096): Document.Dropped(), a
     # ConstructKind closed over drop CLASSES rather than call sites, Clause

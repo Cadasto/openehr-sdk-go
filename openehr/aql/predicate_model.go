@@ -12,7 +12,10 @@ package aql
 // VALUE and is authoritative for comparison. Nothing here is read by a write
 // path, so REQ-119's round-trip closure is untouched by construction.
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // SegmentPredicate is the typed form of one bracketed path predicate, sealed
 // over the forms the grammar's `pathPredicate` position admits:
@@ -84,19 +87,42 @@ type ParamPredicate struct {
 // WHERE comparison and a predicate comparison share ONE vocabulary rather
 // than two structurally-identical ones.
 //
+// Because the vocabulary is reused, [Comparison.Path] keeps that type's
+// landed definition — the relative object path AS WRITTEN — and is the one
+// component here that carries a spelling rather than a value. Its trivia-free
+// decomposition is [Comparison.ParsedPath].Segments, and [EqualPredicates]
+// compares through the structured form, so `[name / value = 'x']` equals
+// `[name/value='x']`.
+//
 // NOT `==`-comparable — see [SegmentPredicate] § Comparability.
 type ComparisonPredicate struct {
 	Comparison Comparison
 }
 
 // MatchesPredicate is the regex form — `[name/value matches {/systolic/}]`.
+//
+// NOT `==`-comparable when ParsedPath is set — see [SegmentPredicate]
+// § Comparability.
 type MatchesPredicate struct {
-	// Path is the left-hand object path as written.
+	// Path is the left-hand object path AS WRITTEN — the same two-field
+	// story as [Comparison]: the spelling here, the structured form on
+	// ParsedPath. Equality ([EqualPredicates]) reads the structured form,
+	// so trivia in the spelling does not reach it.
 	Path string
-	// Regex is the pattern with its `{` `}` delimiters removed. The inner
-	// `/…/` slashes, when present, are part of the pattern the grammar
-	// carries and are left as written.
+	// ParsedPath carries the same path's structured Segments with an empty
+	// Alias (a relative predicate path binds no FROM alias) — the
+	// trivia-free component a reader compares.
+	ParsedPath *IdentifiedPath
+	// Regex is the pattern between the `/` delimiters of the token's
+	// `SLASH_REGEX` part — braces, surrounding whitespace and the slash
+	// delimiters removed, and the `\/` spelling (which exists only because
+	// `/` is the delimiter) resolved to `/`. Every other backslash sequence
+	// is regex syntax and is left exactly as written.
 	Regex string
+	// Label is the optional trailing name the token admits after a `;`
+	// (`{/systolic/; 'label'}`), quotes removed and escapes resolved. ""
+	// when the source carried none.
+	Label string
 }
 
 // JunctionPredicate is an `AND` / `OR` over two structured predicates —
@@ -192,7 +218,7 @@ func (n *PredicateName) key() string {
 		return ""
 	}
 	return strings.Join([]string{
-		string(rune('0' + n.Kind)), n.Text, n.Terminology, n.Code, n.Display,
+		strconv.Itoa(int(n.Kind)), n.Text, n.Terminology, n.Code, n.Display,
 	}, "\x00")
 }
 
@@ -207,24 +233,53 @@ func (p ArchetypePredicate) key() string {
 func (p ParamPredicate) key() string { return "param\x00" + p.Name }
 
 func (p ComparisonPredicate) key() string {
-	var val string
+	var left, val string
+	if v, ok := derefValue(p.Comparison.Left); ok {
+		left = v.token()
+	}
 	if v, ok := derefValue(p.Comparison.Val); ok {
 		val = v.token()
 	}
-	return "cmp\x00" + p.Comparison.Path + "\x00" + string(p.Comparison.Op) + "\x00" + val
+	return "cmp\x00" + canonicalPathKey(p.Comparison.Path, p.Comparison.ParsedPath) +
+		"\x00" + string(p.Comparison.Op) + "\x00" + left + "\x00" + val
 }
 
 func (p MatchesPredicate) key() string {
-	return "match\x00" + p.Path + "\x00" + p.Regex
+	return "match\x00" + canonicalPathKey(p.Path, p.ParsedPath) +
+		"\x00" + p.Regex + "\x00" + p.Label
+}
+
+// canonicalPathKey is the trivia-free comparison form of a path-valued
+// component: the structured segments when the producer supplied them, the
+// spelling only as a last resort (a hand-built value with no ParsedPath).
+// Comparing through the segments is what keeps `name / value` equal to
+// `name/value` — the token names carry no trivia. A predicate nested inside a
+// segment of the operand path stays verbatim (it is its own bracketed
+// position, with its own structured carrier one level down).
+func canonicalPathKey(path string, ip *IdentifiedPath) string {
+	if ip == nil || len(ip.Segments) == 0 {
+		return path
+	}
+	var b strings.Builder
+	for i, seg := range ip.Segments {
+		if i > 0 {
+			b.WriteByte('/')
+		}
+		b.WriteString(seg.Name)
+		if seg.Predicate != "" {
+			b.WriteString("[" + seg.Predicate + "]")
+		}
+	}
+	return b.String()
 }
 
 func (p JunctionPredicate) key() string {
 	var l, r string
-	if p.Left != nil {
-		l = p.Left.key()
+	if v, ok := derefSegmentPredicate(p.Left); ok {
+		l = v.key()
 	}
-	if p.Right != nil {
-		r = p.Right.key()
+	if v, ok := derefSegmentPredicate(p.Right); ok {
+		r = v.key()
 	}
 	return "junc\x00" + string(p.Op) + "\x00(" + l + ")\x00(" + r + ")"
 }
@@ -240,10 +295,55 @@ func (p JunctionPredicate) key() string {
 // `(a AND b) AND c` — the model retains the source grouping, and collapsing it
 // here would make equality disagree with what the predicate carries.
 func EqualPredicates(a, b SegmentPredicate) bool {
-	if a == nil || b == nil {
-		return a == nil && b == nil
+	av, aok := derefSegmentPredicate(a)
+	bv, bok := derefSegmentPredicate(b)
+	if !aok || !bok {
+		return aok == bok
 	}
-	return samePredicateShape(a, b) && a.key() == b.key()
+	return samePredicateShape(av, bv) && av.key() == bv.key()
+}
+
+// derefSegmentPredicate normalises a predicate to its value shape — key() has
+// value receivers, so `*NodeIDPredicate` and friends satisfy the interface
+// too, exactly as every [Value] shape has a pointer twin. The bool is false
+// for a nil — untyped, or a typed-nil pointer, which would panic in key().
+// Mirrors [DerefValue].
+func derefSegmentPredicate(p SegmentPredicate) (SegmentPredicate, bool) {
+	switch v := p.(type) {
+	case nil:
+		return nil, false
+	case *NodeIDPredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	case *ArchetypePredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	case *ParamPredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	case *ComparisonPredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	case *MatchesPredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	case *JunctionPredicate:
+		if v == nil {
+			return nil, false
+		}
+		return *v, true
+	}
+	return p, true
 }
 
 // samePredicateShape reports whether two predicates carry the same concrete

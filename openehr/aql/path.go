@@ -23,9 +23,12 @@ type PathSegment struct {
 	// nil means the SDK does not structure this form, and that is a
 	// STATEMENT, not an accident: a reader may fail closed on it. There is
 	// no partial structure — a Parsed that is non-nil is complete for its
-	// kind. As of REQ-113 every alternative the grammar admits at this
-	// position is structured, so nil here means the segment carries no
-	// predicate at all (Predicate is "" too).
+	// kind. When Predicate is "" the segment carries no predicate at all;
+	// when Predicate is populated and Parsed is nil, the predicate is one of
+	// the ENUMERATED unstructured forms (REQ-113 § Structured node
+	// predicates): a comparison whose right-hand operand the value
+	// vocabulary does not carry — an object path, a node code, or an
+	// out-of-range numeric — or a junction containing one.
 	//
 	// NOT `==`-comparable and not a map key — see [SegmentPredicate]
 	// § Comparability. Compare with [EqualPredicates].

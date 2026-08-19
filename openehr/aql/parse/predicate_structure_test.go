@@ -23,10 +23,15 @@ import (
 
 const grammarPath = "../../../resources/aql/grammar/active/AqlParser.g4"
 
-// predicateProductions are the productions `pathPredicate` dispatches to. The
-// bracket is THREE overlapping productions, not `nodePredicate` alone, which
-// is why all three are swept.
-var predicateProductions = []string{"standardPredicate", "archetypePredicate", "nodePredicate"}
+// predicateProductions are the productions `pathPredicate` dispatches to —
+// three overlapping top-level productions PLUS `pathPredicateOperand`, which
+// the comparison alternatives reach and whose members decide
+// structured-versus-enumerated-unstructured. The sweep stopping at the top
+// level is exactly how the operand forms went unenumerated in the section's
+// first draft (branch review, 2026-08-19).
+var predicateProductions = []string{
+	"standardPredicate", "archetypePredicate", "nodePredicate", "pathPredicateOperand",
+}
 
 // position is where in the bracket a form is presented.
 type position int
@@ -53,8 +58,12 @@ type predicateRow struct {
 	alts []string
 	// pred is the predicate text, without its brackets.
 	pred string
-	// want is the expected concrete kind, as %T.
-	want string
+	// want is the expected concrete kind, as %T. "" with wantNil set means
+	// the form is one of the spec's ENUMERATED unstructured forms: Parsed
+	// MUST be nil beside the populated verbatim text — never a partial
+	// structure.
+	want    string
+	wantNil bool
 	// at lists the positions this form can occupy. A form shadowed at the top
 	// of the bracket by an earlier pathPredicate alternative is still reachable
 	// as a junction operand, and MUST yield the same kind there.
@@ -149,6 +158,53 @@ func predicateRows() []predicateRow {
 					t.Errorf("Regex %q still carries its brace delimiters", m.Regex)
 				}
 			},
+		},
+		{
+			name: "comparison with a parameter operand",
+			alts: []string{"PARAMETER"}, // pathPredicateOperand : PARAMETER
+			pred: "name/value=$who",
+			want: "aql.ComparisonPredicate",
+			at:   both,
+		},
+		{
+			name: "comparison with a primitive operand",
+			alts: []string{"primitive"}, // pathPredicateOperand : primitive
+			pred: "magnitude=3.5",
+			want: "aql.ComparisonPredicate",
+			at:   both,
+		},
+		{
+			// ENUMERATED UNSTRUCTURED: the operand is an object path, which
+			// the shared value vocabulary does not carry at this position.
+			name:    "comparison with a path operand",
+			alts:    []string{"objectPath"}, // pathPredicateOperand : objectPath
+			pred:    "name/value=other/path",
+			wantNil: true,
+			at:      both,
+		},
+		{
+			// ENUMERATED UNSTRUCTURED: node-code operands have no value kind.
+			name:    "comparison with an at-code operand",
+			alts:    []string{"AT_CODE"}, // pathPredicateOperand : AT_CODE
+			pred:    "name/value=at0004",
+			wantNil: true,
+			at:      both,
+		},
+		{
+			// ENUMERATED UNSTRUCTURED: same, the ID_CODE spelling.
+			name:    "comparison with an id-code operand",
+			alts:    []string{"ID_CODE"}, // pathPredicateOperand : ID_CODE
+			pred:    "name/value=id4",
+			wantNil: true,
+			at:      both,
+		},
+		{
+			// ENUMERATED UNSTRUCTURED: the REQ-119 § Amends REQ-117 residual.
+			name:    "comparison with an out-of-range numeric operand",
+			alts:    nil, // a primitive spelling, covered above; listed for the enumeration
+			pred:    "magnitude=99999999999999999999999999",
+			wantNil: true,
+			at:      both,
 		},
 		{
 			name: "and junction",
@@ -267,9 +323,23 @@ func TestEveryFormStructures(t *testing.T) {
 				t.Parallel()
 				q := r.query(at)
 				got, raw := segmentPredicate(t, q)
+				if r.wantNil {
+					// An enumerated unstructured form: nil beside the verbatim
+					// text — at BOTH positions, since a junction containing a
+					// hole must not ship a partial structure.
+					if got != nil {
+						t.Fatalf("predicate %q structured as %T; the spec enumerates "+
+							"this form as unstructured", raw, got)
+					}
+					if raw == "" {
+						t.Fatal("verbatim text is empty; Raw must stay populated for an " +
+							"unstructured predicate")
+					}
+					return
+				}
 				if got == nil {
-					t.Fatalf("predicate %q is unstructured; every alternative the "+
-						"grammar admits at this position is structured", raw)
+					t.Fatalf("predicate %q is unstructured; it is not in the spec's "+
+						"enumerated unstructured set", raw)
 				}
 				// At a junction position the whole predicate is a junction; the
 				// row's own kind is its right operand.
@@ -299,7 +369,7 @@ func TestEveryFormStructures(t *testing.T) {
 func TestTheSameFormYieldsTheSameKindInBothPositions(t *testing.T) {
 	t.Parallel()
 	for _, r := range predicateRows() {
-		if len(r.at) < 2 {
+		if len(r.at) < 2 || r.wantNil {
 			continue
 		}
 		t.Run(r.name, func(t *testing.T) {
@@ -333,7 +403,16 @@ func TestTriviaAndEscapesDoNotReachTheComponents(t *testing.T) {
 		{"whitespace", "at0001,'Systolic'", "at0001 ,   'Systolic'"},
 		{"comment", "at0001,'Systolic'", "at0001 -- which one\n,'Systolic'"},
 		{"comparison whitespace", "name/value='x'", "name/value  =  'x'"},
+		// Trivia INSIDE the operand path — the review counterexample: the
+		// as-written Comparison.Path differs, so equality must go through
+		// ParsedPath.Segments, not the spelling.
+		{"comparison path interior", "name/value='x'", "name / value = 'x'"},
+		{"comparison path comment", "name/value='x'", "name -- c\n/value='x'"},
 		{"junction whitespace", "at0001 and at0002", "at0001   and   at0002"},
+		// The CONTAINED_REGEX token admits interior whitespace around the
+		// pattern — delimiters, not value.
+		{"regex padding", "name/value matches {/systolic/}", "name/value matches {  /systolic/  }"},
+		{"matches path interior", "name/value matches {/x/}", "name / value matches {/x/}"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -505,6 +584,103 @@ func TestEmissionIsUnaffected(t *testing.T) {
 				t.Errorf("emission is not a fixed point:\n  first  %q\n  second %q", emitted, twice)
 			}
 		})
+	}
+}
+
+// TestNestedJunctionRetainsGrouping covers the junction-inside-junction
+// position the recursion admits without parentheses: `a and b or c` groups as
+// (a and b) or c, and the model keeps that grouping.
+func TestNestedJunctionRetainsGrouping(t *testing.T) {
+	t.Parallel()
+	got, raw := segmentPredicate(t,
+		"SELECT o/data[at0001 and at0002 or at0003]/x FROM OBSERVATION o")
+	outer, ok := got.(aql.JunctionPredicate)
+	if !ok {
+		t.Fatalf("%q structured as %T; want a junction", raw, got)
+	}
+	if outer.Op != aql.OpOr {
+		t.Fatalf("outer op = %v; want OR — left-recursive grouping", outer.Op)
+	}
+	inner, ok := outer.Left.(aql.JunctionPredicate)
+	if !ok || inner.Op != aql.OpAnd {
+		t.Fatalf("left operand = %+v; want the nested AND junction", outer.Left)
+	}
+	if _, ok := outer.Right.(aql.NodeIDPredicate); !ok {
+		t.Fatalf("right operand = %T; want the bare node id", outer.Right)
+	}
+}
+
+// TestRegexComponentIsDecomposed pins the CONTAINED_REGEX value rules: braces,
+// interior whitespace, slash delimiters and the `;` are delimiters; the label
+// is its own component with escapes resolved; the escaped-slash spelling —
+// which exists only because `/` delimits — resolves; other regex escapes stay.
+func TestRegexComponentIsDecomposed(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, in, regex, label string
+	}{
+		{"bare", "{/systolic/}", "systolic", ""},
+		{"padded", "{  /systolic/  }", "systolic", ""},
+		{"label", "{/systolic/; 'the label'}", "systolic", "the label"},
+		{"escaped label", `{/systolic/; 'it\'s'}`, "systolic", "it's"},
+		{"escaped slash", `{/sys\/tolic/}`, "sys/tolic", ""},
+		{"regex escape kept", `{/a\d+/}`, `a\d+`, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, raw := segmentPredicate(t,
+				"SELECT o/data[name/value matches "+tc.in+"]/x FROM OBSERVATION o")
+			m, ok := got.(aql.MatchesPredicate)
+			if !ok {
+				t.Fatalf("%q structured as %T; want aql.MatchesPredicate", raw, got)
+			}
+			if m.Regex != tc.regex {
+				t.Errorf("Regex = %q; want %q", m.Regex, tc.regex)
+			}
+			if m.Label != tc.label {
+				t.Errorf("Label = %q; want %q", m.Label, tc.label)
+			}
+			if m.ParsedPath == nil || len(m.ParsedPath.Segments) == 0 {
+				t.Error("ParsedPath is empty; the trivia-free path component is missing")
+			}
+		})
+	}
+}
+
+// TestEqualPredicatesNormalisesPointerCarriers pins the EqualValues parity:
+// key() has value receivers, so pointer shapes satisfy the interface, and the
+// equality must compare them as the shape they point at.
+func TestEqualPredicatesNormalisesPointerCarriers(t *testing.T) {
+	t.Parallel()
+	v := aql.NodeIDPredicate{ID: "at0001"}
+	if !aql.EqualPredicates(v, &v) {
+		t.Error("a pointer carrier does not equal its value shape")
+	}
+	var typedNil *aql.NodeIDPredicate
+	if aql.EqualPredicates(v, typedNil) {
+		t.Error("a typed-nil pointer equals a populated predicate")
+	}
+	if !aql.EqualPredicates(typedNil, nil) {
+		t.Error("a typed-nil pointer does not equal nil")
+	}
+}
+
+// TestComparisonEqualityCoversTheLeftOperand pins that a function-call left
+// operand — which the reused WHERE-side Comparison carries even though the
+// predicate grammar cannot spell it — participates in equality.
+func TestComparisonEqualityCoversTheLeftOperand(t *testing.T) {
+	t.Parallel()
+	mk := func(fn string) aql.ComparisonPredicate {
+		return aql.ComparisonPredicate{Comparison: aql.Comparison{
+			Op: "=", Val: aql.Int(5), Left: aql.Func(fn, aql.Path("c/x")),
+		}}
+	}
+	if aql.EqualPredicates(mk("LENGTH"), mk("UPPER")) {
+		t.Error("comparisons differing only in their Left operand compare equal")
+	}
+	if !aql.EqualPredicates(mk("LENGTH"), mk("LENGTH")) {
+		t.Error("identical comparisons with a Left operand compare unequal")
 	}
 }
 

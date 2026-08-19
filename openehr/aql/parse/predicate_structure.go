@@ -28,8 +28,12 @@ import (
 )
 
 // structuredPathPredicate is the entry point for a whole bracket. Returns nil
-// when the context carries no alternative this model covers — which, as of
-// REQ-113, only a nil or empty context can.
+// for a nil or empty context, and for the ENUMERATED unstructured forms
+// (REQ-113 § Structured node predicates): a comparison whose operand the
+// value vocabulary does not carry — an objectPath, a node code, or an
+// out-of-range numeric, per pathPredicateOperandValue — and a junction
+// containing one. Nil-not-partial: a hole never ships inside a populated
+// carrier.
 func structuredPathPredicate(pp gen.IPathPredicateContext) aql.SegmentPredicate {
 	if pp == nil {
 		return nil
@@ -96,9 +100,16 @@ func structuredNodePredicate(np gen.INodePredicateContext) aql.SegmentPredicate 
 		if op == nil || rx == nil {
 			return nil
 		}
+		parsed := &aql.IdentifiedPath{
+			Segments: segmentsFromObjectPath(op),
+			Raw:      sourceText(op),
+		}
+		pattern, label := splitContainedRegex(rx.GetText())
 		return aql.MatchesPredicate{
-			Path:  sourceText(op),
-			Regex: trimBraces(rx.GetText()),
+			Path:       sourceText(op),
+			ParsedPath: parsed,
+			Regex:      pattern,
+			Label:      label,
 		}
 	}
 	// `objectPath COMPARISON_OPERATOR pathPredicateOperand` — the same shape
@@ -239,8 +250,56 @@ func termCodeName(text string) *aql.PredicateName {
 	return n
 }
 
-// trimBraces removes a contained regex's `{` `}` delimiters.
-func trimBraces(s string) string {
-	s = strings.TrimPrefix(s, "{")
-	return strings.TrimSuffix(s, "}")
+// splitContainedRegex decomposes a CONTAINED_REGEX token —
+// `'{' WS* SLASH_REGEX WS* (';' WS* STRING)? WS* '}'` — into its two values:
+// the pattern between the SLASH_REGEX slashes (with the `\/` spelling, which
+// exists only because `/` is the delimiter, resolved to `/`; every other
+// backslash sequence is regex syntax and stays as written), and the optional
+// label with quotes removed and escapes resolved. Handed the components
+// rather than the token, a reader has nothing left to re-lex — the braces,
+// the interior whitespace and the `;` are all delimiters, not value.
+func splitContainedRegex(text string) (pattern, label string) {
+	body := strings.TrimSuffix(strings.TrimPrefix(text, "{"), "}")
+	body = strings.TrimSpace(body)
+	if len(body) == 0 || body[0] != '/' {
+		// Defensive: the lexer cannot produce a CONTAINED_REGEX whose first
+		// non-WS byte is not the pattern's opening slash.
+		return body, ""
+	}
+	// Scan the SLASH_REGEX body (the lexer fragment quoted above): a byte
+	// after a backslash never closes the pattern.
+	i, escaped := 1, false
+	var b strings.Builder
+	for ; i < len(body); i++ {
+		c := body[i]
+		if escaped {
+			if c != '/' {
+				// A regex escape — keep its backslash.
+				b.WriteByte('\\')
+			}
+			b.WriteByte(c)
+			escaped = false
+			continue
+		}
+		if c == '\\' {
+			escaped = true
+			continue
+		}
+		if c == '/' {
+			break
+		}
+		b.WriteByte(c)
+	}
+	pattern = b.String()
+	rest := strings.TrimSpace(body[min(i+1, len(body)):])
+	if after, ok := strings.CutPrefix(rest, ";"); ok {
+		q := strings.TrimSpace(after)
+		// REQ-119: normalise before deciding behaviour from a concrete shape.
+		if v, okDeref := aql.DerefValue(unquoteAQLString(q)); okDeref {
+			if sv, isString := v.(aql.StringValue); isString {
+				label = sv.S
+			}
+		}
+	}
+	return pattern, label
 }
