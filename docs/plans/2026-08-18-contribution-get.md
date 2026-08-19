@@ -7,7 +7,7 @@
 **Probes:** [PROBE-092](../specifications/conformance.md#probe-092--contribution-read-matches-contribution_get) (Draft)
 **Implementation:** planned
 **Depends on:** landed `ehrstatus.Get` pattern; `transport.Decode`; vendored ITS-REST pin (`ehr-validation.openapi.yaml`, `contribution_get`)
-**Ordering:** [path-segment-validation](2026-08-18-path-segment-validation.md) (REQ-150) SHOULD land first so interpolated ids get transport-side refusal; nothing here compiles against it
+**Ordering:** [path-segment-validation](archive/2026-08-18-path-segment-validation.md) (REQ-150) **landed** — interpolated ids now get transport-side refusal; nothing here compiles against it
 **Defers:** Simplified-format `Accept` on contribution read; other missing read leaves
 
 > **Execution:** work the steps sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.

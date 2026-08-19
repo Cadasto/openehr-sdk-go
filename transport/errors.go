@@ -41,6 +41,18 @@ var (
 	// ErrInvalidShape indicates the response body did not match the
 	// expected shape (e.g. Prefer=representation got an empty body).
 	ErrInvalidShape = errors.New("transport: invalid response shape")
+	// ErrInvalidPathSegment indicates a decoded Request.Path segment is
+	// empty, is `.` or `..`, carries `\` or a control character, or (for
+	// [ValidatePathSegment]) carries `/` — or that the path's segment
+	// count contradicts its Route template, which is how a separator
+	// smuggled inside one parameter shows up (REQ-150).
+	//
+	// Returned errors wrap ErrInvalidConfig as well, so
+	// errors.Is(err, ErrInvalidConfig) still means "the request never
+	// left the process". The two sentinels are independent values —
+	// errors.Is(ErrInvalidPathSegment, ErrInvalidConfig) is false; only
+	// the returned chain carries both.
+	ErrInvalidPathSegment = errors.New("transport: invalid path segment")
 )
 
 // OpenEHRErrorDetail is the parsed openEHR REST error envelope per
