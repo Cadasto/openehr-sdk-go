@@ -12,6 +12,7 @@ package rminfo_test
 
 import (
 	"maps"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -474,8 +475,14 @@ func TestProbe094AttributeSetsAreComplete(t *testing.T) {
 		t.Fatal("no class was checked — the completeness arm is vacuous")
 	}
 	// A pin that no longer describes reality is worse than no pin: it would
-	// keep excusing a drop that had actually been fixed.
+	// keep excusing a drop that had actually been fixed. And the REQ-048 pin
+	// rule binds every pin to an open research strand — held mechanically so
+	// a future pin cannot excuse a drop with free text.
+	strandRef := regexp.MustCompile(`STRAND-\d+`)
 	for key, why := range unshippedProperties {
+		if !strandRef.MatchString(why) {
+			t.Errorf("unshippedProperties pins %s without citing a research strand: %q", key, why)
+		}
 		if !unshippedHits[key] {
 			t.Errorf("unshippedProperties pins %s (%s) but it is shipped now — drop the pin", key, why)
 		}
