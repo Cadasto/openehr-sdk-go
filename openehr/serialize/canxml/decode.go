@@ -60,7 +60,9 @@ type Decoder struct {
 func NewDecoder(r io.Reader, opts ...DecoderOption) *Decoder {
 	d := &Decoder{dec: xml.NewDecoder(r)}
 	for _, o := range opts {
-		o(&d.cfg)
+		if o != nil {
+			o(&d.cfg)
+		}
 	}
 	return d
 }

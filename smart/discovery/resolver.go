@@ -130,7 +130,9 @@ func NewResolver(cache Cache, opts ...Option) (*Resolver, error) {
 		wellKnownPath:    WellKnownPath,
 	}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	if cfg.httpClient == nil {
 		return nil, fmt.Errorf("discovery: %w", &DiscoveryError{Reason: ReasonFetchFailed, Inner: errors.New("HTTPClient is required (REQ-021)")})

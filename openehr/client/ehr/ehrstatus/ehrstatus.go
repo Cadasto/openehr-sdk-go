@@ -142,7 +142,9 @@ func Put(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, if
 	}
 	cfg := putConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	body, err := canjson.Marshal(status)
 	if err != nil {

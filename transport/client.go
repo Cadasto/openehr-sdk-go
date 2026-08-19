@@ -64,7 +64,9 @@ func New(catalog *discovery.ServiceCatalog, opts ...Option) (*Client, error) {
 		logger:                  slog.Default(),
 	}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	if catalog == nil {
 		return nil, fmt.Errorf("%w: ServiceCatalog is required (REQ-070)", ErrInvalidConfig)

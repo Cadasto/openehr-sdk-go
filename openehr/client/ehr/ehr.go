@@ -111,7 +111,9 @@ func WithInitialStatus(s *rm.EHRStatus) CreateOption {
 func Create(ctx context.Context, c *transport.Client, opts ...CreateOption) (*rm.EHR, *VersionMetadata, error) {
 	cfg := createConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 
 	var body []byte

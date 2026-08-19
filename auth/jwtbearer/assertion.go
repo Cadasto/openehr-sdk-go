@@ -113,7 +113,9 @@ type ClaimsSigner struct {
 func NewClaimsSigner(template ClaimsTemplate, signer crypto.Signer, opts ...SignerOption) (*ClaimsSigner, error) {
 	s := &ClaimsSigner{Template: template, Signer: signer, Algorithm: "RS384"}
 	for _, o := range opts {
-		o(s)
+		if o != nil {
+			o(s)
+		}
 	}
 	if s.Signer == nil {
 		return nil, fmt.Errorf("%w: signer is required", auth.ErrInvalidConfig)

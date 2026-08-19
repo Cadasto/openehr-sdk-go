@@ -139,7 +139,9 @@ func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...Wr
 	}
 	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	body, err := canjson.Marshal(party)
 	if err != nil {
@@ -190,7 +192,9 @@ func Update(ctx context.Context, c *transport.Client, t Type, voID openehrclient
 	}
 	cfg := writeConfig{WriteConfig: openehrclient.WriteConfig{Prefer: transport.PreferMinimal}}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	body, err := canjson.Marshal(party)
 	if err != nil {
@@ -252,7 +256,9 @@ func Delete(ctx context.Context, c *transport.Client, t Type, versionUID openehr
 	}
 	cfg := deleteConfig{}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	auditHeader, err := openehrclient.MarshalAuditDetails(cfg.auditDetails)
 	if err != nil {

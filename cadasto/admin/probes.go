@@ -91,7 +91,9 @@ func WithReadyPath(p string) ReadyOption {
 func Live(ctx context.Context, c *transport.Client, opts ...LiveOption) error {
 	cfg := liveConfig{path: DefaultLivePath}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	return probe(ctx, c, cfg.path)
 }
@@ -103,7 +105,9 @@ func Live(ctx context.Context, c *transport.Client, opts ...LiveOption) error {
 func Ready(ctx context.Context, c *transport.Client, opts ...ReadyOption) error {
 	cfg := readyConfig{path: DefaultReadyPath}
 	for _, o := range opts {
-		o(&cfg)
+		if o != nil {
+			o(&cfg)
+		}
 	}
 	return probe(ctx, c, cfg.path)
 }
