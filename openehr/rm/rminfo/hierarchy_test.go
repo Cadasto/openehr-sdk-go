@@ -467,8 +467,12 @@ func TestHierarchyOverSyntheticModel(t *testing.T) {
 			Attributes: map[string]rminfo.AttrMeta{
 				"shared": {TypeName: "String", DeclaredIn: "MID"},
 				"own":    {TypeName: "String", DeclaredIn: "LEAF"},
+				// DeclaredIn deliberately omitted: only synthetic data can
+				// reach DeclaredOn's empty-site guard, since Default always
+				// ships a site.
+				"unsited": {TypeName: "String"},
 			},
-			AttrOrder: []string{"shared", "own"},
+			AttrOrder: []string{"shared", "own", "unsited"},
 		},
 		// Abstract with nothing concrete under it: a dead end that must
 		// still report as known with an empty expansion.
@@ -498,6 +502,12 @@ func TestHierarchyOverSyntheticModel(t *testing.T) {
 	}
 	if got, ok := h.DeclaredOn("LEAF", "own"); !ok || got != "LEAF" {
 		t.Errorf("DeclaredOn(LEAF, own) = (%q, %t), want (LEAF, true)", got, ok)
+	}
+	// A present attribute with no recorded site is not-found, not ("", true):
+	// an empty string handed back as a class name would send the caller
+	// asking about a class that cannot exist.
+	if got, ok := h.DeclaredOn("LEAF", "unsited"); ok || got != "" {
+		t.Errorf(`DeclaredOn(LEAF, unsited) = (%q, %t), want ("", false) — an omitted site is not a class name`, got, ok)
 	}
 
 	// The dangling parent: returned verbatim, and then unanswerable. Both

@@ -140,6 +140,10 @@ The declaration site **MUST** agree with the fold that produced those tables. Ob
 
 Two answers to "where does this attribute come from" would be the same defect as the erasure this recovers from.
 
+#### The attribute tables are complete against the BMM
+
+Per class, the shipped attribute-name set **MUST** equal the effective property set — own plus inherited — of the same class in the pinned BMM: an attribute the generator silently declines to translate is a defect, not a gap to be discovered later. A known drop is admissible only as a **named exemption pin**, and this clause is the pin rule's normative home: each pin **MUST** cite an open research strand, and the pinned drop **MUST NOT** be folded in ahead of that strand's resolution. Exactly one exemption exists today — `Iso8601_timezone.value`, the pre-existing emission gap open as [STRAND-13](research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped). The equality, and the pin list held two-sidedly (an unpinned drop fails; a stale pin whose drop has since been fixed fails too), are what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) arm (d) asserts.
+
 #### Abstract is the BMM's flag, not a storability verdict
 
 `is_abstract` in the pinned BMM answers "does the model forbid instantiating this class". It is **not** the same question as "can a stored instance carry this name as `_type`", and this surface **MUST NOT** conflate them. Two consequences bind:

@@ -54,5 +54,6 @@ The public export shape (`template.Compile` / `template.Compiled`) is deferred u
 
 - **Positive:** REQ-101/102 can share one compiled tree; rminfo is reusable without importing `templatecompile`.
 - **Positive:** Codegen drift check recurses into `openehr/rm/rminfo/` (idempotent emit).
+- **Negative (REQ-048 extension, 2026-08-19):** the emitted class set widens 125 → 139, so a caller that counted on 125 `KnownRMTypes()` entries breaks; and two questions stay open against the widened surface — [STRAND-12](../specifications/research-strands.md#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) (BMM-interface abstractness) and [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) (a property inherited from a primitive-mapped ancestor is dropped).
 - **Negative:** Two path resolution semantics (wire vs compiled) — document in package godoc and REQ-100 follow-up material.
 - **Negative:** Public API promotion requires a follow-up ADR amendment or supersession when `template.Compile` is exported.
