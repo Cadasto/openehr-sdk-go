@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -587,4 +588,41 @@ func readComposition(t *testing.T) *rm.Composition {
 		t.Fatalf("decode composition cassette: %v", err)
 	}
 	return &comp
+}
+
+// TestGetRefusesTraversalEHRID pins REQ-150 at a leaf: a hostile ehr_id
+// interpolated into the request path fails closed inside the transport,
+// with nothing on the wire, and the leaf does not have to re-implement the
+// check (PROBE-091 covers the same shape across every leaf).
+func TestGetRefusesTraversalEHRID(t *testing.T) {
+	cases := []struct {
+		name  string
+		ehrID openehrclient.EHRID
+	}{
+		// Traversal: the segments themselves are illegal.
+		{"traversal", "a/../../definition/query/evil"},
+		// Smuggled separator: every resulting segment is legal, only the
+		// count contradicts the Route template.
+		{"smuggled separator", "foo/bar"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+				hits.Add(1)
+			}))
+			defer srv.Close()
+
+			_, _, err := composition.Get(t.Context(), newClient(t, srv), tc.ehrID, openehrclient.VersionOf(compositionVUID))
+			if !errors.Is(err, transport.ErrInvalidPathSegment) {
+				t.Errorf("composition.Get(%q) = %v, want ErrInvalidPathSegment", tc.ehrID, err)
+			}
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("composition.Get(%q) = %v, want ErrInvalidConfig in the chain", tc.ehrID, err)
+			}
+			if n := hits.Load(); n != 0 {
+				t.Errorf("issued %d requests, want 0", n)
+			}
+		})
+	}
 }

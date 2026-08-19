@@ -30,13 +30,25 @@ type Request struct {
 	// it exactly once via [url.URL.String]. Callers MUST interpolate raw,
 	// decoded path parameters (e.g. a template id `Referral Request.v1`)
 	// and MUST NOT pre-escape them with [url.PathEscape] — doing so
-	// double-encodes (` ` → `%20` → `%2520`) and 404s. openEHR ids
-	// (template ids, archetype ids, qualified query names) contain no `/`,
-	// so a decoded path round-trips correctly.
+	// double-encodes (` ` → `%20` → `%2520`) and 404s.
+	//
+	// Segment legality is a separate question from encoding: the transport
+	// validates every decoded segment before building the URL and refuses
+	// a traversal, empty, backslash-bearing, or control-character segment
+	// with [ErrInvalidPathSegment] (REQ-150). The SDK does not assume
+	// openEHR ids carry no `/` — that assumption is exactly what a hostile
+	// id exploits. Use [ValidatePathSegment] to preflight one interpolated
+	// parameter.
 	Path string
-	// Route is the optional path template used for OTel span naming
-	// and error attribution (e.g. "/ehr/{ehr_id}/composition"). When
-	// empty the transport falls back to Path.
+	// Route is the path template used for OTel span naming and error
+	// attribution (e.g. "/ehr/{ehr_id}/composition"). When empty the
+	// transport falls back to Path for those.
+	//
+	// Optional for a raw transport.Do caller, but REQUIRED of any request
+	// that interpolates a parameter into Path: the REQ-150 arity check
+	// that catches a separator smuggled inside one parameter runs only
+	// when Route is set, so leaving it empty silently disables that
+	// defence. A tripwire test in openehr/client holds every leaf to it.
 	Route string
 	// Query is appended to the resolved URL.
 	Query url.Values

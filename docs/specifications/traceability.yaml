@@ -1984,8 +1984,23 @@ requirements:
     title: Path-parameter segment validation
     canonical: docs/specifications/transport.md#req-150--path-parameter-segment-validation
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [transport, openehr/client]
     probes: [PROBE-091]
-    plans: [docs/plans/2026-08-18-path-segment-validation.md]
-
+    plans: [docs/plans/archive/2026-08-18-path-segment-validation.md]
+    tests:
+      - transport/path_test.go
+      - openehr/client/route_guard_test.go
+      - openehr/client/ehr/composition/composition_test.go
+      - testkit/probes/transport/probes_test.go
+    notes: >-
+      ValidatePathSegment / ValidateRequestPath refuse a segment that is
+      "." / ".." / empty or carries "/", "\\", a C0 control byte or DEL;
+      the chain wraps both ErrInvalidPathSegment and ErrInvalidConfig, and the
+      sentinels stay independent values. Enforced at Do's request-preparation
+      site (not inside joinTarget, whose call site already wraps
+      ErrInvalidConfig) together with the Route-arity rule that catches a
+      separator smuggled inside one parameter. A Path of exactly "/" is the
+      service root and passes -- the System API sends OPTIONS /. Route gates
+      the arity half, so openehr/client carries an AST tripwire holding every
+      transport.Request literal to setting it.

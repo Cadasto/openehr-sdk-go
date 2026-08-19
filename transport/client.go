@@ -119,6 +119,22 @@ func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
 	if !ok {
 		return nil, fmt.Errorf("%w: %q", ErrServiceUnavailable, req.effectiveServiceID())
 	}
+	// REQ-150: validate before the URL is built, so a traversal or
+	// control-character segment never reaches the wire. Both checks live
+	// here rather than inside joinTarget: the arity half needs req.Route,
+	// and joinTarget's error is re-wrapped with ErrInvalidConfig below —
+	// returning the validators' chain through that branch would wrap the
+	// sentinel twice.
+	if err := ValidateRequestPath(req.Path); err != nil {
+		return nil, err
+	}
+	// A parameter carrying `/` yields individually legal segments, so only
+	// the arity betrays it. Keyed on req.Route directly, never on
+	// effectiveRoute() — that falls back to Path, and comparing a path's
+	// arity against itself never fires.
+	if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
+		return nil, fmt.Errorf("%w: %w: path %q does not match route template %q", ErrInvalidConfig, ErrInvalidPathSegment, req.Path, req.Route)
+	}
 	target, err := joinTarget(svc.BaseURL, req.Path, req.Query)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
