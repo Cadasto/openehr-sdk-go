@@ -756,7 +756,11 @@ requirements:
     # and a bare boolean literal in any value position (comparison operand, SELECT projection, function argument). No new codes, no severity change,
     # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
     # row and its § in clinical-modeling.md.
-    implementation: landed
+    #
+    # PARTIAL since 2026-08-19: § Value-free lint diagnostics adds Issue.Span
+    # and a normative value-free / value-bearing field classification. Specified,
+    # not yet built — plan below, PROBE-096.
+    implementation: partial
     packages:
       - openehr/aql/parse
       - openehr/aql/parse/gen
@@ -765,10 +769,11 @@ requirements:
       - openehr/templatecompile  # REQ-111 — lint.Options.Compiled is the public compiled type
       - internal/templatecompile
       - testkit/probes/aql
-    probes: [PROBE-028]
+    probes: [PROBE-028]  # PROBE-096 joins when its test lands
     plans:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
+      - docs/plans/2026-08-18-aql-value-free-diagnostics.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -1066,13 +1071,21 @@ requirements:
     # class-predicate ParsedPath is now populated too (Segments with an empty
     # Alias, mirroring the WHERE side) so a consumer need not re-split the
     # relative predicate path.
-    implementation: landed
+    #
+    # PARTIAL since 2026-08-19: two sections were added and are specified but
+    # not yet built — § Structured node predicates (a typed sum beside the
+    # verbatim predicate text, path-SEGMENT position only; the class position
+    # keeps the carriers above) and § Value-free structured drop records (a
+    # {kind, clause, span} record beside ErrIncompleteAST, with no source text
+    # in any field). Plans below; PROBE-095 / PROBE-096.
+    implementation: partial
     packages:
       - openehr/aql
       - openehr/aql/parse
     probes:
       - PROBE-080
       - PROBE-082
+      # PROBE-095 / PROBE-096 join when their tests land
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
@@ -1082,6 +1095,8 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
+      - docs/plans/2026-08-18-aql-structured-node-predicates.md
+      - docs/plans/2026-08-18-aql-value-free-diagnostics.md
 
   - id: REQ-116
     title: Template-level node naming and name-predicated paths
@@ -1914,3 +1929,4 @@ requirements:
     packages: [transport, openehr/client]
     probes: [PROBE-091]
     plans: [docs/plans/2026-08-18-path-segment-validation.md]
+

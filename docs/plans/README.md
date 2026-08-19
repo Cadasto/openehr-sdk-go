@@ -28,13 +28,22 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 ### Model & diagnostics asks (2026-08-18)
 
-Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. Proposed ids: REQ-124 in the RM-behavioural headroom; REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is the transport extension band — first allocation REQ-150).
+Three plans. The two AQL ones have their **spec text written and their code not written** — no new requirement ids: each extends the landed requirement that already owns its surface, so [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) and [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) are now `partial`. Build the diagnostics one first — it only adds fields. The `rminfo` plan still needs its own spec text written.
 
-| Plan | Scope | Covers (proposed) | Probe (proposed) |
+| Plan | Scope | Covers | Probe |
 |---|---|---|---|
-| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, ancestors, conformance, concrete descendants) + declaration-site attribute lookup | REQ-124 (builds on REQ-041/042/045) | PROBE-094 |
-| [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | Typed node/segment/class predicate model beside the verbatim text | REQ-160 (builds on REQ-113/117/119) | PROBE-095 |
-| [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | Structured drop-channel records + lint spans, with a value-free field contract | REQ-161 (builds on REQ-109/113) | PROBE-096 |
+| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy + declaration-site attribute lookup | REQ-124 (**proposed**) | PROBE-094 (proposed) |
+| [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | A `{kind, clause, span}` record beside `ErrIncompleteAST`, a `Span` on `lint.Issue`, and which fields may carry query text | REQ-113 + REQ-109 (spec written) | [PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) (Draft) |
+| [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | A typed predicate model beside the verbatim text, path-segment position only | REQ-113 (spec written) | [PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring) (Draft) |
+
+**Checking the two plans against the real grammar and the real code found four mistakes in them.** That is the useful part of the spec pass; each is now recorded in the plan it belongs to:
+
+- The bracketed predicate is **three** overlapping grammar productions, not `nodePredicate` alone — so a comparison, a bare archetype id and a bare `$param` are each spelled twice, and which parse node carries one depends on how deeply it is nested. The plans would have keyed the model on the parse node and reported one predicate as two different kinds.
+- The predicate **name slot allows five spellings on two of those productions**, one of them a `$param` that defers the name to query-bind time. The draft's archetype kind could not carry a name at all.
+- The extractor has **27 drop sites but only one that a legal query can reach**; the rest are defensive. The plans asked for one enum member per site *and* a test corpus reaching every site — which cannot both be done, so the enum counts kinds of drop and the completeness check reads the source instead.
+- **Two proposed types already exist** — `parse.Clause` and `parse.Position` — so both are reused rather than duplicated.
+
+One open question was decided rather than left hanging: the typed predicate model goes on the path-**segment** position only, and `parse.ClassExpr` keeps the fields it already has, because populating two carriers from one source node is how they drift apart.
 
 ### Ecosystem fit-gap delivery (2026-07-16)
 
