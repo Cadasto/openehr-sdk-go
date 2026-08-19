@@ -1192,3 +1192,42 @@ func readCassette(t *testing.T, dir, name string) []byte {
 	}
 	return b
 }
+
+// TestDoNilClient pins REQ-025: a nil *Client is caller-constructible
+// and reachable through every exported leaf (they all call c.Do), so it
+// MUST fail closed with a typed error rather than dereference nil. One
+// guard here closes every leaf at once — a method call on a nil pointer
+// receiver is legal Go, so Do is reached normally.
+func TestDoNilClient(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("(*Client)(nil).Do panicked: %v", r)
+		}
+	}()
+	var c *Client
+	resp, err := c.Do(t.Context(), &Request{Method: http.MethodGet, Path: "/ehr", Route: "/ehr"})
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("err = %v; want ErrInvalidConfig", err)
+	}
+	if resp != nil {
+		t.Errorf("resp = %+v; want nil", resp)
+	}
+}
+
+// TestDoNilRequest pins the sibling guard: a nil *Request reaches
+// effectiveServiceID, which reads r.ServiceID and would dereference.
+func TestDoNilRequest(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("Do(nil request) panicked: %v", r)
+		}
+	}()
+	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
+		Issuer:   "https://x",
+		Services: map[string]discovery.ServiceEntry{},
+	})
+	c, _ := New(cat, WithHTTPClient(http.DefaultClient))
+	if _, err := c.Do(t.Context(), nil); !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("err = %v; want ErrInvalidConfig", err)
+	}
+}

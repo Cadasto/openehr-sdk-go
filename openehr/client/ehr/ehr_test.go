@@ -254,3 +254,33 @@ func TestRefConstruction(t *testing.T) {
 		t.Errorf("LatestAtTime Query value = %q", v)
 	}
 }
+
+// TestNilClientLeavesDoNotPanic pins the consequence of the REQ-025
+// guard in transport.Do: every exported leaf takes a *transport.Client
+// and calls c.Do, so a nil client used to crash inside the transport.
+// Each leaf must now surface ErrInvalidConfig instead. These are the
+// EHR-package entry points; the guard is central, so one arm per
+// distinct call shape is enough to hold it.
+func TestNilClientLeavesDoNotPanic(t *testing.T) {
+	const id openehrclient.EHRID = "8849182c-82ad-4088-a07f-48ead4180515"
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"Exists", func() error { _, err := openehrclient.Exists(t.Context(), nil, id); return err }},
+		{"Get", func() error { _, _, err := openehrclient.Get(t.Context(), nil, id); return err }},
+		{"Create", func() error { _, _, err := openehrclient.Create(t.Context(), nil); return err }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("%s with a nil client panicked: %v", tc.name, r)
+				}
+			}()
+			if err := tc.call(); !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("err = %v; want ErrInvalidConfig", err)
+			}
+		})
+	}
+}

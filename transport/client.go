@@ -112,6 +112,15 @@ func (c *Client) HTTPClient() *http.Client { return c.cfg.httpClient }
 //  6. Parse the response body into Body + Metadata; map the wire
 //     error envelope onto the typed-sentinel hierarchy.
 func (c *Client) Do(ctx context.Context, req *Request) (*Response, error) {
+	// REQ-025: a nil Client is caller-constructible and reaches here
+	// through every exported leaf, so it fails closed with a typed error
+	// rather than dereferencing. Guarding once here covers them all.
+	if c == nil {
+		return nil, fmt.Errorf("transport.Do: %w: nil Client", ErrInvalidConfig)
+	}
+	if req == nil {
+		return nil, fmt.Errorf("transport.Do: %w: nil Request", ErrInvalidConfig)
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
