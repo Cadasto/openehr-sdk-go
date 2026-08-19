@@ -5,7 +5,7 @@
 **Date:** 2026-07-02
 **Status:** Landed
 **Owner:** SDK maintainers
-**Covers:** No new REQ. **Promotes content into** [REQ-055 / REQ-057](../specifications/wire.md#req-055--wire-boundary) (wire), [REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance value-fill), [REQ-083](../specifications/conformance.md#req-083--cadasto-platform-api-conformance) (cadasto health probes). Governed by **[ADR 0012](../adr/0012-retire-sdk-gap-identifier.md)**.
+**Covers:** No new REQ. **Promotes content into** [REQ-055 / REQ-057](../../specifications/wire.md#req-055--wire-boundary) (wire), [REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) (instance value-fill), [REQ-083](../../specifications/conformance.md#req-083--cadasto-platform-api-conformance) (cadasto health probes). Governed by **[ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md)**.
 **Probes:** none built here. PROBE-077 / 078 / 079 stay `Deferred` catalog entries.
 **Implementation:** landed.
 **Depends on:** ADR 0012 committed (`7cb4436`, this branch); the GAP→REQ/PROBE crosswalk in that ADR is the authoritative mapping for every replacement below.
@@ -23,7 +23,7 @@ Two PRs. **PR1** (small, judgment-heavy) promotes the three durable facts into `
 
 - **Worktree only.** All edits happen in `/src/cadasto/openehr-sdk-go-retire-gap` on `chore/retire-sdk-gap-identifier`. Never touch the shared tree at `/src/cadasto/openehr-sdk-go`.
 - **Never rewrite git history.** Commit messages retain their tokens by design.
-- **Authoritative mapping.** Every GAP→REQ/PROBE replacement uses the crosswalk table in [ADR 0012](../adr/0012-retire-sdk-gap-identifier.md#crosswalk--sdk-gap-nn--req--probe-permanent-decoder). Do not invent mappings.
+- **Authoritative mapping.** Every GAP→REQ/PROBE replacement uses the crosswalk table in [ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md#crosswalk--sdk-gap-nn--req--probe-permanent-decoder). Do not invent mappings.
 - **Replace, don't delete, in code.** A stripped `(SDK-GAP-NN)` in a code comment becomes its governing `(REQ-NNN)` / `(PROBE-NNN)` — traceability is preserved.
 - **Legitimate residual (the ONLY files that keep the token).** The token survives *only* where the subject is the retirement itself: `docs/adr/0012-retire-sdk-gap-identifier.md`, this plan, the ADR index row in `docs/adr/README.md`, and the one-line going-forward rule in `AGENTS.md` + `docs/development-process.md`. Everywhere else → zero.
 - **No normative prose duplication.** New RFC-2119 text lands in the canonical topic spec; `REQ.md` gets a registry row/status only, never duplicated prose (AGENTS.md rule).
@@ -191,7 +191,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - [ ] **Step 1: Add the rule to AGENTS.md** — one line in the spec-driven-workflow section:
 
 ```markdown
-- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose. See [ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md).
+- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose. See [ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md).
 ```
 
 - [ ] **Step 2: Add the same rule (fuller)** to `docs/development-process.md` wherever identifier conventions / DoR-DoD live, linking ADR 0012 as the rationale + crosswalk.
@@ -442,8 +442,8 @@ Open PR2 titled `chore: purge SDK-GAP tokens from the mutable tree (rename plans
 
 ## Mapping to specs
 
-- [ADR 0012](../adr/0012-retire-sdk-gap-identifier.md) — decision + authoritative crosswalk.
-- [wire.md § REQ-055 / § REQ-057](../specifications/wire.md) — GAP-16 promotion target.
-- [clinical-modeling.md § REQ-107](../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) — GAP-14 promotion target.
-- [conformance.md § REQ-083](../specifications/conformance.md#req-083--cadasto-platform-api-conformance) — GAP-07 promotion target.
-- [traceability.yaml](../specifications/traceability.yaml) + [REQ.md](../specifications/REQ.md) — registry/trace updates.
+- [ADR 0012](../../adr/0012-retire-sdk-gap-identifier.md) — decision + authoritative crosswalk.
+- [wire.md § REQ-055 / § REQ-057](../../specifications/wire.md) — GAP-16 promotion target.
+- [clinical-modeling.md § REQ-107](../../specifications/clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) — GAP-14 promotion target.
+- [conformance.md § REQ-083](../../specifications/conformance.md#req-083--cadasto-platform-api-conformance) — GAP-07 promotion target.
+- [traceability.yaml](../../specifications/traceability.yaml) + [REQ.md](../../specifications/REQ.md) — registry/trace updates.

@@ -20,17 +20,17 @@ Chosen after re-verifying the A/B split on `main`. Both sub-gaps land together o
 
 ### Sub-gap A — **A1, shared poly helper** (not the value-receiver regen variant)
 
-Root cause re-confirmed: `MarshalJSON` is a pointer-receiver, and `rmwrite` stores a concrete *value* (`coerceDVCodedText`) into a `*Like` interface field ([`writeClusterSingle`/`writeElementSingle`](../../internal/templateinstance/rmwrite/write.go)), so `encoding/json` uses default struct encoding and drops `_type`.
+Root cause re-confirmed: `MarshalJSON` is a pointer-receiver, and `rmwrite` stores a concrete *value* (`coerceDVCodedText`) into a `*Like` interface field ([`writeClusterSingle`/`writeElementSingle`](../../../internal/templateinstance/rmwrite/write.go)), so `encoding/json` uses default struct encoding and drops `_type`.
 
 - New leaf package **`openehr/internal/jsonpoly`** — pure `reflect` + `encoding/json`, **no `openehr/rm` dependency** (the existing `openehr/serialize/internal/poly` is internal to `serialize/`, so the marshaller targets `openehr/rm` and `openehr/aom/aom14` cannot import it; `openehr/internal/...` is reachable by both).
   - `Marshal(v any) (json.RawMessage, error)` — boxes a non-pointer concrete into a pointer via `reflect.New` so the pointer-receiver `MarshalJSON` runs and emits `_type`; this also restores the nested `CODE_PHRASE` `_type` (once `DVCodedText.MarshalJSON` runs, its wire struct is marshalled by-pointer, so its value-typed `defining_code` field is addressable). Returns `nil` for a nil interface (so `omitempty` still omits).
   - `MarshalSlice[T](s []T) (json.RawMessage, error)` — element-wise, preserving `nil`/`omitempty` semantics.
-- **Codegen** ([`internal/bmmgen/render_jsonmar.go`](../../internal/bmmgen/render_jsonmar.go)): for fields where `isInterfaceTypeRef` is true (single) or the container element is an interface (slice), the wire-struct field type becomes `json.RawMessage` (same json tag, `omitempty` preserved) and the generated `MarshalJSON` pre-computes it via `jsonpoly.*` with error propagation. Non-interface fields, and the no-poly-field classes, keep the current form. No map-of-interface fields exist in the RM, so maps are untouched.
+- **Codegen** ([`internal/bmmgen/render_jsonmar.go`](../../../internal/bmmgen/render_jsonmar.go)): for fields where `isInterfaceTypeRef` is true (single) or the container element is an interface (slice), the wire-struct field type becomes `json.RawMessage` (same json tag, `omitempty` preserved) and the generated `MarshalJSON` pre-computes it via `jsonpoly.*` with error propagation. Non-interface fields, and the no-poly-field classes, keep the current form. No map-of-interface fields exist in the RM, so maps are untouched.
 - **A3 guardrail:** a short pointer-contract note in `openehr/rm/doc.go` only — the codec fix makes the wire correct regardless of pointer-vs-value, so a vet/lint analyzer would be cosmetic. (Maintainer chose doc-note-only.)
 
 ### Sub-gap B — **B1, validator inspects the bounds**
 
-- Extend the interval admission check at [`walk_composition.go:185`](../../openehr/validation/walk_composition.go#L185) to also consider the RM `val`. When the OPT wants `DV_INTERVAL<X>` but the round-tripped value collapsed to bare `DV_INTERVAL` (`DVInterval[DVOrdered]`, per the single [`typereg`](../../openehr/rm/typereg_gen.go#L35) registration), crack open `.Lower`/`.Upper` and accept when the present bound(s) `describeRMType` as `X`. The wire form and the bounds are already correct (sub-gap B is decode-reconstruction, not an encode loss); no decode/`typereg` change.
+- Extend the interval admission check at [`walk_composition.go:185`](../../../openehr/validation/walk_composition.go#L185) to also consider the RM `val`. When the OPT wants `DV_INTERVAL<X>` but the round-tripped value collapsed to bare `DV_INTERVAL` (`DVInterval[DVOrdered]`, per the single [`typereg`](../../../openehr/rm/typereg_gen.go#L35) registration), crack open `.Lower`/`.Upper` and accept when the present bound(s) `describeRMType` as `X`. The wire form and the bounds are already correct (sub-gap B is decode-reconstruction, not an encode loss); no decode/`typereg` change.
 
 ### Not chosen / deferred
 
@@ -54,7 +54,7 @@ A decoder that yields `DV_TEXT` for a discriminator-less `{"value":…}` is **co
 
 ### Sub-gap A — substituted leaf in a `*Like` slot loses its mandatory `_type` (ENCODE defect)
 
-`MarshalJSON` for `DVText` / `DVCodedText` / `DVInterval[T]` has a **pointer receiver** ([data_types_text_jsonmar_gen.go:65,125](../../openehr/rm/data_types_text_jsonmar_gen.go#L65), [data_types_quantity_jsonmar_gen.go:77](../../openehr/rm/data_types_quantity_jsonmar_gen.go#L77)) and the `_type` is emitted *inside* that method. A concrete **value** placed in a `*Like`/abstract interface field is not in the pointer method set, so `encoding/json` falls back to default struct encoding — omitting `_type`.
+`MarshalJSON` for `DVText` / `DVCodedText` / `DVInterval[T]` has a **pointer receiver** ([data_types_text_jsonmar_gen.go:65,125](../../../openehr/rm/data_types_text_jsonmar_gen.go#L65), [data_types_quantity_jsonmar_gen.go:77](../../../openehr/rm/data_types_quantity_jsonmar_gen.go#L77)) and the `_type` is emitted *inside* that method. A concrete **value** placed in a `*Like`/abstract interface field is not in the pointer method set, so `encoding/json` falls back to default struct encoding — omitting `_type`.
 
 Reproduced (`Section.Name DVTextLike`, throwaway test):
 
@@ -65,7 +65,7 @@ Reproduced (`Section.Name DVTextLike`, throwaway test):
 
 `LOCATABLE.name` is statically `DV_TEXT`, so a `DV_CODED_TEXT` there must carry `_type` on the wire (ITS-JSON). The value form is therefore non-conformant encoding — a genuine wire-level data loss.
 
-The **production trigger** is the instance generator walk routing OPT-pinned `name` attributes through `rmwrite`: [`internal/templateinstance/rmwrite/write.go`](../../internal/templateinstance/rmwrite/write.go) (`writeElementSingle` / `writeClusterSingle`) calls `coerceDVCodedText`, which dereferences `*DVCodedText` into a **value** stored in the `DVTextLike` slot — exactly the failure mode above. [`locatable.go`](../../openehr/instance/locatable.go) stamps `rm.DVText{…}` at construction (the declared base type); that path is not the substituted-subtype regression but illustrates the same pointer-receiver vs value-in-interface mechanism.
+The **production trigger** is the instance generator walk routing OPT-pinned `name` attributes through `rmwrite`: [`internal/templateinstance/rmwrite/write.go`](../../../internal/templateinstance/rmwrite/write.go) (`writeElementSingle` / `writeClusterSingle`) calls `coerceDVCodedText`, which dereferences `*DVCodedText` into a **value** stored in the `DVTextLike` slot — exactly the failure mode above. [`locatable.go`](../../../openehr/instance/locatable.go) stamps `rm.DVText{…}` at construction (the declared base type); that path is not the substituted-subtype regression but illustrates the same pointer-receiver vs value-in-interface mechanism.
 
 **Layer:** 1 (encode). Decode and validator are behaving correctly given the (lossy) bytes.
 
@@ -80,7 +80,7 @@ Reproduced (`&DVInterval[DVQuantity]` in `Element.Value DataValue`, throwaway te
             "upper":{"_type":"DV_QUANTITY","magnitude":90,"units":"cm"}, …}
   ```
   (Canonically, `_type` is the bare class `DV_INTERVAL`; the `<DV_QUANTITY>` is **never** on the wire — it is carried by the bounds' `_type`.)
-- **Decode collapses the Go generic parameter:** the value re-decodes as `*rm.DVInterval[rm.DVOrdered]`, **not** `[DVQuantity]`, because `typereg` has a single registration `"DV_INTERVAL" → DVInterval[DVOrdered]` ([typereg_gen.go:35](../../openehr/rm/typereg_gen.go#L35)). The **bounds survive correctly as `*DVQuantity`** (recovered from their own `_type`).
+- **Decode collapses the Go generic parameter:** the value re-decodes as `*rm.DVInterval[rm.DVOrdered]`, **not** `[DVQuantity]`, because `typereg` has a single registration `"DV_INTERVAL" → DVInterval[DVOrdered]` ([typereg_gen.go:35](../../../openehr/rm/typereg_gen.go#L35)). The **bounds survive correctly as `*DVQuantity`** (recovered from their own `_type`).
 
 So nothing is lost on the wire or in the bounds — only the *container's* static `T` collapses `DVQuantity → DVOrdered`. The in-memory `NewSkeleton` instance is `DVInterval[DVQuantity]` (validates OK); the round-tripped value is `DVInterval[DVOrdered]`, and `validation.ValidateComposition` keys off that, reporting `DV_INTERVAL does not satisfy DV_INTERVAL<DV_QUANTITY>`.
 

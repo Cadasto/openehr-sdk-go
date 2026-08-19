@@ -35,6 +35,15 @@ type Lookup interface {
 	// KnownRMTypes returns all RM class names this Lookup recognises,
 	// sorted alphabetically. Used by validators that need to walk the
 	// universe of types (e.g. discovery probes).
+	//
+	// The set is every class the RM generation target emits a Go type
+	// for, which since REQ-048 includes the abstract and attribute-less
+	// ones (DATA_VALUE, PATHABLE, the support service classes): a class
+	// absent here cannot be asked about at all, and a descendant
+	// expansion rooted at an abstract class needs that class present.
+	// It is therefore NOT a list of instantiable types — see
+	// [Hierarchy.IsAbstract] and, for what is decodable, the type
+	// registry in openehr/rm/typereg (REQ-040).
 	KnownRMTypes() []string
 }
 
@@ -64,11 +73,20 @@ var (
 // Default is the package-level Lookup populated by the generated
 // data tables (see lookup_gen.go). Tests and consumers should use
 // this value; New is provided for unit testing with synthetic data.
+//
+// Default is safe for concurrent use by multiple goroutines, including on
+// first use: the derived indexes it builds lazily are published under
+// [sync.Once].
 var Default Lookup = &lookup{data: defaultData}
 
 // New constructs a Lookup over a caller-supplied data set. Intended
 // for unit tests that need to substitute synthetic RM shapes.
 // Production callers should use [Default].
+//
+// The returned Lookup RETAINS data rather than copying it, and derives indexes
+// from it on first use. Callers MUST NOT mutate data afterwards: doing so races
+// with those indexes and leaves the derived answers permanently stale, with no
+// diagnostic. Like [Default], the result is otherwise safe for concurrent use.
 func New(data map[string]ClassMeta) Lookup {
 	return &lookup{data: data}
 }
@@ -76,6 +94,10 @@ func New(data map[string]ClassMeta) Lookup {
 // ClassMeta is the per-class data the Lookup consults. It is
 // exported only to allow tests to construct synthetic data; the
 // production tables live in lookup_gen.go.
+//
+// Construct with field NAMES. Fields may be added in a minor release
+// (REQ-048 added Abstract and Parents), which breaks positional literals —
+// idiom.md § Public-API stability.
 type ClassMeta struct {
 	// Attributes is the effective attribute set (own + inherited)
 	// keyed by attribute name.
@@ -83,9 +105,25 @@ type ClassMeta struct {
 	// AttrOrder is Attributes' iteration order (BMM declaration
 	// order; ancestors first, then own).
 	AttrOrder []string
+	// Abstract mirrors the BMM is_abstract flag verbatim: the model
+	// forbids instantiating the class, so naming it denotes its concrete
+	// descendants rather than one instantiable class. It is NOT a
+	// verdict on whether a stored instance can carry the name as _type
+	// — see [Hierarchy.IsAbstract] (REQ-048).
+	Abstract bool
+	// Parents lists the class's immediate parents in BMM declaration
+	// order, filtered to the classes this data set defines. A BMM
+	// ancestor outside the class universe — the foundation typing layer
+	// (Any, Ordered, Interval, the Iso8601_* types) — is dropped, which
+	// makes its child a root rather than an edge pointing at a name no
+	// method can answer for (REQ-048).
+	Parents []string
 }
 
 // AttrMeta is the per-attribute data the Lookup consults.
+//
+// Construct with field NAMES, for the same reason as [ClassMeta]: REQ-048
+// added DeclaredIn, and a positional literal would no longer compile.
 type AttrMeta struct {
 	// TypeName is the BMM RM type name of the attribute value. For
 	// container properties this is the element type (the type
@@ -98,13 +136,24 @@ type AttrMeta struct {
 	// Container reports whether the attribute is multi-valued
 	// (declared as a container property in the BMM).
 	Container bool
+	// DeclaredIn names the class whose BMM declaration supplied this
+	// attribute — the owning class itself, or the ancestor the
+	// inheritance fold took it from. It is recorded BY that fold, so
+	// it cannot disagree with the TypeName / Required / Container
+	// triple beside it (REQ-048).
+	DeclaredIn string
 }
 
-// lookup is the concrete Lookup backed by a data map.
+// lookup is the concrete Lookup backed by a data map. It also implements the
+// optional [AttributeLister] and [Hierarchy] capability interfaces.
 type lookup struct {
 	data      map[string]ClassMeta
 	knownOnce sync.Once
 	known     []string
+	// childOnce/children memoise the inverted Parents edges the generated
+	// tables do not carry — see childIndex in hierarchy.go.
+	childOnce sync.Once
+	children  map[string][]string
 }
 
 func (l *lookup) RequiredAttributes(rmType string) []string {
