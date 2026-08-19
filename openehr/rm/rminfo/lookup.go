@@ -83,6 +83,16 @@ type ClassMeta struct {
 	// AttrOrder is Attributes' iteration order (BMM declaration
 	// order; ancestors first, then own).
 	AttrOrder []string
+	// Abstract mirrors the BMM is_abstract flag: the model forbids
+	// instantiating the class, so naming it denotes its concrete
+	// descendants rather than a storable _type (REQ-048).
+	Abstract bool
+	// Parents lists the class's immediate parents in BMM declaration
+	// order, filtered to the classes this data set defines. A BMM
+	// ancestor outside the class universe (Any, OPENEHR_DEFINITIONS)
+	// is dropped, which makes its child a root rather than an edge
+	// pointing at a name no method can answer for (REQ-048).
+	Parents []string
 }
 
 // AttrMeta is the per-attribute data the Lookup consults.
@@ -98,6 +108,12 @@ type AttrMeta struct {
 	// Container reports whether the attribute is multi-valued
 	// (declared as a container property in the BMM).
 	Container bool
+	// DeclaredIn names the class whose BMM declaration supplied this
+	// attribute — the owning class itself, or the ancestor the
+	// inheritance fold took it from. It is recorded BY that fold, so
+	// it cannot disagree with the TypeName / Required / Container
+	// triple beside it (REQ-048).
+	DeclaredIn string
 }
 
 // lookup is the concrete Lookup backed by a data map.
