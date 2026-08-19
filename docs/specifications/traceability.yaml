@@ -57,6 +57,9 @@ requirements:
     # universe was the attribute-BEARING subset, so DATA_VALUE and PATHABLE —
     # the abstract roots a descendant expansion starts from — were absent
     # entirely. Widening the universe is part of this REQ, not a side effect.
+    # STRAND-12 holds open whether abstractness should also cover BMM
+    # interface classes (six admitted classes carry no is_abstract flag).
+    # REQ-047 settles today's behaviour: report the BMM's flag verbatim.
     adrs: [docs/adr/0005-compiled-template-foundation.md]
     probes: [PROBE-094]
     packages:

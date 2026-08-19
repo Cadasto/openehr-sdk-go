@@ -125,11 +125,11 @@ Design constraints carried over from the landed package:
   attributes into every class's map — `RequiredAttributes` and the REQ-112
   validation walkers depend on the resolved view. Hierarchy data is additive;
   no table shrinks to own-only declarations.
-- Unknown class ≠ abstract class ≠ concrete class with no descendants — the three
-  answers stay distinguishable, because a caller refusing a query needs to say
-  *which* it is.
+- The three-way distinction the surface must keep is canonical in
+  [bmm-conformance.md § Three answers, never conflated](../specifications/bmm-conformance.md#three-answers-never-conflated)
+  — not restated here, because a plan-side paraphrase is how the two drift.
 
-### Two decisions Phase 0 settled beyond the REQ text
+### How two of the REQ's rules are implemented
 
 1. **`Parents` ships alongside `Ancestors`.** The plan left the immediate-parents
    variant open. It is in: the BMM's own `ancestors` field *is* the immediate
@@ -156,24 +156,17 @@ Met by Phase 0 (landed in this branch):
       is defined in `conformance.md` (Draft): the generated answers are
       equivalent to an **independent** reduction of the pinned BMM — through the
       `openehr/bmm` loader, deliberately not through the generator's own walk.
-- [x] Negative space: unknown class ≠ abstract class ≠ concrete class with no
-      descendants — three distinguishable answers, never conflated; `DeclaredOn`
-      on an attribute the class does not carry reports not-found rather than
-      guessing.
+- [x] Negative space is normative in
+      [bmm-conformance.md § Three answers, never conflated](../specifications/bmm-conformance.md#three-answers-never-conflated)
+      and in the acceptance criteria there — cited, not restated, so the plan
+      cannot drift from it.
 - [x] Each phase names its verification command.
 
 ### The home decision (settled)
 
-`bmm-conformance.md`, **not** the 120–129 band. `rm-functions.md` scopes itself to
-the RM's *behavioural* functions — the operations `bmmgen` emits as signatures but
-cannot implement from a schema, because "they carry algorithm, not just shape".
-Hierarchy introspection is the opposite: pure shape, derivable from the schema
-alone, and not a function the RM declares on any RM class. It belongs beside
-REQ-041/042/045, whose generator, drift check, and building-block loader it
-inherits, and whose REQ-045 already sets the precedent of specifying a public
-building-block surface in that document. Allocated in the free BMM headroom
-(**048**) so no band straddles two documents; 124–129 stays free for behavioural
-functions ([numbering policy](../specifications/REQ.md#numbering-policy)).
+`bmm-conformance.md` / **REQ-048**, not the proposed REQ-124. The rationale is
+canonical in [REQ.md § Numbering policy](../specifications/REQ.md#numbering-policy)
+and is not repeated here.
 
 ## Definition of Done
 
@@ -189,7 +182,7 @@ functions ([numbering policy](../specifications/REQ.md#numbering-policy)).
 |---|---|
 | REQ § + registry row (Phase 0) | done |
 | PROBE defined in `conformance.md` (Draft) | done |
-| Generator + `ClassMeta` / `AttrMeta` extension + regenerated tables | |
+| Generator + `ClassMeta` / `AttrMeta` extension + regenerated tables | done |
 | `Hierarchy` interface + `DeclaredOn` | |
 | Tests with `// REQ-` / `// PROBE-` comments | |
 | `make spec-check` | |
@@ -210,26 +203,37 @@ functions ([numbering policy](../specifications/REQ.md#numbering-policy)).
 
 **Verification:** `make spec-check` — passes with the new rows.
 
-### Phase 1 — Generator and data
+### Phase 1 — Generator and data — **done**
 
-1. Extend the `rminfo` generator to emit into `ClassMeta`: `Abstract bool` (the
-   BMM `is_abstract` flag) and `Parents []string` (the BMM `ancestors` list,
-   **filtered to the emitted class universe**, in declaration order — so `Any`
-   and `OPENEHR_DEFINITIONS` do not leak in and `PATHABLE` / `DATA_VALUE` are
-   roots). Emit `AttrMeta.DeclaredIn` from the fold itself.
-2. **Widen the emitted class universe**: drop the `len(attrs) == 0` skip, so the
-   attribute-less classes join the table. This is required by REQ-048 (a
+1. [x] Extend the `rminfo` generator to emit into `ClassMeta`: `Abstract bool`
+   (the BMM `is_abstract` flag) and `Parents []string` (the BMM `ancestors`
+   list, **filtered to the emitted class universe**, in declaration order).
+   Emit `AttrMeta.DeclaredIn` from the fold itself.
+2. [x] **Widen the emitted class universe**: drop the `len(attrs) == 0` skip, so
+   the attribute-less classes join the table. This is required by REQ-048 (a
    descendant expansion of `DATA_VALUE` is unanswerable while `DATA_VALUE` is
-   absent) and it is the one behaviour change to a landed surface —
-   `KnownRMTypes()` grows by exactly the 10 attribute-less non-`ehr_extract`
-   classes the generator already emits Go types for: `ACCESS_CONTROL_SETTINGS`,
-   `CODE_SET_ACCESS`, `DATA_VALUE`, `EXTERNAL_ENVIRONMENT_ACCESS`,
+   absent) and it is the one behaviour change to a landed surface:
+   `KnownRMTypes()` goes from **125 to 139** entries, gaining exactly the
+   attribute-less classes the RM target already types —
+   `ACCESS_CONTROL_SETTINGS`, `BASIC_DEFINITIONS`, `CODE_SET_ACCESS`,
+   `DATA_VALUE`, `EXTERNAL_ENVIRONMENT_ACCESS`, `Iso8601_timezone`,
    `MEASUREMENT_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`,
-   `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, `PATHABLE`, `TERMINOLOGY_ACCESS`,
-   `TERMINOLOGY_SERVICE`. Pin that delta in a test so a future widening is a
-   deliberate edit, not a silent one, and check the `KnownRMTypes()` consumers
-   (`openehr/template/optvalidate`, the REQ-112 floor) for a behaviour change.
-3. Regenerate; extend the drift coverage to the new generated fields.
+   `OPENEHR_DEFINITIONS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, `PATHABLE`,
+   `TERMINOLOGY_ACCESS`, `TERMINOLOGY_SERVICE`, `Time_Definitions`. Nothing is
+   removed. The delta is pinned by test so a future widening is a deliberate
+   edit; the whole suite (including `openehr/template/optvalidate` and the
+   REQ-112 floor, the two `KnownRMTypes()` consumers) stays green.
+3. [x] Regenerate; extend the drift coverage to the new generated fields.
+
+**What the parent filter actually drops** (measured against the pinned BMM, not
+assumed): `Any` — `PATHABLE`'s only ancestor, so `PATHABLE` is the one class the
+filter turns into a root — plus `Ordered`, `Interval`, the `Iso8601_*` types and
+the `PROPORTION_KIND` enumeration. Every class naming one of those names an RM
+ancestor beside it (`DV_ORDERED` is `[DATA_VALUE, Ordered]`, `DV_INTERVAL` is
+`[DATA_VALUE, Interval]`, `DV_PROPORTION` is `[PROPORTION_KIND, DV_AMOUNT]`), so
+no RM edge is lost. `OPENEHR_DEFINITIONS` is **not** filtered — the RM target
+emits it, so `DATA_VALUE`'s parent edge is real. The only genuine multiple
+inheritance inside the universe is the two `support` service classes.
 
 **Verification:** `make codegen-verify` (byte-stable across two runs; red when a
 generated field is hand-edited) and `go test ./internal/bmmgen/...`.

@@ -22,7 +22,7 @@ The template list-filters plan **landed 2026-08-19 and was archived** ([archive/
 
 | Plan | Scope | Covers | Probe |
 |---|---|---|---|
-| [2026-08-18-probe-runnability.md](2026-08-18-probe-runnability.md) | Give the existing probe catalog (63 entries) the execution modes REQ-082 mandates: one shared result type + a runner (phase 1), a real `sandbox/` in-memory backend (phase 2), then recording/replay and Live (phases 3–4, blocked on access to a live CDR) | REQ-082 (**`partial`**) | none new — promotes PROBE-077 / 078 / 079 out of `Status: Deferred` and unblocks PROBE-065 (`Status: Draft`) |
+| [2026-08-18-probe-runnability.md](2026-08-18-probe-runnability.md) | Give the existing probe catalog (64 entries) the execution modes REQ-082 mandates: one shared result type + a runner (phase 1), a real `sandbox/` in-memory backend (phase 2), then recording/replay and Live (phases 3–4, blocked on access to a live CDR) | REQ-082 (**`partial`**) | none new — promotes PROBE-077 / 078 / 079 out of `Status: Deferred` and unblocks PROBE-065 (`Status: Draft`) |
 
 Phase 0 (the REQ-082 normative prose — mode selection, the probe result contract, per-mode rules, cross-mode precedence) landed 2026-08-18 alongside [STRAND-11](../specifications/research-strands.md#strand-11--probe-recording-format-har-or-a-purpose-built-yaml), which holds the recording-format fork open until there is a capture to judge it against. Eight probes and [STRAND-09](../specifications/research-strands.md#strand-09--its-rest-conformance-follow-ups) item 1 are gated on this plan, and REQ-082 is one of the three [`v1.0.0` gate](../releases.md#v100-gate) conditions.
 

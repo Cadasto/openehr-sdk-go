@@ -200,6 +200,28 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
+## STRAND-12 — BMM interface classes carry no `is_abstract` flag
+
+**Status:** Open — opened by the [REQ-048 specification pass](../plans/2026-08-18-rminfo-class-hierarchy.md).
+
+**Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-047](bmm-conformance.md#req-047--bmm-spec-divergence-resolution)?
+
+**Why it's open:** six classes in REQ-048's universe carry no `is_abstract` flag: `MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`, and — the sharp cases — `CODE_SET_ACCESS` and `TERMINOLOGY_ACCESS`, which are `P_BMM_INTERFACE` declarations the generator renders as Go **interfaces**. Nothing can instantiate a Go interface, so the surface reports "not abstract" for a class that is unquestionably not instantiable, and a concrete-descendant expansion hands it back. REQ-047 settles the immediate behaviour — the BMM wins, the SDK reports the flag verbatim, and REQ-048 says so normatively — but it does not settle whether the *question* is the right one.
+
+**The trade-off:**
+
+- **Report the flag only** (today's behaviour). One rule, one source, no local model of instantiability; a caller needing the decodable set uses the [REQ-040 registry](rm-modeling.md#type-registry-req-040), which is the authority for what Go can construct. Against it: a caller who reads "not abstract" as "instantiable" is misled on six classes, and the surface offers no way to notice.
+- **Widen abstractness to cover BMM interfaces** — report `is_abstract || _type == P_BMM_INTERFACE`. Matches what the generator actually emits and what a caller means. Against it: it is the SDK second-guessing the BMM, which REQ-047 forbids as a general practice precisely because local corrections diverge silently from every other openEHR implementation reading the same file.
+- **Raise it upstream and keep reporting the flag** until the schema changes. Correct in the long run and costs nothing locally; the timescale is not ours to set.
+
+**Evidence needed:** whether the openEHR BMM treats a missing `is_abstract` on `P_BMM_INTERFACE` as implicit (in which case every consumer must infer it, and inferring is not second-guessing) or as an oversight in these six declarations. That is a question for the openEHR specifications repository, not for this tree.
+
+**Resolution form:** an upstream issue first; then either an ADR widening the abstractness question, or a documented acceptance that the flag is the whole answer. Until then REQ-048's § *Abstract is the BMM's flag, not a storability verdict* holds and **MUST NOT** be pre-empted in code.
+
+**Affects:** REQ-048, and REQ-047's divergence-reporting duty.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -215,3 +237,4 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-09](#strand-09--its-rest-conformance-follow-ups) | ITS-REST conformance follow-ups (REST probes; stored-query `fetch`) | Open (deferred) | REQ-059, REQ-095, REQ-099 |
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | Open | REQ-082 |
+| [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |

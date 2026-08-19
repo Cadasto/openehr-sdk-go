@@ -41,7 +41,7 @@ Every probe that asserts against a **backend** **MUST** be runnable in three mod
 
 The probe definition is the single source; the runner picks the backend at invocation time.
 
-**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 9 of the 63 catalog entries are in-repo by construction.
+**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 10 of the 64 catalog entries are in-repo by construction.
 
 For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 15 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
 
@@ -577,22 +577,6 @@ client scenarios to SDK coverage:
 - **Modes:** Sandbox.
 - **Status:** Draft.
 
-### RM model introspection
-
-#### PROBE-094 — RM meta-model introspection equals the pinned BMM
-
-- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, and per-attribute declaring class — equals an independent reduction of the pinned RM BMM, and every answer it gives is closed over the universe it reports.
-- **Preconditions:** The pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — deliberately **not** through the generator's own reduction, which would make the comparison tautological and would pass on a generator whose walk is itself wrong.
-- **Wire assertion:** In-repo property, not backend-facing.
-  (a) **Universe** — the compiled-in class set equals the classes the pinned RM defines minus the wholesale generator exclusions (the `org.openehr.rm.ehr_extract` package, primitives, enumerations). A class present on one side only is a failure **in either direction**: a missing class is an unanswerable question, an extra one is a class name the RM does not define.
-  (b) **Per class** — abstractness equals the BMM `is_abstract` flag; immediate parents equal the BMM `ancestors` list filtered to the universe, in declaration order; transitive ancestors equal the closure of that filtered edge set; concrete descendants equal the non-abstract members of the inverse closure, plus the class itself when concrete.
-  (c) **Closure** — every class name any answer returns is itself in the universe: no `Any`, no `OPENEHR_DEFINITIONS`, and no `ehr_extract` class leaks in through an ancestor or descendant edge.
-  (d) **Declaration site** — for every class and every attribute the flattened tables report on it, the declaring class MUST be that class or one of its transitive ancestors, its own BMM declaration MUST carry the attribute, and the attribute's reported type / required / container triple MUST equal the one the declaring class reports. The flattened fold and the declaration site MUST NOT be able to disagree — that is the whole point of recovering a site the fold erased, and a site derived by a second, independent walk would reintroduce the divergence.
-  (e) **Negative space** — a name outside the universe MUST be distinguishable from every in-universe answer on every question; an attribute a class does not carry MUST report not-found rather than a guessed class; and a root class and a dead-end abstract class MUST each report as known with an empty answer, never as unknown. This arm is exercised through the synthetic-model seam as well as the pinned RM, since the pinned RM cannot supply every shape (REQ-048).
-- **Modes:** In-repo (unit-level property; no backend).
-- **Status:** Draft — defined ahead of implementation; see [2026-08-18-rminfo-class-hierarchy](../plans/2026-08-18-rminfo-class-hierarchy.md).
-- **Satisfies:** REQ-048.
-
 ### Service discovery
 
 #### PROBE-040 — Catalog cache honours TTL
@@ -783,6 +767,22 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — [`testkit/probes/definition/probe_093_template_list_filters.go`](../../testkit/probes/definition/probe_093_template_list_filters.go); harness in [`probes_test.go`](../../testkit/probes/definition/probes_test.go). Plan: [`docs/plans/archive/2026-08-18-template-list-filters.md`](../plans/archive/2026-08-18-template-list-filters.md).
 - **Satisfies:** REQ-143.
 
+### RM model introspection
+
+#### PROBE-094 — RM meta-model introspection equals the pinned BMM
+
+- **Title:** The compiled-in RM class graph — class universe, abstractness, immediate parents, transitive ancestors, concrete-descendant expansion, and per-attribute declaring class — equals an independent reduction of the pinned RM BMM, and every answer it gives is closed over the universe it reports.
+- **Preconditions:** The pinned primary RM schema and its includes under [`resources/bmm/`](../../resources/bmm) (REQ-041), reduced in-test through the `openehr/bmm` loader (REQ-045) — deliberately **not** through the generator's own reduction, which would make the comparison tautological and would pass on a generator whose walk is itself wrong.
+- **Wire assertion:** In-repo property, not backend-facing.
+  (a) **Universe** — the compiled-in class set equals the class universe REQ-048 defines: the classes the RM generation target emits from the primary RM schema **and the BASE classes it includes**, minus that target's three exclusions (the `org.openehr.rm.ehr_extract` package, the primitives of bmm-conformance.md § Primitive type mapping, and enumerations). A class present on one side only is a failure **in either direction**: a missing class is an unanswerable question, an extra one is a class name the pinned schemas do not define.
+  (b) **Per class** — abstractness equals the BMM `is_abstract` flag *verbatim*, including the six classes that carry no flag (`MEASUREMENT_SERVICE`, `TERMINOLOGY_SERVICE`, `CODE_SET_ACCESS`, `TERMINOLOGY_ACCESS`, `OPENEHR_CODE_SET_IDENTIFIERS`, `OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS`) and are therefore reported non-abstract — REQ-047 forbids substituting a locally-derived verdict, and this arm MUST fail if one is substituted, not merely if the flag is misread. Immediate parents equal the BMM `ancestors` list filtered to the universe, in declaration order; transitive ancestors equal the closure of that filtered edge set; concrete descendants equal the non-abstract members of the inverse closure, plus the class itself when it is not abstract.
+  (c) **Closure** — every class name any answer returns is itself in the universe: none of the foundation typing layer the RM target does not emit (`Any`, `Ordered`, `Interval`, the `Iso8601_*` types, the `PROPORTION_KIND` enumeration) and no `ehr_extract` class leaks in through an ancestor or descendant edge. The converse arm is the load-bearing one: the filter MUST NOT cost an RM edge — for every class whose BMM ancestors mix an RM class with a filtered one (`DV_ORDERED`, `DV_INTERVAL`, `DV_DATE`, `DV_PROPORTION`, …), the RM ancestor MUST survive, since an edge lost here silently shrinks every descendant expansion above it.
+  (d) **Declaration site** — for every class and every attribute the flattened tables report on it, the declaring class MUST be that class or one of its transitive ancestors, its own BMM declaration MUST carry the attribute, and the attribute's reported type / required / container triple MUST equal the one the declaring class reports. Those three checks are the whole observable content of "the fold and the site agree"; how the site is derived is an implementation decision, not something a probe can assert.
+  (e) **Negative space** — a name outside the universe MUST be distinguishable from every in-universe answer on every question; an attribute a class does not carry MUST report not-found rather than a guessed class; and a root class and a dead-end abstract class MUST each report as known with an empty answer, never as unknown. This arm is exercised through the synthetic-model seam as well as the pinned RM, since the pinned RM cannot supply every shape (REQ-048).
+- **Modes:** In-repo (unit-level property; no backend).
+- **Status:** Draft — defined ahead of implementation; see [2026-08-18-rminfo-class-hierarchy](../plans/2026-08-18-rminfo-class-hierarchy.md).
+- **Satisfies:** REQ-048.
+
 ### Observability
 
 #### PROBE-050 — OTel span carries openEHR attributes
@@ -807,7 +807,7 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 
 A new probe **MUST**:
 
-- Be assigned the next available `PROBE-NNN` for its topic range (gap of 10 between topics).
+- Be assigned the next available `PROBE-NNN`. The original rule was *next in the probe's topic range, with a gap of 10 between topics*; that rule was exhausted once the catalog crossed 080 and allocation has been **sequential across topics** ever since — 086 and 089 are formats probes, 087/088/090 AQL, 091–093 REST binding, 094 RM model introspection. A new topic therefore takes the next free number and adds its own catalog section rather than opening a decade. Renumbering remains prohibited either way.
 - Have a definition in this catalog *before* any implementation lands.
 - Be runnable in at least Sandbox mode; Cassette and Live modes follow when fixtures are recorded.
 - Carry a `Status:` transition (Draft → Implemented → Ratified, or Deprecated before removal) in this spec when its state changes; transitions go in the CHANGELOG.

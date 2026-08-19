@@ -22,6 +22,8 @@ The public export shape (`template.Compile` / `template.Compiled`) is deferred u
 - Expose a small `Lookup` interface + `Default` accessor; no runtime BMM parse in consumers.
 - `RequiredAttributes` order follows BMM declaration order for implicit injection.
 
+**Extended by [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface)** (2026-08-19), without changing this decision's shape: the same generated, stdlib-only, no-runtime-BMM table also carries the RM **class graph** (abstractness, immediate parents, and the attribute declaration site the fold erases), and its emitted class set widens from the attribute-BEARING classes to every class the RM target types — a descendant expansion rooted at `DATA_VALUE` or `PATHABLE` was unanswerable while those classes were absent. `KnownRMTypes()` therefore reports 139 classes rather than 125. The compiled-in / no-runtime-parse rule is unchanged and is now normative in that requirement rather than only here.
+
 ### C2 — `templatecompile` stays under `internal/` until REQ-101 lands
 
 - Composition and validation import via Go's `internal/` rule (same module).
