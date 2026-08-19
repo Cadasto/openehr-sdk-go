@@ -11,7 +11,10 @@ import (
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
 
-const routeTemplate = "/ehr/{ehr_id}/contribution"
+const (
+	routeTemplate = "/ehr/{ehr_id}/contribution"
+	routeGet      = "/ehr/{ehr_id}/contribution/{contribution_uid}"
+)
 
 // commitConfig is the resolved option set for [Commit].
 type commitConfig struct {
@@ -87,9 +90,43 @@ func Commit(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID,
 	return &out, meta, nil
 }
 
+// Get reads a persisted contribution by uid (REQ-142 / PROBE-092).
+//
+// Wire: GET /ehr/{ehr_id}/contribution/{contribution_uid}
+// (ITS-REST `contribution_get`). The response decodes as the persisted
+// `*rm.Contribution` — `versions[]` of OBJECT_REF, not the
+// `Contribution_create` submission shape [Commit] sends.
+//
+// The returned [*openehrclient.VersionMetadata] exists for shape
+// consistency with the other EHR leaves and carries whatever headers
+// the server sent: the vendored pin defines only `Content-Type` on
+// `200_CONTRIBUTION` (`ETag` / `Location` belong to `201_CONTRIBUTION`),
+// so callers MUST NOT require it to be populated on a read.
+//
+// An empty ehrID or contributionUID fails with
+// [transport.ErrInvalidConfig] before any request is issued; a 404 maps
+// to [transport.ErrNotFound]. v1 requests canonical JSON only —
+// simplified-format Accept values are out of scope.
+func Get(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+	if ehrID == "" {
+		return nil, nil, fmt.Errorf("contribution.Get: %w: empty EHRID", transport.ErrInvalidConfig)
+	}
+	if contributionUID == "" {
+		return nil, nil, fmt.Errorf("contribution.Get: %w: empty contributionUID", transport.ErrInvalidConfig)
+	}
+	req := &transport.Request{
+		Method: http.MethodGet,
+		Path:   "/ehr/" + string(ehrID) + "/contribution/" + contributionUID,
+		Route:  routeGet,
+	}
+	out, meta, err := transport.Decode[rm.Contribution](ctx, c, req)
+	return out, openehrclient.NewVersionMetadata(meta), err
+}
+
 // Repository mirrors the package functions for DI seams.
 type Repository interface {
 	Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error)
+	Get(ctx context.Context, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error)
 }
 
 // NewRepository binds c to a Repository.
@@ -99,4 +136,8 @@ type repository struct{ c *transport.Client }
 
 func (r *repository) Commit(ctx context.Context, ehrID openehrclient.EHRID, batch *Submission, opts ...CommitOption) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
 	return Commit(ctx, r.c, ehrID, batch, opts...)
+}
+
+func (r *repository) Get(ctx context.Context, ehrID openehrclient.EHRID, contributionUID string) (*rm.Contribution, *openehrclient.VersionMetadata, error) {
+	return Get(ctx, r.c, ehrID, contributionUID)
 }

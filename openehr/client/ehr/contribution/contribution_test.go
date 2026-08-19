@@ -216,3 +216,119 @@ func TestCommitMapsVersionConflict(t *testing.T) {
 		t.Errorf("expected ErrVersionConflict, got %v", err)
 	}
 }
+
+// contributionGetFixture is a canonical persisted CONTRIBUTION body —
+// the `versions[]` of OBJECT_REF shape (distinct from the
+// Contribution_create submission body asserted above).
+const contributionGetFixture = `{
+  "_type": "CONTRIBUTION",
+  "uid": {"_type": "HIER_OBJECT_ID", "value": "0826851c-c4c2-4d61-92b9-410fb8275ff0"},
+  "audit": {
+    "_type": "AUDIT_DETAILS",
+    "system_id": "cdr.example",
+    "committer": {"_type": "PARTY_IDENTIFIED", "name": "alice"},
+    "change_type": {
+      "_type": "DV_CODED_TEXT",
+      "value": "creation",
+      "defining_code": {"_type": "CODE_PHRASE", "code_string": "249"}
+    }
+  },
+  "versions": [
+    {"_type": "OBJECT_REF", "namespace": "local", "type": "COMPOSITION",
+     "id": {"_type": "OBJECT_VERSION_ID", "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}}
+  ]
+}`
+
+// TestGetRejectsInputs pins REQ-142's fail-before-request rule: an empty
+// ehr_id or contribution_uid is refused with ErrInvalidConfig and MUST
+// NOT issue a request (an empty interpolated segment is what REQ-150's
+// validator refuses; the sentinel contract has one home).
+func TestGetRejectsInputs(t *testing.T) {
+	var requests int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	_, _, err := contribution.Get(t.Context(), c, "", "cont-1")
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("empty EHRID: expected ErrInvalidConfig, got %v", err)
+	}
+	_, _, err = contribution.Get(t.Context(), c, ehrIDFixture, "")
+	if !errors.Is(err, transport.ErrInvalidConfig) {
+		t.Errorf("empty contributionUID: expected ErrInvalidConfig, got %v", err)
+	}
+	if requests != 0 {
+		t.Errorf("issued %d request(s); REQ-142 requires failing before any request", requests)
+	}
+}
+
+// TestGet pins the REQ-142 / PROBE-092 request shape (method, path, and
+// the canonical-JSON Accept) and the 200 decode down to versions[0]'s
+// concrete OBJECT_REF and its fields — the read-side inverse of
+// TestCommitSubmissionShape. Per the vendored pin, 200_CONTRIBUTION
+// defines only Content-Type, so no version-metadata assertion is made
+// here.
+func TestGet(t *testing.T) {
+	const uid = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(contributionGetFixture))
+	}))
+	defer srv.Close()
+
+	out, _, err := contribution.Get(t.Context(), newClient(t, srv), ehrIDFixture, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if captured.Method != http.MethodGet {
+		t.Errorf("method = %q (want GET)", captured.Method)
+	}
+	if want := "/openehr/v1/ehr/" + string(ehrIDFixture) + "/contribution/" + uid; captured.URL.Path != want {
+		t.Errorf("path = %q, want %q", captured.URL.Path, want)
+	}
+	if got := captured.Header.Get("Accept"); got != "application/json" {
+		t.Errorf("Accept = %q, want %q (v1 requests canonical JSON only)", got, "application/json")
+	}
+	if out == nil {
+		t.Fatal("nil Contribution on 200")
+	}
+	if out.UID.Value != uid {
+		t.Errorf("uid = %q, want %q", out.UID.Value, uid)
+	}
+	if len(out.Versions) != 1 {
+		t.Fatalf("len(versions) = %d (want 1)", len(out.Versions))
+	}
+	ref, ok := out.Versions[0].(*rm.ObjectRef)
+	if !ok {
+		t.Fatalf("versions[0] = %T, want *rm.ObjectRef", out.Versions[0])
+	}
+	if ref.Namespace != "local" || ref.Type != "COMPOSITION" {
+		t.Errorf("versions[0] namespace/type = %q/%q, want %q/%q", ref.Namespace, ref.Type, "local", "COMPOSITION")
+	}
+	const wantVersionID = "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+	if got, ok := rm.ObjectIDValue(ref.ID); !ok || got != wantVersionID {
+		t.Errorf("versions[0] id = %q, want %q", got, wantVersionID)
+	}
+	if out.Audit == nil {
+		t.Error("audit not decoded")
+	}
+}
+
+// TestGetMapsNotFound pins REQ-142's 404 -> ErrNotFound mapping.
+func TestGetMapsNotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"no such contribution"}`))
+	}))
+	defer srv.Close()
+	_, _, err := contribution.Get(t.Context(), newClient(t, srv), ehrIDFixture, "missing")
+	if !errors.Is(err, transport.ErrNotFound) {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}

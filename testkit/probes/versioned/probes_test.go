@@ -376,3 +376,85 @@ func TestProbe013RejectsTenantLeak(t *testing.T) {
 		t.Errorf("expected fail on 200 cross-EHR read, got %q", r.Status)
 	}
 }
+
+// contributionGetBody is a canonical persisted CONTRIBUTION — the
+// versions[] of OBJECT_REF shape returned by contribution_get.
+const contributionGetBody = `{
+  "_type": "CONTRIBUTION",
+  "uid": {"_type": "HIER_OBJECT_ID", "value": "0826851c-c4c2-4d61-92b9-410fb8275ff0"},
+  "audit": {"_type": "AUDIT_DETAILS", "system_id": "cdr.example",
+    "committer": {"_type": "PARTY_IDENTIFIED", "name": "alice"},
+    "change_type": {"_type": "DV_CODED_TEXT", "value": "creation",
+      "defining_code": {"_type": "CODE_PHRASE", "code_string": "249"}}},
+  "versions": [{"_type": "OBJECT_REF", "namespace": "local", "type": "COMPOSITION",
+    "id": {"_type": "OBJECT_VERSION_ID", "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}}]
+}`
+
+// contributionGetServer answers 200 with a canonical contribution for
+// presentUID and 404 for anything else, recording every request.
+func contributionGetServer(t *testing.T, captured *[]*http.Request, presentUID string) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*captured = append(*captured, r.Clone(r.Context()))
+		if strings.HasSuffix(r.URL.Path, "/contribution/"+presentUID) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(contributionGetBody))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"no such contribution"}`))
+	}))
+}
+
+func TestProbe092ContributionGetPass(t *testing.T) {
+	const presentUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
+	var captured []*http.Request
+	srv := contributionGetServer(t, &captured, presentUID)
+	defer srv.Close()
+
+	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), &captured, ehrIDFixture, presentUID, "missing-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-092 status = %q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// TestProbe092ContributionGetFlagsWrongMethod plants a backend that
+// records a mutated request (POST) so the probe's method assertion is
+// itself exercised — a probe that cannot fail proves nothing.
+func TestProbe092ContributionGetFlagsWrongMethod(t *testing.T) {
+	const presentUID = "0826851c-c4c2-4d61-92b9-410fb8275ff0"
+	var captured []*http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		planted := r.Clone(r.Context())
+		planted.Method = http.MethodPost
+		captured = append(captured, planted)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(contributionGetBody))
+	}))
+	defer srv.Close()
+
+	r, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), &captured, ehrIDFixture, presentUID, "missing-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("PROBE-092 status = %q, want fail on a non-GET method (detail=%q)", r.Status, r.Detail)
+	}
+}
+
+func TestProbe092ContributionGetRejectsMissingInputs(t *testing.T) {
+	var captured []*http.Request
+	srv := contributionGetServer(t, &captured, "u")
+	defer srv.Close()
+	if _, err := probes.Probe092ContributionGet(context.Background(), nil, &captured, ehrIDFixture, "u", "m"); err == nil {
+		t.Error("nil client: expected an error")
+	}
+	if _, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), nil, ehrIDFixture, "u", "m"); err == nil {
+		t.Error("nil recorder: expected an error")
+	}
+}

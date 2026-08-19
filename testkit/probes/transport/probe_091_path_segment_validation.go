@@ -45,8 +45,8 @@ const (
 // character is refused before any HTTP request is issued, on every
 // path-interpolating leaf package (REQ-150).
 //
-// Driven calls, one per `openehr/client` package that builds its own
-// transport.Request:
+// Driven calls, at least one per `openehr/client` package that builds
+// its own transport.Request:
 //
 //   - ehr.Get                      — /ehr/{ehr_id}
 //   - composition.Get              — /ehr/{ehr_id}/composition/{uid}
@@ -54,6 +54,7 @@ const (
 //   - ehrstatus.Get                — /ehr/{ehr_id}/ehr_status
 //   - ehrstatus.GetAtTime          — same, plus a trailing query parameter
 //   - contribution.Commit          — /ehr/{ehr_id}/contribution (a write)
+//   - contribution.Get             — /ehr/{ehr_id}/contribution/{contribution_uid}
 //   - query.RunStored              — /query/{qualified_query_name}
 //   - definition.GetTemplate       — /definition/template/{format}/{template_id}
 //   - demographic.GetVersionedParty — /demographic/versioned_party/{uid}
@@ -160,6 +161,7 @@ type hostileLeaf struct {
 // mutated by a caller between probe runs.
 func hostileLeaves() []hostileLeaf {
 	const versionUID openehrclient.VersionUID = "1234abcd-5678-9012-3456-7890abcdef00::cdr.example::1"
+	const ehrID openehrclient.EHRID = "1234abcd-5678-9012-3456-7890abcdef00"
 	return []hostileLeaf{
 		{"ehr.Get", func(ctx context.Context, c *transport.Client, id string) error {
 			_, _, err := openehrclient.Get(ctx, c, openehrclient.EHRID(id))
@@ -186,6 +188,14 @@ func hostileLeaves() []hostileLeaf {
 			// guards -- otherwise the leaf refuses on the body and the probe
 			// would credit a refusal the transport never made.
 			_, _, err := contribution.Commit(ctx, c, openehrclient.EHRID(id), minimalSubmission())
+			return err
+		}},
+		{"contribution.Get", func(ctx context.Context, c *transport.Client, id string) error {
+			// The read half drives the hostile value through the SECOND
+			// interpolation site, {contribution_uid} — {ehr_id} is already
+			// covered by the Commit leg above. Get's own guard refuses only
+			// EMPTY ids, so a refusal here can only come from the transport.
+			_, _, err := contribution.Get(ctx, c, ehrID, id)
 			return err
 		}},
 		{"query.RunStored", func(ctx context.Context, c *transport.Client, id string) error {
