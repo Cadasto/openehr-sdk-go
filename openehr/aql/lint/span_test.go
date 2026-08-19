@@ -36,14 +36,16 @@ type spanCase struct {
 func spanCases() []spanCase {
 	return []spanCase{
 		{
-			name:   "unbound alias",
-			query:  "SELECT zz/data[at0001, 'Systolic']/magnitude FROM COMPOSITION c",
-			values: []string{"Systolic", "at0001"},
+			name:     "unbound alias",
+			query:    "SELECT zz/data[at0001, 'Systolic']/magnitude FROM COMPOSITION c",
+			values:   []string{"Systolic", "at0001"},
+			mustFind: "aql_unknown_alias",
 		},
 		{
-			name:   "syntax error",
-			query:  "SELECT c FROM COMPOSITION c WHERE c/x = = 'secret-value'",
-			values: []string{"secret-value"},
+			name:     "syntax error",
+			query:    "SELECT c FROM COMPOSITION c WHERE c/x = = 'secret-value'",
+			values:   []string{"secret-value"},
+			mustFind: "aql_syntax",
 		},
 		{
 			name:   "unbound param",
@@ -59,9 +61,10 @@ func spanCases() []spanCase {
 			mustFind: "aql_unbound_param",
 		},
 		{
-			name:   "deprecated top",
-			query:  "SELECT TOP 5 c FROM COMPOSITION c LIMIT 10",
-			values: nil,
+			name:     "deprecated top",
+			query:    "SELECT TOP 5 c FROM COMPOSITION c LIMIT 10",
+			values:   nil,
+			mustFind: "aql_deprecated_top",
 		},
 	}
 }
