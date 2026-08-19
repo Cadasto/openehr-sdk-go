@@ -84,6 +84,9 @@ func templateIssues(md Metadata, c *tcimpl.Compiled) []Issue {
 					bad, ce.Archetype,
 				),
 				Severity: Warning,
+				// The whole path is the finding's extent; the diverging segment
+				// is named in Detail, which is value-bearing anyway.
+				Span: spanOfText(p.Pos, p.Raw),
 			})
 		}
 	}

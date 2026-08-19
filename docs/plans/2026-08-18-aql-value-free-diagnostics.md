@@ -1,12 +1,12 @@
 # Plan — AQL value-free structured diagnostics (drop channel + lint spans)
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Complete
 **Owner:** SDK maintainers
 **Covers:** **[REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Value-free structured drop records** and **[REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) § Value-free lint diagnostics** — the spec text is written; the code is not. No new requirement id: each half extends the landed requirement that already owns its surface.
 **Verifies / builds on:** landed [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the incomplete-AST channel: `aql.ErrIncompleteAST`, `Document.QueryErr()`), [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (lint issue model), [REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (structural naming of a refused predicate + diagnostic redaction — the one-position precedent this plan generalises), the archived [AQL honesty-residuals plan](archive/2026-08-18-aql-honesty-residuals.md) (the MATCHES URI redaction one-off)
 **Probes:** **[PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics)** (allocated, `Status: Draft`) — every drop and lint diagnostic carries a structured record whose fields contain no source text
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** `openehr/aql/parse` (extractor `incomplete(...)` sites), `openehr/aql/lint`
 **Defers:** changing any existing human-readable message (compatibility — texts stay as they are); redaction *policy* (what counts as a value is the caller's call; this plan only guarantees the structured fields carry none); structured diagnostics for the simplified-format codecs (same pattern, separate ask)
 
@@ -129,9 +129,14 @@ type Issue struct {
 }
 ```
 
-**Also for Phase 2:** `exhaustive` is **not** in [`.golangci.yml`](../../.golangci.yml)'s enabled set.
-This REQ ships two closed enums whose contract obliges consumers to switch exhaustively and fail
-closed; enabling `exhaustive` holds the SDK's own switches to the same standard it asks of readers.
+**`exhaustive` was trialled and NOT enabled.** The linter is absent from
+[`.golangci.yml`](../../.golangci.yml), and turning it on reports four findings in packages this
+change does not touch — `openehr/aql/top.go`, `openehr/serialize/canxml/marshal.go`,
+`smart/discovery/errors.go`, `internal/bmmgen/render_jsonmar.go` (with
+`default-signifies-exhaustive: true`, which is the setting that matches what the spec actually asks
+for: a `default` arm IS fail-closed). Fixing four unrelated switches is a separate cleanup, so the
+obligation stays where the spec puts it — on the consumer — and the SDK's own new switches carry a
+`default` arm. Worth revisiting as its own change.
 
 ## Definition of Ready
 
@@ -161,13 +166,13 @@ closed; enabling `exhaustive` holds the SDK's own switches to the same standard 
 | Step | Status |
 |---|---|
 | Spec text in REQ-113 + REQ-109 + PROBE-096 (Phase 0) | ✅ |
-| `DroppedConstruct` + `Dropped()` + per-class kinds + source-derived completeness sweep | |
-| `Clause` extended append-only (+ `String()` arms) | |
-| `lint.Issue.Span` + field-contract godoc | |
-| `exhaustive` linter enabled (or reason recorded) | |
-| Tests with `// REQ-` / `// PROBE-` comments | |
-| `make spec-check` | ✅ (Phase 0) |
-| `make ci` | |
+| `DroppedConstruct` + `Dropped()` + per-class kinds + source-derived completeness sweep | ✅ |
+| `Clause` extended append-only (+ `String()` arms) | ✅ |
+| `lint.Issue.Span` + field-contract godoc | ✅ |
+| `exhaustive` linter enabled (or reason recorded) | ✅ reason recorded below |
+| Tests with `// REQ-` / `// PROBE-` comments | ✅ |
+| `make spec-check` | ✅ |
+| `make ci` | ✅ |
 
 ## Phases
 

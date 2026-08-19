@@ -757,10 +757,13 @@ requirements:
     # PROBE-028's multiset untouched; the acceptances are owned by the REQ-117
     # row and its § in clinical-modeling.md.
     #
-    # PARTIAL since 2026-08-19: § Value-free lint diagnostics adds Issue.Span
-    # and a normative value-free / value-bearing field classification. Specified,
-    # not yet built — plan below, PROBE-096.
-    implementation: partial
+    # § Value-free lint diagnostics (2026-08-19) adds Issue.Span — a re-export
+    # of parse.Span, NOT a twin, so a lint issue and a dropped construct are
+    # compared rather than converted — and pins normatively which fields are
+    # value-free (Code / Severity / Span) and which may carry query text
+    # (Detail / Path — a path spelling carries its own predicates). No code
+    # added or removed, so PROBE-028's multiset is untouched.
+    implementation: landed
     packages:
       - openehr/aql/parse
       - openehr/aql/parse/gen
@@ -769,7 +772,7 @@ requirements:
       - openehr/templatecompile  # REQ-111 — lint.Options.Compiled is the public compiled type
       - internal/templatecompile
       - testkit/probes/aql
-    probes: [PROBE-028]  # PROBE-096 joins when its test lands
+    probes: [PROBE-028, PROBE-096]
     plans:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
@@ -779,6 +782,7 @@ requirements:
       - openehr/aql/parse/ast_test.go
       - openehr/aql/parse/imports_test.go
       - openehr/aql/lint/extract_test.go
+      - openehr/aql/lint/span_test.go
       - openehr/aql/lint/lint_test.go
       - openehr/aql/lint/imports_test.go
       - openehr/validation/aql_test.go
@@ -1078,6 +1082,14 @@ requirements:
     # keeps the carriers above) and § Value-free structured drop records (a
     # {kind, clause, span} record beside ErrIncompleteAST, with no source text
     # in any field). Plans below; PROBE-095 / PROBE-096.
+    #
+    # The drop records LANDED 2026-08-19 (PROBE-096): Document.Dropped(), a
+    # ConstructKind closed over drop CLASSES rather than call sites, Clause
+    # extended append-only, and Span as a line/col pair over Position. Writing
+    # the unreachability arm caught a misclassification — an out-of-range
+    # literal in a WHERE comparison reached a site labelled defensive, because
+    # the gap travelled as a bare string — so the kind now travels with the
+    # reason. § Structured node predicates is what keeps this row partial.
     implementation: partial
     packages:
       - openehr/aql
@@ -1085,12 +1097,14 @@ requirements:
     probes:
       - PROBE-080
       - PROBE-082
-      # PROBE-095 / PROBE-096 join when their tests land
+      - PROBE-096
+      # PROBE-095 joins when its test lands
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/structured_test.go
+      - openehr/aql/parse/dropped_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md

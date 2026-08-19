@@ -90,7 +90,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-106 | WebTemplate JSON export | [clinical-modeling.md § REQ-106](clinical-modeling.md#req-106--webtemplate-json-export) | landed |
 | REQ-107 | Template-driven RM instance example generator | [clinical-modeling.md § REQ-107](clinical-modeling.md#req-107--template-driven-rm-instance-example-generator) | landed |
 | REQ-108 | Untrusted document bounds | [clinical-modeling.md § REQ-108](clinical-modeling.md#req-108--untrusted-document-bounds) | landed |
-| REQ-109 | AQL static lint | [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) | partial |
+| REQ-109 | AQL static lint | [clinical-modeling.md § REQ-109](clinical-modeling.md#req-109--aql-static-lint) | landed |
 | REQ-110 | Template-driven validation beyond COMPOSITION | [clinical-modeling.md § REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) | landed |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) | landed |
 | REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | landed |
