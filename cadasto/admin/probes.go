@@ -116,6 +116,12 @@ func probe(ctx context.Context, c *transport.Client, path string) error {
 	if path == "" || !strings.HasPrefix(path, "/") {
 		return fmt.Errorf("%w: %q (must be a non-empty absolute path starting with '/')", ErrInvalidPath, path)
 	}
+	// REQ-025: this leaf deliberately bypasses transport.Do (see the Live
+	// doc), so Do's central nil-Client guard never runs here — the probe
+	// carries its own.
+	if c == nil {
+		return fmt.Errorf("admin: probe: %w: nil Client", transport.ErrInvalidConfig)
+	}
 	entry, ok := c.Catalog().OpenEHRRest()
 	if !ok {
 		return fmt.Errorf("admin: probe: %w: %s", transport.ErrServiceUnavailable, discovery.ServiceIDOpenEHRRest)

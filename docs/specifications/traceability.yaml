@@ -1798,8 +1798,9 @@ requirements:
       The no-panic clause is enforced across the caller-constructible axis, not
       only at the contribution constructors: a typed-nil PartyProxy committer is
       refused at Validate and marshal, lint.Extract guards a nil/unparsed
-      document, transport.Do guards a nil Client and Request (closing every
-      exported leaf at once), and all 30 variadic-option loops skip a nil option
+      document, transport.Do guards a nil Client and Request for every
+      Do-routed leaf while the admin probes guard their deliberate Do
+      bypass themselves, and all 30 variadic-option loops skip a nil option
       — held by an AST tripwire in internal/option_guard_test.go. The clause
       carries a Must-prefix carve-out for the Go convention.
 
