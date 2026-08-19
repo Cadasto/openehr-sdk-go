@@ -139,6 +139,87 @@ func TestSubmissionValidate(t *testing.T) {
 	}
 }
 
+// TestSubmissionValidateRejectsUnpopulatedWrap is the #114 / REQ-025
+// follow-through: after Wrap* stop panicking they still MUST fail
+// Validate, which is the gate Commit already calls.
+func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
+	cases := []struct {
+		name    string
+		wrap    func() contribution.CommitVersion
+		wantErr string
+	}{
+		{
+			name: "rejects OriginalVersion wrapped from nil",
+			wrap: func() contribution.CommitVersion {
+				return contribution.WrapOriginalVersion[rm.Composition](nil)
+			},
+			wantErr: "Version is nil",
+		},
+		{
+			name: "rejects OriginalVersion with nil CommitAudit",
+			wrap: func() contribution.CommitVersion {
+				return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{})
+			},
+			wantErr: "commit_audit.committer is nil",
+		},
+		{
+			name: "rejects ImportedVersion wrapped from nil",
+			wrap: func() contribution.CommitVersion {
+				return contribution.WrapImportedVersion[rm.Composition](nil)
+			},
+			wantErr: "Version is nil",
+		},
+		{
+			name: "rejects ImportedVersion with nil CommitAudit",
+			wrap: func() contribution.CommitVersion {
+				return contribution.WrapImportedVersion(&rm.ImportedVersion[rm.Composition]{})
+			},
+			wantErr: "commit_audit.committer is nil",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("constructing Submission panicked: %v", r)
+				}
+			}()
+			sub := &contribution.Submission{Versions: []contribution.CommitVersion{tc.wrap()}}
+			err := sub.Validate()
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("error = %v; want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestSubmissionValidateRejectsTypedNilElement pins the v == nil half of
+// validateWrite: a typed-nil wrapper in Versions passes the interface-nil
+// check and the type switch, and must surface as an error, not a panic.
+func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
+	cases := []struct {
+		name string
+		v    contribution.CommitVersion
+	}{
+		{"typed-nil OriginalVersion", (*contribution.OriginalVersion[rm.Composition])(nil)},
+		{"typed-nil ImportedVersion", (*contribution.ImportedVersion[rm.Composition])(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Validate panicked: %v", r)
+				}
+			}()
+			sub := &contribution.Submission{Versions: []contribution.CommitVersion{tc.v}}
+			err := sub.Validate()
+			if err == nil || !strings.Contains(err.Error(), "typed-nil") {
+				t.Errorf("error = %v; want substring %q", err, "typed-nil")
+			}
+		})
+	}
+}
+
 func TestSubmissionMarshalJSONCanonical(t *testing.T) {
 	sub := &contribution.Submission{
 		Audit:    newAudit(),

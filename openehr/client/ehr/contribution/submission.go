@@ -36,8 +36,9 @@ type Submission struct {
 	// for T in {rm.Composition, rm.EHRStatus, rm.Folder, rm.EHRAccess}.
 	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
 	// Validate enforces this via an explicit type-switch over the 8 concrete
-	// generic instantiations (no reflection per REQ-024); the slice must also
-	// be non-empty.
+	// generic instantiations (no reflection per REQ-024); it also rejects an
+	// empty slice, a nil wrapped Version, and a commit_audit with a nil
+	// Committer.
 	Versions []CommitVersion
 }
 
@@ -56,7 +57,11 @@ type CommitVersion interface {
 // *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
 // rm.Folder, rm.EHRAccess} — the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
-// also required (the spec rejects an empty contribution).
+// also required (the spec rejects an empty contribution). A wrapped
+// version whose Version is nil or whose commit_audit has no Committer
+// is rejected — the empty UpdateAudit [WrapOriginalVersion] /
+// [WrapImportedVersion] produce for nil caller input surfaces here as
+// a typed error rather than as a panic (REQ-025).
 //
 // Implemented as an explicit type-switch over the 8 concrete generic
 // instantiations (no reflection per REQ-024). Other types satisfying
@@ -81,9 +86,48 @@ func (s *Submission) Validate() error {
 			*ImportedVersion[rm.EHRStatus],
 			*ImportedVersion[rm.Folder],
 			*ImportedVersion[rm.EHRAccess]:
+			// The assertion cannot fail: every type in this case list is a
+			// wrapper, and both wrappers implement writeSideVersion.
+			if err := v.(writeSideVersion).validateWrite(i); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("Submission.Versions[%d] is %T (BMMName=%q); want *OriginalVersion[T] or *ImportedVersion[T] for T in {Composition, EHRStatus, Folder, EHRAccess}", i, v, v.BMMName())
 		}
+	}
+	return nil
+}
+
+// writeSideVersion is the unexported inspection seam Validate uses to
+// reject a nil wrapped Version or an empty commit_audit without
+// duplicating the 8-way type switch above.
+type writeSideVersion interface {
+	validateWrite(index int) error
+}
+
+func (v *OriginalVersion[T]) validateWrite(index int) error {
+	if v == nil {
+		return fmt.Errorf("Submission.Versions[%d] is a typed-nil %T", index, v)
+	}
+	if v.Version == nil {
+		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
+	}
+	return validateWriteAudit(index, v.CommitAudit)
+}
+
+func (v *ImportedVersion[T]) validateWrite(index int) error {
+	if v == nil {
+		return fmt.Errorf("Submission.Versions[%d] is a typed-nil %T", index, v)
+	}
+	if v.Version == nil {
+		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
+	}
+	return validateWriteAudit(index, v.CommitAudit)
+}
+
+func validateWriteAudit(index int, a UpdateAudit) error {
+	if a.Committer == nil {
+		return fmt.Errorf("Submission.Versions[%d]: commit_audit.committer is nil", index)
 	}
 	return nil
 }

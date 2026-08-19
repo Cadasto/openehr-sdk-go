@@ -216,9 +216,9 @@ func hostileLeaves() []hostileLeaf {
 //     refuses a nil Committer. Left zero, all four hostile legs fail closed on
 //     the body and credit the probe with a refusal the transport never made
 //     -- the probe would pass with REQ-150 enforcement removed from this leaf.
-//   - the wrapped version's CommitAudit: WrapOriginalVersion reads it through
-//     the AuditDetailsLike interface, which is nil on a zero value (issue
-//     #114), and the same nil-Committer rule applies to the DTO it builds.
+//   - the wrapped version's CommitAudit: WrapOriginalVersion converts it to
+//     the UpdateAudit DTO (a nil or typed-nil audit yields the empty DTO —
+//     the #114 fix), and Submission.Validate refuses the DTO's nil Committer.
 func minimalSubmission() *contribution.Submission {
 	committer := "probe"
 	party := &rm.PartyIdentified{Name: &committer}

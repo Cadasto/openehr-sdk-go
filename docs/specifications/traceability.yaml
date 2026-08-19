@@ -1785,7 +1785,10 @@ requirements:
     canonical: docs/specifications/idiom.md#errors-req-025
     status: draft
     implementation: landed
-    packages: [transport]
+    packages: [transport, openehr/client/ehr/contribution]
+    tests:
+      - openehr/client/ehr/contribution/version_test.go
+      - openehr/client/ehr/contribution/submission_test.go
 
   - id: REQ-026
     title: Goroutine-safe clients

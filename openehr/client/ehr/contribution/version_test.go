@@ -328,3 +328,79 @@ func TestSubmissionWithWrappedVersions(t *testing.T) {
 		t.Errorf("versions[0].commit_audit must not contain time_committed, got %v", ca0["time_committed"])
 	}
 }
+
+// TestWrapOriginalVersionNilInputsDoNotPanic is the #114 / REQ-025
+// regression: a nil version pointer, a zero OriginalVersion (nil
+// CommitAudit interface), or a CommitAudit holding a typed-nil concrete
+// is caller-constructible. WrapOriginalVersion MUST NOT panic; it
+// yields a wrapper with an empty UpdateAudit so Submission.Validate can
+// reject it.
+func TestWrapOriginalVersionNilInputsDoNotPanic(t *testing.T) {
+	cases := []struct {
+		name string
+		in   *rm.OriginalVersion[rm.Composition]
+	}{
+		{"nil version pointer", nil},
+		{"zero version (nil CommitAudit)", &rm.OriginalVersion[rm.Composition]{}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.OriginalVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("WrapOriginalVersion panicked: %v", r)
+				}
+			}()
+			got := contribution.WrapOriginalVersion(tc.in)
+			if got == nil {
+				t.Fatal("returned nil wrapper")
+			}
+			if got.CommitAudit.Committer != nil {
+				t.Errorf("CommitAudit.Committer = %v, want nil (empty UpdateAudit)", got.CommitAudit.Committer)
+			}
+			if tc.in == nil && got.Version != nil {
+				t.Errorf("Version = %v, want nil", got.Version)
+			}
+			if tc.in != nil && got.Version != tc.in {
+				t.Errorf("Version pointer not preserved")
+			}
+		})
+	}
+}
+
+// TestWrapImportedVersionNilInputsDoNotPanic mirrors
+// TestWrapOriginalVersionNilInputsDoNotPanic for the imported wrapper.
+func TestWrapImportedVersionNilInputsDoNotPanic(t *testing.T) {
+	cases := []struct {
+		name string
+		in   *rm.ImportedVersion[rm.Composition]
+	}{
+		{"nil version pointer", nil},
+		{"zero version (nil CommitAudit)", &rm.ImportedVersion[rm.Composition]{}},
+		{"typed-nil *rm.AuditDetails CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.AuditDetails)(nil)}}},
+		{"typed-nil *rm.Attestation CommitAudit", &rm.ImportedVersion[rm.Composition]{Version: rm.Version[rm.Composition]{CommitAudit: (*rm.Attestation)(nil)}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("WrapImportedVersion panicked: %v", r)
+				}
+			}()
+			got := contribution.WrapImportedVersion(tc.in)
+			if got == nil {
+				t.Fatal("returned nil wrapper")
+			}
+			if got.CommitAudit.Committer != nil {
+				t.Errorf("CommitAudit.Committer = %v, want nil (empty UpdateAudit)", got.CommitAudit.Committer)
+			}
+			if tc.in == nil && got.Version != nil {
+				t.Errorf("Version = %v, want nil", got.Version)
+			}
+			if tc.in != nil && got.Version != tc.in {
+				t.Errorf("Version pointer not preserved")
+			}
+		})
+	}
+}
