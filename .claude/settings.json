@@ -7,7 +7,7 @@
           {
             "type": "command",
             "command": "bash .claude/hooks/goformat-on-save.sh",
-            "timeout": 20000
+            "timeout": 20
           }
         ]
       }
