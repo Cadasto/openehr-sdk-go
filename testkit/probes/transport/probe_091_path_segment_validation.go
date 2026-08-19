@@ -206,23 +206,37 @@ func hostileLeaves() []hostileLeaf {
 	}
 }
 
-// minimalSubmission is the smallest batch that clears contribution.Commit's
-// own guards (non-nil batch, at least one version of an accepted type), so a
-// refusal can only come from the transport's path check and not from the
-// body. The commit audit must be populated: WrapOriginalVersion reads the
-// wrapped version's CommitAudit through the AuditDetailsLike interface and
-// panics on the zero value.
+// minimalSubmission is the smallest batch that clears every guard
+// contribution.Commit applies BEFORE the transport prepares the request, so a
+// refusal can only come from the path check and not from the body. Commit
+// canjson.Marshals the batch on its way to Do, so BOTH audits it touches have
+// to be populated -- each is a distinct pre-Do gate:
+//
+//   - Submission.Audit, the batch commit audit: UpdateAudit.MarshalJSON
+//     refuses a nil Committer. Left zero, all four hostile legs fail closed on
+//     the body and credit the probe with a refusal the transport never made
+//     -- the probe would pass with REQ-150 enforcement removed from this leaf.
+//   - the wrapped version's CommitAudit: WrapOriginalVersion reads it through
+//     the AuditDetailsLike interface, which is nil on a zero value (issue
+//     #114), and the same nil-Committer rule applies to the DTO it builds.
 func minimalSubmission() *contribution.Submission {
 	committer := "probe"
+	party := &rm.PartyIdentified{Name: &committer}
+	changeType := rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}}
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
 	return &contribution.Submission{
+		Audit: contribution.UpdateAudit{
+			SystemID:   "probe.example",
+			Committer:  party,
+			ChangeType: changeType,
+		},
 		Versions: []contribution.CommitVersion{
 			contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{
 				Version: rm.Version[rm.Composition]{
 					CommitAudit: rm.AuditDetails{
 						SystemID:   "probe.example",
-						Committer:  &rm.PartyIdentified{Name: &committer},
-						ChangeType: rm.DVCodedText{DVText: rm.DVText{Value: "creation"}, DefiningCode: rm.CodePhrase{CodeString: "249"}},
+						Committer:  party,
+						ChangeType: changeType,
 					},
 				},
 				UID:            rm.ObjectVersionID{Value: "1::probe.example::1"},
