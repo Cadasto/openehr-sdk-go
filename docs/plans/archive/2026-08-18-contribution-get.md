@@ -1,18 +1,18 @@
 # Plan — Contribution read (`contribution.Get`)
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Done (archived)
 **Owner:** SDK maintainers
-**Covers:** [REQ-142](../specifications/wire.md#req-142--contribution-read)
-**Probes:** [PROBE-092](../specifications/conformance.md#probe-092--contribution-read-matches-contribution_get) (Draft)
-**Implementation:** planned
+**Covers:** [REQ-142](../../specifications/wire.md#req-142--contribution-read)
+**Probes:** [PROBE-092](../../specifications/conformance.md#probe-092--contribution-read-matches-contribution_get) (Draft)
+**Implementation:** landed
 **Depends on:** landed `ehrstatus.Get` pattern; `transport.Decode`; vendored ITS-REST pin (`ehr-validation.openapi.yaml`, `contribution_get`)
-**Ordering:** [path-segment-validation](archive/2026-08-18-path-segment-validation.md) (REQ-150) **landed** — interpolated ids now get transport-side refusal; nothing here compiles against it
+**Ordering:** [path-segment-validation](2026-08-18-path-segment-validation.md) (REQ-150) **landed** — interpolated ids now get transport-side refusal; nothing here compiles against it
 **Defers:** Simplified-format `Accept` on contribution read; other missing read leaves
 
 > **Execution:** work the steps sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
 
-**Goal:** Callers read a persisted contribution by uid through a typed leaf, without dropping to raw `transport.Do`. This is the missing half of the contribution round-trip: `Commit` landed (PROBE-072) but its effect is not verifiable through the same client — landing `Get` unblocks commit → read-back integration and conformance coverage, which is why this leaf is sequenced before the [template-list-filters plan](archive/2026-08-18-template-list-filters.md).
+**Goal:** Callers read a persisted contribution by uid through a typed leaf, without dropping to raw `transport.Do`. This is the missing half of the contribution round-trip: `Commit` landed (PROBE-072) but its effect is not verifiable through the same client — landing `Get` unblocks commit → read-back integration and conformance coverage, which is why this leaf is sequenced before the [template-list-filters plan](2026-08-18-template-list-filters.md).
 
 **Architecture:** `contribution.Get` mirrors `ehrstatus.Get` (same option-free read shape, same `transport.Decode` leaf idiom).
 
@@ -127,5 +127,5 @@ EOF
 
 ## Mapping to specs
 
-- [wire.md § REQ-142](../specifications/wire.md#req-142--contribution-read)
+- [wire.md § REQ-142](../../specifications/wire.md#req-142--contribution-read)
 - ITS-REST pin: `resources/its-rest/ehr-validation.openapi.yaml` (`contribution_get`, `200_CONTRIBUTION`)

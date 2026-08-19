@@ -8,12 +8,13 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 
-Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Implementation order: contribution read (it unblocks commit → read-back conformance coverage), then the write-result contract. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
+Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Three have landed; the write-result contract is the one still open. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
 
 | Plan | Scope | Covers | Probe |
 |---|---|---|---|
-| [2026-08-18-contribution-get.md](2026-08-18-contribution-get.md) | `contribution.Get` — the missing read half of the contribution round-trip | REQ-142 | PROBE-092 |
 | [2026-08-18-write-result-contract.md](2026-08-18-write-result-contract.md) | Typed-nil success body + committed-but-unusable representation | REQ-094 (implementation-aligned) | package tests (PROBE-061/071 unchanged) |
+
+The contribution-read plan **landed 2026-08-19 and was archived** ([archive/2026-08-18-contribution-get.md](archive/2026-08-18-contribution-get.md)): REQ-142 is `landed` and PROBE-092 is Implemented (Sandbox). `contribution.Get` issues `GET /ehr/{ehr_id}/contribution/{contribution_uid}` and decodes the persisted `CONTRIBUTION`; `Repository` grew the same read — source-compatible for callers, a compile-time break for out-of-tree implementers. Empty ids fail with `ErrInvalidConfig` before any request and a 404 maps to `ErrNotFound`. Version metadata is returned for shape consistency but never required: the pin defines only `Content-Type` on `200_CONTRIBUTION`. This closes the EHR contribution surface — the pin declares no other contribution operation.
 
 The path-segment-validation plan **landed 2026-08-19 and was archived** ([archive/2026-08-18-path-segment-validation.md](archive/2026-08-18-path-segment-validation.md)): REQ-150 is `landed` and PROBE-091 is Implemented (Sandbox). `transport.ValidatePathSegment` / `ValidateRequestPath` refuse a traversal, empty, backslash-bearing or control-character segment, and a `Route`-arity rule catches a separator smuggled inside one parameter; both run at `Do` before the URL is built, so a violation issues no request. The service root (`OPTIONS /`) is exempt. Because the arity rule is gated on `Route`, `openehr/client` carries an AST tripwire holding every `transport.Request` literal to setting it.
 

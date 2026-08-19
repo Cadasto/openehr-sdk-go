@@ -1958,10 +1958,19 @@ requirements:
     title: Contribution read
     canonical: docs/specifications/wire.md#req-142--contribution-read
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/ehr/contribution]
     probes: [PROBE-092]
-    plans: [docs/plans/2026-08-18-contribution-get.md]
+    plans: [docs/plans/archive/2026-08-18-contribution-get.md]
+    tests:
+      - openehr/client/ehr/contribution/contribution_test.go
+      - testkit/probes/versioned/probes_test.go
+    notes: >-
+      Get reads GET /ehr/{ehr_id}/contribution/{contribution_uid} and decodes
+      the persisted CONTRIBUTION; Repository grew the same read. Empty ids fail
+      with ErrInvalidConfig before any request; 404 maps to ErrNotFound. Version
+      metadata is returned for shape consistency but never required — the pin
+      defines only Content-Type on 200_CONTRIBUTION.
 
   - id: REQ-143
     title: Template list filters
