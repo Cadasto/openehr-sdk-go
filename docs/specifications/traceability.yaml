@@ -1089,22 +1089,33 @@ requirements:
     # the unreachability arm caught a misclassification — an out-of-range
     # literal in a WHERE comparison reached a site labelled defensive, because
     # the gap travelled as a bare string — so the kind now travels with the
-    # reason. § Structured node predicates is what keeps this row partial.
-    implementation: partial
+    # reason.
+    #
+    # § Structured node predicates LANDED the same day (PROBE-095):
+    # PathSegment.Parsed carries a sealed sum over the whole pathPredicate
+    # position — node id (± name), archetype HRID (± name), $param,
+    # comparison, MATCHES regex, AND/OR junction — with components
+    # delimiter-free, escape-resolved and trivia-free, plus EqualPredicates as
+    # the panic-free equality the aql.Value comparability trap requires. The
+    # class position is UNCHANGED and keeps the carriers above: two carriers
+    # populated from one source node is drift by construction. Emission reads
+    # Raw only, asserted rather than assumed.
+    implementation: landed
     packages:
       - openehr/aql
       - openehr/aql/parse
     probes:
       - PROBE-080
       - PROBE-082
+      - PROBE-095
       - PROBE-096
-      # PROBE-095 joins when its test lands
     tests:
       - openehr/aql/introspect_test.go
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/query_test.go
       - openehr/aql/parse/structured_test.go
       - openehr/aql/parse/dropped_test.go
+      - openehr/aql/parse/predicate_structure_test.go
       - openehr/aql/parse/roundtrip_test.go
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md

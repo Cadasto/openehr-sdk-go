@@ -1,12 +1,12 @@
 # Plan — AQL structured node predicates (typed path-segment predicate model)
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Complete
 **Owner:** SDK maintainers
 **Covers:** **[REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Structured node predicates** — the spec text is written; the code is not. No new requirement id: this extends the landed REQ-113 read AST, which already owns `PathSegment` and the class-predicate structuring.
 **Verifies / builds on:** landed [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (structured read AST; `aql.IdentifiedPath`/`PathSegment`, `ClassExpr.PredicateComparison`), [REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (expression-catalogue completion), [REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (re-parseable emission; verbatim predicate text; `aql.StripPredicateTrivia`)
 **Probes:** **[PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring)** (Draft) — a corpus generated from the grammar's `pathPredicate` alternatives
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** `openehr/aql`, `openehr/aql/parse` (extractor), the REQ-119 verbatim-text guarantee (unchanged by this plan)
 **Defers:** the **class position** — `parse.ClassExpr` keeps its landed REQ-113 carriers (`Archetype` / `ParamArchetype` / `Predicate` / `PredicateComparison`) and gains no parallel one; a Phase 0 decision, with the reasoning in the canonical section. A carrier for VERSION class predicates (`LATEST_VERSION` / `ALL_VERSIONS`) — a version-query-shaped ask that should ride a version-query slice. Full `nodePredicate` sub-grammar *validation* (the REQ-119 § Out of scope deferral for issue #99 stands untouched: structuring what the parser already accepted is not deciding what to accept). Rewriting or normalising `Raw` (REQ-119 keeps it verbatim). A disclosure policy over the components — the point is that each consumer applies its own; the SDK's own diagnostics are [REQ-113 § Value-free structured drop records](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)'s.
 
@@ -154,10 +154,10 @@ package ships `EqualPredicates` beside the landed `aql.EqualValues`. The builder
 | Step | Status |
 |---|---|
 | Spec text in REQ-113 + PROBE-095 (Phase 0) | ✅ |
-| Sum type + `EqualPredicates` + extractor population | |
-| Tests with `// REQ-` / `// PROBE-` comments (generated corpus; trivia + escape + both positions) | |
-| `make spec-check` | ✅ (Phase 0) |
-| `make ci` | |
+| Sum type + `EqualPredicates` + extractor population | ✅ |
+| Tests with `// REQ-` / `// PROBE-` comments (generated corpus; trivia + escape + both positions) | ✅ |
+| `make spec-check` | ✅ |
+| `make ci` | ✅ |
 
 ## Phases
 
@@ -184,13 +184,20 @@ name slot. The class position was decided (left alone) rather than left open.
 **Definition of done:** `go test ./openehr/aql/...` green; PROBE implemented;
 REQ-119's round-trip suite untouched and green.
 
-### Phase 2 — Helper alignment
+### Phase 2 — Helper alignment — **done, with one carry-over**
 
-1. Doc updates on `StripPredicateTrivia` / `RedactPredicateValues`.
-2. A worked example (`docs/examples.md`) showing predicate consumption without
-   text comparison.
+1. ✅ `StripPredicateTrivia` and `RedactPredicateValues` godoc now point at
+   `PathSegment.Parsed` as the preferred consumption path, and say why each
+   still exists: the first for consumers holding predicate TEXT (the class
+   position, a hand-assembled predicate), the second because it cannot decide
+   what a value is for every reader — it treats a numeric literal as structure,
+   which a disclosure rule counting a bare magnitude as a value cannot adopt.
+2. **Carried over:** the worked example. `docs/examples.md` documents real
+   programs under [`cmd/examples/`](../../cmd/examples/) and must stay in sync
+   with them in the same PR, so adding one is a new example program rather than
+   a prose block — its own small change, not a footnote to this one.
 
-**Definition of done:** examples build; docs updated.
+**Definition of done:** godoc updated; `make ci` green.
 
 ## Mapping to specs
 

@@ -269,6 +269,10 @@ func (e *extractor) EnterIdentifiedPath(c *gen.IdentifiedPathContext) {
 			}
 			if pp := part.PathPredicate(); pp != nil {
 				seg.Predicate = trimBrackets(sourceText(pp))
+				// REQ-113 § Structured node predicates: the typed form beside
+				// the verbatim text. Both path extractors populate it, because
+				// their outputs are compared for equality.
+				seg.Parsed = structuredPathPredicate(pp)
 			}
 			ip.Segments = append(ip.Segments, seg)
 		}

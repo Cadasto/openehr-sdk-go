@@ -94,7 +94,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-110 | Template-driven validation beyond COMPOSITION | [clinical-modeling.md § REQ-110](clinical-modeling.md#req-110--template-driven-validation-beyond-composition) | landed |
 | REQ-111 | Public compiled-template bridge | [clinical-modeling.md § REQ-111](clinical-modeling.md#req-111--public-compiled-template-bridge) | landed |
 | REQ-112 | Template-less Reference Model validation floor | [clinical-modeling.md § REQ-112](clinical-modeling.md#req-112--template-less-reference-model-validation-floor) | landed |
-| REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | partial |
+| REQ-113 | Execution-oriented parsed AQL AST | [clinical-modeling.md § REQ-113](clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) | landed |
 | REQ-116 | Template-level node naming and name-predicated paths | [clinical-modeling.md § REQ-116](clinical-modeling.md#req-116--template-level-node-naming-and-name-predicated-paths) | landed |
 | REQ-117 | AQL expression-catalogue completion | [clinical-modeling.md § REQ-117](clinical-modeling.md#req-117--aql-expression-catalogue-completion) | landed |
 | REQ-118 | Deprecated `SELECT TOP` clause and literal source text | [clinical-modeling.md § REQ-118](clinical-modeling.md#req-118--deprecated-select-top-clause-and-literal-source-text) | landed |
