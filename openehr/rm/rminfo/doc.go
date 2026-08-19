@@ -10,8 +10,10 @@
 // [Default] implements and consumers reach by type assertion.
 //
 // The data is generated from the pinned BMM under resources/bmm/
-// via internal/bmmgen and lives in lookup_gen.go; this package
-// contains only the Lookup interface and the [Default] accessor.
+// via internal/bmmgen and lives in lookup_gen.go; the hand-written
+// surface is the [Lookup], [Hierarchy] and [AttributeLister]
+// interfaces, the [ClassMeta] and [AttrMeta] data types, and the
+// [Default] and [New] accessors.
 // No runtime BMM dependency — generated tables are pure Go strings.
 //
 // Consumed by [internal/templatecompile] (REQ-100 follow-up Phase 4)

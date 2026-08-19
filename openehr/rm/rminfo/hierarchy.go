@@ -110,15 +110,12 @@ type Hierarchy interface {
 	// cannot otherwise get back. The site and the attribute's reported
 	// shape come from one generated record, so they cannot disagree.
 	//
-	// The site is faithful to the BMM, so it MAY name a class outside the
+	// The site is faithful to the BMM, so it may name a class outside the
 	// known universe when the attribute is inherited from an excluded
-	// primitive_types entry. On the pinned RM the only such site is
-	// "Interval", which declares the bounds DV_INTERVAL, Point_interval and
-	// Proper_interval carry. Clamping those to the carrying class would
-	// report six attributes as locally declared that no RM class declares —
-	// the opposite of what this method is for. Note that openehr/rm DOES
-	// emit a Go Interval[T]; being outside this surface's universe means
-	// the surface does not model the class, not that no type exists.
+	// primitive_types entry ("Interval" is the only such site on the
+	// pinned RM) — the deliberate carve-out REQ-048 § The class universe
+	// specifies, with the reasoning. Every class-graph question about such
+	// a name reports not-known, which is how a caller can tell.
 	//
 	// ok=false when rmType is undefined, when it does not carry attrName,
 	// or when the data set records no site for the attribute at all (which

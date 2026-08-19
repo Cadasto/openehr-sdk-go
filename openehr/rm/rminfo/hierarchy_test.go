@@ -235,11 +235,12 @@ func TestConcreteDescendantsExpandsAbstractClasses(t *testing.T) {
 		t.Errorf("ConcreteDescendants(DV_TEXT) = %v, want [DV_CODED_TEXT DV_TEXT]", text)
 	}
 
-	// DATA_VALUE is the abstract root the pre-REQ-048 table could not even
-	// name; its expansion must reach the whole DV_* family.
+	// DATA_VALUE is the abstract apex of the DV_* family (not a root — its
+	// parent is OPENEHR_DEFINITIONS) that the pre-REQ-048 table could not
+	// even name; its expansion must reach the whole family.
 	dv, known := h.ConcreteDescendants("DATA_VALUE")
 	if !known {
-		t.Fatal("ConcreteDescendants(DATA_VALUE): known=false — the abstract root must be askable")
+		t.Fatal("ConcreteDescendants(DATA_VALUE): known=false — the DV_* apex must be askable")
 	}
 	for _, w := range []string{"DV_QUANTITY", "DV_CODED_TEXT", "DV_DATE_TIME", "DV_ORDINAL", "DV_MULTIMEDIA", "DV_INTERVAL"} {
 		if !slices.Contains(dv, w) {

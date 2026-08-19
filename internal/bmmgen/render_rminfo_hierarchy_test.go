@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
@@ -216,24 +217,47 @@ func TestRenderRMInfoEmitsHierarchyFields(t *testing.T) {
 	}
 	src := string(out)
 
-	// Patterns, not literals: gofmt aligns keyed struct fields, so the
-	// run of spaces after a key depends on its neighbours in the block.
-	for _, want := range []string{
-		`"DATA_VALUE": \{(?s:.*?)Abstract: +true,`,
-		`"PATHABLE": \{(?s:.*?)Abstract: +true,`,
-		`"LOCATABLE": \{(?s:.*?)Parents: +\[\]string\{"PATHABLE"\},`,
-		`"name": +\{TypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"\},`,
+	// Each field assertion runs inside the named class's own entry,
+	// extracted first — a lazy scan over the whole rendered file would
+	// match the NEXT class carrying the field and miss this one losing
+	// it. Patterns, not literals, within the entry: gofmt aligns keyed
+	// struct fields, so the run of spaces after a key depends on its
+	// neighbours in the block.
+	for _, tc := range []struct {
+		class, want string
+	}{
+		{"DATA_VALUE", `Abstract: +true,`},
+		{"PATHABLE", `Abstract: +true,`},
+		{"LOCATABLE", `Parents: +\[\]string\{"PATHABLE"\},`},
+		{"LOCATABLE", `"name": +\{TypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"\},`},
 	} {
-		if !regexp.MustCompile(want).MatchString(src) {
-			t.Errorf("rendered rminfo table does not match %q", want)
+		entry := classEntry(t, src, tc.class)
+		if !regexp.MustCompile(tc.want).MatchString(entry) {
+			t.Errorf("%s entry does not match %q", tc.class, tc.want)
 		}
 	}
 	// A concrete class carries no Abstract key at all (the zero value is
 	// omitted), so the flag can never be silently inverted by a
 	// mis-emitted literal.
-	if regexp.MustCompile(`"DV_QUANTITY": \{[^}]*Abstract`).MatchString(src) {
+	if strings.Contains(classEntry(t, src, "DV_QUANTITY"), "Abstract") {
 		t.Error("concrete class DV_QUANTITY emitted an Abstract key")
 	}
+}
+
+// classEntry cuts one class's ClassMeta literal out of the rendered table:
+// from its quoted key to the entry terminator — `},` indented by exactly one
+// tab, which cannot occur inside the entry, whose nested literals sit deeper.
+func classEntry(t *testing.T, src, class string) string {
+	t.Helper()
+	start := strings.Index(src, "\t\""+class+"\": {")
+	if start < 0 {
+		t.Fatalf("rendered table has no entry for %s", class)
+	}
+	end := strings.Index(src[start:], "\n\t},")
+	if end < 0 {
+		t.Fatalf("entry for %s has no terminator", class)
+	}
+	return src[start : start+end+len("\n\t},")]
 }
 
 // TestDriftDetectionCoversHierarchyFields — REQ-042 discipline applied to the
