@@ -102,11 +102,18 @@ The surface **MUST** be generated from the **primary** RM BMM file under [REQ-04
 
 #### The class universe
 
-The surface's **class universe** **MUST** be every class the **RM generation target** emits a Go type for — which spans the primary RM schema *and* the BASE classes it includes, since REQ-042 emits both into `openehr/rm/` — minus the three exclusions that target already applies: the `org.openehr.rm.ehr_extract` package (REQ-042), the primitives of [§ Primitive type mapping](#primitive-type-mapping), and enumerations. Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
+The surface's **class universe** **MUST** be the classes the **RM generation target** emits from the BMM's `class_definitions` — which spans the primary RM schema *and* the BASE classes it includes, since REQ-042 emits both into `openehr/rm/` — minus enumerations and minus the foundation typing classes that target skips as typing constraints rather than data. Deriving the universe from the generation target rather than from a list written here is deliberate: a hand-kept list would rot against the pinned schemas, and the equality is exactly what [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) checks.
 
-The universe **MUST** therefore include the classes that carry no attributes of their own or inherited, and so appear in no attribute table — the abstract roots `DATA_VALUE` and `PATHABLE`, the `support` terminology/measurement access and service classes, and the definition-constant holders. A class the generation target emits but the universe omits cannot be asked about at all, and a descendant expansion rooted at an abstract class is unanswerable while that class is absent: that gap is what this requirement closes.
+Two exclusions sit *outside* that rule rather than inside it, and conflating them with it would misdescribe the surface:
 
-The graph **MUST** be closed over that universe: every class name an introspection answer returns **MUST** itself be in the universe. A BMM ancestor outside it **MUST NOT** be reported, and a class whose every BMM ancestor lies outside it is a **root**.
+- The `org.openehr.rm.ehr_extract` package never reaches emission at all (REQ-042), so it is excluded upstream of the universe.
+- The `primitive_types` entries of [§ Primitive type mapping](#primitive-type-mapping) are **NOT** in the universe **even where the target does emit a Go type for them** — `Cardinality`, `Interval`, `Multiplicity_interval`, `Terminology_code` and `Terminology_term` are emitted as Go values, and are still out. They are values the RM *uses*, not RM classes to reason *about*. "Not in the universe" therefore means *this surface does not model the class*, which is **not** the same as *no Go type exists for it*.
+
+The universe **MUST** therefore include the classes that carry no attributes of their own or inherited, and so appear in no attribute table — the abstract bases `DATA_VALUE` and `PATHABLE`, the `support` terminology/measurement access and service classes, and the definition-constant holders. A class the generation target emits but the universe omits cannot be asked about at all, and a descendant expansion rooted at an abstract class is unanswerable while that class is absent: that gap is what this requirement closes.
+
+The **class-graph** answers — immediate parents, transitive ancestors, conformance, concrete descendants — **MUST** be closed over that universe: every class name they return **MUST** itself be in it. A BMM ancestor outside the universe **MUST NOT** be reported, and a class whose every BMM ancestor lies outside it is a **root**.
+
+The **attribute declaration site** is deliberately **not** closed, because it belongs to the attribute layer rather than to the graph. It **MUST** name the BMM class that actually declares the attribute, and that class **MAY** lie outside the universe when the attribute is inherited from an excluded `primitive_types` entry. On the pinned RM the only such site is `Interval`, which declares the bounds attributes `DV_INTERVAL`, `Point_interval` and `Proper_interval` carry; clamping those to the carrying class would report six attributes as locally declared by three classes that declare none of them, which is the very loss this question exists to prevent. The flattened attribute lookup already behaves this way — it reports primitives and generic parameters (`String`, `Integer`, `T`) as attribute types — so the split is consistent: **the attribute layer is faithful to the BMM, the class graph is navigable.** A caller handed an out-of-universe site can tell, because every class-graph question about that name reports not-known.
 
 What that filter removes is exactly the excluded kinds, not RM structure: the [§ Primitive type mapping](#primitive-type-mapping) entries that appear as BMM ancestors — `Any`, `Ordered`, `Interval`, `Iso8601_type` and the four `Iso8601_*` value types — plus the `PROPORTION_KIND` enumeration. The two lists are the same list, which is why the universe rule and the filter cannot drift apart. It **MUST NOT** cost an RM edge, and the closure **MUST** be asserted rather than assumed: every class that names one of those also names an RM ancestor beside it, and an RM edge lost to the filter would silently shrink every descendant expansion above it. Four classes have no in-universe ancestor left and are therefore roots — `PATHABLE` (its only ancestor is `Any`), `Point_interval` and `Proper_interval` (`Interval`), and `Iso8601_timezone` (`Iso8601_type`). Each loses a foundation edge, none an RM information-model edge; a fifth **MUST** be treated as a defect rather than a new root, since it would mean an RM class had lost its RM parent.
 
@@ -125,7 +132,13 @@ For a class in the universe:
 
 The per-class attribute tables are inheritance-**flattened** and **MUST** stay so: they answer the inheritance-*resolved* question the REQ-112 validation floor and the REQ-111 compiled template depend on. The declaration site is **additive** — it recovers what the fold erases — and **MUST NOT** be obtained by narrowing any table to own-only declarations.
 
-The declaration site **MUST** agree with the fold that produced those tables. Observably: for an attribute a class carries, the class named **MUST** be that class or one of its transitive ancestors, that class's own BMM declaration **MUST** carry the attribute, and the attribute's reported type, required flag, and container flag **MUST** equal the ones the named class reports. Two answers to "where does this attribute come from" would be the same defect as the erasure this recovers from.
+The declaration site **MUST** agree with the fold that produced those tables. Observably, for an attribute a class carries:
+
+- the class named **MUST** be that class or one of its BMM ancestors — the **unfiltered** ancestor chain, since the site may lie outside the universe (§ The class universe above);
+- the named class's own BMM declaration **MUST** carry the attribute;
+- when the named class is **in** the universe, the attribute's reported type, required flag, and container flag **MUST** equal the ones that class reports. When it is outside, no such row exists and the BMM declaration itself is the reference.
+
+Two answers to "where does this attribute come from" would be the same defect as the erasure this recovers from.
 
 #### Abstract is the BMM's flag, not a storability verdict
 
@@ -142,7 +155,7 @@ An introspection answer **MUST** keep these states distinct, because a caller re
 
 | State | Meaning |
 |---|---|
-| **not in the universe** | the generation target does not emit this class |
+| **not in the universe** | this surface does not model the class — see § The class universe, which is not the same as no Go type existing for it |
 | **in the universe, abstract, with concrete descendants** | naming it denotes those descendants |
 | **in the universe, abstract, with none** | a dead end: it denotes nothing instantiable |
 
