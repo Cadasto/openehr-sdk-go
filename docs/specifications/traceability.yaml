@@ -46,7 +46,7 @@ requirements:
     title: RM meta-model introspection
     canonical: docs/specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface
     status: draft
-    implementation: planned
+    implementation: landed
     # WHY THIS EXISTS, in one line: the landed rminfo tables answer the
     # inheritance-RESOLVED attribute question and nothing else — no ancestry,
     # no abstractness, no descendant expansion, and the fold that resolves an
@@ -65,6 +65,10 @@ requirements:
     packages:
       - openehr/rm/rminfo
       - internal/bmmgen
+    tests:
+      - openehr/rm/rminfo/hierarchy_test.go
+      - openehr/rm/rminfo/probe_094_test.go
+      - internal/bmmgen/render_rminfo_hierarchy_test.go
     plans:
       - docs/plans/2026-08-18-rminfo-class-hierarchy.md
 

@@ -162,12 +162,14 @@ func rmInfoUniverse(plan *Plan) []string {
 //
 // Filtering is what keeps the emitted graph closed over the universe
 // (REQ-048): what it drops is the foundation typing layer the RM target does
-// not emit — `Any` (PATHABLE's only ancestor, so PATHABLE is a root),
-// `Ordered`, `Interval`, the `Iso8601_*` types, and the PROPORTION_KIND
-// enumeration. It costs no RM edge: every class that names one of those also
-// names its RM ancestor (DV_ORDERED is `[DATA_VALUE, Ordered]`, DV_INTERVAL
-// is `[DATA_VALUE, Interval]`, DV_PROPORTION is `[PROPORTION_KIND,
-// DV_AMOUNT]`), and that ancestor survives.
+// not emit — `Any`, `Ordered`, `Interval`, the `Iso8601_*` types, and the
+// PROPORTION_KIND enumeration. It costs no RM edge, because every class that
+// names one of those also names an RM ancestor beside it (DV_ORDERED is
+// `[DATA_VALUE, Ordered]`, DV_INTERVAL is `[DATA_VALUE, Interval]`,
+// DV_PROPORTION is `[PROPORTION_KIND, DV_AMOUNT]`) and that ancestor survives.
+// Four classes are left with no in-universe ancestor and become roots —
+// PATHABLE, Point_interval, Proper_interval, Iso8601_timezone — each losing a
+// foundation edge, none an RM one. PROBE-094 pins that set.
 func rmInfoParents(plan *Plan, className string, inUniverse map[string]bool) []string {
 	pc, ok := plan.Classes[className]
 	if !ok {

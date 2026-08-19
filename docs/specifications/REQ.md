@@ -43,7 +43,7 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | REQ-045 | BMM loader building block | [bmm-conformance.md § REQ-045](bmm-conformance.md#req-045--bmm-loader-is-a-building-block) | landed |
 | REQ-046 | Primitive type mapping | [bmm-conformance.md § Primitive type mapping](bmm-conformance.md#primitive-type-mapping) | landed |
 | REQ-047 | BMM authoritative on divergence | [bmm-conformance.md § REQ-047](bmm-conformance.md#req-047--bmm-spec-divergence-resolution) | landed |
-| REQ-048 | RM meta-model introspection | [bmm-conformance.md § REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) | planned |
+| REQ-048 | RM meta-model introspection | [bmm-conformance.md § REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) | landed |
 | REQ-050 | REST 1.1.0-development pin | [wire.md § REQ-050](wire.md#req-050) | landed |
 | REQ-051 | Cadasto spec-version header | [wire.md § REQ-051](wire.md#req-051) | landed |
 | REQ-052 | Canonical JSON | [wire.md § REQ-052](wire.md#req-052) | landed |

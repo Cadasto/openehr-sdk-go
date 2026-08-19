@@ -1,0 +1,470 @@
+package rminfo_test
+
+// PROBE-094 — the compiled-in RM class graph equals an independent reduction
+// of the pinned BMM (REQ-048).
+//
+// The reduction below reads the pinned schemas through the openehr/bmm loader
+// (REQ-045) and re-derives every answer from the raw BMM. It deliberately does
+// NOT call internal/bmmgen: comparing the table against the walk that produced
+// it would pass on a generator whose walk is itself wrong, which is the one
+// failure this probe exists to catch. `make codegen-verify` already covers the
+// other direction — that the committed table is what the generator emits.
+
+import (
+	"maps"
+	"slices"
+	"testing"
+
+	"github.com/cadasto/openehr-sdk-go/openehr/bmm"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
+)
+
+const probeResourcesDir = "../../../" + bmm.DefaultResourcesDir
+
+// probeExcludedClasses is the set of BMM class_definitions entries the RM
+// generation target does not emit, written out HERE rather than imported from
+// internal/bmmgen. That duplication is the point: it confronts the generator's
+// skip list from the other side, so a class silently added to or dropped from
+// one list fails this probe rather than quietly changing the shipped universe.
+//
+// Grouped by why they are out:
+//   - foundation_types.functional / builtins: not data (REQ-042 skip packages)
+//   - the primitive-typing hierarchy that lands in class_definitions in the
+//     openehr_base 1.3.0 dialect: typing constraints, not classes
+var probeExcludedClasses = map[string]bool{
+	"TUPLE": true, "TUPLE1": true, "TUPLE2": true,
+	"FUNCTION": true, "ROUTINE": true, "PROCEDURE": true,
+	"Env": true, "Math": true, "Locale": true,
+	"Statistical_evaluator": true, "Quantity_converter": true,
+	"Numeric": true, "Ordered": true, "Ordered_Numeric": true,
+	"Comparable": true, "Container": true,
+}
+
+// probeExcludedPackagePrefixes mirrors REQ-042's wholesale package skips.
+var probeExcludedPackagePrefixes = []string{
+	"org.openehr.rm.ehr_extract",
+	"org.openehr.base.foundation_types.functional",
+	"org.openehr.base.foundation_types.builtins",
+	"org.openehr.base.base_types.builtins",
+}
+
+// bmmReduction is the independently-derived model the probe compares against.
+type bmmReduction struct {
+	// universe is the class set the reduction expects to be shipped.
+	universe map[string]bool
+	// abstract, ancestors are read straight off the BMM class.
+	abstract     map[string]bool
+	bmmAncestors map[string][]string
+	// parents is bmmAncestors filtered to universe, declaration order kept.
+	parents map[string][]string
+	// classOf resolves a name to its BMM class in EITHER map, because a
+	// declaration site may be a primitive_types entry (Interval).
+	classOf map[string]bmm.Class
+}
+
+func reducePinnedBMM(t *testing.T) *bmmReduction {
+	t.Helper()
+	schema, err := bmm.LoadAll("openehr_rm_1.2.0", bmm.FSResolver{Root: probeResourcesDir})
+	if err != nil {
+		t.Fatalf("LoadAll(openehr_rm_1.2.0): %v", err)
+	}
+
+	pkgOf := packagePaths(schema)
+	r := &bmmReduction{
+		universe:     map[string]bool{},
+		abstract:     map[string]bool{},
+		bmmAncestors: map[string][]string{},
+		parents:      map[string][]string{},
+		classOf:      map[string]bmm.Class{},
+	}
+	maps.Copy(r.classOf, schema.PrimitiveTypes)
+	for name, cls := range schema.ClassDefinitions {
+		r.classOf[name] = cls
+		r.abstract[name] = cls.IsAbstract()
+		r.bmmAncestors[name] = cls.Ancestors()
+		if probeExcludedClasses[name] {
+			continue
+		}
+		if _, isEnum := cls.(*bmm.Enumeration); isEnum {
+			continue
+		}
+		if excludedPackage(pkgOf[name]) {
+			continue
+		}
+		r.universe[name] = true
+	}
+	for name := range r.universe {
+		var parents []string
+		for _, anc := range r.bmmAncestors[name] {
+			if r.universe[anc] && !slices.Contains(parents, anc) {
+				parents = append(parents, anc)
+			}
+		}
+		r.parents[name] = parents
+	}
+	return r
+}
+
+// packagePaths maps every class name to the dotted package path that lists it.
+func packagePaths(schema *bmm.Schema) map[string]string {
+	out := map[string]string{}
+	var walk func(prefix string, pkgs map[string]*bmm.Package)
+	walk = func(prefix string, pkgs map[string]*bmm.Package) {
+		for name, pkg := range pkgs {
+			path := name
+			if prefix != "" {
+				path = prefix + "." + name
+			}
+			for _, cls := range pkg.Classes {
+				out[cls] = path
+			}
+			walk(path, pkg.Packages)
+		}
+	}
+	walk("", schema.Packages)
+	return out
+}
+
+func excludedPackage(path string) bool {
+	for _, p := range probeExcludedPackagePrefixes {
+		if path == p || (len(path) > len(p) && path[:len(p)] == p && path[len(p)] == '.') {
+			return true
+		}
+	}
+	return false
+}
+
+// TestProbe094UniverseEqualsThePinnedBMM — arm (a). Both directions: a missing
+// class is an unanswerable question, an extra one is a name the pinned schemas
+// do not define.
+func TestProbe094UniverseEqualsThePinnedBMM(t *testing.T) {
+	r := reducePinnedBMM(t)
+	shipped := rminfo.Default.KnownRMTypes()
+
+	for _, name := range shipped {
+		if !r.universe[name] {
+			reason := "not defined by the pinned schemas"
+			switch {
+			case r.classOf[name] == nil:
+			case probeExcludedClasses[name]:
+				reason = "in the probe's excluded-class set"
+			default:
+				reason = "excluded by package or kind"
+			}
+			t.Errorf("shipped class %q is not in the reduction: %s", name, reason)
+		}
+	}
+	for name := range r.universe {
+		if !slices.Contains(shipped, name) {
+			t.Errorf("the pinned BMM defines %q but it is not shipped — unanswerable", name)
+		}
+	}
+	if len(shipped) != len(r.universe) {
+		t.Errorf("universe size: shipped %d, reduction %d", len(shipped), len(r.universe))
+	}
+}
+
+// TestProbe094PerClassFactsEqualThePinnedBMM — arm (b). Abstractness is the
+// BMM flag verbatim (REQ-047), parents are the BMM ancestors filtered to the
+// universe in declaration order, and ancestors/descendants are the closures of
+// that edge set, computed here rather than read from the table.
+func TestProbe094PerClassFactsEqualThePinnedBMM(t *testing.T) {
+	r := reducePinnedBMM(t)
+	h := hier(t)
+
+	for name := range r.universe {
+		abstract, known := h.IsAbstract(name)
+		if !known {
+			t.Errorf("%s: IsAbstract reports unknown", name)
+			continue
+		}
+		if abstract != r.abstract[name] {
+			t.Errorf("%s: IsAbstract = %t, BMM is_abstract = %t", name, abstract, r.abstract[name])
+		}
+
+		parents, _ := h.Parents(name)
+		if !slices.Equal(parents, r.parents[name]) {
+			t.Errorf("%s: Parents = %v, reduction = %v", name, parents, r.parents[name])
+		}
+
+		wantAncestors := r.closureUp(name)
+		gotAncestors, _ := h.Ancestors(name)
+		if !slices.Equal(gotAncestors, wantAncestors) {
+			t.Errorf("%s: Ancestors = %v, reduction = %v", name, gotAncestors, wantAncestors)
+		}
+
+		wantDescendants := r.concreteDescendants(name)
+		gotDescendants, _ := h.ConcreteDescendants(name)
+		if !slices.Equal(gotDescendants, wantDescendants) {
+			t.Errorf("%s: ConcreteDescendants = %v, reduction = %v", name, gotDescendants, wantDescendants)
+		}
+	}
+}
+
+// closureUp is the reduction's own transitive ancestor closure, sorted, strict.
+func (r *bmmReduction) closureUp(name string) []string {
+	seen := map[string]bool{name: true}
+	var out []string
+	queue := slices.Clone(r.parents[name])
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+		queue = append(queue, r.parents[n]...)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// concreteDescendants is the reduction's own expansion: itself when not
+// BMM-abstract, plus every non-abstract class whose closure reaches it.
+func (r *bmmReduction) concreteDescendants(name string) []string {
+	var out []string
+	for candidate := range r.universe {
+		if r.abstract[candidate] {
+			continue
+		}
+		if candidate == name || slices.Contains(r.closureUp(candidate), name) {
+			out = append(out, candidate)
+		}
+	}
+	slices.Sort(out)
+	return out
+}
+
+// filterRoots are the classes the parent filter turns into roots: their ONLY
+// BMM ancestor is a foundation type the RM target does not emit, so there is no
+// in-universe edge left to keep. All four lose a foundation edge, none an RM
+// information-model edge:
+//
+//   - PATHABLE        -> Any            (the universal foundation root)
+//   - Point_interval  -> Interval       (a primitive_types generic)
+//   - Proper_interval -> Interval
+//   - Iso8601_timezone -> Iso8601_type  (a foundation temporal type)
+var filterRoots = map[string]bool{
+	"PATHABLE":         true,
+	"Point_interval":   true,
+	"Proper_interval":  true,
+	"Iso8601_timezone": true,
+}
+
+// TestProbe094FilterCostsNoRMEdge — arm (c), the load-bearing half. Dropping a
+// BMM ancestor outside the universe must not drop an RM edge: an ancestor lost
+// here silently shrinks every descendant expansion above it.
+func TestProbe094FilterCostsNoRMEdge(t *testing.T) {
+	r := reducePinnedBMM(t)
+	h := hier(t)
+
+	dropped := map[string][]string{}
+	for name := range r.universe {
+		for _, anc := range r.bmmAncestors[name] {
+			if !r.universe[anc] {
+				dropped[anc] = append(dropped[anc], name)
+			}
+		}
+	}
+	if len(dropped) == 0 {
+		t.Fatal("no ancestor was filtered — the closure arm would be vacuous, so the reduction is wrong")
+	}
+	for anc, children := range dropped {
+		for _, child := range children {
+			// Every class that loses an ancestor must keep at least one,
+			// unless it is one of the four whose ONLY BMM ancestor is a
+			// foundation type the RM target does not emit. Pinning those
+			// four means a fifth is a failure rather than a silent root —
+			// and a fifth would mean an RM class had quietly lost its RM
+			// parent, which is the loss this arm exists to catch.
+			parents, _ := h.Parents(child)
+			if len(parents) == 0 && !filterRoots[child] {
+				t.Errorf("%s lost its only ancestor (%s) to the filter and is now an unexpected root", child, anc)
+			}
+			if slices.Contains(parents, anc) {
+				t.Errorf("%s kept out-of-universe ancestor %s", child, anc)
+			}
+		}
+	}
+	// The pin must stay tight in the other direction too: a class listed
+	// here that has gained a parent means the reason for its exemption is
+	// gone and the list should shrink.
+	for child := range filterRoots {
+		if parents, known := h.Parents(child); !known {
+			t.Errorf("filterRoots names %q, which is not a known class", child)
+		} else if len(parents) > 0 {
+			t.Errorf("filterRoots names %q but it now has parents %v — drop it from the pin", child, parents)
+		}
+	}
+	// The class-graph answers never name a class outside the universe.
+	for name := range r.universe {
+		ancestors, _ := h.Ancestors(name)
+		descendants, _ := h.ConcreteDescendants(name)
+		for _, n := range slices.Concat(ancestors, descendants) {
+			if !r.universe[n] {
+				t.Errorf("%s: an answer names %q, which is outside the universe", name, n)
+			}
+		}
+	}
+}
+
+// TestProbe094DeclarationSitesAreRealBMMDeclarations — arm (d). The site must
+// be a class whose OWN BMM properties map carries the attribute; the class it
+// is reported for must be the site or a descendant of it.
+func TestProbe094DeclarationSitesAreRealBMMDeclarations(t *testing.T) {
+	r := reducePinnedBMM(t)
+	h := hier(t)
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement AttributeLister")
+	}
+
+	checked := 0
+	for name := range r.universe {
+		for _, attr := range lister.AttributeNames(name) {
+			site, ok := h.DeclaredOn(name, attr)
+			if !ok {
+				t.Errorf("%s carries %q but reports no declaration site", name, attr)
+				continue
+			}
+			cls := r.classOf[site]
+			if cls == nil {
+				t.Errorf("DeclaredOn(%s, %s) = %q, which the pinned BMM does not define", name, attr, site)
+				continue
+			}
+			if !bmmDeclares(cls, attr) {
+				t.Errorf("DeclaredOn(%s, %s) = %s, but %s's own BMM declaration does not carry %s",
+					name, attr, site, site, attr)
+				continue
+			}
+			// The site is the class itself, or a class it descends from —
+			// including a filtered foundation class, which is why the
+			// BMM ancestor closure is used here, not the shipped one.
+			if site != name && !slices.Contains(r.bmmClosureUp(name), site) {
+				t.Errorf("DeclaredOn(%s, %s) = %s, which %s does not descend from", name, attr, site, name)
+			}
+			// Container-ness is the one shape fact readable from the raw
+			// BMM property without re-implementing REQ-043's type
+			// mapping, so it is the one asserted here.
+			gotContainer, _ := rminfo.Default.IsContainer(name, attr)
+			if gotContainer != bmmIsContainer(cls, attr) {
+				t.Errorf("%s.%s container = %t, but %s's BMM declaration says otherwise",
+					name, attr, gotContainer, site)
+			}
+			checked++
+		}
+	}
+	if checked == 0 {
+		t.Fatal("no declaration site was checked — the arm is vacuous")
+	}
+	t.Logf("checked %d declaration sites across %d classes", checked, len(r.universe))
+}
+
+// bmmClosureUp is the UNFILTERED BMM ancestor closure — it reaches the
+// foundation classes the shipped graph drops, which is what a declaration site
+// may legitimately name.
+func (r *bmmReduction) bmmClosureUp(name string) []string {
+	seen := map[string]bool{name: true}
+	var out []string
+	queue := slices.Clone(r.bmmAncestors[name])
+	for len(queue) > 0 {
+		n := queue[0]
+		queue = queue[1:]
+		if seen[n] {
+			continue
+		}
+		seen[n] = true
+		out = append(out, n)
+		queue = append(queue, r.bmmAncestors[n]...)
+		if cls := r.classOf[n]; cls != nil {
+			queue = append(queue, cls.Ancestors()...)
+		}
+	}
+	return out
+}
+
+func bmmProperties(cls bmm.Class) map[string]bmm.Property {
+	switch c := cls.(type) {
+	case *bmm.SimpleClass:
+		return c.Properties
+	case *bmm.Interface:
+		return c.Properties
+	default:
+		return nil
+	}
+}
+
+func bmmDeclares(cls bmm.Class, attr string) bool {
+	_, ok := bmmProperties(cls)[attr]
+	return ok
+}
+
+func bmmIsContainer(cls bmm.Class, attr string) bool {
+	_, ok := bmmProperties(cls)[attr].(*bmm.ContainerProperty)
+	return ok
+}
+
+// TestProbe094NegativeSpace — arm (e). A name outside the universe is
+// distinguishable from every in-universe answer, on every question.
+func TestProbe094NegativeSpace(t *testing.T) {
+	r := reducePinnedBMM(t)
+	h := hier(t)
+
+	// Names the pinned BMM defines but the universe excludes are the
+	// sharpest probes: they exist upstream and must still be unknown here.
+	outside := []string{"EXTRACT", "SYNC_EXTRACT", "Ordered", "TUPLE", "PROPORTION_KIND", "NEVER_AN_RM_CLASS"}
+	for _, name := range outside {
+		if r.universe[name] {
+			t.Errorf("%q is in the reduction's universe — pick a different negative case", name)
+			continue
+		}
+		if _, known := h.IsAbstract(name); known {
+			t.Errorf("IsAbstract(%q): known=true for a class outside the universe", name)
+		}
+		if p, known := h.Parents(name); known || p != nil {
+			t.Errorf("Parents(%q) = (%v, %t), want (nil, false)", name, p, known)
+		}
+		if a, known := h.Ancestors(name); known || a != nil {
+			t.Errorf("Ancestors(%q) = (%v, %t), want (nil, false)", name, a, known)
+		}
+		if d, known := h.ConcreteDescendants(name); known || d != nil {
+			t.Errorf("ConcreteDescendants(%q) = (%v, %t), want (nil, false)", name, d, known)
+		}
+		if _, known := h.ConformsTo(name, "LOCATABLE"); known {
+			t.Errorf("ConformsTo(%q, LOCATABLE): known=true", name)
+		}
+		if _, known := h.ConformsTo("COMPOSITION", name); known {
+			t.Errorf("ConformsTo(COMPOSITION, %q): known=true", name)
+		}
+		if s, ok := h.DeclaredOn(name, "name"); ok {
+			t.Errorf("DeclaredOn(%q, name) = (%q, true), want not-found", name, s)
+		}
+	}
+
+	// A root and a dead-end abstract class report as KNOWN with an empty
+	// answer — the distinction the negative space turns on.
+	roots, deadEnds := 0, 0
+	for name := range r.universe {
+		if p, known := h.Parents(name); known && len(p) == 0 {
+			roots++
+			if a, known := h.Ancestors(name); !known || len(a) != 0 {
+				t.Errorf("root %s: Ancestors = (%v, %t), want (empty, true)", name, a, known)
+			}
+		}
+		abstract, _ := h.IsAbstract(name)
+		if d, known := h.ConcreteDescendants(name); known && len(d) == 0 {
+			deadEnds++
+			if !abstract {
+				t.Errorf("%s has no concrete descendant but is not abstract — a concrete class denotes itself", name)
+			}
+		}
+	}
+	if roots == 0 {
+		t.Error("no root class found — the root arm is vacuous")
+	}
+	if deadEnds == 0 {
+		t.Error("no dead-end abstract class found — that arm is vacuous")
+	}
+	t.Logf("%d roots, %d dead-end abstract classes", roots, deadEnds)
+}

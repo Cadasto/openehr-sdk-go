@@ -1,7 +1,13 @@
 // Package rminfo answers "what does the openEHR Reference Model
 // declare about RM class X?" — required attributes, attribute RM
-// types, multi-cardinality flags, and the universe of known concrete
-// class names.
+// types, multi-cardinality flags, the universe of known class names,
+// and (REQ-048) the class graph over them: abstractness, immediate
+// parents, transitive ancestors, conformance, the concrete classes an
+// abstract class denotes, and the class each attribute is declared on.
+//
+// The attribute questions are on the [Lookup] interface; the class-graph
+// questions are on the optional [Hierarchy] capability interface, which
+// [Default] implements and consumers reach by type assertion.
 //
 // The data is generated from the pinned BMM under resources/bmm/
 // via internal/bmmgen and lives in lookup_gen.go; this package
@@ -12,7 +18,10 @@
 // for implicit attribute injection on the compiled template, and
 // by composition-builder / validator code that needs to enumerate
 // the RM-mandatory fields the OPT does not model explicitly (e.g.
-// COMPOSITION.category, COMPOSITION.language).
+// COMPOSITION.category, COMPOSITION.language). The class graph serves
+// consumers reasoning about the RM rather than about one template —
+// AQL class-expression expansion and CONTAINS conformance,
+// polymorphic slot fit, and BMM-faithful re-serialisation.
 //
 // Building-block weight: stdlib-only, single internal data table,
 // no init-time work beyond a map literal. Safe to import from any

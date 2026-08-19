@@ -14,6 +14,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 - **Template list filters (REQ-143).** `ListTemplates` takes the ITS-REST list filters as trailing options; `definition.Repository` grows the same variadic — a compile-time break for external implementers.
 - **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
+- **RM meta-model introspection (REQ-048, PROBE-094, STRAND-12).** `rminfo` gains a compiled-in class graph — abstractness, parents, ancestors, conformance, concrete-descendant expansion, attribute declaration site — and `KnownRMTypes` widens to every emitted class.
 
 ## [0.20.0] - 2026-08-18
 

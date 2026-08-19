@@ -4,9 +4,9 @@
 **Status:** In progress
 **Owner:** SDK maintainers
 **Covers:** [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — RM meta-model introspection surface.
-**Probes:** [PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) (Draft) — the generated tables vs an independent reduction of the pinned BMM
+**Probes:** [PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) (Implemented) — the generated tables vs an independent reduction of the pinned BMM
 **Verifies / builds on:** landed `openehr/rm/rminfo` (BMM-derived structural lookup, [ADR 0005](../adr/0005-compiled-template-foundation.md)), [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (pinned BMM sources), [REQ-042](../specifications/bmm-conformance.md#req-042--generated-code-drift-detected) (generated code, drift-detected)
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** `openehr/bmm` loader (REQ-045), the existing `rminfo` generator
 **Defers:** runtime BMM loading (stays forbidden — compiled-in tables only); AOM/AM hierarchy; generic-parameter resolution beyond the root-type reduction `rminfo` already applies; multiple-schema selection
 
@@ -183,9 +183,9 @@ and is not repeated here.
 | REQ § + registry row (Phase 0) | done |
 | PROBE defined in `conformance.md` (Draft) | done |
 | Generator + `ClassMeta` / `AttrMeta` extension + regenerated tables | done |
-| `Hierarchy` interface + `DeclaredOn` | |
-| Tests with `// REQ-` / `// PROBE-` comments | |
-| `make spec-check` | |
+| `Hierarchy` interface + `DeclaredOn` | done |
+| Tests with `// REQ-` / `// PROBE-` comments | done |
+| `make spec-check` | done |
 | `make ci` | |
 
 ## Phases
@@ -226,42 +226,65 @@ and is not repeated here.
 3. [x] Regenerate; extend the drift coverage to the new generated fields.
 
 **What the parent filter actually drops** (measured against the pinned BMM, not
-assumed): `Any` — `PATHABLE`'s only ancestor, so `PATHABLE` is the one class the
-filter turns into a root — plus `Ordered`, `Interval`, the `Iso8601_*` types and
-the `PROPORTION_KIND` enumeration. Every class naming one of those names an RM
+assumed): `Any`, `Ordered`, `Interval`, the `Iso8601_*` types and the
+`PROPORTION_KIND` enumeration. Every class naming one of those names an RM
 ancestor beside it (`DV_ORDERED` is `[DATA_VALUE, Ordered]`, `DV_INTERVAL` is
 `[DATA_VALUE, Interval]`, `DV_PROPORTION` is `[PROPORTION_KIND, DV_AMOUNT]`), so
-no RM edge is lost. `OPENEHR_DEFINITIONS` is **not** filtered — the RM target
-emits it, so `DATA_VALUE`'s parent edge is real. The only genuine multiple
-inheritance inside the universe is the two `support` service classes.
+no RM edge is lost. Four classes are left with no in-universe ancestor and
+become roots — `PATHABLE`, `Point_interval`, `Proper_interval`,
+`Iso8601_timezone` — each losing a foundation edge only; PROBE-094 pins that set
+so a fifth is a failure. `OPENEHR_DEFINITIONS` is **not** filtered — the RM
+target emits it, so `DATA_VALUE`'s parent edge is real. The only genuine
+multiple inheritance inside the universe is the two `support` service classes.
 
 **Verification:** `make codegen-verify` (byte-stable across two runs; red when a
 generated field is hand-edited) and `go test ./internal/bmmgen/...`.
 
-### Phase 2 — Lookup surface
+### Phase 2 — Lookup surface — **done**
 
-1. Implement `Hierarchy` on the default lookup: `Parents`/`IsAbstract` straight
-   from `ClassMeta`; `Ancestors` as the transitive closure of `Parents`, sorted;
-   `ConformsTo` over that closure; `ConcreteDescendants` over a lazily built
-   inverse index (`sync.Once`, as `KnownRMTypes` already does), sorted. All
-   returns are copies. Cycle-safe: a malformed synthetic model must not hang.
-2. Implement `DeclaredOn` from `AttrMeta.DeclaredIn`.
-3. Table-driven tests: `LOCATABLE`-inherited attributes, abstract expansion of
-   `ENTRY`/`CARE_ENTRY`/`DATA_VALUE`, `PATHABLE` as a root, unknown-class
-   behaviour on every method, dead-end abstract classes, and the synthetic-model
-   seam (`New(data)`) for the shapes the pinned RM cannot supply.
-4. Implement PROBE-094 beside the package: reduce the pinned BMM through
-   `openehr/bmm` and compare the universe, abstractness, parents, ancestor
-   closure, descendant expansion, and every declaration site.
+1. [x] `Hierarchy` on the default lookup (`hierarchy.go`): `Parents`/`IsAbstract`
+   straight from `ClassMeta`; `Ancestors` as the transitive closure of `Parents`,
+   sorted and strict; `ConformsTo` over that closure; `ConcreteDescendants` over
+   a lazily built inverse index (`sync.Once`, as `KnownRMTypes` already does),
+   sorted. All returns are copies. Cycle-safe — the walks seed their `seen` set
+   with the starting class, so a malformed synthetic model terminates instead of
+   hanging, which `TestHierarchyTerminatesOnCyclicSyntheticModel` holds.
+2. [x] `DeclaredOn` from `AttrMeta.DeclaredIn`.
+3. [x] Table-driven tests (`hierarchy_test.go`, 12 suites): `LOCATABLE`-inherited
+   attributes, abstract expansion of `ENTRY`/`CARE_ENTRY`/`DATA_VALUE`, `PATHABLE`
+   as a root, unknown-class behaviour on every method, dead-end abstract classes,
+   the returned-slice-is-a-copy property, and the synthetic-model seam
+   (`New(data)`) for the shapes the pinned RM cannot supply.
+4. [x] PROBE-094 (`probe_094_test.go`): the pinned BMM reduced through
+   `openehr/bmm`, compared on universe (both directions), abstractness, parents,
+   ancestor closure, descendant expansion, and all 728 declaration sites.
 
-**Verification:** `go test ./openehr/rm/rminfo/...` green; PROBE-094 promoted from
-`Draft` to `Implemented (inline)` in `conformance.md`.
+**Two contract decisions this phase settled**, both surfaced by a test rather
+than foreseen:
+
+- **`DeclaredOn` is faithful, not clamped.** The agreement test caught
+  `DV_INTERVAL.lower` reporting `Interval` — a `primitive_types` entry outside
+  the class universe. Clamping it to `DV_INTERVAL` would claim three RM classes
+  locally declare six bounds attributes that no RM class declares, so the site
+  stays faithful and the closure rule is scoped to the class-graph answers. That
+  matches the landed `AttributeRMType`, which already reports `String`,
+  `Integer` and the generic parameter `T`. `Interval` is the only such site on
+  the pinned RM, pinned by test.
+- **The filter leaves four roots, not one.** PROBE-094's closure arm found
+  `Point_interval`, `Proper_interval` and `Iso8601_timezone` beside `PATHABLE`.
+  All four lose a foundation edge and none an RM edge; the set is pinned
+  two-sidedly, so a fifth fails rather than becoming a silent root.
+
+**Verification:** `go test ./openehr/rm/rminfo/...` green (17 suites); PROBE-094
+promoted from `Draft` to `Implemented (inline)` in `conformance.md`. Both
+mutation-checked: sorting `Parents`, and admitting abstract classes into
+`ConcreteDescendants`, each redden the unit suite *and* the probe independently.
 
 ### Phase 3 — Wiring and close-out
 
-1. `traceability.yaml`: `implementation: landed`, tests listed; REQ.md **Impl.**
-   column to match. `roadmap.md` row. `doc.go` REQ citations.
-2. CHANGELOG entry (one artefact-class bullet).
+1. [x] `traceability.yaml`: `implementation: landed`, tests listed; REQ.md
+   **Impl.** column to match. `roadmap.md` row. `doc.go` REQ citations.
+2. [x] CHANGELOG entry (one artefact-class bullet).
 3. Archive the plan (`sdd-archive`) in the implementing PR.
 
 **Verification:** `make spec-check` and `make ci` green.

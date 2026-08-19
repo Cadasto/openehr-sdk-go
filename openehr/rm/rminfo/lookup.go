@@ -35,6 +35,15 @@ type Lookup interface {
 	// KnownRMTypes returns all RM class names this Lookup recognises,
 	// sorted alphabetically. Used by validators that need to walk the
 	// universe of types (e.g. discovery probes).
+	//
+	// The set is every class the RM generation target emits a Go type
+	// for, which since REQ-048 includes the abstract and attribute-less
+	// ones (DATA_VALUE, PATHABLE, the support service classes): a class
+	// absent here cannot be asked about at all, and a descendant
+	// expansion rooted at an abstract class needs that class present.
+	// It is therefore NOT a list of instantiable types — see
+	// [Hierarchy.IsAbstract] and, for what is decodable, the type
+	// registry in openehr/rm/typereg (REQ-040).
 	KnownRMTypes() []string
 }
 
@@ -83,15 +92,18 @@ type ClassMeta struct {
 	// AttrOrder is Attributes' iteration order (BMM declaration
 	// order; ancestors first, then own).
 	AttrOrder []string
-	// Abstract mirrors the BMM is_abstract flag: the model forbids
-	// instantiating the class, so naming it denotes its concrete
-	// descendants rather than a storable _type (REQ-048).
+	// Abstract mirrors the BMM is_abstract flag verbatim: the model
+	// forbids instantiating the class, so naming it denotes its concrete
+	// descendants rather than one instantiable class. It is NOT a
+	// verdict on whether a stored instance can carry the name as _type
+	// — see [Hierarchy.IsAbstract] (REQ-048).
 	Abstract bool
 	// Parents lists the class's immediate parents in BMM declaration
 	// order, filtered to the classes this data set defines. A BMM
-	// ancestor outside the class universe (Any, OPENEHR_DEFINITIONS)
-	// is dropped, which makes its child a root rather than an edge
-	// pointing at a name no method can answer for (REQ-048).
+	// ancestor outside the class universe — the foundation typing layer
+	// (Any, Ordered, Interval, the Iso8601_* types) — is dropped, which
+	// makes its child a root rather than an edge pointing at a name no
+	// method can answer for (REQ-048).
 	Parents []string
 }
 
@@ -116,11 +128,16 @@ type AttrMeta struct {
 	DeclaredIn string
 }
 
-// lookup is the concrete Lookup backed by a data map.
+// lookup is the concrete Lookup backed by a data map. It also implements the
+// optional [AttributeLister] and [Hierarchy] capability interfaces.
 type lookup struct {
 	data      map[string]ClassMeta
 	knownOnce sync.Once
 	known     []string
+	// childOnce/children memoise the inverted Parents edges the generated
+	// tables do not carry — see childIndex in hierarchy.go.
+	childOnce sync.Once
+	children  map[string][]string
 }
 
 func (l *lookup) RequiredAttributes(rmType string) []string {
