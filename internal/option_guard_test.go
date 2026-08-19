@@ -34,7 +34,7 @@ func TestEveryOptionLoopGuardsNil(t *testing.T) {
 	root := filepath.Dir(filepath.Dir(self)) // module root
 
 	fset := token.NewFileSet()
-	checked := 0
+	optionLoops := 0
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -65,21 +65,36 @@ func TestEveryOptionLoopGuardsNil(t *testing.T) {
 			if !isIdent || v.Name == "_" {
 				return true
 			}
+			guarded := false // a prior `if o == nil { continue }` in this body
+			loopCalls := false
 			for _, stmt := range rng.Body.List {
-				// Guarded form A: if o != nil { o(&cfg) }
-				if ifs, isIf := stmt.(*ast.IfStmt); isIf && comparesToNil(ifs.Cond, v.Name, token.NEQ) {
-					continue
-				}
-				// Guarded form B: if o == nil { continue }
-				if ifs, isIf := stmt.(*ast.IfStmt); isIf && comparesToNil(ifs.Cond, v.Name, token.EQL) {
-					continue
+				if ifs, isIf := stmt.(*ast.IfStmt); isIf {
+					// Guarded form A: if o != nil { o(&cfg) } — credited
+					// only when the call is inside the then-branch.
+					if comparesToNil(ifs.Cond, v.Name, token.NEQ) && callsIdent(ifs.Body, v.Name) {
+						loopCalls = true
+						continue
+					}
+					// Guarded form B: if o == nil { continue } — guards
+					// every later call in this body. Any other `== nil`
+					// body (e.g. one that calls the option) earns no
+					// credit and falls through to the call check.
+					if comparesToNil(ifs.Cond, v.Name, token.EQL) && bodyIsContinue(ifs.Body) {
+						guarded = true
+						continue
+					}
 				}
 				if callsIdent(stmt, v.Name) {
-					checked++
-					pos := fset.Position(stmt.Pos())
-					t.Errorf("%s:%d: calls option %q without a nil guard — a caller can pass a nil option, and REQ-025 forbids panicking on that; wrap it in `if %s != nil { ... }`",
-						rel, pos.Line, v.Name, v.Name)
+					loopCalls = true
+					if !guarded {
+						pos := fset.Position(stmt.Pos())
+						t.Errorf("%s:%d: calls option %q without a nil guard — a caller can pass a nil option, and REQ-025 forbids panicking on that; wrap it in `if %s != nil { ... }`",
+							rel, pos.Line, v.Name, v.Name)
+					}
 				}
+			}
+			if loopCalls {
+				optionLoops++
 			}
 			return true
 		})
@@ -88,9 +103,23 @@ func TestEveryOptionLoopGuardsNil(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if checked > 0 {
-		t.Logf("%d unguarded option call(s)", checked)
+	// Self-check: the module is known to hold at least this many
+	// value-calling range loops. A count below the floor means the walk
+	// or the pattern matching has gone blind and a green run proves
+	// nothing — lower the floor only for a deliberate API removal.
+	const minOptionLoops = 30
+	if optionLoops < minOptionLoops {
+		t.Fatalf("walk found %d option loop(s); the module is known to have at least %d — the tripwire has gone blind", optionLoops, minOptionLoops)
 	}
+}
+
+// bodyIsContinue reports whether body is exactly `{ continue }`.
+func bodyIsContinue(body *ast.BlockStmt) bool {
+	if body == nil || len(body.List) != 1 {
+		return false
+	}
+	br, ok := body.List[0].(*ast.BranchStmt)
+	return ok && br.Tok == token.CONTINUE
 }
 
 // comparesToNil reports whether cond is `name <op> nil`.
