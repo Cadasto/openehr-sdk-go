@@ -1,6 +1,7 @@
 // Package contribution is the openEHR REST 1.1.0-development
 // Contribution sub-resource client — multi-version atomic commits
-// against an EHR.
+// against an EHR ([Commit]) and reads of a persisted contribution by
+// uid ([Get], REQ-142), the two operations the ITS-REST pin declares.
 //
 // The submission body is the ITS-REST `Contribution_create` schema
 // [Submission] (audit + inline ORIGINAL_VERSION / IMPORTED_VERSION
