@@ -42,6 +42,29 @@ requirements:
     tests:
       - openehr/serialize/canjson/edgecases_test.go
 
+  - id: REQ-048
+    title: RM meta-model introspection
+    canonical: docs/specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface
+    status: draft
+    implementation: planned
+    # WHY THIS EXISTS, in one line: the landed rminfo tables answer the
+    # inheritance-RESOLVED attribute question and nothing else — no ancestry,
+    # no abstractness, no descendant expansion, and the fold that resolves an
+    # attribute erases which class declared it. Any module reasoning about the
+    # RM rather than about one template had to re-reduce the pinned BMM.
+    #
+    # WHY THE EXISTING TABLES COULD NOT HAVE CARRIED IT: the emitted class
+    # universe was the attribute-BEARING subset, so DATA_VALUE and PATHABLE —
+    # the abstract roots a descendant expansion starts from — were absent
+    # entirely. Widening the universe is part of this REQ, not a side effect.
+    adrs: [docs/adr/0005-compiled-template-foundation.md]
+    probes: [PROBE-094]
+    packages:
+      - openehr/rm/rminfo
+      - internal/bmmgen
+    plans:
+      - docs/plans/2026-08-18-rminfo-class-hierarchy.md
+
   - id: REQ-040
     title: Type registry
     canonical: docs/specifications/rm-modeling.md#type-registry-req-040
