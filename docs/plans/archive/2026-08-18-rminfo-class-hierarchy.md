@@ -1,7 +1,7 @@
 # Plan — RM class hierarchy and declaration-site attribute lookup (`rminfo`)
 
 **Date:** 2026-08-18
-**Status:** In progress
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** [REQ-048](../specifications/bmm-conformance.md#req-048--rm-meta-model-introspection-surface) — RM meta-model introspection surface.
 **Probes:** [PROBE-094](../specifications/conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm) (Implemented) — the generated tables vs an independent reduction of the pinned BMM

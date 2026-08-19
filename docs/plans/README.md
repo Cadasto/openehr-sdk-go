@@ -28,11 +28,10 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 ### Model & diagnostics asks (2026-08-18)
 
-Three independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. The `rminfo` plan's Phase 0 has landed as **REQ-048** — allocated in the BMM headroom, not the proposed REQ-124: [bmm-conformance.md](../specifications/bmm-conformance.md) owns the generated-from-pinned-BMM contract this surface inherits, while `rm-functions.md` scopes itself to runtime behaviour on RM values, so 124–129 stays free for behavioural functions. The two AQL plans still propose REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is the transport extension band — first allocation REQ-150).
+Two independent draft plans. Each authors its REQ spec prose in a Phase 0 before implementation, per the fit-gap pattern below. They propose REQ-160/161 in a **new** "AQL structured model & diagnostics" band (160–169; clinical-modeling 100–119 is exhausted, and 150–159 is the transport extension band — first allocation REQ-150). The third plan of this group, `rminfo` class hierarchy, landed as **REQ-048** and is [archived](archive/2026-08-18-rminfo-class-hierarchy.md).
 
 | Plan | Scope | Covers (proposed) | Probe (proposed) |
 |---|---|---|---|
-| [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy (abstract, immediate parents, ancestors, conformance, concrete descendants) + declaration-site attribute lookup | **REQ-048** (allocated; builds on REQ-041/042/045) | PROBE-094 |
 | [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | Typed node/segment/class predicate model beside the verbatim text | REQ-160 (builds on REQ-113/117/119) | PROBE-095 |
 | [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | Structured drop-channel records + lint spans, with a value-free field contract | REQ-161 (builds on REQ-109/113) | PROBE-096 |
 

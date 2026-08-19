@@ -202,7 +202,7 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ## STRAND-12 — BMM interface classes carry no `is_abstract` flag
 
-**Status:** Open — opened by the [REQ-048 specification pass](../plans/2026-08-18-rminfo-class-hierarchy.md).
+**Status:** Open — opened by the [REQ-048 specification pass](../plans/archive/2026-08-18-rminfo-class-hierarchy.md).
 
 **Question:** should the RM meta-model introspection surface ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface)) report a `P_BMM_INTERFACE` class as abstract even though the pinned BMM sets no `is_abstract` flag on it — and is the missing flag an upstream BMM defect this SDK should raise per [REQ-047](bmm-conformance.md#req-047--bmm-spec-divergence-resolution)?
 
