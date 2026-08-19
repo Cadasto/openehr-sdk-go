@@ -8,10 +8,12 @@ import (
 	"maps"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/client/definition"
@@ -352,5 +354,150 @@ func TestRepository(t *testing.T) {
 	}
 	if !bytes.Equal(got, opt) {
 		t.Error("Repository.GetTemplate bytes mismatch")
+	}
+}
+
+// TestListTemplatesFilters pins the ITS-REST list query parameters on the
+// wire: each option emits its named key, unset options omit theirs, and an
+// explicit zero offset/fetch is sent rather than dropped (REQ-143,
+// PROBE-093).
+func TestListTemplatesFilters(t *testing.T) {
+	cases := []struct {
+		name string
+		opts []definition.ListOption
+		want url.Values
+	}{
+		{
+			name: "no options emits no query",
+			want: url.Values{},
+		},
+		{
+			name: "template id",
+			opts: []definition.ListOption{definition.WithTemplateID("vital*")},
+			want: url.Values{"template_id": {"vital*"}},
+		},
+		{
+			name: "concept",
+			opts: []definition.ListOption{definition.WithConcept("*signs*")},
+			want: url.Values{"concept": {"*signs*"}},
+		},
+		{
+			name: "version",
+			opts: []definition.ListOption{definition.WithVersion("1.2.*")},
+			want: url.Values{"version": {"1.2.*"}},
+		},
+		{
+			name: "offset",
+			opts: []definition.ListOption{definition.WithOffset(10)},
+			want: url.Values{"offset": {"10"}},
+		},
+		{
+			name: "fetch",
+			opts: []definition.ListOption{definition.WithFetch(25)},
+			want: url.Values{"fetch": {"25"}},
+		},
+		{
+			name: "explicit zero offset and fetch are sent",
+			opts: []definition.ListOption{definition.WithOffset(0), definition.WithFetch(0)},
+			want: url.Values{"offset": {"0"}, "fetch": {"0"}},
+		},
+		{
+			name: "all five combined",
+			opts: []definition.ListOption{
+				definition.WithTemplateID("vital*"),
+				definition.WithConcept("*signs*"),
+				definition.WithVersion("1.2.*"),
+				definition.WithOffset(10),
+				definition.WithFetch(25),
+			},
+			want: url.Values{
+				"template_id": {"vital*"},
+				"concept":     {"*signs*"},
+				"version":     {"1.2.*"},
+				"offset":      {"10"},
+				"fetch":       {"25"},
+			},
+		},
+		{
+			name: "last option wins for a repeated key",
+			opts: []definition.ListOption{definition.WithOffset(10), definition.WithOffset(20)},
+			want: url.Values{"offset": {"20"}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured *http.Request
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				captured = r.Clone(r.Context())
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write(readCassette(t, "template_list.json"))
+			}))
+			defer srv.Close()
+
+			list, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14, tc.opts...)
+			if err != nil {
+				t.Fatalf("ListTemplates(%v) = %v, want nil error", tc.name, err)
+			}
+			if got := captured.URL.Query(); !maps.EqualFunc(got, tc.want, slices.Equal) {
+				t.Errorf("query = %v, want %v", got, tc.want)
+			}
+			if captured.URL.Path != "/openehr/v1/definition/template/adl1.4" {
+				t.Errorf("path = %q, want the unfiltered list path", captured.URL.Path)
+			}
+			// The decode is unchanged by filtering (REQ-143).
+			if len(list) != 2 {
+				t.Errorf("len(list) = %d, want 2", len(list))
+			}
+		})
+	}
+}
+
+// TestListTemplatesRejectsNegativePaging pins the SDK floor: the pin gives
+// offset/fetch no negative semantics, so a negative fails closed with no
+// request rather than being forwarded (REQ-143, PROBE-093).
+func TestListTemplatesRejectsNegativePaging(t *testing.T) {
+	cases := []struct {
+		name string
+		opt  definition.ListOption
+	}{
+		{"negative offset", definition.WithOffset(-1)},
+		{"negative fetch", definition.WithFetch(-1)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var hits atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				hits.Add(1)
+			}))
+			defer srv.Close()
+
+			_, _, err := definition.ListTemplates(t.Context(), newClient(t, srv), definition.FormatADL14, tc.opt)
+			if !errors.Is(err, transport.ErrInvalidConfig) {
+				t.Errorf("err = %v, want ErrInvalidConfig", err)
+			}
+			if n := hits.Load(); n != 0 {
+				t.Errorf("issued %d requests, want 0", n)
+			}
+		})
+	}
+}
+
+// TestRepositoryListTemplatesCarriesOptions pins that the DI seam reaches
+// the same filters as the package function (REQ-143).
+func TestRepositoryListTemplatesCarriesOptions(t *testing.T) {
+	var captured *http.Request
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r.Clone(r.Context())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(readCassette(t, "template_list.json"))
+	}))
+	defer srv.Close()
+
+	repo := definition.NewRepository(newClient(t, srv))
+	if _, _, err := repo.ListTemplates(t.Context(), definition.FormatADL14, definition.WithTemplateID("vital*")); err != nil {
+		t.Fatal(err)
+	}
+	if got := captured.URL.Query().Get("template_id"); got != "vital*" {
+		t.Errorf("template_id = %q, want %q", got, "vital*")
 	}
 }

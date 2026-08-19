@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -113,5 +114,64 @@ func TestProbe067RejectsByteDrift(t *testing.T) {
 	}
 	if r.Status != "fail" {
 		t.Errorf("expected fail on byte drift, got %q (detail: %s)", r.Status, r.Detail)
+	}
+}
+
+// TestProbe093TemplateListFilters drives PROBE-093 in Sandbox mode: the
+// fake records every request's query and answers each list call with a
+// template-metadata body (REQ-143).
+func TestProbe093TemplateListFilters(t *testing.T) {
+	var captured []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = append(captured, r.URL.Query())
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[{"template_id":"vital_signs.v1","concept":"Vital Signs"}]`))
+	}))
+	defer srv.Close()
+
+	res, err := probes.Probe093TemplateListFilters(t.Context(), newClient(t, srv), &captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "pass" {
+		t.Fatalf("PROBE-093 = %s: %s", res.Status, res.Detail)
+	}
+	// Three of the four legs reach the wire; the negative-paging leg must not.
+	if len(captured) != 3 {
+		t.Errorf("captured %d requests, want 3 (unfiltered, filtered, zero-paging)", len(captured))
+	}
+}
+
+// TestProbe093EmptyCatalogPasses pins that an empty catalog is a pass, not
+// a decode failure: ListTemplates yields a nil slice for a 204, and REQ-143
+// licenses no assertion that a filtered deployment holds templates.
+func TestProbe093EmptyCatalogPasses(t *testing.T) {
+	var captured []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = append(captured, r.URL.Query())
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	res, err := probes.Probe093TemplateListFilters(t.Context(), newClient(t, srv), &captured)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Status != "pass" {
+		t.Fatalf("PROBE-093 against an empty catalog = %s: %s", res.Status, res.Detail)
+	}
+}
+
+// TestProbe093RejectsMissingInputs pins the probe's own guard rails.
+func TestProbe093RejectsMissingInputs(t *testing.T) {
+	var captured []url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	defer srv.Close()
+
+	if _, err := probes.Probe093TemplateListFilters(t.Context(), nil, &captured); err == nil {
+		t.Error("nil client: want an error")
+	}
+	if _, err := probes.Probe093TemplateListFilters(t.Context(), newClient(t, srv), nil); err == nil {
+		t.Error("nil recorder: want an error")
 	}
 }
