@@ -289,12 +289,14 @@ func TestDriftDetectionCoversHierarchyFields(t *testing.T) {
 	// One case per generated hierarchy field, each restored before the next.
 	// Each replacement is the SAME byte length as what it overwrites, so the
 	// mutation is a pure substitution rather than a truncation the drift check
-	// could catch for the wrong reason. The spellings carry gofmt's column
-	// padding, which is why they are matched literally rather than by name.
+	// could catch for the wrong reason — and stays valid Go, the way a real
+	// hand-edit would, so a future syntax-aware verifier would still see drift
+	// rather than a parse error. The spellings carry gofmt's column padding,
+	// which is why they are matched literally rather than by name.
 	cases := []struct {
 		name, from, to string
 	}{
-		{"Abstract", "Abstract:   true,", "Abstract:   false"},
+		{"Abstract", "Abstract:   true,", "Abstract:  false,"},
 		{"Parents", `Parents:    []string{"OPENEHR_DEFINITIONS"}`, `Parents:    []string{"openehr_definitions"}`},
 		{"DeclaredIn", `DeclaredIn: "LOCATABLE"`, `DeclaredIn: "COMPOSITIO"`},
 	}
