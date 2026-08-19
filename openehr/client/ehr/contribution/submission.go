@@ -37,7 +37,8 @@ type Submission struct {
 	// Construct elements with [WrapOriginalVersion] / [WrapImportedVersion].
 	// Validate enforces this via an explicit type-switch over the 8 concrete
 	// generic instantiations (no reflection per REQ-024); it also rejects an
-	// empty slice, a nil wrapped Version, and an unpopulated commit_audit.
+	// empty slice, a nil wrapped Version, and a commit_audit with a nil
+	// Committer.
 	Versions []CommitVersion
 }
 
@@ -85,6 +86,8 @@ func (s *Submission) Validate() error {
 			*ImportedVersion[rm.EHRStatus],
 			*ImportedVersion[rm.Folder],
 			*ImportedVersion[rm.EHRAccess]:
+			// The assertion cannot fail: every type in this case list is a
+			// wrapper, and both wrappers implement writeSideVersion.
 			if err := v.(writeSideVersion).validateWrite(i); err != nil {
 				return err
 			}
@@ -103,14 +106,20 @@ type writeSideVersion interface {
 }
 
 func (v *OriginalVersion[T]) validateWrite(index int) error {
-	if v == nil || v.Version == nil {
+	if v == nil {
+		return fmt.Errorf("Submission.Versions[%d] is a typed-nil %T", index, v)
+	}
+	if v.Version == nil {
 		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
 	}
 	return validateWriteAudit(index, v.CommitAudit)
 }
 
 func (v *ImportedVersion[T]) validateWrite(index int) error {
-	if v == nil || v.Version == nil {
+	if v == nil {
+		return fmt.Errorf("Submission.Versions[%d] is a typed-nil %T", index, v)
+	}
+	if v.Version == nil {
 		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
 	}
 	return validateWriteAudit(index, v.CommitAudit)
@@ -118,7 +127,7 @@ func (v *ImportedVersion[T]) validateWrite(index int) error {
 
 func validateWriteAudit(index int, a UpdateAudit) error {
 	if a.Committer == nil {
-		return fmt.Errorf("Submission.Versions[%d]: commit_audit is unpopulated", index)
+		return fmt.Errorf("Submission.Versions[%d]: commit_audit.committer is nil", index)
 	}
 	return nil
 }

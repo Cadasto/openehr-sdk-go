@@ -160,7 +160,7 @@ func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
 			wrap: func() contribution.CommitVersion {
 				return contribution.WrapOriginalVersion(&rm.OriginalVersion[rm.Composition]{})
 			},
-			wantErr: "commit_audit is unpopulated",
+			wantErr: "commit_audit.committer is nil",
 		},
 		{
 			name: "rejects ImportedVersion wrapped from nil",
@@ -174,7 +174,7 @@ func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
 			wrap: func() contribution.CommitVersion {
 				return contribution.WrapImportedVersion(&rm.ImportedVersion[rm.Composition]{})
 			},
-			wantErr: "commit_audit is unpopulated",
+			wantErr: "commit_audit.committer is nil",
 		},
 	}
 	for _, tc := range cases {
@@ -188,6 +188,33 @@ func TestSubmissionValidateRejectsUnpopulatedWrap(t *testing.T) {
 			err := sub.Validate()
 			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
 				t.Errorf("error = %v; want substring %q", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestSubmissionValidateRejectsTypedNilElement pins the v == nil half of
+// validateWrite: a typed-nil wrapper in Versions passes the interface-nil
+// check and the type switch, and must surface as an error, not a panic.
+func TestSubmissionValidateRejectsTypedNilElement(t *testing.T) {
+	cases := []struct {
+		name string
+		v    contribution.CommitVersion
+	}{
+		{"typed-nil OriginalVersion", (*contribution.OriginalVersion[rm.Composition])(nil)},
+		{"typed-nil ImportedVersion", (*contribution.ImportedVersion[rm.Composition])(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("Validate panicked: %v", r)
+				}
+			}()
+			sub := &contribution.Submission{Versions: []contribution.CommitVersion{tc.v}}
+			err := sub.Validate()
+			if err == nil || !strings.Contains(err.Error(), "typed-nil") {
+				t.Errorf("error = %v; want substring %q", err, "typed-nil")
 			}
 		})
 	}

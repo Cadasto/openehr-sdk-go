@@ -9,7 +9,8 @@ import (
 
 // updateAuditFromLike builds the write DTO from any AuditDetailsLike,
 // dropping the server-assigned time_committed. Uses the interface's
-// exported accessors (the interface itself is sealed).
+// exported accessors (the interface itself is sealed). A nil or
+// typed-nil a yields the zero UpdateAudit.
 func updateAuditFromLike(a rm.AuditDetailsLike) UpdateAudit {
 	if a == nil || rm.IsTypedNil(a) {
 		return UpdateAudit{}
@@ -43,9 +44,9 @@ type OriginalVersion[T any] struct {
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
 // marshal — later mutations to the wrapped Version.CommitAudit are ignored.
-// A nil v, or a v whose CommitAudit is nil or holds a typed-nil concrete,
-// yields an empty UpdateAudit; [Submission.Validate] rejects that
-// (REQ-025 — no panic on caller input).
+// A nil v yields an empty wrapper; a nil or typed-nil CommitAudit yields
+// an empty UpdateAudit. [Submission.Validate] rejects both (REQ-025 —
+// no panic on caller input).
 func WrapOriginalVersion[T any](v *rm.OriginalVersion[T]) *OriginalVersion[T] {
 	if v == nil {
 		return &OriginalVersion[T]{}
@@ -114,9 +115,9 @@ type ImportedVersion[T any] struct {
 // write path, converting its commit_audit to the UpdateAudit DTO (drops
 // time_committed). Only the returned wrapper's CommitAudit is emitted on
 // marshal — later mutations to the wrapped Version.CommitAudit are ignored.
-// A nil v, or a v whose CommitAudit is nil or holds a typed-nil concrete,
-// yields an empty UpdateAudit; [Submission.Validate] rejects that
-// (REQ-025 — no panic on caller input).
+// A nil v yields an empty wrapper; a nil or typed-nil CommitAudit yields
+// an empty UpdateAudit. [Submission.Validate] rejects both (REQ-025 —
+// no panic on caller input).
 func WrapImportedVersion[T any](v *rm.ImportedVersion[T]) *ImportedVersion[T] {
 	if v == nil {
 		return &ImportedVersion[T]{}
