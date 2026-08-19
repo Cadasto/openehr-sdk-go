@@ -52,13 +52,17 @@ func RenderRMInfoFile(plan *Plan) ([]byte, error) {
 
 	entries := make([]entry, 0, len(classNames))
 	for _, name := range classNames {
+		// One lookup, passed down: rmInfoUniverse only yields plan keys, so
+		// the class is present by construction, and hoisting it keeps the
+		// two uses from disagreeing about whether they need a guard.
+		pc := plan.Classes[name]
 		attrs, order := effectiveProperties(plan, name)
 		entries = append(entries, entry{
 			className: name,
 			attrs:     attrs,
 			order:     order,
-			abstract:  plan.Classes[name].Class.IsAbstract(),
-			parents:   rmInfoParents(plan, name, inUniverse),
+			abstract:  pc.Class.IsAbstract(),
+			parents:   rmInfoParents(pc, inUniverse),
 		})
 	}
 
@@ -171,11 +175,7 @@ func rmInfoUniverse(plan *Plan) []string {
 // Four classes are left with no in-universe ancestor and become roots —
 // PATHABLE, Point_interval, Proper_interval, Iso8601_timezone — each losing a
 // foundation edge, none an RM one. PROBE-094 pins that set.
-func rmInfoParents(plan *Plan, className string, inUniverse map[string]bool) []string {
-	pc, ok := plan.Classes[className]
-	if !ok {
-		return nil
-	}
+func rmInfoParents(pc *PlannedClass, inUniverse map[string]bool) []string {
 	var out []string
 	for _, anc := range pc.Class.Ancestors() {
 		if !inUniverse[anc] || slices.Contains(out, anc) {

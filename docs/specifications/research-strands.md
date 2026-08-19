@@ -222,6 +222,30 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 
 ---
 
+## STRAND-13 — Properties inherited from a primitive-mapped ancestor are dropped
+
+**Status:** Open — opened by [PROBE-094](conformance.md#probe-094--rm-meta-model-introspection-equals-the-pinned-bmm)'s attribute-set completeness arm ([REQ-048](bmm-conformance.md#req-048--rm-meta-model-introspection-surface) implementation).
+
+**Question:** when a `class_definitions` class inherits a property from a `primitive_types` ancestor that [§ Primitive type mapping](bmm-conformance.md#primitive-type-mapping) maps to a Go primitive, should the generator fold that property in — into the emitted struct, into the `rminfo` attribute tables, or into neither?
+
+**Why it's open:** the generator plans `primitive_types` entries mapped to a Go primitive as primitives, not as classes, so it never walks their properties. On the pinned schemas exactly one class is affected: `Iso8601_timezone` (a `class_definitions` entry, and so in REQ-048's class universe) inherits `value: String` — **mandatory** — from `Iso8601_type`, which maps to Go `string`. The result is consistent between the two SDK surfaces and inconsistent with the BMM: `rm.ISO8601Timezone` is emitted as an **empty struct**, and `rminfo` reports the class as carrying no attributes. The type cannot hold its own value, and nothing flagged it until PROBE-094 compared the shipped attribute sets against an independent BMM reduction.
+
+This is a pre-existing emission gap, not a REQ-048 regression — REQ-048 only made it visible, by removing the attribute-less-class skip that had kept `Iso8601_timezone` out of the table entirely.
+
+**The trade-off:**
+
+- **Fold it into both surfaces** — `rm.ISO8601Timezone` gains a `Value string` field and `rminfo` reports the attribute. Faithful to the BMM, and the type becomes able to hold the value it is defined by. Against it: it changes a generated public struct, and the same rule would then apply to every primitive-mapped ancestor, whose blast radius across the base schema is unmeasured.
+- **Fold it into `rminfo` only** — the tables become BMM-faithful while the struct stays empty. Against it: `rminfo` would then describe an attribute no Go type can hold, and the REQ-112 validation floor would demand a field that does not exist. Strictly worse than either consistent option.
+- **Leave both as they are** and treat these classes as deliberately value-less in Go, on the grounds that the four ISO 8601 value types are already mapped to `string` and this one is reached through them. Against it: it leaves a mandatory BMM attribute unrepresentable and undocumented outside a test pin.
+
+**Evidence needed:** the census this strand cannot assume — every `class_definitions` class with a primitive-mapped ancestor that declares properties, across all primary schemas, not just the one the pinned RM reduction surfaces. Whether `Iso8601_timezone` is a one-off or the visible member of a family decides which option is affordable.
+
+**Resolution form:** an ADR amending the § Mapping rules inheritance rule, plus a regenerated tree, if either folding option wins; otherwise a documented mapping exemption. Until then the drop is pinned by name in PROBE-094's completeness arm (`unshippedProperties`) so it cannot grow silently, and it **MUST NOT** be resolved in code ahead of this strand.
+
+**Affects:** REQ-042, REQ-043, REQ-046, REQ-048.
+
+---
+
 ## Index
 
 | Strand | Title | Status | Affects |
@@ -238,3 +262,4 @@ Strand IDs (`STRAND-NN`) are stable. Renumbering is prohibited.
 | [STRAND-10](#strand-10--rmpath-one-sentinel-for-two-not-found-conditions) | rmpath not-found sentinel split | Open | REQ-053, REQ-121 |
 | [STRAND-11](#strand-11--probe-recording-format-har-or-a-purpose-built-yaml) | Probe recording format (HAR vs YAML) | Open | REQ-082 |
 | [STRAND-12](#strand-12--bmm-interface-classes-carry-no-is_abstract-flag) | BMM interface classes carry no `is_abstract` | Open | REQ-047, REQ-048 |
+| [STRAND-13](#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped) | Properties inherited from a primitive-mapped ancestor are dropped | Open | REQ-042, REQ-043, REQ-046, REQ-048 |

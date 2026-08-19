@@ -250,14 +250,15 @@ generated field is hand-edited) and `go test ./internal/bmmgen/...`.
    with the starting class, so a malformed synthetic model terminates instead of
    hanging, which `TestHierarchyTerminatesOnCyclicSyntheticModel` holds.
 2. [x] `DeclaredOn` from `AttrMeta.DeclaredIn`.
-3. [x] Table-driven tests (`hierarchy_test.go`, 12 suites): `LOCATABLE`-inherited
+3. [x] Table-driven tests (`hierarchy_test.go`, 13 suites): `LOCATABLE`-inherited
    attributes, abstract expansion of `ENTRY`/`CARE_ENTRY`/`DATA_VALUE`, `PATHABLE`
    as a root, unknown-class behaviour on every method, dead-end abstract classes,
    the returned-slice-is-a-copy property, and the synthetic-model seam
    (`New(data)`) for the shapes the pinned RM cannot supply.
-4. [x] PROBE-094 (`probe_094_test.go`): the pinned BMM reduced through
+4. [x] PROBE-094 (`probe_094_test.go`, 6 suites): the pinned BMM reduced through
    `openehr/bmm`, compared on universe (both directions), abstractness, parents,
-   ancestor closure, descendant expansion, and all 728 declaration sites.
+   ancestor closure, descendant expansion, all 728 declaration sites, and the
+   per-class attribute-set completeness.
 
 **Two contract decisions this phase settled**, both surfaced by a test rather
 than foreseen:
@@ -275,10 +276,35 @@ than foreseen:
   All four lose a foundation edge and none an RM edge; the set is pinned
   two-sidedly, so a fifth fails rather than becoming a silent root.
 
-**Verification:** `go test ./openehr/rm/rminfo/...` green (17 suites); PROBE-094
-promoted from `Draft` to `Implemented (inline)` in `conformance.md`. Both
-mutation-checked: sorting `Parents`, and admitting abstract classes into
-`ConcreteDescendants`, each redden the unit suite *and* the probe independently.
+### What the review round changed
+
+Two reviews ran against the landed code — a spec-conformance pass over REQ-048
+clause by clause, and a Go review of the diff. Both are worth recording because
+each found something a green suite was hiding:
+
+- **The spec forbade what the code does.** REQ-048's closure MUST and
+  declaration-site agreement MUST were written unqualified, while the code, its
+  interface doc and its tests all treat the declaration site as faithful to the
+  BMM. PROBE-094 arms (c) and (d) had quietly been written to the weaker,
+  unstated property, so nothing failed. The prose now carries the carve-out and
+  the arms assert the stated rule. The lesson is that a design decision recorded
+  in a doc comment and a plan is *not* recorded in the spec.
+- **The completeness arm found a pre-existing emission gap.** Holding the shipped
+  attribute *set* to the BMM's effective property set — not just the sites it
+  ships — surfaced `Iso8601_timezone.value`: declared mandatory in the BMM,
+  inherited from the primitive-mapped `Iso8601_type`, and absent from both the
+  table and the emitted `rm.ISO8601Timezone` (an empty struct). That is a
+  REQ-042/043 emission question, not this surface's, so it is pinned by name in
+  the probe and opened as [STRAND-13](../specifications/research-strands.md#strand-13--properties-inherited-from-a-primitive-mapped-ancestor-are-dropped)
+  rather than settled here.
+
+**Verification:** `go test ./openehr/rm/rminfo/...` green (19 suites across the
+two new files); PROBE-094 promoted from `Draft` to `Implemented (inline)` in
+`conformance.md`. Both mutation-checked: sorting `Parents`, and admitting
+abstract classes into `ConcreteDescendants`, each redden the unit suite *and*
+the probe independently. `TestDriftDetectionCoversHierarchyFields` shows each of
+the three generated fields is caught by the REQ-042 check when hand-edited,
+which the acceptance criteria claimed and nothing asserted.
 
 ### Phase 3 — Wiring and close-out
 

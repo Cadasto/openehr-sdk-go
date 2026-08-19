@@ -21,16 +21,31 @@ import (
 
 const probeResourcesDir = "../../../" + bmm.DefaultResourcesDir
 
-// probeExcludedClasses is the set of BMM class_definitions entries the RM
-// generation target does not emit, written out HERE rather than imported from
-// internal/bmmgen. That duplication is the point: it confronts the generator's
-// skip list from the other side, so a class silently added to or dropped from
-// one list fails this probe rather than quietly changing the shipped universe.
+// probeExcludedClasses mirrors internal/bmmgen's skippedClasses, written out
+// HERE rather than imported. That duplication is the point: it confronts the
+// generator's skip list from the other side, so a class silently added to or
+// dropped from one list fails this probe rather than quietly changing the
+// shipped universe.
 //
-// Grouped by why they are out:
-//   - foundation_types.functional / builtins: not data (REQ-042 skip packages)
-//   - the primitive-typing hierarchy that lands in class_definitions in the
-//     openehr_base 1.3.0 dialect: typing constraints, not classes
+// How much weight each entry carries — measured against
+// openehr_base_1.3.0.bmm.json, not assumed, because the honest answer is "less
+// than it looks":
+//
+//   - `Comparable` is the ONLY entry that decides anything today: a
+//     class_definitions entry in a package no prefix below excludes.
+//   - TUPLE/TUPLE1/TUPLE2/FUNCTION/ROUTINE/PROCEDURE (foundation_types.
+//     functional) and Env/Math/Locale/Statistical_evaluator/
+//     Quantity_converter (base_types.builtins) are class_definitions entries
+//     already covered by probeExcludedPackagePrefixes; they are belt and
+//     braces.
+//   - Numeric/Ordered/Ordered_Numeric/Container are primitive_types-only, so
+//     the reduction never consults this map for them — the IsPrimitive rule
+//     excludes them on both sides. They are kept for symmetry with
+//     internal/bmmgen/primitives.go, which lists them for the same reason,
+//     and drift in either list for THOSE four would go undetected.
+//
+// The confrontation therefore bites for future class_definitions entries and
+// for `Comparable`; it does not bite for the four primitive-only names.
 var probeExcludedClasses = map[string]bool{
 	"TUPLE": true, "TUPLE1": true, "TUPLE2": true,
 	"FUNCTION": true, "ROUTINE": true, "PROCEDURE": true,
@@ -137,27 +152,34 @@ func packagePaths(schema *bmm.Schema) map[string]string {
 	return out
 }
 
-// exclusionReason names why a class is outside the universe, or "" if it
-// should have been in it. The reasons are exactly the universe rule's, so a
-// class this cannot account for is either a defect in the shipped table or a
-// change to the generation target that the probe has not been told about.
-func (r *bmmReduction) exclusionReason(name string) string {
-	if r.universe[name] {
-		return ""
-	}
+// exclusionReason accounts for a name the universe does not contain. The
+// reasons are exactly the universe rule's, so accounted=false means the name is
+// either a defect in the shipped table or a change to the generation target the
+// probe has not been told about.
+//
+// The two returns are separate because "" is not a usable sentinel: a name that
+// IS in the universe and a name that cannot be accounted for are opposite
+// outcomes, and collapsing them once let the second pass as the first.
+func (r *bmmReduction) exclusionReason(name string) (reason string, accounted bool) {
 	switch {
+	case r.universe[name]:
+		return "in the universe", false
 	case r.primitive[name]:
-		return "a primitive_types entry (bmm-conformance.md § Primitive type mapping)"
+		return "a primitive_types entry (bmm-conformance.md § Primitive type mapping)", true
 	case r.enumeration[name]:
-		return "an enumeration"
+		return "an enumeration", true
 	case probeExcludedClasses[name]:
-		return "in the declared excluded-class set"
+		return "in the declared excluded-class set", true
 	case excludedPackage(r.packageOf[name]):
-		return "in an excluded package (" + r.packageOf[name] + ")"
+		return "in an excluded package (" + r.packageOf[name] + ")", true
 	case r.classOf[name] == nil:
-		return "not defined by the pinned schemas at all"
+		// NOT an exclusion: a BMM ancestor the pinned schemas do not define
+		// is a REQ-047 divergence to raise upstream, not a licence to drop
+		// the edge. Saying so here is the difference between this arm
+		// catching that day and blessing it.
+		return "NOT DEFINED by the pinned schemas — a REQ-047 divergence, not an exclusion", false
 	default:
-		return ""
+		return "no declared exclusion matches", false
 	}
 }
 
@@ -179,14 +201,7 @@ func TestProbe094UniverseEqualsThePinnedBMM(t *testing.T) {
 
 	for _, name := range shipped {
 		if !r.universe[name] {
-			reason := "not defined by the pinned schemas"
-			switch {
-			case r.classOf[name] == nil:
-			case probeExcludedClasses[name]:
-				reason = "in the probe's excluded-class set"
-			default:
-				reason = "excluded by package or kind"
-			}
+			reason, _ := r.exclusionReason(name)
 			t.Errorf("shipped class %q is not in the reduction: %s", name, reason)
 		}
 	}
@@ -312,10 +327,10 @@ func TestProbe094FilterCostsNoRMEdge(t *testing.T) {
 		// the pinned root set alone; with it, an RM information-model class
 		// that ever fell out of the universe fails HERE, naming itself,
 		// rather than surviving as a quietly shrunken expansion.
-		reason := r.exclusionReason(anc)
-		if reason == "" {
-			t.Errorf("ancestor %q (of %v) was dropped but matches none of the declared exclusions — "+
-				"if it is an RM class, every expansion above it just shrank", anc, children)
+		reason, accounted := r.exclusionReason(anc)
+		if !accounted {
+			t.Errorf("ancestor %q (of %v) was dropped but %s — "+
+				"if it is an RM class, every expansion above it just shrank", anc, children, reason)
 		}
 		t.Logf("dropped ancestor %-16s %-58s children=%v", anc, reason, children)
 		for _, child := range children {
@@ -408,6 +423,116 @@ func TestProbe094DeclarationSitesAreRealBMMDeclarations(t *testing.T) {
 	t.Logf("checked %d declaration sites across %d classes", checked, len(r.universe))
 }
 
+// TestProbe094AttributeSetsAreComplete — arm (d), the completeness half. Arm
+// (d)'s site checks only look at attributes the table SHIPS; nothing held the
+// shipped set to being the whole effective property set. That mattered as soon
+// as REQ-048 removed the `len(attrs) == 0` class skip, which used to be the
+// only signal that the generator had declined to translate every property of a
+// class.
+//
+// The expectation is re-derived here by walking the unfiltered BMM ancestor
+// chain and collecting property NAMES only — no type mapping, so this stays
+// independent of REQ-043 rather than restating it.
+func TestProbe094AttributeSetsAreComplete(t *testing.T) {
+	r := reducePinnedBMM(t)
+	lister, ok := rminfo.Default.(rminfo.AttributeLister)
+	if !ok {
+		t.Fatal("rminfo.Default does not implement AttributeLister")
+	}
+
+	unshippedHits := map[string]bool{}
+	checked := 0
+	for name := range r.universe {
+		want := r.effectivePropertyNames(name)
+		slices.Sort(want)
+		shipped := slices.Clone(lister.AttributeNames(name))
+		slices.Sort(shipped)
+		if !slices.Equal(shipped, want) {
+			// Report the asymmetry rather than the two lists: a dropped
+			// property and an invented one are different defects.
+			for _, w := range want {
+				if slices.Contains(shipped, w) {
+					continue
+				}
+				key := name + "." + w
+				if unshippedProperties[key] == "" {
+					t.Errorf("%s is declared in the BMM chain but absent from the shipped table — "+
+						"a silently untranslated property", key)
+					continue
+				}
+				unshippedHits[key] = true
+			}
+			for _, g := range shipped {
+				if !slices.Contains(want, g) {
+					t.Errorf("%s.%s is shipped but no class in its BMM chain declares it", name, g)
+				}
+			}
+		}
+		checked++
+	}
+	if checked == 0 {
+		t.Fatal("no class was checked — the completeness arm is vacuous")
+	}
+	// A pin that no longer describes reality is worse than no pin: it would
+	// keep excusing a drop that had actually been fixed.
+	for key, why := range unshippedProperties {
+		if !unshippedHits[key] {
+			t.Errorf("unshippedProperties pins %s (%s) but it is shipped now — drop the pin", key, why)
+		}
+	}
+}
+
+// unshippedProperties are the BMM-declared attributes the shipped tables do NOT
+// carry, each with why. Pinned rather than tolerated: this arm exists to make a
+// silent drop loud, so every drop has to be named here first.
+//
+// The single entry is a PRE-EXISTING emission gap this arm surfaced, not
+// something REQ-048 introduced. `Iso8601_type` is a primitive_types entry
+// mapped to Go `string` (REQ-046, § Primitive type mapping), so the generator
+// never plans it as a class and never folds the mandatory `value` it declares
+// into its class_definitions descendant. openehr/rm agrees with the table
+// rather than with the BMM — `rm.ISO8601Timezone` is emitted as an EMPTY
+// struct, so the type cannot hold its own value either.
+//
+// Whether the generator should fold a primitive-mapped ancestor's properties —
+// which would make rminfo disagree with the emitted Go struct instead of with
+// the BMM — is a REQ-042/REQ-043 emission question, not this surface's, and it
+// is open as STRAND-13. It MUST NOT be resolved here.
+var unshippedProperties = map[string]string{
+	"Iso8601_timezone.value": "inherited from the primitive-mapped Iso8601_type; see STRAND-13",
+}
+
+// effectivePropertyNames collects the property names a class carries, own and
+// inherited, over the UNFILTERED BMM chain — the same set the generator folds,
+// derived independently of it.
+func (r *bmmReduction) effectivePropertyNames(name string) []string {
+	var out []string
+	seen := map[string]bool{}
+	visited := map[string]bool{}
+	var visit func(string)
+	visit = func(n string) {
+		if visited[n] {
+			return
+		}
+		visited[n] = true
+		cls := r.classOf[n]
+		if cls == nil {
+			return
+		}
+		for _, anc := range cls.Ancestors() {
+			visit(anc)
+		}
+		for prop := range bmmProperties(cls) {
+			if !seen[prop] {
+				seen[prop] = true
+				out = append(out, prop)
+			}
+		}
+	}
+	visit(name)
+	return out
+}
+
 // bmmClosureUp is the UNFILTERED BMM ancestor closure — it reaches the
 // foundation classes the shipped graph drops, which is what a declaration site
 // may legitimately name.
@@ -423,7 +548,10 @@ func (r *bmmReduction) bmmClosureUp(name string) []string {
 		}
 		seen[n] = true
 		out = append(out, n)
-		queue = append(queue, r.bmmAncestors[n]...)
+		// classOf covers BOTH schema maps, so this subsumes bmmAncestors
+		// (which is populated from the same call, for class_definitions
+		// entries only) and additionally reaches a primitive_types site
+		// such as Interval.
 		if cls := r.classOf[n]; cls != nil {
 			queue = append(queue, cls.Ancestors()...)
 		}
@@ -491,7 +619,8 @@ func TestProbe094NegativeSpace(t *testing.T) {
 
 	// A root and a dead-end abstract class report as KNOWN with an empty
 	// answer — the distinction the negative space turns on.
-	roots, deadEnds := 0, 0
+	roots := 0
+	var deadEnds []string
 	for name := range r.universe {
 		if p, known := h.Parents(name); known && len(p) == 0 {
 			roots++
@@ -501,7 +630,7 @@ func TestProbe094NegativeSpace(t *testing.T) {
 		}
 		abstract, _ := h.IsAbstract(name)
 		if d, known := h.ConcreteDescendants(name); known && len(d) == 0 {
-			deadEnds++
+			deadEnds = append(deadEnds, name)
 			if !abstract {
 				t.Errorf("%s has no concrete descendant but is not abstract — a concrete class denotes itself", name)
 			}
@@ -510,8 +639,12 @@ func TestProbe094NegativeSpace(t *testing.T) {
 	if roots == 0 {
 		t.Error("no root class found — the root arm is vacuous")
 	}
-	if deadEnds == 0 {
-		t.Error("no dead-end abstract class found — that arm is vacuous")
+	// Named, not counted: a different single dead-end class would keep the
+	// count at three and go unnoticed.
+	wantDeadEnds := []string{"ACCESS_CONTROL_SETTINGS", "AUTHORED_RESOURCE", "EXTERNAL_ENVIRONMENT_ACCESS"}
+	slices.Sort(deadEnds)
+	if !slices.Equal(deadEnds, wantDeadEnds) {
+		t.Errorf("dead-end abstract classes = %v, want %v", deadEnds, wantDeadEnds)
 	}
-	t.Logf("%d roots, %d dead-end abstract classes", roots, deadEnds)
+	t.Logf("%d roots, dead-end abstract classes %v", roots, deadEnds)
 }

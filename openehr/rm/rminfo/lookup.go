@@ -73,11 +73,20 @@ var (
 // Default is the package-level Lookup populated by the generated
 // data tables (see lookup_gen.go). Tests and consumers should use
 // this value; New is provided for unit testing with synthetic data.
+//
+// Default is safe for concurrent use by multiple goroutines, including on
+// first use: the derived indexes it builds lazily are published under
+// [sync.Once].
 var Default Lookup = &lookup{data: defaultData}
 
 // New constructs a Lookup over a caller-supplied data set. Intended
 // for unit tests that need to substitute synthetic RM shapes.
 // Production callers should use [Default].
+//
+// The returned Lookup RETAINS data rather than copying it, and derives indexes
+// from it on first use. Callers MUST NOT mutate data afterwards: doing so races
+// with those indexes and leaves the derived answers permanently stale, with no
+// diagnostic. Like [Default], the result is otherwise safe for concurrent use.
 func New(data map[string]ClassMeta) Lookup {
 	return &lookup{data: data}
 }
@@ -85,6 +94,10 @@ func New(data map[string]ClassMeta) Lookup {
 // ClassMeta is the per-class data the Lookup consults. It is
 // exported only to allow tests to construct synthetic data; the
 // production tables live in lookup_gen.go.
+//
+// Construct with field NAMES. Fields may be added in a minor release
+// (REQ-048 added Abstract and Parents), which breaks positional literals —
+// idiom.md § Public-API stability.
 type ClassMeta struct {
 	// Attributes is the effective attribute set (own + inherited)
 	// keyed by attribute name.
@@ -108,6 +121,9 @@ type ClassMeta struct {
 }
 
 // AttrMeta is the per-attribute data the Lookup consults.
+//
+// Construct with field NAMES, for the same reason as [ClassMeta]: REQ-048
+// added DeclaredIn, and a positional literal would no longer compile.
 type AttrMeta struct {
 	// TypeName is the BMM RM type name of the attribute value. For
 	// container properties this is the element type (the type

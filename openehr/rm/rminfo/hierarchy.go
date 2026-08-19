@@ -23,20 +23,25 @@ import (
 // empty ancestor list on a known class means *root*; an empty
 // concrete-descendant list on a known class means *dead-end abstract*.
 //
-// **Closure.** Every class name the class-graph methods return — [Parents],
-// [Ancestors], [ConcreteDescendants] — is itself a known class: the generator
-// drops BMM ancestors outside the emitted class universe, so the graph has no
-// edges pointing at names no method can answer for. That is a property of the
-// data (asserted by PROBE-094), deliberately not re-imposed at run time,
-// because filtering here would mask a generator defect instead of failing on
-// it.
+// **Closure.** Every class name the class-graph methods return —
+// [Hierarchy.Parents], [Hierarchy.Ancestors], [Hierarchy.ConcreteDescendants]
+// — is itself a known class: the generator drops BMM ancestors outside the
+// emitted class universe, so the graph has no edges pointing at names no
+// method can answer for.
 //
-// [DeclaredOn] is the exception, and belongs to the attribute layer rather
-// than the class graph: it names the BMM class that actually declares the
-// attribute, which for one inherited from the un-emitted foundation layer is
-// outside the universe. That matches [Lookup.AttributeRMType], which already
-// reports primitives and generic parameters (`String`, `Integer`, `T`) — the
-// attribute layer is faithful to the BMM, the graph is navigable.
+// That is a property of the generated data (asserted by PROBE-094),
+// deliberately NOT re-imposed at run time, because filtering here would mask a
+// generator defect instead of failing on it. The consequence is visible
+// through [New]: a synthetic data set whose Parents name a class it does not
+// define gets that name back from Ancestors, and every question about the name
+// then reports known=false. On [Default] that cannot happen.
+//
+// [Hierarchy.DeclaredOn] is the exception, and belongs to the attribute layer
+// rather than the class graph: it names the BMM class that actually declares
+// the attribute, which for one inherited from an excluded primitive_types
+// entry is outside the universe. That matches [Lookup.AttributeRMType], which
+// already reports primitives and generic parameters ("String", "Integer",
+// "T") — the attribute layer is faithful to the BMM, the graph is navigable.
 type Hierarchy interface {
 	// IsAbstract reports the pinned BMM's is_abstract flag for rmType, so a
 	// caller can tell that naming the class denotes its concrete
@@ -69,6 +74,10 @@ type Hierarchy interface {
 	//
 	// known=false for a class the data set does not define; an empty result
 	// with known=true is a root — a different answer.
+	//
+	// A parent the data set names but does not define is returned verbatim
+	// rather than filtered (see § Closure above), so on a malformed
+	// synthetic model an ancestor name can itself report known=false.
 	Ancestors(rmType string) (ancestors []string, known bool)
 
 	// ConformsTo reports whether sub is rmType or descends from it — the
@@ -102,15 +111,19 @@ type Hierarchy interface {
 	// shape come from one generated record, so they cannot disagree.
 	//
 	// The site is faithful to the BMM, so it MAY name a class outside the
-	// known universe when the attribute is inherited from the foundation
-	// layer the RM target does not emit: on the pinned RM the only such
-	// site is `Interval`, which declares the bounds DV_INTERVAL,
-	// Point_interval and Proper_interval carry. Clamping those to the
-	// carrying class would report six attributes as locally declared that
-	// no RM class declares — the opposite of what this method is for.
+	// known universe when the attribute is inherited from an excluded
+	// primitive_types entry. On the pinned RM the only such site is
+	// "Interval", which declares the bounds DV_INTERVAL, Point_interval and
+	// Proper_interval carry. Clamping those to the carrying class would
+	// report six attributes as locally declared that no RM class declares —
+	// the opposite of what this method is for. Note that openehr/rm DOES
+	// emit a Go Interval[T]; being outside this surface's universe means
+	// the surface does not model the class, not that no type exists.
 	//
-	// ok=false when rmType is undefined or does not carry attrName — never
-	// a guessed class.
+	// ok=false when rmType is undefined, when it does not carry attrName,
+	// or when the data set records no site for the attribute at all (which
+	// only a synthetic model omitting the field can produce) — never a
+	// guessed class, and never an empty class name reported as success.
 	DeclaredOn(rmType, attrName string) (declaringClass string, ok bool)
 }
 
@@ -147,6 +160,9 @@ func (l *lookup) Ancestors(rmType string) ([]string, bool) {
 	// synthetic model terminates instead of walking forever.
 	seen := map[string]bool{rmType: true}
 	var out []string
+	// Clone, not alias: queue is appended to below, and meta.Parents is the
+	// generated table's own slice — a caller-supplied one via New may carry
+	// spare capacity, so appending in place would overwrite its neighbour.
 	queue := slices.Clone(meta.Parents)
 	for len(queue) > 0 {
 		name := queue[0]
@@ -162,6 +178,20 @@ func (l *lookup) Ancestors(rmType string) ([]string, bool) {
 	return out, true
 }
 
+// ConformsTo builds the full ancestor closure to answer a membership
+// question. At the pinned RM's scale (139 classes, depth <= 6) that is free —
+// the 139x139 cross-check in the test suite runs in well under a millisecond —
+// so it is left simple. Two tempting optimisations are wrong, and are recorded
+// here rather than rediscovered:
+//
+//   - Memoising into a plain map field races with concurrent readers of the
+//     shared [Default]. Use a third sync.Once over a fully built map.
+//   - Returning a memoised slice directly breaks the no-aliasing rule. The
+//     copy-on-return test passes trivially today because every walk allocates;
+//     it exists to catch exactly this change.
+//
+// The safe cheap win, if one is ever needed, is an early-exit upward walk that
+// returns on first hit instead of building and sorting the whole closure.
 func (l *lookup) ConformsTo(sub, rmType string) (bool, bool) {
 	if _, ok := l.data[sub]; !ok {
 		return false, false
@@ -187,6 +217,10 @@ func (l *lookup) ConcreteDescendants(rmType string) ([]string, bool) {
 	if !meta.Abstract {
 		out = append(out, rmType)
 	}
+	// Clone for the same reason as in Ancestors, and here it is stricter:
+	// childIndex builds its slices by repeated append, so they routinely
+	// have spare capacity, and appending into one would corrupt the shared
+	// index for every later call.
 	queue := slices.Clone(children[rmType])
 	for len(queue) > 0 {
 		name := queue[0]
@@ -222,7 +256,12 @@ func (l *lookup) DeclaredOn(rmType, attrName string) (string, bool) {
 	return attr.DeclaredIn, true
 }
 
-// childIndex inverts the Parents edges once, lazily — the generated tables
+// childIndex returns the shared, memoised child index. The returned map and
+// its slices are READ-ONLY for callers: they are package state published once
+// under childOnce, and the only caller (ConcreteDescendants) clones before it
+// appends.
+//
+// It inverts the Parents edges once, lazily — the generated tables
 // carry the up-edges only, and [Hierarchy.ConcreteDescendants] needs the
 // down-edges. Built on first use rather than at init so importing the package
 // stays free (doc.go § Building-block weight), and sorted so a BFS over it is

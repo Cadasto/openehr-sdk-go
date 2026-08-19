@@ -362,10 +362,12 @@ func TestDeclaredOnAgreesWithTheFlattenedTables(t *testing.T) {
 	if !ok {
 		t.Fatal("rminfo.Default does not implement AttributeLister")
 	}
+	checked := 0
 	for _, class := range rminfo.Default.KnownRMTypes() {
 		ancestors, _ := h.Ancestors(class)
 		required := rminfo.Default.RequiredAttributes(class)
 		for _, attr := range lister.AttributeNames(class) {
+			checked++
 			site, ok := h.DeclaredOn(class, attr)
 			if !ok {
 				t.Errorf("%s carries %q but DeclaredOn reports no site", class, attr)
@@ -409,6 +411,10 @@ func TestDeclaredOnAgreesWithTheFlattenedTables(t *testing.T) {
 			}
 		}
 	}
+	if checked == 0 {
+		t.Fatal("no attribute was checked — the agreement rule went unasserted")
+	}
+	t.Logf("checked %d attribute sites", checked)
 }
 
 // TestHierarchyReturnsCopiesNotPackageState — REQ-048. A caller that sorts or
@@ -436,8 +442,14 @@ func TestHierarchyReturnsCopiesNotPackageState(t *testing.T) {
 }
 
 // TestHierarchyOverSyntheticModel — REQ-048. The New(data) seam must reach
-// every question, because the pinned RM cannot supply every shape: a
-// dead-end abstract class, and a class whose parent is not in the data set.
+// every question, because the pinned RM cannot supply every shape: a dead-end
+// abstract class, and a class whose parent is NOT in the data set.
+//
+// The dangling parent is the one place closure is a run-time question rather
+// than a property of the generated table. The documented behaviour is that the
+// name comes back verbatim and then reports known=false — the surface does not
+// filter, because filtering would hide a generator defect instead of failing
+// on it.
 func TestHierarchyOverSyntheticModel(t *testing.T) {
 	data := map[string]rminfo.ClassMeta{
 		"ROOT": {Abstract: true},
@@ -460,6 +472,8 @@ func TestHierarchyOverSyntheticModel(t *testing.T) {
 		// Abstract with nothing concrete under it: a dead end that must
 		// still report as known with an empty expansion.
 		"DEAD_END": {Abstract: true, Parents: []string{"ROOT"}},
+		// Names a parent this data set does not define.
+		"ORPHAN": {Parents: []string{"NOT_IN_DATA"}},
 	}
 	h, ok := rminfo.New(data).(rminfo.Hierarchy)
 	if !ok {
@@ -483,6 +497,23 @@ func TestHierarchyOverSyntheticModel(t *testing.T) {
 	}
 	if got, ok := h.DeclaredOn("LEAF", "own"); !ok || got != "LEAF" {
 		t.Errorf("DeclaredOn(LEAF, own) = (%q, %t), want (LEAF, true)", got, ok)
+	}
+
+	// The dangling parent: returned verbatim, and then unanswerable. Both
+	// halves matter — dropping it would silently shrink the answer, and
+	// reporting it as known would be a lie.
+	if anc, known := h.Ancestors("ORPHAN"); !known || !slices.Equal(anc, []string{"NOT_IN_DATA"}) {
+		t.Errorf("Ancestors(ORPHAN) = (%v, %t), want ([NOT_IN_DATA], true) — an undefined parent is not filtered", anc, known)
+	}
+	if _, known := h.IsAbstract("NOT_IN_DATA"); known {
+		t.Error("IsAbstract(NOT_IN_DATA): known=true for a name the data set does not define")
+	}
+	if conforms, known := h.ConformsTo("ORPHAN", "NOT_IN_DATA"); known || conforms {
+		t.Errorf("ConformsTo(ORPHAN, NOT_IN_DATA) = (%t, %t), want (false, false)", conforms, known)
+	}
+	// And it does not become a phantom class in the descendant direction.
+	if ds, known := h.ConcreteDescendants("NOT_IN_DATA"); known || ds != nil {
+		t.Errorf("ConcreteDescendants(NOT_IN_DATA) = (%v, %t), want (nil, false)", ds, known)
 	}
 }
 
@@ -524,20 +555,31 @@ func TestHierarchyConcurrentFirstUse(t *testing.T) {
 	if !ok {
 		t.Fatal("rminfo.New does not implement Hierarchy")
 	}
+	lookup, ok := h.(rminfo.Lookup)
+	if !ok {
+		t.Fatal("the Hierarchy is not also a Lookup")
+	}
 	const goroutines = 32
-	got := make([][]string, goroutines)
+	descendants := make([][]string, goroutines)
+	knownCounts := make([]int, goroutines)
 	var wg sync.WaitGroup
 	for i := range goroutines {
 		wg.Go(func() {
-			d, _ := h.ConcreteDescendants("ENTRY")
-			got[i] = d
+			// Both lazy caches on the same cold value, from the same
+			// goroutine, so childOnce and knownOnce race each other too.
+			descendants[i], _ = h.ConcreteDescendants("ENTRY")
+			knownCounts[i] = len(lookup.KnownRMTypes())
 		})
 	}
 	wg.Wait()
 	want := []string{"ACTION", "ADMIN_ENTRY", "EVALUATION", "INSTRUCTION", "OBSERVATION"}
-	for i, d := range got {
-		if !slices.Equal(d, want) {
-			t.Errorf("goroutine %d saw ConcreteDescendants(ENTRY) = %v, want %v", i, d, want)
+	wantKnown := len(rminfo.Default.KnownRMTypes())
+	for i := range goroutines {
+		if !slices.Equal(descendants[i], want) {
+			t.Errorf("goroutine %d saw ConcreteDescendants(ENTRY) = %v, want %v", i, descendants[i], want)
+		}
+		if knownCounts[i] != wantKnown {
+			t.Errorf("goroutine %d saw %d known types, want %d", i, knownCounts[i], wantKnown)
 		}
 	}
 }

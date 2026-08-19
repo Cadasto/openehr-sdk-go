@@ -1,7 +1,10 @@
 package bmmgen
 
 import (
+	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"testing"
@@ -170,7 +173,7 @@ func TestRMInfoParentsAreClosedOverTheUniverse(t *testing.T) {
 	}
 
 	for _, name := range universe {
-		for _, parent := range rmInfoParents(plan, name, inUniverse) {
+		for _, parent := range rmInfoParents(plan.Classes[name], inUniverse) {
 			if !inUniverse[parent] {
 				t.Errorf("%s has parent %q, which is not in the class universe", name, parent)
 			}
@@ -195,7 +198,7 @@ func TestRMInfoParentsAreClosedOverTheUniverse(t *testing.T) {
 		"TERMINOLOGY_SERVICE": {"OPENEHR_TERMINOLOGY_GROUP_IDENTIFIERS", "OPENEHR_CODE_SET_IDENTIFIERS"},
 	}
 	for class, want := range cases {
-		got := rmInfoParents(plan, class, inUniverse)
+		got := rmInfoParents(plan.Classes[class], inUniverse)
 		if !slices.Equal(got, want) {
 			t.Errorf("%s parents = %v, want %v", class, got, want)
 		}
@@ -216,10 +219,9 @@ func TestRenderRMInfoEmitsHierarchyFields(t *testing.T) {
 	// Patterns, not literals: gofmt aligns keyed struct fields, so the
 	// run of spaces after a key depends on its neighbours in the block.
 	for _, want := range []string{
-		`"DATA_VALUE": {`,
-		`"PATHABLE": {`,
-		`Abstract: +true,`,
-		`Parents: +\[\]string\{"PATHABLE"\},`,
+		`"DATA_VALUE": \{(?s:.*?)Abstract: +true,`,
+		`"PATHABLE": \{(?s:.*?)Abstract: +true,`,
+		`"LOCATABLE": \{(?s:.*?)Parents: +\[\]string\{"PATHABLE"\},`,
 		`"name": +\{TypeName: "DV_TEXT", Required: true, Container: false, DeclaredIn: "LOCATABLE"\},`,
 	} {
 		if !regexp.MustCompile(want).MatchString(src) {
@@ -231,5 +233,85 @@ func TestRenderRMInfoEmitsHierarchyFields(t *testing.T) {
 	// mis-emitted literal.
 	if regexp.MustCompile(`"DV_QUANTITY": \{[^}]*Abstract`).MatchString(src) {
 		t.Error("concrete class DV_QUANTITY emitted an Abstract key")
+	}
+}
+
+// TestDriftDetectionCoversHierarchyFields — REQ-042 discipline applied to the
+// REQ-048 fields. TestDriftDetection already proves the mechanism, but it
+// mutates a marker comment in a datatype file; REQ-048's acceptance criteria
+// claim specifically that hand-editing a generated HIERARCHY field is caught,
+// and nothing asserted that until now.
+//
+// The mutation is semantic rather than cosmetic on purpose: flipping
+// `Abstract: true` to `false` is exactly the hand-edit that would make an
+// abstract class look instantiable, so it is the one the drift check has to
+// catch.
+func TestDriftDetectionCoversHierarchyFields(t *testing.T) {
+	dir := t.TempDir()
+	opts := Options{
+		ResourcesDir: testResources,
+		OutDir:       dir,
+		RootID:       "openehr_rm_1.2.0",
+	}
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("initial Run: %v", err)
+	}
+	target := filepath.Join(dir, "openehr", "rm", "rminfo", "lookup_gen.go")
+	orig, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read %s: %v", target, err)
+	}
+
+	// One case per generated hierarchy field, each restored before the next.
+	// Each replacement is the SAME byte length as what it overwrites, so the
+	// mutation is a pure substitution rather than a truncation the drift check
+	// could catch for the wrong reason. The spellings carry gofmt's column
+	// padding, which is why they are matched literally rather than by name.
+	cases := []struct {
+		name, from, to string
+	}{
+		{"Abstract", "Abstract:   true,", "Abstract:   false"},
+		{"Parents", `Parents:    []string{"OPENEHR_DEFINITIONS"}`, `Parents:    []string{"openehr_definitions"}`},
+		{"DeclaredIn", `DeclaredIn: "LOCATABLE"`, `DeclaredIn: "COMPOSITIO"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			idx := bytes.Index(orig, []byte(tc.from))
+			if idx < 0 {
+				t.Fatalf("generated table has no %q to mutate", tc.from)
+			}
+			mutated := append([]byte{}, orig...)
+			copy(mutated[idx:], tc.to)
+			if err := os.WriteFile(target, mutated, 0o644); err != nil {
+				t.Fatalf("write mutated: %v", err)
+			}
+			defer func() {
+				if err := os.WriteFile(target, orig, 0o644); err != nil {
+					t.Fatalf("restore: %v", err)
+				}
+			}()
+
+			verify := opts
+			verify.Verify = true
+			result, err := Run(verify)
+			if err != nil {
+				t.Fatalf("verify Run: %v", err)
+			}
+			if !slices.ContainsFunc(result.Drifts, func(d DriftRecord) bool { return d.Path == target }) {
+				t.Errorf("hand-editing %s went undetected; drifts = %v", tc.name, result.Drifts)
+			}
+		})
+	}
+
+	// Control: with the file restored, the tree is clean again — otherwise
+	// the assertions above could be passing on unrelated drift.
+	verify := opts
+	verify.Verify = true
+	result, err := Run(verify)
+	if err != nil {
+		t.Fatalf("final verify Run: %v", err)
+	}
+	if len(result.Drifts) != 0 {
+		t.Errorf("tree not clean after restore: %v", result.Drifts)
 	}
 }
