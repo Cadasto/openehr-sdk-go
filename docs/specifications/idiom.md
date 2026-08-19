@@ -199,10 +199,10 @@ Consumers detect classes with `errors.Is(err, transport.ErrPreconditionFailed)`.
 Library code **MUST NOT** panic on:
 
 - Wire input (malformed JSON, unexpected `_type`) — return a typed error.
-- Consumer input (nil pointers, nil interfaces, zero-value structs a caller can construct, nil maps, empty strings, invalid IDs) — return a typed error, or return a value that a documented validation or marshalling path rejects.
+- Consumer input (nil maps, empty strings, invalid IDs) — return a typed error or document the preconditions.
 - Authentication failures — return `ErrUnauthorized` or a wrapped equivalent.
 
-Exported constructors **MUST NOT** panic on caller-constructible input, including a nil argument or a zero-value struct whose interface fields are nil. When the constructor's signature does not return an error, it **MUST** produce a value the package's existing validation or marshalling path rejects with an error.
+Exported constructors **MUST NOT** panic on caller-constructible input, including a nil argument or a zero-value struct whose interface fields are nil. They **MUST** fail closed instead: return a typed error, or — when the signature does not return an error — return a value that a documented validation or marshalling path rejects with an error.
 
 Panics are reserved for **programmer errors** the consumer cannot trigger via documented APIs (nil dereference of an unexported struct, broken invariant in the type registry).
 
