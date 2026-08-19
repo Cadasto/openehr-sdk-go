@@ -9,9 +9,12 @@ package lint_test
 // that had quietly made them structural and would hide the point of the split.
 
 import (
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/cadasto/openehr-sdk-go/openehr/aql"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/lint"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
 )
@@ -22,6 +25,12 @@ type spanCase struct {
 	name   string
 	query  string
 	values []string
+	// opts enables the layers a case's intended code needs — the
+	// parameter-binding checks only run when Options.Query is set.
+	opts *lint.Options
+	// mustFind pins the code the case exists to exercise, so a case that
+	// stops producing it fails instead of passing on whatever else fired.
+	mustFind string
 }
 
 func spanCases() []spanCase {
@@ -40,6 +49,14 @@ func spanCases() []spanCase {
 			name:   "unbound param",
 			query:  "SELECT c FROM COMPOSITION c WHERE c/name/value = $missing",
 			values: []string{"missing"},
+			// aql_unbound_param only fires when Options.Query is set — with
+			// nil options this case found only bystander issues and never saw
+			// the code it names (PR #112 review).
+			opts: &lint.Options{Query: &aql.Query{
+				Q:          "SELECT c FROM COMPOSITION c WHERE c/name/value = $missing",
+				Parameters: map[string]any{},
+			}},
+			mustFind: "aql_unbound_param",
 		},
 		{
 			name:   "deprecated top",
@@ -55,15 +72,21 @@ func TestValueFreeFieldsCarryNoSourceText(t *testing.T) {
 	for _, tc := range spanCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			res := lint.LintString(tc.query, nil)
+			res := lint.LintString(tc.query, tc.opts)
 			if len(res.Issues) == 0 {
 				t.Fatalf("LintString(%q) found nothing; the case no longer "+
 					"exercises the diagnostic surface", tc.query)
 			}
+			if tc.mustFind != "" && !slices.ContainsFunc(res.Issues, func(i lint.Issue) bool {
+				return i.Code == tc.mustFind
+			}) {
+				t.Fatalf("no %s issue; the case stopped exercising the code it names", tc.mustFind)
+			}
 			for _, iss := range res.Issues {
-				// Code and Severity render; Span is numeric. Together they are
-				// the value-free surface.
-				got := iss.Code + " " + iss.Severity.String()
+				// The whole value-free surface renders: Code, Severity, and
+				// Span — today all-numeric, folded in so a future string field
+				// on Span cannot slip past this guard.
+				got := fmt.Sprintf("%s %s %+v", iss.Code, iss.Severity, iss.Span)
 				for _, v := range tc.values {
 					if strings.Contains(got, v) {
 						t.Errorf("value-free fields %q contain the source value %q", got, v)
@@ -81,7 +104,7 @@ func TestSpanIsEitherAttributedOrZero(t *testing.T) {
 	for _, tc := range spanCases() {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			for _, iss := range lint.LintString(tc.query, nil).Issues {
+			for _, iss := range lint.LintString(tc.query, tc.opts).Issues {
 				sp := iss.Span
 				if sp.IsZero() {
 					continue // not attributable — allowed, and stated as such

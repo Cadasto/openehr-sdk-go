@@ -1,6 +1,7 @@
 package parse
 
 import (
+	"reflect"
 	"strings"
 
 	"github.com/antlr4-go/antlr/v4"
@@ -84,17 +85,42 @@ func endOf(tok antlr.Token) Position {
 // three share no interface, and a drop site should not have to pick a helper
 // per shape.
 func spanAt(node any) Span {
-	switch n := node.(type) {
-	case nil:
+	// An absent node yields a zero span whether the nil arrives untyped or
+	// typed — a typed nil would satisfy the interface cases below and panic
+	// inside the accessor, and a diagnostics helper must not be able to
+	// panic. This is a nil GUARD, not type dispatch (the REQ-024 reflection
+	// rule binds `_type` dispatch).
+	if node == nil {
 		return Span{}
+	}
+	if rv := reflect.ValueOf(node); rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return Span{}
+	}
+	switch n := node.(type) {
 	case antlr.ParserRuleContext:
-		return Span{Start: posOf(n.GetStart()), End: endOf(n.GetStop())}
+		return boundedSpan(posOf(n.GetStart()), endOf(n.GetStop()))
 	case antlr.TerminalNode:
-		return Span{Start: posOf(n.GetSymbol()), End: endOf(n.GetSymbol())}
+		return boundedSpan(posOf(n.GetSymbol()), endOf(n.GetSymbol()))
 	case antlr.Token:
-		return Span{Start: posOf(n), End: endOf(n)}
+		return boundedSpan(posOf(n), endOf(n))
 	}
 	return Span{}
+}
+
+// boundedSpan keeps the documented [Start, End) contract when the two
+// endpoints were computed independently: a missing endpoint (an epsilon rule
+// match leaving GetStop nil) collapses the span to zero width at the known
+// one rather than producing an inverted range.
+func boundedSpan(start, end Position) Span {
+	switch {
+	case start == (Position{}) && end == (Position{}):
+		return Span{}
+	case start == (Position{}):
+		return Span{Start: end, End: end}
+	case end == (Position{}):
+		return Span{Start: start, End: start}
+	}
+	return Span{Start: start, End: end}
 }
 
 // ClassExpr is one class expression bound in the FROM / CONTAINS tree

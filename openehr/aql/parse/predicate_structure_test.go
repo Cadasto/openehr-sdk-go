@@ -393,10 +393,47 @@ func TestTheSameFormYieldsTheSameKindInBothPositions(t *testing.T) {
 	}
 }
 
-// TestTriviaAndEscapesDoNotReachTheComponents is the property form of the
-// trivia rule: a padded, commented, escaped spelling MUST produce the same
-// components as the bare one WHILE the verbatim text differs. A corpus in
-// which both assertions cannot fire is not exercising the rule.
+// TestTriviaIndependenceOverTheGeneratedCorpus drives the trivia property
+// from predicateRows() — EVERY form, not a named subset (PR #112 review: the
+// named cases were eight spellings, the same coverage shape as the
+// operand-sweep miss one level up). The padding is mechanical — leading
+// whitespace and a trailing `--` comment inside the bracket — so a row added
+// for a new grammar alternative is covered the day it lands. Interior-trivia
+// spellings that cannot be generated mechanically stay in the named-case
+// test below.
+func TestTriviaIndependenceOverTheGeneratedCorpus(t *testing.T) {
+	t.Parallel()
+	for _, r := range predicateRows() {
+		t.Run(r.name, func(t *testing.T) {
+			t.Parallel()
+			mk := func(pred string) string {
+				return "SELECT o/data[" + pred + "]/magnitude FROM OBSERVATION o"
+			}
+			padded := "  " + r.pred + " -- trivia\n "
+			bareP, bareRaw := segmentPredicate(t, mk(r.pred))
+			padP, padRaw := segmentPredicate(t, mk(padded))
+			if bareRaw == padRaw {
+				t.Fatal("padding produced identical verbatim text; the arm is not firing")
+			}
+			if r.wantNil {
+				// The enumerated unstructured forms stay nil under padding too
+				// — a padded hole must not become a partial structure.
+				if bareP != nil || padP != nil {
+					t.Fatalf("an enumerated unstructured form structured under padding: %v / %v", bareP, padP)
+				}
+				return
+			}
+			if !aql.EqualPredicates(bareP, padP) {
+				t.Errorf("trivia reached the components:\n  bare   %q -> %+v\n  padded %q -> %+v",
+					bareRaw, bareP, padRaw, padP)
+			}
+		})
+	}
+}
+
+// TestTriviaAndEscapesDoNotReachTheComponents keeps the INTERIOR-trivia
+// spellings no mechanical padding can generate: trivia inside an operand
+// path, inside the name slot, inside the regex braces.
 func TestTriviaAndEscapesDoNotReachTheComponents(t *testing.T) {
 	t.Parallel()
 	cases := []struct{ name, bare, padded string }{
@@ -681,6 +718,47 @@ func TestComparisonEqualityCoversTheLeftOperand(t *testing.T) {
 	}
 	if !aql.EqualPredicates(mk("LENGTH"), mk("LENGTH")) {
 		t.Error("identical comparisons with a Left operand compare unequal")
+	}
+}
+
+// TestNestedPredicateTriviaDoesNotReachEquality pins the PR #112 review
+// finding: a predicate nested inside an operand-path segment recurses through
+// its own structured carrier, so `data[at0001]/value` equals
+// `data[ at0001 ]/value` all the way down.
+func TestNestedPredicateTriviaDoesNotReachEquality(t *testing.T) {
+	t.Parallel()
+	mk := func(inner string) (aql.SegmentPredicate, string) {
+		return segmentPredicate(t,
+			"SELECT o/x[data["+inner+"]/value = 1]/y FROM OBSERVATION o")
+	}
+	bare, bareRaw := mk("at0001")
+	padded, padRaw := mk(" at0001 ")
+	if bareRaw == padRaw {
+		t.Fatal("the two spellings produced identical verbatim text")
+	}
+	if !aql.EqualPredicates(bare, padded) {
+		t.Errorf("nested-predicate trivia reached equality:\n  %q -> %+v\n  %q -> %+v",
+			bareRaw, bare, padRaw, padded)
+	}
+}
+
+// TestValueOperandShapeReachesEquality pins the other PR #112 review finding:
+// tokens alone conflate value shapes (`PathValue{Raw:"true"}` and
+// `BoolValue{true}` both spell `true`), so the comparison key must be
+// shape-qualified — equality here must not be weaker than aql.EqualValues.
+func TestValueOperandShapeReachesEquality(t *testing.T) {
+	t.Parallel()
+	pathTrue := aql.ComparisonPredicate{Comparison: aql.Comparison{
+		Op: "=", Val: aql.PathValue{IdentifiedPath: aql.IdentifiedPath{Raw: "true"}},
+	}}
+	boolTrue := aql.ComparisonPredicate{Comparison: aql.Comparison{
+		Op: "=", Val: aql.Bool(true),
+	}}
+	if aql.EqualPredicates(pathTrue, boolTrue) {
+		t.Error("a path operand spelled `true` compares equal to the boolean literal")
+	}
+	if !aql.EqualPredicates(pathTrue, pathTrue) {
+		t.Error("a predicate does not equal itself")
 	}
 }
 

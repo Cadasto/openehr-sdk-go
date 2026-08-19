@@ -28,24 +28,11 @@ Phase 0 (the REQ-082 normative prose — mode selection, the probe result contra
 
 ### Model & diagnostics asks (2026-08-18)
 
-The two AQL plans **landed 2026-08-19** — no new requirement ids: each extended the landed requirement that already owned its surface, so [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) and [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) stay `landed` with new sections, and PROBE-095 / PROBE-096 are implemented inline. The `rminfo` plan is the one still open, and still needs its own spec text written.
+The two AQL plans **landed 2026-08-19 and were archived** ([archive/2026-08-18-aql-structured-node-predicates.md](archive/2026-08-18-aql-structured-node-predicates.md), [archive/2026-08-18-aql-value-free-diagnostics.md](archive/2026-08-18-aql-value-free-diagnostics.md)) — no new requirement ids: each extended the landed requirement that already owned its surface ([REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast), [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint)), and PROBE-095 / PROBE-096 are implemented inline. The grounding story — four plan errors caught by checking the vendored grammar and the extractor before writing code, a fifth caught by a test, and the review round that closed the operand-level gap — is recorded in the archived plans and the [archive README](archive/README.md). The `rminfo` plan is the one still open, and still needs its own spec text written.
 
 | Plan | Scope | Covers | Probe |
 |---|---|---|---|
 | [2026-08-18-rminfo-class-hierarchy.md](2026-08-18-rminfo-class-hierarchy.md) | `rminfo` class hierarchy + declaration-site attribute lookup | REQ-124 (**proposed**) | PROBE-094 (proposed) |
-| [2026-08-18-aql-value-free-diagnostics.md](2026-08-18-aql-value-free-diagnostics.md) | `Document.Dropped()`, `lint.Issue.Span`, and which fields may carry query text | REQ-113 + REQ-109 (**landed**) | [PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) |
-| [2026-08-18-aql-structured-node-predicates.md](2026-08-18-aql-structured-node-predicates.md) | `PathSegment.Parsed` — a typed model beside the verbatim text, path-segment position only | REQ-113 (**landed**) | [PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring) |
-
-**Checking the two plans against the real grammar and the real code found four mistakes in them,** each fixed before any code was written:
-
-- The bracketed predicate is **three** overlapping grammar productions, not `nodePredicate` alone — so a comparison, a bare archetype id and a bare `$param` are each spelled twice, and which parse node carries one depends on how deeply it is nested. The plans would have keyed the model on the parse node and reported one predicate as two different kinds. PROBE-095 now presents every form at both positions and requires the same kind.
-- The predicate **name slot allows five spellings on two of those productions**, one of them a `$param` that defers the name to query-bind time. The draft's archetype kind could not carry a name at all.
-- The extractor has **27 drop sites but only one that a legal query can reach**; the rest are defensive. The plans asked for one enum member per site *and* a corpus reaching every site, which cannot both be done — so the enum counts kinds of drop and completeness is checked by reading the source.
-- **Two proposed types already existed** — `parse.Clause` and `parse.Position` — so both are reused rather than duplicated.
-
-**Building it found a fifth, which only a test could have found.** The claim that the defensive drop sites are unreachable turned out to be false for one of them: an out-of-range literal in a `WHERE` comparison reached a site labelled defensive, because the reason travelled as a bare string with no kind attached. The kind now travels with the reason, so a call site cannot pair a reachable gap with a defensive kind.
-
-Two things were deliberately left out rather than half-done: the `exhaustive` linter (it reports four findings in unrelated packages — its own cleanup) and a worked `cmd/examples/` program for predicate consumption (examples are real programs here, so that is a new program, not a prose block).
 
 ### Ecosystem fit-gap delivery (2026-07-16)
 

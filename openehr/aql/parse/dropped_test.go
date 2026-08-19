@@ -12,6 +12,7 @@ package parse_test
 
 import (
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -140,9 +141,10 @@ func TestDropRecordsCarryNoSourceText(t *testing.T) {
 				t.Fatalf("Parse(%q) = %v", tc.query, err)
 			}
 			for _, d := range doc.Dropped() {
-				// The record's whole rendered form stands in for its fields:
-				// Kind and Clause render through String(), Span is numeric.
-				rendered := d.String() + " " + d.Kind.String() + " " + d.Clause.String()
+				// The record's WHOLE rendered form stands in for its fields —
+				// Span included, so a future string field on it cannot slip
+				// past this guard.
+				rendered := fmt.Sprintf("%s %s %s %+v", d, d.Kind, d.Clause, d.Span)
 				for _, v := range tc.values {
 					if strings.Contains(rendered, v) {
 						t.Errorf("record %q contains the source value %q; every "+
@@ -271,14 +273,34 @@ func TestUnmodelledConstructIsUnreachableByALegalQuery(t *testing.T) {
 // sites would not be.
 func TestEveryIncompleteSiteRecordsAKind(t *testing.T) {
 	t.Parallel()
-	const src = "extract_query.go"
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, src, nil, 0)
+	// Sweep EVERY non-test file in the package, not one named file: an
+	// ex.incomplete(...) added in a new file must be covered the day it
+	// lands, or the sweep under-delivers on its stated scope (PR #112
+	// review).
+	entries, err := os.ReadDir(".")
 	if err != nil {
-		t.Fatalf("parsing %s: %v", src, err)
+		t.Fatalf("reading the package directory: %v", err)
+	}
+	fset := token.NewFileSet()
+	var files []*ast.File
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, name, nil, 0)
+		if err != nil {
+			t.Fatalf("parsing %s: %v", name, err)
+		}
+		files = append(files, f)
 	}
 	var sites, bad int
-	ast.Inspect(f, func(n ast.Node) bool {
+	inspectAll := func(fn func(ast.Node) bool) {
+		for _, f := range files {
+			ast.Inspect(f, fn)
+		}
+	}
+	inspectAll(func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
 		if !ok {
 			return true

@@ -13,6 +13,7 @@ package aql
 // path, so REQ-119's round-trip closure is untouched by construction.
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -33,7 +34,7 @@ import (
 //
 // Every component is the VALUE, not the spelling: brackets and quotes
 // removed, escapes resolved, and trivia (whitespace, `--` comments) absent.
-// [PathSegment.Raw] keeps the verbatim text for anyone who needs it.
+// [PathSegment.Predicate] keeps the verbatim text for anyone who needs it.
 //
 // The set grows ADDITIVELY as further positions are structured, so a consumer
 // type-switching over it MUST treat an unrecognised case as unstructured —
@@ -233,15 +234,22 @@ func (p ArchetypePredicate) key() string {
 func (p ParamPredicate) key() string { return "param\x00" + p.Name }
 
 func (p ComparisonPredicate) key() string {
-	var left, val string
-	if v, ok := derefValue(p.Comparison.Left); ok {
-		left = v.token()
-	}
-	if v, ok := derefValue(p.Comparison.Val); ok {
-		val = v.token()
-	}
 	return "cmp\x00" + canonicalPathKey(p.Comparison.Path, p.Comparison.ParsedPath) +
-		"\x00" + string(p.Comparison.Op) + "\x00" + left + "\x00" + val
+		"\x00" + string(p.Comparison.Op) +
+		"\x00" + valueKey(p.Comparison.Left) + "\x00" + valueKey(p.Comparison.Val)
+}
+
+// valueKey is a value operand's comparison form: shape-qualified, because
+// tokens alone conflate shapes — `PathValue{Raw: "true"}` and
+// `BoolValue{B: true}` both spell `true` — which is the reason [EqualValues]
+// pairs sameShape with the token, and equality here MUST NOT be weaker than
+// the vocabulary's own.
+func valueKey(v Value) string {
+	inner, ok := derefValue(v)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%T", inner) + "\x00" + inner.token()
 }
 
 func (p MatchesPredicate) key() string {
@@ -254,8 +262,9 @@ func (p MatchesPredicate) key() string {
 // spelling only as a last resort (a hand-built value with no ParsedPath).
 // Comparing through the segments is what keeps `name / value` equal to
 // `name/value` — the token names carry no trivia. A predicate nested inside a
-// segment of the operand path stays verbatim (it is its own bracketed
-// position, with its own structured carrier one level down).
+// segment recurses the same way: its own structured carrier when populated,
+// its verbatim text only for an enumerated unstructured form — so
+// `data[at0001]/value` equals `data[ at0001 ]/value`, all the way down.
 func canonicalPathKey(path string, ip *IdentifiedPath) string {
 	if ip == nil || len(ip.Segments) == 0 {
 		return path
@@ -266,7 +275,9 @@ func canonicalPathKey(path string, ip *IdentifiedPath) string {
 			b.WriteByte('/')
 		}
 		b.WriteString(seg.Name)
-		if seg.Predicate != "" {
+		if nested, ok := derefSegmentPredicate(seg.Parsed); ok {
+			b.WriteString("[" + nested.key() + "]")
+		} else if seg.Predicate != "" {
 			b.WriteString("[" + seg.Predicate + "]")
 		}
 	}

@@ -776,7 +776,7 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-15-aql-lint.md
       - docs/plans/archive/2026-08-18-aql-honesty-residuals.md
-      - docs/plans/2026-08-18-aql-value-free-diagnostics.md
+      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
     tests:
       - openehr/aql/parse/parse_test.go
       - openehr/aql/parse/ast_test.go
@@ -1123,8 +1123,8 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-29-aql-execution-ast.md
       - docs/plans/archive/2026-07-13-path-encoding-and-classpred-parsedpath.md
-      - docs/plans/2026-08-18-aql-structured-node-predicates.md
-      - docs/plans/2026-08-18-aql-value-free-diagnostics.md
+      - docs/plans/archive/2026-08-18-aql-structured-node-predicates.md
+      - docs/plans/archive/2026-08-18-aql-value-free-diagnostics.md
 
   - id: REQ-116
     title: Template-level node naming and name-predicated paths

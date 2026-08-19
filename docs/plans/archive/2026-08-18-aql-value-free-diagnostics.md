@@ -3,9 +3,9 @@
 **Date:** 2026-08-18
 **Status:** Complete
 **Owner:** SDK maintainers
-**Covers:** **[REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Value-free structured drop records** and **[REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) § Value-free lint diagnostics** — the spec text is written; the code is not. No new requirement id: each half extends the landed requirement that already owns its surface.
-**Verifies / builds on:** landed [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the incomplete-AST channel: `aql.ErrIncompleteAST`, `Document.QueryErr()`), [REQ-109](../specifications/clinical-modeling.md#req-109--aql-static-lint) (lint issue model), [REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (structural naming of a refused predicate + diagnostic redaction — the one-position precedent this plan generalises), the archived [AQL honesty-residuals plan](archive/2026-08-18-aql-honesty-residuals.md) (the MATCHES URI redaction one-off)
-**Probes:** **[PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics)** (allocated, `Status: Draft`) — every drop and lint diagnostic carries a structured record whose fields contain no source text
+**Covers:** **[REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Value-free structured drop records** and **[REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) § Value-free lint diagnostics** — spec text and implementation landed together (PR #112). No new requirement id: each half extends the landed requirement that already owns its surface.
+**Verifies / builds on:** landed [REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (the incomplete-AST channel: `aql.ErrIncompleteAST`, `Document.QueryErr()`), [REQ-109](../../specifications/clinical-modeling.md#req-109--aql-static-lint) (lint issue model), [REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (structural naming of a refused predicate + diagnostic redaction — the one-position precedent this plan generalises), the archived [AQL honesty-residuals plan](2026-08-18-aql-honesty-residuals.md) (the MATCHES URI redaction one-off)
+**Probes:** **[PROBE-096](../../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics)** — Implemented (inline); every drop and lint diagnostic carries a structured record whose fields contain no source text
 **Implementation:** landed
 **Depends on:** `openehr/aql/parse` (extractor `incomplete(...)` sites), `openehr/aql/lint`
 **Defers:** changing any existing human-readable message (compatibility — texts stay as they are); redaction *policy* (what counts as a value is the caller's call; this plan only guarantees the structured fields carry none); structured diagnostics for the simplified-format codecs (same pattern, separate ask)
@@ -54,14 +54,14 @@ complete enough to refuse on (kind + clause), not merely to log.
 
 The normative rules — the two-surface field contract, the drop-record properties, the closed-enum
 and completeness discipline, the clause and span reuse, and the additive-only clause — live in the
-[canonical section](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)
+[canonical section](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)
 and are **not** restated here. What this section carries is the implementation shape and the three
 Phase 0 findings that changed the draft sketch.
 
 ### 27 drop sites, one reachable class (Phase 0 finding)
 
 The sweep the DoR demanded found **27** `incomplete(...)` call sites in
-[`extract_query.go`](../../openehr/aql/parse/extract_query.go), not the one the Motivation below
+[`extract_query.go`](../../../openehr/aql/parse/extract_query.go), not the one the Motivation below
 implies. They split into two populations:
 
 | Population | Shape | Reachable by a legal query? |
@@ -78,7 +78,7 @@ repo already runs in its dispatch tripwires) rather than by a list a maintainer 
 
 ### `Clause` already exists (Phase 0 finding)
 
-The draft proposed a new `Clause` enum. [`parse.Clause`](../../openehr/aql/parse/ast.go) is landed —
+The draft proposed a new `Clause` enum. [`parse.Clause`](../../../openehr/aql/parse/ast.go) is landed —
 `ClauseUnknown` (zero) / `ClauseSelect` / `ClauseWhere` / `ClauseOrderBy`, with a `String()`, already
 carried on `IdentifiedPath`. So the clause axis **extends** it rather than introducing a twin.
 Extension is **append-only** (the existing `iota` values must not move), `String()` gains an arm per
@@ -87,7 +87,7 @@ CHANGELOG: an existing exhaustive switch over `Clause` gains an unhandled case.
 
 ### `Span` reuses `Position`, not byte offsets (Phase 0 finding)
 
-The draft proposed byte offsets. [`parse.Position`](../../openehr/aql/parse/parse.go) is `{Line, Col}`
+The draft proposed byte offsets. [`parse.Position`](../../../openehr/aql/parse/parse.go) is `{Line, Col}`
 and is what `SyntaxError`, every AST node, and `lint.Issue.Detail`'s syntax-error text already report.
 A byte-offset span beside them would give one fact two incomparable spellings and force any consumer
 correlating a drop with a syntax error to convert. Both come off the same ANTLR tokens, so reusing
@@ -130,7 +130,7 @@ type Issue struct {
 ```
 
 **`exhaustive` was trialled and NOT enabled.** The linter is absent from
-[`.golangci.yml`](../../.golangci.yml), and turning it on reports four findings in packages this
+[`.golangci.yml`](../../../.golangci.yml), and turning it on reports four findings in packages this
 change does not touch — `openehr/aql/top.go`, `openehr/serialize/canxml/marshal.go`,
 `smart/discovery/errors.go`, `internal/bmmgen/render_jsonmar.go` (with
 `default-signifies-exhaustive: true`, which is the setting that matches what the spec actually asks
@@ -142,9 +142,9 @@ obligation stays where the spec puts it — on the consumer — and the SDK's ow
 
 **Phase 0 has landed, so implementation (Phase 1+) may start.** Each item below is satisfied:
 
-- ✅ Canonical prose exists — the two-surface field contract, the drop-record properties, the closed-enum-over-classes rule with source-derived completeness, the clause and span reuse, and the additive-only clause: [clinical-modeling.md § REQ-113 § Value-free structured drop records](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast).
+- ✅ Canonical prose exists — the two-surface field contract, the drop-record properties, the closed-enum-over-classes rule with source-derived completeness, the clause and span reuse, and the additive-only clause: [clinical-modeling.md § REQ-113 § Value-free structured drop records](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast).
 - ✅ The extractor sweep was **run, not remembered** — 27 `incomplete(...)` sites, one reachable class (§ Architecture). It is what changed the enum design from per-site to per-class.
-- ✅ [PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) defined (`Status: Draft`), in three arms: (a) a record per drop, held by a source-derived sweep that is itself shown able to fail, plus the accessor's four properties; (b) no value-free field contains any substring of the input's **value spans**, asserted against the input rather than against expected strings, and the value-bearing fields deliberately **not** asserted clean; (c) spans resolve to the offending construct, in one span type across both packages.
+- ✅ [PROBE-096](../../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) defined (`Status: Draft`), in three arms: (a) a record per drop, held by a source-derived sweep that is itself shown able to fail, plus the accessor's four properties; (b) no value-free field contains any substring of the input's **value spans**, asserted against the input rather than against expected strings, and the value-bearing fields deliberately **not** asserted clean; (c) spans resolve to the offending construct, in one span type across both packages.
 - ✅ Negative space pinned: an unknown kind is fail-closed switch material (closed enum, zero = unclassified); a drop with no record is a **defect**, not a gap; a value-free field never falls back to embedding source text when attribution is hard — it reports the unattributability instead.
 - ✅ Each phase names its verification command.
 
@@ -154,7 +154,7 @@ obligation stays where the spec puts it — on the consumer — and the SDK's ow
   `incomplete(...)` site records a kind, enforced by the source-derived sweep.
 - Godoc on `QueryErr()`, `Dropped()` and `lint.Issue` states the field contract — the classification
   has to be readable where a consumer holds the type, not only in the spec.
-- `exhaustive` enabled in [`.golangci.yml`](../../.golangci.yml) (§ Architecture), or a recorded
+- `exhaustive` enabled in [`.golangci.yml`](../../../.golangci.yml) (§ Architecture), or a recorded
   reason not to.
 - `traceability.yaml` + REQ.md **Impl.** column; `roadmap.md` row; CHANGELOG — the consumer-visible
   facts are the two additive surfaces **and** the `Clause` widening, which can leave an existing
@@ -212,6 +212,6 @@ completeness is a source sweep (§ Architecture). Two proposed types turned out 
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-113 § Value-free structured drop records](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the canonical normative contract (authored in Phase 0; this plan restates none of it)
-- [conformance.md § PROBE-096](../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) — the three arms and their oracles
+- [clinical-modeling.md § REQ-113 § Value-free structured drop records](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the canonical normative contract (authored in Phase 0; this plan restates none of it)
+- [conformance.md § PROBE-096](../../specifications/conformance.md#probe-096--aql-value-free-structured-diagnostics) — the three arms and their oracles
 - REQ-109 / REQ-113 / REQ-119 sections — the landed diagnostic surfaces this plan structures, and the one-position precedent it generalises

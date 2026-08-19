@@ -3,12 +3,12 @@
 **Date:** 2026-08-18
 **Status:** Complete
 **Owner:** SDK maintainers
-**Covers:** **[REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Structured node predicates** — the spec text is written; the code is not. No new requirement id: this extends the landed REQ-113 read AST, which already owns `PathSegment` and the class-predicate structuring.
-**Verifies / builds on:** landed [REQ-113](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (structured read AST; `aql.IdentifiedPath`/`PathSegment`, `ClassExpr.PredicateComparison`), [REQ-117](../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (expression-catalogue completion), [REQ-119](../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (re-parseable emission; verbatim predicate text; `aql.StripPredicateTrivia`)
-**Probes:** **[PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring)** (Draft) — a corpus generated from the grammar's `pathPredicate` alternatives
+**Covers:** **[REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) § Structured node predicates** — spec text and implementation landed together (PR #112). No new requirement id: this extends the landed REQ-113 read AST, which already owns `PathSegment` and the class-predicate structuring.
+**Verifies / builds on:** landed [REQ-113](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) (structured read AST; `aql.IdentifiedPath`/`PathSegment`, `ClassExpr.PredicateComparison`), [REQ-117](../../specifications/clinical-modeling.md#req-117--aql-expression-catalogue-completion) (expression-catalogue completion), [REQ-119](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) (re-parseable emission; verbatim predicate text; `aql.StripPredicateTrivia`)
+**Probes:** **[PROBE-095](../../specifications/conformance.md#probe-095--aql-predicate-structuring)** — Implemented (inline); a corpus generated from the grammar's `pathPredicate` alternatives, `pathPredicateOperand` included
 **Implementation:** landed
 **Depends on:** `openehr/aql`, `openehr/aql/parse` (extractor), the REQ-119 verbatim-text guarantee (unchanged by this plan)
-**Defers:** the **class position** — `parse.ClassExpr` keeps its landed REQ-113 carriers (`Archetype` / `ParamArchetype` / `Predicate` / `PredicateComparison`) and gains no parallel one; a Phase 0 decision, with the reasoning in the canonical section. A carrier for VERSION class predicates (`LATEST_VERSION` / `ALL_VERSIONS`) — a version-query-shaped ask that should ride a version-query slice. Full `nodePredicate` sub-grammar *validation* (the REQ-119 § Out of scope deferral for issue #99 stands untouched: structuring what the parser already accepted is not deciding what to accept). Rewriting or normalising `Raw` (REQ-119 keeps it verbatim). A disclosure policy over the components — the point is that each consumer applies its own; the SDK's own diagnostics are [REQ-113 § Value-free structured drop records](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)'s.
+**Defers:** the **class position** — `parse.ClassExpr` keeps its landed REQ-113 carriers (`Archetype` / `ParamArchetype` / `Predicate` / `PredicateComparison`) and gains no parallel one; a Phase 0 decision, with the reasoning in the canonical section. A carrier for VERSION class predicates (`LATEST_VERSION` / `ALL_VERSIONS`) — a version-query-shaped ask that should ride a version-query slice. Full `nodePredicate` sub-grammar *validation* (the REQ-119 § Out of scope deferral for issue #99 stands untouched: structuring what the parser already accepted is not deciding what to accept). Rewriting or normalising `Raw` (REQ-119 keeps it verbatim). A disclosure policy over the components — the point is that each consumer applies its own; the SDK's own diagnostics are [REQ-113 § Value-free structured drop records](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)'s.
 
 ## Goal
 
@@ -59,7 +59,7 @@ sites if the carrier stays raw text.
 Follow the package's sealed-interface style (`aql.Value`, `parse.SelectExpr`). The normative
 rules — the kinds, the trivia/delimiter contract, the unstructured-set enumeration, the
 comparability restriction, the class-position scope, and the REQ-119 non-interference clause —
-live in the [canonical section](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)
+live in the [canonical section](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast)
 and are **not** restated here. What this section carries is the implementation shape and the two
 grammar facts Phase 0 surfaced, which change the sketch this plan was drafted with.
 
@@ -86,9 +86,9 @@ top-level alternative, once inside `nodePredicate` — so which parse-tree node 
 depends on whether it sits at the top of the bracket or nested as a junction operand. The
 extractor therefore populates the same kind from more than one context type, and PROBE-095
 presents every form in **both** positions. The class position already splits this way in landed
-code ([`extract_query.go`](../../openehr/aql/parse/extract_query.go) switches on
+code ([`extract_query.go`](../../../openehr/aql/parse/extract_query.go) switches on
 `pp.ArchetypePredicate()` then falls through to `pp.StandardPredicate()`); the segment position
-([`ast.go`](../../openehr/aql/parse/ast.go)) takes raw text and is what this plan structures.
+([`ast.go`](../../../openehr/aql/parse/ast.go)) takes raw text and is what this plan structures.
 
 ### The name slot is wider than the sketch (Phase 0 finding)
 
@@ -130,8 +130,8 @@ package ships `EqualPredicates` beside the landed `aql.EqualValues`. The builder
 
 **Phase 0 has landed, so implementation (Phase 1+) may start.** Each item below is satisfied:
 
-- ✅ Canonical normative prose exists — the kinds, the trivia/delimiter rules, the unstructured-set enumeration, the comparability restriction, the class-position scope, and the REQ-119 non-interference clause: [clinical-modeling.md § REQ-113 § Structured node predicates](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast). The kinds were enumerated **against the vendored grammar**, which is where the two findings in § Architecture came from.
-- ✅ [PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring) defined (`Status: Draft`): a corpus **generated from** the `pathPredicate` alternatives, every form presented at bracket top level *and* as a junction operand, trivia/escape independence asserted as a property, the five name spellings on both carrying alternatives, and a sweep that fails when the grammar admits a form no kind covers.
+- ✅ Canonical normative prose exists — the kinds, the trivia/delimiter rules, the unstructured-set enumeration, the comparability restriction, the class-position scope, and the REQ-119 non-interference clause: [clinical-modeling.md § REQ-113 § Structured node predicates](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast). The kinds were enumerated **against the vendored grammar**, which is where the two findings in § Architecture came from.
+- ✅ [PROBE-095](../../specifications/conformance.md#probe-095--aql-predicate-structuring) defined (`Status: Draft`): a corpus **generated from** the `pathPredicate` alternatives, every form presented at bracket top level *and* as a junction operand, trivia/escape independence asserted as a property, the five name spellings on both carrying alternatives, and a sweep that fails when the grammar admits a form no kind covers.
 - ✅ Negative space pinned: an unstructured form reports itself unstructured with `Raw` intact and **never** a partial structure; the unstructured set is ENUMERATED in the canonical section (comparison operands the value vocabulary does not carry, and junctions containing one — the branch review corrected this line's original "empty" claim); the class position is unchanged.
 - ✅ Each phase names its verification command.
 
@@ -193,7 +193,7 @@ REQ-119's round-trip suite untouched and green.
    what a value is for every reader — it treats a numeric literal as structure,
    which a disclosure rule counting a bare magnitude as a value cannot adopt.
 2. **Carried over:** the worked example. `docs/examples.md` documents real
-   programs under [`cmd/examples/`](../../cmd/examples/) and must stay in sync
+   programs under [`cmd/examples/`](../../../cmd/examples/) and must stay in sync
    with them in the same PR, so adding one is a new example program rather than
    a prose block — its own small change, not a footnote to this one.
 
@@ -201,6 +201,6 @@ REQ-119's round-trip suite untouched and green.
 
 ## Mapping to specs
 
-- [clinical-modeling.md § REQ-113 § Structured node predicates](../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the canonical normative contract (authored in Phase 0; this plan restates none of it)
-- [conformance.md § PROBE-095](../specifications/conformance.md#probe-095--aql-predicate-structuring) — the corpus construction and its oracle
+- [clinical-modeling.md § REQ-113 § Structured node predicates](../../specifications/clinical-modeling.md#req-113--execution-oriented-parsed-aql-ast) — the canonical normative contract (authored in Phase 0; this plan restates none of it)
+- [conformance.md § PROBE-095](../../specifications/conformance.md#probe-095--aql-predicate-structuring) — the corpus construction and its oracle
 - REQ-113 / REQ-117 / REQ-119 sections — the landed vocabulary this model completes
