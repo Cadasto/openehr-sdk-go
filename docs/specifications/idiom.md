@@ -208,7 +208,7 @@ A variadic option that is nil **MUST** be skipped rather than invoked: `f(..., o
 
 The one exception is the Go `Must`-prefix convention (`regexp.MustCompile`, `template.Must`): a constructor whose name begins with `Must` **MAY** panic on invalid input, because the prefix is the documented signal that it does. A non-panicking alternative **MUST** be available to callers — a sibling in the same package, or the standard-library call it wraps — so the panic is always the caller's explicit opt-in, and the godoc **MUST** say the function panics.
 
-Panics are reserved for **programmer errors** the consumer cannot trigger via documented APIs (nil dereference of an unexported struct, broken invariant in the type registry).
+Except for `Must`-prefix constructors, panics are reserved for **programmer errors** the consumer cannot trigger via documented APIs (nil dereference of an unexported struct, broken invariant in the type registry).
 
 ## Concurrency (REQ-026)
 
