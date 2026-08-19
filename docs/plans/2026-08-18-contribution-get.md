@@ -35,6 +35,7 @@
 ## Definition of Done
 
 - `Get` landed with `// REQ-142` / `// PROBE-092` citations; `Repository` grew the same read.
+- CHANGELOG `### Added` names the read AND the `Repository` interface growth (a compile-time break for out-of-tree implementers — the disclosure REQ-142 mandates, mirroring REQ-143).
 - `traceability.yaml` + REQ.md Impl. `planned → landed` for REQ-142.
 - PROBE-092 Draft → Implemented (Sandbox).
 - `make spec-check` and `make ci` pass.

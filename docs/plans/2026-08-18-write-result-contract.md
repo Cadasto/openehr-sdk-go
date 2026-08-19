@@ -28,7 +28,7 @@
 
 - The REQ-094 amendment text is final (Phase 0 below carries it verbatim); `transport.md` is edited in this plan's PR, not before.
 - No ADR (the success path stays `err == nil` for identifier/minimal).
-- Verification: `go test ./openehr/client/ehr/... ./openehr/client/ehr/contribution/ -count=1`, `make spec-check`, `make ci`.
+- Verification: `go test ./openehr/client/ehr/... ./openehr/client/demographic/ -count=1` (demographic calls the same `WriteResult`, so its observable error type changes with Phase 2 too), `make spec-check`, `make ci`.
 - Negative space: a 409 stays `*WireError`; an empty representation after 2xx is `*NoRepresentationError`, never a silent nil success.
 
 ## Definition of Done
@@ -138,9 +138,16 @@ go test ./openehr/client/ehr/ -run 'TestHasResource|TestNoRepresentationErrorAs'
 
 ```go
 // HasResource reports whether a write returned a usable resource (REQ-094).
-// False for a bare-nil interface, a typed-nil RM pointer, and an interface
-// holding one; true otherwise. Comparing any(v) against a boxed zero value
-// would panic for an uncomparable T — compare against untyped nil only.
+// False for a bare-nil interface, a typed-nil REGISTERED RM pointer, and an
+// interface holding one; true otherwise. The contract is scoped to the RM
+// registry: rm.IsTypedNil is a generated closed type switch whose default is
+// false, so a typed nil of a type OUTSIDE the registry reads as present —
+// state the scope in the godoc rather than promising "any typed nil", or the
+// helper tells the exact lie it exists to prevent. (Every write leaf returns
+// a registered RM type, so the planned tests cannot reach the gap; the
+// CONTRACT is what must not overclaim.) Comparing any(v) against a boxed
+// zero value would panic for an uncomparable T — compare against untyped
+// nil only.
 func HasResource[T any](v T) bool {
 	a := any(v)
 	if a == nil {
@@ -149,6 +156,13 @@ func HasResource[T any](v T) bool {
 	return !rm.IsTypedNil(a)
 }
 
+// NoRepresentationError: Meta and the CLASSIFICATION (the type itself, via
+// errors.As) are the boundary-safe surface. Cause is internal diagnostics
+// and MAY carry payload-derived text — rm decode errors embed the offending
+// value verbatim (`parse %q`), the same class WithRawErrorBodies gates for
+// OpenEHRErrorDetail.Message — so Cause MUST NOT be forwarded into logs or
+// user-facing messages without the same consideration; the godoc states
+// this split.
 type NoRepresentationError struct {
 	Meta  *VersionMetadata
 	Cause error

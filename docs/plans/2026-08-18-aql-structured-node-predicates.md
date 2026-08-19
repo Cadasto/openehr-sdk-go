@@ -88,6 +88,15 @@ type ComparisonPredicate struct{ Comparison Comparison }
 
 Rules the spec section must pin (Phase 0):
 
+- **Comparability is part of the contract, and the compiler cannot see it**:
+  `aql.Comparison`'s `Val` carries `aql.Value`, which `aql/value.go` documents
+  as panicking under `==` (slice-bearing kinds) — so `ComparisonPredicate`, and
+  any predicate sum type embedding it, MUST NOT be compared with `==` and MUST
+  NOT be a map key. The spec section pins that restriction in the godoc AND
+  ships `EqualPredicates`, the counterpart of the existing `aql.EqualValues`,
+  as the supported equality — a structural-comparison vocabulary without a
+  panic-free equality is the trap REQ-119's `EqualValues` closed once already.
+
 - **One carrier per fact at the class position**: `parse.ClassExpr.PredicateComparison`
   (landed, REQ-113) already holds the standing comparison. Phase 0 decides —
   either `Parsed` subsumes it (with a documented migration/deprecation path for

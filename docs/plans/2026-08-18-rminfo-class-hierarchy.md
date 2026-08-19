@@ -3,7 +3,7 @@
 **Date:** 2026-08-18
 **Status:** Draft
 **Owner:** SDK maintainers
-**Covers:** **REQ-124** (RM model introspection — hierarchy) — proposed; canonical home to be authored at `bmm-conformance.md` (or `rm-modeling.md`, Phase 0 decides) in the RM-behavioural-functions headroom (124–129), beside REQ-120–123. Final banding is settled in Phase 0 per the [numbering policy](../specifications/REQ.md#numbering-policy); the id here is a proposal, not an allocation.
+**Covers:** **REQ-124** (RM model introspection — hierarchy) — proposed; canonical home decided in Phase 0: `rm-functions.md` keeps the 120–129 band in one file beside REQ-120–123 (its header scopes itself to runtime behaviour, so admitting structural introspection is a deliberate widening to state); `bmm-conformance.md` fits the content but would split the band across files — if that home wins, allocate in the free BMM headroom (048–049) instead of 124, so no band straddles two documents. Final banding is settled in Phase 0 per the [numbering policy](../specifications/REQ.md#numbering-policy); the id here is a proposal, not an allocation.
 **Verifies / builds on:** landed `openehr/rm/rminfo` (BMM-derived structural lookup, [ADR 0005](../adr/0005-compiled-template-foundation.md)), [REQ-041](../specifications/bmm-conformance.md#req-041--pinned-bmm-sources) (pinned BMM sources), [REQ-042](../specifications/bmm-conformance.md#req-042--generated-code-drift-detected) (generated code, drift-detected)
 **Probes:** **PROBE-094** (proposed; allocated in Phase 0) — generated hierarchy tables vs the pinned BMM
 **Implementation:** planned
@@ -71,22 +71,34 @@ type Hierarchy interface {
     // IsAbstract reports whether the model forbids instantiating rmType.
     // known=false when the model does not define the class at all.
     IsAbstract(rmType string) (abstract, known bool)
-    // Ancestors returns the immediate parent class names, sorted.
-    Ancestors(rmType string) []string
+    // Ancestors returns every ancestor class name, transitively, sorted
+    // (the Goal's question; an immediate-parents variant is a Phase 0
+    // decision, not a doc drift). known=false for an undefined class —
+    // an empty slice with known=true is a root class, a different answer.
+    Ancestors(rmType string) (ancestors []string, known bool)
     // ConformsTo reports whether sub is rmType or descends from it.
-    ConformsTo(sub, rmType string) bool
-    // ConcreteDescendants returns every concrete class naming rmType
-    // denotes: rmType itself when concrete, plus every non-abstract
-    // strict descendant, sorted. Empty for an unknown class.
-    ConcreteDescendants(rmType string) []string
-}
+    // known=false when EITHER name is undefined, so "no" and "never
+    // heard of it" stay distinguishable.
+    ConformsTo(sub, rmType string) (conforms, known bool)
+    // ConcreteDescendants returns every concrete class rmType denotes:
+    // rmType itself when concrete, plus every non-abstract strict
+    // descendant, sorted. known=false for an undefined class; an empty
+    // slice with known=true is an abstract class nothing concrete
+    // extends — the negative-space rule below demands the distinction
+    // on every method, not only IsAbstract.
+    ConcreteDescendants(rmType string) (descendants []string, known bool)
 
-// DeclaredOn returns the class that declares attrName as seen from
-// rmType — rmType itself, or the nearest ancestor whose BMM class
-// declares it. The flattened AttributeRMType / IsContainer /
-// RequiredAttributes maps already answer the inheritance-RESOLVED
-// question and are unchanged; this recovers the site the fold erases.
-func DeclaredOn(rmType, attrName string) (declaringClass string, ok bool)
+    // DeclaredOn returns the class that declares attrName as seen from
+    // rmType — rmType itself, or the nearest ancestor whose BMM class
+    // declares it. The flattened AttributeRMType / IsContainer /
+    // RequiredAttributes maps already answer the inheritance-RESOLVED
+    // question and are unchanged; this recovers the site the fold
+    // erases. A method on the capability interface, NOT a package-level
+    // function: package-level would read Default's package state and
+    // bypass the New(data) seam that exists precisely so synthetic-RM
+    // unit tests (Phase 2's list) can exercise it.
+    DeclaredOn(rmType, attrName string) (declaringClass string, ok bool)
+}
 ```
 
 Design constraints carried over from the landed package:

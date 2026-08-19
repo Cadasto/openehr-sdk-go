@@ -13,7 +13,7 @@
 
 **Goal:** The transport refuses a decoded path segment that would change the request URI (`.`, `..`, empty, `\`, control characters) and issues no HTTP request.
 
-**Architecture:** `ValidRequestPath` walks `Request.Path` segments; the transport calls it once at the request-preparation point before building the URL. The same point compares the segment count of `Request.Path` against `Request.Route` when set — a parameter that *contains* `/` yields well-formed segments, so only the arity mismatch betrays it. `ValidPathSegment` is the per-parameter rule for callers constructing raw requests. New sentinel `ErrInvalidPathSegment` wraps `ErrInvalidConfig`.
+**Architecture:** `ValidateRequestPath` walks `Request.Path` segments; the transport calls it once at the request-preparation point before building the URL. The same point compares the segment count of `Request.Path` against `Request.Route` when set — a parameter that *contains* `/` yields well-formed segments, so only the arity mismatch betrays it. `ValidatePathSegment` is the per-parameter rule for callers constructing raw requests. New sentinel `ErrInvalidPathSegment`; a violation returns one error chain wrapping BOTH it and `ErrInvalidConfig` (the sentinels themselves are independent — `errors.Is(ErrInvalidPathSegment, ErrInvalidConfig)` is false).
 
 **Tech Stack:** Go 1.26; stdlib `net/http/httptest` + `testing`; no new dependencies.
 
@@ -65,18 +65,20 @@ Implementation may start when:
 
 **Interfaces:**
 
-- Produces: `var ErrInvalidPathSegment error`; `func ValidPathSegment(s string) error`; `func ValidRequestPath(path string) error`
+- Produces: `var ErrInvalidPathSegment error`; `func ValidatePathSegment(s string) error`; `func ValidateRequestPath(path string) error`
 
 - [ ] **Step 1: Write the failing tests**
 
 ```go
 // REQ-150
-func TestValidPathSegment(t *testing.T) {
+func TestValidatePathSegment(t *testing.T) {
 	cases := []struct {
 		in      string
 		wantErr bool
 	}{
 		{"Referral Request.v1", false},
+		// the service root: no segments to validate — the System API sends it
+		// (ValidateRequestPath case; a bare "/" is not a valid single SEGMENT)
 		{"openEHR-EHR-COMPOSITION.t_vital_signs.v1", false},
 		{"..", true},
 		{".", true},
@@ -87,7 +89,7 @@ func TestValidPathSegment(t *testing.T) {
 		{"%2e%2e", false}, // not decoded — ordinary segment
 	}
 	for _, tc := range cases {
-		err := ValidPathSegment(tc.in)
+		err := ValidatePathSegment(tc.in)
 		if tc.wantErr && err == nil {
 			t.Fatalf("%q: want error", tc.in)
 		}
@@ -100,14 +102,20 @@ func TestValidPathSegment(t *testing.T) {
 	}
 }
 
-func TestValidRequestPathIgnoresLeadingSlash(t *testing.T) {
-	if err := ValidRequestPath("/ehr/abc/composition"); err != nil {
+func TestValidateRequestPathAcceptsTheServiceRoot(t *testing.T) {
+	if err := ValidateRequestPath("/"); err != nil {
+		t.Fatalf("service root refused: %v (the landed System API sends OPTIONS /)", err)
+	}
+}
+
+func TestValidateRequestPathIgnoresLeadingSlash(t *testing.T) {
+	if err := ValidateRequestPath("/ehr/abc/composition"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidRequestPath("/ehr/a/../../definition/query/evil/composition"); err == nil {
+	if err := ValidateRequestPath("/ehr/a/../../definition/query/evil/composition"); err == nil {
 		t.Fatal("expected traversal to fail")
 	}
-	if err := ValidRequestPath("/ehr/abc/composition/"); err == nil {
+	if err := ValidateRequestPath("/ehr/abc/composition/"); err == nil {
 		t.Fatal("trailing empty segment must fail")
 	}
 }
@@ -116,10 +124,10 @@ func TestValidRequestPathIgnoresLeadingSlash(t *testing.T) {
 - [ ] **Step 2: Run tests and confirm they fail**
 
 ```
-go test ./transport/ -run 'TestValidPathSegment|TestValidRequestPath' -count=1
+go test ./transport/ -run 'TestValidatePathSegment|TestValidateRequestPath' -count=1
 ```
 
-Expected: FAIL — `ValidPathSegment` / `ErrInvalidPathSegment` undefined.
+Expected: FAIL — `ValidatePathSegment` / `ErrInvalidPathSegment` undefined.
 
 - [ ] **Step 3: Implement the helpers**
 
@@ -127,8 +135,9 @@ Add to `transport/errors.go`:
 
 ```go
 // ErrInvalidPathSegment indicates a decoded Request.Path segment is empty,
-// `.` / `..`, contains `\` or a control character, or (for ValidPathSegment)
-// contains `/`. Wrapped with ErrInvalidConfig at the join step (REQ-150).
+// `.` / `..`, contains `\` or a control character, or (for ValidatePathSegment)
+// contains `/`. Returned errors also wrap ErrInvalidConfig — the chain is
+// built where the violation is detected, inside the validators (REQ-150).
 ErrInvalidPathSegment = errors.New("transport: invalid path segment")
 ```
 
@@ -142,8 +151,8 @@ import (
 	"strings"
 )
 
-// ValidPathSegment reports whether s is a single decoded path parameter (REQ-150).
-func ValidPathSegment(s string) error {
+// ValidatePathSegment reports whether s is a single decoded path parameter (REQ-150).
+func ValidatePathSegment(s string) error {
 	if s == "" || s == "." || s == ".." {
 		return fmt.Errorf("%w: %w", ErrInvalidConfig, ErrInvalidPathSegment)
 	}
@@ -155,14 +164,14 @@ func ValidPathSegment(s string) error {
 	return nil
 }
 
-// ValidRequestPath validates a decoded Request.Path (REQ-150). The leading
+// ValidateRequestPath validates a decoded Request.Path (REQ-150). The leading
 // empty segment of an absolute path is ignored.
-func ValidRequestPath(path string) error {
+func ValidateRequestPath(path string) error {
 	for i, seg := range strings.Split(path, "/") {
 		if i == 0 && seg == "" {
 			continue
 		}
-		if err := ValidPathSegment(seg); err != nil {
+		if err := ValidatePathSegment(seg); err != nil {
 			return err
 		}
 	}
@@ -170,12 +179,12 @@ func ValidRequestPath(path string) error {
 }
 ```
 
-Wrapping rule: `ValidPathSegment` builds the one error chain carrying both sentinels; `ValidRequestPath` and `joinTarget` return that error **unchanged** — the chain wraps `ErrInvalidConfig` exactly once.
+Wrapping rule: `ValidatePathSegment` builds the one error chain carrying both sentinels; `ValidateRequestPath` and `joinTarget` return that error **unchanged** — the chain wraps `ErrInvalidConfig` exactly once.
 
 - [ ] **Step 4: Re-run the helper tests**
 
 ```
-go test ./transport/ -run 'TestValidPathSegment|TestValidRequestPath' -count=1
+go test ./transport/ -run 'TestValidatePathSegment|TestValidateRequestPath' -count=1
 ```
 
 Expected: PASS.
@@ -187,7 +196,7 @@ git add transport/path.go transport/path_test.go transport/errors.go
 git commit -m "$(cat <<'EOF'
 feat(transport): add path-segment validation helpers
 
-REQ-150: ValidPathSegment / ValidRequestPath refuse traversal
+REQ-150: ValidatePathSegment / ValidateRequestPath refuse traversal
 segments before any request is built.
 EOF
 )"
@@ -197,7 +206,7 @@ EOF
 
 **Files:**
 
-- Modify: `transport/client.go` — `joinTarget` sees only `(base, path, query)`; the route-arity half needs `Request.Route`, so enforce both checks at `joinTarget`'s caller where the `*Request` is in scope (or widen `joinTarget`'s signature — implementer's choice, one enforcement site either way)
+- Modify: `transport/client.go` — `joinTarget` sees only `(base, path, query)`; the route-arity half needs `Request.Route`, so enforce both checks at `joinTarget`'s caller where the `*Request` is in scope. (Widening `joinTarget`'s signature instead is NOT sanctioned as-is: `Do`'s call site wraps every `joinTarget` error with `ErrInvalidConfig` already, so validators returning the double-sentinel chain from inside `joinTarget` would wrap `ErrInvalidConfig` twice, violating the wrapping rule below — taking that branch requires unwrapping at the call site in the same change.)
 - Modify: `transport/request.go` (godoc — drop the “ids contain no `/`” assumption; point at REQ-150)
 - Test: `transport/path_test.go` (Do / joinTarget cases)
 
@@ -205,9 +214,9 @@ EOF
 
 ```go
 func TestDoRejectsTraversalPath(t *testing.T) {
-	var hits int
+	var hits atomic.Int32 // Store/Load cross handler and test goroutines; -race aborts on a plain int
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		hits++
+		hits.Add(1)
 	}))
 	t.Cleanup(srv.Close)
 	c, err := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
@@ -221,7 +230,7 @@ func TestDoRejectsTraversalPath(t *testing.T) {
 	if !errors.Is(err, ErrInvalidPathSegment) || !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("err = %v", err)
 	}
-	if hits != 0 {
+	if hits.Load() != 0 {
 		t.Fatalf("issued %d requests, want 0", hits)
 	}
 }
@@ -229,9 +238,9 @@ func TestDoRejectsTraversalPath(t *testing.T) {
 func TestDoRejectsSmuggledSeparator(t *testing.T) {
 	// ehr_id="foo/bar" interpolated into the path: every segment is legal,
 	// only the count betrays it — 5 path segments vs 4 in the route template.
-	var hits int
+	var hits atomic.Int32 // Store/Load cross handler and test goroutines; -race aborts on a plain int
 	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-		hits++
+		hits.Add(1)
 	}))
 	t.Cleanup(srv.Close)
 	c, err := New(newCatalog(t, srv), WithHTTPClient(srv.Client()))
@@ -246,7 +255,7 @@ func TestDoRejectsSmuggledSeparator(t *testing.T) {
 	if !errors.Is(err, ErrInvalidPathSegment) || !errors.Is(err, ErrInvalidConfig) {
 		t.Fatalf("err = %v", err)
 	}
-	if hits != 0 {
+	if hits.Load() != 0 {
 		t.Fatalf("issued %d requests, want 0", hits)
 	}
 }
@@ -268,7 +277,7 @@ Expected: FAIL for both — `hits != 0` or missing sentinel.
 At the single request-preparation site (where the `*Request` is in scope):
 
 ```go
-if err := ValidRequestPath(req.Path); err != nil {
+if err := ValidateRequestPath(req.Path); err != nil {
 	return nil, err
 }
 if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
@@ -276,7 +285,7 @@ if req.Route != "" && segmentCount(req.Path) != segmentCount(req.Route) {
 }
 ```
 
-`segmentCount` counts `/`-separated segments ignoring the leading empty one — an unexported helper beside `ValidRequestPath`. A `Route`-less request skips the arity half (`Route` is optional on raw `transport.Do` use); every path-interpolating leaf sets it, which the REQ-150 spec text now requires.
+`segmentCount` counts `/`-separated segments ignoring the leading empty one — an unexported helper beside `ValidateRequestPath`. A `Route`-less request skips the arity half (`Route` is optional on raw `transport.Do` use); every path-interpolating leaf sets it, which the REQ-150 spec text now requires — key the check on `req.Route != ""` directly, never on `effectiveRoute()` (it falls back to `Path`, and comparing a path's arity against itself never fires). Add the tripwire the spec mandates: a source-level test asserting every `transport.Request` literal under `openehr/client/` sets `Route`, so a new leaf cannot silently opt out of the smuggling defence.
 
 - [ ] **Step 9: Re-run transport tests including REQ-095 encoding and the smuggling case**
 
@@ -310,9 +319,9 @@ EOF
 
 - [ ] **Step 11: Leaf httptest** — `composition.Get` with a traversal `ehrID` returns the sentinel and the server sees zero requests. Cite `// REQ-150`.
 
-- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives one path-interpolating call per `openehr/client` leaf package (composition, directory, ehrstatus, contribution, itemtags, query, definition, demographic — enumerate the driven calls in the probe file's doc comment) with **two** hostile inputs each: a traversal id (`a/../../…`) and a separator-smuggling id (`foo/bar` — legal segments, wrong arity against the leaf's `Route`). Per REQ-080 the probe asserts fail-closed behaviour only: non-nil error and zero captured requests — **no** sentinel-identity assertions (those live in `transport/path_test.go`). Status in `conformance.md`: Draft → Implemented (Sandbox).
+- [ ] **Step 12: Implement PROBE-091** as a Sandbox function that drives one path-interpolating call per `openehr/client` leaf package that builds its own `transport.Request` (ehr, composition, directory, ehrstatus, contribution, query, definition, demographic, admin — enumerate the driven calls in the probe file's doc comment; `itemtags` builds none, delegating wholly to composition / ehrstatus / directory, and `system`'s only path is the fixed service root, which is PROBE-091's positive `"/"` case rather than an interpolation site) with **two** hostile inputs each: a traversal id (`a/../../…`) and a separator-smuggling id (`foo/bar` — legal segments, wrong arity against the leaf's `Route`). Per REQ-080 the probe asserts fail-closed behaviour only: non-nil error and zero captured requests — **no** sentinel-identity assertions (those live in `transport/path_test.go`). Status in `conformance.md`: Draft → Implemented (Sandbox).
 
-- [ ] **Step 13: Flip REQ-150 to landed** in `REQ.md` + `traceability.yaml` (packages, tests, probes). Archive this plan.
+- [ ] **Step 13: Flip REQ-150 to landed** in `REQ.md` + `traceability.yaml` (packages, tests, probes); move the `roadmap.md` REQ-150 row from **Planned** to **Landed**. Archive this plan.
 
 - [ ] **Step 14: Verify**
 

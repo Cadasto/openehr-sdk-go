@@ -41,7 +41,7 @@ Every probe that asserts against a **backend** **MUST** be runnable in three mod
 
 The probe definition is the single source; the runner picks the backend at invocation time.
 
-**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 9 of the 60 catalog entries are in-repo by construction.
+**Not every probe is backend-facing.** An **in-repo** probe asserts a property over vendored inputs or over the SDK's own output — the AQL round-trip and catalogue properties, the upstream FLAT parity harness, the codec and validation multiset probes — and reaches no server in any mode. Such a probe **MUST** declare `In-repo` in its **Modes** line, and the three-mode rule above does **not** bind it: there is no backend for a recording to capture or a deployment to confirm. This is a declared class, not a shortfall, and it is why a blanket three-mode reading of this requirement is wrong — 9 of the 63 catalog entries are in-repo by construction.
 
 For a backend-facing probe, its **Modes** line is the authoritative statement of which of the three it currently supports, and any mode missing from that line is an open gap in *this* requirement rather than a defect in the probe. Today 15 entries declare all three; the rest are the work [REQ-082's plan](../plans/2026-08-18-probe-runnability.md) sequences.
 
@@ -710,33 +710,6 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Status:** Implemented (Sandbox) — `contribution.Submission` lands in [`openehr/client/ehr/contribution/submission.go`](../../openehr/client/ehr/contribution/submission.go) and `contribution.Commit` now takes `*Submission`; the probe is at [`testkit/probes/versioned/probe_072_contribution_submission_shape.go`](../../testkit/probes/versioned/probe_072_contribution_submission_shape.go). The commit-audit DTO (`contribution.UpdateAudit` + write-version wrappers `OriginalVersion`/`ImportedVersion`) drops the server-assigned `time_committed`; the probe asserts both the version shape and the audit shape. Unit-level pins `TestCommitSubmissionShape` and the `update_audit` / `version` tests cover the SDK leaf. Plans: [`docs/plans/archive/2026-05-26-contribution-submission-shape.md`](../plans/archive/2026-05-26-contribution-submission-shape.md) (REQ-050/095) and the UPDATE_AUDIT/DvCodedText follow-up (SPECITS-95).
 - **Satisfies:** REQ-050, REQ-095.
 
-#### PROBE-091 — Path-parameter traversal is refused
-
-- **Title:** A path parameter that is `.` or `..`, is empty, or contains `/`, `\`, or a control character is refused before any HTTP request is issued, on every path-interpolating leaf package.
-- **Preconditions:** A transport client whose `*http.Client` records whether any request was issued (httptest or a tripwire RoundTripper).
-- **Wire assertion:** For each leaf package that interpolates a path parameter, at least one hostile input (`a/../../definition/query/evil`, `..`, a separator-smuggling id `foo/bar` on a `Route`-set request, a backslash-bearing id, a control character) fails with a non-nil error and the captured request count is zero — the call fails closed with no bytes on the wire. A well-formed id that only needs percent-encoding (a space or dots in a template id, `Blood Pressure.v1`) still issues exactly one request whose path is encoded once (REQ-095). Sentinel identity (`ErrInvalidPathSegment`, `ErrInvalidConfig`) is pinned by `transport/` unit tests, not by this probe (REQ-080: no error-type assertions in probes).
-- **Modes:** Sandbox.
-- **Status:** Draft — defined ahead of implementation; see [2026-08-18-path-segment-validation](../plans/2026-08-18-path-segment-validation.md).
-- **Satisfies:** REQ-150.
-
-#### PROBE-092 — Contribution read matches `contribution_get`
-
-- **Title:** `GET /ehr/{ehr_id}/contribution/{contribution_uid}` is issued by the contribution read leaf and the 200 body decodes as the persisted `CONTRIBUTION`.
-- **Preconditions:** A known EHR id and contribution uid; a sandbox server returning a canonical-JSON contribution body (or 404).
-- **Wire assertion:** The captured request method and path match the ITS-REST template; a 200 decodes to the contribution type (version metadata is **not** asserted — the pin defines only `Content-Type` on `200_CONTRIBUTION`); empty ids issue no request; a 404 fails with a non-nil error. Sentinel identity (`ErrNotFound`, `ErrInvalidConfig`) is pinned by `contribution` unit tests, not by this probe (REQ-080).
-- **Modes:** Sandbox.
-- **Status:** Draft — defined ahead of implementation; see [2026-08-18-contribution-get](../plans/2026-08-18-contribution-get.md).
-- **Satisfies:** REQ-142.
-
-#### PROBE-093 — Template list filters reach the wire
-
-- **Title:** `ListTemplates` emits the ITS-REST list query parameters `template_id`, `concept`, `version`, `offset`, and `fetch` when the corresponding options are set, and omits them when unset.
-- **Preconditions:** A sandbox Definition server on `GET /definition/template/adl1.4` (the only `TemplateFormat` v1 registers; the pin's ADL 2 list operation shares the same five parameter components).
-- **Wire assertion:** Each option appears as the named query key; an explicit `WithOffset(0)` / `WithFetch(0)` is present on the wire; a negative offset or fetch fails with a non-nil error and no request (sentinel identity is pinned by `definition` unit tests, not by this probe — REQ-080); no options yields an empty query. The response still decodes as the existing template-metadata slice.
-- **Modes:** Sandbox.
-- **Status:** Draft — defined ahead of implementation; see [2026-08-18-template-list-filters](../plans/2026-08-18-template-list-filters.md).
-- **Satisfies:** REQ-143.
-
 #### PROBE-073 — Demographic PARTY polymorphic round-trip
 
 - **Title:** A PARTY of each concrete type (PERSON / ORGANISATION / GROUP / AGENT / ROLE) round-trips through create → get → get-version with its `_type` discriminator decoded back into the same concrete type at every hop.
@@ -763,6 +736,36 @@ The REST-binding probes assert the openEHR-REST 1.1.0-development wire contract 
 - **Modes:** Sandbox (planned); Cassette, Live not yet scoped.
 - **Status:** Deferred — REQ-057 recovery order is landed and unit-covered ([`openehr/client/definition/stored_query_test.go`](../../openehr/client/definition/stored_query_test.go)); the dedicated wire-level PROBE-079 is deferred to a follow-up cycle (tracked in [roadmap.md](../roadmap.md)).
 - **Satisfies:** REQ-057.
+
+#### PROBE-091 — Path-parameter traversal is refused
+
+- **Title:** A path parameter that is `.` or `..`, is empty, or contains `/`, `\`, or a control character is refused before any HTTP request is issued, on every path-interpolating leaf package.
+- **Preconditions:** A transport client whose `*http.Client` records whether any request was issued (httptest or a tripwire RoundTripper).
+- **Wire assertion:** For each leaf package that interpolates a path parameter, at least two hostile inputs — one of which MUST be the separator-smuggling id (`foo/bar` on a `Route`-set request), the only input that exercises the route-arity rule; the other drawn from a traversal id (`a/../../definition/query/evil`, `..`), a backslash-bearing id, or a control character — each fail with a non-nil error and a captured request count of zero: the call fails closed with no bytes on the wire. A well-formed id that only needs percent-encoding (a space or dots in a template id, `Blood Pressure.v1`) still issues exactly one request whose path is encoded once (REQ-095), and the service root `"/"` — the System API's only operation — passes validation and issues its request (the REQ-150 exemption's positive control). Sentinel identity (`ErrInvalidPathSegment`, `ErrInvalidConfig`) is pinned by `transport/` unit tests, not by this probe (REQ-080: no error-type assertions in probes).
+- **Effect:** read-only — the hostile arms assert that NO request reaches the wire, and the positive control issues a read.
+- **Modes:** Sandbox.
+- **Status:** Draft — defined ahead of implementation; see [2026-08-18-path-segment-validation](../plans/2026-08-18-path-segment-validation.md).
+- **Satisfies:** REQ-150.
+
+#### PROBE-092 — Contribution read matches `contribution_get`
+
+- **Title:** `GET /ehr/{ehr_id}/contribution/{contribution_uid}` is issued by the contribution read leaf and the 200 body decodes as the persisted `CONTRIBUTION`.
+- **Preconditions:** A known EHR id and contribution uid; a sandbox server returning a canonical-JSON contribution body (or 404).
+- **Wire assertion:** The captured request method and path match the ITS-REST template; a 200 decodes to the contribution type (version metadata is **not** asserted — the pin defines only `Content-Type` on `200_CONTRIBUTION`); empty ids issue no request; a 404 fails with a non-nil error. Sentinel identity (`ErrNotFound`, `ErrInvalidConfig`) is pinned by `contribution` unit tests, not by this probe (REQ-080).
+- **Effect:** read-only (`GET`, no state change).
+- **Modes:** Sandbox.
+- **Status:** Draft — defined ahead of implementation; see [2026-08-18-contribution-get](../plans/2026-08-18-contribution-get.md).
+- **Satisfies:** REQ-142.
+
+#### PROBE-093 — Template list filters reach the wire
+
+- **Title:** `ListTemplates` emits the ITS-REST list query parameters `template_id`, `concept`, `version`, `offset`, and `fetch` when the corresponding options are set, and omits them when unset.
+- **Preconditions:** A sandbox Definition server on `GET /definition/template/adl1.4` (the only `TemplateFormat` v1 registers; the pin's ADL 2 list operation shares the same five parameter components).
+- **Wire assertion:** Each option appears as the named query key; an explicit `WithOffset(0)` / `WithFetch(0)` is present on the wire; a negative offset or fetch fails with a non-nil error and no request (sentinel identity is pinned by `definition` unit tests, not by this probe — REQ-080); no options yields an empty query. The response still decodes as the existing template-metadata slice.
+- **Effect:** read-only (`GET` list, no state change).
+- **Modes:** Sandbox.
+- **Status:** Draft — defined ahead of implementation; see [2026-08-18-template-list-filters](../plans/2026-08-18-template-list-filters.md).
+- **Satisfies:** REQ-143.
 
 ### Observability
 

@@ -324,7 +324,7 @@ requirements:
     canonical: docs/specifications/transport.md#req-094--prefer-response-shape-negotiation
     status: draft
     implementation: landed
-    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus]
+    packages: [transport, openehr/client/ehr, openehr/client/ehr/composition, openehr/client/ehr/directory, openehr/client/ehr/ehrstatus, openehr/client/ehr/contribution, openehr/client/demographic]
     probes: [PROBE-061, PROBE-071]
     plans: [docs/plans/2026-08-18-write-result-contract.md]
     tests:

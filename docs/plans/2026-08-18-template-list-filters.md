@@ -75,6 +75,8 @@ func ListTemplates(ctx context.Context, c *transport.Client, format TemplateForm
 
 Use `*Set` boolean flags for offset/fetch exactly as `query.ExecuteOption` does, so an explicit `WithOffset(0)` is distinguishable from unset.
 
+Two deliberate choices to state in godoc rather than leave as accidents: the option names are generic (`WithVersion` / `WithOffset` / `WithFetch`) in a package that otherwise names options by operation (`WithUploadVersion`, `WithExampleType`) — Phase 0 either renames to `WithListVersion` etc. for consistency or documents why the list options own the generic names; and the negative-offset/fetch refusal DIVERGES from `query.WithOffset` / `WithFetch`, which accept and send a negative — the divergence is intentional (the template list pin gives the parameters no negative semantics) and the godoc says so, or a reader will "fix" one side to match the other.
+
 `Repository.ListTemplates` (template.go) grows the same trailing `...ListOption` — source-compatible for callers, a **compile-time break for interface implementers** (precedent: `UploadTemplate`'s `...UploadOption` already in the interface). The CHANGELOG `### Added` entry names the interface growth.
 
 - [ ] **Step 1: Failing tests** — each option appears as its named query key on the captured URL; combined options; `WithOffset(0)` / `WithFetch(0)` present on the wire; no options → empty query; negative offset/fetch → `ErrInvalidConfig`, zero requests. Test against `FormatADL14` only — it is the sole registered `TemplateFormat`.

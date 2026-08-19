@@ -69,6 +69,16 @@ type DroppedConstruct struct {
 // Dropped returns every drop this Document's extraction recorded, in source
 // order. Empty when QueryErr() is nil. The existing QueryErr() text is
 // unchanged.
+//
+// Contract pins Phase 0 must carry into the spec section:
+//   - Dropped() runs the SAME lazy extraction (sync.Once + nil guard) as
+//     Query()/QueryErr() — a Document nobody called Query() on must not
+//     read as "nothing dropped"; the method's completeness claim is the
+//     contract, so it triggers extraction itself.
+//   - It returns a COPY, never the backing slice — a caller mutating the
+//     result must not corrupt the Document.
+//   - ConstructKind reserves its zero value as invalid/unknown (fail-closed
+//     switch material), so an unset Kind cannot alias the first real member.
 func (d *Document) Dropped() []DroppedConstruct
 ```
 
@@ -77,7 +87,11 @@ func (d *Document) Dropped() []DroppedConstruct
 
 type Issue struct {
     // ... existing fields unchanged ...
-    Span Span // NEW: where in the input; zero when not attributable
+    Span Span // NEW: where in the input; zero when not attributable.
+    // Span has ONE definition — parse owns it; lint re-exports the parse
+    // type (`type Span = parse.Span`), since PROBE-096 asserts spans across
+    // both packages and two structurally-identical types would make that
+    // comparison a conversion exercise.
 }
 // Field contract for Phase 0 to pin as REQ text (no normative force
 // here — the REQ is unallocated; Phase 0 assigns the RFC-2119 keywords):

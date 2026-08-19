@@ -31,7 +31,7 @@ Pinned source: `https://github.com/openEHR/specifications-ITS-REST/tree/master/c
 
 When the OpenAPI files and any in-repo prose disagree, the OpenAPI wins; the prose is updated, not the wire behaviour.
 
-**Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Segment legality is a separate question from encoding: a path parameter containing `/` — or any other content [REQ-150](transport.md#req-150--path-parameter-segment-validation) forbids — is governed by that requirement, the transport's segment validator; the transport does not honour `url.URL.RawPath` (the encoded hint), so there is no encoding-level escape hatch for a separator-bearing value. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
+**Path-parameter encoding.** A request path **MUST** conform to the OAS path template — each path parameter is percent-encoded **exactly once** on the wire. The transport is the **single canonical path encoder**: [`transport.Request.Path`](../../transport/request.go) is a **decoded** path (`url.URL.Path` semantics) that `url.URL.String()` encodes once on the way out. Leaf clients (`openehr/client/*`) **MUST** interpolate the **raw**, decoded id into `Request.Path` and **MUST NOT** pre-escape it with `url.PathEscape` — a pre-escaped parameter is encoded twice (a template id `Referral Request.v1` → `%20` → `%2520`), which a strict server unescapes to a literal `%20` and answers `404`. Segment legality is a separate question from encoding: a path parameter containing `/` — or any other content [REQ-150](transport.md#req-150--path-parameter-segment-validation) forbids — is governed by that requirement, the transport's segment validator — which also forbids honouring `url.URL.RawPath` (the encoded hint), so there is no encoding-level escape hatch for a separator-bearing value; the MUST NOT lives there, not here. Decoding a server-supplied value (e.g. the `Location` header via `url.PathUnescape`) is unaffected — the rule is about **forming** the request path, not reading a response.
 
 ## REST version pin
 
@@ -330,19 +330,21 @@ Rules the SDK **MUST** enforce:
 
 ETag handling on reads is symmetric: the SDK **MUST** capture `ETag` from a response and expose it on the typed return value so the caller can use it for the next PUT.
 
-## REQ-142 — Contribution read
+## REST leaf operations
+
+### REQ-142 — Contribution read
 
 The EHR Contribution leaf **MUST** expose a read operation matching ITS-REST `contribution_get`:
 
 `GET /ehr/{ehr_id}/contribution/{contribution_uid}`
 
-The call **MUST** return the persisted `CONTRIBUTION` decoded as the SDK's contribution type. The leaf returns a `*VersionMetadata` for shape consistency with the other EHR leaves, populated from whatever response headers the server sends — the vendored pin defines only `Content-Type` on `200_CONTRIBUTION` (`ETag` / `Location` belong to `201_CONTRIBUTION`), so the SDK **MUST NOT** require populated version metadata on a contribution read. Empty `ehr_id` or `contribution_uid` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. A `404` **MUST** map to `ErrNotFound`. Path parameters are ordinary decoded strings; [REQ-150](transport.md#req-150--path-parameter-segment-validation) applies.
+The call **MUST** return the persisted `CONTRIBUTION` decoded as the SDK's contribution type. The leaf returns a `*VersionMetadata` for shape consistency with the other EHR leaves, populated from whatever response headers the server sends — the vendored pin defines only `Content-Type` on `200_CONTRIBUTION` (`ETag` / `Location` belong to `201_CONTRIBUTION`), so the SDK **MUST NOT** require populated version metadata on a contribution read. Empty `ehr_id` or `contribution_uid` **MUST** fail before any request is issued — an empty interpolated segment is exactly what [REQ-150](transport.md#req-150--path-parameter-segment-validation)'s validator refuses (`errors.Is(err, ErrInvalidConfig)` holds; the sentinel contract has that one home). A `404` **MUST** map to `ErrNotFound`. Path parameters are ordinary decoded strings; [REQ-150](transport.md#req-150--path-parameter-segment-validation) applies.
 
 v1 of this leaf **MUST** request canonical JSON. Simplified-format `Accept` values (FLAT / STRUCTURED inner payloads) are out of scope — no other EHR Get leaf takes a format yet.
 
-The leaf's repository interface **MUST** include the same read.
+The leaf's repository interface **MUST** include the same read — no break for callers of the package functions, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
 
-## REQ-143 — Template list filters
+### REQ-143 — Template list filters
 
 `ListTemplates` **MUST** accept the ITS-REST list filters of `definition_template_adl1.4_list` in the vendored OpenAPI pin (the ADL 2 list operation references the same five parameter components, so the option set carries over unchanged when ADL 2 support lands):
 
@@ -354,7 +356,7 @@ The leaf's repository interface **MUST** include the same read.
 | `offset` | `WithOffset` | 0-based; an explicit `0` **MUST** be sent |
 | `fetch` | `WithFetch` | An explicit `0` **MUST** be sent |
 
-Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface grows the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`).
+Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface **MUST** grow the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
 
 ## Transport cross-cutting concerns
 
