@@ -161,8 +161,9 @@ func rmInfoUniverse(plan *Plan) []string {
 // order, filtered to inUniverse and de-duplicated.
 //
 // Filtering is what keeps the emitted graph closed over the universe
-// (REQ-048): what it drops is the foundation typing layer the RM target does
-// not emit — `Any`, `Ordered`, `Interval`, the `Iso8601_*` types, and the
+// (REQ-048): what it drops is exactly the excluded kinds — the base schema's
+// primitive_types entries that appear as BMM ancestors (`Any`, `Ordered`,
+// `Interval`, `Iso8601_type` and the four `Iso8601_*` value types) plus the
 // PROPORTION_KIND enumeration. It costs no RM edge, because every class that
 // names one of those also names an RM ancestor beside it (DV_ORDERED is
 // `[DATA_VALUE, Ordered]`, DV_INTERVAL is `[DATA_VALUE, Interval]`,

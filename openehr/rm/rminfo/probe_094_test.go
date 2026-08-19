@@ -60,6 +60,12 @@ type bmmReduction struct {
 	// classOf resolves a name to its BMM class in EITHER map, because a
 	// declaration site may be a primitive_types entry (Interval).
 	classOf map[string]bmm.Class
+	// primitive / enumeration / packageOf carry the three facts the
+	// universe rule excludes on, so exclusionReason can account for every
+	// name the universe leaves out.
+	primitive   map[string]bool
+	enumeration map[string]bool
+	packageOf   map[string]string
 }
 
 func reducePinnedBMM(t *testing.T) *bmmReduction {
@@ -69,26 +75,32 @@ func reducePinnedBMM(t *testing.T) *bmmReduction {
 		t.Fatalf("LoadAll(openehr_rm_1.2.0): %v", err)
 	}
 
-	pkgOf := packagePaths(schema)
 	r := &bmmReduction{
 		universe:     map[string]bool{},
 		abstract:     map[string]bool{},
 		bmmAncestors: map[string][]string{},
 		parents:      map[string][]string{},
 		classOf:      map[string]bmm.Class{},
+		primitive:    map[string]bool{},
+		enumeration:  map[string]bool{},
+		packageOf:    packagePaths(schema),
 	}
 	maps.Copy(r.classOf, schema.PrimitiveTypes)
+	for name := range schema.PrimitiveTypes {
+		r.primitive[name] = true
+	}
 	for name, cls := range schema.ClassDefinitions {
 		r.classOf[name] = cls
 		r.abstract[name] = cls.IsAbstract()
 		r.bmmAncestors[name] = cls.Ancestors()
+		if _, isEnum := cls.(*bmm.Enumeration); isEnum {
+			r.enumeration[name] = true
+			continue
+		}
 		if probeExcludedClasses[name] {
 			continue
 		}
-		if _, isEnum := cls.(*bmm.Enumeration); isEnum {
-			continue
-		}
-		if excludedPackage(pkgOf[name]) {
+		if excludedPackage(r.packageOf[name]) {
 			continue
 		}
 		r.universe[name] = true
@@ -123,6 +135,30 @@ func packagePaths(schema *bmm.Schema) map[string]string {
 	}
 	walk("", schema.Packages)
 	return out
+}
+
+// exclusionReason names why a class is outside the universe, or "" if it
+// should have been in it. The reasons are exactly the universe rule's, so a
+// class this cannot account for is either a defect in the shipped table or a
+// change to the generation target that the probe has not been told about.
+func (r *bmmReduction) exclusionReason(name string) string {
+	if r.universe[name] {
+		return ""
+	}
+	switch {
+	case r.primitive[name]:
+		return "a primitive_types entry (bmm-conformance.md § Primitive type mapping)"
+	case r.enumeration[name]:
+		return "an enumeration"
+	case probeExcludedClasses[name]:
+		return "in the declared excluded-class set"
+	case excludedPackage(r.packageOf[name]):
+		return "in an excluded package (" + r.packageOf[name] + ")"
+	case r.classOf[name] == nil:
+		return "not defined by the pinned schemas at all"
+	default:
+		return ""
+	}
 }
 
 func excludedPackage(path string) bool {
@@ -271,6 +307,17 @@ func TestProbe094FilterCostsNoRMEdge(t *testing.T) {
 		t.Fatal("no ancestor was filtered — the closure arm would be vacuous, so the reduction is wrong")
 	}
 	for anc, children := range dropped {
+		// Every dropped edge must be dropped for one of the reasons the
+		// universe rule states. Without this, "no RM edge is lost" rests on
+		// the pinned root set alone; with it, an RM information-model class
+		// that ever fell out of the universe fails HERE, naming itself,
+		// rather than surviving as a quietly shrunken expansion.
+		reason := r.exclusionReason(anc)
+		if reason == "" {
+			t.Errorf("ancestor %q (of %v) was dropped but matches none of the declared exclusions — "+
+				"if it is an RM class, every expansion above it just shrank", anc, children)
+		}
+		t.Logf("dropped ancestor %-16s %-58s children=%v", anc, reason, children)
 		for _, child := range children {
 			// Every class that loses an ancestor must keep at least one,
 			// unless it is one of the four whose ONLY BMM ancestor is a
