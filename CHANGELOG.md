@@ -12,6 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **Path-parameter segment validation (REQ-150).** The transport refuses a traversal, empty, backslash-bearing or control-character path segment, and a path whose segment count contradicts its `Route` template, before any request is issued.
 - **Template list filters (REQ-143).** `ListTemplates` takes the ITS-REST list filters as trailing options; `definition.Repository` grows the same variadic — a compile-time break for external implementers.
 - **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
 
