@@ -6,11 +6,38 @@
 # on every Write/Edit would dominate the latency budget for a save hook.
 # Graceful no-op when a formatter isn't on the host: `make fmt`, which routes
 # through the pinned golangci-lint image, is the authoritative full-tree pass.
+#
+# Claude Code delivers the edited path as JSON on stdin (`.tool_input.file_path`).
+# It does NOT set CLAUDE_FILE_PATH / CLAUDE_FILE_PATHS — reading those yields an
+# empty value and turns this hook into a permanent no-op, which is how it sat
+# silently broken. The payload-parse failure below is therefore loud, not quiet:
+# a missing formatter is an acceptable degradation, a missing path is a defect.
 set -euo pipefail
 
-f="${CLAUDE_FILE_PATH:-}"
+payload="$(cat)"
+
+if command -v jq >/dev/null 2>&1; then
+  f="$(printf '%s' "$payload" | jq -r '.tool_input.file_path // empty' 2>/dev/null)" || {
+    echo "goformat-on-save: hook payload is not valid JSON; run 'make fmt'" >&2
+    exit 0
+  }
+elif command -v python3 >/dev/null 2>&1; then
+  f="$(printf '%s' "$payload" | python3 -c \
+    'import json,sys; print(json.load(sys.stdin).get("tool_input",{}).get("file_path") or "")' 2>/dev/null)" || {
+    echo "goformat-on-save: hook payload is not valid JSON; run 'make fmt'" >&2
+    exit 0
+  }
+else
+  echo "goformat-on-save: neither jq nor python3 on PATH; cannot read the hook payload — run 'make fmt'" >&2
+  exit 0
+fi
+
 [[ -n "$f" ]] || exit 0
 [[ "$f" == *.go ]] || exit 0
+
+# A relative file_path resolves against the project root.
+[[ "$f" == /* ]] || f="${CLAUDE_PROJECT_DIR:-$PWD}/$f"
+[[ -f "$f" ]] || exit 0
 
 # Generated files belong to bmmgen — reformatting here would diverge from
 # `make codegen-verify`. golangci-lint excludes them too (Code generated marker).
