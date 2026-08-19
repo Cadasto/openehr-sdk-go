@@ -56,14 +56,21 @@ type CommitVersion interface {
 // *[ImportedVersion][T] for T ∈ {rm.Composition, rm.EHRStatus,
 // rm.Folder, rm.EHRAccess} — the four versionable types in the
 // ITS-REST `Contribution_create` schema. A non-empty Versions slice is
-// also required (the spec rejects an empty contribution).
+// also required (the spec rejects an empty contribution). A wrapped
+// version whose Version is nil or whose commit_audit has no Committer
+// is rejected (the empty UpdateAudit [WrapOriginalVersion] /
+// [WrapImportedVersion] produce for nil caller input).
 //
 // Implemented as an explicit type-switch over the 8 concrete generic
 // instantiations (no reflection per REQ-024). Other types satisfying
 // the CommitVersion method set are rejected with a typed error naming
-// the BMMName for caller diagnostics. Called automatically by
-// MarshalJSON; callers MAY invoke it earlier to surface a typed error
-// without paying for marshalling.
+// the BMMName for caller diagnostics. A nil wrapped Version or an
+// unpopulated commit_audit (nil Committer — the empty UpdateAudit
+// [WrapOriginalVersion] / [WrapImportedVersion] produce for nil input)
+// is also rejected so those mistakes surface here rather than as a
+// panic (REQ-025). Called automatically by MarshalJSON; callers MAY
+// invoke it earlier to surface a typed error without paying for
+// marshalling.
 func (s *Submission) Validate() error {
 	if len(s.Versions) == 0 {
 		return errors.New("Submission.Versions: empty (Contribution_create requires at least one version)")
@@ -81,9 +88,40 @@ func (s *Submission) Validate() error {
 			*ImportedVersion[rm.EHRStatus],
 			*ImportedVersion[rm.Folder],
 			*ImportedVersion[rm.EHRAccess]:
+			if err := v.(writeSideVersion).validateWrite(i); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("Submission.Versions[%d] is %T (BMMName=%q); want *OriginalVersion[T] or *ImportedVersion[T] for T in {Composition, EHRStatus, Folder, EHRAccess}", i, v, v.BMMName())
 		}
+	}
+	return nil
+}
+
+// writeSideVersion is the unexported inspection seam Validate uses to
+// reject a nil wrapped Version or an empty commit_audit without an
+// 8-way type switch (REQ-024).
+type writeSideVersion interface {
+	validateWrite(index int) error
+}
+
+func (v *OriginalVersion[T]) validateWrite(index int) error {
+	if v == nil || v.Version == nil {
+		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
+	}
+	return validateWriteAudit(index, v.CommitAudit)
+}
+
+func (v *ImportedVersion[T]) validateWrite(index int) error {
+	if v == nil || v.Version == nil {
+		return fmt.Errorf("Submission.Versions[%d]: Version is nil", index)
+	}
+	return validateWriteAudit(index, v.CommitAudit)
+}
+
+func validateWriteAudit(index int, a UpdateAudit) error {
+	if a.Committer == nil {
+		return fmt.Errorf("Submission.Versions[%d]: commit_audit is unpopulated", index)
 	}
 	return nil
 }
