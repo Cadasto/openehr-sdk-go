@@ -16,6 +16,7 @@ requirements:
     implementation: landed
     packages: [resources/bmm, openehr/bmm]
     plans: [docs/plans/archive/2026-05-15-bmm-codegen.md]
+    adrs: [docs/adr/0001-bmm-version-bump-runbook.md]
 
   - id: REQ-042
     title: Generated code drift-detected
@@ -24,6 +25,11 @@ requirements:
     implementation: landed
     packages: [openehr/rm, openehr/aom/aom14, internal/bmmgen, cmd/bmmgen]
     plans: [docs/plans/archive/2026-05-15-bmm-codegen.md]
+    tests:
+      - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_rminfo_hierarchy_test.go
+      - openehr/rm/rminfo/hierarchy_test.go
+      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-045
     title: BMM loader building block
@@ -31,6 +37,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/bmm]
+    tests:
+      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-046
     title: Primitive type mapping
@@ -79,8 +87,11 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm/typereg]
-    probes: [PROBE-031, PROBE-073]
+    probes: [PROBE-031, PROBE-073, PROBE-030, PROBE-033, PROBE-034, PROBE-038]
     adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
+    tests:
+      - openehr/client/demographic/party_test.go
+      - openehr/rm/locatable_identity_test.go
 
   - id: REQ-052
     title: Canonical JSON
@@ -129,6 +140,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
+    tests:
+      - auth/introspect/introspect_test.go
 
   - id: REQ-060
     title: TokenSource interface
@@ -226,7 +239,7 @@ requirements:
     packages: [smart/discovery]
     plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
     adrs: [docs/adr/0008-smart-discovery-services-shape.md]
-    probes: [PROBE-002]
+    probes: [PROBE-002, PROBE-040]
     fixtures:
       - testkit/cassettes/its_rest/discovery/smart-configuration.json
     tests:
@@ -239,6 +252,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [smart/discovery]
+    probes: [PROBE-041]
     plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
 
   - id: REQ-072
@@ -249,7 +263,7 @@ requirements:
     packages: [smart/discovery]
     plans: [docs/plans/archive/2026-06-16-auth-smart-conformance-audit.md]
     adrs: [docs/adr/0008-smart-discovery-services-shape.md]
-    probes: [PROBE-002, PROBE-003]
+    probes: [PROBE-002, PROBE-003, PROBE-040, PROBE-041]
     fixtures:
       - testkit/cassettes/its_rest/discovery/smart-configuration-mismatch.json
     tests:
@@ -331,6 +345,8 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport]
+    tests:
+      - transport/client_test.go
 
   - id: REQ-092
     title: TLS posture
@@ -345,6 +361,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [transport, openehr/client/query]
+    probes: [PROBE-010, PROBE-011]
     plans: [docs/plans/archive/2026-06-11-security-hardening-and-simplification.md, docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     notes: ErrUnprocessable (422) sentinel added by the ITS-REST conformance remediation.
     tests:
@@ -554,6 +571,8 @@ requirements:
       - openehr/serialize/simplified
     probes:
       - PROBE-076
+      - PROBE-086
+      - PROBE-089
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
@@ -744,7 +763,7 @@ requirements:
     # shared result type, per-mode rules, cross-mode precedence) and opened
     # STRAND-11 for the recording format; implementation is phased in the plan.
     plans: [docs/plans/2026-08-18-probe-runnability.md]
-    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086]
+    probes: [PROBE-007, PROBE-022, PROBE-024, PROBE-030, PROBE-031, PROBE-033, PROBE-034, PROBE-010, PROBE-011, PROBE-012, PROBE-013, PROBE-040, PROBE-041, PROBE-067, PROBE-071, PROBE-086, PROBE-023, PROBE-025, PROBE-026]
 
   - id: REQ-100
     title: ADL 1.4 operational template (OPT) parse and paths
@@ -820,6 +839,7 @@ requirements:
       - openehr/validation/aql_test.go
       - internal/templatecompile/compile_test.go
       - testkit/probes/aql/probes_test.go
+    adrs: [docs/adr/0007-aql-antlr-grammar-profile.md]
 
   - id: REQ-103
     title: Primitive constraint introspection
@@ -827,7 +847,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/template, openehr/template/constraints, internal/templatecompile, testkit/probes/template]
-    probes: [PROBE-024]
+    probes: [PROBE-024, PROBE-025, PROBE-074]
     tests:
       - openehr/template/constraints/constraints_test.go
       - openehr/template/constraints/example_test.go
@@ -885,7 +905,7 @@ requirements:
     packages:
       - openehr/template/webtemplate
     adrs: [docs/adr/0014-webtemplate-reference-implementation-lock.md]
-    probes: [PROBE-075]
+    probes: [PROBE-075, PROBE-086]
     tests:
       - openehr/template/webtemplate/build_test.go
       - openehr/template/webtemplate/build_internal_test.go
@@ -978,7 +998,7 @@ requirements:
     implementation: landed
     packages: [openehr/validation, openehr/validation/rmread, openehr/templatecompile, internal/templatecompile, testkit/probes/validation]
     adrs: [docs/adr/0006-composition-validation-walker-placement.md]
-    probes: [PROBE-025, PROBE-026]
+    probes: [PROBE-025, PROBE-026, PROBE-074]
     tests:
       - openehr/validation/composition_test.go
       - openehr/validation/interval_bounds_test.go
@@ -1745,6 +1765,17 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm, openehr/serialize, openehr/validation, openehr/template, openehr/aql]
+    tests:
+      - openehr/aql/lint/imports_test.go
+      - openehr/aql/parse/imports_test.go
+      - openehr/aql/parse/identifier_parity_test.go
+      - openehr/aql/predicate_test.go
+      - openehr/composition/imports_test.go
+      - openehr/instance/imports_test.go
+      - openehr/serialize/simplified/independence_test.go
+      - openehr/template/webtemplate/independence_test.go
+      - openehr/templatecompile/imports_test.go
+      - openehr/validation/imports_test.go
 
   - id: REQ-014
     title: Dependency direction
@@ -1780,6 +1811,10 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
+    tests:
+      - openehr/instance/instance_test.go
+      - openehr/template/constraints/example_test.go
+      - openehr/template/webtemplate/incontext_rmpath_test.go
 
   - id: REQ-025
     title: Error wrapping
@@ -1840,6 +1875,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm, openehr/rm/typereg]
+    adrs: [docs/adr/0003-rm-event-polymorphism.md]
 
   - id: REQ-043
     title: P_BMM to Go mapping rules
@@ -1847,7 +1883,9 @@ requirements:
     status: draft
     implementation: landed
     packages: [internal/bmmgen]
-    adrs: [docs/adr/0013-generated-locatable-identity-surface.md]
+    adrs: [docs/adr/0013-generated-locatable-identity-surface.md, docs/adr/0002-bmm-codegen-decisions.md]
+    tests:
+      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-044
     title: Hand-written extensions isolated
@@ -1862,6 +1900,9 @@ requirements:
     status: draft
     implementation: landed
     packages: [internal/bmmgen]
+    tests:
+      - openehr/rm/rminfo/hierarchy_test.go
+      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-058
     title: Datamap V2
@@ -1944,7 +1985,7 @@ requirements:
       - testkit/probes
       - testkit/cassettes/flat-conformance
       - testkit/conformance/webtemplate
-    probes: [PROBE-086]
+    probes: [PROBE-086, PROBE-089]
     tests:
       - testkit/conformance/webtemplate/runner_test.go
       - testkit/conformance/webtemplate/helpers_test.go

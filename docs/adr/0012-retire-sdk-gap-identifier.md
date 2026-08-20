@@ -5,6 +5,7 @@
 - **Superseded by:** —
 - **Strand:** none — direct process/convention decision (brainstormed 2026-07-02); no prior open research strand.
 - **Introduces:** — (no new `REQ-NNN`). **Promotes content into:** REQ-055, REQ-057, REQ-107, REQ-083. **Applies:** the SDD conventions in [`.sdd.yaml`](../.sdd.yaml) and [`development-process.md`](../development-process.md).
+- **Traceability:** deliberately cited by **no** `adrs:` axis in [`traceability.yaml`](../specifications/traceability.yaml). This is a process/convention decision about identifiers, not the rationale behind any one requirement — the REQs above received re-homed prose, they were not shaped by this decision. An audit finding it "uncited" is reporting the intended state.
 
 ## Context
 
