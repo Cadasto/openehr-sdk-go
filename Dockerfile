@@ -23,7 +23,7 @@ ARG GO_VERSION=1.26.6
 # `golang:${GO_VERSION}-alpine` ships. Pinning it separately needs the
 # `-alpineX.Y` tag form, which is not published for every Go patch, so a fixed
 # value fails the `make image-dev` build outright on some later Go bump.
-ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.12.2-alpine
+ARG GOLANGCI_IMAGE=golangci/golangci-lint:v2.13.0-alpine
 # ANTLR generator (Java) version — MUST track the antlr4-go/antlr runtime in
 # go.mod (lockstep; see resources/aql/grammar/baseline/PIN).
 ARG ANTLR_VERSION=4.13.2
