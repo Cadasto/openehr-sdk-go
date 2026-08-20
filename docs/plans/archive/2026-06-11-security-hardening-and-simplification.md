@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-06-11
-**Status:** Draft
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** — (remediation of review findings; no existing REQ. Candidate new REQ rows flagged inline as `REQ-candidate`.)
 **Probes:** —
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** nothing (all phases independent; tasks within a phase are independent unless noted)
 **Defers:** `bmm.Load` context-awareness (API change, revisit pre-1.0 freeze); same-origin JWKS enforcement beyond HTTPS-only (needs product decision); `testkit/fixtures` `runtime.Caller` → `go:embed` migration (test-only)
 

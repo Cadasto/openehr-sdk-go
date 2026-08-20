@@ -3,7 +3,7 @@
 **Date:** 2026-06-29
 **Status:** Landed (PR #57, 2026-06-30)
 **Owner:** SDK maintainers
-**Covers:** [REQ-055](../../specifications/wire.md#req-055--wire-boundary) (AQL query — execution client) and [REQ-057](../../specifications/wire.md#req-057--definition) (Definition — stored-query store/get). No new REQ; both findings are spec-conformance corrections within the existing contracts.
+**Covers:** [REQ-055](../../specifications/wire.md#req-055--wire-boundary) (AQL query — execution client) and [REQ-057](../../specifications/wire.md#req-057) (Definition — stored-query store/get). No new REQ; both findings are spec-conformance corrections within the existing contracts.
 **Probes:** PROBE-078 (POST execution with `openehr-ehr-id` header scoping) and PROBE-079 (no-version `PutStoredQuery` recovers the assigned version from `Location`) — deferred to a follow-up cycle; unit pins in `execute_test.go` and `stored_query_test.go` cover the first-cycle wire shape.
 **Implementation:** landed
 **Depends on:** nothing new — both fixes are local to [`openehr/client/query/execute.go`](../../../openehr/client/query/execute.go) and [`openehr/client/definition/stored_query.go`](../../../openehr/client/definition/stored_query.go) and the vendored OAS under [`resources/ehrbase/`](../../../resources/ehrbase/).
@@ -64,7 +64,7 @@ The Location parse is forgiving: the host/scheme are ignored, only the last two 
 
 **Tasks:**
 - Record maintainer sign-off on A1 vs A2.
-- Lock the PROBE-078 + PROBE-079 cassette pair — capture the OAS-defined headers/bodies; commit the cassettes under [`testkit/cassettes/query/`](../../../testkit/cassettes/query/) and [`testkit/cassettes/definition/`](../../../testkit/cassettes/definition/).
+- Lock the PROBE-078 + PROBE-079 cassette pair — capture the OAS-defined headers/bodies; commit the cassettes under `testkit/cassettes/query/` and `testkit/cassettes/definition/` (not yet captured — PROBE-078/079 remain Deferred).
 
 **Definition of done:** sign-off recorded; cassettes in place; this plan flipped Draft → Ready.
 

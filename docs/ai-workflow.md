@@ -24,19 +24,20 @@ For **code exploration, call-chain tracing, and impact analysis**, query the **c
 
 ## openEHR ground truth (MCP / skills)
 
-This repo is an openEHR workspace. Before guessing an RM path, terminology code, or ITS-JSON shape, use the **openehr-assistant** skills (Skill tool, `openehr-assistant:<name>`) — the openEHR analogue of looking it up in the spec:
+This repo is an openEHR workspace. Before guessing an RM path, terminology code, or ITS-JSON shape, look it up with the **openehr-assistant** plugin — skills via the Skill tool (`openehr-assistant:<name>`), commands typed as `/<name>`:
 
-| Skill | Use when |
+| Skill / command | Use when |
 |---|---|
-| `type-spec` | exact attribute list / invariant / signature for an RM class — **before locking goldens or types** |
-| `terminology` | resolve a numeric terminology code to a term, or vice versa |
-| `format-data` | validate the shape of a sample Composition / FLAT / STRUCTURED instance |
-| `guide` | how-to: spec-lookup methodology (`howto/spec-lookup`), ITS-REST envelopes, simplified formats |
-| `rm-structure` | domain overview (composition categories, ISM states, versioning, PARTY hierarchy) |
-| `archetype-explain`, `template-explain` | semantics of an archetype / OPT — input to builders and validation tests |
-| `aql-designer` | design / explain / review AQL for `openehr/aql/` |
+| `/openehr-explain` | **start here for any lookup** — RM/AM/BASE type, RM structural concept, archetype, template, ADL idiom, AQL keyword, or terminology code |
+| `openehr-assistant` | routing + the guide corpus: spec-lookup methodology (`howto/spec-lookup`), ITS-REST envelopes, simplified formats |
+| `aql-authoring` | write, optimize, or review AQL for `openehr/aql/` |
+| `composition-builder` | build or check a Composition instance |
+| `template-authoring` | OET/OPT authoring and constraint review |
+| `archetype-authoring` · `archetype-lint` | author / review / lint an archetype |
+| `demographic-modeling` | PARTY and demographic structures |
+| `/ckm-search` | find a published CKM archetype or template before modelling one |
 
-The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
+For an exact attribute list, invariant, or signature — **before locking goldens or types** — call the MCP tool `type_specification_get` (BMM-backed); resolve a numeric code with `terminology_resolve`.
 
 ## The loop
 
@@ -60,5 +61,5 @@ After Write/Edit on a `*.go` file, Claude Code formats it via [`.claude/hooks/go
 ## When stuck
 
 - **Open decision** (STRAND-NN) → draft an [ADR](adr/) or ask the user; don't settle it in a PR.
-- **Ambiguous spec** → `openehr-assistant:guide` (`howto/spec-lookup`) for the canonical wording.
+- **Ambiguous spec** → `/openehr-explain`, or the `openehr-assistant` skill's `howto/spec-lookup` guide, for the canonical wording.
 - **Missing normative rule** → add a `Status: Draft` REQ in [REQ.md](specifications/REQ.md) and elaborate in the topic spec before coding — never a rule that exists only in code.

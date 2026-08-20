@@ -12,7 +12,7 @@
 
 COMPOSE         ?= docker compose
 COMPOSE_PROJECT ?= openehr-sdk-go
-LINT_IMAGE      ?= golangci/golangci-lint:v2.12.2-alpine
+LINT_IMAGE      ?= golangci/golangci-lint:v2.13.0-alpine
 DOCKER_MOUNT    = -v $(CURDIR):/app -w /app
 
 # ANTLR codegen (maintainer-only). The generator is Java, confined to the
@@ -194,6 +194,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 ##@ Specs
 
 spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
+	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
 
 spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)

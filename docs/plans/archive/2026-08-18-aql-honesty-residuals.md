@@ -86,7 +86,7 @@ In [§ REQ-109 Layer 3](../../specifications/clinical-modeling.md#req-109--aql-s
 
 In [§ REQ-119 Canonical value spellings — `MATCHES {uri}`](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission), after the existing URI-token paragraph, add:
 
-> A refusal of this operand **MUST** name the path and the structural reason and **MUST NOT** reproduce the URI text — the same diagnostic contract [§ The class predicate positions](#req-119--re-parseable-canonical-aql-emission) already requires of a refused class predicate.
+> A refusal of this operand **MUST** name the path and the structural reason and **MUST NOT** reproduce the URI text — the same diagnostic contract [§ The class predicate positions](../../specifications/clinical-modeling.md#req-119--re-parseable-canonical-aql-emission) already requires of a refused class predicate.
 
 If Phase 5 ships in this PR, add one Layer-2 table row (Warning, does not flip `OK()`):
 

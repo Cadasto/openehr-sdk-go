@@ -438,6 +438,7 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/client/admin]
+    probes: [PROBE-070]
     plans: [docs/plans/archive/2026-06-19-its-rest-conformance-remediation.md]
     tests:
       - openehr/client/admin/admin_test.go

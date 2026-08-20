@@ -10,6 +10,10 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+### Added
+
+- **Toolchain pins.** golangci-lint v2.12.2 → v2.13.0, which carries the `modernize` analyzers forward with `golang.org/x/tools` 0.44 → 0.48, and the Go dev image 1.26.5 → 1.26.6; the `go.mod` floor stays `1.26.0`.
+
 ## [0.21.0] - 2026-08-20
 
 Twenty-first `v0.x` minor — the client now fails closed on hostile path segments, nil caller input and typed-nil committers before anything reaches the wire, and the contribution read, template list filters and RM meta-model introspection land. **Breaking:** `contribution.Repository` and `definition.Repository` each grow a member and `parse.Clause` gains four — compile-time breaks for out-of-tree implementers and exhaustive switches.

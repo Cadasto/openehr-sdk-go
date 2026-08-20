@@ -239,7 +239,7 @@ Cross-SDK probes (REQ-080) compare against shared cassettes encoded with this or
 - [docs/specifications/rm-modeling.md § Type registry](../../specifications/rm-modeling.md#type-registry-req-040) — REQ-040
 - [docs/specifications/idiom.md § Generics policy](../../specifications/idiom.md#generics-policy-req-024) — REQ-024: reflection OK for ordinary field mapping; `_type` dispatch only via typereg
 - [docs/specifications/conformance.md PROBE-030, PROBE-031](../../specifications/conformance.md)
-- [`.codebase-memory/adr.md`](../../../.codebase-memory/adr.md) — D3 typereg layout, D4 flattening, D5 `rm.CodePhrase`
+- [ADR 0002](../../adr/0002-bmm-codegen-decisions.md) — D3 typereg layout, D4 flattening
 - [docs/specifications/research-strands.md STRAND-04](../../specifications/research-strands.md)
 
 ## References
