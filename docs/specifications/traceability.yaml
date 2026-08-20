@@ -27,9 +27,9 @@ requirements:
     plans: [docs/plans/archive/2026-05-15-bmm-codegen.md]
     tests:
       - internal/bmmgen/plan_test.go
+      - internal/bmmgen/render_test.go
       - internal/bmmgen/render_rminfo_hierarchy_test.go
-      - openehr/rm/rminfo/hierarchy_test.go
-      - openehr/rm/rminfo/probe_094_test.go
+      - internal/bmmgen/aom14_test.go
 
   - id: REQ-045
     title: BMM loader building block
@@ -38,7 +38,7 @@ requirements:
     implementation: landed
     packages: [openehr/bmm]
     tests:
-      - openehr/rm/rminfo/probe_094_test.go
+      - openehr/bmm/load_test.go
 
   - id: REQ-046
     title: Primitive type mapping
@@ -141,7 +141,7 @@ requirements:
     implementation: landed
     packages: [transport]
     tests:
-      - auth/introspect/introspect_test.go
+      - transport/client_test.go
 
   - id: REQ-060
     title: TokenSource interface
@@ -1807,9 +1807,6 @@ requirements:
     status: draft
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
-    tests:
-      - openehr/template/constraints/example_test.go
-      - openehr/template/webtemplate/incontext_rmpath_test.go
 
   - id: REQ-025
     title: Error wrapping
