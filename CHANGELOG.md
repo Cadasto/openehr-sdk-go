@@ -10,17 +10,20 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-08-20
+
+Twenty-first `v0.x` minor — the client now fails closed on hostile path segments, nil caller input and typed-nil committers before anything reaches the wire, and the contribution read, template list filters and RM meta-model introspection land. **Breaking:** `contribution.Repository` and `definition.Repository` each grow a member and `parse.Clause` gains four — compile-time breaks for out-of-tree implementers and exhaustive switches.
+
 ### Added
 
 - **Path-parameter segment validation (REQ-150).** The transport refuses a traversal, empty, backslash-bearing or control-character path segment, and a path whose segment count contradicts its `Route` template, before any request is issued.
 - **Template list filters (REQ-143).** `ListTemplates` takes the ITS-REST list filters as trailing options; `definition.Repository` grows the same variadic — a compile-time break for external implementers.
 - **Probe runnability specified (REQ-082, STRAND-11).** The three-mode mandate gains mode selection, a shared probe-result contract, per-mode rules, and write-probe semantics; the `v1.0.0` gate now cites the per-REQ `Impl.` axis.
-- **Value-free AQL diagnostics (REQ-113, REQ-109, PROBE-096).** `parse.Document.Dropped()` and `lint.Issue.Span` report a finding's kind, clause and position with no query text in any structured field; `parse.Clause` gains four members — an existing exhaustive switch over it gains cases it does not handle.
+- **Value-free AQL diagnostics (REQ-113, REQ-109, PROBE-096).** `parse.Document.Dropped()` and `lint.Issue.Span` report a finding's kind, clause and position with no query text in any structured field; `parse.Clause` gains four members, so a consumer's exhaustive switch gains unhandled cases.
 - **Structured AQL node predicates (REQ-113, PROBE-095).** `aql.PathSegment.Parsed` types every bracketed path-segment predicate beside its verbatim text — node ids, names, `$param`, comparisons, regex and junctions — with `aql.EqualPredicates` for comparison.
 - **RM meta-model introspection (REQ-048, PROBE-094, STRAND-12/13).** `rminfo` gains a compiled-in class graph — abstractness, parents, ancestors, conformance, concrete-descendant expansion, attribute declaration site — and `KnownRMTypes` widens to every emitted class.
 - **Contribution read (REQ-142, PROBE-092).** `contribution.Get` reads a persisted contribution by uid and `contribution.Repository` grows the same read — a compile-time break for external implementers.
-- **Library code fails closed instead of panicking (REQ-025).** Constructors and client entry points fail closed on nil or typed-nil caller input, a nil variadic option is skipped, and the REQ-025 clause gains a `Must`-prefix carve-out.
-- **Write-side committer validation hardened (REQ-025).** `Submission.Validate` and `UpdateAudit.MarshalJSON` reject typed-nil and non-pointer `PartyProxy` committers on the batch audit and every version commit_audit, closing the `"committer":null` and missing-`_type` wire escapes.
+- **Library code fails closed instead of panicking (REQ-025).** Constructors, client entry points and variadic options refuse nil, typed-nil and zero-value caller input — including `PartyProxy` committers that leaked `"committer":null` — with a `Must`-prefix carve-out.
 
 ## [0.20.0] - 2026-08-18
 
