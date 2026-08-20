@@ -51,9 +51,10 @@ func WithPrefer(p transport.Prefer) CommitOption {
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] that carries the commit
 // metadata; a non-2xx stays a [*transport.WireError]. A successful
-// minimal or identifier write returns a nil `*rm.Contribution` — a
-// typed-nil pointer; use [openehrclient.HasResource] (or
-// [rm.IsTypedNil]) rather than `== nil` as the presence test.
+// minimal or identifier write returns a nil `*rm.Contribution` —
+// `== nil` is a correct test for this concrete return;
+// [openehrclient.HasResource] is the uniform presence test across
+// write leaves, including interface returns.
 //
 // Concurrency failures within the batch surface as
 // [transport.ErrVersionConflict].

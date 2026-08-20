@@ -77,15 +77,19 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 //   - Any other Prefer (minimal, the spec default, or unset) returns a
 //     nil/zero resource; the version id is in Location/ETag.
 //
-// A successful minimal or identifier write returns a zero resource. For
-// a pointer T that is a typed nil; for an interface T (demographic
-// [rm.Party]) it may be a boxed typed-nil pointer. `== nil` is not a
-// reliable presence test across those return types — use [HasResource]
-// (or [rm.IsTypedNil] when already holding the RM value).
+// A successful minimal or identifier write returns a zero resource: a
+// typed-nil pointer for a concrete-pointer T (`== nil` is a correct
+// test there) and a bare-nil interface for an interface T (demographic
+// [rm.Party]) — but an interface return can in general hold a boxed
+// typed-nil pointer, for which `== nil` lies. [HasResource] is the
+// uniform presence test across the return types; [rm.IsTypedNil] is the
+// typed-nil absence check for callers already holding a registered RM
+// pointer (false for a bare-nil interface).
 //
-// label prefixes every error WriteResult itself raises (e.g.
-// "composition", "ehrstatus.Put") so each site's error strings stay
-// byte-identical to the pre-consolidation duplicated code; decode is the
+// label prefixes the identifier-arm errors WriteResult itself raises
+// (e.g. "composition", "ehrstatus.Put") and the empty-body Cause inside
+// [*NoRepresentationError]; the representation arm's outer error string
+// is the typed error's own value-free classification. decode is the
 // site's own response-body decoder and is responsible for wrapping its
 // own decode errors with its own message.
 //

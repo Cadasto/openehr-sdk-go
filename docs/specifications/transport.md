@@ -124,6 +124,8 @@ A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** re
 
 The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
 
+This contract binds the versioned-write `WriteResult` family and `contribution.Commit`. EHR creation (`ehr.Create`, a non-versioned write that decodes through the shared read-path `transport.Decode`) retains the bare `transport.ErrInvalidShape` contract on an empty 2xx body; typing its committed-but-unusable arm is deferred (recorded in the archived write-result plan's Defers).
+
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 
 ---

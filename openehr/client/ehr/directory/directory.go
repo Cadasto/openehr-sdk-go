@@ -170,9 +170,10 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // ITS-REST `Identifier` body, resolved into the metadata `VersionUID`;
 // `PreferMinimal` (the spec default) returns an empty body with only
 // metadata (`ETag` → `VersionUID`) populated. The zero resource on a
-// successful minimal/identifier write is a typed-nil pointer: use
-// [openehrclient.HasResource] (or [rm.IsTypedNil]) rather than `== nil`.
-// After 2xx + PreferRepresentation, an empty or undecodable body is a
+// successful minimal/identifier write is a nil pointer — `== nil` is a
+// correct test for this concrete return; [openehrclient.HasResource] is
+// the uniform presence test across write leaves (REQ-094). After 2xx +
+// PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {

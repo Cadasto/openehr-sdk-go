@@ -7,7 +7,7 @@
 **Probes:** none new — package tests only (PROBE-061/071 stay the representation-decode probes)
 **Implementation:** landed (amendment on a landed REQ)
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
-**Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap)
+**Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap); typing `ehr.Create`'s committed-but-unusable arm (it decodes through `transport.Decode`, shared with the read paths, which keep the bare `ErrInvalidShape`)
 
 > **Execution (historical):** phases were worked in order; this copy is the archived record.
 

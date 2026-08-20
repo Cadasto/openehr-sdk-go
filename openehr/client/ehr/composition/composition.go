@@ -167,9 +167,10 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //     identifier is resolved into the metadata `VersionUID` (the
 //     `Location` header stays canonical when present).
 //
-// The zero resource on a successful minimal/identifier write is a
-// typed-nil pointer: use [openehrclient.HasResource] (or [rm.IsTypedNil])
-// rather than treating presence as `== nil`. After 2xx +
+// The zero resource on a successful minimal/identifier write is a nil
+// pointer — `== nil` is a correct test for this concrete return;
+// [openehrclient.HasResource] is the uniform presence test across write
+// leaves, including interface returns (REQ-094). After 2xx +
 // PreferRepresentation, an empty or undecodable body is a
 // [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
