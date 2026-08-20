@@ -102,7 +102,7 @@ func TestCommitIdentifierSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("identifier success err = %v", err)
 	}
-	if out != nil {
+	if openehrclient.HasResource(out) {
 		t.Errorf("identifier mode returns no Contribution, got %+v", out)
 	}
 	if meta == nil {

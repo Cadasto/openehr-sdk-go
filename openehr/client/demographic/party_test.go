@@ -483,7 +483,7 @@ func TestCreateSendsAuditAndPreferHeaders(t *testing.T) {
 
 // TestCreatePreferRepresentationEmptyBody pins the REQ-094 strict guard: a
 // caller that asks for representation but gets no body must see
-// ErrInvalidShape, never a silently-nil Party.
+// NoRepresentationError, never a silently-nil Party.
 func TestCreatePreferRepresentationEmptyBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("ETag", `"`+personVersion+`"`)
@@ -491,14 +491,24 @@ func TestCreatePreferRepresentationEmptyBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, meta, err := demographic.Create(t.Context(), newClient(t, srv),
+	out, meta, err := demographic.Create(t.Context(), newClient(t, srv),
 		&rm.Person{Name: rm.DVText{Value: "Jane Doe"}},
 		demographic.WithPrefer(transport.PreferRepresentation))
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("representation empty body: err = %v, want *NoRepresentationError", err)
+	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
-		t.Fatalf("representation empty body: err = %v, want ErrInvalidShape", err)
+		t.Error("empty body must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Error("expected no Party on empty representation body")
 	}
 	if meta == nil {
-		t.Error("expected metadata alongside ErrInvalidShape")
+		t.Error("expected metadata alongside NoRepresentationError")
+	}
+	if nre.Meta == nil {
+		t.Error("NoRepresentationError must carry commit metadata")
 	}
 }
 

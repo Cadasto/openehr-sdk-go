@@ -196,9 +196,8 @@ func TestPutMinimal(t *testing.T) {
 
 // TestPutRepresentationEmptyBodyErrors pins REQ-094 on the ehr_status
 // leaf (same shared openehrclient.WriteResult pattern as
-// composition/directory): an empty
-// body under Prefer=return=representation MUST surface
-// transport.ErrInvalidShape, not a silent nil EHR_STATUS.
+// composition/directory): an empty body under Prefer=return=representation
+// MUST return NoRepresentationError, not a silent nil EHR_STATUS.
 func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(ehrStatusUID)+`"`)
@@ -218,14 +217,21 @@ func TestPutRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, "old-version-uid", status,
 		ehrstatus.WithPrefer(transport.PreferRepresentation),
 	)
-	if !errors.Is(err, transport.ErrInvalidShape) {
-		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
-	if out != nil {
-		t.Errorf("expected nil EHR_STATUS on empty representation body, got %+v", out)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("empty body must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Errorf("expected no EHR_STATUS on empty representation body, got %+v", out)
 	}
 	if meta == nil || meta.VersionUID != ehrStatusUID {
 		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+	if nre.Meta == nil || nre.Meta.VersionUID != ehrStatusUID {
+		t.Errorf("NoRepresentationError metadata = %+v, want VersionUID %q", nre.Meta, ehrStatusUID)
 	}
 }
 
