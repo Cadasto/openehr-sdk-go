@@ -1,62 +1,46 @@
 # AGENTS.md
 
-**Entry point for every coding agent and contributor.** Pair with [`README.md`](README.md). Claude Code also loads [`.claude/CLAUDE.md`](.claude/CLAUDE.md) (Claude-specific notes only). This is the 1-page map; the specialized docs it links are **canonical** — defer to them rather than duplicating.
+**Entry point for every coding agent and contributor.** Pair with [`README.md`](README.md); Claude Code also loads [`.claude/CLAUDE.md`](.claude/CLAUDE.md) (Claude-specific notes only).
 
 ## Project
 
-A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`. **openEHR-first**: openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
+A first-party **Go SDK for openEHR** — `github.com/cadasto/openehr-sdk-go`, MIT. **openEHR-first**: openEHR REST `1.1.0-development`, the Reference Model, AQL, ADL 1.4 OPT, and SMART-on-openEHR auth are the normative scope. Cadasto-platform extras (Datamap, MPI, Extra API, Admin, Care) ship in the same module for v1, behind a clean `cadasto/` cut line so later extraction is a subtree move, not a rewrite.
 
-| Aspect | Setting |
-|---|---|
-| Module path | `github.com/cadasto/openehr-sdk-go` |
-| License | MIT |
-| Go version | `1.26.x` (current stable line, floor `1.26.0` — [REQ-002](docs/specifications/packaging.md#req-002--go-version)) |
-| openEHR REST | `1.1.0-development` |
-| Status | **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md) |
+Go `1.26.x`, module floor `1.26.0` ([REQ-002](docs/specifications/packaging.md#req-002--go-version)). **Early implementation, pre-1.0** — landed-vs-planned in [docs/roadmap.md](docs/roadmap.md).
 
 ## Source of truth
 
 The normative spec lives **in this repo** under [`docs/specifications/`](docs/specifications/) — self-contained; implementing or reviewing the SDK needs no external sources. Conventions (RFC-2119 keywords, status headers, identifiers, traceability): [`docs/specifications/README.md`](docs/specifications/README.md).
 
-When code and specs disagree, **the specs win**. Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
+`docs/specifications/` carries the RFC-2119 statements code, plans, and tests are measured against; `docs/architecture.md` carries the design narrative. **When anything disagrees with the specs, the specs win.** Never silently resolve an open [research strand](docs/specifications/research-strands.md) in code — surface the decision or land an [ADR](docs/adr/).
 
 ## Documentation
 
-Reading order:
+Reading order — the specialized docs are **canonical**; defer to them rather than restating:
 
 | # | Doc | Scope |
 |---|---|---|
 | 0 | [docs/quick-start.md](docs/quick-start.md) · [docs/examples.md](docs/examples.md) | **Developer onboarding** — install, integration paths, runnable `cmd/examples/` catalog |
-| 1 | [AGENTS.md](AGENTS.md) (this file) | 1-page entry point |
-| 2 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
-| 3 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
-| 4 | [docs/ai-workflow.md](docs/ai-workflow.md) | AI conventions — recommended plugins/skills (go-coding, gopls-lsp, codebase-memory), MCP/openEHR skills, hooks |
-| 5 | [docs/adr/](docs/adr/) | Closed architectural decisions |
-| 6 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
-| 7 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
-| 8 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
-
-**Normative vs narrative.** `docs/specifications/` carries the RFC-2119 statements code/plans/tests are measured against; `docs/architecture.md` carries the design narrative. If they disagree, the specs win.
+| 1 | [docs/specifications/](docs/specifications/) | **Normative specs** — REQ/PROBE/STRAND in [REQ.md](docs/specifications/REQ.md); machine map in [traceability.yaml](docs/specifications/traceability.yaml); process + descriptor in [development-process.md](docs/development-process.md) / [.sdd.yaml](docs/.sdd.yaml) |
+| 2 | [docs/architecture.md](docs/architecture.md) | Design narrative — package organization, dependencies, integration, mermaid diagrams |
+| 3 | [docs/ai-workflow.md](docs/ai-workflow.md) | **AI conventions** — the working loop, recommended plugins/skills, openEHR ground-truth lookups, hooks |
+| 4 | [docs/adr/](docs/adr/) | Closed architectural decisions |
+| 5 | [docs/plans/](docs/plans/) + [docs/roadmap.md](docs/roadmap.md) | Implementation plans and landed-vs-planned checklist |
+| 6 | [CHANGELOG.md](CHANGELOG.md) + [docs/releases.md](docs/releases.md) | Release log and version policy |
+| 7 | [CONTRIBUTING.md](CONTRIBUTING.md) + [SECURITY.md](SECURITY.md) | Contributor flow and vulnerability reporting |
 
 ### Spec-driven workflow (agents)
 
-When implementing or reviewing against a REQ:
+**Start with `make spec-context REQ=NNN`** — one bundle with the registry row, traceability block, canonical excerpt, and touching strands. **Finish with `make spec-check`** (`make ci` includes it). The step-by-step loop lives in [ai-workflow.md § The loop](docs/ai-workflow.md#the-loop); the rules that bind regardless of how you got there:
 
-0. Run `make spec-context REQ=NNN` — one bundle with the registry row, traceability block (packages/probes/tests/plans), canonical excerpt, and touching strands.
-1. Open the row in [`docs/specifications/REQ.md`](docs/specifications/REQ.md) → follow the **Canonical** link (don't read prose out of `REQ.md` itself).
-2. Check [`docs/specifications/traceability.yaml`](docs/specifications/traceability.yaml) for landed packages, probes, and tests.
-3. Cite `REQ-NNN` / `PROBE-NNN` in tests and `doc.go`; update `traceability.yaml` when landing code.
-4. Run `make spec-check` before claiming spec compliance (`make ci` includes it).
-
-New normative text goes in the **canonical topic spec** first, then the REQ registry row — never as duplicate prose in `REQ.md` or as a rule that exists only in code.
-
-- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose. See [ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md).
+- New normative text goes in the **canonical topic spec** first, then the REQ registry row — never as duplicate prose in `REQ.md`, and never as a rule that exists only in code.
+- Cite `REQ-NNN` / `PROBE-NNN` in tests and `doc.go`; update `traceability.yaml` in the same change that lands the code.
+- **`REQ`/`PROBE` is the feature register; there is no `SDK-GAP` identifier.** A discovered gap is worked under a REQ (extend or create via `sdd-specify`) with a `PROBE` for wire conformance. A GAP-style label may appear only as an ephemeral in-flight plan filename — never in `traceability.yaml`, test names, `doc.go`, or normative prose ([ADR 0012](docs/adr/0012-retire-sdk-gap-identifier.md)).
+- Keep [`cmd/examples/`](cmd/examples/) docs in sync **in the same PR** as the program — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
 **Descriptor & process.** Machine-readable conventions (REQ style, document paths, `make` targets, `PROBE`/`STRAND` toggles, ground-truth source) live in [`docs/.sdd.yaml`](docs/.sdd.yaml) — the descriptor the `sdd-*` skills read first. The end-to-end loop and the Definition of Ready / Done are mapped in [`docs/development-process.md`](docs/development-process.md).
 
 **superpowers + SDD.** SDD owns the spec/traceability layer; the superpowers loop owns build/verify/branch. Brainstorming design docs are *narrative input* that feeds the canonical specs (not a normative source), and plans belong in [`docs/plans/`](docs/plans/) with the `**Covers:**` header + DoR/DoD — never a parallel `docs/superpowers/` tree. Full redirect: [development-process.md § superpowers + SDD](docs/development-process.md#superpowers--sdd).
-
-**Examples:** when you add, rename, remove, or materially change a [`cmd/examples/`](cmd/examples/) program, keep its docs in sync **in the same PR** — checklist in [ai-workflow.md § Examples](docs/ai-workflow.md#examples).
 
 ## Module layout & boundaries
 
@@ -78,7 +62,7 @@ The elaborate, normative idiom spec is [`idiom.md`](docs/specifications/idiom.md
 - **Tests:** stdlib `testing` only — no assertion libraries — plus helpers in [`testkit/`](testkit/); behaviour tests for a public surface belong in the external `_test` package, so they exercise what consumers can reach. Guards carry the bar their spec sets — typically *removing the guard MUST fail a named test*.
 - **Commits:** [Conventional Commits](https://www.conventionalcommits.org/) — scope is the touched area (`auth`, `rm`, `transport`, `client/ehr`, `docs`, `build`, …).
 
-**CHANGELOG.md** — agents update it only on request or when cutting a release / merging a milestone. **One single-sentence bullet (~35 words max) per artefact class** — artefact + scope + key REQ/PROBE only; **no API inventories, method/type enumerations, or per-REQ breakdowns** (those live in `traceability.yaml`, commits, PR bodies). The release-summary line is one sentence. Err short — release notes are generated verbatim from the block, and a longer entry is a defect, not thoroughness. Pre-1.0: only `### Added` is used.
+**CHANGELOG.md** — update only on request or when cutting a release. **One single-sentence bullet (~35 words max) per artefact class**: artefact + scope + key REQ/PROBE, never API inventories or per-REQ breakdowns (those live in `traceability.yaml`, commits, and PR bodies). Release notes are generated verbatim from the block, so a long entry is a defect — err short. Pre-1.0: `### Added` only.
 
 ## Tooling & workflow
 
@@ -93,12 +77,18 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 | Vet / lint | `make vet` / `make lint` |
 | Unit / race tests | `make test` / `make test-race` |
 | BMM codegen verify | `make codegen-verify` |
-| AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen`. Both run under `make test` / `make ci`. |
+| AQL parser codegen verify | `make aqlgen-verify` — fails if `openehr/aql/parse/gen/` drifts from the `active/` grammar (needs Docker, not a host JRE); regenerate with `make aqlgen` |
 | Spec traceability | `make spec-check` |
 | Spec context bundle | `make spec-context REQ=NNN` — registry row + traceability + canonical excerpt + strands |
 | Probe status | `make probe-status` — each PROBE's status and whether its test file exists |
-| FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored upstream EHRbase FLAT corpus (PROBE-086's input) against its `MANIFEST.txt`; runs under `make ci`. `make flat-conformance-check` adds an upstream-drift report (needs network; dev helper, not a gate). Never hand-edit a vendored fixture: being byte-identical to upstream is its whole value |
+| FLAT corpus integrity | `make flat-conformance-verify` — offline `sha256` of the vendored EHRbase FLAT corpus (PROBE-086's input); `…-check` adds a network drift report (dev helper, not a gate) |
 | Build Docker dev image | `make image-dev` (only when host Go is missing) |
+
+**Gotchas worth the reading:**
+
+- **Never hand-edit a vendored fixture** under `resources/` or `testkit/cassettes/` — being byte-identical to upstream is its whole value. Re-sync instead.
+- `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
+- **`make ci` cannot complete without Docker**, via one link only: `test` → `aqlgen-verify` → `antlr-image`. (`codegen-verify` runs host Go; `lint` prefers a host `golangci-lint`.) Without Docker run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 
@@ -119,7 +109,7 @@ Rationale and the wider picture: [architecture.md § Dependencies](docs/architec
 
 Use the openEHR MCP skills before guessing RM paths, terminology codes, or ITS-JSON shapes — see [ai-workflow.md § openEHR ground truth](docs/ai-workflow.md#openehr-ground-truth-mcp--skills). The openEHR conformance probe suite is the source of truth for wire-level semantics; the openEHR spec is authoritative for class invariants.
 
-**REST API schema.** The machine-readable openEHR REST API contract is vendored in [`resources/its-rest/`](resources/its-rest/README.md) — the upstream `*-validation.openapi.yaml` OpenAPI 3.0 documents (EHR, Query, Definition, Admin, Demographic, System). When you need endpoint paths, request/response bodies, headers, or status codes for any REST resource, read those files rather than guessing. Refresh / verify the pin with `make its-rest-sync` / `make its-rest-check`. EHRbase-specific endpoints and deployment extensions (e.g. the `/admin/template/all` template purge) are referenced separately in [`resources/ehrbase/`](resources/ehrbase/README.md) — vendored EHRbase OpenAPI specs, **not** the normative contract.
+**REST API schema.** For any endpoint path, request/response body, header, or status code, read the vendored OpenAPI pin in [`resources/its-rest/`](resources/its-rest/README.md) (`*-validation.openapi.yaml`) rather than guessing — it is the machine-readable contract. Refresh/verify with `make its-rest-sync` / `make its-rest-check`. [`resources/ehrbase/`](resources/ehrbase/README.md) holds EHRbase deployment extensions and is **not** the normative contract.
 
 ## Do not touch (yet)
 
