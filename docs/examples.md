@@ -1,15 +1,10 @@
 # Examples
 
-Runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes** — production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns.
+**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline — the two REST ones use an in-process `httptest` backend, so nothing needs a CDR.
 
-All examples resolve fixture paths relative to the source file, so `go run ./cmd/examples/<name>` works from **any working directory** inside a clone.
+The 16 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes** — production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note, which is the part worth reading if you are here to build something.
 
-Build every example at once:
-
-```bash
-make build
-# or: go build ./cmd/examples/...
-```
+Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from **any working directory** inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
 ---
 
@@ -293,9 +288,7 @@ canonical emission:
   SELECT TOP 5 BACKWARD c/uid/value, 1.5, 'quoted' FROM COMPOSITION c ORDER BY c/uid/value DESC
 ```
 
-**What to copy into your app:** type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue — the sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.
-
-**What to copy into your app:** use `parse.ParseQuery(src)` to get the structured AST when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings); check `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps. `Query.Emit()` round-trips the AST back to AQL for execution against the CDR.
+**What to copy into your app:** use `parse.ParseQuery(src)` when you need to introspect a caller-supplied query (highlight paths, swap a comparison value, audit alias bindings), and `errors.Is(err, aql.ErrIncompleteAST)` to branch on catalogue gaps; `Query.Emit()` round-trips the AST back to AQL for execution. Type-switch over `parse.SelectExpr` / `aql.WhereExpr` / `aql.Value` and treat an unrecognised case as out-of-catalogue — those sets grow additively. Check `From.Junction` before `From.Root`: a FROM-root junction leaves `Root` zero.
 
 ### lint-aql
 

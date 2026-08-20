@@ -2,7 +2,7 @@
 
 **Narrative companion to [`docs/specifications/`](../docs/specifications/).** This document describes the SDK's structure as prose and diagrams; the normative `MUST / SHOULD / MAY` statements live in [`docs/specifications/`](../docs/specifications/). When the two disagree, `docs/specifications/` wins and this document is the one to update.
 
-> **Status: early implementation (pre-1.0).** A large surface is landed — BMM codegen, RM types + registry, canonical JSON/XML, `transport/`, the auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart`), `smart/discovery` + launch context, the openEHR REST clients, and the ADL 1.4 template / validation / instance / composition stack. The composition/AQL *builders*, SMART App Registration, and the `cadasto/*` extras are open. Authoritative landed-vs-planned matrix: [`roadmap.md`](roadmap.md).
+> **Status: early implementation (pre-1.0).** A large surface is landed — BMM codegen, RM types + registry, canonical JSON/XML, `transport/`, the auth providers (`clientcreds`, `jwtbearer`, `basic`, `smart`), `smart/discovery` + launch context, the openEHR REST clients, and the ADL 1.4 template / validation / instance / composition stack **including the composition and AQL builders**. Still open: SMART App Registration, the `cadasto/*` extras, the sandbox transport + probe runner, and ADL 2. Authoritative landed-vs-planned matrix: [`roadmap.md`](roadmap.md).
 
 ## Where to find what
 
@@ -90,9 +90,7 @@ flowchart TD
 
 ## Dependencies
 
-The SDK is built for a minimal, auditable dependency surface:
-
-Runtime dependencies are kept deliberately minimal and reviewed. The current set:
+Runtime dependencies are deliberately minimal and auditable — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 
 | Dependency | Scope | Rationale |
 |---|---|---|
