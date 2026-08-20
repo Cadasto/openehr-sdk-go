@@ -379,6 +379,9 @@ requirements:
       - openehr/client/ehr/composition/composition_test.go
       - openehr/client/ehr/directory/directory_test.go
       - openehr/client/ehr/ehrstatus/ehrstatus_test.go
+      - openehr/client/ehr/resource_test.go
+      - openehr/client/ehr/write_test.go
+      - openehr/client/ehr/contribution/representation_test.go
       - testkit/probes/versioned/probe_071_composition_write_response_shape.go
     notes: >-
       All three write-path modes landed for the shared WriteResult family

@@ -64,8 +64,10 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 //
 //   - PreferRepresentation decodes the bare resource body via decode.
 //     REQ-094: representation MUST NOT silently downgrade to an empty
-//     body — an empty body returns [transport.ErrInvalidShape] rather
-//     than a nil/zero resource.
+//     body — an empty or undecodable body returns a
+//     [*NoRepresentationError] (wrapping [transport.ErrInvalidShape] for
+//     an empty body, the decoder's error otherwise) that carries the
+//     commit metadata, never a nil/zero resource.
 //   - PreferIdentifier resolves the ITS-REST Identifier body into the
 //     returned metadata's VersionUID. REQ-094: populate the identifier
 //     slot from the body when present; never silently discard it.
@@ -94,11 +96,14 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	switch req.Prefer {
 	case transport.PreferRepresentation:
 		if len(resp.Body) == 0 {
-			return zero, meta, fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape)
+			return zero, meta, &NoRepresentationError{
+				Meta:  meta,
+				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),
+			}
 		}
 		out, err := decode(resp.Body)
 		if err != nil {
-			return zero, meta, err
+			return zero, meta, &NoRepresentationError{Meta: meta, Cause: err}
 		}
 		return out, meta, nil
 	case transport.PreferIdentifier:
