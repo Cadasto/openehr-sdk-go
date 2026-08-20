@@ -67,12 +67,19 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 //     body — an empty or undecodable body returns a
 //     [*NoRepresentationError] (wrapping [transport.ErrInvalidShape] for
 //     an empty body, the decoder's error otherwise) that carries the
-//     commit metadata, never a nil/zero resource.
+//     commit metadata, not a nil-error success. The resource slot is
+//     still the zero value.
 //   - PreferIdentifier resolves the ITS-REST Identifier body into the
 //     returned metadata's VersionUID. REQ-094: populate the identifier
 //     slot from the body when present; never silently discard it.
 //   - Any other Prefer (minimal, the spec default, or unset) returns a
 //     nil/zero resource; the version id is in Location/ETag.
+//
+// A successful minimal or identifier write returns a zero resource. For
+// a pointer T that is a typed nil; for an interface T (demographic
+// [rm.Party]) it may be a boxed typed-nil pointer. `== nil` is not a
+// reliable presence test across those return types — use [HasResource]
+// (or [rm.IsTypedNil] when already holding the RM value).
 //
 // label prefixes every error WriteResult itself raises (e.g.
 // "composition", "ehrstatus.Put") so each site's error strings stay

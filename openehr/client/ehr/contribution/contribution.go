@@ -27,7 +27,10 @@ type CommitOption func(*commitConfig)
 // WithPrefer overrides the response-shape preference (REQ-094).
 // Default [transport.PreferMinimal] — the spec write-path rule. With
 // PreferRepresentation the server returns the persisted Contribution
-// body which is decoded into the returned [*rm.Contribution].
+// body which is decoded into the returned [*rm.Contribution]; an empty
+// or undecodable 2xx body is a [*openehrclient.NoRepresentationError],
+// not a silent metadata-only success. PreferIdentifier is metadata-only
+// today (identifier-slot population is deferred).
 func WithPrefer(p transport.Prefer) CommitOption {
 	return func(c *commitConfig) { c.prefer = p }
 }
@@ -43,7 +46,13 @@ func WithPrefer(p transport.Prefer) CommitOption {
 // `IMPORTED_VERSION<T>` (REQ-050/095 / PROBE-072), NOT the persisted
 // `rm.Contribution` shape whose `versions[]` is `[]OBJECT_REF`. The
 // response decodes as `*rm.Contribution` (persisted shape, returned
-// under `Prefer: return=representation`).
+// under `Prefer: return=representation`). After 2xx +
+// PreferRepresentation, an empty or undecodable body is a
+// [*openehrclient.NoRepresentationError] that carries the commit
+// metadata; a non-2xx stays a [*transport.WireError]. A successful
+// minimal or identifier write returns a nil `*rm.Contribution` — a
+// typed-nil pointer; use [openehrclient.HasResource] (or
+// [rm.IsTypedNil]) rather than `== nil` as the presence test.
 //
 // Concurrency failures within the batch surface as
 // [transport.ErrVersionConflict].

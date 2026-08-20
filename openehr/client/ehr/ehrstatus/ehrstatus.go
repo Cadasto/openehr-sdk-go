@@ -126,7 +126,11 @@ func WithLifecycleState(s openehrclient.LifecycleState) PutOption {
 // the returned `*rm.EHRStatus` is nil and only the metadata is
 // populated; identifier returns the ITS-REST `Identifier` body,
 // resolved into the metadata `VersionUID`; representation returns the
-// full updated EHR_STATUS in the body.
+// full updated EHR_STATUS in the body. The zero resource on a
+// successful minimal/identifier write is a typed-nil pointer: use
+// [openehrclient.HasResource] (or [rm.IsTypedNil]) rather than `== nil`.
+// After 2xx + PreferRepresentation, an empty or undecodable body is a
+// [*openehrclient.NoRepresentationError] carrying commit metadata.
 //
 // Errors map per REQ-093: 409 → [transport.ErrVersionConflict], 412 →
 // [transport.ErrPreconditionFailed], 428 → [transport.ErrPreconditionRequired].
