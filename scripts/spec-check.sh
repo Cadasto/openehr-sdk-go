@@ -48,13 +48,20 @@ slugify() {
     | LC_ALL=C sed -E 's/[^a-z0-9 _-]+//g' | LC_ALL=C tr ' ' '-'
 }
 
-# Strip a trailing YAML comment and surrounding whitespace from a block-list
-# item. Block entries routinely carry `# why` notes; no path or PROBE id
-# contains '#', so cutting at the first one is safe.
+# Strip trailing whitespace and an inline `# comment` from a block-list item.
+# Paths and PROBE ids must not contain `#`; only ` # why` suffixes are stripped.
 yaml_item() {
-  local v="${1%%#*}"
+  local v="$1"
+  v="$(printf '%s' "$v" | sed -E 's/[[:space:]]+#.*$//')"
   v="${v#"${v%%[![:space:]]*}"}"
   printf '%s' "${v%"${v##*[![:space:]]}"}"
+}
+
+reset_collectors() {
+  in_packages=0
+  in_probes=0
+  in_tests=0
+  in_plans=0
 }
 
 # Lazily extract every ATX heading anchor from a spec file into anchor_set["rel#slug"].
@@ -137,10 +144,7 @@ flush_req() {
   probe_ids=()
   test_paths=()
   plan_paths=()
-  in_packages=0
-  in_probes=0
-  in_tests=0
-  in_plans=0
+  reset_collectors
 }
 
 pkg_paths=()
@@ -175,10 +179,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       _p="${_p//\"/}"
       [[ -n "$_p" ]] && pkg_paths+=("$_p")
     done
-    in_packages=0
-    in_probes=0
-    in_tests=0
-    in_plans=0
+    reset_collectors
     continue
   fi
   # Block-form `packages:` — without this arm a multi-line package list was
@@ -196,6 +197,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       _p="${_p// /}"
       [[ -n "$_p" ]] && probe_ids+=("$_p")
     done
+    reset_collectors
     continue
   fi
   if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*$ ]]; then
@@ -218,10 +220,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       _p="${_p// /}"
       [[ -n "$_p" ]] && plan_paths+=("$_p")
     done
-    in_packages=0
-    in_probes=0
-    in_tests=0
-    in_plans=0
+    reset_collectors
     continue
   fi
   # Block-form `plans:` — these used to fall through into the still-open
@@ -252,11 +251,14 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     probe_ids+=("${BASH_REMATCH[1]}")
     continue
   fi
+  # REQ-row fields we do not parse (adrs, fixtures, notes, title, …) must
+  # not leave a block collector armed for the next list.
+  if [[ -n "$current_id" && "$line" =~ ^[[:space:]]{4}[a-z_]+: ]]; then
+    reset_collectors
+    continue
+  fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
-    in_packages=0
-    in_probes=0
-    in_tests=0
-    in_plans=0
+    reset_collectors
   fi
 done < "$YAML"
 flush_req
