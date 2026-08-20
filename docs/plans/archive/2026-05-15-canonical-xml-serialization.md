@@ -199,7 +199,7 @@ Same normative rule as canonical JSON (and amended REQ-052 / REQ-056 narrative):
 - [docs/specifications/idiom.md § Generics policy](../../specifications/idiom.md#generics-policy-req-024) — REQ-024
 - [docs/specifications/conformance.md PROBE-033, PROBE-034](../../specifications/conformance.md) — reserved Phase 0
 - [Canonical JSON plan](2026-05-15-canonical-json-serialization.md) — shared ordering, `poly`, cross-format tests
-- [`.codebase-memory/adr.md`](../../../.codebase-memory/adr.md) — typereg layout (D3), flattening (D4)
+- [ADR 0002](../../adr/0002-bmm-codegen-decisions.md) — typereg layout (D3), flattening (D4)
 
 ## References
 

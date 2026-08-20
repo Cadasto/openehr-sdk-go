@@ -1,11 +1,11 @@
 # Plan — Data instance validation (Composition vs OPT, demographic, AQL)
 
 **Date:** 2026-05-21 (research-updated 2026-05-22)
-**Status:** Draft (umbrella — composition scope superseded)
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** REQ-013, REQ-014; **REQ-102** composition validation → see [`2026-05-24-composition-validation-template-driven.md`](2026-05-24-composition-validation-template-driven.md) (**landed**)
 **Probes:** PROBE-024 (landed under template — REQ-103); PROBE-025/026 (landed — [composition validation plan](2026-05-24-composition-validation-template-driven.md)); PROBE-021 partially (AQL path errors at execute time — query plan owns syntax)
-**Implementation:** partial — REQ-102 composition validator **landed** ([composition validation plan](2026-05-24-composition-validation-template-driven.md)); demographic + AQL lint **planned**
+**Implementation:** landed — composition (REQ-102), AQL lint (REQ-109) and demographic + EHR-IM roots (REQ-110) all landed via the plans linked above
 **Depends on:** [`2026-05-21-template-parser.md`](2026-05-21-template-parser.md) (REQ-100, landed); [`2026-05-22-template-req100-followups.md`](2026-05-22-template-req100-followups.md) Phases 4 + 4-bis + 5 + 6 (compiled template + RMInfoLookup + walker + REQ-103 primitives); [`2026-05-21-composition-builder.md`](2026-05-21-composition-builder.md) Phase 1 (fixture compositions); [`2026-05-21-aql-builders.md`](2026-05-21-aql-builders.md) optional for AQL lint subset
 **Defers:** Full ADL2 / AOM 2 validation surface; terminology server checks (external code-list verification); validate wire bytes / canonical JSON (no `serialize/` import); cross-archetype reference integrity (slot-fill linker)
 

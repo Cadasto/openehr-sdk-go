@@ -3,11 +3,11 @@
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Date:** 2026-06-11
-**Status:** Draft
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** [REQ-050](../../specifications/wire.md#req-050), [REQ-095](../../specifications/wire.md#req-095) (OpenAPI authoritative source); proposed addendum to REQ-059 (commit audit on write paths)
 **Probes:** **PROBE-072** (extend or sibling probe for `UPDATE_AUDIT` / `change_type` shape); possible **PROBE-073** (lifecycle_state on `UpdateVersion`)
-**Implementation:** planned
+**Implementation:** landed
 **Depends on:** Landed [`contribution.Submission`](../../../openehr/client/ehr/contribution/submission.go) + [archive plan](2026-05-26-contribution-submission-shape.md); upstream merge of [openEHR/specifications-ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)
 **Defers:** Demographic contribution client (same schema family — mirror EHR changes when `openehr/client/demographic/` lands); re-pinning bundled OAS artefacts in-repo (SDK consumes spec by reference, not vendored OAS today)
 
