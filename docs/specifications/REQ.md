@@ -123,9 +123,9 @@ Conventions: RFC 2119 keywords — see [README.md § How to read these specs](RE
 | Reference Model | 030–040 | — |
 | BMM conformance | 041–048 | 049 |
 | Wire format | 050–059 | — |
-| Authentication | 060–068 | 069 |
+| Authentication | 060–069 | — |
 | Service discovery | 070–073 | 074–079 |
-| openEHR conformance | 080–082 | 083–089 |
+| openEHR conformance | 080–083 | 084–089 |
 | Transport / observability | 090–092 | — |
 | REST binding | 093–095 | — |
 | Transport / REST extensions | 096–099 | — |

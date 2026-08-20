@@ -11,7 +11,7 @@
 
 ## Goal
 
-Make the probe catalog (63 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
+Make the probe catalog (66 entries) runnable the way REQ-082 requires, starting with the two modes CI can run with nothing external at run time — Sandbox outright, Cassette by replaying a vendored recording (capturing one still needs a deployment). Consumers are twofold: the SDK's own CI, which today reaches each probe only through a bespoke hand-written test, and SDK **integrators**, for whom `sandbox/` is the advertised way to test an application against a fake CDR — a package that currently contains no code.
 
 ## Why this is the next conformance step
 
