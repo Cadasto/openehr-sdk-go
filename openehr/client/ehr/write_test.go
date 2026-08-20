@@ -65,22 +65,28 @@ func TestWriteResultRepresentationEmptyBody(t *testing.T) {
 	if meta == nil || nre.Meta == nil {
 		t.Error("commit metadata must survive the failed representation")
 	}
+	const wantUID VersionUID = "obj-1::sys::1"
+	if meta.VersionUID != wantUID || nre.Meta.VersionUID != wantUID {
+		t.Errorf("VersionUID meta=%q nre=%q, want %q", meta.VersionUID, nre.Meta.VersionUID, wantUID)
+	}
 }
 
 // REQ-094: a 2xx representation whose body cannot be decoded is a
 // NoRepresentationError wrapping the decoder's error, not ErrInvalidShape.
 func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/ehr-1/composition/obj-1::sys::1")
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte("not json"))
 	}))
 	defer srv.Close()
 
 	decodeErr := errors.New("boom")
-	_, _, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferRepresentation), "composition",
+	_, meta, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferRepresentation), "composition",
 		func([]byte) (*rm.Composition, error) { return nil, decodeErr })
 
-	if _, ok := errors.AsType[*NoRepresentationError](err); !ok {
+	var nre *NoRepresentationError
+	if !errors.As(err, &nre) {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, decodeErr) {
@@ -88,6 +94,13 @@ func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	}
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("a decode failure is not an empty-body ErrInvalidShape")
+	}
+	const wantUID VersionUID = "obj-1::sys::1"
+	if meta == nil || nre.Meta == nil {
+		t.Fatal("commit metadata must survive a decode failure")
+	}
+	if meta.VersionUID != wantUID || nre.Meta.VersionUID != wantUID {
+		t.Errorf("VersionUID meta=%q nre=%q, want %q", meta.VersionUID, nre.Meta.VersionUID, wantUID)
 	}
 }
 
