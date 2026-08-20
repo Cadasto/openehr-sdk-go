@@ -1,11 +1,11 @@
 # Plan — Write-result contract
 
 **Date:** 2026-08-18
-**Status:** Draft
+**Status:** Done
 **Owner:** SDK maintainers
 **Covers:** [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (implementation-aligned amendment — the normative delta is carried in this plan under [Spec delta](#phase-0--spec-delta-same-pr-as-the-code) and lands in `transport.md` in the same PR as the code, never ahead of it)
 **Probes:** none new — package tests only (PROBE-061/071 stay the representation-decode probes)
-**Implementation:** planned (amendment on a landed REQ)
+**Implementation:** landed (amendment on a landed REQ)
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
 **Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap)
 
@@ -43,11 +43,11 @@
 
 | Step | Status |
 |---|---|
-| Phase 0: REQ-094 § amended (same PR as the code) | |
-| Code | |
-| Tests with `// REQ-094` comments | |
-| `make spec-check` | |
-| `make ci` | |
+| Phase 0: REQ-094 § amended (same PR as the code) | ✅ |
+| Code | ✅ |
+| Tests with `// REQ-094` comments | ✅ |
+| `make spec-check` | ✅ |
+| `make ci` | host gates ✅ (gofmt/vet/lint/build/`go test ./...`/`codegen-verify`); the `aqlgen-verify`→`antlr-image` step needs Docker and is unaffected by this change |
 
 ## Phases
 

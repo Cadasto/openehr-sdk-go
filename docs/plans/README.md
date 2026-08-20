@@ -8,11 +8,9 @@ Active and archived implementation plans for `openehr-sdk-go`. Plans derive from
 
 ### Client path safety, write-result contract, and missing leaves (2026-08-18)
 
-Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143). Three have landed; the write-result contract is the one still open. The REQ-094 amendment is carried inside its plan and lands with the code (implementation-aligned), not ahead of it.
+Four independent plans, specified first (REQ-150 / REQ-094 amendment / REQ-142 / REQ-143) — all four have now landed. The REQ-094 amendment was carried inside its plan and landed with the code (implementation-aligned), not ahead of it.
 
-| Plan | Scope | Covers | Probe |
-|---|---|---|---|
-| [2026-08-18-write-result-contract.md](2026-08-18-write-result-contract.md) | Typed-nil success body + committed-but-unusable representation | REQ-094 (implementation-aligned) | package tests (PROBE-061/071 unchanged) |
+The write-result contract plan **landed 2026-08-20 and was archived** ([archive/2026-08-18-write-result-contract.md](archive/2026-08-18-write-result-contract.md)): REQ-094 stays `landed` (implementation-aligned amendment), PROBE-061/071 unchanged. `ehr.HasResource` is a reflection-free typed-nil guard for the absent-resource success path, and a 2xx `representation` with an empty or undecodable body — in both `WriteResult` (composition / directory / ehr_status / demographic) and `contribution.Commit` — is now a typed `ehr.NoRepresentationError` that carries the commit metadata and is distinguishable via `errors.As`, never a silent nil success. **Deferred:** a breaking `WriteOutcome[T]`, canjson marshal-error typing, and `contribution.Commit` `identifier`-slot population.
 
 The contribution-read plan **landed 2026-08-19 and was archived** ([archive/2026-08-18-contribution-get.md](archive/2026-08-18-contribution-get.md)): REQ-142 is `landed` and PROBE-092 is Implemented (Sandbox). `contribution.Get` issues `GET /ehr/{ehr_id}/contribution/{contribution_uid}` and decodes the persisted `CONTRIBUTION`; `Repository` grew the same read — source-compatible for callers, a compile-time break for out-of-tree implementers. Empty ids fail with `ErrInvalidConfig` before any request and a 404 maps to `ErrNotFound`. Version metadata is returned for shape consistency but never required: the pin defines only `Content-Type` on `200_CONTRIBUTION`. This closes the EHR contribution surface — the pin declares no other contribution operation.
 
