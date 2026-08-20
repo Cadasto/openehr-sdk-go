@@ -88,7 +88,7 @@ Host Go `1.26.x` is the fast path; the Makefile auto-routes through a Docker dev
 
 - **Never hand-edit a vendored fixture** under `resources/` or `testkit/cassettes/` — being byte-identical to upstream is its whole value. Re-sync instead.
 - `make probe-status` prints `MISSING` for any probe covered inline or in a sibling's file. That is the filename heuristic, **not** drift — `make spec-check` is the real gate.
-- **`make ci` cannot complete without Docker**, via one link only: `test` → `aqlgen-verify` → `antlr-image`. (`codegen-verify` runs host Go; `lint` prefers a host `golangci-lint`.) Without Docker run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
+- **`make ci` cannot complete without Docker** — `test` → `aqlgen-verify` → `antlr-image` is the only *unconditional* Docker link. The rest reaches for Docker only when host tooling is missing: `vet`/`build`/`test` need host Go `1.26.x`, `fmt-check`/`lint` a host `golangci-lint` (routing: [ci.md](docs/ci.md)). With those installed, run `fmt-check`, `vet`, `spec-check`, `flat-conformance-verify`, `build` and `go test ./... -count=1`, and let PR CI be the gate.
 
 **Runtime dependencies** are deliberately minimal and reviewed — adding one is a decision, not a convenience. The current set, each confined to the package it serves:
 
