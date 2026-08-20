@@ -388,10 +388,11 @@ requirements:
       (composition / directory / ehr_status / demographic): return=representation
       bare-body decode (PROBE-061/071); return=identifier populates the
       VersionMetadata identifier slot from the ITS-REST Identifier body
-      (ehr.ResolveIdentifierBody); a 2xx representation with an empty or
-      undecodable body returns NoRepresentationError wrapping
-      transport.ErrInvalidShape (no silent downgrade), carrying the commit
-      metadata and distinguishable via errors.As. HasResource is the
+      (ehr.ResolveIdentifierBody); a 2xx representation with an empty body
+      returns NoRepresentationError wrapping transport.ErrInvalidShape
+      (no silent downgrade); an undecodable body returns
+      NoRepresentationError wrapping the decoder's error. Both carry the
+      commit metadata and are distinguishable via errors.As. HasResource is the
       reflection-free typed-nil guard for the absent-resource success path.
       contribution.Commit carries minimal and the representation decode only
       and obeys the same NoRepresentationError rule; the identifier slot is

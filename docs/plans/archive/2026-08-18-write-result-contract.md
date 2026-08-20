@@ -3,13 +3,13 @@
 **Date:** 2026-08-18
 **Status:** Done
 **Owner:** SDK maintainers
-**Covers:** [REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) (implementation-aligned amendment — the normative delta is carried in this plan under [Spec delta](#phase-0--spec-delta-same-pr-as-the-code) and lands in `transport.md` in the same PR as the code, never ahead of it)
+**Covers:** [REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation) (implementation-aligned amendment — binding words live in that §; this plan is delivery history)
 **Probes:** none new — package tests only (PROBE-061/071 stay the representation-decode probes)
 **Implementation:** landed (amendment on a landed REQ)
 **Depends on:** landed REQ-094 Prefer state machine; `rm.IsTypedNil`
 **Defers:** a breaking `WriteOutcome[T]` result type; canjson marshal error typing; changing Prefer defaults; `contribution.Commit` `identifier`-slot population (Commit treats `identifier` as metadata-only today — REQ-094's landed-state paragraph names the gap)
 
-> **Execution:** work the phases in order and the steps within a phase sequentially. Run each step's verification command before moving on; a failing step blocks the next. Commit exactly where a step says commit.
+> **Execution (historical):** phases were worked in order; this copy is the archived record.
 
 **Goal:** Callers can tell “no body, write succeeded” from “write committed, body unusable” without inspecting `WireError` or correlating a parallel metadata value, and without treating a typed-nil resource as present.
 
@@ -26,7 +26,7 @@
 
 ## Definition of Ready
 
-- The REQ-094 amendment text is final (Phase 0 below carries it verbatim); `transport.md` is edited in this plan's PR, not before.
+- The REQ-094 amendment text is final; it landed in `transport.md` § REQ-094 in this plan's PR, not before.
 - No ADR (the success path stays `err == nil` for identifier/minimal).
 - Verification: `go test ./openehr/client/ehr/... ./openehr/client/demographic/ -count=1` (demographic calls the same `WriteResult`, so its observable error type changes with Phase 2 too), `make spec-check`, `make ci`.
 - Negative space: a 409 stays `*WireError`; an empty representation after 2xx is `*NoRepresentationError`, never a silent nil success.
@@ -38,6 +38,7 @@
 - `traceability.yaml` REQ-094 notes + tests list updated (implementation stays `landed`).
 - `make spec-check` and `make ci` pass.
 - Plan archived.
+- DoR negative space exercised: 409 stays `*WireError`; empty 2xx representation is `*NoRepresentationError`.
 
 ## Implementation checklist
 
@@ -53,25 +54,11 @@
 
 ### Phase 0 — Spec delta (same PR as the code)
 
-`transport.md` § REQ-094 is **implementation-aligned**: the spec edit and the code below ride one PR. Apply both edits to [transport.md § REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation) in this plan's first commit; `make spec-check` gates the pair.
+The RFC-2119 amendment landed in [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation). This phase is historical; the § is the only binding home.
 
-- [ ] **Step 0a:** In the landed-state paragraph ("All three write-path modes are landed…"), replace the clause "returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body" with "reports an empty body as `NoRepresentationError` wrapping `transport.ErrInvalidShape`" — one contract per path, no contradiction with the new MUSTs. In the `contribution.Commit` sentence, replace "an empty `representation` body is today a silent metadata-only success — closed by the [write-result plan](../plans/2026-08-18-write-result-contract.md) —" with "an empty or undecodable `representation` body is a `NoRepresentationError`" (Phase 2 closes the gap; the `identifier`-slot clause stays — that gap remains deferred).
-
-- [ ] **Step 0b:** Append the amendment verbatim after that paragraph (proposed SPEC text — it lands in `transport.md` § REQ-094 together with the code, and only then):
-
-> **Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil: `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper that reports false for a typed-nil pointer, a bare-nil interface, and an interface holding a typed-nil pointer, and true for any populated resource. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
->
-> **Committed write, unusable representation.** After a successful HTTP response (2xx), when `Prefer: return=representation` was sent and the body is empty or does not decode as the expected resource, the write **MUST** be reported as a typed `NoRepresentationError` that:
->
-> - carries the version metadata that proves the commit (including `VersionUID` when the server supplied it);
-> - wraps the cause (`ErrInvalidShape` for an empty body; the decoder's error otherwise);
-> - is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value.
->
-> A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** return `NoRepresentationError` for a non-2xx response. The existing `(resource, metadata, error)` triple **MUST** still populate metadata on this path so current callers do not break.
->
-> The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
-
-- [ ] **Step 0c:** Same commit: `traceability.yaml` REQ-094 — replace the "Amendment planned" note with the landed facts (tests list grows in Phase 2); `docs/roadmap.md` REQ-094 row — drop the "Amendment planned" clause. Registry Impl. stays `landed` throughout.
+- [x] **Step 0a:** Landed-state paragraph updated so empty `representation` is a `NoRepresentationError` wrapping `transport.ErrInvalidShape`; `contribution.Commit` no longer treats an empty representation as silent success. The `identifier`-slot gap stays deferred (this plan's Defers).
+- [x] **Step 0b:** Absent-resource and committed-but-unusable-representation clauses landed in that § (not restated here).
+- [x] **Step 0c:** `traceability.yaml` REQ-094 notes + `docs/roadmap.md` REQ-094 row updated. Registry Impl. stays `landed`.
 
 ### Phase 1 — `HasResource` and `NoRepresentationError`
 
@@ -85,7 +72,7 @@
 
 - Produces: `func HasResource[T any](v T) bool`; `type NoRepresentationError struct { Meta *VersionMetadata; Cause error }`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```go
 // REQ-094
@@ -128,13 +115,13 @@ func TestNoRepresentationErrorAs(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Confirm FAIL**
+- [x] **Step 2: Confirm FAIL**
 
 ```
 go test ./openehr/client/ehr/ -run 'TestHasResource|TestNoRepresentationErrorAs' -count=1
 ```
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```go
 // HasResource reports whether a write returned a usable resource (REQ-094).
@@ -160,7 +147,7 @@ func HasResource[T any](v T) bool {
 // errors.As) are the boundary-safe surface. Cause is internal diagnostics
 // and MAY carry payload-derived text — rm decode errors embed the offending
 // value verbatim (`parse %q`), the same class WithRawErrorBodies gates for
-// OpenEHRErrorDetail.Message — so Cause MUST NOT be forwarded into logs or
+// OpenEHRErrorDetail.Message — so Cause is not forwarded into logs or
 // user-facing messages without the same consideration; the godoc states
 // this split.
 type NoRepresentationError struct {
@@ -186,7 +173,7 @@ func (e *NoRepresentationError) Unwrap() error {
 }
 ```
 
-- [ ] **Step 4: Tests PASS**, then commit
+- [x] **Step 4: Tests PASS**, then commit
 
 ```
 git add openehr/client/ehr/resource.go openehr/client/ehr/resource_test.go openehr/client/ehr/write.go
@@ -207,7 +194,7 @@ EOF
 - Modify: `openehr/client/ehr/contribution/contribution.go`
 - Test: existing composition / directory / ehrstatus write tests; new Commit cases
 
-- [ ] **Step 5: Representation empty body returns `*NoRepresentationError`**
+- [x] **Step 5: Representation empty body returns `*NoRepresentationError`**
 
 Change the empty-body arm from a wrapped `ErrInvalidShape` to:
 
@@ -226,11 +213,11 @@ return zero, meta, &NoRepresentationError{Meta: meta, Cause: err}
 
 Do **not** wrap identifier/minimal success in this type.
 
-- [ ] **Step 6: `contribution.Commit`** — when `PreferRepresentation` and the body is empty, return `*NoRepresentationError` (today this is `nil, meta, nil`). Decode failure wraps the same type.
+- [x] **Step 6: `contribution.Commit`** — when `PreferRepresentation` and the body is empty, return `*NoRepresentationError` (today this is `nil, meta, nil`). Decode failure wraps the same type.
 
-- [ ] **Step 7: httptest** — PreferRepresentation + 2xx + empty body: `errors.As` `*NoRepresentationError`, `HasResource` false, `Meta` set. PreferIdentifier success: `err == nil`, `HasResource` false. Wire 409: `*WireError`, not `*NoRepresentationError`.
+- [x] **Step 7: httptest** — PreferRepresentation + 2xx + empty body: `errors.As` `*NoRepresentationError`, `HasResource` false, `Meta` set. PreferIdentifier success: `err == nil`, `HasResource` false. Wire 409: `*WireError`, not `*NoRepresentationError`.
 
-- [ ] **Step 8: Verify and commit**
+- [x] **Step 8: Verify and commit**
 
 ```
 go test ./openehr/client/ehr/... -count=1
@@ -250,5 +237,5 @@ EOF
 
 ## Mapping to specs
 
-- [transport.md § REQ-094](../specifications/transport.md#req-094--prefer-response-shape-negotiation)
-- [REQ.md](../specifications/REQ.md)
+- [transport.md § REQ-094](../../specifications/transport.md#req-094--prefer-response-shape-negotiation)
+- [REQ.md](../../specifications/REQ.md)
