@@ -184,7 +184,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   fi
   # Block-form `packages:` — without this arm a multi-line package list was
   # collected by nobody, so its paths were never existence-checked.
-  if [[ "$line" =~ ^[[:space:]]*packages:[[:space:]]*$ ]]; then
+  if [[ "$line" =~ ^[[:space:]]*packages:[[:space:]]*(#.*)?$ ]]; then
     in_packages=1
     in_probes=0
     in_tests=0
@@ -200,14 +200,14 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     reset_collectors
     continue
   fi
-  if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*$ ]]; then
+  if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*(#.*)?$ ]]; then
     in_probes=1
     in_packages=0
     in_tests=0
     in_plans=0
     continue
   fi
-  if [[ "$line" =~ ^[[:space:]]*tests:[[:space:]]*$ ]]; then
+  if [[ "$line" =~ ^[[:space:]]*tests:[[:space:]]*(#.*)?$ ]]; then
     in_tests=1
     in_packages=0
     in_probes=0
@@ -225,7 +225,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   fi
   # Block-form `plans:` — these used to fall through into the still-open
   # `tests:` collector and pass the -f check only because plans are files.
-  if [[ "$line" =~ ^[[:space:]]*plans:[[:space:]]*$ ]]; then
+  if [[ "$line" =~ ^[[:space:]]*plans:[[:space:]]*(#.*)?$ ]]; then
     in_plans=1
     in_packages=0
     in_probes=0
