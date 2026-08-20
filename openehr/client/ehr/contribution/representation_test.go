@@ -51,6 +51,35 @@ func TestCommitRepresentationEmptyBody(t *testing.T) {
 	}
 }
 
+// REQ-094: a JSON null 2xx body classifies as empty — it would decode
+// into rm.Contribution as a nil-error no-op, not as the persisted
+// resource.
+func TestCommitRepresentationNullBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("null"))
+	}))
+	defer srv.Close()
+
+	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
+		contribution.WithPrefer(transport.PreferRepresentation))
+
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
+	}
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("a null body classifies as empty and must wrap ErrInvalidShape")
+	}
+	if out != nil {
+		t.Errorf("no Contribution on a null body, got %+v", out)
+	}
+	if meta == nil || nre.Meta == nil {
+		t.Fatal("commit metadata must survive a null body")
+	}
+}
+
 // REQ-094: PreferRepresentation with an undecodable 2xx body is a
 // NoRepresentationError wrapping the decode error.
 func TestCommitRepresentationUndecodable(t *testing.T) {

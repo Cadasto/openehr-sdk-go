@@ -1,6 +1,7 @@
 package ehr
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -103,7 +104,11 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	meta := NewVersionMetadata(resp.Metadata)
 	switch req.Prefer {
 	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
+		// A JSON null literal unmarshals into a struct as a nil-error
+		// no-op, so letting it reach decode would report a zero-value
+		// resource as a full success; it carries no representation and
+		// classifies as empty (REQ-094).
+		if body := bytes.TrimSpace(resp.Body); len(body) == 0 || bytes.Equal(body, []byte("null")) {
 			return zero, meta, &NoRepresentationError{
 				Meta:  meta,
 				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),

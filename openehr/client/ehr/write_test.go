@@ -53,6 +53,34 @@ func TestWriteResultRepresentationEmptyBody(t *testing.T) {
 	}
 }
 
+// REQ-094: a 2xx representation body of JSON null carries no resource and
+// classifies as empty — json.Unmarshal(null, &struct) is a nil-error no-op,
+// so without the guard a zero-value resource would report as full success.
+func TestWriteResultRepresentationNullBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/ehr-1/composition/obj-1::sys::1")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("null\n"))
+	}))
+	defer srv.Close()
+
+	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
+
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("null body: err = %v, want *NoRepresentationError", err)
+	}
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("a null body classifies as empty and must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Error("no resource on a null representation body")
+	}
+	if meta == nil || nre.Meta == nil {
+		t.Fatal("commit metadata must survive a null body")
+	}
+}
+
 // REQ-094: a 2xx representation whose body cannot be decoded is a
 // NoRepresentationError wrapping the decoder's error, not ErrInvalidShape.
 func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
