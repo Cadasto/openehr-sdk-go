@@ -194,6 +194,7 @@ mod-tidy-check: ## Fail if go mod tidy would change go.mod or go.sum
 ##@ Specs
 
 spec-check: ## Verify docs/specifications/traceability.yaml against repo artefacts
+	@bash scripts/spec-check-selftest.sh
 	@bash scripts/spec-check.sh
 
 spec-context: ## Assemble the SDD context bundle for a REQ (usage: make spec-context REQ=094)
