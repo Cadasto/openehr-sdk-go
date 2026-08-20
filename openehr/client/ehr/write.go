@@ -111,6 +111,43 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	}
 }
 
+// NoRepresentationError reports a committed write — a 2xx response — whose
+// `representation` body was empty or could not be decoded as the expected
+// resource (REQ-094). It lets callers tell "no body, write succeeded" from
+// "write committed, body unusable" with errors.As alone: it is never a
+// [*transport.WireError], and a non-2xx failure is never wrapped in it.
+//
+// Meta carries the version metadata that proves the commit (VersionUID when
+// the server supplied it) and, together with the classification (the type
+// itself, via errors.As), is the boundary-safe surface. Cause is internal
+// diagnostics and MAY carry payload-derived text — rm decode errors embed
+// the offending value verbatim (`parse %q`), the same class
+// WithRawErrorBodies gates for OpenEHRErrorDetail.Message — so Cause MUST NOT
+// be forwarded into logs or user-facing messages without the same care.
+type NoRepresentationError struct {
+	Meta  *VersionMetadata
+	Cause error
+}
+
+func (e *NoRepresentationError) Error() string {
+	if e == nil {
+		return "ehr: no representation"
+	}
+	if e.Cause != nil {
+		return fmt.Sprintf("ehr: committed write has no usable representation: %v", e.Cause)
+	}
+	return "ehr: committed write has no usable representation"
+}
+
+// Unwrap exposes Cause so errors.Is/As reach the wrapped sentinel or decode
+// error (REQ-025).
+func (e *NoRepresentationError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
 // DoDelete issues a logical-delete request (Composition / Directory /
 // demographic PARTY — EHR_STATUS has no delete operation) and returns
 // only the version metadata; a delete response carries no body.
