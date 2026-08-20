@@ -105,7 +105,7 @@ openEHR REST 1.1.0-development uses `Prefer: return=<mode>` on write paths. The 
 
 Rules:
 
-- Per-call option: `transport.WithPrefer(Prefer)` — typed enum, not a raw string.
+- Per-call option: each write leaf exposes `WithPrefer(transport.Prefer)` (e.g. `composition.WithPrefer`) — typed enum, not a raw string.
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
@@ -117,7 +117,8 @@ All three write-path modes are landed for the shared `WriteResult` family (`comp
 
 - carries the version metadata that proves the commit (including `VersionUID` when the server supplied it);
 - wraps the cause (`transport.ErrInvalidShape` for an empty body; the decoder's error otherwise);
-- is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value.
+- is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value;
+- keeps its `Error()` string value-free in the `WireError.Error()` discipline (REQ-093): the classification only, **never** the cause text or any payload-derived value — the cause stays reachable through unwrapping.
 
 A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** return `NoRepresentationError` for a non-2xx response. The existing `(resource, metadata, error)` triple **MUST** still populate metadata on this path so current callers do not break.
 

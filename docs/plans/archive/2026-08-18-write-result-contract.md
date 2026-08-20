@@ -145,11 +145,10 @@ func HasResource[T any](v T) bool {
 
 // NoRepresentationError: Meta and the CLASSIFICATION (the type itself, via
 // errors.As) are the boundary-safe surface. Cause is internal diagnostics
-// and MAY carry payload-derived text — rm decode errors embed the offending
-// value verbatim (`parse %q`), the same class WithRawErrorBodies gates for
-// OpenEHRErrorDetail.Message — so Cause is not forwarded into logs or
-// user-facing messages without the same consideration; the godoc states
-// this split.
+// and may carry payload-derived text — rm decode errors embed the offending
+// value (`parse %q`), the same class WithRawErrorBodies gates for
+// OpenEHRErrorDetail.Message — so Error() is value-free per the landed §
+// (REQ-093 discipline); Cause is reachable only by unwrapping.
 type NoRepresentationError struct {
 	Meta  *VersionMetadata
 	Cause error
@@ -159,8 +158,11 @@ func (e *NoRepresentationError) Error() string {
 	if e == nil {
 		return "ehr: no representation"
 	}
+	if errors.Is(e.Cause, transport.ErrInvalidShape) {
+		return "ehr: committed write has no usable representation (empty body)"
+	}
 	if e.Cause != nil {
-		return fmt.Sprintf("ehr: committed write has no usable representation: %v", e.Cause)
+		return "ehr: committed write has no usable representation (decode failed)"
 	}
 	return "ehr: committed write has no usable representation"
 }

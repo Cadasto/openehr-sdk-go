@@ -2,6 +2,7 @@ package ehr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -130,23 +131,30 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 // [*transport.WireError], and a non-2xx failure is never wrapped in it.
 //
 // Meta carries the version metadata that proves the commit (VersionUID when
-// the server supplied it) and, together with the classification (the type
-// itself, via errors.As), is the boundary-safe surface. Cause is internal
-// diagnostics and MAY carry payload-derived text — rm decode errors embed
-// the offending value verbatim (`parse %q`), the same class
-// WithRawErrorBodies gates for OpenEHRErrorDetail.Message — so Cause MUST NOT
-// be forwarded into logs or user-facing messages without the same care.
+// the server supplied it); errors raised by this SDK always carry a non-nil
+// Meta. Together with the classification (the type itself, via errors.As),
+// Meta is the boundary-safe surface. Cause is internal diagnostics and may
+// carry payload-derived text — rm decode errors embed the offending value
+// (`parse %q`), the same class [transport.WithRawErrorBodies] gates for
+// [transport.OpenEHRErrorDetail] — so, like [*transport.WireError] (REQ-093),
+// Error is value-free and never interpolates Cause; callers that need the
+// diagnostics unwrap or read Cause deliberately.
 type NoRepresentationError struct {
 	Meta  *VersionMetadata
 	Cause error
 }
 
+// Error names the classification only (REQ-093 value-free discipline):
+// never Cause text, never a payload-derived value.
 func (e *NoRepresentationError) Error() string {
 	if e == nil {
 		return "ehr: no representation"
 	}
+	if errors.Is(e.Cause, transport.ErrInvalidShape) {
+		return "ehr: committed write has no usable representation (empty body)"
+	}
 	if e.Cause != nil {
-		return fmt.Sprintf("ehr: committed write has no usable representation: %v", e.Cause)
+		return "ehr: committed write has no usable representation (decode failed)"
 	}
 	return "ehr: committed write has no usable representation"
 }
