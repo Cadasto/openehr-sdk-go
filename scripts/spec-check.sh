@@ -40,9 +40,21 @@ warn_msg() { echo "spec-check: warning: $*" >&2; warn=$((warn + 1)); }
 # then spaces -> hyphens (consecutive specials collapse to repeated hyphens, e.g.
 # "REQ-055 — Wire boundary" -> "req-055--wire-boundary"). Matches GitHub's anchor rule
 # for the ASCII headings used in these specs.
+#
+# `_` is KEPT: GitHub preserves underscores in anchors, so stripping them here
+# would falsely reject a canonical link to a heading like `EVENT_CONTEXT`.
 slugify() {
   printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' \
-    | LC_ALL=C sed -E 's/[^a-z0-9 -]+//g' | LC_ALL=C tr ' ' '-'
+    | LC_ALL=C sed -E 's/[^a-z0-9 _-]+//g' | LC_ALL=C tr ' ' '-'
+}
+
+# Strip a trailing YAML comment and surrounding whitespace from a block-list
+# item. Block entries routinely carry `# why` notes; no path or PROBE id
+# contains '#', so cutting at the first one is safe.
+yaml_item() {
+  local v="${1%%#*}"
+  v="${v#"${v%%[![:space:]]*}"}"
+  printf '%s' "${v%"${v##*[![:space:]]}"}"
 }
 
 # Lazily extract every ATX heading anchor from a spec file into anchor_set["rel#slug"].
@@ -163,6 +175,19 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       _p="${_p//\"/}"
       [[ -n "$_p" ]] && pkg_paths+=("$_p")
     done
+    in_packages=0
+    in_probes=0
+    in_tests=0
+    in_plans=0
+    continue
+  fi
+  # Block-form `packages:` — without this arm a multi-line package list was
+  # collected by nobody, so its paths were never existence-checked.
+  if [[ "$line" =~ ^[[:space:]]*packages:[[:space:]]*$ ]]; then
+    in_packages=1
+    in_probes=0
+    in_tests=0
+    in_plans=0
     continue
   fi
   if [[ "$line" =~ ^[[:space:]]*probes:[[:space:]]*\[(.*)\][[:space:]]*$ ]]; then
@@ -193,12 +218,34 @@ while IFS= read -r line || [[ -n "$line" ]]; do
       _p="${_p// /}"
       [[ -n "$_p" ]] && plan_paths+=("$_p")
     done
-    in_tests=0
+    in_packages=0
     in_probes=0
+    in_tests=0
+    in_plans=0
     continue
   fi
-  if [[ $in_tests -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)[[:space:]]*$ ]]; then
-    test_paths+=("${BASH_REMATCH[1]}")
+  # Block-form `plans:` — these used to fall through into the still-open
+  # `tests:` collector and pass the -f check only because plans are files.
+  if [[ "$line" =~ ^[[:space:]]*plans:[[:space:]]*$ ]]; then
+    in_plans=1
+    in_packages=0
+    in_probes=0
+    in_tests=0
+    continue
+  fi
+  if [[ $in_packages -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
+    _v="$(yaml_item "${BASH_REMATCH[1]}")"
+    [[ -n "$_v" ]] && pkg_paths+=("$_v")
+    continue
+  fi
+  if [[ $in_plans -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
+    _v="$(yaml_item "${BASH_REMATCH[1]}")"
+    [[ -n "$_v" ]] && plan_paths+=("$_v")
+    continue
+  fi
+  if [[ $in_tests -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(.+)$ ]]; then
+    _v="$(yaml_item "${BASH_REMATCH[1]}")"
+    [[ -n "$_v" ]] && test_paths+=("$_v")
     continue
   fi
   if [[ $in_probes -eq 1 && "$line" =~ ^[[:space:]]*-[[:space:]]*(PROBE-[0-9]+) ]]; then
@@ -206,8 +253,10 @@ while IFS= read -r line || [[ -n "$line" ]]; do
     continue
   fi
   if [[ "$line" =~ ^[[:space:]]*-[[:space:]]*id: ]]; then
-    in_tests=0
+    in_packages=0
     in_probes=0
+    in_tests=0
+    in_plans=0
   fi
 done < "$YAML"
 flush_req
