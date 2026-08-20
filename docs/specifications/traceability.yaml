@@ -571,8 +571,6 @@ requirements:
       - openehr/serialize/simplified
     probes:
       - PROBE-076
-      - PROBE-086
-      - PROBE-089
     plans:
       - docs/plans/archive/2026-07-14-flat-structured-codecs.md
       - docs/plans/archive/2026-08-03-flat-coverage-ratchet.md
@@ -1768,8 +1766,6 @@ requirements:
     tests:
       - openehr/aql/lint/imports_test.go
       - openehr/aql/parse/imports_test.go
-      - openehr/aql/parse/identifier_parity_test.go
-      - openehr/aql/predicate_test.go
       - openehr/composition/imports_test.go
       - openehr/instance/imports_test.go
       - openehr/serialize/simplified/independence_test.go
@@ -1812,7 +1808,6 @@ requirements:
     implementation: landed
     packages: [openehr/rm/typereg, openehr/serialize]
     tests:
-      - openehr/instance/instance_test.go
       - openehr/template/constraints/example_test.go
       - openehr/template/webtemplate/incontext_rmpath_test.go
 
@@ -1884,8 +1879,6 @@ requirements:
     implementation: landed
     packages: [internal/bmmgen]
     adrs: [docs/adr/0013-generated-locatable-identity-surface.md, docs/adr/0002-bmm-codegen-decisions.md]
-    tests:
-      - openehr/rm/rminfo/probe_094_test.go
 
   - id: REQ-044
     title: Hand-written extensions isolated
