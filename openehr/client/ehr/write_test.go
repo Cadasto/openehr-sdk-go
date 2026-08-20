@@ -1,4 +1,4 @@
-package ehr
+package ehr_test
 
 import (
 	"errors"
@@ -6,28 +6,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
-	"github.com/cadasto/openehr-sdk-go/smart/discovery"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
-
-func writeTestClient(t *testing.T, srv *httptest.Server) *transport.Client {
-	t.Helper()
-	cat, _ := discovery.NewStaticCatalog(discovery.StaticConfig{
-		Issuer: "https://test.example.com",
-		Services: map[string]discovery.ServiceEntry{
-			discovery.ServiceIDOpenEHRRest: {
-				BaseURL:     discovery.MustParseURL(srv.URL + "/openehr/v1"),
-				SpecVersion: discovery.SpecVersionPin,
-			},
-		},
-	})
-	c, err := transport.New(cat, transport.WithHTTPClient(srv.Client()))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return c
-}
 
 func writeReq(prefer transport.Prefer) *transport.Request {
 	return &transport.Request{
@@ -50,22 +32,22 @@ func TestWriteResultRepresentationEmptyBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	out, meta, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
+	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
 
-	var nre *NoRepresentationError
+	var nre *openehrclient.NoRepresentationError
 	if !errors.As(err, &nre) {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
 	if !errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("empty body must wrap ErrInvalidShape")
 	}
-	if HasResource(out) {
+	if openehrclient.HasResource(out) {
 		t.Error("HasResource true on absent representation")
 	}
 	if meta == nil || nre.Meta == nil {
-		t.Error("commit metadata must survive the failed representation")
+		t.Fatal("commit metadata must survive the failed representation")
 	}
-	const wantUID VersionUID = "obj-1::sys::1"
+	const wantUID openehrclient.VersionUID = "obj-1::sys::1"
 	if meta.VersionUID != wantUID || nre.Meta.VersionUID != wantUID {
 		t.Errorf("VersionUID meta=%q nre=%q, want %q", meta.VersionUID, nre.Meta.VersionUID, wantUID)
 	}
@@ -82,10 +64,10 @@ func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	defer srv.Close()
 
 	decodeErr := errors.New("boom")
-	_, meta, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferRepresentation), "composition",
+	_, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition",
 		func([]byte) (*rm.Composition, error) { return nil, decodeErr })
 
-	var nre *NoRepresentationError
+	var nre *openehrclient.NoRepresentationError
 	if !errors.As(err, &nre) {
 		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
@@ -95,7 +77,7 @@ func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
 	if errors.Is(err, transport.ErrInvalidShape) {
 		t.Error("a decode failure is not an empty-body ErrInvalidShape")
 	}
-	const wantUID VersionUID = "obj-1::sys::1"
+	const wantUID openehrclient.VersionUID = "obj-1::sys::1"
 	if meta == nil || nre.Meta == nil {
 		t.Fatal("commit metadata must survive a decode failure")
 	}
@@ -114,15 +96,37 @@ func TestWriteResultIdentifierSuccess(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	out, meta, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferIdentifier), "composition", okComposition)
+	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferIdentifier), "composition", okComposition)
 	if err != nil {
 		t.Fatalf("identifier success err = %v", err)
 	}
-	if HasResource(out) {
+	if openehrclient.HasResource(out) {
 		t.Error("identifier mode returns no resource")
 	}
 	if meta == nil {
 		t.Error("metadata must be populated in identifier mode")
+	}
+}
+
+// REQ-094: an identifier body that cannot be resolved is a plain labeled
+// error on the identifier arm — never reclassified as a
+// NoRepresentationError (that type is representation-mode only).
+func TestWriteResultIdentifierResolveFailureNotNoRepresentation(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("not an identifier"))
+	}))
+	defer srv.Close()
+
+	_, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferIdentifier), "composition", okComposition)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Fatalf("unresolvable identifier body: err = %v, want ErrInvalidShape", err)
+	}
+	if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
+		t.Fatal("an identifier-arm failure must not be a NoRepresentationError")
+	}
+	if meta == nil {
+		t.Error("metadata must survive an identifier-resolve failure")
 	}
 }
 
@@ -134,12 +138,12 @@ func TestWriteResultWireErrorNotNoRepresentation(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	_, _, err := WriteResult(t.Context(), writeTestClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
+	_, _, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
 
 	if _, ok := errors.AsType[*transport.WireError](err); !ok {
 		t.Fatalf("409 err = %v, want *transport.WireError", err)
 	}
-	if _, ok := errors.AsType[*NoRepresentationError](err); ok {
+	if _, ok := errors.AsType[*openehrclient.NoRepresentationError](err); ok {
 		t.Fatal("a wire failure must not be a NoRepresentationError")
 	}
 }
