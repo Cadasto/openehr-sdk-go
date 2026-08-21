@@ -29,7 +29,10 @@ upstream at a recorded commit — do not hand-edit it. Refresh with
 upstream-drift report (needs network; dev helper, not a gate). Resolve paths via
 [`fixtures.FlatConformanceOpt`](../fixtures/paths.go) /
 `fixtures.FlatConformanceFlat` / `fixtures.ListFlatConformance`. The rest of
-this directory is curated by hand and is not covered by that manifest.
+this directory is curated by hand and is not covered by that manifest; the
+EHRbase Robot integration-test subset records the upstream commit it was
+ingested from in [`ROBOT_SOURCE.txt`](ROBOT_SOURCE.txt) (a provenance pin, not
+a per-file `sha256` lock).
 
 Resolve paths via [`testkit/fixtures`](../fixtures/) (`TemplateOpt`, `CompositionJSON`, `CompositionXML`, `RMJSON`, `RMXML`, `SubmissionJSON`, `WebTemplateOpt`, `WebTemplateReference`).
 
