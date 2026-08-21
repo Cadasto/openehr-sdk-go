@@ -1596,11 +1596,13 @@ requirements:
     title: Contribution builder
     canonical: docs/specifications/wire.md#req-130--contribution-builder
     status: draft
-    implementation: planned
+    implementation: landed
     packages: [openehr/client/ehr/contribution]
     probes: [PROBE-084]
-    plans: [docs/plans/2026-07-16-contribution-builder.md]
-    tests: []
+    plans: [docs/plans/archive/2026-07-16-contribution-builder.md]
+    tests:
+      - openehr/client/ehr/contribution/builder_test.go
+      - testkit/probes/versioned/probes_test.go
     notes: >-
       First allocation in the SDK authoring & client-tooling band (130-139).
       A fluent builder over the landed Contribution_create submission shape

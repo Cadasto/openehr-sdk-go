@@ -1,0 +1,239 @@
+{
+  "audit": {
+    "_type": "AUDIT_DETAILS",
+    "system_id": "cdr.example",
+    "committer": {
+      "_type": "PARTY_IDENTIFIED",
+      "name": "probe-084"
+    },
+    "change_type": {
+      "_type": "DV_CODED_TEXT",
+      "value": "modification",
+      "defining_code": {
+        "_type": "CODE_PHRASE",
+        "terminology_id": {
+          "_type": "TERMINOLOGY_ID",
+          "value": "openehr"
+        },
+        "code_string": "251"
+      }
+    }
+  },
+  "versions": [
+    {
+      "_type": "ORIGINAL_VERSION",
+      "commit_audit": {
+        "_type": "AUDIT_DETAILS",
+        "system_id": "cdr.example",
+        "committer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "probe-084"
+        },
+        "change_type": {
+          "_type": "DV_CODED_TEXT",
+          "value": "creation",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": "openehr"
+            },
+            "code_string": "249"
+          }
+        }
+      },
+      "lifecycle_state": {
+        "_type": "DV_CODED_TEXT",
+        "value": "complete",
+        "defining_code": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "openehr"
+          },
+          "code_string": "532"
+        }
+      },
+      "data": {
+        "_type": "COMPOSITION",
+        "name": null,
+        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
+        "language": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "territory": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "category": {
+          "_type": "DV_CODED_TEXT",
+          "value": "",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": ""
+            },
+            "code_string": ""
+          }
+        },
+        "composer": null
+      }
+    },
+    {
+      "_type": "ORIGINAL_VERSION",
+      "commit_audit": {
+        "_type": "AUDIT_DETAILS",
+        "system_id": "cdr.example",
+        "committer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "probe-084"
+        },
+        "change_type": {
+          "_type": "DV_CODED_TEXT",
+          "value": "amendment",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": "openehr"
+            },
+            "code_string": "250"
+          }
+        }
+      },
+      "preceding_version_uid": {
+        "_type": "OBJECT_VERSION_ID",
+        "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"
+      },
+      "lifecycle_state": {
+        "_type": "DV_CODED_TEXT",
+        "value": "complete",
+        "defining_code": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "openehr"
+          },
+          "code_string": "532"
+        }
+      },
+      "data": {
+        "_type": "COMPOSITION",
+        "name": null,
+        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
+        "language": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "territory": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "category": {
+          "_type": "DV_CODED_TEXT",
+          "value": "",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": ""
+            },
+            "code_string": ""
+          }
+        },
+        "composer": null
+      }
+    },
+    {
+      "_type": "ORIGINAL_VERSION",
+      "commit_audit": {
+        "_type": "AUDIT_DETAILS",
+        "system_id": "cdr.example",
+        "committer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "probe-084"
+        },
+        "change_type": {
+          "_type": "DV_CODED_TEXT",
+          "value": "deleted",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": "openehr"
+            },
+            "code_string": "523"
+          }
+        }
+      },
+      "preceding_version_uid": {
+        "_type": "OBJECT_VERSION_ID",
+        "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"
+      },
+      "lifecycle_state": {
+        "_type": "DV_CODED_TEXT",
+        "value": "complete",
+        "defining_code": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "openehr"
+          },
+          "code_string": "532"
+        }
+      },
+      "data": {
+        "_type": "COMPOSITION",
+        "name": null,
+        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
+        "language": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "territory": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": ""
+          },
+          "code_string": ""
+        },
+        "category": {
+          "_type": "DV_CODED_TEXT",
+          "value": "",
+          "defining_code": {
+            "_type": "CODE_PHRASE",
+            "terminology_id": {
+              "_type": "TERMINOLOGY_ID",
+              "value": ""
+            },
+            "code_string": ""
+          }
+        },
+        "composer": null
+      }
+    }
+  ]
+}

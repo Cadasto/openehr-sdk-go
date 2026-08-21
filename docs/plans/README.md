@@ -32,13 +32,14 @@ All three plans in this group **landed 2026-08-19 and were archived**. The two A
 
 ### Ecosystem fit-gap delivery (2026-07-16)
 
-Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opens a new "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
+Prioritised from a peer-SDK ecosystem fit-gap review. Each plan authors its REQ spec prose (Phase 0, via `sdd-specify`) before implementation starts. The proposed REQ IDs follow the [numbering policy](../specifications/REQ.md#numbering-policy) topic bands — the two authoring validators land in the clinical-modeling headroom (110–119) next to REQ-109/110; the contribution builder opened the "SDK authoring & client tooling" band (130–139) because the wire band (050–059) is exhausted.
 
 | Plan | Scope | Covers (proposed) | Probe |
 |---|---|---|---|
 | [2026-07-16-flat-author-linter.md](2026-07-16-flat-author-linter.md) | Pre-submit FLAT path linter + CLI | REQ-115 (builds on REQ-053/106/111) | PROBE-083 |
 | [2026-07-16-opt-author-validator.md](2026-07-16-opt-author-validator.md) | OPT author validator + CLI | REQ-114 (builds on REQ-100/104/106/108) | PROBE-085 |
-| [2026-07-16-contribution-builder.md](2026-07-16-contribution-builder.md) | Fluent `Contribution_create` builder | REQ-130 (builds on REQ-050/059) | PROBE-084 |
+
+The contribution-builder plan **landed 2026-08-21 and was archived** ([archive/2026-07-16-contribution-builder.md](archive/2026-07-16-contribution-builder.md)): REQ-130 is `landed` — the first allocation in the SDK authoring & client-tooling band — and PROBE-084 is Implemented (Sandbox). `contribution.Builder` plus the `Creation` / `Amendment` / `Modification` / `Deletion` constructors assemble a `Contribution_create` body; the type parameter sits on those package-level constructors rather than on `Add*` methods, because Go methods cannot take type parameters. The plan's open question is settled from the vendored pin — `UpdateVersion` marks `lifecycle_state` required, so it is body-carried and REQ-059's per-request header was never a dependency — and the corpus refuted a derived batch `change_type` (10 of 47 records) and a change-type-derived lifecycle state (6 of 10 deletions carry `complete`). It also closed a wire defect the builder could not route around: the write-side wrappers no longer emit the server-assigned `contribution` / empty `uid` that the pin's `UpdateVersion` does not declare. **Deferred:** `IMPORTED_VERSION` authoring beyond the landed pass-through, multi-EHR batching, checkpoint/resume.
 
 The fourth plan in this set — the upstream FLAT parity harness — **landed 2026-08-01 and was archived** ([archive/2026-07-16-web-template-tests-conformance.md](archive/2026-07-16-web-template-tests-conformance.md)): PROBE-086 is Implemented (Sandbox), and REQ-080's roadmap row moved `planned → partial`.
 

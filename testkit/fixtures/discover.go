@@ -95,6 +95,26 @@ func collectJSON(dir, kind string, out *[]CompositionJSONRel) error {
 	return nil
 }
 
+// ListSubmissionJSON returns the absolute path of every *.json under
+// submissions/, sorted. The corpus mixes deliberately valid and invalid
+// records — a caller asserting conformance filters on the file name, one
+// asserting a shape the wire is known to carry uses them all.
+func ListSubmissionJSON() ([]string, error) {
+	entries, err := os.ReadDir(submissionsDir())
+	if err != nil {
+		return nil, fmt.Errorf("fixtures: read %q: %w", submissionsDir(), err)
+	}
+	var out []string
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		out = append(out, filepath.Join(submissionsDir(), e.Name()))
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
 // ResolveCompositionJSON opens a path from [ListCompositionJSON].
 func ResolveCompositionJSON(rel CompositionJSONRel) string {
 	return filepath.Join(CassettesRoot(), filepath.FromSlash(rel.Rel))
