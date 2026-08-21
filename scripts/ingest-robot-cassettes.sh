@@ -96,4 +96,33 @@ while IFS= read -r -d '' f; do
   cp_sub "$rel" "$safe"
 done < <(find "$ROBOT/contributions" -name '*.json' -print0)
 
+# Record the upstream source commit so the curated cassettes carry provenance.
+# Best-effort: the Robot data is copied and renamed by hand, so unlike
+# flat-conformance/MANIFEST.txt this pins ONLY the source commit the ingest
+# read from — it is not a per-file sha256 lock.
+src_root=$(git -C "$ROBOT" rev-parse --show-toplevel 2>/dev/null || true)
+if [[ -n "$src_root" ]]; then
+  src_sha=$(git -C "$src_root" rev-parse HEAD 2>/dev/null || echo unknown)
+  src_date=$(git -C "$src_root" log -1 --format=%cI 2>/dev/null || echo unknown)
+  src_remote=$(git -C "$src_root" config --get remote.origin.url 2>/dev/null \
+    | sed -E 's#^(git@github.com:|https://github.com/)##; s#\.git$##' || true)
+  src_rel=${ROBOT#"$src_root/"}
+  {
+    echo "# EHRbase Robot integration-test data — source provenance pin"
+    echo "# Written by scripts/ingest-robot-cassettes.sh. Best-effort: the curated"
+    echo "# cassettes are copied and renamed by hand, so this pins only the upstream"
+    echo "# commit the ingest read from — NOT a per-file sha256 lock."
+    echo "source_repo: ${src_remote:-unknown}"
+    echo "source_path: ${src_rel:-unknown}"
+    echo "commit: ${src_sha}"
+    echo "commit_date: ${src_date}"
+    echo "recorded_utc: $(date -u +%Y-%m-%d)"
+    echo "source_tree: https://github.com/${src_remote:-ehrbase/integration-tests}/tree/${src_sha}/${src_rel}"
+    echo "license: Apache-2.0 (see THIRD_PARTY_LICENSES.md)"
+  } > "$CAS/ROBOT_SOURCE.txt"
+  echo "recorded source pin ${src_remote:-?}@${src_sha:0:12} -> $CAS/ROBOT_SOURCE.txt"
+else
+  echo "WARNING: $ROBOT is not a git checkout; ROBOT_SOURCE.txt not updated" >&2
+fi
+
 echo "ingested robot cassettes into $CAS"
