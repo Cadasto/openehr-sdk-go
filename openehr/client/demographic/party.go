@@ -129,6 +129,13 @@ func WithLifecycleState(s openehrclient.LifecycleState) WriteOption {
 // is in the Location / ETag headers and the returned Party is nil;
 // representation returns the created PARTY body; identifier returns the
 // ITS-REST Identifier body, resolved into the metadata VersionUID.
+// The returned Party is an interface: a boxed typed-nil pointer is not
+// `== nil`. Use [openehrclient.HasResource] as the presence test
+// ([rm.IsTypedNil] is the typed-nil absence check for callers already
+// holding a registered RM pointer; it is false for a bare-nil
+// interface). After 2xx + PreferRepresentation, an empty or
+// undecodable body is a [*openehrclient.NoRepresentationError]
+// carrying commit metadata.
 func Create(ctx context.Context, c *transport.Client, party rm.Party, opts ...WriteOption) (rm.Party, *openehrclient.VersionMetadata, error) {
 	if party == nil {
 		return nil, nil, fmt.Errorf("demographic.Create: %w: nil Party", transport.ErrInvalidConfig)

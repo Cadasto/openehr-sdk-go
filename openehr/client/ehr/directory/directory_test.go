@@ -321,7 +321,7 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 
 // TestSaveRepresentationEmptyBodyErrors pins REQ-094 on the directory
 // leaf: Prefer=return=representation with an empty server body MUST
-// surface transport.ErrInvalidShape, not a silent nil Folder.
+// return NoRepresentationError, not a silent nil Folder.
 func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/directory/"+string(folderVUID))
@@ -337,14 +337,21 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, folder,
 		directory.WithPrefer(transport.PreferRepresentation),
 	)
-	if !errors.Is(err, transport.ErrInvalidShape) {
-		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
-	if out != nil {
-		t.Errorf("expected nil Folder on empty representation body, got %+v", out)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("empty body must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Errorf("expected no Folder on empty representation body, got %+v", out)
 	}
 	if meta == nil || meta.VersionUID != folderVUID {
 		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+	if nre.Meta == nil || nre.Meta.VersionUID != folderVUID {
+		t.Errorf("NoRepresentationError metadata = %+v, want VersionUID %q", nre.Meta, folderVUID)
 	}
 }
 

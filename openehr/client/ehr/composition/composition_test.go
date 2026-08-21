@@ -321,9 +321,8 @@ func TestSaveRepresentationRejectsOriginalVersionShape(t *testing.T) {
 
 // TestSaveRepresentationEmptyBodyErrors pins REQ-094: when the caller
 // asks for Prefer=return=representation but the server returns an empty
-// body, the shared openehrclient.WriteResult MUST surface
-// transport.ErrInvalidShape rather than
-// silently returning a nil Composition ("MUST NOT silently downgrade").
+// body, WriteResult MUST return a NoRepresentationError (wrapping
+// ErrInvalidShape), not a silently-nil Composition.
 func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("ETag", `"`+string(compositionVUID)+`"`)
@@ -336,14 +335,21 @@ func TestSaveRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
-	if !errors.Is(err, transport.ErrInvalidShape) {
-		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
-	if out != nil {
-		t.Errorf("expected nil Composition on empty representation body, got %+v", out)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("empty body must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Errorf("expected no Composition on empty representation body, got %+v", out)
 	}
 	if meta == nil || meta.VersionUID != compositionVUID {
 		t.Errorf("expected metadata still populated from headers, got %+v", meta)
+	}
+	if nre.Meta == nil || nre.Meta.VersionUID != compositionVUID {
+		t.Errorf("NoRepresentationError metadata = %+v, want VersionUID %q", nre.Meta, compositionVUID)
 	}
 }
 
@@ -361,11 +367,18 @@ func TestUpdateRepresentationEmptyBodyErrors(t *testing.T) {
 		t.Context(), newClient(t, srv), ehrIDFixture, compositionVOID, string(compositionVUID), readComposition(t),
 		composition.WithPrefer(transport.PreferRepresentation),
 	)
-	if !errors.Is(err, transport.ErrInvalidShape) {
-		t.Fatalf("expected ErrInvalidShape, got %v", err)
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("err = %v, want *NoRepresentationError", err)
 	}
-	if out != nil {
-		t.Errorf("expected nil Composition, got %+v", out)
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("empty body must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Errorf("expected no Composition, got %+v", out)
+	}
+	if nre.Meta == nil || nre.Meta.VersionUID != compositionVUID {
+		t.Errorf("NoRepresentationError metadata = %+v, want VersionUID %q", nre.Meta, compositionVUID)
 	}
 }
 

@@ -1,7 +1,9 @@
 package ehr
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -64,17 +66,30 @@ func (c WriteConfig) ResolveLifecycleHeader(label string) (string, error) {
 //
 //   - PreferRepresentation decodes the bare resource body via decode.
 //     REQ-094: representation MUST NOT silently downgrade to an empty
-//     body — an empty body returns [transport.ErrInvalidShape] rather
-//     than a nil/zero resource.
+//     body — an empty or undecodable body returns a
+//     [*NoRepresentationError] (wrapping [transport.ErrInvalidShape] for
+//     an empty body, the decoder's error otherwise) that carries the
+//     commit metadata, not a nil-error success. The resource slot is
+//     still the zero value.
 //   - PreferIdentifier resolves the ITS-REST Identifier body into the
 //     returned metadata's VersionUID. REQ-094: populate the identifier
 //     slot from the body when present; never silently discard it.
 //   - Any other Prefer (minimal, the spec default, or unset) returns a
 //     nil/zero resource; the version id is in Location/ETag.
 //
-// label prefixes every error WriteResult itself raises (e.g.
-// "composition", "ehrstatus.Put") so each site's error strings stay
-// byte-identical to the pre-consolidation duplicated code; decode is the
+// A successful minimal or identifier write returns a zero resource: a
+// typed-nil pointer for a concrete-pointer T (`== nil` is a correct
+// test there) and a bare-nil interface for an interface T (demographic
+// [rm.Party]) — but an interface return can in general hold a boxed
+// typed-nil pointer, for which `== nil` lies. [HasResource] is the
+// uniform presence test across the return types; [rm.IsTypedNil] is the
+// typed-nil absence check for callers already holding a registered RM
+// pointer (false for a bare-nil interface).
+//
+// label prefixes the identifier-arm errors WriteResult itself raises
+// (e.g. "composition", "ehrstatus.Put") and the empty-body Cause inside
+// [*NoRepresentationError]; the representation arm's outer error string
+// is the typed error's own value-free classification. decode is the
 // site's own response-body decoder and is responsible for wrapping its
 // own decode errors with its own message.
 //
@@ -93,12 +108,19 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	meta := NewVersionMetadata(resp.Metadata)
 	switch req.Prefer {
 	case transport.PreferRepresentation:
-		if len(resp.Body) == 0 {
-			return zero, meta, fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape)
+		// A JSON null literal unmarshals into a struct as a nil-error
+		// no-op, so letting it reach decode would report a zero-value
+		// resource as a full success; it carries no representation and
+		// classifies as empty (REQ-094).
+		if body := bytes.TrimSpace(resp.Body); len(body) == 0 || bytes.Equal(body, []byte("null")) {
+			return zero, meta, &NoRepresentationError{
+				Meta:  meta,
+				Cause: fmt.Errorf("%s: %w: Prefer=return=representation but response body is empty", label, transport.ErrInvalidShape),
+			}
 		}
 		out, err := decode(resp.Body)
 		if err != nil {
-			return zero, meta, err
+			return zero, meta, &NoRepresentationError{Meta: meta, Cause: err}
 		}
 		return out, meta, nil
 	case transport.PreferIdentifier:
@@ -109,6 +131,50 @@ func WriteResult[T any](ctx context.Context, c *transport.Client, req *transport
 	default:
 		return zero, meta, nil
 	}
+}
+
+// NoRepresentationError reports a committed write — a 2xx response — whose
+// `representation` body was empty or could not be decoded as the expected
+// resource (REQ-094). It lets callers tell "no body, write succeeded" from
+// "write committed, body unusable" with errors.As alone: it is never a
+// [*transport.WireError], and a non-2xx failure is never wrapped in it.
+//
+// Meta carries the version metadata that proves the commit (VersionUID when
+// the server supplied it); errors raised by this SDK always carry a non-nil
+// Meta. Together with the classification (the type itself, via errors.As),
+// Meta is the boundary-safe surface. Cause is internal diagnostics and may
+// carry payload-derived text — rm decode errors embed the offending value
+// (`parse %q`), the same class [transport.WithRawErrorBodies] gates for
+// [transport.OpenEHRErrorDetail] — so, like [*transport.WireError] (REQ-093),
+// Error is value-free and never interpolates Cause; callers that need the
+// diagnostics unwrap or read Cause deliberately.
+type NoRepresentationError struct {
+	Meta  *VersionMetadata
+	Cause error
+}
+
+// Error names the classification only (REQ-093 value-free discipline):
+// never Cause text, never a payload-derived value.
+func (e *NoRepresentationError) Error() string {
+	if e == nil {
+		return "ehr: no representation"
+	}
+	if errors.Is(e.Cause, transport.ErrInvalidShape) {
+		return "ehr: committed write has no usable representation (empty body)"
+	}
+	if e.Cause != nil {
+		return "ehr: committed write has no usable representation (decode failed)"
+	}
+	return "ehr: committed write has no usable representation"
+}
+
+// Unwrap exposes Cause so errors.Is/As reach the wrapped sentinel or decode
+// error (REQ-025).
+func (e *NoRepresentationError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
 }
 
 // DoDelete issues a logical-delete request (Composition / Directory /

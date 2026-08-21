@@ -105,11 +105,26 @@ openEHR REST 1.1.0-development uses `Prefer: return=<mode>` on write paths. The 
 
 Rules:
 
-- Per-call option: `transport.WithPrefer(Prefer)` — typed enum, not a raw string.
+- Per-call option: each write leaf exposes `WithPrefer(transport.Prefer)` (e.g. `composition.WithPrefer`) — typed enum, not a raw string.
 - **Defaults:** writes default to `minimal`; reads default to `representation` (no Prefer header).
 - The SDK **MUST NOT** silently downgrade `representation` when the server omits the body.
 
-All three write-path modes are landed for the shared `WriteResult` family (`composition` / `directory` / `ehr_status` / `demographic`): `representation` decodes the bare resource (REQ-094) and returns [`transport.ErrInvalidShape`](../../transport/errors.go) on an empty body; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via [`ehr.ResolveIdentifierBody`](../../openehr/client/ehr/identifier.go), with the `Location` header staying canonical; `minimal` returns metadata only. [`contribution.Commit`](../../openehr/client/ehr/contribution/contribution.go) (its own `WithPrefer`) carries `minimal` and the `representation` decode only: an empty `representation` body is today a silent metadata-only success — closed by the [write-result plan](../plans/2026-08-18-write-result-contract.md) — and the `identifier` slot is never populated from the body (deferred; recorded in that plan's Defers). See the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
+All three write-path modes are landed for the shared `WriteResult` family (`composition` / `directory` / `ehr_status` / `demographic`): `representation` decodes the bare resource; `identifier` populates the `VersionMetadata` identifier slot from the ITS-REST `Identifier` body (`{"uid": …}`) via `ehr.ResolveIdentifierBody`, with the `Location` header staying canonical; `minimal` returns metadata only. `contribution.Commit` (its own `WithPrefer`) carries `minimal` and the `representation` decode only: the `identifier` slot is never populated from the body (deferred; recorded in the archived [write-result plan](../plans/archive/2026-08-18-write-result-contract.md) Defers). Identifier-slot population for the WriteResult family landed in the archived [follow-up plan](../plans/archive/2026-05-25-req094-prefer-followups.md). Deferred: the PROBE-065 `minimal`→GET identifier round-trip.
+
+**Absent resource on a successful write.** `minimal` and `identifier` **MUST** return a nil error and a zero resource. For a pointer resource type the zero value is a typed nil — `== nil` is the correct test for a concrete `*T` return, but an interface return (`rm.Party`) can hold a typed-nil pointer, for which `== nil` is the wrong test. The SDK **MUST** expose a reflection-free `HasResource` helper scoped to registered RM types: it reports false for a typed-nil pointer to a registered RM type, a bare-nil interface, and an interface holding a typed-nil registered RM pointer, and true for any populated resource. A typed nil of a type outside the RM registry is out of scope. Write-path documentation **MUST** name the typed-nil trap and point at that helper (and at `rm.IsTypedNil` for callers already on the RM type).
+
+**Committed write, unusable representation.** After a successful HTTP response (2xx), when `Prefer: return=representation` was sent and the body is empty or does not decode as the expected resource, the write **MUST** be reported as a typed `NoRepresentationError`. A whitespace-only body and the JSON `null` literal — which unmarshals into a struct as a nil-error no-op — **MUST** classify as empty; they carry no representation. The error:
+
+- carries the version metadata that proves the commit (including `VersionUID` when the server supplied it);
+- wraps the cause (`transport.ErrInvalidShape` for an empty body; the decoder's error otherwise);
+- is distinguishable with `errors.As` alone, with no reference to `WireError` and no correlation against a separately-returned metadata value;
+- keeps its `Error()` string value-free in the `WireError.Error()` discipline (REQ-093): the classification only, **never** the cause text or any payload-derived value — the cause stays reachable through unwrapping.
+
+A wire failure **MUST** remain a `*transport.WireError`. The SDK **MUST NOT** return `NoRepresentationError` for a non-2xx response. The existing `(resource, metadata, error)` triple **MUST** still populate metadata on this path so current callers do not break.
+
+The same empty-body and decode-failure rules **MUST** apply to `contribution.Commit` when `Prefer: return=representation` was sent. An empty representation body **MUST NOT** be a silent success.
+
+This contract binds the versioned-write `WriteResult` family and `contribution.Commit`. **Keyed exception:** EHR creation (`ehr.Create`, a non-versioned write that decodes through the shared read-path `transport.Decode`) **MUST** keep the bare `transport.ErrInvalidShape` contract on an empty 2xx body until its committed-but-unusable arm is typed in a spec-first change (deferred; recorded in the archived write-result plan's Defers).
 
 - **Lives in:** [`transport/`](../../transport), [`openehr/client/ehr/`](../../openehr/client/ehr) (composition / directory / ehrstatus / contribution), [`openehr/client/demographic/`](../../openehr/client/demographic)
 

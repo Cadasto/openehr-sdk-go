@@ -167,6 +167,13 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 //     identifier is resolved into the metadata `VersionUID` (the
 //     `Location` header stays canonical when present).
 //
+// The zero resource on a successful minimal/identifier write is a nil
+// pointer — `== nil` is a correct test for this concrete return;
+// [openehrclient.HasResource] is the uniform presence test across write
+// leaves, including interface returns (REQ-094). After 2xx +
+// PreferRepresentation, an empty or undecodable body is a
+// [*openehrclient.NoRepresentationError] carrying commit metadata.
+//
 // Audit details and the template id flow via the `openehr-*` header
 // family (REQ-059).
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, comp *rm.Composition, opts ...WriteOption) (*rm.Composition, *openehrclient.VersionMetadata, error) {

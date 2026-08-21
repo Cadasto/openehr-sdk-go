@@ -169,7 +169,12 @@ func WithDeleteAudit(a *rm.AuditDetails) DeleteOption {
 // (REQ-094, ITS-REST `201_directory`); `PreferIdentifier` returns the
 // ITS-REST `Identifier` body, resolved into the metadata `VersionUID`;
 // `PreferMinimal` (the spec default) returns an empty body with only
-// metadata (`ETag` → `VersionUID`) populated.
+// metadata (`ETag` → `VersionUID`) populated. The zero resource on a
+// successful minimal/identifier write is a nil pointer — `== nil` is a
+// correct test for this concrete return; [openehrclient.HasResource] is
+// the uniform presence test across write leaves (REQ-094). After 2xx +
+// PreferRepresentation, an empty or undecodable body is a
+// [*openehrclient.NoRepresentationError] carrying commit metadata.
 func Save(ctx context.Context, c *transport.Client, ehrID openehrclient.EHRID, folder *rm.Folder, opts ...WriteOption) (*rm.Folder, *openehrclient.VersionMetadata, error) {
 	if ehrID == "" {
 		return nil, nil, fmt.Errorf("directory.Save: %w: empty EHRID", transport.ErrInvalidConfig)
