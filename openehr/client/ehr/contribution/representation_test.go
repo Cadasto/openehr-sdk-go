@@ -80,6 +80,34 @@ func TestCommitRepresentationNullBody(t *testing.T) {
 	}
 }
 
+// REQ-094: a whitespace-only 2xx body classifies as empty
+// (ErrInvalidShape), not as a decode failure.
+func TestCommitRepresentationWhitespaceBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(" \n\t"))
+	}))
+	defer srv.Close()
+
+	out, meta, err := contribution.Commit(t.Context(), newClient(t, srv), ehrIDFixture, representationBatch(),
+		contribution.WithPrefer(transport.PreferRepresentation))
+
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
+	}
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("a whitespace-only body classifies as empty and must wrap ErrInvalidShape")
+	}
+	if out != nil {
+		t.Errorf("no Contribution on a whitespace-only body, got %+v", out)
+	}
+	if meta == nil || nre.Meta == nil {
+		t.Fatal("commit metadata must survive a whitespace-only body")
+	}
+}
+
 // REQ-094: PreferRepresentation with an undecodable 2xx body is a
 // NoRepresentationError wrapping the decode error.
 func TestCommitRepresentationUndecodable(t *testing.T) {

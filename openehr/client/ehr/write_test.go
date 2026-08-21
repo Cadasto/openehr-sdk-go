@@ -81,6 +81,34 @@ func TestWriteResultRepresentationNullBody(t *testing.T) {
 	}
 }
 
+// REQ-094: a whitespace-only 2xx representation body classifies as empty
+// (ErrInvalidShape), not as a decode failure — the TrimSpace guard is
+// load-bearing on its own, independent of the JSON null arm.
+func TestWriteResultRepresentationWhitespaceBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Location", "/ehr/ehr-1/composition/obj-1::sys::1")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(" \n\t"))
+	}))
+	defer srv.Close()
+
+	out, meta, err := openehrclient.WriteResult(t.Context(), newClient(t, srv), writeReq(transport.PreferRepresentation), "composition", okComposition)
+
+	var nre *openehrclient.NoRepresentationError
+	if !errors.As(err, &nre) {
+		t.Fatalf("whitespace body: err = %v, want *NoRepresentationError", err)
+	}
+	if !errors.Is(err, transport.ErrInvalidShape) {
+		t.Error("a whitespace-only body classifies as empty and must wrap ErrInvalidShape")
+	}
+	if openehrclient.HasResource(out) {
+		t.Error("no resource on a whitespace-only representation body")
+	}
+	if meta == nil || nre.Meta == nil {
+		t.Fatal("commit metadata must survive a whitespace-only body")
+	}
+}
+
 // REQ-094: a 2xx representation whose body cannot be decoded is a
 // NoRepresentationError wrapping the decoder's error, not ErrInvalidShape.
 func TestWriteResultRepresentationDecodeFailure(t *testing.T) {
