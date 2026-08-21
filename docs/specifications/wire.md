@@ -2,7 +2,7 @@
 
 **Status:** Draft
 
-The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), and REQ-143 (template list filters). The wire-extension band 140–149 continues the exhausted 050–059 band. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
+The normative contract between the SDK and any conformant openEHR backend (Cadasto CDR, EHRbase, others). Covers REQ-050 through REQ-059 (wire surface and openEHR headers), REQ-095 (OpenAPI authoritative source), REQ-130 (contribution builder), REQ-140 (underscore-prefixed RM attributes), REQ-142 (contribution read), and REQ-143 (template list filters). The wire-extension band 140–149 continues the exhausted 050–059 band; the SDK authoring & client-tooling band 130–139 opens here with REQ-130. Transport hygiene (REQ-090–094, REQ-150) lives in [transport.md](transport.md).
 
 The premise: correctness is wire-level (REQ-080). The bytes on the wire and the AQL strings conform to the openEHR spec; the Go source shape is independent.
 
@@ -255,7 +255,7 @@ Two endpoints carry **distinct request and response shapes** that are easy to co
 - **`POST /ehr/{ehr_id}/contribution`** ([PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)). Request body: ITS-REST `Contribution_create` — `{audit, versions: [ORIGINAL_VERSION<T> with inline data: T]}` for `T ∈ {COMPOSITION, EHR_STATUS, FOLDER, EHR_ACCESS}`. Response body: persisted `CONTRIBUTION` whose `versions[]` is `[]OBJECT_REF` (the references the server assigned). A submission body shaped like the persisted `CONTRIBUTION` is rejected by spec-conformant CDRs because its `OBJECT_REF`s point at versions that do not yet exist.
   - **Commit-audit DTO asymmetry (SPECITS-95 / [ITS-REST PR 131](https://github.com/openEHR/specifications-ITS-REST/pull/131)).** The request-side commit audit (the batch `audit` and each version's `commit_audit`) is the `UPDATE_AUDIT` DTO, **not** the persisted `AUDIT_DETAILS`: it MUST omit the server-assigned `time_committed`, treats `system_id` as optional, and types `change_type` (and `UpdateVersion.lifecycle_state`) as `DV_CODED_TEXT` — never the withdrawn flat `TERMINOLOGY_CODE`. A client SHOULD send `_type:"UPDATE_AUDIT"`; servers SHOULD accept `AUDIT_DETAILS` or an omitted `_type`. The Go SDK emits `AUDIT_DETAILS` by default (`contribution.UpdateAudit`) and exposes `AuditType` to fall back to `UPDATE_AUDIT` for non-conformant servers.
 
-Implementations **MUST NOT** serialise the persisted shape on either submission path. The Go SDK enforces this via [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) (distinct from `rm.Contribution`) and the composition / directory write surfaces that take bare RM types.
+Implementations **MUST NOT** serialise the persisted shape on either submission path. The Go SDK enforces this via [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) (distinct from `rm.Contribution`) and the composition / directory write surfaces that take bare RM types. Which version fields a *request* body carries — and which server-assigned ones it omits — is specified by [REQ-130 § Server-assigned fields](#req-130--contribution-builder).
 
 ## AQL
 
@@ -358,6 +358,43 @@ The leaf's repository interface **MUST** include the same read — no break for 
 
 Unset options **MUST** omit the corresponding query key. A negative `offset` or `fetch` **MUST** fail with `ErrInvalidConfig` and **MUST NOT** issue a request. The existing `format` argument selects the list path; v1 supports `FormatADL14` — the only registered `TemplateFormat` value. The decoded result **MUST** remain the same template-metadata slice the unfiltered list already returns. Adding a trailing variadic option list **MUST** stay source-compatible with existing callers. The `Repository` interface **MUST** grow the same variadic options — no break for callers, a compile-time break for interface implementers (precedent: `UploadTemplate`); the CHANGELOG `### Added` entry **MUST** name the interface growth.
 
+## Write-side authoring
+
+### REQ-130 — Contribution builder
+
+The contribution leaf **MUST** expose a builder that assembles a `Contribution_create` body — a [`contribution.Submission`](../../openehr/client/ehr/contribution/submission.go) — from caller payloads without hand-wiring version wrappers, change-type codes, or write-side audit fields. It is the first allocation in the **SDK authoring & client tooling** band (130–139) and is named as SDK-provided by [use-cases.md § Synthetic data seeder](use-cases.md#synthetic-data-seeder).
+
+The builder is an authoring surface over the landed submission shape (REQ-050/095, [PROBE-072](conformance.md#probe-072--contribution-submission-body-matches-contribution_create)) and introduces no new wire shape: anything it emits, a caller **MUST** be able to hand-wire. Where the two could disagree, the submission shape wins.
+
+**Change types.** A version's `commit_audit.change_type` **MUST** carry the openEHR *audit change type* coded value for the operation the caller requested, `DV_CODED_TEXT`-shaped (nested `defining_code`, never the withdrawn flat `TERMINOLOGY_CODE`) with `terminology_id.value = "openehr"`:
+
+| Operation | `value` | `code_string` |
+|---|---|---|
+| Creation | `creation` | `249` |
+| Amendment | `amendment` | `250` |
+| Modification | `modification` | `251` |
+| Deletion | `deleted` | `523` |
+
+This table is the code set's single home in these specs — `523` is the deletion code; `253` is *unknown*, not *deleted*. The batch-level `audit.change_type` describes the contribution as a whole and **MUST** be caller-supplied: the builder **MUST NOT** derive it from the versions it holds. The vendored corpus ([`testkit/cassettes/submissions/`](../../testkit/cassettes/README.md)) settles that — a batch audit there records `creation` over an all-`modification` version list, and `modification` over an all-`creation` one, so no derivation rule is faithful to it.
+
+**Preceding version.** An amendment, modification, or deletion **MUST** carry `preceding_version_uid`; a creation **MUST NOT** — the version it would follow does not exist yet. The builder **MUST** refuse a preceding-version-bearing operation whose uid is empty rather than emitting a version the server cannot resolve.
+
+**Lifecycle state.** `lifecycle_state` is **required** on the pin's `UpdateVersion` DTO, so it is carried in the **version body**, never in the `openehr-version` request header: that header ([REQ-059](#req-059)) is per-*request* and cannot express a distinct state for each version of a batch that commits several. Each built version **MUST** emit a `DV_CODED_TEXT`-shaped state from the openEHR *version lifecycle state* group — `complete` (`532`), `incomplete` (`553`), `deleted` (`523`) — defaulting to `complete` and overridable per version. The default **MUST NOT** be derived from the change type: in the vendored corpus most deletions carry a `complete` lifecycle state, so a derived `deleted` would contradict the wire it claims to follow.
+
+**Audit.** The batch `audit` and every version's `commit_audit` are the write-side commit-audit DTO — `time_committed` is never emitted (§ [Request vs response shape asymmetry](#request-vs-response-shape-asymmetry)). The pin marks `change_type` and `committer` **required** on both. The builder **MUST** refuse at build time when either is missing, rather than emitting an audit the pin rejects, and **MUST** apply the batch committer, system id, and audit `_type` to every version whose own audit does not override them — one declaration, not one per version.
+
+**Server-assigned fields.** The pin's `UpdateVersion` declares neither `contribution` nor `uid`; the server assigns both at commit. A write-side version body **MUST** omit each of them when the caller supplied neither, rather than emitting `"contribution":null` or an empty `uid` object — a field the request schema does not declare, sent with no value, is a body a strict server may refuse and no record in the vendored corpus carries. A caller-supplied `uid` is still emitted verbatim. This clause is **implementation-aligned**: it amends what the landed write-side wrappers emit, and lands with the code that satisfies it.
+
+**Builder contract.**
+
+- `Build` **MUST** return a `*Submission` that passes `Validate`, or a typed error and no submission — never a partially populated one. No caller input **MUST** be able to panic it (REQ-025).
+- `Build` **MUST** be idempotent, and the submission it returns **MUST** be independent of the builder: mutating the builder afterwards **MUST NOT** change an already-built submission.
+- An accumulation error (an unsupported operation, a missing preceding uid) **MUST** be reported at `Build`, not swallowed and not panicked at the call that made it — a fluent chain has nowhere to return an error.
+- The closed versionable type-set — `COMPOSITION`, `EHR_STATUS`, `FOLDER`, `EHR_ACCESS`, the four the submission shape admits — **MUST** be enforced at compile time by explicit generic instantiation, with no reflection (REQ-024).
+- A builder holding no versions **MUST** fail at `Build`: the pin requires a non-empty `versions` array.
+
+**Out of scope for v1:** `IMPORTED_VERSION` authoring beyond the landed pass-through wrapper, multi-EHR batching, and checkpoint/resume — the seeder's responsibility per [use-cases.md](use-cases.md#synthetic-data-seeder).
+
 ## Transport cross-cutting concerns
 
 REQ-090 (OpenTelemetry), REQ-091 (retry), REQ-092 (TLS posture), REQ-093 (error envelope), REQ-094 (`Prefer`), and REQ-150 (path-parameter segment validation) are specified in [transport.md](transport.md).
@@ -385,6 +422,7 @@ Out of v1 scope:
 | openEHR custom header family | REQ-059 | `transport/` (option API), `openehr/client/*` (typed per-method options) |
 | OpenAPI authoritative source | REQ-095 | `testkit/cassettes/its_rest/` (records upstream commit) |
 | Path-parameter segment validation | REQ-150 | [transport.md](transport.md) → `transport/` |
+| Contribution builder | REQ-130 | `openehr/client/ehr/contribution/` |
 | Contribution read | REQ-142 | `openehr/client/ehr/contribution/` |
 | Template list filters | REQ-143 | `openehr/client/definition/` |
 | Shared RM / OPT fixtures | REQ-052, REQ-056 | `testkit/cassettes/{templates,compositions,rm}/` — resolve via `testkit/fixtures/`; index in [`testkit/cassettes/README.md`](../../testkit/cassettes/README.md). Bodies, not REQ-082 Cassette-mode recordings ([conformance.md § Vendored fixtures](conformance.md#vendored-fixtures-testkitcassettes)) |

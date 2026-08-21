@@ -32,7 +32,7 @@ An OPT-guided faker that produces bulk Compositions and demographic records for 
 |---|---|
 | RM types (`openehr/rm`) — concrete structs to fill in | Generation rules per clinical domain (vital-signs value distributions, demographic plausibility) |
 | OPT-driven generic Composition builder (`openehr/composition`) | OPT inventory — which templates to seed; the seeder picks |
-| `ContributionBuilder` for batched atomic writes | Checkpointing and resume — the seeder's responsibility, not the SDK's |
+| `contribution.Builder` for batched atomic writes ([REQ-130](wire.md#req-130--contribution-builder)) | Checkpointing and resume — the seeder's responsibility, not the SDK's |
 | Demographic helpers in `cadasto/care` | Identity strategy (deterministic seeds for reproducibility) |
 | `testkit/` fluent builders for trivial cases | Faker library bindings (e.g. `gofakeit`) |
 

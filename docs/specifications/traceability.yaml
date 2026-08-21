@@ -1592,6 +1592,25 @@ requirements:
     plans:
       - docs/plans/archive/2026-06-19-rm-functions.md
 
+  - id: REQ-130
+    title: Contribution builder
+    canonical: docs/specifications/wire.md#req-130--contribution-builder
+    status: draft
+    implementation: planned
+    packages: [openehr/client/ehr/contribution]
+    probes: [PROBE-084]
+    plans: [docs/plans/2026-07-16-contribution-builder.md]
+    tests: []
+    notes: >-
+      First allocation in the SDK authoring & client-tooling band (130-139).
+      A fluent builder over the landed Contribution_create submission shape
+      (REQ-050/095, PROBE-072): per-operation change-type codes, a
+      body-carried lifecycle_state (the openehr-version header is
+      per-request and cannot express one state per version), a
+      caller-supplied batch audit change_type that MUST NOT be derived, and
+      omission of the server-assigned contribution / uid fields the pin's
+      UpdateVersion DTO does not declare.
+
   - id: REQ-140
     title: Underscore-prefixed RM attributes (simplified formats)
     canonical: docs/specifications/wire.md#req-140--underscore-prefixed-rm-attributes
