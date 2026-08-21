@@ -200,8 +200,11 @@ func probe084VersionIssue(i int, op, precedingUID, wantCode string, v map[string
 	if _, has := v["contribution"]; has {
 		return at + " emits the server-assigned `contribution` (not declared on UpdateVersion — REQ-130)"
 	}
-	if _, has := v["uid"]; has {
-		return at + " emits an unset `uid` (server-assigned — REQ-130)"
+	if uidMap, has := v["uid"].(map[string]any); has {
+		val, _ := uidMap["value"].(string)
+		if val == "" {
+			return at + " emits an empty `uid` (server-assigned — REQ-130)"
+		}
 	}
 	data, ok := v["data"].(map[string]any)
 	if !ok || data["_type"] == nil {

@@ -213,6 +213,32 @@ func TestOriginalVersionLifecycleStateDefiningCode(t *testing.T) {
 	}
 }
 
+// TestOriginalVersionOmitsEmptyUID pins REQ-130 § Server-assigned fields:
+// an unset uid is omitted from the write body, not emitted as {"value":""}.
+func TestOriginalVersionOmitsEmptyUID(t *testing.T) {
+	base := buildOriginalVersionRM()
+	base.UID = rm.ObjectVersionID{}
+	ov := contribution.WrapOriginalVersion(base)
+	m := marshalToMap(t, ov)
+	if _, has := m["uid"]; has {
+		t.Errorf("empty uid must be omitted on marshal, got %v", m["uid"])
+	}
+}
+
+// TestOriginalVersionEmitsCallerSuppliedUID is the counter-arm: a
+// caller-named uid reaches the wire verbatim.
+func TestOriginalVersionEmitsCallerSuppliedUID(t *testing.T) {
+	ov := contribution.WrapOriginalVersion(buildOriginalVersionRM())
+	m := marshalToMap(t, ov)
+	uid, ok := m["uid"].(map[string]any)
+	if !ok {
+		t.Fatal("caller-supplied uid was dropped on marshal")
+	}
+	if uid["value"] != "42::cdr.example::1" {
+		t.Errorf("uid.value = %v, want 42::cdr.example::1", uid["value"])
+	}
+}
+
 // TestWrapOriginalVersionDropsTimeCommitted is the canonical regression
 // guard: the source rm.AuditDetails has a time_committed; WrapOriginalVersion
 // must drop it from the marshalled commit_audit.

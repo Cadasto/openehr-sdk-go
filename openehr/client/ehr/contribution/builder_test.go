@@ -46,6 +46,24 @@ func codeOf(m map[string]any, field string) string {
 	return s
 }
 
+// termOf reads a DV_CODED_TEXT's defining_code.terminology_id.value.
+func termOf(m map[string]any, field string) string {
+	ct, ok := m[field].(map[string]any)
+	if !ok {
+		return ""
+	}
+	dc, ok := ct["defining_code"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	tid, ok := dc["terminology_id"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := tid["value"].(string)
+	return s
+}
+
 // TestBuilderCreationWireShape pins the REQ-130 creation contract: the
 // creation change-type code on the version audit, a defaulted `complete`
 // lifecycle state in the version body, no preceding_version_uid, and none
@@ -82,11 +100,17 @@ func TestBuilderCreationWireShape(t *testing.T) {
 	if got := codeOf(ca, "change_type"); got != "249" {
 		t.Errorf("commit_audit.change_type code = %q, want 249 (creation)", got)
 	}
+	if got := termOf(ca, "change_type"); got != "openehr" {
+		t.Errorf("commit_audit.change_type terminology = %q, want openehr", got)
+	}
 	if _, has := ca["time_committed"]; has {
 		t.Error("commit_audit carries server-assigned time_committed")
 	}
 	if got := codeOf(v, "lifecycle_state"); got != "532" {
 		t.Errorf("lifecycle_state code = %q, want 532 (complete by default)", got)
+	}
+	if got := termOf(v, "lifecycle_state"); got != "openehr" {
+		t.Errorf("lifecycle_state terminology = %q, want openehr", got)
 	}
 	if _, has := v["preceding_version_uid"]; has {
 		t.Error("a creation must not carry preceding_version_uid")
