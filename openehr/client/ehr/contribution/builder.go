@@ -3,6 +3,7 @@ package contribution
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	openehrclient "github.com/cadasto/openehr-sdk-go/openehr/client/ehr"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
@@ -10,9 +11,10 @@ import (
 
 // ChangeType is an openEHR *audit change type* terminology code, carried as
 // the `commit_audit.change_type` of a contributed version. The value set is
-// closed and its normative home is
-// [wire.md § REQ-130](../../../../docs/specifications/wire.md#req-130--contribution-builder)
-// — `523` is the deletion code; `253` is *unknown*, not *deleted*.
+// closed; its normative home is docs/specifications/wire.md § REQ-130, where
+// `523` is the deletion code — `253` is *unknown*, not *deleted*. A code
+// outside this set is reachable only by supplying a whole [UpdateAudit] via
+// [Builder.WithAudit].
 type ChangeType string
 
 const (
@@ -349,7 +351,10 @@ func (b *Builder) Build() (*Submission, error) {
 	if b == nil {
 		return nil, errors.New("contribution: nil Builder")
 	}
-	errs := b.errs
+	// Clone rather than append onto b.errs: appending into its spare
+	// capacity would write through the shared backing array, so a second
+	// Build would be scribbling over the first one's working slice.
+	errs := slices.Clone(b.errs)
 	if len(b.changes) == 0 {
 		errs = append(errs, errors.New("contribution.Builder: no versions added (Contribution_create requires at least one)"))
 	}
