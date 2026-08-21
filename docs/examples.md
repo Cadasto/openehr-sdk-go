@@ -1,8 +1,8 @@
 # Examples
 
-**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline — the two REST ones use an in-process `httptest` backend, so nothing needs a CDR.
+**New here?** Run `go run ./cmd/examples/canonical_json` and then follow the [suggested learning order](#suggested-learning-order). Every example works offline — the REST ones use an in-process `httptest` backend, so nothing needs a CDR.
 
-The 16 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes** — production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note, which is the part worth reading if you are here to build something.
+The 17 runnable programs under [`cmd/examples/`](../cmd/examples/) demonstrate each major SDK surface. They are **reference shapes** — production tools (benchmark harnesses, MCP servers, federators) live in their own repositories but follow the same patterns. Each entry below ends with a **What to copy into your app** note, which is the part worth reading if you are here to build something.
 
 Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<name>` works from **any working directory** inside a clone. Build them all with `make build` (or `go build ./cmd/examples/...`).
 
@@ -27,6 +27,7 @@ Fixture paths resolve relative to the source file, so `go run ./cmd/examples/<na
 | [webtemplate-export](#webtemplate-export) | No | `template`, `templatecompile`, `template/webtemplate` | Compiled OPT → EHRbase v2.3 WebTemplate JSON (REQ-106) |
 | [flat-roundtrip](#flat-roundtrip) | No | `serialize/simplified`, `template/webtemplate`, `canjson`, `validation` | COMPOSITION ↔ FLAT / STRUCTURED simplified formats + conformant `WithTemplate` decode (REQ-053) |
 | [ehr_create](#ehr_create) | Mock (`httptest`) | `discovery`, `transport`, `client/ehr` | Smallest REST create path |
+| [contribution-build](#contribution-build) | Optional mock (`-commit`) | `client/ehr/contribution`, `canjson` | Fluent multi-version `Contribution_create` assembly (REQ-130) |
 | [smart-launch](#smart-launch) | Mock (`httptest`) | `auth/smart`, `auth` | Standalone PKCE launch; **state + verifier persistence** across redirect (REQ-061) |
 
 ---
@@ -471,6 +472,36 @@ To hit a real backend, swap the catalog base URL and add `transport.WithTokenSou
 
 ---
 
+### contribution-build
+
+**Purpose:** Assemble a multi-version CONTRIBUTION with `contribution.Builder` (REQ-130) — two vendored canonical compositions committed in one batch, one as a first version and one as an amendment — and print the `Contribution_create` body. `-commit` additionally POSTs it through `contribution.Commit` to an in-process fake CDR and asserts the captured request is byte-identical to what was built.
+
+```bash
+go run ./cmd/examples/contribution-build
+go run ./cmd/examples/contribution-build -commit
+```
+
+**Packages:** `openehr/client/ehr/contribution`, `openehr/serialize/canjson`, `testkit/fixtures` (+ `smart/discovery`, `transport` under `-commit`)
+
+**Sample output** (body elided):
+
+```text
+batch audit change_type: creation (249) — declared, not derived
+versions[0]: ORIGINAL_VERSION<COMPOSITION> change_type=creation/249 lifecycle_state=complete/532 preceding=(none — a first version)
+versions[1]: ORIGINAL_VERSION<COMPOSITION> change_type=amendment/250 lifecycle_state=complete/532 preceding=8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1
+```
+
+**What to copy into your app:**
+
+1. `contribution.NewBuilder()`, then declare the batch audit once — committer, system id, and the batch `change_type` (which is *never* derived from the versions).
+2. Accumulate one `Change` per version: `contribution.Creation(payload)`, or `Amendment` / `Modification` / `Deletion` with the preceding version uid. Each is generic over the four versionable RM types, so a wrong payload type is a compile error.
+3. `Build()` once — it returns a `*contribution.Submission` that has already passed `Validate`, or every accumulated error joined.
+4. `contribution.Commit(ctx, client, ehrID, submission)`.
+
+Per-version overrides (`WithLifecycleState`, `WithVersionCommitter`, `WithVersionDescription`, `WithVersionSystemID`, `WithVersionUID`) refine what a version would otherwise inherit from the batch audit.
+
+---
+
 ### smart-launch
 
 **Purpose:** Demonstrate the full **standalone SMART-on-openEHR authorization-code + PKCE flow** for a public client (no client secret), backed by an in-process `httptest`-style stub server — no external network, no secrets, works offline.
@@ -524,7 +555,7 @@ See [specifications/auth.md § REQ-061](specifications/auth.md#req-061--pkce-flo
 6. smart-launch            ← SMART PKCE auth (standalone, public client)
 ```
 
-Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction).
+Optional depth: `canxml_roundtrip` (multi-format), `primitive-validate` (leaf constraints), `validate-composition` (in-memory RM construction), `contribution-build` (batched atomic writes).
 
 ---
 

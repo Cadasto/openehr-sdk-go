@@ -19,6 +19,7 @@
 //   - cmd/examples/validate-from-json     — canjson + OPT validate (REQ-052, REQ-102)
 //   - cmd/examples/primitive-validate     — primitive constraints (REQ-103)
 //   - cmd/examples/ehr_create           — REST EHR create (transport + client)
+//   - cmd/examples/contribution-build   — fluent multi-version Contribution_create assembly (REQ-130)
 //   - cmd/examples/generate-example     — OPT → RM instance synthesis (REQ-107)
 //   - cmd/examples/aql-build            — AQL struct + verb builders (REQ-055); containment algebra + in-text paging (REQ-117)
 //   - cmd/examples/aql-parse-structured — AQL → parse.Query AST + Emit round-trip (REQ-113, REQ-117, REQ-118)
