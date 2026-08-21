@@ -27,4 +27,14 @@
 // versions are submitted through the [OriginalVersion] / [ImportedVersion]
 // write-wrappers ([WrapOriginalVersion] / [WrapImportedVersion]), which
 // carry the same commit-audit shape. PROBE-072; REQ-050 / REQ-095.
+//
+// [Builder] is the authoring surface over that shape (REQ-130,
+// PROBE-084): it assembles a [Submission] from payloads and per-operation
+// [Change] values ([Creation], [Amendment], [Modification], [Deletion]),
+// setting each version's change-type code and lifecycle state and
+// inheriting the batch audit, so a caller never hand-wires a version
+// wrapper. It emits nothing a caller could not write by hand — the
+// server-assigned `contribution` and `uid` fields, which the pin's
+// `UpdateVersion` request DTO does not declare, are omitted from every
+// write-side body rather than sent empty.
 package contribution

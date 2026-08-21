@@ -65,15 +65,37 @@ func (v *OriginalVersion[T]) BMMName() string { return "ORIGINAL_VERSION" }
 // structs, update these copies in lockstep — `go test ./openehr/client/ehr/contribution/...`.
 type originalVersionJSON[T any] struct {
 	Type                  string               `json:"_type"`
-	Contribution          rm.ObjectRefLike     `json:"contribution"`
+	Contribution          rm.ObjectRefLike     `json:"contribution,omitempty"`
 	Signature             *string              `json:"signature,omitempty"`
 	CommitAudit           UpdateAudit          `json:"commit_audit"`
-	UID                   rm.ObjectVersionID   `json:"uid"`
+	UID                   *rm.ObjectVersionID  `json:"uid,omitempty"`
 	PrecedingVersionUID   *rm.ObjectVersionID  `json:"preceding_version_uid,omitempty"`
 	OtherInputVersionUids []rm.ObjectVersionID `json:"other_input_version_uids,omitempty"`
 	LifecycleState        rm.DVCodedText       `json:"lifecycle_state"`
 	Attestations          []rm.Attestation     `json:"attestations,omitempty"`
 	Data                  *T                   `json:"data,omitempty"`
+}
+
+// omitIfAbsent reports the contribution reference to emit, or nil when the
+// caller supplied none. `contribution` and `uid` are assigned by the server
+// at commit and are not declared on the pin's `UpdateVersion` request DTO,
+// so a write-side body omits them rather than sending `null` or an empty
+// id object (wire.md § REQ-130 § Server-assigned fields). A typed-nil
+// interface counts as absent — it would otherwise marshal as `null`.
+func omitIfAbsent(ref rm.ObjectRefLike) rm.ObjectRefLike {
+	if ref == nil || rm.IsTypedNil(ref) {
+		return nil
+	}
+	return ref
+}
+
+// uidOrNil returns a pointer to uid when the caller populated it, so an
+// unset uid is omitted rather than emitted as `{"value":""}` (REQ-130).
+func uidOrNil(uid rm.ObjectVersionID) *rm.ObjectVersionID {
+	if uid.Value == "" {
+		return nil
+	}
+	return &uid
 }
 
 // MarshalJSON emits the canonical ORIGINAL_VERSION wire shape, replacing
@@ -87,10 +109,10 @@ func (v *OriginalVersion[T]) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(&originalVersionJSON[T]{
 		Type:                  "ORIGINAL_VERSION",
-		Contribution:          o.Contribution,
+		Contribution:          omitIfAbsent(o.Contribution),
 		Signature:             o.Signature,
 		CommitAudit:           v.CommitAudit,
-		UID:                   o.UID,
+		UID:                   uidOrNil(o.UID),
 		PrecedingVersionUID:   o.PrecedingVersionUID,
 		OtherInputVersionUids: o.OtherInputVersionUids,
 		LifecycleState:        o.LifecycleState,
@@ -130,7 +152,7 @@ func (v *ImportedVersion[T]) BMMName() string { return "IMPORTED_VERSION" }
 
 type importedVersionJSON[T any] struct {
 	Type         string                  `json:"_type"`
-	Contribution rm.ObjectRefLike        `json:"contribution"`
+	Contribution rm.ObjectRefLike        `json:"contribution,omitempty"`
 	Signature    *string                 `json:"signature,omitempty"`
 	CommitAudit  UpdateAudit             `json:"commit_audit"`
 	Item         rm.OriginalVersion[any] `json:"item"`
@@ -146,7 +168,7 @@ func (v *ImportedVersion[T]) MarshalJSON() ([]byte, error) {
 	}
 	return json.Marshal(&importedVersionJSON[T]{
 		Type:         "IMPORTED_VERSION",
-		Contribution: i.Contribution,
+		Contribution: omitIfAbsent(i.Contribution),
 		Signature:    i.Signature,
 		CommitAudit:  v.CommitAudit,
 		Item:         i.Item,
