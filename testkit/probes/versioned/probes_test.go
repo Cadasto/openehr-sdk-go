@@ -627,6 +627,14 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 			wantDetail: "whose caller supplied none",
 		},
 		{
+			// What dropping `omitempty` from the write-side uid field emits.
+			// A present-but-null key type-asserts like a missing one, so this
+			// is the arm that keeps absence judged on key presence.
+			name:       "null uid emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":null`})...),
+			wantDetail: "absent rather than empty or null",
+		},
+		{
 			name:       "top-level CONTRIBUTION envelope",
 			planted:    []byte(`{"_type":"CONTRIBUTION",` + strings.TrimPrefix(string(probe084Body("253", conformant...)), "{")),
 			wantDetail: "Contribution_create has no class envelope",

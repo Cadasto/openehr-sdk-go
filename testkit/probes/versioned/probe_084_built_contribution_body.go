@@ -258,16 +258,26 @@ func probe084VersionIssue(i int, want probe084Step, v map[string]any) string {
 // supply MUST be absent — not merely non-empty. Accepting any non-empty uid
 // where none was supplied would let a builder that synthesised one pass,
 // which is the MUST NOT this arm exists to catch.
+//
+// Absence is judged on **key presence**, before any type assertion, because
+// `"uid":null` is a present key whose value type-asserts like a missing one.
+// Dropping `omitempty` from the write-side uid field emits exactly that, and
+// asserting the type first read it as absent — the neighbouring golden and
+// wrapper tests caught the regression, this arm did not.
 func probe084UIDIssue(at, wantUID string, v map[string]any) string {
-	got, present := v["uid"].(map[string]any)
+	raw, present := v["uid"]
 	if wantUID == "" {
 		if present {
-			return fmt.Sprintf("%s emits `uid` %v for a version whose caller supplied none — the server assigns it (REQ-130)", at, got["value"])
+			return fmt.Sprintf("%s emits `uid` %v for a version whose caller supplied none — the server assigns it, so the key must be absent rather than empty or null (REQ-130)", at, raw)
 		}
 		return ""
 	}
 	if !present {
 		return fmt.Sprintf("%s dropped the caller-supplied `uid` %q (REQ-130 emits it verbatim)", at, wantUID)
+	}
+	got, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Sprintf("%s.uid = %v, want the caller-supplied %q as an OBJECT_VERSION_ID object", at, raw, wantUID)
 	}
 	if got["value"] != wantUID {
 		return fmt.Sprintf("%s.uid = %v, want the caller-supplied %q", at, got["value"], wantUID)
