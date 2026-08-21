@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -513,67 +514,122 @@ func TestProbe084BuiltContributionBodyPass(t *testing.T) {
 	}
 }
 
+// probe084Planted builds a `Contribution_create` body in the shape
+// PROBE-084's own batch produces, so a planted variant differs from the
+// real thing in exactly the one clause under test. Each version is
+// `{code, rmType, extra}`; `extra` injects the violation.
+type probe084Planted struct {
+	code   string
+	rmType string
+	extra  string
+}
+
+func probe084Body(batchCode string, versions ...probe084Planted) []byte {
+	audit := func(code string) string {
+		return `{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"value":"openehr"},"code_string":"` + code + `"}}}`
+	}
+	out := make([]string, 0, len(versions))
+	for _, v := range versions {
+		s := `{"_type":"ORIGINAL_VERSION","commit_audit":` + audit(v.code) +
+			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}}` +
+			`,"data":{"_type":"` + v.rmType + `"}`
+		if v.extra != "" {
+			s += "," + v.extra
+		}
+		out = append(out, s+"}")
+	}
+	return []byte(`{"audit":` + audit(batchCode) + `,"versions":[` + strings.Join(out, ",") + `]}`)
+}
+
 // TestProbe084BuiltContributionBodyRejects plants bodies that each violate
 // one REQ-130 clause, so a probe that stopped asserting a clause would fail
-// here rather than keep reporting green.
+// here rather than keep reporting green. Each case also names the substring
+// its Detail must carry: asserting only `status == "fail"` would let a case
+// rot into failing for an unrelated reason (a version-count change, say) and
+// still look like it was pinning its clause.
 func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
-	const preceding = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}`
-	const preceding2 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"}`
-	audit := func(code string) string {
-		return `{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"` + code + `"}}}`
+	const (
+		preceding1 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}`
+		preceding2 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"}`
+		preceding4 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4"}`
+		callerUID  = `"uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"}`
+	)
+	// The four versions PROBE-084's own batch emits, in order.
+	conformant := []probe084Planted{
+		{code: "249", rmType: "COMPOSITION"},
+		{code: "250", rmType: "COMPOSITION", extra: preceding1},
+		{code: "251", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID},
+		{code: "523", rmType: "FOLDER", extra: preceding4},
 	}
-	version := func(code, extra string) string {
-		v := `{"_type":"ORIGINAL_VERSION","commit_audit":` + audit(code) +
-			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}}` +
-			`,"data":{"_type":"COMPOSITION"}`
-		if extra != "" {
-			v += "," + extra
-		}
-		return v + "}"
-	}
-	body := func(batchCode string, versions ...string) []byte {
-		return []byte(`{"audit":` + audit(batchCode) + `,"versions":[` + strings.Join(versions, ",") + `]}`)
-	}
-	conformant := []string{
-		version("249", ""),
-		version("250", preceding),
-		version("523", preceding2),
+	// mutate returns the conformant batch with one version replaced.
+	mutate := func(i int, v probe084Planted) []probe084Planted {
+		out := slices.Clone(conformant)
+		out[i] = v
+		return out
 	}
 	cases := []struct {
-		name    string
-		planted []byte
+		name       string
+		planted    []byte
+		wantDetail string
 	}{
 		{
-			name:    "batch change_type derived from a version",
-			planted: body("249", conformant...),
+			name:       "batch change_type derived from a version",
+			planted:    probe084Body("249", conformant...),
+			wantDetail: "forbids deriving the batch code",
 		},
 		{
-			name:    "creation carries a preceding version",
-			planted: body("251", version("249", preceding), version("250", preceding), version("523", preceding2)),
+			name:       "creation carries a preceding version",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: preceding1})...),
+			wantDetail: "a creation follows no version",
 		},
 		{
-			name:    "amendment lacks a preceding version",
-			planted: body("251", version("249", ""), version("250", ""), version("523", preceding2)),
+			name:       "amendment lacks a preceding version",
+			planted:    probe084Body("253", mutate(1, probe084Planted{code: "250", rmType: "COMPOSITION"})...),
+			wantDetail: "missing preceding_version_uid",
 		},
 		{
-			name:    "wrong change-type code for the operation",
-			planted: body("251", version("249", ""), version("251", preceding), version("523", preceding2)),
+			name:       "wrong change-type code for the operation",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "250", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID})...),
+			wantDetail: `change_type code = "250", want "251"`,
 		},
 		{
-			name:    "lifecycle_state absent",
-			planted: []byte(`{"audit":` + audit("251") + `,"versions":[{"_type":"ORIGINAL_VERSION","commit_audit":` + audit("249") + `,"data":{"_type":"COMPOSITION"}},` + version("250", preceding) + `,` + version("523", preceding2) + `]}`),
+			name:       "payload type swapped",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "251", rmType: "COMPOSITION", extra: preceding2 + "," + callerUID})...),
+			wantDetail: "data._type = COMPOSITION, want EHR_STATUS",
 		},
 		{
-			name:    "server-assigned contribution emitted",
-			planted: body("251", version("249", `"contribution":null`), version("250", preceding), version("523", preceding2)),
+			// The counter-arm: a uid the caller DID supply must survive.
+			name:       "caller-supplied uid dropped",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "251", rmType: "EHR_STATUS", extra: preceding2})...),
+			wantDetail: "dropped the caller-supplied `uid`",
 		},
 		{
-			name:    "empty uid emitted",
-			planted: body("251", version("249", `"uid":{"value":""}`), version("250", preceding), version("523", preceding2)),
+			name:       "lifecycle_state absent",
+			planted:    []byte(strings.Replace(string(probe084Body("253", conformant...)), `"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}},`, "", 1)),
+			wantDetail: "lifecycle_state is missing",
 		},
 		{
-			name:    "top-level CONTRIBUTION envelope",
-			planted: []byte(`{"_type":"CONTRIBUTION","audit":` + audit("251") + `,"versions":[` + strings.Join(conformant, ",") + `]}`),
+			name:       "server-assigned contribution emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"contribution":null`})...),
+			wantDetail: "emits the server-assigned `contribution`",
+		},
+		{
+			name:       "empty uid emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":{"value":""}`})...),
+			wantDetail: "whose caller supplied none",
+		},
+		{
+			// The arm that a "reject only an empty uid" reading would let
+			// through: REQ-130 forbids the builder synthesising a uid, so a
+			// non-empty one the caller never asked for must fail too.
+			name:       "synthesised non-empty uid",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":{"value":"invented::cdr.example::1"}`})...),
+			wantDetail: "whose caller supplied none",
+		},
+		{
+			name:       "top-level CONTRIBUTION envelope",
+			planted:    []byte(`{"_type":"CONTRIBUTION",` + strings.TrimPrefix(string(probe084Body("253", conformant...)), "{")),
+			wantDetail: "Contribution_create has no class envelope",
 		},
 	}
 	for _, tc := range cases {
@@ -587,6 +643,9 @@ func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
 			}
 			if r.Status != "fail" {
 				t.Errorf("PROBE-084 status = %q, want fail (detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tc.wantDetail) {
+				t.Errorf("PROBE-084 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
 			}
 		})
 	}

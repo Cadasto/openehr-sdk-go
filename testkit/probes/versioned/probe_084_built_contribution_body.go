@@ -33,23 +33,50 @@ var builtVersionFields = []string{
 	"item", // IMPORTED_VERSION's nested historical version
 }
 
-// probe084Batch is the batch PROBE-084 builds: one version per operation
-// that carries a distinct change-type code, so the code table is asserted
-// in one pass. The batch audit deliberately declares `modification` —
-// a code no version below shares — because REQ-130 forbids deriving the
-// batch code from the versions, and a derived one would silently agree
-// with whichever version happened to be first.
-var probe084Batch = []struct {
-	op           string
+// probe084Step is one expected version of the batch: what was asked for, and
+// what the wire must therefore carry.
+type probe084Step struct {
+	// label names the operation in a failure message.
+	label string
+	// rmType is the `data._type` the payload must keep on the wire — the
+	// batch spans three of the four versionable types, so a generic
+	// instantiation that lost its discriminator shows up here.
+	rmType string
+	// precedingUID is the version this one follows; empty for a creation,
+	// which must carry no `preceding_version_uid` at all.
 	precedingUID string
-	wantCode     string
-}{
-	{op: "creation", wantCode: "249"},
-	{op: "amendment", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1", wantCode: "250"},
-	{op: "deletion", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2", wantCode: "523"},
+	// wantCode is the audit change-type code the operation implies.
+	wantCode string
+	// wantUID is the `uid` the caller supplied. Empty means the caller
+	// supplied none, and the version must then carry **no** `uid` key:
+	// REQ-130 forbids the builder synthesising one. Asserting "absent"
+	// rather than "not empty" is what keeps this arm biting — a builder
+	// that invented a uid would satisfy a non-empty check.
+	wantUID string
 }
 
-const probe084BatchCode = "251"
+// probe084Batch is the batch PROBE-084 builds: one version per operation, so
+// the whole change-type table (249 / 250 / 251 / 523) is asserted in one
+// pass, across three of the four versionable types.
+var probe084Batch = []probe084Step{
+	{label: "creation of a COMPOSITION", rmType: "COMPOSITION", wantCode: "249"},
+	{label: "amendment of a COMPOSITION", rmType: "COMPOSITION", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1", wantCode: "250"},
+	// This one names its own uid, so both halves of the server-assigned-field
+	// rule are asserted on the wire: three versions must carry no `uid`, and
+	// this one must carry exactly the caller's.
+	{label: "modification of an EHR_STATUS with a caller-supplied uid", rmType: "EHR_STATUS", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2", wantCode: "251", wantUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"},
+	{label: "deletion of a FOLDER", rmType: "FOLDER", precedingUID: "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4", wantCode: "523"},
+}
+
+// probe084BatchCode is the batch audit's change type — openEHR `unknown`,
+// which is deliberately NOT one of the four codes the builder authors per
+// operation. Since the versions between them now carry all four, a code
+// from outside that set is the only batch value no derivation rule over the
+// versions could reproduce, so the non-derivation arm cannot pass by
+// coincidence. It reaches the audit through Builder.WithAudit — the
+// documented escape hatch for a code outside the authored table — which
+// this probe therefore also exercises on the wire.
+const probe084BatchCode = "253"
 
 // Probe084BuiltContributionBody implements PROBE-084: a
 // `Contribution_create` body assembled by [contribution.Builder] reaches
@@ -125,7 +152,7 @@ func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, cap
 		return r, nil
 	}
 	for i, want := range probe084Batch {
-		if msg := probe084VersionIssue(i, want.op, want.precedingUID, want.wantCode, body.Versions[i]); msg != "" {
+		if msg := probe084VersionIssue(i, want, body.Versions[i]); msg != "" {
 			r.Status = "fail"
 			r.Detail = msg
 			return r, nil
@@ -138,40 +165,52 @@ func Probe084BuiltContributionBody(ctx context.Context, c *transport.Client, cap
 		return r, nil
 	}
 	r.Status = "pass"
-	r.Detail = fmt.Sprintf("built body: %d versions (249/250/523), batch audit code %s carried as declared; %d corpus records witness %d version fields, all emittable",
+	r.Detail = fmt.Sprintf("built body: %d versions covering 249/250/251/523 over COMPOSITION/EHR_STATUS/FOLDER, batch audit code %s carried as declared; %d corpus records witness %d version fields, all emittable",
 		len(body.Versions), probe084BatchCode, len(corpus), corpusFields)
 	return r, nil
 }
 
 // buildProbe084Submission assembles the batch through the public builder —
-// the surface under test. The payload only needs to be a COMPOSITION: this
-// probe asserts version metadata, not composition validity (REQ-102 owns
-// that).
+// the surface under test. The changes are written out rather than looped
+// because each operation instantiates its own payload type, which is the
+// point: three of the four versionable types travel in one batch. The
+// payloads need only carry their discriminator — this probe asserts version
+// metadata, not composition validity (REQ-102 owns that). Their order MUST
+// match [probe084Batch], and a mismatch is reported as framework misuse
+// rather than as a builder defect.
 func buildProbe084Submission() (*contribution.Submission, error) {
 	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
-	b := contribution.NewBuilder().
+	status := rm.EHRStatus{ArchetypeNodeID: "openEHR-EHR-EHR_STATUS.generic.v1", IsQueryable: true, IsModifiable: true}
+	folder := rm.Folder{Name: rm.DVText{Value: "Encounters"}}
+	changes := []contribution.Change{
+		contribution.Creation(&comp),
+		contribution.Amendment(probe084Batch[1].precedingUID, &comp),
+		contribution.Modification(probe084Batch[2].precedingUID, &status, contribution.WithVersionUID(probe084Batch[2].wantUID)),
+		contribution.Deletion(probe084Batch[3].precedingUID, &folder),
+	}
+	if len(changes) != len(probe084Batch) {
+		return nil, fmt.Errorf("built %d changes for %d expected steps", len(changes), len(probe084Batch))
+	}
+	// The batch audit is set wholesale so its change type can be a code
+	// outside the authored table (see probe084BatchCode); the committer and
+	// system id are then layered on, exercising both entry points.
+	return contribution.NewBuilder().
+		WithAudit(contribution.UpdateAudit{
+			ChangeType: rm.DVCodedText{
+				DVText:       rm.DVText{Value: "unknown"},
+				DefiningCode: rm.CodePhrase{TerminologyID: rm.TerminologyID{Value: "openehr"}, CodeString: probe084BatchCode},
+			},
+		}).
 		WithCommitterName("probe-084").
 		WithSystemID("cdr.example").
-		WithChangeType(contribution.ChangeTypeModification)
-	for _, step := range probe084Batch {
-		switch step.op {
-		case "creation":
-			b = b.Add(contribution.Creation(&comp))
-		case "amendment":
-			b = b.Add(contribution.Amendment(step.precedingUID, &comp))
-		case "deletion":
-			b = b.Add(contribution.Deletion(step.precedingUID, &comp))
-		default:
-			return nil, fmt.Errorf("unknown probe step %q", step.op)
-		}
-	}
-	return b.Build()
+		Add(changes...).
+		Build()
 }
 
 // probe084VersionIssue returns a non-empty description when one decoded
 // version violates REQ-130, or "" when it conforms.
-func probe084VersionIssue(i int, op, precedingUID, wantCode string, v map[string]any) string {
-	at := fmt.Sprintf("versions[%d] (%s)", i, op)
+func probe084VersionIssue(i int, want probe084Step, v map[string]any) string {
+	at := fmt.Sprintf("versions[%d] (%s)", i, want.label)
 	if v["_type"] != "ORIGINAL_VERSION" {
 		return fmt.Sprintf("%s._type = %v, want ORIGINAL_VERSION", at, v["_type"])
 	}
@@ -182,33 +221,56 @@ func probe084VersionIssue(i int, op, precedingUID, wantCode string, v map[string
 	if msg := auditWriteShapeIssue(at+".commit_audit", ca); msg != "" {
 		return msg
 	}
-	if got := codedCodeString(ca, "change_type"); got != wantCode {
-		return fmt.Sprintf("%s.commit_audit.change_type code = %q, want %q", at, got, wantCode)
+	if got := codedCodeString(ca, "change_type"); got != want.wantCode {
+		return fmt.Sprintf("%s.commit_audit.change_type code = %q, want %q", at, got, want.wantCode)
 	}
 	if got := codedCodeString(v, "lifecycle_state"); got == "" {
 		return at + ".lifecycle_state is missing or not DV_CODED_TEXT-shaped (required on the pin's UpdateVersion)"
 	}
 	uid, hasPreceding := v["preceding_version_uid"].(map[string]any)
 	switch {
-	case precedingUID == "" && hasPreceding:
+	case want.precedingUID == "" && hasPreceding:
 		return fmt.Sprintf("%s carries preceding_version_uid %v — a creation follows no version", at, uid["value"])
-	case precedingUID != "" && !hasPreceding:
+	case want.precedingUID != "" && !hasPreceding:
 		return at + " is missing preceding_version_uid"
-	case precedingUID != "" && uid["value"] != precedingUID:
-		return fmt.Sprintf("%s.preceding_version_uid = %v, want %q", at, uid["value"], precedingUID)
+	case want.precedingUID != "" && uid["value"] != want.precedingUID:
+		return fmt.Sprintf("%s.preceding_version_uid = %v, want %q", at, uid["value"], want.precedingUID)
 	}
 	if _, has := v["contribution"]; has {
 		return at + " emits the server-assigned `contribution` (not declared on UpdateVersion — REQ-130)"
 	}
-	if uidMap, has := v["uid"].(map[string]any); has {
-		val, _ := uidMap["value"].(string)
-		if val == "" {
-			return at + " emits an empty `uid` (server-assigned — REQ-130)"
-		}
+	if msg := probe084UIDIssue(at, want.wantUID, v); msg != "" {
+		return msg
 	}
 	data, ok := v["data"].(map[string]any)
 	if !ok || data["_type"] == nil {
 		return at + ".data is missing or carries no _type (Contribution_create requires the payload inline)"
+	}
+	if data["_type"] != want.rmType {
+		return fmt.Sprintf("%s.data._type = %v, want %s", at, data["_type"], want.rmType)
+	}
+	return ""
+}
+
+// probe084UIDIssue holds the version `uid` to exactly what the caller asked
+// for. REQ-130 splits this two ways and both halves are asserted: a uid the
+// caller supplied MUST reach the wire verbatim, and one the caller did not
+// supply MUST be absent — not merely non-empty. Accepting any non-empty uid
+// where none was supplied would let a builder that synthesised one pass,
+// which is the MUST NOT this arm exists to catch.
+func probe084UIDIssue(at, wantUID string, v map[string]any) string {
+	got, present := v["uid"].(map[string]any)
+	if wantUID == "" {
+		if present {
+			return fmt.Sprintf("%s emits `uid` %v for a version whose caller supplied none — the server assigns it (REQ-130)", at, got["value"])
+		}
+		return ""
+	}
+	if !present {
+		return fmt.Sprintf("%s dropped the caller-supplied `uid` %q (REQ-130 emits it verbatim)", at, wantUID)
+	}
+	if got["value"] != wantUID {
+		return fmt.Sprintf("%s.uid = %v, want the caller-supplied %q", at, got["value"], wantUID)
 	}
 	return ""
 }

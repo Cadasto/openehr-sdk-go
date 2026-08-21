@@ -8,14 +8,14 @@
     },
     "change_type": {
       "_type": "DV_CODED_TEXT",
-      "value": "modification",
+      "value": "unknown",
       "defining_code": {
         "_type": "CODE_PHRASE",
         "terminology_id": {
           "_type": "TERMINOLOGY_ID",
           "value": "openehr"
         },
-        "code_string": "251"
+        "code_string": "253"
       }
     }
   },
@@ -173,16 +173,20 @@
         },
         "change_type": {
           "_type": "DV_CODED_TEXT",
-          "value": "deleted",
+          "value": "modification",
           "defining_code": {
             "_type": "CODE_PHRASE",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
               "value": "openehr"
             },
-            "code_string": "523"
+            "code_string": "251"
           }
         }
+      },
+      "uid": {
+        "_type": "OBJECT_VERSION_ID",
+        "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"
       },
       "preceding_version_uid": {
         "_type": "OBJECT_VERSION_ID",
@@ -201,38 +205,61 @@
         }
       },
       "data": {
-        "_type": "COMPOSITION",
+        "_type": "EHR_STATUS",
         "name": null,
-        "archetype_node_id": "openEHR-EHR-COMPOSITION.report.v1",
-        "language": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
+        "archetype_node_id": "openEHR-EHR-EHR_STATUS.generic.v1",
+        "subject": {
+          "_type": "PARTY_SELF"
         },
-        "territory": {
-          "_type": "CODE_PHRASE",
-          "terminology_id": {
-            "_type": "TERMINOLOGY_ID",
-            "value": ""
-          },
-          "code_string": ""
+        "is_queryable": true,
+        "is_modifiable": true
+      }
+    },
+    {
+      "_type": "ORIGINAL_VERSION",
+      "commit_audit": {
+        "_type": "AUDIT_DETAILS",
+        "system_id": "cdr.example",
+        "committer": {
+          "_type": "PARTY_IDENTIFIED",
+          "name": "probe-084"
         },
-        "category": {
+        "change_type": {
           "_type": "DV_CODED_TEXT",
-          "value": "",
+          "value": "deleted",
           "defining_code": {
             "_type": "CODE_PHRASE",
             "terminology_id": {
               "_type": "TERMINOLOGY_ID",
-              "value": ""
+              "value": "openehr"
             },
-            "code_string": ""
+            "code_string": "523"
           }
+        }
+      },
+      "preceding_version_uid": {
+        "_type": "OBJECT_VERSION_ID",
+        "value": "8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4"
+      },
+      "lifecycle_state": {
+        "_type": "DV_CODED_TEXT",
+        "value": "complete",
+        "defining_code": {
+          "_type": "CODE_PHRASE",
+          "terminology_id": {
+            "_type": "TERMINOLOGY_ID",
+            "value": "openehr"
+          },
+          "code_string": "532"
+        }
+      },
+      "data": {
+        "_type": "FOLDER",
+        "name": {
+          "_type": "DV_TEXT",
+          "value": "Encounters"
         },
-        "composer": null
+        "archetype_node_id": ""
       }
     }
   ]

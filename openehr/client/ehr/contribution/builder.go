@@ -359,11 +359,17 @@ func (b *Builder) Build() (*Submission, error) {
 		errs = append(errs, errors.New("contribution.Builder: no versions added (Contribution_create requires at least one)"))
 	}
 	// change_type and committer are both required on the pin's write-side
-	// audit DTO. Validate covers the committer for every submission; the
-	// change type is the builder's own gate, since an audit that reached
-	// Validate with an empty code would ship a body the pin rejects.
+	// audit DTO, and both are checked here so one Build reports both. The
+	// change type is the builder's own gate — an audit that reached
+	// Validate with an empty code would ship a body the pin rejects — and
+	// the committer is checked eagerly rather than left to Validate, which
+	// runs only after this error set is empty and would therefore defer a
+	// missing committer to a second Build.
 	if b.audit.ChangeType.DefiningCode.CodeString == "" {
 		errs = append(errs, errors.New("contribution.Builder: batch audit change_type is required — set it with WithChangeType"))
+	}
+	if err := checkCommitter(b.audit.Committer); err != nil {
+		errs = append(errs, fmt.Errorf("contribution.Builder: batch audit %w — set it with WithCommitter or WithCommitterName", err))
 	}
 	versions := make([]CommitVersion, 0, len(b.changes))
 	for i, ch := range b.changes {

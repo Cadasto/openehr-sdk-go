@@ -460,6 +460,58 @@ func TestBuilderEmitsCallerSuppliedUID(t *testing.T) {
 	}
 }
 
+// TestBuilderReportsEveryAuditGapInOnePass — `change_type` and `committer`
+// are both required on the pin's write-side audit DTO, so one Build reports
+// both. Leaving the committer to Submission.Validate would defer it to a
+// second Build, because Validate runs only once this error set is empty.
+// REQ-130.
+func TestBuilderReportsEveryAuditGapInOnePass(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	sub, err := contribution.NewBuilder().Add(contribution.Creation(&comp)).Build()
+	if err == nil {
+		t.Fatalf("Build succeeded with neither change_type nor committer: %+v", sub)
+	}
+	if sub != nil {
+		t.Error("Build returned a submission alongside an error")
+	}
+	for _, want := range []string{"change_type is required", "committer is nil"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error = %q, want it to mention %q in the same pass", err, want)
+		}
+	}
+}
+
+// TestBuilderBuildIsIdempotentOnTheErrorPath — the success path is covered
+// by [TestBuilderBuildIsIdempotent]; this is its refusal twin. A builder
+// carrying both a builder-level error (an unknown batch code) and a
+// change-level one (an amendment with no preceding uid) must report the
+// same set on every Build, and the set must not grow with each attempt.
+//
+// What this does NOT pin: the `slices.Clone(b.errs)` in Build. That clone
+// is defensive hygiene, not a fix for a reachable defect — appending into
+// the spare capacity of b.errs writes past its length, which nothing reads,
+// and errors.Join materialises the values into a new error, so a returned
+// error never aliases the builder. Reverting the clone keeps this test (and
+// its success-path twin) green; verified by mutation.
+func TestBuilderBuildIsIdempotentOnTheErrorPath(t *testing.T) {
+	comp := rm.Composition{ArchetypeNodeID: "openEHR-EHR-COMPOSITION.report.v1"}
+	b := contribution.NewBuilder().
+		WithCommitterName("alice").
+		WithChangeType(contribution.ChangeType("253")).
+		Add(contribution.Amendment("", &comp))
+	first, err1 := b.Build()
+	second, err2 := b.Build()
+	if err1 == nil || err2 == nil {
+		t.Fatalf("Build must refuse both times: %v / %v", err1, err2)
+	}
+	if first != nil || second != nil {
+		t.Error("Build returned a submission alongside an error")
+	}
+	if err1.Error() != err2.Error() {
+		t.Errorf("error set differs between Builds:\nfirst:  %v\nsecond: %v", err1, err2)
+	}
+}
+
 // TestBuilderWithAuditCarriesAnyChangeType — [Builder.WithChangeType] admits
 // only the four codes the SDK authors, so a caller who needs another one
 // (`253` unknown, say) supplies the whole audit instead. That path must

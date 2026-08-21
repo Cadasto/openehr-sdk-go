@@ -213,6 +213,24 @@ func TestOriginalVersionLifecycleStateDefiningCode(t *testing.T) {
 	}
 }
 
+// TestVersionWrappersOmitAbsentContribution pins REQ-130 § Server-assigned
+// fields for BOTH write-side wrappers: `contribution` is assigned by the
+// server at commit and is not declared on the pin's UpdateVersion DTO, so an
+// unset one is omitted rather than emitted as `"contribution":null`. The
+// IMPORTED_VERSION arm is the one no other test reaches — the builder never
+// authors an imported version — so without it that half of the rule could be
+// reverted and stay green.
+func TestVersionWrappersOmitAbsentContribution(t *testing.T) {
+	original := marshalToMap(t, contribution.WrapOriginalVersion(buildOriginalVersionRM()))
+	if _, has := original["contribution"]; has {
+		t.Errorf("ORIGINAL_VERSION emitted contribution=%v, want the key omitted", original["contribution"])
+	}
+	imported := marshalToMap(t, contribution.WrapImportedVersion(buildImportedVersionRM()))
+	if _, has := imported["contribution"]; has {
+		t.Errorf("IMPORTED_VERSION emitted contribution=%v, want the key omitted", imported["contribution"])
+	}
+}
+
 // TestOriginalVersionOmitsEmptyUID pins REQ-130 § Server-assigned fields:
 // an unset uid is omitted from the write body, not emitted as {"value":""}.
 func TestOriginalVersionOmitsEmptyUID(t *testing.T) {

@@ -53,13 +53,13 @@ Two further decisions came out of the same lookup, both grounded in the vendored
 
 ## Definition of Ready
 
-Implementation (Phase 1+) may start once **Phase 0 has landed REQ-130**:
+**All satisfied at close-out** — this section is the gate as it stood before Phase 0 landed, kept for the record:
 
-- `Covers:` names the REQ this plan implements (REQ-130) and the REQs it builds on (REQ-050 landed, REQ-059 partial).
-- Canonical normative prose for REQ-130 exists — a `wire.md § REQ-130` section + a `REQ.md` registry row + the new numbering-policy band — authored via `sdd-specify` (Phase 0). Until then this DoR item is **pending**, not satisfied.
-- The change-type code table and the builder's normative surface live **once**, in REQ-130 (not duplicated in this plan).
-- The lifecycle-state placement question (above) is resolved in REQ-130.
-- PROBE-084 wire assertion defined in `conformance.md` (Draft).
+- `Covers:` names the REQ this plan implements (REQ-130) and the REQs it builds on. **Satisfied**, with the REQ-059 dependency dropped as mistaken (see § Open question, resolved).
+- Canonical normative prose for REQ-130 exists — a `wire.md § REQ-130` section + a `REQ.md` registry row + the numbering-policy band. **Satisfied** in Phase 0; the band row was already reserved, so only the allocation was needed.
+- The change-type code table and the builder's normative surface live **once**, in REQ-130 (not duplicated in this plan). **Satisfied** — this plan cites the table, the Go constants are its only other home.
+- The lifecycle-state placement question (above) is resolved in REQ-130. **Satisfied** from the vendored pin, no STRAND.
+- PROBE-084 wire assertion defined in `conformance.md`. **Satisfied** — Draft in Phase 0, Implemented (Sandbox) at close-out.
 
 ## Definition of Done
 
@@ -85,7 +85,7 @@ Implementation (Phase 1+) may start once **Phase 0 has landed REQ-130**:
 
 ### Phase 0 — Spec, numbering band & registry (the specify gate)
 
-The MUST bullets below are a **draft seed to author into REQ-130** — the canonical home is `wire.md`, not this plan.
+The MUST bullets below were the **draft seed authored into REQ-130** — they landed there in Phase 0, so read [wire.md § REQ-130](../../specifications/wire.md#req-130--contribution-builder), not this list, for the normative text. What shipped differs in two places: the lifecycle-state decision was made (not left open), and the server-assigned-field rule was added.
 
 **Tasks:**
 
