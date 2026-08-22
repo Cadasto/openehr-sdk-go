@@ -1,10 +1,16 @@
 package versionedprobes_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -12,6 +18,7 @@ import (
 	"github.com/cadasto/openehr-sdk-go/openehr/client/ehr/contribution"
 	"github.com/cadasto/openehr-sdk-go/openehr/rm"
 	"github.com/cadasto/openehr-sdk-go/smart/discovery"
+	"github.com/cadasto/openehr-sdk-go/testkit/fixtures"
 	probes "github.com/cadasto/openehr-sdk-go/testkit/probes/versioned"
 	"github.com/cadasto/openehr-sdk-go/transport"
 )
@@ -456,5 +463,281 @@ func TestProbe092ContributionGetRejectsMissingInputs(t *testing.T) {
 	}
 	if _, err := probes.Probe092ContributionGet(context.Background(), newClient(t, srv), nil, ehrIDFixture, "u", "m"); err == nil {
 		t.Error("nil recorder: expected an error")
+	}
+}
+
+// contributionCommitServer records the request body and answers a bare 201.
+func contributionCommitServer(captured *[]byte, plant []byte) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		if plant != nil {
+			b = plant
+		}
+		*captured = b
+		w.Header().Set("Location", "/ehr/"+string(ehrIDFixture)+"/contribution/cont-1")
+		w.WriteHeader(http.StatusCreated)
+	}))
+}
+
+// submissionCorpus loads the vendored submission corpus PROBE-084 uses as
+// its shape witness.
+func submissionCorpus(t *testing.T) [][]byte {
+	t.Helper()
+	paths, err := fixtures.ListSubmissionJSON()
+	if err != nil {
+		t.Fatalf("list submission corpus: %v", err)
+	}
+	if len(paths) == 0 {
+		t.Fatal("submission corpus is empty")
+	}
+	corpus := make([][]byte, 0, len(paths))
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		corpus = append(corpus, raw)
+	}
+	return corpus
+}
+
+func TestProbe084BuiltContributionBodyPass(t *testing.T) {
+	var captured []byte
+	srv := contributionCommitServer(&captured, nil)
+	defer srv.Close()
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Errorf("PROBE-084 status = %q detail=%q", r.Status, r.Detail)
+	}
+}
+
+// probe084Planted builds a `Contribution_create` body in the shape
+// PROBE-084's own batch produces, so a planted variant differs from the
+// real thing in exactly the one clause under test. Each version is
+// `{code, rmType, extra}`; `extra` injects the violation.
+type probe084Planted struct {
+	code   string
+	rmType string
+	extra  string
+}
+
+func probe084Body(batchCode string, versions ...probe084Planted) []byte {
+	audit := func(code string) string {
+		return `{"_type":"AUDIT_DETAILS","change_type":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","terminology_id":{"value":"openehr"},"code_string":"` + code + `"}}}`
+	}
+	out := make([]string, 0, len(versions))
+	for _, v := range versions {
+		s := `{"_type":"ORIGINAL_VERSION","commit_audit":` + audit(v.code) +
+			`,"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}}` +
+			`,"data":{"_type":"` + v.rmType + `"}`
+		if v.extra != "" {
+			s += "," + v.extra
+		}
+		out = append(out, s+"}")
+	}
+	return []byte(`{"audit":` + audit(batchCode) + `,"versions":[` + strings.Join(out, ",") + `]}`)
+}
+
+// TestProbe084BuiltContributionBodyRejects plants bodies that each violate
+// one REQ-130 clause, so a probe that stopped asserting a clause would fail
+// here rather than keep reporting green. Each case also names the substring
+// its Detail must carry: asserting only `status == "fail"` would let a case
+// rot into failing for an unrelated reason (a version-count change, say) and
+// still look like it was pinning its clause.
+func TestProbe084BuiltContributionBodyRejects(t *testing.T) {
+	const (
+		preceding1 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::1"}`
+		preceding2 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::2"}`
+		preceding4 = `"preceding_version_uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::4"}`
+		callerUID  = `"uid":{"value":"8849182c-82ad-4088-a07f-48ead4180515::cdr.example::3"}`
+	)
+	// The four versions PROBE-084's own batch emits, in order.
+	conformant := []probe084Planted{
+		{code: "249", rmType: "COMPOSITION"},
+		{code: "250", rmType: "COMPOSITION", extra: preceding1},
+		{code: "251", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID},
+		{code: "523", rmType: "FOLDER", extra: preceding4},
+	}
+	// mutate returns the conformant batch with one version replaced.
+	mutate := func(i int, v probe084Planted) []probe084Planted {
+		out := slices.Clone(conformant)
+		out[i] = v
+		return out
+	}
+	cases := []struct {
+		name       string
+		planted    []byte
+		wantDetail string
+	}{
+		{
+			name:       "batch change_type derived from a version",
+			planted:    probe084Body("249", conformant...),
+			wantDetail: "forbids deriving the batch code",
+		},
+		{
+			name:       "creation carries a preceding version",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: preceding1})...),
+			wantDetail: "a creation follows no version",
+		},
+		{
+			name:       "amendment lacks a preceding version",
+			planted:    probe084Body("253", mutate(1, probe084Planted{code: "250", rmType: "COMPOSITION"})...),
+			wantDetail: "missing preceding_version_uid",
+		},
+		{
+			name:       "wrong change-type code for the operation",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "250", rmType: "EHR_STATUS", extra: preceding2 + "," + callerUID})...),
+			wantDetail: `change_type code = "250", want "251"`,
+		},
+		{
+			name:       "payload type swapped",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "251", rmType: "COMPOSITION", extra: preceding2 + "," + callerUID})...),
+			wantDetail: "data._type = COMPOSITION, want EHR_STATUS",
+		},
+		{
+			// The counter-arm: a uid the caller DID supply must survive.
+			name:       "caller-supplied uid dropped",
+			planted:    probe084Body("253", mutate(2, probe084Planted{code: "251", rmType: "EHR_STATUS", extra: preceding2})...),
+			wantDetail: "dropped the caller-supplied `uid`",
+		},
+		{
+			name:       "lifecycle_state absent",
+			planted:    []byte(strings.Replace(string(probe084Body("253", conformant...)), `"lifecycle_state":{"_type":"DV_CODED_TEXT","defining_code":{"_type":"CODE_PHRASE","code_string":"532"}},`, "", 1)),
+			wantDetail: "lifecycle_state is missing",
+		},
+		{
+			name:       "server-assigned contribution emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"contribution":null`})...),
+			wantDetail: "emits the server-assigned `contribution`",
+		},
+		{
+			name:       "empty uid emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":{"value":""}`})...),
+			wantDetail: "whose caller supplied none",
+		},
+		{
+			// The arm that a "reject only an empty uid" reading would let
+			// through: REQ-130 forbids the builder synthesising a uid, so a
+			// non-empty one the caller never asked for must fail too.
+			name:       "synthesised non-empty uid",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":{"value":"invented::cdr.example::1"}`})...),
+			wantDetail: "whose caller supplied none",
+		},
+		{
+			// What dropping `omitempty` from the write-side uid field emits.
+			// A present-but-null key type-asserts like a missing one, so this
+			// is the arm that keeps absence judged on key presence.
+			name:       "null uid emitted",
+			planted:    probe084Body("253", mutate(0, probe084Planted{code: "249", rmType: "COMPOSITION", extra: `"uid":null`})...),
+			wantDetail: "absent rather than empty or null",
+		},
+		{
+			name:       "top-level CONTRIBUTION envelope",
+			planted:    []byte(`{"_type":"CONTRIBUTION",` + strings.TrimPrefix(string(probe084Body("253", conformant...)), "{")),
+			wantDetail: "Contribution_create has no class envelope",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured []byte
+			srv := contributionCommitServer(&captured, tc.planted)
+			defer srv.Close()
+			r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if r.Status != "fail" {
+				t.Errorf("PROBE-084 status = %q, want fail (detail=%q)", r.Status, r.Detail)
+			}
+			if !strings.Contains(r.Detail, tc.wantDetail) {
+				t.Errorf("PROBE-084 failed for the wrong reason:\n got: %s\nwant it to mention: %s", r.Detail, tc.wantDetail)
+			}
+		})
+	}
+}
+
+// updateGolden regenerates the checked-in PROBE-084 body golden.
+var updateGolden = flag.Bool("update", false, "update probe golden files")
+
+// TestProbe084BuiltBodyGolden is PROBE-084's byte-level pin: the exact
+// `Contribution_create` bytes the builder puts on the wire, field order
+// included. The vendored corpus cannot serve as this golden — its records
+// carry an envelope and payloads this SDK does not author — so the golden
+// is the SDK's own output, and a change to it is a reviewable wire change.
+func TestProbe084BuiltBodyGolden(t *testing.T) {
+	var captured []byte
+	srv := contributionCommitServer(&captured, nil)
+	defer srv.Close()
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, submissionCorpus(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "pass" {
+		t.Fatalf("PROBE-084 status = %q detail=%q", r.Status, r.Detail)
+	}
+	var pretty bytes.Buffer
+	if err := json.Indent(&pretty, captured, "", "  "); err != nil {
+		t.Fatalf("indent: %v", err)
+	}
+	pretty.WriteByte('\n')
+
+	golden := filepath.Join("testdata", "probe_084_built_body.json")
+	if *updateGolden {
+		if err := os.MkdirAll(filepath.Dir(golden), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(golden, pretty.Bytes(), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("read golden (run with -update): %v", err)
+	}
+	if !bytes.Equal(pretty.Bytes(), want) {
+		t.Errorf("built body != golden %s (run with -update to regenerate)", golden)
+	}
+}
+
+// TestProbe084BuiltContributionBodyCorpusArm proves the shape-witness arm
+// bites: a record carrying a version field this SDK cannot emit fails the
+// probe rather than passing unnoticed.
+func TestProbe084BuiltContributionBodyCorpusArm(t *testing.T) {
+	var captured []byte
+	srv := contributionCommitServer(&captured, nil)
+	defer srv.Close()
+	hostile := [][]byte{[]byte(`{"versions":[{"_type":"ORIGINAL_VERSION","invented_field":1}]}`)}
+	r, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, hostile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != "fail" {
+		t.Errorf("PROBE-084 status = %q, want fail on an unemittable version field (detail=%q)", r.Status, r.Detail)
+	}
+}
+
+// TestProbe084BuiltContributionBodyFrameworkMisuse separates "could not
+// run" from "the builder is wrong" — a missing input or an empty corpus is
+// an error, never a passing result (REQ-082).
+func TestProbe084BuiltContributionBodyFrameworkMisuse(t *testing.T) {
+	var captured []byte
+	srv := contributionCommitServer(&captured, nil)
+	defer srv.Close()
+	corpus := submissionCorpus(t)
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), nil, &captured, ehrIDFixture, corpus); err == nil {
+		t.Error("nil client: expected an error")
+	}
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), nil, ehrIDFixture, corpus); err == nil {
+		t.Error("nil recorder: expected an error")
+	}
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, "", corpus); err == nil {
+		t.Error("empty ehr id: expected an error")
+	}
+	if _, err := probes.Probe084BuiltContributionBody(context.Background(), newClient(t, srv), &captured, ehrIDFixture, nil); err == nil {
+		t.Error("empty corpus: expected an error")
 	}
 }

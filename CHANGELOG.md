@@ -12,6 +12,7 @@ Pre-1.0 (`v0.x`): only `### Added` is in use; fix-ups and dropped experiments fo
 
 ### Added
 
+- **Contribution builder (REQ-130, PROBE-084).** `contribution.Builder` assembles a `Contribution_create` body from per-operation changes; write-side version bodies stop emitting the server-assigned `contribution` and an empty `uid`.
 - **Write-result contract (REQ-094).** Callers distinguish a successful write with no body from a committed write whose representation is empty or unusable, via `HasResource` and `NoRepresentationError`; `contribution.Commit` no longer treats an empty 2xx representation as success.
 - **Toolchain pins.** golangci-lint v2.12.2 → v2.13.0, which carries the `modernize` analyzers forward with `golang.org/x/tools` 0.44 → 0.48, and the Go dev image 1.26.5 → 1.26.6; the `go.mod` floor stays `1.26.0`.
 
