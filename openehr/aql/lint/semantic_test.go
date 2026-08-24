@@ -769,3 +769,353 @@ func TestSemanticChecksSurviveALintOnlyDocument(t *testing.T) {
 		t.Errorf("Lint reported %v but LintString reported %v", viaDoc, viaString)
 	}
 }
+
+// --- the three portability advisories (REQ-161) -----------------------------
+//
+// aql_version_no_predicate (SPECPR-481), aql_versioned_object_unreferenced
+// (Discourse #14186), and aql_fanout_row_grain (SPECQUERY-9). Unlike the five
+// codes above, these are PORTABILITY warnings, not RM-correctness checks: the
+// AQL is legal and well-formed, but the openEHR QUERY specification leaves
+// the behaviour open, so a conformant CDR is free to differ. None of the
+// three may ever become an Error.
+
+const (
+	codeVersionNoPredicate          = "aql_version_no_predicate"
+	codeVersionedObjectUnreferenced = "aql_versioned_object_unreferenced"
+	codeFanoutRowGrain              = "aql_fanout_row_grain"
+)
+
+func portabilityCodes() []string {
+	return []string{codeVersionNoPredicate, codeVersionedObjectUnreferenced, codeFanoutRowGrain}
+}
+
+// req161Portability filters a result down to the three portability codes,
+// mirroring req161's role for the five containment codes — kept separate so a
+// test pinning "exactly this containment code" (or vice versa) is not
+// disturbed by the other group.
+func req161Portability(r lint.Result) []string {
+	var out []string
+	for _, i := range r.Issues {
+		if slices.Contains(portabilityCodes(), i.Code) {
+			out = append(out, i.Code)
+		}
+	}
+	return out
+}
+
+// TestVersionNoPredicateFires is REQ-161 § Checks / SPECPR-481: a bare
+// VERSION class expression — no version predicate at all — fires, as a
+// Warning, spanned on the VERSION class expression itself.
+func TestVersionNoPredicateFires(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT v FROM VERSION v"
+	r := lint.LintString(q, nil)
+	if got := req161Portability(r); !slices.Equal(got, []string{codeVersionNoPredicate}) {
+		t.Fatalf("portability codes = %v, want exactly [%s] (full result %v)", got, codeVersionNoPredicate, codes(r))
+	}
+	iss := r.Issues[slices.IndexFunc(r.Issues, func(i lint.Issue) bool { return i.Code == codeVersionNoPredicate })]
+	if iss.Severity != lint.Warning {
+		t.Errorf("severity = %v, want Warning", iss.Severity)
+	}
+	if want := classSpan(t, q, "VERSION", 1); iss.Span != want {
+		t.Errorf("span = %+v, want %+v (on the VERSION class expression)", iss.Span, want)
+	}
+	if iss.Path != "VERSION v" {
+		t.Errorf("path = %q, want %q", iss.Path, "VERSION v")
+	}
+	if iss.Detail == "" {
+		t.Error("carries no Detail")
+	}
+	if !r.OK() {
+		t.Error("a Warning-severity finding must not make Result.OK() false")
+	}
+}
+
+// TestVersionWithExplicitTierStaysSilent is the near-miss half of REQ-161's
+// § Checks wording: a VERSION expression that DOES carry [LATEST_VERSION] or
+// [ALL_VERSIONS] — the two spellings the spec names verbatim — raises
+// nothing. The lower-case spelling is included because the grammar's
+// version-predicate keywords are case-insensitive like every other AQL
+// keyword; it is still an explicit predicate, not an absent one.
+func TestVersionWithExplicitTierStaysSilent(t *testing.T) {
+	t.Parallel()
+	queries := []string{
+		"SELECT v FROM VERSION v[LATEST_VERSION]",
+		"SELECT v FROM VERSION v[ALL_VERSIONS]",
+		"SELECT v FROM VERSION v[all_versions]",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			t.Parallel()
+			if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
+				t.Errorf("%q raised %v, want silence", q, got)
+			}
+		})
+	}
+}
+
+// TestVersionedObjectUnreferencedFires is REQ-161 § Checks / Discourse
+// #14186: an operand whose class conforms to VERSIONED_OBJECT and whose
+// alias is never used outside FROM/CONTAINS fires; the identical query with
+// the SAME alias projected in SELECT (via a real path, not just the bare
+// alias — see [TestVersionedObjectBareAliasProjectionCountsAsReferenced] for
+// that variant) stays silent. The classes are taken from several of the ones
+// this check's own conformance question is true for — the same VERSIONED_*
+// containers openehr/aql/contain's acceptance tables ship
+// (VERSIONED_COMPOSITION, VERSIONED_FOLDER, VERSIONED_EHR_ACCESS,
+// VERSIONED_EHR_STATUS, VERSIONED_PARTY), not invented here.
+//
+// Each is used as a bare FROM root, deliberately with no CONTAINS chain: this
+// check is about alias usage, not containment reachability, and REQ-160's
+// own acceptance table records that the pinned RM does not admit every one
+// of these five as an EHR-contained descendant (EHR CONTAINS VERSIONED_PARTY
+// is a documented Never — the EHR IM versions no parties). Wrapping every row
+// in a container that is Never for one of the five would draw an UNRELATED
+// aql_impossible_containment Error and falsely fail this test's Result.OK()
+// assertion; the root position sidesteps that RM fact entirely, since it is
+// irrelevant to what this check is testing.
+func TestVersionedObjectUnreferencedFires(t *testing.T) {
+	t.Parallel()
+	for _, class := range []string{
+		"VERSIONED_COMPOSITION", "VERSIONED_FOLDER", "VERSIONED_EHR_ACCESS",
+		"VERSIONED_EHR_STATUS", "VERSIONED_PARTY",
+	} {
+		t.Run(class, func(t *testing.T) {
+			t.Parallel()
+			// SELECT 1 (a literal, not a path) keeps the query valid without
+			// binding a second alias — there is only one class in FROM, so
+			// any bound identifier other than a literal would have to be vo
+			// itself, which [TestVersionedObjectBareAliasProjectionCountsAsReferenced]
+			// establishes counts as a reference.
+			unreferenced := "SELECT 1 FROM " + class + " vo"
+			referenced := "SELECT vo/uid/value FROM " + class + " vo"
+
+			r := lint.LintString(unreferenced, nil)
+			if got := req161Portability(r); !slices.Equal(got, []string{codeVersionedObjectUnreferenced}) {
+				t.Fatalf("%q portability codes = %v, want exactly [%s] (full result %v)",
+					unreferenced, got, codeVersionedObjectUnreferenced, codes(r))
+			}
+			iss := r.Issues[slices.IndexFunc(r.Issues, func(i lint.Issue) bool { return i.Code == codeVersionedObjectUnreferenced })]
+			if iss.Severity != lint.Warning {
+				t.Errorf("severity = %v, want Warning", iss.Severity)
+			}
+			if want := classSpan(t, unreferenced, class, 1); iss.Span != want {
+				t.Errorf("span = %+v, want %+v (on the %s class expression)", iss.Span, want, class)
+			}
+			if iss.Path != class+" vo" {
+				t.Errorf("path = %q, want %q", iss.Path, class+" vo")
+			}
+			if iss.Detail == "" {
+				t.Error("carries no Detail")
+			}
+			if !r.OK() {
+				t.Error("a Warning-severity finding must not make Result.OK() false")
+			}
+
+			if got := req161Portability(lint.LintString(referenced, nil)); len(got) != 0 {
+				t.Errorf("%q raised %v, want silence (the alias is projected)", referenced, got)
+			}
+		})
+	}
+}
+
+// TestVersionedObjectAnonymousOperandFires pins that an ALIAS-LESS
+// VERSIONED_OBJECT-conforming operand (AQL's classExprOperand grammar makes
+// the alias optional) still fires: with no alias, no identified path
+// anywhere could possibly reference it, so REQ-161's "roots no identified
+// path" condition holds unconditionally rather than being vacuously exempt.
+func TestVersionedObjectAnonymousOperandFires(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT c FROM EHR e CONTAINS VERSIONED_COMPOSITION CONTAINS COMPOSITION c"
+	if got := req161Portability(lint.LintString(q, nil)); !slices.Equal(got, []string{codeVersionedObjectUnreferenced}) {
+		t.Fatalf("portability codes = %v, want exactly [%s]", got, codeVersionedObjectUnreferenced)
+	}
+}
+
+// TestVersionedObjectBareAliasProjectionCountsAsReferenced pins that
+// `SELECT vo` (the bare alias, no path segments) counts as referencing the
+// operand: the grammar's identifiedPath admits an alias with no object path,
+// so it is captured in [parse.Document.Paths] like any other identified
+// path, and selecting the operand's own default representation is squarely
+// NOT the redundant case REQ-161 names.
+func TestVersionedObjectBareAliasProjectionCountsAsReferenced(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT vo FROM EHR e CONTAINS VERSIONED_COMPOSITION vo"
+	if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
+		t.Errorf("%q raised %v, want silence (the bare alias is itself a SELECT reference)", q, got)
+	}
+}
+
+// TestVersionedObjectUsesConformanceNotNamePrefix is the task-brief's
+// load-bearing test for this check: the relation is asked a real conformance
+// question, never a `VERSIONED_` name-prefix guess. A class spelled to LOOK
+// like a VERSIONED_OBJECT descendant, but genuinely unknown to the relation,
+// stays silent for the portability code — a prefix-matching implementation
+// would have fired here — while the PRE-EXISTING aql_unknown_rm_class code
+// still fires, because the relation is total and answers UnknownClass for
+// any name it does not know, whatever the check under test does.
+func TestVersionedObjectUsesConformanceNotNamePrefix(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT c FROM EHR e CONTAINS VERSIONED_NOT_A_REAL_CLASS vf CONTAINS COMPOSITION c"
+	r := lint.LintString(q, nil)
+	if got := req161Portability(r); len(got) != 0 {
+		t.Errorf("portability codes = %v, want silence (VERSIONED_NOT_A_REAL_CLASS is unknown, not proven to conform)", got)
+	}
+	if !has(r, codeUnknownClass) {
+		t.Errorf("%s did not fire for an unknown class; full result %v", codeUnknownClass, codes(r))
+	}
+}
+
+// TestVersionedObjectUnknownClassStaysSilent pins the "unknown is not wrong"
+// half directly (REQ-161 § Flagging policy): an alias-less, unreferenced,
+// genuinely unknown class must not manufacture the portability code either —
+// unknown is unknown in both directions, not a default to "assume it fires".
+func TestVersionedObjectUnknownClassStaysSilent(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT c FROM EHR e CONTAINS FOO_BAR CONTAINS COMPOSITION c"
+	if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
+		t.Errorf("portability codes = %v, want silence", got)
+	}
+}
+
+// TestFanoutRowGrainFires is REQ-161 § Checks / SPECQUERY-9, decomposed
+// exactly per the spec's clauses: only an AND junction can fire; its leaves
+// are found by flattening nested AND junctions without descending into an
+// OR; it fires only when two or more of those leaves are each rooted by at
+// least one SELECT column; every other shape — OR junctions included — stays
+// silent. The two rows marked "near miss" are the exact pins REQ-161 names by
+// name: an AND junction with only one projected alias, and an OR junction
+// with two projected aliases, neither of which may fire.
+func TestFanoutRowGrainFires(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		query string
+		fires bool
+	}{
+		{
+			"AND junction, two projected aliases: fires",
+			"SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			true,
+		},
+		{
+			"near miss: AND junction, only one projected alias",
+			"SELECT o1 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			false,
+		},
+		{
+			"near miss: OR junction, two projected aliases",
+			"SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 OR OBSERVATION o2)",
+			false,
+		},
+		{
+			"AND junction, three projected aliases: fires (>= 2, not == 2)",
+			"SELECT a, b, c2 FROM COMPOSITION c CONTAINS (OBSERVATION a AND OBSERVATION b AND OBSERVATION c2)",
+			true,
+		},
+		{
+			"nested AND flattens: two projected aliases across the nesting fire",
+			"SELECT a, b FROM COMPOSITION c CONTAINS (OBSERVATION a AND (OBSERVATION b AND OBSERVATION c2))",
+			true,
+		},
+		{
+			"OR subtree under an AND contributes no leaves: its own projected " +
+				"members do not count towards the outer AND, which then has only one leaf",
+			"SELECT a, ob, c2 FROM COMPOSITION c CONTAINS (OBSERVATION a AND (OBSERVATION ob OR OBSERVATION c2))",
+			false,
+		},
+		{
+			"no containment junction at all",
+			"SELECT o FROM COMPOSITION c CONTAINS OBSERVATION o",
+			false,
+		},
+		{
+			"AND junction with no projected aliases at all",
+			"SELECT c FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)",
+			false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := req161Portability(lint.LintString(tc.query, nil))
+			fired := slices.Contains(got, codeFanoutRowGrain)
+			if fired != tc.fires {
+				t.Errorf("%q: %s fired = %v, want %v (portability codes: %v)", tc.query, codeFanoutRowGrain, fired, tc.fires, got)
+			}
+		})
+	}
+}
+
+// TestFanoutRowGrainDetailsAndSeverity pins the shape of the finding itself:
+// Warning severity, a Detail citing SPECQUERY-9 without adjudicating row
+// semantics, and a Span landing on one of the two offending operands (a
+// junction node itself carries no source position, so — unlike every other
+// REQ-161 code — there is no single "the" offending class expression; the
+// first projected leaf in document order is the anchor).
+func TestFanoutRowGrainDetailsAndSeverity(t *testing.T) {
+	t.Parallel()
+	const q = "SELECT o1, o2 FROM COMPOSITION c CONTAINS (OBSERVATION o1 AND OBSERVATION o2)"
+	r := lint.LintString(q, nil)
+	idx := slices.IndexFunc(r.Issues, func(i lint.Issue) bool { return i.Code == codeFanoutRowGrain })
+	if idx < 0 {
+		t.Fatalf("%s did not fire on %q; full result %v", codeFanoutRowGrain, q, codes(r))
+	}
+	iss := r.Issues[idx]
+	if iss.Severity != lint.Warning {
+		t.Errorf("severity = %v, want Warning", iss.Severity)
+	}
+	if iss.Span.IsZero() {
+		t.Error("span is zero; the finding must be attributable to one of its operands")
+	}
+	if want := classSpan(t, q, "OBSERVATION", 1); iss.Span != want {
+		t.Errorf("span = %+v, want %+v (the first projected leaf in document order)", iss.Span, want)
+	}
+	if !strings.Contains(iss.Detail, "engine-defined") {
+		t.Errorf("Detail = %q, want it to state that row multiplicity is engine-defined", iss.Detail)
+	}
+	if !r.OK() {
+		t.Error("a Warning-severity finding must not make Result.OK() false")
+	}
+}
+
+// TestFanoutRowGrainNeverFiresOnPairOnly pins the containment-check codes
+// above and the fanout advisory as genuinely INDEPENDENT: a plain adjacent
+// CONTAINS pair (no junction at all) never raises the fanout code, whatever
+// its own containment-check verdict is.
+func TestFanoutRowGrainNeverFiresOnPairOnly(t *testing.T) {
+	t.Parallel()
+	queries := []string{
+		"SELECT o, c FROM OBSERVATION o CONTAINS COMPOSITION c", // impossible pair
+		"SELECT o, c FROM EHR e CONTAINS COMPOSITION c CONTAINS OBSERVATION o",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			t.Parallel()
+			if got := req161Portability(lint.LintString(q, nil)); slices.Contains(got, codeFanoutRowGrain) {
+				t.Errorf("%q raised %s, want it absent (no junction present)", q, codeFanoutRowGrain)
+			}
+		})
+	}
+}
+
+// TestPortabilityChecksAreAdditive extends REQ-161 § Additivity to the three
+// portability codes: none of them may leak onto a query that carries none of
+// their defects.
+func TestPortabilityChecksAreAdditive(t *testing.T) {
+	t.Parallel()
+	queries := []string{
+		"SELECT o FROM OBSERVATION o CONTAINS COMPOSITION c",
+		"SELECT c FROM COMPOSITION c",
+		"SELECT c FROM COMPOSITION c CONTAINS (OBSERVATION o1 OR OBSERVATION o2)",
+		"SELECT v FROM VERSION v[LATEST_VERSION]",
+	}
+	for _, q := range queries {
+		t.Run(q, func(t *testing.T) {
+			t.Parallel()
+			if got := req161Portability(lint.LintString(q, nil)); len(got) != 0 {
+				t.Errorf("%q raised portability codes %v, want none", q, got)
+			}
+		})
+	}
+}

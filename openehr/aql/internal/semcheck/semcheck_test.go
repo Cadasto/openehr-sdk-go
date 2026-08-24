@@ -42,6 +42,13 @@ func TestSeverityOfIsTheOneCatalogue(t *testing.T) {
 		{semcheck.CodeUnknownRMClass, semcheck.Warning},
 		{semcheck.CodeContainmentByReference, semcheck.Warning},
 		{semcheck.CodeArchetypeClassMismatch, semcheck.Error},
+		// REQ-161's three portability codes: Warning ONLY, and MUST stay
+		// Warning — none of the three may ever become an Error (REQ-161
+		// § Flagging policy), since the openEHR QUERY specification leaves
+		// the underlying behaviour open.
+		{semcheck.CodeVersionNoPredicate, semcheck.Warning},
+		{semcheck.CodeVersionedObjectUnreferenced, semcheck.Warning},
+		{semcheck.CodeFanoutRowGrain, semcheck.Warning},
 	}
 	for _, tc := range cases {
 		t.Run(tc.code, func(t *testing.T) {
@@ -65,11 +72,14 @@ func TestSeverityOfIsTheOneCatalogue(t *testing.T) {
 func TestCodeSpellings(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
-		semcheck.CodeImpossibleContainment:  "aql_impossible_containment",
-		semcheck.CodeNotContainable:         "aql_contains_not_containable",
-		semcheck.CodeUnknownRMClass:         "aql_unknown_rm_class",
-		semcheck.CodeContainmentByReference: "aql_containment_by_reference",
-		semcheck.CodeArchetypeClassMismatch: "aql_archetype_class_mismatch",
+		semcheck.CodeImpossibleContainment:       "aql_impossible_containment",
+		semcheck.CodeNotContainable:              "aql_contains_not_containable",
+		semcheck.CodeUnknownRMClass:              "aql_unknown_rm_class",
+		semcheck.CodeContainmentByReference:      "aql_containment_by_reference",
+		semcheck.CodeArchetypeClassMismatch:      "aql_archetype_class_mismatch",
+		semcheck.CodeVersionNoPredicate:          "aql_version_no_predicate",
+		semcheck.CodeVersionedObjectUnreferenced: "aql_versioned_object_unreferenced",
+		semcheck.CodeFanoutRowGrain:              "aql_fanout_row_grain",
 	}
 	for got, want := range cases {
 		if got != want {

@@ -52,6 +52,37 @@ const (
 	// HRID type segment does not conform to the class it is attached to
 	// (REQ-161 § Checks, REQ-160 § Archetype/class conformance).
 	CodeArchetypeClassMismatch = "aql_archetype_class_mismatch"
+
+	// The three REQ-161 portability codes below are advisory: the query is
+	// legal and well-formed, but its behaviour is left open by the openEHR
+	// QUERY specification, so a conformant CDR is free to differ. None of the
+	// three may ever become an Error (REQ-161 § Flagging policy) — see
+	// [severities].
+
+	// CodeVersionNoPredicate marks a VERSION class expression carrying no
+	// version predicate at all: the default tier a bare VERSION resolves to
+	// is unspecified (SPECPR-481), so a portable query SHOULD state
+	// [LATEST_VERSION] or [ALL_VERSIONS] explicitly.
+	CodeVersionNoPredicate = "aql_version_no_predicate"
+	// CodeVersionedObjectUnreferenced marks an operand whose class conforms
+	// to VERSIONED_OBJECT (a conformance question, REQ-160 § Containable
+	// operands — never a `VERSIONED_` name-prefix guess) and whose alias
+	// roots no identified path outside FROM/CONTAINS: the step is redundant
+	// unless container-level attributes are read (Discourse #14186).
+	CodeVersionedObjectUnreferenced = "aql_versioned_object_unreferenced"
+	// CodeFanoutRowGrain marks an AND containment junction whose
+	// AND-flattened class-expression leaves (never descending into an OR
+	// junction) include two or more operands each projected by at least one
+	// SELECT column: what a result row IS when sibling containments multiply
+	// is an open specification question (SPECQUERY-9), so this is advisory
+	// only, and deliberately narrow. Unlike the other two portability codes,
+	// this one carries no RM question at all — no relation is consulted — so
+	// the firing rule lives entirely in the lint adapter
+	// (openehr/aql/lint/semantic.go), which is a pure walk of the parsed
+	// containment/SELECT shape; this package only holds its code spelling
+	// and severity, for the single reason every other code does (one
+	// catalogue, never two).
+	CodeFanoutRowGrain = "aql_fanout_row_grain"
 )
 
 // Severity is the REQ-161 severity of an issue code.
@@ -90,6 +121,12 @@ var severities = map[string]Severity{
 	CodeUnknownRMClass:         Warning,
 	CodeContainmentByReference: Warning,
 	CodeArchetypeClassMismatch: Error,
+	// The three portability codes are Warning ONLY: REQ-161 § Checks holds
+	// none of them may ever become an Error — the openEHR QUERY specification
+	// leaves the behaviour open, so a conformant CDR is free to differ.
+	CodeVersionNoPredicate:          Warning,
+	CodeVersionedObjectUnreferenced: Warning,
+	CodeFanoutRowGrain:              Warning,
 }
 
 // SeverityOf reports the REQ-161 severity of code, and whether code is in the

@@ -1,64 +1,99 @@
 package lint
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/internal/semcheck"
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/parse"
+	"github.com/cadasto/openehr-sdk-go/openehr/rm/rminfo"
 )
 
 // semanticIssues runs the Layer-2 semantic containment checks (REQ-161
 // § Checks): aql_unknown_rm_class and aql_contains_not_containable per class
 // expression, aql_impossible_containment and aql_containment_by_reference per
-// adjacent FROM/CONTAINS pair, and aql_archetype_class_mismatch (plus the
-// second arm of aql_unknown_rm_class) per literal archetype predicate. rel
-// may be nil (the REQ-160 default relation).
+// adjacent FROM/CONTAINS pair, aql_archetype_class_mismatch (plus the second
+// arm of aql_unknown_rm_class) per literal archetype predicate, and the three
+// REQ-161 portability advisories: aql_version_no_predicate (SPECPR-481),
+// aql_versioned_object_unreferenced (Discourse #14186), and
+// aql_fanout_row_grain (SPECQUERY-9). rel may be nil (the REQ-160 default
+// relation).
 //
 // This function is an ADAPTER, not a rule engine. Every verdict→code decision,
 // and the suppression rule between the operand codes and the pair codes, lives
 // in openehr/aql/internal/semcheck — shared verbatim with the write-side
 // builder verification, which REQ-162 § Contract holds to an identical code
-// multiset. What is added here is what only the read side has: the Span on the
+// multiset (a subset that the three portability advisories are NOT part of —
+// REQ-162 § Contract scopes read/write parity to the containment-check codes
+// alone). What is added here is what only the read side has: the Span on the
 // offending class expression, the Path spelling, and the severity lookup.
 //
-// It reads the STRUCTURED tree ([parse.Document.Query]), not the flat
-// [parse.Document.Classes]: the flat view is the FROM/CONTAINS tree collapsed to
-// document order and carries no nesting at all, so it cannot say which operands
-// are adjacent, which sit under a junction, or what is negated. A non-nil
-// [parse.Document.QueryErr] is deliberately NOT fatal here — the structured AST
-// is best-effort by contract (REQ-119), and a shape the extraction catalogue
-// dropped simply goes unchecked, which is the conservative direction.
+// The containment-pair checks read the STRUCTURED tree
+// ([parse.Document.Query]), not the flat [parse.Document.Classes]: the flat
+// view is the FROM/CONTAINS tree collapsed to document order and carries no
+// nesting at all, so it cannot say which operands are adjacent, which sit
+// under a junction, or what is negated. A non-nil [parse.Document.QueryErr]
+// is deliberately NOT fatal here — the structured AST is best-effort by
+// contract (REQ-119), and a shape the extraction catalogue dropped simply
+// goes unchecked, which is the conservative direction.
+//
+// aql_version_no_predicate and aql_versioned_object_unreferenced need none of
+// that nesting — each is scoped to a single class expression's own fields —
+// so they run unconditionally over the flat view, structured extraction
+// notwithstanding; only aql_fanout_row_grain, which asks about junction
+// SHAPE, is gated on a successful [parse.Document.Query] the same way the
+// containment-pair checks are.
 func semanticIssues(doc *parse.Document, rel *contain.Relation) []Issue {
-	q := doc.Query()
-	if q == nil {
-		return nil
-	}
-	c := containCheck{ck: semcheck.New(rel)}
-	from := q.From
+	ck := semcheck.New(rel)
+	var issues []Issue
 
-	// The FROM root participates: it is the ancestor of each of its direct
-	// CONTAINS children. RoleRoot, because the anchor of a containment tree is
-	// not itself a CONTAINS operand (REQ-161 § Checks).
-	root := c.operand(from.Root, semcheck.RoleRoot)
-	if from.Contains != nil {
-		// Reached from the root by a CONTAINS keyword, so the subtree starts in
-		// the contained position ([semcheck.Role.Next]).
-		c.walk(root, semcheck.RoleRoot.Next(semcheck.StepContains), *from.Contains)
+	// REQ-161 § Checks: pure per-class-expression checks, independent of
+	// containment nesting — see [versionPredicateIssues] and
+	// [versionedObjectIssues]. versionedObjectIssues takes no relation: the
+	// VERSIONED_OBJECT conformance question it asks is answered straight from
+	// the pinned BMM ([rminfo.Default]), not from rel — see that function's
+	// doc comment for why that is correct rather than a shortcut.
+	issues = append(issues, versionPredicateIssues(doc)...)
+	issues = append(issues, versionedObjectIssues(doc)...)
+
+	if q := doc.Query(); q != nil {
+		c := containCheck{ck: ck}
+		from := q.From
+
+		// The FROM root participates: it is the ancestor of each of its direct
+		// CONTAINS children. RoleRoot, because the anchor of a containment tree
+		// is not itself a CONTAINS operand (REQ-161 § Checks).
+		root := c.operand(from.Root, semcheck.RoleRoot)
+		if from.Contains != nil {
+			// Reached from the root by a CONTAINS keyword, so the subtree starts
+			// in the contained position ([semcheck.Role.Next]).
+			c.walk(root, semcheck.RoleRoot.Next(semcheck.StepContains), *from.Contains)
+		}
+		if from.Junction != nil {
+			// A junction AT the FROM root (`FROM A a OR B b`) leaves Root zero.
+			// Two consequences, both handled by what is passed in here rather
+			// than by a special case:
+			//
+			//   - its operands have no enclosing parent, so there is no pair to
+			//     ask about — the zero Operand says exactly that and suppresses
+			//     every pair;
+			//   - the junction OCCUPIES the root position, so its operands are
+			//     roots too. Passing RoleRoot (not RoleContained) is what makes
+			//     `FROM DV_TEXT t OR COMPOSITION c` answer the same as the
+			//     single root `FROM DV_TEXT t`: a root is a root in every
+			//     spelling.
+			c.walk(semcheck.Operand{}, semcheck.RoleRoot, *from.Junction)
+		}
+		issues = append(issues, c.issues...)
 	}
-	if from.Junction != nil {
-		// A junction AT the FROM root (`FROM A a OR B b`) leaves Root zero.
-		// Two consequences, both handled by what is passed in here rather than
-		// by a special case:
-		//
-		//   - its operands have no enclosing parent, so there is no pair to ask
-		//     about — the zero Operand says exactly that and suppresses every
-		//     pair;
-		//   - the junction OCCUPIES the root position, so its operands are
-		//     roots too. Passing RoleRoot (not RoleContained) is what makes
-		//     `FROM DV_TEXT t OR COMPOSITION c` answer the same as the single
-		//     root `FROM DV_TEXT t`: a root is a root in every spelling.
-		c.walk(semcheck.Operand{}, semcheck.RoleRoot, *from.Junction)
-	}
-	return c.issues
+
+	// aql_fanout_row_grain (REQ-161 § Checks, SPECQUERY-9) needs the
+	// structured junction tree, so [fanoutIssues] performs its own
+	// [parse.Document.Query] lookup and degrades to silence exactly like the
+	// pair walk above when structured extraction did not succeed.
+	issues = append(issues, fanoutIssues(doc)...)
+	return issues
 }
 
 // containCheck accumulates the semantic issues of one document.
@@ -207,4 +242,322 @@ func classToken(ce parse.ClassExpr) string {
 		return ce.RMType
 	}
 	return ce.RMType + " " + ce.Alias
+}
+
+// --- REQ-161 portability advisories -----------------------------------------
+//
+// The three checks below are portability warnings, not RM-correctness
+// checks: the AQL is legal and well-formed, but the openEHR QUERY
+// specification leaves its behaviour open, so a conformant CDR is free to
+// differ. None of the three may ever become an Error (REQ-161 § Checks).
+
+// versionPredicateIssues raises aql_version_no_predicate (REQ-161 § Checks;
+// [SPECPR-481](https://openehr.atlassian.net/browse/SPECPR-481)) for every
+// VERSION class expression carrying no version predicate at all: the tier a
+// bare VERSION defaults to is unspecified, so a portable query SHOULD state
+// [LATEST_VERSION] or [ALL_VERSIONS] explicitly.
+//
+// It fires on ABSENCE of any predicate ([parse.ClassExpr.HasPredicate]
+// false), never on which predicate is present — a VERSION carrying some
+// OTHER version predicate (a standing comparison the `versionPredicate`
+// grammar rule also admits) has already made an explicit choice, however it
+// spelled it, so REQ-161's "no version predicate" condition does not reach
+// it.
+//
+// This is a pure walk of the flat [parse.Document.Classes]: the code is
+// scoped to a single class expression's own fields, needs no containment
+// nesting, and so needs no [contain.Relation] either.
+func versionPredicateIssues(doc *parse.Document) []Issue {
+	var issues []Issue
+	for _, ce := range doc.Classes {
+		if !ce.Version || ce.HasPredicate {
+			continue
+		}
+		issues = append(issues, Issue{
+			Code: semcheck.CodeVersionNoPredicate,
+			Path: classToken(ce),
+			Detail: "VERSION class expression carries no version predicate; the tier it defaults to is " +
+				"unspecified (SPECPR-481), so a portable query SHOULD state [LATEST_VERSION] or " +
+				"[ALL_VERSIONS] explicitly",
+			Severity: severityOf(semcheck.CodeVersionNoPredicate),
+			// ce.Pos starts at the VERSION keyword itself (parse/ast.go's
+			// EnterVersionClassExpr), so the span covers the class expression,
+			// not its alias or predicate.
+			Span: spanOfText(ce.Pos, ce.RMType),
+		})
+	}
+	return issues
+}
+
+// versionedObjectIssues raises aql_versioned_object_unreferenced (REQ-161
+// § Checks; [Discourse #14186](https://discourse.openehr.org/t/aql-versionedobject-grammar/14186))
+// for every class expression whose class conforms to VERSIONED_OBJECT — a
+// conformance question, never a `VERSIONED_` name-prefix guess — and whose
+// alias roots no identified path anywhere outside FROM/CONTAINS.
+//
+// The conformance question is asked directly of [rminfo.Default]
+// ([conformsToVersionedObject]), not through a [*contain.Relation]. That is
+// deliberate, not a shortcut: every [*contain.Relation] a caller can obtain —
+// [contain.Default] and every [contain.Relation.WithOverlay] copy of it —
+// carries the SAME [rminfo.Lookup] underneath (WithOverlay copies it
+// unchanged; the package's only other constructor, `build`, is unexported),
+// so there is no caller-suppliable relation this function could consult
+// instead that would ever answer differently. An overlay edge states a
+// containment ROUTE fact (REQ-160 § Extensibility) — never an IS-A fact — so
+// it has nothing to say about VERSIONED_OBJECT conformance either way, and a
+// relation parameter here would be decorative.
+//
+// [parse.Document.Paths] already IS "outside FROM/CONTAINS": an identified
+// path only ever occurs in SELECT, WHERE, or ORDER BY
+// ([parse.clauseOf] recognises exactly those three); a FROM/CONTAINS class
+// predicate is a relative, alias-less object path
+// ([parse.ClassExpr.PredicateComparison]'s doc comment), never an
+// [parse.IdentifiedPath]. So checking whether the alias appears as any
+// path's root there IS the whole "outside FROM/CONTAINS" test — no separate
+// exclusion of FROM/CONTAINS itself is needed.
+//
+// An anonymous operand (no alias at all — AQL's `classExprOperand` grammar
+// makes the alias optional) is INCLUDED, not skipped: with no alias, no path
+// anywhere can possibly reference it, so "roots no identified path" holds
+// unconditionally, and the redundancy the code names is if anything more
+// certain, not less.
+//
+// When the class is not one the pinned BMM knows, [conformsToVersionedObject]
+// answers false exactly as it would for a genuine non-conformance, and this
+// function stays silent either way — REQ-161 § Flagging policy: unknown is
+// not wrong, so a class the BMM cannot place must not be treated as proof of
+// anything.
+func versionedObjectIssues(doc *parse.Document) []Issue {
+	referenced := make(map[string]bool, len(doc.Paths))
+	for _, p := range doc.Paths {
+		referenced[p.Alias] = true
+	}
+	var issues []Issue
+	for _, ce := range doc.Classes {
+		if ce.RMType == "" || !conformsToVersionedObject(ce.RMType) {
+			continue
+		}
+		if ce.Alias != "" && referenced[ce.Alias] {
+			continue
+		}
+		issues = append(issues, Issue{
+			Code:     semcheck.CodeVersionedObjectUnreferenced,
+			Path:     classToken(ce),
+			Detail:   versionedObjectDetail(ce),
+			Severity: severityOf(semcheck.CodeVersionedObjectUnreferenced),
+			Span:     spanOfText(ce.Pos, ce.RMType),
+		})
+	}
+	return issues
+}
+
+// conformsToVersionedObject reports whether rmType's class conforms to
+// VERSIONED_OBJECT under the pinned RM ([rminfo.Default]) — REQ-160
+// § Containable operands names the concept; this is the one place in the
+// lint package that asks it directly rather than through
+// [*contain.Relation], for the reason [versionedObjectIssues] explains.
+// Unknown classes and known-but-non-conforming classes both answer false;
+// REQ-161 § Flagging policy forbids treating an unknown name as proof of
+// anything, so the caller must not, and does not need to, tell the two
+// apart.
+//
+// rmType is folded ASCII a-z → A-Z before the lookup: [rminfo.Hierarchy]'s
+// map is keyed by the BMM's exact spelling, unlike [*contain.Relation] (which
+// folds internally), so this function folds locally to keep this check's
+// case-insensitivity consistent with every other REQ-161 code.
+// strings.ToUpper is deliberately not used — its Unicode fold can map some
+// non-ASCII letters INTO the ASCII alphabet (e.g. 'ı' → 'I'), which would let
+// a token that is not a valid RM identifier at all masquerade as one; RM
+// class names are ASCII-only, so only ASCII needs folding.
+//
+// The [rminfo.Hierarchy] type assertion cannot fail against [rminfo.Default]
+// (compile-time-checked in that package), but is checked anyway rather than
+// asserted blindly — REQ-025: library code must not panic on caller input,
+// and "caller input" here is broad enough to include however this function
+// might be reached.
+func conformsToVersionedObject(rmType string) bool {
+	h, ok := rminfo.Default.(rminfo.Hierarchy)
+	if !ok {
+		return false
+	}
+	conf, known := h.ConformsTo(asciiUpperRMType(rmType), "VERSIONED_OBJECT")
+	return known && conf
+}
+
+// asciiUpperRMType folds only ASCII a-z to A-Z, leaving every other byte
+// untouched — see [conformsToVersionedObject]'s doc comment for why
+// strings.ToUpper is not used here.
+func asciiUpperRMType(s string) string {
+	b := []byte(s)
+	changed := false
+	for i, c := range b {
+		if c >= 'a' && c <= 'z' {
+			b[i] = c - ('a' - 'A')
+			changed = true
+		}
+	}
+	if !changed {
+		return s
+	}
+	return string(b)
+}
+
+// versionedObjectDetail names the offending alias, spelling an anonymous
+// operand explicitly rather than leaving the sentence read as if an alias
+// were merely omitted from the message.
+func versionedObjectDetail(ce parse.ClassExpr) string {
+	alias := ce.Alias
+	if alias == "" {
+		alias = "(anonymous)"
+	}
+	return fmt.Sprintf("%s conforms to VERSIONED_OBJECT but its alias %s roots no identified path outside "+
+		"FROM/CONTAINS; the step is redundant unless container-level attributes are read (Discourse #14186)",
+		ce.RMType, alias)
+}
+
+// fanoutIssues raises aql_fanout_row_grain (REQ-161 § Checks;
+// [SPECQUERY-9](https://openehr.atlassian.net/browse/SPECQUERY-9)) — the
+// SDK's one deliberately narrow row-semantics-ADJACENT advisory. What a
+// result row IS when sibling containments multiply has been an open
+// specification question for years and engines still diverge; this check
+// warns that the shape exists, and never adjudicates, dedupes, zips, or
+// refuses on the strength of it (plan § The big picture).
+//
+// It fires once per AND containment junction whose AND-flattened
+// class-expression leaves ([andFrontier]) include two or more operands each
+// projected by at least one SELECT column. Per REQ-161 § Checks, verbatim,
+// three clauses:
+//
+//   - only an AND junction can fire it — an OR junction (or any junction
+//     that is not AND) never fires, however many of ITS operands are
+//     projected: "alternation selects rows, it does not multiply them";
+//   - the counted leaves are found by flattening nested AND junctions,
+//     WITHOUT descending into an OR junction — an OR subtree contributes NO
+//     leaves to its enclosing AND;
+//   - "projected" means the leaf's alias roots at least one SELECT column,
+//     checked against [parse.Document.Paths] tagged [parse.ClauseSelect] —
+//     the same source [versionedObjectIssues] reads for "outside
+//     FROM/CONTAINS", here filtered to one clause rather than excluding one.
+//
+// This is a pure [parse.Document] walk: no [contain.Relation] is consulted —
+// whether two operands' aliases are both SELECT-projected is not an RM
+// question, and the containment SHAPE this check reads is a structural fact
+// of the parsed query, not a containability verdict.
+func fanoutIssues(doc *parse.Document) []Issue {
+	q := doc.Query()
+	if q == nil {
+		return nil
+	}
+	projected := make(map[string]bool)
+	for _, p := range doc.Paths {
+		if p.Clause == parse.ClauseSelect {
+			projected[p.Alias] = true
+		}
+	}
+	var issues []Issue
+	var walk func(n parse.Containment)
+	walk = func(n parse.Containment) {
+		if !isJunction(n) {
+			for _, ch := range n.Children {
+				walk(ch)
+			}
+			return
+		}
+		if n.ChildJoin != parse.ContainsAnd {
+			// An OR (or any non-AND) junction never fires itself, but one of
+			// its operands may hide its own AND junction, at any depth.
+			for _, ch := range n.Children {
+				walk(ch)
+			}
+			return
+		}
+		leaves, boundary := andFrontier(n)
+		if found := fanoutFinding(leaves, projected); found != nil {
+			issues = append(issues, *found)
+		}
+		// andFrontier already consumed every nested-AND descendant in full —
+		// re-walking leaves or boundary as a plain child list would double-
+		// count the SAME junction. What it did NOT explore is each leaf's own
+		// onward CONTAINS chain (a deeper containment step, not a sibling of
+		// THIS junction) and each excluded OR subtree (which may hide its own,
+		// independent, AND junction) — both are walked here, so no AND
+		// junction anywhere in the tree goes unchecked, and none is checked
+		// twice.
+		for _, leaf := range leaves {
+			for _, ch := range leaf.Children {
+				walk(ch)
+			}
+		}
+		for _, b := range boundary {
+			walk(b)
+		}
+	}
+	if q.From.Contains != nil {
+		walk(*q.From.Contains)
+	}
+	if q.From.Junction != nil {
+		walk(*q.From.Junction)
+	}
+	return issues
+}
+
+// andFrontier flattens n's nested-AND structure — n MUST be an AND junction
+// (checked by the caller). leaves are the class-expression operands reached
+// without crossing a non-AND junction (REQ-161's flattening rule, applied
+// regardless of how deep the AND-only nesting runs — same-operator junctions
+// arrive pre-flattened by the extractor already, REQ-117, but this recurses
+// regardless so a hand-built or future unflattened AST is handled
+// identically). boundary is every node the flatten explicitly did NOT
+// explore: a non-AND (OR) child, returned whole so the caller can look for
+// an AND junction nested inside it independently — it contributes nothing to
+// THIS junction's leaves, but it is not silently dropped either.
+func andFrontier(n parse.Containment) (leaves, boundary []parse.Containment) {
+	if !isJunction(n) {
+		return []parse.Containment{n}, nil
+	}
+	if n.ChildJoin != parse.ContainsAnd {
+		return nil, []parse.Containment{n}
+	}
+	for _, ch := range n.Children {
+		l, b := andFrontier(ch)
+		leaves = append(leaves, l...)
+		boundary = append(boundary, b...)
+	}
+	return leaves, boundary
+}
+
+// fanoutFinding builds the aql_fanout_row_grain [Issue] for one AND
+// junction's leaves, or nil when fewer than two are SELECT-projected —
+// REQ-161's ">= 2" threshold, the exact boundary the near-miss pin (one
+// projected alias) must not cross.
+//
+// The Span lands on the FIRST (document-order) projected leaf: a fan-out
+// finding is a joint property of two or more operands together, so — unlike
+// every other REQ-161 code — there is no single offending class expression
+// to blame; the first one a reader would meet in the source is the most
+// useful anchor, and Path/Detail name every projected leaf, not just it.
+func fanoutFinding(leaves []parse.Containment, projectedAliases map[string]bool) *Issue {
+	var hits []parse.ClassExpr
+	for _, leaf := range leaves {
+		if leaf.Class.Alias != "" && projectedAliases[leaf.Class.Alias] {
+			hits = append(hits, leaf.Class)
+		}
+	}
+	if len(hits) < 2 {
+		return nil
+	}
+	tokens := make([]string, len(hits))
+	for i, ce := range hits {
+		tokens[i] = classToken(ce)
+	}
+	joined := strings.Join(tokens, ", ")
+	return &Issue{
+		Code: semcheck.CodeFanoutRowGrain,
+		Path: joined,
+		Detail: fmt.Sprintf("this AND containment step has %d SELECT-projected sibling operands (%s); row "+
+			"multiplicity for this shape is engine-defined (SPECQUERY-9) — verify the result shape against "+
+			"the target CDR", len(hits), joined),
+		Severity: severityOf(semcheck.CodeFanoutRowGrain),
+		Span:     spanOfText(hits[0].Pos, hits[0].RMType),
+	}
 }
