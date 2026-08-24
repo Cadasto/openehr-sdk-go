@@ -41,6 +41,33 @@ func TestReferenceAttributesTerminateReachability(t *testing.T) {
 	}
 }
 
+// TestLocatableDeclaredAttributesExcludedFromReachability pins the REQ-160 §
+// Reachability semantics housekeeping rule: an attribute whose DeclaredOn site
+// is LOCATABLE or PATHABLE MUST NOT be a containment edge. On the pinned BMM
+// the real case is ELEMENT → CLUSTER via feeder_audit; a synthetic model
+// isolates the guard so disabling isInfrastructureAttr would admit a spurious
+// route and pass the acceptance table while violating the spec MUST.
+func TestLocatableDeclaredAttributesExcludedFromReachability(t *testing.T) {
+	lk := rminfo.New(map[string]rminfo.ClassMeta{
+		"LOCATABLE": {Abstract: true},
+		"ELEMENT": {
+			Parents: []string{"LOCATABLE"},
+			Attributes: map[string]rminfo.AttrMeta{
+				"feeder_audit": {TypeName: "CLUSTER", DeclaredIn: "LOCATABLE"},
+			},
+			AttrOrder: []string{"feeder_audit"},
+		},
+		"CLUSTER": {Parents: []string{"LOCATABLE"}},
+	})
+	r := build(lk, nil)
+	if got := r.Containable("ELEMENT"); got != Admissible {
+		t.Fatalf("Containable(ELEMENT) = %v, want Admissible (synthetic model wiring broken)", got)
+	}
+	if got := r.CanContain("ELEMENT", "CLUSTER"); got != Never {
+		t.Errorf("CanContain(ELEMENT, CLUSTER) = %v, want Never (LOCATABLE-declared attributes must not be containment edges)", got)
+	}
+}
+
 // lookupOnly hides rminfo.Default's optional capability interfaces: interface
 // embedding promotes only the Lookup methods, so the wrapper satisfies neither
 // rminfo.Hierarchy nor rminfo.AttributeLister.
