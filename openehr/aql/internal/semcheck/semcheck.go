@@ -370,16 +370,25 @@ func (c Checker) Pair(ancestor, descendant Operand) []contain.Finding {
 //   - Otherwise, [contain.Never] (a genuine mismatch between two known
 //     classes) → [CodeArchetypeClassMismatch] (Error): the query can never
 //     match.
-//   - Otherwise, [contain.UnknownClass] from ArchetypeMatches itself — the
-//     HRID is unparseable, or its type segment names a class the relation
-//     does not know, while the declared class IS known — →
-//     [CodeUnknownRMClass] (Warning). This is the "second arm" of that code:
-//     the same code as the class-token arm, but firing for a different
-//     reason (the archetype side, not the declared class), still exactly
-//     once per class expression. Which of the two archetype-side causes
-//     applies is deliberately NOT distinguished in the Detail text below:
-//     ArchetypeMatches collapses both into one verdict, and telling them
-//     apart would mean re-deriving the HRID shape ourselves.
+//   - Otherwise, [contain.UnknownClass] from ArchetypeMatches itself. This
+//     verdict has THREE live causes, only two of them archetype-side: the
+//     HRID's type segment names a class the relation does not know; the
+//     HRID is unparseable; or — declared-class-side — rmType passed the
+//     suppression check above (it IS [contain.Admissible] under
+//     [contain.Relation.Containable]) yet ArchetypeMatches still cannot
+//     resolve it in the pinned BMM. That third case is the overlay-only
+//     class: one the relation knows solely as an overlay-edge endpoint,
+//     which Containable admits but ArchetypeMatches's BMM-only resolution
+//     does not consult. (A fourth combination — rmType unknown to BOTH
+//     Containable and the BMM — never reaches this branch: it is caught by
+//     the suppression check above, and already reported by the class-token
+//     arm.) → [CodeUnknownRMClass] (Warning). This is the "second arm" of
+//     that code: the same code as the class-token arm, but firing for a
+//     different reason, still exactly once per class expression. Which of
+//     the three causes applies is deliberately NOT distinguished in the
+//     Detail text below: ArchetypeMatches collapses all of them into one
+//     verdict, and the Detail is worded to stay true regardless of which
+//     one applies.
 //   - [contain.Admissible] → no finding.
 //
 // An empty rmType names nothing (mirrors [Checker.Operand]: a degenerate
@@ -406,11 +415,10 @@ func (c Checker) Archetype(rmType, archetypeID string) []contain.Finding {
 	case contain.UnknownClass:
 		return []contain.Finding{{
 			Code: CodeUnknownRMClass,
-			Detail: fmt.Sprintf("archetype %s cannot be checked against declared class %s:"+
-				" its type segment is not a class the relation knows, or the archetype id is"+
-				" not a well-formed HRID; unknown is not wrong — a future RM release, a"+
-				" demographic deployment, or a dialect may still define the type,"+
-				" or the id may simply need correcting", archetypeID, rmType),
+			Detail: fmt.Sprintf("archetype %s's conformance to declared class %s cannot be"+
+				" decided from the pinned RM, so it is unchecked; unknown is not wrong — a"+
+				" future RM release, a demographic deployment, or a dialect may define the"+
+				" names involved, and a malformed archetype id would land here too", archetypeID, rmType),
 		}}
 	case contain.Admissible, contain.ByReference:
 		return nil // ByReference is unreachable: ArchetypeMatches never returns it

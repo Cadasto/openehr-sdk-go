@@ -14,6 +14,7 @@ package semcheck_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/cadasto/openehr-sdk-go/openehr/aql/contain"
@@ -491,8 +492,25 @@ func TestOverlayRelationRetiresFindings(t *testing.T) {
 	// ArchetypeMatches's own resolve-based notion of "known" would flip this
 	// row to total silence while every other test stays green — this row
 	// exists to catch exactly that regression.
-	if got := codesOf(ck.Archetype("FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1")); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
+	overlayFindings := ck.Archetype("FOO_BAR", "openEHR-EHR-OBSERVATION.blood_pressure.v1")
+	if got := codesOf(overlayFindings); !slices.Equal(got, []string{semcheck.CodeUnknownRMClass}) {
 		t.Errorf("Archetype(FOO_BAR, ...) over the overlay = %v, want exactly [%s]", got, semcheck.CodeUnknownRMClass)
+	}
+	// Pin the Detail wording itself, not just the code: this is the overlay-only
+	// case fix-round Important 1 exists for — the declared class (FOO_BAR) IS
+	// known to Containable (via the overlay) and the HRID IS well-formed with a
+	// known type segment (OBSERVATION), so a Detail naming either "its type
+	// segment is not a class the relation knows" or "the archetype id is not a
+	// well-formed HRID" (the old, superseded wording) would be false for this
+	// case. The cause-neutral phrase below is true regardless of which of the
+	// three live causes applies, so it must survive here specifically.
+	const wantSubstring = "cannot be decided from the pinned RM"
+	if len(overlayFindings) != 1 || !strings.Contains(overlayFindings[0].Detail, wantSubstring) {
+		detail := ""
+		if len(overlayFindings) == 1 {
+			detail = overlayFindings[0].Detail
+		}
+		t.Errorf("Archetype(FOO_BAR, ...) Detail = %q, want it to contain %q", detail, wantSubstring)
 	}
 }
 
