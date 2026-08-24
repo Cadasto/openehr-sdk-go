@@ -64,9 +64,11 @@ func TestCanContainAcceptanceTable(t *testing.T) {
 		{"DV_TEXT", "FOO_BAR", contain.UnknownClass},
 	}
 	for _, c := range cases {
-		if got := r.CanContain(c.ancestor, c.descendant); got != c.want {
-			t.Errorf("CanContain(%q, %q) = %v, want %v", c.ancestor, c.descendant, got, c.want)
-		}
+		t.Run(c.ancestor+" CONTAINS "+c.descendant, func(t *testing.T) {
+			if got := r.CanContain(c.ancestor, c.descendant); got != c.want {
+				t.Errorf("CanContain(%q, %q) = %v, want %v", c.ancestor, c.descendant, got, c.want)
+			}
+		})
 	}
 }
 
@@ -92,9 +94,11 @@ func TestContainable(t *testing.T) {
 		{"FOO_BAR", contain.UnknownClass},
 	}
 	for _, c := range cases {
-		if got := r.Containable(c.class); got != c.want {
-			t.Errorf("Containable(%q) = %v, want %v", c.class, got, c.want)
-		}
+		t.Run(c.class, func(t *testing.T) {
+			if got := r.Containable(c.class); got != c.want {
+				t.Errorf("Containable(%q) = %v, want %v", c.class, got, c.want)
+			}
+		})
 	}
 }
 
@@ -204,9 +208,11 @@ func TestVerdictString(t *testing.T) {
 		{contain.Verdict(42), "Verdict(42)"},
 	}
 	for _, c := range cases {
-		if got := c.v.String(); got != c.want {
-			t.Errorf("Verdict(%d).String() = %q, want %q", int(c.v), got, c.want)
-		}
+		t.Run(c.want, func(t *testing.T) {
+			if got := c.v.String(); got != c.want {
+				t.Errorf("Verdict(%d).String() = %q, want %q", int(c.v), got, c.want)
+			}
+		})
 	}
 }
 

@@ -27,8 +27,10 @@ func TestArchetypeMatches(t *testing.T) {
 		{"case-insensitive declared", "entry", "openEHR-EHR-OBSERVATION.x.v1", contain.Admissible},
 	}
 	for _, c := range cases {
-		if got := r.ArchetypeMatches(c.rmType, c.hrid); got != c.want {
-			t.Errorf("%s: ArchetypeMatches(%q, %q) = %v, want %v", c.name, c.rmType, c.hrid, got, c.want)
-		}
+		t.Run(c.name, func(t *testing.T) {
+			if got := r.ArchetypeMatches(c.rmType, c.hrid); got != c.want {
+				t.Errorf("ArchetypeMatches(%q, %q) = %v, want %v", c.rmType, c.hrid, got, c.want)
+			}
+		})
 	}
 }
